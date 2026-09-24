@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T16:52:23.032Z · model: claude-opus-5 · open: 840_
+_Last sequenced: 2026-09-24T16:57:44.615Z · model: claude-opus-5 · open: 839_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,8 +13,6 @@ _Last sequenced: 2026-09-24T16:52:23.032Z · model: claude-opus-5 · open: 840_
 | 8 | PAN-3931 | S | medium | ok |  |  | Peer dashboards still mark primary conversations ended, write agent state and durable events; gate on isPeerDashboardProcess per site |
 | 9 | PAN-3924 | S | medium | ok |  |  | pipeline-membership: gh graphql failure drops stderr and toasts; retry once; listProjectTrackerIssues blind to GitHub-tracked projects |
 | 11 | PAN-3929 | S | medium | ok |  |  | Five SKILL.md files still tell agents to read deleted status fields; rewrite to the derived model and widen the guard's Markdown patterns |
-| 12 | PAN-3927 | S | medium | ok |  |  | lint-prompts.sh still requires the deleted pan inspect verb in the work item loop; rewrite the rule and the three prompts together |
-| 14 | PAN-3932 | XS | low | ok |  |  | AutoMergeToggle is read-only post-cut; make it set/clear the auto-merge label or explain the label in the tooltip |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 16 | PAN-3928 | XS | low | ok |  |  | pan start prints a tmux attach hint for Herdr panes; print backend, pane id and the Herdr attach command |
 | 17 | PAN-3982 | M | medium | ok |  |  | Palette hits 404: PAN-3950 dropped the unregistered-session fallback; subagent transcripts index as agent-* with no row |
@@ -68,6 +66,7 @@ _Last sequenced: 2026-09-24T16:52:23.032Z · model: claude-opus-5 · open: 840_
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
+| 82 | PAN-4074 | XS | high | ok |  |  | Reconnect banner sticks forever after a restart; heartbeats cancel the retry. Fix is already up in PR #4075 — needs merge, not a worker. |
 | 83 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 84 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 85 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -206,6 +205,7 @@ _Last sequenced: 2026-09-24T16:52:23.032Z · model: claude-opus-5 · open: 840_
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 221 | PAN-4052 | M | high | ok |  |  | Metrics cost panels, specialist run and handoff logs and the boot stamp have live readers but no writer post-Cut; restore or delete each |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
+| 223 | PAN-4077 | S | medium | ok |  |  | Four post-cut follow-ups with file paths: async project-path containment, Herdr-wrong tmux tooltip, stale planning prompt, Codex noise. |
 | 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
@@ -516,7 +516,6 @@ _Last sequenced: 2026-09-24T16:52:23.032Z · model: claude-opus-5 · open: 840_
 | 538 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
 | 539 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
 | 540 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 541 | PAN-4059 | S | medium | ok |  |  | Leftovers from the #4002 suffix rename: a stale Promise suffix, three same-named export pairs, and stale codebase-context docs. |
 | 542 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
 | 543 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
 | 544 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
@@ -880,14 +879,6 @@ In pipeline — rank pinned.
 
 In pipeline — rank pinned.
 
-### PAN-3927 (rank 12)
-
-In pipeline — rank pinned.
-
-### PAN-3932 (rank 14)
-
-In pipeline — rank pinned.
-
 ### PAN-3930 (rank 15)
 
 In pipeline — rank pinned.
@@ -1100,6 +1091,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4074 (rank 82)
+
+New since the prior run and fully root-caused in the body: EventRouter sets reconnecting=true, only a successful snapshot bootstrap clears it, and handleEvent() cancelled the pending retry on every domain event — heartbeats included — so a recovered stream permanently suppressed the recovery it was proving unnecessary. The operator's live tab then shows 'Connection lost — reconnecting…' until a manual page load. Ranked high because it silently blinds the primary operator surface after every pan reload, but placed at 82 rather than the top tier because the fix already exists on fix/terminal-reconnect-after-restart with PR #4075 open and CI running: the remaining work is merge, not implementation, and a worker spawned here would duplicate landed code.
+
 ### PAN-3096 (rank 83)
 
 New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
@@ -1168,6 +1163,10 @@ Planning finalizes (issue->planned) but the work agent never auto-spawns — sil
 
 Rank held at 99. resolveBootGates is only called from restart.ts; reload and the post-merge deploy path relaunch with no OVERDECK_* gate env, so deacon-lite is silently off after most deploys. The related PAN-3898 closed as obsolete after the cut, so that cross-reference is dropped; nothing in the boot-gate defect depended on it.
 
+### PAN-3811 (rank 100)
+
+New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts shelling straight to docker builder prune --all --force, with no BuildKit bytes in the canonical inventory, no candidate through the resource reclaim door and no age or size floor. The partial strike is a fine urgent backstop, but closing PAN-3809 on it would quietly drop requirements 1-3. Ranked directly behind its parent so the completion work is not forgotten once the emergency lands. Dropped dependsOn PAN-3809 (closed since the prior run).
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1175,10 +1174,10 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T16:52:23.032Z",
+  "generatedAt": "2026-09-24T16:57:44.615Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 840,
+  "openCount": 839,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1280,32 +1279,6 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "condition": "ok",
       "dependsOn": [],
       "why": "Five SKILL.md files still tell agents to read deleted status fields; rewrite to the derived model and widen the guard's Markdown patterns",
-      "rationale": "In pipeline — rank pinned.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3927",
-      "rank": 12,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "lint-prompts.sh still requires the deleted pan inspect verb in the work item loop; rewrite the rule and the three prompts together",
-      "rationale": "In pipeline — rank pinned.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3932",
-      "rank": 14,
-      "size": "XS",
-      "importance": "low",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "AutoMergeToggle is read-only post-cut; make it set/clear the auto-merge label or explain the label in the tooltip",
       "rationale": "In pipeline — rank pinned.",
       "gate": "auto",
       "planning": "auto"
@@ -1794,28 +1767,15 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "planning": "auto"
     },
     {
-      "issue": "PAN-2874",
-      "rank": 222,
-      "size": "M",
+      "issue": "PAN-4061",
+      "rank": 65,
+      "size": "S",
       "importance": "high",
-      "score": 45,
-      "condition": "needs-refinement",
+      "score": 84,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope.",
-      "rationale": "Demoted from rank 64 (critical/92) because the closure of its blocker PAN-2828 and of PAN-3898 falsified most of the premise. Defect 1 — the verification gate demanding a vBRIEF checklist strikes never have — is fixed: src/dashboard/server/routes/workspaces/merge-strike.ts:36 sets skipPlanChecklist: true for request.kind === 'strike', and verification-runner.ts:775 honours it, so the incomplete-plan-items gate no longer fires for a strike. Defect 3 — the landing loop leaving strike_landing_state: 'recovering' after a transient fetch failure — describes deacon-strike-landing.ts, which the PAN-3917 cut deleted; no stored strike landing state remains to retry. Only defect 2 may survive: feedback delivery can still strand on feedback_delivery_needs_you (src/lib/cloister/review-verdict-feedback.ts:276) when the target agent has exited, although the strike carve-out removes the failure that used to trigger it. Held above the obsolete tail rather than sent to it, because that residual needs a rescope against the current code rather than a close.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2883",
-      "rank": 871,
-      "size": "M",
-      "importance": "high",
-      "score": 20,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close.",
-      "rationale": "Demoted from rank 65 because clearing the closed PAN-2828 dependency prompted a reread, and the fix has landed: src/lib/overdeck/pull-requests.ts:200-209 probes feature/<id> then strike/<id>, so a strike PR resolves and close-out's deploy row gets its mergedAt. The issue body itself records this under 'Fix (landed)' with live verification across six strikes. Nothing here is workable; it needs an operator verification and a close, not an agent.",
+      "why": "Harness ToS gate fails open: an unlisted harness (or a raw legacy pi) skips the Anthropic subscription block at all three layers.",
+      "rationale": "New issue filed 2026-09-24, placed at the rank freed by the PAN-2828 closure. canUseHarness (src/lib/harness-policy.ts:145-146) returns ALLOWED for anything its explicit branches miss, HarnessPolicyDecisionMap keys the inner record by string so an omitted RuntimeName still compiles, and ModelPicker.tsx:46 defaults a missing decision row to { allowed: true }. All three default open, so a harness added without a policy entry silently bypasses the Anthropic-subscription ToS block that protects the account every agent runs on — and a raw legacy 'pi' that escaped normalization is allowed today where 'ohmypi' is blocked. The fix is small and mechanical: type the map Record<RuntimeName, ...> so the omission is a compile error, deny unrecognised harnesses with a reason, and map legacy 'pi' onto the ohmypi rules. High rather than critical because nothing is blocked on it and the hole needs an unlisted harness or an unnormalized config to open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2013,6 +1973,19 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "rationale": "New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4074",
+      "rank": 82,
+      "size": "XS",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Reconnect banner sticks forever after a restart; heartbeats cancel the retry. Fix is already up in PR #4075 — needs merge, not a worker.",
+      "rationale": "New since the prior run and fully root-caused in the body: EventRouter sets reconnecting=true, only a successful snapshot bootstrap clears it, and handleEvent() cancelled the pending retry on every domain event — heartbeats included — so a recovered stream permanently suppressed the recovery it was proving unnecessary. The operator's live tab then shows 'Connection lost — reconnecting…' until a manual page load. Ranked high because it silently blinds the primary operator surface after every pan reload, but placed at 82 rather than the top tier because the fix already exists on fix/terminal-reconnect-after-restart with PR #4075 open and CI running: the remaining work is merge, not implementation, and a worker spawned here would duplicate landed code.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-3096",
@@ -3521,19 +3494,6 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "planning": "auto"
     },
     {
-      "issue": "PAN-2995",
-      "rank": 872,
-      "size": "XS",
-      "importance": "high",
-      "score": 20,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content.",
-      "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2980",
       "rank": 202,
       "size": "XS",
@@ -3761,6 +3721,32 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "dependsOn": [],
       "why": "Metrics cost panels, specialist run and handoff logs and the boot stamp have live readers but no writer post-Cut; restore or delete each",
       "rationale": "New this pass at rank 221, beside PAN-4046 in the band the closed façade-cut chapters vacated. Post-Cut substrate hygiene with a user-visible edge: nothing on main calls recordCostSync, so the Metrics page's daily total and its top-agents/top-issues panels render stale or empty data while the Costs page — reading cost_events, which does have writers — is correct, which is worse than an outright outage because the two pages disagree. Three smaller gaps sit behind it: finalizeRunLogSync runs in production against run logs createRunLogSync never created, logSpecialistHandoff has readers and no caller, and the missing stampBootReconciliation drops the watchdog back to the OVERDECK_BOOT_ID env var. Condition ok, not needs-refinement: each item carries a stated restore-or-delete rule and the acceptance is mechanically checkable, with the disposition recorded in docs/THE-CUT.md.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2874",
+      "rank": 222,
+      "size": "M",
+      "importance": "high",
+      "score": 45,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope.",
+      "rationale": "Demoted from rank 64 (critical/92) because the closure of its blocker PAN-2828 and of PAN-3898 falsified most of the premise. Defect 1 — the verification gate demanding a vBRIEF checklist strikes never have — is fixed: src/dashboard/server/routes/workspaces/merge-strike.ts:36 sets skipPlanChecklist: true for request.kind === 'strike', and verification-runner.ts:775 honours it, so the incomplete-plan-items gate no longer fires for a strike. Defect 3 — the landing loop leaving strike_landing_state: 'recovering' after a transient fetch failure — describes deacon-strike-landing.ts, which the PAN-3917 cut deleted; no stored strike landing state remains to retry. Only defect 2 may survive: feedback delivery can still strand on feedback_delivery_needs_you (src/lib/cloister/review-verdict-feedback.ts:276) when the target agent has exited, although the strike carve-out removes the failure that used to trigger it. Held above the obsolete tail rather than sent to it, because that residual needs a rescope against the current code rather than a close.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4077",
+      "rank": 223,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Four post-cut follow-ups with file paths: async project-path containment, Herdr-wrong tmux tooltip, stale planning prompt, Codex noise.",
+      "rationale": "New since the prior run. A review-batch follow-up list, but concrete enough to plan directly: resolveProjectKeyForCwdFromProjects still matches project paths by string prefix with no ~ expansion or realpath, so the async door misses the containment fix #4062 landed for findProjectByPath; WorkspaceCard.tsx and channels/SMOKE_TEST.md still hand operators a 'tmux -L overdeck attach' hint that is wrong under Herdr, the default backend; and the planning prompt still teaches a work.inspect gate that no longer exists. Medium rather than high because none of it wedges the pipeline — the path-containment gap is a correctness seam on a request path, the rest is operator-facing accuracy. Item 4 (Codex models-manager noise) is explicitly conditional and should be dropped if the source is not obvious.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11561,27 +11547,28 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "planning": "auto"
     },
     {
-      "issue": "PAN-4061",
-      "rank": 65,
-      "size": "S",
+      "issue": "PAN-2883",
+      "rank": 871,
+      "size": "M",
       "importance": "high",
-      "score": 84,
-      "condition": "ok",
+      "score": 20,
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Harness ToS gate fails open: an unlisted harness (or a raw legacy pi) skips the Anthropic subscription block at all three layers.",
-      "rationale": "New issue filed 2026-09-24, placed at the rank freed by the PAN-2828 closure. canUseHarness (src/lib/harness-policy.ts:145-146) returns ALLOWED for anything its explicit branches miss, HarnessPolicyDecisionMap keys the inner record by string so an omitted RuntimeName still compiles, and ModelPicker.tsx:46 defaults a missing decision row to { allowed: true }. All three default open, so a harness added without a policy entry silently bypasses the Anthropic-subscription ToS block that protects the account every agent runs on — and a raw legacy 'pi' that escaped normalization is allowed today where 'ohmypi' is blocked. The fix is small and mechanical: type the map Record<RuntimeName, ...> so the omission is a compile error, deny unrecognised harnesses with a reason, and map legacy 'pi' onto the ohmypi rules. High rather than critical because nothing is blocked on it and the hole needs an unlisted harness or an unnormalized config to open.",
+      "why": "Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close.",
+      "rationale": "Demoted from rank 65 because clearing the closed PAN-2828 dependency prompted a reread, and the fix has landed: src/lib/overdeck/pull-requests.ts:200-209 probes feature/<id> then strike/<id>, so a strike PR resolves and close-out's deploy row gets its mergedAt. The issue body itself records this under 'Fix (landed)' with live verification across six strikes. Nothing here is workable; it needs an operator verification and a close, not an agent.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4059",
-      "rank": 541,
-      "size": "S",
-      "importance": "medium",
-      "score": 42,
-      "condition": "ok",
+      "issue": "PAN-2995",
+      "rank": 872,
+      "size": "XS",
+      "importance": "high",
+      "score": 20,
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Leftovers from the #4002 suffix rename: a stale Promise suffix, three same-named export pairs, and stale codebase-context docs.",
+      "why": "Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content.",
+      "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12470,20 +12457,6 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "confidence": 1
     },
     {
-      "from": "PAN-3955",
-      "to": "PAN-3932",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3954",
-      "to": "PAN-3932",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3953",
       "to": "PAN-3923",
       "type": "informs",
@@ -12549,13 +12522,6 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
     {
       "from": "PAN-3935",
       "to": "PAN-3930",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3935",
-      "to": "PAN-3927",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
@@ -12669,13 +12635,6 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "from": "PAN-3983",
       "to": "PAN-3925",
       "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-3983",
-      "to": "PAN-3932",
-      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.5
     },
@@ -12804,6 +12763,34 @@ Rank held at 99. resolveBootGates is only called from restart.ts; reload and the
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.75
+    },
+    {
+      "from": "PAN-3778",
+      "to": "PAN-4074",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4074",
+      "to": "PAN-3616",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.55
+    },
+    {
+      "from": "PAN-3928",
+      "to": "PAN-4077",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3929",
+      "to": "PAN-4077",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
