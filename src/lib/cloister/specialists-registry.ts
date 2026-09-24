@@ -12,7 +12,7 @@ import { OVERDECK_HOME } from '../paths.js';
 const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
 
-const SPECIALIST_AGENT_NAMES = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'] as const;
+const SPECIALIST_AGENT_NAMES = ['merge-agent', 'review-agent', 'test-agent', 'uat-agent'] as const;
 export type SpecialistAgentName = typeof SPECIALIST_AGENT_NAMES[number];
 
 type SpecialistLifecycleState = 'sleeping' | 'active' | 'uninitialized';

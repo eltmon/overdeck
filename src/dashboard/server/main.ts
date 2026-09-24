@@ -443,7 +443,8 @@ function buildAgentStatusChangedPayload(
     lastFailureReason: state.lastFailureReason ?? null,
     lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
   };
-  return hasLiveTmuxSession === undefined ? payload : { ...payload, hasLiveTmuxSession };
+  // `hasLiveTmuxSession` is the deprecated alias of `hasLivePane` (#4105).
+  return hasLiveTmuxSession === undefined ? payload : { ...payload, hasLivePane: hasLiveTmuxSession, hasLiveTmuxSession };
 }
 
 // Wire up deacon → domain events for orphaned agent recovery.

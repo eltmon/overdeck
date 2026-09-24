@@ -354,13 +354,24 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
   }
 }
 
+/**
+ * #4105 — `hasLivePane` and its deprecated alias `hasLiveTmuxSession` carry one
+ * fact. An agent snapshot from a stored event may carry only the old name; fill
+ * whichever one is missing so readers of either name agree.
+ */
+export function withPaneLivenessAlias(agent: AgentSnapshot): AgentSnapshot {
+  const pane = agent.hasLivePane ?? agent.hasLiveTmuxSession
+  if (pane === undefined || (agent.hasLivePane === pane && agent.hasLiveTmuxSession === pane)) return agent
+  return { ...agent, hasLivePane: pane, hasLiveTmuxSession: pane }
+}
+
 // ─── applyEvent — apply a single domain event ───────────────────────────────
 
 export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModelState {
   switch (event.type) {
     case 'agent.created': {
       const existing = state.agentsById[event.payload.agentId]
-      const agent = event.payload.agent
+      const agent = withPaneLivenessAlias(event.payload.agent)
       const nextAgentIdBySessionId = agent.sessionId
         ? { ...state.agentIdBySessionId, [agent.sessionId]: agent.id }
         : state.agentIdBySessionId
@@ -378,7 +389,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     case 'agent.started': {
-      const agent = event.payload.agent
+      const agent = withPaneLivenessAlias(event.payload.agent)
       const nextAgentIdBySessionId = agent.sessionId
         ? { ...state.agentIdBySessionId, [agent.sessionId]: agent.id }
         : state.agentIdBySessionId
@@ -427,6 +438,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             [event.payload.agentId]: {
               ...stoppedAgent,
               status: 'stopped' as const,
+              hasLivePane: false,
               hasLiveTmuxSession: false,
               lastActivity: event.timestamp,
             },
@@ -504,7 +516,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const nextAgent: AgentSnapshot = (() => {
         const base: Record<string, unknown> = { ...agent, status: event.payload.status }
         const optionalFields = [
-          'hasLiveTmuxSession', 'stoppedByUser', 'stoppedByPause', 'paused', 'pausedReason', 'pausedAt',
+          'hasLivePane', 'hasLiveTmuxSession', 'stoppedByUser', 'stoppedByPause', 'paused', 'pausedReason', 'pausedAt',
           'troubled', 'troubledAt', 'consecutiveFailures',
           'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason', 'lastFailureNextRetryAt',
           'kickoffDelivered', 'hostOverride', 'role', 'model', 'workspace', 'sessionId',
@@ -524,6 +536,19 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             }
           }
         }
+        // #4105 — `hasLivePane` and its deprecated alias `hasLiveTmuxSession`
+        // carry one fact. A producer (or a stored event) may send either name;
+        // the snapshot always carries both, so readers of either agree.
+        const payloadPane = event.payload.hasLivePane ?? event.payload.hasLiveTmuxSession
+        if ('hasLivePane' in event.payload || 'hasLiveTmuxSession' in event.payload) {
+          if (payloadPane === null || payloadPane === undefined) {
+            delete base['hasLivePane']
+            delete base['hasLiveTmuxSession']
+          } else {
+            base['hasLivePane'] = payloadPane
+            base['hasLiveTmuxSession'] = payloadPane
+          }
+        }
         // PAN-1520 (fixes #339) — clear stale pending-input fields whenever the
         // agent transitions out of an actively-running state. The enrichment
         // poller stops emitting events for non-running agents, so without this
@@ -532,7 +557,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         // PAN-2633 — an idle-alive agent (stopped-shaped status, live tmux pane)
         // is the archetypal awaiting-operator state and must keep its pending-input
         // payload; gate the wipe on the liveness flag carried in the event.
-        const sessionAlive = event.payload.hasLiveTmuxSession === true
+        const sessionAlive = payloadPane === true
         if (event.payload.status !== 'running' && event.payload.status !== 'starting' && !sessionAlive) {
           delete base['hasPendingQuestion']
           delete base['pendingQuestionCount']

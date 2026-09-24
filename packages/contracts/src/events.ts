@@ -220,6 +220,9 @@ export const AgentStatusChangedEvent = Schema.Struct({
     issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     status: AgentStatus,
     previousStatus: Schema.optional(AgentStatus),
+    /** The agent has a live pane on its terminal backend (Herdr or tmux). */
+    hasLivePane: Schema.optional(Schema.Boolean),
+    /** @deprecated Alias of `hasLivePane`, kept for events written before it existed (#4105). */
     hasLiveTmuxSession: Schema.optional(Schema.Boolean),
     stoppedByUser: Schema.optional(Schema.Boolean),
     stoppedByPause: Schema.optional(Schema.Boolean),

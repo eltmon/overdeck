@@ -22,40 +22,40 @@ function agent(overrides: Partial<AgentSnapshot>): AgentSnapshot {
 
 describe('classifyDashboardAgent', () => {
   it('returns active for PAN-1370 running with a live tmux session', () => {
-    expect(classifyDashboardAgent(agent({ issueId: 'PAN-1370', status: 'running', hasLiveTmuxSession: true }), NOW_MS)).toBe('active');
+    expect(classifyDashboardAgent(agent({ issueId: 'PAN-1370', status: 'running', hasLivePane: true }), NOW_MS)).toBe('active');
   });
 
   it('returns active when a stopped agent still has a live tmux session', () => {
-    expect(classifyDashboardAgent(agent({ status: 'stopped', hasLiveTmuxSession: true, startedAt: OLD_TIMESTAMP }), NOW_MS)).toBe('active');
+    expect(classifyDashboardAgent(agent({ status: 'stopped', hasLivePane: true, startedAt: OLD_TIMESTAMP }), NOW_MS)).toBe('active');
   });
 
   it('returns stopped for a recent stopped agent without a tmux session', () => {
-    expect(classifyDashboardAgent(agent({ status: 'stopped', hasLiveTmuxSession: false, lastActivity: RECENT_TIMESTAMP }), NOW_MS)).toBe('stopped');
+    expect(classifyDashboardAgent(agent({ status: 'stopped', hasLivePane: false, lastActivity: RECENT_TIMESTAMP }), NOW_MS)).toBe('stopped');
   });
 
   it('returns orphan_test for PAN-AC22 when the prefix matches and age exceeds seven days', () => {
-    expect(classifyDashboardAgent(agent({ issueId: 'PAN-AC22', status: 'stopped', hasLiveTmuxSession: false, lastActivity: OLD_TIMESTAMP }), NOW_MS)).toBe('orphan_test');
+    expect(classifyDashboardAgent(agent({ issueId: 'PAN-AC22', status: 'stopped', hasLivePane: false, lastActivity: OLD_TIMESTAMP }), NOW_MS)).toBe('orphan_test');
   });
 
   it('returns orphan_test for PAN-TEST-1 when the prefix matches and age exceeds seven days', () => {
-    expect(classifyDashboardAgent(agent({ issueId: 'PAN-TEST-1', status: 'stopped', hasLiveTmuxSession: false, startedAt: OLD_TIMESTAMP }), NOW_MS)).toBe('orphan_test');
+    expect(classifyDashboardAgent(agent({ issueId: 'PAN-TEST-1', status: 'stopped', hasLivePane: false, startedAt: OLD_TIMESTAMP }), NOW_MS)).toBe('orphan_test');
   });
 
   it('returns stopped for a pipeline agent that stopped recently', () => {
-    expect(classifyDashboardAgent(agent({ issueId: 'PAN-SHIP-1', status: 'stopped', hasLiveTmuxSession: false, lastActivity: RECENT_TIMESTAMP }), NOW_MS)).toBe('stopped');
+    expect(classifyDashboardAgent(agent({ issueId: 'PAN-SHIP-1', status: 'stopped', hasLivePane: false, lastActivity: RECENT_TIMESTAMP }), NOW_MS)).toBe('stopped');
   });
 
   it('returns active for ambiguous tmux-unknown running agents', () => {
-    expect(classifyDashboardAgent(agent({ status: 'running', hasLiveTmuxSession: undefined }), NOW_MS)).toBe('active');
+    expect(classifyDashboardAgent(agent({ status: 'running', hasLivePane: undefined }), NOW_MS)).toBe('active');
   });
 
   it('does not use stale running status as active when tmux is known dead', () => {
-    expect(classifyDashboardAgent(agent({ status: 'running', hasLiveTmuxSession: false }), NOW_MS)).toBe('stopped');
+    expect(classifyDashboardAgent(agent({ status: 'running', hasLivePane: false }), NOW_MS)).toBe('stopped');
   });
 
   it('requires both orphan prefix and age threshold', () => {
-    expect(classifyDashboardAgent(agent({ issueId: 'PAN-1370', status: 'stopped', hasLiveTmuxSession: false, startedAt: OLD_TIMESTAMP }), NOW_MS)).toBe('stopped');
-    expect(classifyDashboardAgent(agent({ issueId: 'PAN-REVIEW-1', status: 'stopped', hasLiveTmuxSession: false, startedAt: RECENT_TIMESTAMP }), NOW_MS)).toBe('stopped');
+    expect(classifyDashboardAgent(agent({ issueId: 'PAN-1370', status: 'stopped', hasLivePane: false, startedAt: OLD_TIMESTAMP }), NOW_MS)).toBe('stopped');
+    expect(classifyDashboardAgent(agent({ issueId: 'PAN-REVIEW-1', status: 'stopped', hasLivePane: false, startedAt: RECENT_TIMESTAMP }), NOW_MS)).toBe('stopped');
   });
 
   it('exports the orphan classifier constants', () => {

@@ -193,6 +193,7 @@ describe('work-agent-lifecycle', () => {
     const lifecycle = await getWorkAgentLifecycleState(agentId);
 
     expect(lifecycle.hasLiveTmuxSession).toBe(true);
+    expect(lifecycle.hasLivePane).toBe(true);
     expect(lifecycle.isRunning).toBe(true);
     expect(lifecycle.isRunningButStuck).toBe(false);
     expect(lifecycle.canStartFresh).toBe(false);
@@ -387,6 +388,7 @@ describe('work-agent-lifecycle', () => {
     // and no live session is simply not orphaned and offers a fresh start.
     expect(lifecycle.hasAgentState).toBe(true);
     expect(lifecycle.hasLiveTmuxSession).toBe(false);
+    expect(lifecycle.hasLivePane).toBe(false);
     expect(lifecycle.isOrphaned).toBe(false);
     expect(lifecycle.canStartFresh).toBe(true);
     expect(lifecycle.canResumeSession).toBe(false);

@@ -14,7 +14,7 @@ import {
 } from '../../lib/orders/writer.js';
 import { findProjectByPath, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
-import { commitPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
+import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
 
 interface OrdersCommandDeps {
   cwd?: string;
@@ -63,10 +63,19 @@ function panDirFor(deps: OrdersCommandDeps = {}): string {
 
 /**
  * Order books live in `<planHome>/.pan/orders/` on `main`, and the verb that
- * writes one commits it (PAN-3917: no daemon commits .pan/ behind your back).
+ * writes one commits it (PAN-3917: no daemon commits .pan/ behind your back)
+ * and pushes it, so the plan home does not drift ahead of origin (#4108).
  */
 async function commitOrders(panDir: string, subject: string): Promise<void> {
-  await commitPlanArtifacts({ cwd: dirname(panDir), paths: [join(panDir, 'orders')], message: subject });
+  const planHome = dirname(panDir);
+  const commit = await commitPlanArtifacts({ cwd: planHome, paths: [join(panDir, 'orders')], message: subject });
+  if (!commit.committed && commit.reason !== 'nothing to commit') {
+    console.error(chalk.yellow(`⚠ Could not commit the order book: ${commit.reason}`));
+    return;
+  }
+  const push = await pushPlanArtifacts(planHome);
+  const warning = push.pushed ? push.warning : push.skipped ? undefined : push.reason;
+  if (warning) console.error(chalk.yellow(`⚠ Order book push: ${warning}`));
 }
 
 async function requireBook(panDir: string, bookId: string): Promise<OrderBook> {

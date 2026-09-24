@@ -36,6 +36,12 @@ export async function issueOwesRework(issueId: string | undefined): Promise<bool
 export interface WorkAgentLifecycleState {
   agentId: string;
   hasAgentState: boolean;
+  /** The agent has a live pane on its terminal backend (Herdr or tmux). */
+  hasLivePane: boolean;
+  /**
+   * @deprecated Misnamed alias of `hasLivePane`: true for a live pane on either
+   * backend, not only a tmux session. Still populated for compatibility (#4105).
+   */
   hasLiveTmuxSession: boolean;
   hasSavedSession: boolean;
   hasResumableTranscript: boolean;
@@ -168,6 +174,7 @@ export async function getWorkAgentLifecycleState(agentOrIssueId: string): Promis
   return {
     agentId,
     hasAgentState,
+    hasLivePane: hasLiveTmuxSession,
     hasLiveTmuxSession,
     hasSavedSession,
     hasResumableTranscript,

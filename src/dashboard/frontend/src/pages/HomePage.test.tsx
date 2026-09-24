@@ -140,7 +140,7 @@ describe('HomePage', () => {
     useDashboardStore.setState({
       agentsById: {
         running: makeAgent({ id: 'running', status: 'running' }),
-        liveStopped: makeAgent({ id: 'liveStopped', status: 'stopped', hasLiveTmuxSession: true }),
+        liveStopped: makeAgent({ id: 'liveStopped', status: 'stopped', hasLivePane: true }),
         paused: makeAgent({ id: 'paused', status: 'stopped', paused: true }),
         failedAgent: makeAgent({ id: 'failedAgent', status: 'failed', consecutiveFailures: 1 }),
         staleStoppedFailure: makeAgent({ id: 'staleStoppedFailure', status: 'stopped', consecutiveFailures: 1 }),

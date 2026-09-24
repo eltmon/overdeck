@@ -298,7 +298,10 @@ answer (backend unreachable) is never a crash. `findConflictingWorkAgents` (the 
 work sessions are still live" refusal) counts every other work agent for the issue that is not
 confirmed dead, so an unanswered probe blocks the start. Neither reads the tmux-only `tmuxActive`.
 `GET /api/agents` reports pane liveness as `hasLivePane`; `hasLiveTmuxSession` is a deprecated
-alias with the same value, true for a live pane on either backend.
+alias with the same value, true for a live pane on either backend. The same pair rides on the
+read-model `AgentSnapshot`, the `agent.status_changed` payload and the work-agent lifecycle
+object. The shared reducer fills whichever name an event omits, so stored events that carry only
+`hasLiveTmuxSession` still set `hasLivePane`. Readers use `hasLivePane`.
 
 **Known gaps on Herdr** (readers, not spawners): the Claude resume-summary gate crossing
 (`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the

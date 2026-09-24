@@ -165,7 +165,7 @@ Stores legend used in reasons: **RS** = SQLite `review_status` · **REC** = git
 | `POST /api/issues/:id/deep-wipe` (`issues.ts:2341`) | writes | **`advance(id, "todo", "wipe")`** (stage part) + **RELOCATE** (workspace/branch teardown) | Legal move 15. The *stage* reset is `advance`; the destructive teardown (tmux, branches, workspace) is **AgentWriter / workspace ops** — Issues only owns the stage flip. |
 | `POST /api/issues/:id/cleanup-workspace` (`issues.ts:2258`) | writes | **RELOCATE → workspace ops** | Workspace teardown, no stage change. |
 | `POST /api/issues/:id/copy-settings` (`issues.ts:2441`) | writes | **RELOCATE → Settings** | Spawn-config copy; not issue state. |
-| `POST /api/issues/:id/beads/:beadId/inspect` (`issues.ts:2990`) | writes | **RELOCATE → Agents (work.inspect)** | Inspect is opt-in WORK-phase, per-bead — **off the merge path** (END-STATE Issues §247). Not an Issues verb. |
+| `POST /api/issues/:id/beads/:beadId/inspect` (`issues.ts:2990`) | writes | **DELETE** | The per-item inspection gate and `pan inspect` were deleted outright (PAN-3917 FR-14; see [THE-CUT.md](../../THE-CUT.md)), along with the `work.inspect` sub-roles. Nothing relocates. |
 | `POST /api/issues/:id/abort-planning` (`issues.ts:1110`) | writes | **`advance(id, "todo", "abort-planning")`** + AgentWriter.stop | Stage back to todo; killing the plan agent is Agents. |
 | `POST /api/workspaces/:issueId/unstick` (`workspaces.ts:4572`) | writes | **RELOCATE → Control/Settings (clear stuck)** | `stuck` is ephemeral review-run runtime, not an `issues` column (headline finding). |
 | `POST /api/workspaces/:issueId/deacon-ignore` (`workspaces.ts:4700`) | writes | **RELOCATE → SettingsWriter** | `issue_policy.deacon_ignored` (schema 284). |
