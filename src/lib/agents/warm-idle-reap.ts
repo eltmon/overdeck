@@ -1,16 +1,19 @@
 import { Effect } from 'effect';
 
 import type { AgentState as BackendAgentState } from '../terminal-backends/types.js';
-import { getAgentState } from './agent-state.js';
 import { isAlive, isConfirmedDead, type LivenessVerdict } from './liveness.js';
 import { stopAgent } from './termination.js';
 
-/** Test seams for `reapWarmIdleRoleRun`. Production callers pass nothing. */
+/** Inputs to `reapWarmIdleRoleRun`; `isAlive` and `stop` are test seams. */
 export interface WarmIdleReapDeps {
   readonly isAlive?: (agentId: string) => Promise<LivenessVerdict>;
   readonly stop?: (agentId: string) => Promise<void>;
-  /** The agent's `state.json` status; defaults to `getAgentState`. */
-  readonly readStatus?: (agentId: string) => string | undefined;
+  /**
+   * The agent's `state.json` status. Required: without it an idle Herdr pane
+   * could be a run still booting. The caller passes it because importing
+   * agent-state here would close an import cycle through spawn.ts.
+   */
+  readonly readStatus: (agentId: string) => string | undefined;
 }
 
 /**
@@ -55,11 +58,10 @@ export function isFinishedRoleRun(verdict: LivenessVerdict, status: string | und
  *
  * Returns true when the leftover was reaped and the dispatch may proceed.
  */
-export async function reapWarmIdleRoleRun(agentId: string, deps: WarmIdleReapDeps = {}): Promise<boolean> {
+export async function reapWarmIdleRoleRun(agentId: string, deps: WarmIdleReapDeps): Promise<boolean> {
   const probe = deps.isAlive ?? ((id: string) => isAlive(id));
   const verdict = await probe(agentId).catch((): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }));
-  const readStatus = deps.readStatus ?? ((id: string) => getAgentState(id)?.status);
-  if (!isFinishedRoleRun(verdict, readStatus(agentId))) return false;
+  if (!isFinishedRoleRun(verdict, deps.readStatus(agentId))) return false;
   const stop = deps.stop ?? ((id: string) => Effect.runPromise(stopAgent(id)));
   await stop(agentId).catch(() => {});
   return true;

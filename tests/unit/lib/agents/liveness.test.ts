@@ -124,7 +124,9 @@ describe('isAlive on the Herdr backend', () => {
       backend: 'herdr' as const,
       probeHerdr: vi.fn(async () => ({ kind: 'alive' as const, paneId: 'wE:p2', state: 'working' as const })),
     });
-    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true });
+    // PAN-3923: Herdr's own pane state rides along, so a reaper can tell a
+    // working run from one idle at its prompt.
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true, backendState: 'working' });
     expect(deps.sessionExists).not.toHaveBeenCalled();
     expect(deps.listPaneRows).not.toHaveBeenCalled();
   });
@@ -137,7 +139,7 @@ describe('isAlive on the Herdr backend', () => {
       backend: 'herdr' as const,
       probeHerdr: vi.fn(async () => ({ kind: 'alive' as const, paneId: 'wE:p2', state: 'unknown' as const })),
     });
-    await expect(isAlive('agent-pan-3705-review', deps)).resolves.toEqual({ alive: true, paneAlive: true });
+    await expect(isAlive('agent-pan-3705-review', deps)).resolves.toEqual({ alive: true, paneAlive: true, backendState: 'unknown' });
   });
 
   it('reports an agent Herdr does not know as no-session (a confirmed death)', async () => {

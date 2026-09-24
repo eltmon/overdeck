@@ -28,7 +28,7 @@ import { agentPaneExists, closeBackendPane, launchAgentPane, resolveLaunchBacken
 import { toPaneRole } from '../terminal-backends/tmux.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
-  getAgentDir,
+  getAgentDir, getAgentState,
   markAgentRunning,
   markSpawnFailed,
   recordStartupSessionExit,
@@ -177,11 +177,10 @@ async function spawnRunWithoutConsentClaim(
   if (await agentPaneExists(agentId)) {
     // PAN-2579 (warm-by-default lifecycle): a session alive at dispatch time may
     // be a warm-idle leftover from the PREVIOUS cycle rather than an active run.
-    // Reap it here — at the moment its slot is needed — when the liveness
-    // oracle proves it finished: no live harness, or (Herdr) a harness idle
-    // at its prompt after its prompt was delivered (PAN-3923). Anything else
-    // is an active run, so keep throwing and let the operator message it.
-    if (!(await reapWarmIdleRoleRun(agentId))) {
+    // Reap it when the liveness oracle proves it finished: no live harness, or
+    // (Herdr) a harness idle at its prompt after delivery (PAN-3923). Anything
+    // else is an active run, so keep throwing and let the operator message it.
+    if (!(await reapWarmIdleRoleRun(agentId, { readStatus: (id) => getAgentState(id)?.status }))) {
       throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
     }
     console.log(`[spawn] ${agentId} is warm-idle from the previous cycle — reaped it for the new ${role} dispatch (PAN-2579)`);

@@ -183,9 +183,26 @@ Who uses them:
 - **`pan kill` / `pan stop` / `pan pause`** — use the async `stopAgent`, and decide "running" and "live
   sibling" with `agentPaneExists`, not `sessionExistsSync`.
 - **`spawnRun`'s warm-idle reap** (PAN-2579, `reapWarmIdleRoleRun` in `src/lib/agents/warm-idle-reap.ts`) — when
-  a role run's pane is still there at dispatch, it asks `isAlive` and reaps through `stopAgent` only on
-  `pane-dead`. It used to read tmux's `#{pane_dead}`, which a Herdr host always answered "not dead",
-  so every re-dispatch was refused as "already running" (PAN-3966).
+  a role run's pane is still there at dispatch, it asks `isAlive` and reaps through `stopAgent` when
+  `isFinishedRoleRun` says the previous run finished. It used to read tmux's `#{pane_dead}`, which a
+  Herdr host always answered "not dead", so every re-dispatch was refused as "already running"
+  (PAN-3966). A role run's harness is interactive and never exits on its own, so a finished run is
+  usually a live harness idle at its prompt, not a dead pane (PAN-3923). Role runs do not close their
+  own pane when they finish, on either backend: sessions stay warm (PAN-2579), and the next dispatch
+  reaps the leftover here. The rule:
+
+  | Liveness verdict | `state.json` status | Result |
+  | --- | --- | --- |
+  | `pane-dead`, `runtime-missing`, `no-session` (no live harness in the pane) | any | reaped |
+  | alive, Herdr `backendState` `idle` or `done` | past `starting` | reaped |
+  | alive, Herdr `idle` or `done` | `starting` (prompt not yet delivered) | refused |
+  | alive, Herdr `working`, `blocked`, `unknown` | any | refused |
+  | alive on tmux (no per-pane agent state) | any | refused |
+  | `runtime-indeterminate`, or the probe threw | any | refused |
+
+  `spawnRun` marks a run `running` only after its prompt is delivered, which is why `starting` guards a
+  run still booting. On Herdr, `isAlive` carries the pane's `agent_status` as `backendState` on an
+  alive verdict; tmux verdicts carry none.
 - **Dashboard Pause and Suspend** — probe with `agentPaneExists` and close with `closeAgentPane`.
 - **Post-merge lifecycle** (`postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`) —
   `closeAgentPane` for the work, planning and strike agents; `closeIssuePanes` with roles
