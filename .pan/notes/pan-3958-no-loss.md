@@ -2383,3 +2383,14 @@ proposed as an extension of #4002 ("`…Sync` and `…Promise` names with no twi
 This PR re-ran the CH-8b computation against the new audit. The set and every production reference count are
 unchanged: 356 functions, one of them Oh My Pi. The CH-8b table above is the final list. `listProjectsSync` is not on
 it, because its module still defines `listProjectsAsync`.
+
+### #4056 review follow-up: order-book writes are serialized
+
+On main, each `orders/writer.ts` mutation read the book synchronously and started its write in the same turn. Moving
+the reads to `getBookAsync`/`readOrderBookAsync` put awaits between read and write. Two concurrent mutations on one
+book (two dashboard PATCHes) could then both read the same version, and the later write dropped the earlier change.
+Two same-id creates could both pass the "already exists" check. Every exported writer mutation, `createBook`
+included, now runs its whole read-modify-write inside a per-plan-directory queue (`serializeByPanDir`, keyed by the
+resolved `panDir`). `advanceQueue` completes the book through the in-lock `setStatus` body, so it does not wait on
+itself. The lock is in-process only; a CLI write racing a dashboard write was possible on main too and is unchanged.
+Two new tests in `orders-writer.test.ts` fire concurrent mutations. Both failed with the lock disabled and pass with it.

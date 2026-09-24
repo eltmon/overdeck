@@ -54,4 +54,40 @@ describe('orders writer', () => {
     const index = JSON.parse(readFileSync(join(root, 'orders', 'index.json'), 'utf8')) as Array<{ id: string }>;
     expect(index.map((entry) => entry.id)).toEqual(['2026-07-17-first', '2026-07-17-second']);
   });
+
+  it('keeps both of two concurrent mutations on one book', async () => {
+    const root = panFixture();
+    await createBook(root, { id: '2026-07-17-first', name: 'First', createdAt: at });
+    await addItems(root, '2026-07-17-first', [
+      { issue: 'PAN-1', lane: 'A', order: 1, prereqs: [], reVerify: false },
+      { issue: 'PAN-2', lane: 'A', order: 2, prereqs: [], reVerify: false },
+    ], 'operator', at);
+
+    // Fired together, as two dashboard PATCHes would be: each reads the book before writing it.
+    await Promise.all([
+      setItemRequirements(root, '2026-07-17-first', 'PAN-1', { reVerify: true }, at),
+      moveItem(root, '2026-07-17-first', 'PAN-2', 'B', 1, at),
+    ]);
+
+    expect((await getBookAsync(root, '2026-07-17-first'))?.items).toMatchObject([
+      { issue: 'PAN-1', lane: 'A', order: 1, reVerify: true },
+      { issue: 'PAN-2', lane: 'B', order: 1 },
+    ]);
+  });
+
+  it('lets only one of two concurrent same-id creates through', async () => {
+    const root = panFixture();
+
+    const results = await Promise.allSettled([
+      createBook(root, { id: '2026-07-17-same', name: 'Winner', createdAt: at }),
+      createBook(root, { id: '2026-07-17-same', name: 'Loser', createdAt: at }),
+    ]);
+
+    expect(results[0]).toMatchObject({ status: 'fulfilled' });
+    expect(results[1]).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({ message: 'Order book already exists: 2026-07-17-same' }),
+    });
+    expect((await getBookAsync(root, '2026-07-17-same'))?.name).toBe('Winner');
+  });
 });
