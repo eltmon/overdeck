@@ -114,3 +114,4 @@
 # Two registration lines; implementation is in the extracted child input route module.
 1072 src/dashboard/server/routes/conversations.ts # PAN-3787
 1061 src/lib/agents/delivery.ts # PAN-3921
+1031 src/dashboard/frontend/src/components/XTerminal.tsx # PAN-3921

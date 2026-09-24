@@ -95,6 +95,7 @@ interface XTerminalProps {
 type ConnectionStatus = 'connected' | 'reconnecting' | 'restarting' | 'failed';
 
 const SERVER_RESTARTING_CLOSE_CODE = 4503;
+const SESSION_NOT_FOUND_RETRY_MS = 3_000; // the single retry of a 4404 (PAN-3921)
 
 interface TerminalSnapshotMessage {
   type: 'snapshot';
@@ -158,6 +159,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   const wsRef = useRef<WebSocket | null>(null);
   const connectionCleanupRef = useRef<(() => void) | null>(null);
   const reconnectPolicy = useRef<ReconnectPolicyState | null>(null);
+  const sessionNotFoundRetried = useRef(false); // reset once data flows
   const [reconnectJitterMs] = useState(() => createReconnectJitter());
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectRef = useRef<(() => void) | null>(null);
@@ -632,6 +634,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     let firstMessageLogged = false;
     let firstLiveByteLogged = false;
     ws.onmessage = (event) => {
+      sessionNotFoundRetried.current = false;
       if (!firstMessageLogged) {
         firstMessageLogged = true;
         profMark(sessionName, tProf, 'first ws message received');
@@ -713,8 +716,14 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // socket or update disposed terminal state.
       if (!mountedRef.current) return;
 
-      // 4404 = session not found on the server (tmux session doesn't exist).
-      // Do NOT retry — the session is gone. Retrying just hammers the server.
+      // 4404 = session not found. Retry once (a respawn may still be bringing the pane up);
+      // a second 4404 in a row means the session is gone — retrying further just hammers the server.
+      if (event.code === 4404 && !sessionNotFoundRetried.current) {
+        sessionNotFoundRetried.current = true;
+        setConnectionStatus('reconnecting');
+        reconnectTimer.current = setTimeout(() => connect(), SESSION_NOT_FOUND_RETRY_MS);
+        return;
+      }
       if (event.code === 4404) {
         term!.writeln(`\r\n\x1b[33m● Session \x1b[1m${sessionName}\x1b[0m\x1b[33m has ended.\x1b[0m`);
         onDisconnectRef.current?.();

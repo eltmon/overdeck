@@ -199,6 +199,50 @@ export async function resolveHerdrTerminalId(sessionName: string): Promise<strin
   }
 }
 
+/** Where a terminal WebSocket attaches: a Herdr terminal, a tmux session, or nothing. */
+export type TerminalAttachTarget =
+  | { readonly kind: 'herdr'; readonly terminalId: string }
+  | { readonly kind: 'tmux' }
+  | { readonly kind: 'missing' };
+
+export interface TerminalAttachTargetDeps {
+  readonly resolveHerdr: (sessionName: string) => Promise<string | null>;
+  readonly listTmuxSessions: () => Promise<readonly string[]>;
+  readonly tmuxSessionExists: (sessionName: string) => Promise<boolean>;
+  readonly isRespawnPending: (sessionName: string) => boolean;
+  readonly waitForRespawn: (sessionName: string, timeoutMs: number) => Promise<boolean>;
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Resolve a terminal attach, riding out a respawn (PAN-3921, review of #4104
+ * F5). A conversation mid switch-model / resume has no pane for a while; the
+ * Herdr terminal id is resolved again AFTER the respawn lands — a Herdr
+ * conversation comes back on a new terminal — and tmux is chosen only when
+ * Herdr truly holds nothing and the tmux session exists. A Herdr pane can
+ * take a moment to become resolvable after its launch, so the post-respawn
+ * lookup is retried briefly. Throws when tmux cannot be listed.
+ */
+export async function resolveTerminalAttachTarget(
+  sessionName: string,
+  respawnWaitMs: number,
+  deps: TerminalAttachTargetDeps,
+): Promise<TerminalAttachTarget> {
+  const initial = await deps.resolveHerdr(sessionName);
+  if (initial) return { kind: 'herdr', terminalId: initial };
+  if ((await deps.listTmuxSessions()).includes(sessionName)) return { kind: 'tmux' };
+  if (!deps.isRespawnPending(sessionName)) return { kind: 'missing' };
+  if (!(await deps.waitForRespawn(sessionName, respawnWaitMs))) return { kind: 'missing' };
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const terminalId = await deps.resolveHerdr(sessionName);
+    if (terminalId) return { kind: 'herdr', terminalId };
+    if (await deps.tmuxSessionExists(sessionName)) return { kind: 'tmux' };
+    await sleep(1_000);
+  }
+  return { kind: 'missing' };
+}
+
 /**
  * A Herdr terminal wearing the PTY interface: output comes from the `observe`
  * stream, input and resizes go out through `control`. The controller is opened
