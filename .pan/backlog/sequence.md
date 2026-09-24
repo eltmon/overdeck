@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T17:30:33.555Z · model: claude-opus-5 · open: 832_
+_Last sequenced: 2026-09-24T17:41:06.930Z · model: claude-opus-5 · open: 832_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,8 +10,9 @@ _Last sequenced: 2026-09-24T17:30:33.555Z · model: claude-opus-5 · open: 832_
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
 | 6 | PAN-3926 | S | high | ok |  |  | isAliveSync is tmux-only; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled — make backend-aware before swarm re-enable |
 | 7 | PAN-3925 | S | medium | ok |  |  | /api/parked and /api/merge-train/auto-merge take 10s+ deriving state per request; batch through the issue-data cache |
+| 8 | PAN-4098 | M | high | ok |  |  | Read model copies stored agent status: 330 rows read running while the backend has one live pane; derive liveness from the inventory |
+| 9 | PAN-4097 | M | high | ok |  |  | Output route, pan status --json and three skills read tmux only: on the default backend a live agent shows blank output and reads stopped |
 | 10 | PAN-4090 | S | high | ok |  |  | On a Herdr host pipeline-status, pan-agent-activity and pan-recap report every agent dead; pipeline-status 404s on a hardcoded project key |
-| 11 | PAN-3929 | S | medium | ok |  |  | Five SKILL.md files still tell agents to read deleted status fields; rewrite to the derived model and widen the guard's Markdown patterns |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 16 | PAN-3928 | XS | low | ok |  |  | pan start prints a tmux attach hint for Herdr panes; print backend, pane id and the Herdr attach command |
 | 17 | PAN-3982 | M | medium | ok |  |  | Palette hits 404: PAN-3950 dropped the unregistered-session fallback; subagent transcripts index as agent-* with no row |
@@ -48,7 +49,6 @@ _Last sequenced: 2026-09-24T17:30:33.555Z · model: claude-opus-5 · open: 832_
 | 60 | PAN-2700 | S | high | needs-refinement |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
 | 61 | PAN-1560 | XS | high | needs-refinement |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
 | 62 | PAN-3936 | S | high | ok |  |  | muse and kimi-code runtimes still call tmuxCreateSession with the supervisor hardcoded; route through launchAgentPane like spawn.ts |
-| 65 | PAN-4061 | S | high | ok |  |  | Harness ToS gate fails open: an unlisted harness (or a raw legacy pi) skips the Anthropic subscription block at all three layers. |
 | 66 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
@@ -290,7 +290,7 @@ _Last sequenced: 2026-09-24T17:30:33.555Z · model: claude-opus-5 · open: 832_
 | 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
-| 320 | PAN-3934 | S | medium | ok |  | PAN-3929 | roles/*.md and two docs still name deleted status fields outside the guard's Markdown roots; follow-up to PAN-3929 |
+| 320 | PAN-3934 | S | medium | ok |  |  | roles/*.md and two docs still name deleted status fields outside the guard’s Markdown roots; PAN-3929 has landed, so this is now free |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1209 | S | low | stale |  |  | bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
@@ -860,13 +860,17 @@ In pipeline — rank pinned. Herdr gaps in the sync liveness path and swarm acco
 
 In pipeline — rank pinned.
 
+### PAN-4098 (rank 8)
+
+New issue filed 2026-09-24, placed at free rank 8 beside the rest of the Herdr-liveness family (PAN-4096 at 2, PAN-3926 at 6, PAN-4090 at 10). agentSnapshotFromOverdeck (src/dashboard/server/read-model.ts) copies each row’s stored status out of AgentsResolver.list and getSnapshot serves it unchanged, so every snapshot consumer — the issue rail, the Agents directory, Kanban badges, command-deck activity, the project session tree — shows dead agents as running. PR #4089 patched only God View’s frontend, which makes the display layer disagree with itself rather than fixing the source. This is the plainest violation of "Overdeck stores no status it can derive" left on the board, and the fix has a real subtlety worth planning: the boot race, where Herdr is not up yet and a live-claiming row must read unknown rather than dead until one good inventory read lands, after which the last-good inventory answers. High rather than critical because it misleads the operator and the skills that read the snapshot but does not itself hold the pipeline.
+
+### PAN-4097 (rank 9)
+
+New issue filed 2026-09-24, placed at free rank 9 next to PAN-4090, which fixed the same blindness in pipeline-status, pan-agent-activity and pan-recap (#4093). Herdr is the default backend, but GET /api/agents/:id/output still calls tmux capturePane alone, so the dashboard terminal excerpt and every output-reading skill see an empty pane; pan status --json reports tmuxActive, which is false for all 35 running agents on this host, and the human output prints them as stopped; pan-oversee and pan-stop-all-agents drive raw tmux -L overdeck, so a drain finds nothing to kill. The work is a route that reads the pane through the host’s terminal backend with output.log as the last fallback, a backend-neutral alive field from src/lib/agents/liveness.ts with tmuxActive kept and deprecated, and three skills moved onto pan verbs and the dashboard API. Scope is already bounded in the body: pan-peer-review waits on PAN-3921.
+
 ### PAN-4090 (rank 10)
 
 New this run. Herdr is the default terminal backend, but three operator-facing skills still find agents through `tmux -L overdeck`, so on a Herdr host they list no sessions, mark every agent dead in the AGENT column and read no pane output; pipeline-status additionally hardcodes project=overdeck against a registry that knows the project as panopticon-cli, so the membership call returns 404 and the board renders empty. The fix is named in the body and backend-agnostic - read liveness from GET /api/agents and output from GET /api/agents/:id/conversation, and resolve the key from `pan project list --json` - so this is a small, high-leverage repair of the operator's read path into the pipeline. Ranked into the tail of the cut-follow-up cluster and ahead of PAN-3929, which rewrites prose in two of the same SKILL.md files (pipeline-status, pan-recap) and should land on corrected commands.
-
-### PAN-3929 (rank 11)
-
-In pipeline — rank pinned.
 
 ### PAN-3930 (rank 15)
 
@@ -1011,10 +1015,6 @@ Triage: review_status is gone but verification still writes a check run to the P
 ### PAN-3936 (rank 62)
 
 Split out of PAN-3921 at planning time. On a Herdr host these specialist-rotation and crash-respawn paths land on tmux, where isAliveOnHerdr reads them as dead. Do after PAN-3921 lands so the pattern is settled.
-
-### PAN-4061 (rank 65)
-
-New issue filed 2026-09-24, placed at the rank freed by the PAN-2828 closure. canUseHarness (src/lib/harness-policy.ts:145-146) returns ALLOWED for anything its explicit branches miss, HarnessPolicyDecisionMap keys the inner record by string so an omitted RuntimeName still compiles, and ModelPicker.tsx:46 defaults a missing decision row to { allowed: true }. All three default open, so a harness added without a policy entry silently bypasses the Anthropic-subscription ToS block that protects the account every agent runs on — and a raw legacy 'pi' that escaped normalization is allowed today where 'ohmypi' is blocked. The fix is small and mechanical: type the map Record<RuntimeName, ...> so the omission is a compile error, deny unrecognised harnesses with a reason, and map legacy 'pi' onto the ohmypi rules. High rather than critical because nothing is blocked on it and the hole needs an unlisted harness or an unnormalized config to open.
 
 ### PAN-2806 (rank 66)
 
@@ -1167,7 +1167,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T17:30:33.555Z",
+  "generatedAt": "2026-09-24T17:41:06.930Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 832,
@@ -1247,19 +1247,6 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "dependsOn": [],
       "why": "On a Herdr host pipeline-status, pan-agent-activity and pan-recap report every agent dead; pipeline-status 404s on a hardcoded project key",
       "rationale": "New this run. Herdr is the default terminal backend, but three operator-facing skills still find agents through `tmux -L overdeck`, so on a Herdr host they list no sessions, mark every agent dead in the AGENT column and read no pane output; pipeline-status additionally hardcodes project=overdeck against a registry that knows the project as panopticon-cli, so the membership call returns 404 and the board renders empty. The fix is named in the body and backend-agnostic - read liveness from GET /api/agents and output from GET /api/agents/:id/conversation, and resolve the key from `pan project list --json` - so this is a small, high-leverage repair of the operator's read path into the pipeline. Ranked into the tail of the cut-follow-up cluster and ahead of PAN-3929, which rewrites prose in two of the same SKILL.md files (pipeline-status, pan-recap) and should land on corrected commands.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3929",
-      "rank": 11,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Five SKILL.md files still tell agents to read deleted status fields; rewrite to the derived model and widen the guard's Markdown patterns",
-      "rationale": "In pipeline — rank pinned.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1728,19 +1715,6 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "dependsOn": [],
       "why": "muse and kimi-code runtimes still call tmuxCreateSession with the supervisor hardcoded; route through launchAgentPane like spawn.ts",
       "rationale": "Split out of PAN-3921 at planning time. On a Herdr host these specialist-rotation and crash-respawn paths land on tmux, where isAliveOnHerdr reads them as dead. Do after PAN-3921 lands so the pattern is settled.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4061",
-      "rank": 65,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Harness ToS gate fails open: an unlisted harness (or a raw legacy pi) skips the Anthropic subscription block at all three layers.",
-      "rationale": "New issue filed 2026-09-24, placed at the rank freed by the PAN-2828 closure. canUseHarness (src/lib/harness-policy.ts:145-146) returns ALLOWED for anything its explicit branches miss, HarnessPolicyDecisionMap keys the inner record by string so an omitted RuntimeName still compiles, and ModelPicker.tsx:46 defaults a missing decision row to { allowed: true }. All three default open, so a harness added without a policy entry silently bypasses the Anthropic-subscription ToS block that protects the account every agent runs on — and a raw legacy 'pi' that escaped normalization is allowed today where 'ohmypi' is blocked. The fix is small and mechanical: type the map Record<RuntimeName, ...> so the omission is a compile error, deny unrecognised harnesses with a reason, and map legacy 'pi' onto the ohmypi rules. High rather than critical because nothing is blocked on it and the hole needs an unlisted harness or an unnormalized config to open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4778,11 +4752,9 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "importance": "medium",
       "score": 50,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-3929"
-      ],
-      "why": "roles/*.md and two docs still name deleted status fields outside the guard's Markdown roots; follow-up to PAN-3929",
-      "rationale": "Follow-up to PAN-3929 (in pipeline); do after it so the widened guard and a roles/ scan root land together.",
+      "dependsOn": [],
+      "why": "roles/*.md and two docs still name deleted status fields outside the guard’s Markdown roots; PAN-3929 has landed, so this is now free",
+      "rationale": "PAN-3929 merged in this run’s delta, so the blocker is gone and this is directly workable: the widened guard and its Markdown roots are on main, and what remains is the roles/*.md and docs sweep plus a roles/ scan root. Rank held at 320 rather than lifted — clearing a blocker makes the item pickable, it does not raise its impact, and the score-50 band around it is the right neighbourhood for operator-facing doc accuracy.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11472,6 +11444,32 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4098",
+      "rank": 8,
+      "size": "M",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Read model copies stored agent status: 330 rows read running while the backend has one live pane; derive liveness from the inventory",
+      "rationale": "New issue filed 2026-09-24, placed at free rank 8 beside the rest of the Herdr-liveness family (PAN-4096 at 2, PAN-3926 at 6, PAN-4090 at 10). agentSnapshotFromOverdeck (src/dashboard/server/read-model.ts) copies each row’s stored status out of AgentsResolver.list and getSnapshot serves it unchanged, so every snapshot consumer — the issue rail, the Agents directory, Kanban badges, command-deck activity, the project session tree — shows dead agents as running. PR #4089 patched only God View’s frontend, which makes the display layer disagree with itself rather than fixing the source. This is the plainest violation of \"Overdeck stores no status it can derive\" left on the board, and the fix has a real subtlety worth planning: the boot race, where Herdr is not up yet and a live-claiming row must read unknown rather than dead until one good inventory read lands, after which the last-good inventory answers. High rather than critical because it misleads the operator and the skills that read the snapshot but does not itself hold the pipeline.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4097",
+      "rank": 9,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Output route, pan status --json and three skills read tmux only: on the default backend a live agent shows blank output and reads stopped",
+      "rationale": "New issue filed 2026-09-24, placed at free rank 9 next to PAN-4090, which fixed the same blindness in pipeline-status, pan-agent-activity and pan-recap (#4093). Herdr is the default backend, but GET /api/agents/:id/output still calls tmux capturePane alone, so the dashboard terminal excerpt and every output-reading skill see an empty pane; pan status --json reports tmuxActive, which is false for all 35 running agents on this host, and the human output prints them as stopped; pan-oversee and pan-stop-all-agents drive raw tmux -L overdeck, so a drain finds nothing to kill. The work is a route that reads the pane through the host’s terminal backend with output.log as the last fallback, a backend-neutral alive field from src/lib/agents/liveness.ts with tmuxActive kept and deprecated, and three skills moved onto pan verbs and the dashboard API. Scope is already bounded in the body: pan-peer-review waits on PAN-3921.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12197,13 +12195,6 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "confidence": 1
     },
     {
-      "from": "PAN-3929",
-      "to": "PAN-3934",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3942",
       "to": "PAN-2444",
       "type": "unblocks",
@@ -12652,20 +12643,6 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "confidence": 0.6
     },
     {
-      "from": "PAN-3929",
-      "to": "PAN-4077",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4090",
-      "to": "PAN-3929",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-4096",
       "to": "PAN-3981",
       "type": "informs",
@@ -12678,6 +12655,48 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-3921",
+      "to": "PAN-4097",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4090",
+      "to": "PAN-4097",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-3926",
+      "to": "PAN-4097",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.65
+    },
+    {
+      "from": "PAN-4096",
+      "to": "PAN-4098",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4090",
+      "to": "PAN-4098",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3926",
+      "to": "PAN-4098",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
