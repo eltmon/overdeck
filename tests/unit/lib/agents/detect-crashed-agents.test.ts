@@ -3,8 +3,18 @@
  * tmux-only `tmuxActive` flag. A live Herdr agent has no tmux session, so the
  * old filter listed every one of them as crashed.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState } from '../../../../src/lib/agents.js';
+
+// The host's agent registry, as both the pre-fix (`listRunningAgentsSync`) and
+// post-fix (`listAgentStates`) readers see it. Every row reads
+// `tmuxActive: false`, as a Herdr agent always does.
+const registry = vi.hoisted(() => ({ rows: [] as unknown[] }));
+vi.mock('../../../../src/lib/agents/queries.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  listRunningAgentsSync: () => registry.rows,
+  listAgentStates: () => registry.rows,
+}));
 import { detectCrashedAgents } from '../../../../src/lib/agents/recovery.js';
 import type { HerdrLivenessProbe } from '../../../../src/lib/terminal-backends/herdr.js';
 
@@ -29,8 +39,13 @@ function herdr(answers: Record<string, HerdrLivenessProbe['kind']>) {
 }
 
 describe('detectCrashedAgents', () => {
-  it('does not report a live Herdr agent as crashed', async () => {
-    const crashed = await detectCrashedAgents([agent('agent-pan-4105')], herdr({ 'agent-pan-4105': 'alive' }));
+  beforeEach(() => {
+    registry.rows = [];
+  });
+
+  it('does not report a live Herdr agent from the registry as crashed', async () => {
+    registry.rows = [agent('agent-pan-4105')];
+    const crashed = await detectCrashedAgents(undefined, herdr({ 'agent-pan-4105': 'alive' }));
     expect(crashed).toEqual([]);
   });
 
@@ -43,7 +58,8 @@ describe('detectCrashedAgents', () => {
   });
 
   it('does not report an agent as crashed when the backend cannot answer', async () => {
-    const crashed = await detectCrashedAgents([agent('agent-pan-4105')], herdr({ 'agent-pan-4105': 'indeterminate' }));
+    registry.rows = [agent('agent-pan-4105')];
+    const crashed = await detectCrashedAgents(undefined, herdr({ 'agent-pan-4105': 'indeterminate' }));
     expect(crashed).toEqual([]);
   });
 
