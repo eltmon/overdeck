@@ -941,6 +941,8 @@ A project with extra test roots (e.g. overdeck's `src/dashboard/frontend`) appen
 
 `{{CHANGED_BASE}}` is injected as `origin/<target-branch>` after the verification runner syncs the target branch. This keeps unrelated pre-existing failures from failing every work agent gate. Vitest's `--changed` graph follows static imports; dynamic imports, fixtures, generated files, and environment-driven branches may need explicit tests because they can be invisible to the changed-file graph.
 
+Gate commands do not inherit the dashboard's `OVERDECK_*` environment (PAN-3902). Variables such as `OVERDECK_NO_RESUME` or `OVERDECK_TERMINAL_BACKEND` describe how the host booted, and a gate that saw them would pass or fail by boot state instead of by the diff. Only `OVERDECK_HOME` passes through. A gate that needs another `OVERDECK_*` value sets it in its `env:` map. The dashboard's `API_PORT`, `PORT`, and `DASHBOARD_URL` are dropped the same way.
+
 Keep e2e, Playwright, and other heavy browser tests out of the local per-change gate. Put them in CI-only jobs or an explicit `@slow` tier so local agent verification stays fast and targeted.
 
 ### Tests on CI (`verification.tests`)
