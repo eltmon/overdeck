@@ -9,7 +9,7 @@ import { IssueRail } from './IssueRail';
 import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
 import { useConfluenceChoreography, useSweepChoreography } from './useConfluenceChoreography';
-import { withObservedLiveness } from './liveness';
+import { isClaimedLiveStatus, withObservedLiveness } from './liveness';
 import type { ConfluenceData, ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
 
@@ -65,6 +65,12 @@ export function GodViewConfluence({
   const agents = useMemo(
     () => withObservedLiveness(agentRows, backendPanesById) as unknown as Agent[],
     [agentRows, backendPanesById],
+  );
+  // The AGENTS donut is a census: hosted agents only, never an `error` or
+  // `stopped` row left behind by one that died.
+  const hostedAgents = useMemo(
+    () => agents.filter((agent) => isClaimedLiveStatus(agent.status)),
+    [agents],
   );
   const [hover, setHover] = useState<HoverState | null>(null);
   const [selectedId, setSelectedId] = useState(() => selectedConfluenceIssueId());
@@ -164,7 +170,7 @@ export function GodViewConfluence({
         </section>
 
         <GodViewSidebar
-          agents={agents}
+          agents={hostedAgents}
           velocity={meta.velocity}
           onIssueHover={(issueId) => effectsRef.current?.emitRing(issueId, '#ffffff')}
           onIssueSelect={(issueId) => setRailId(issueId)}
