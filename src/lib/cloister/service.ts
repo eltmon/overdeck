@@ -189,8 +189,8 @@ export class CloisterService {
   private eventStore: CloisterEventStore | null = null;
 
   // ─── Status cache ────────────────────────────────────────────────────────────
-  // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
-  // to eliminate blocking on high-frequency dashboard polls.
+  // getStatus() reads every running agent's health. Cache for 3s
+  // to absorb high-frequency dashboard polls.
   private _statusCache: CloisterStatus | null = null;
   private _statusCacheAt = 0;
   private readonly STATUS_CACHE_TTL_MS = 3_000;
@@ -672,11 +672,11 @@ export class CloisterService {
   /**
    * Get current status
    *
-   * Uses a 3-second TTL cache to avoid blocking the event loop on repeated
-   * dashboard polls. The underlying computation does sync file I/O and tmux
-   * calls for every agent, which scales poorly with agent count.
+   * Uses a 3-second TTL cache for repeated dashboard polls: the computation
+   * lists running agents and reads every agent's health, which scales poorly
+   * with agent count.
    */
-  getStatus(): CloisterStatus {
+  getStatus(): Promise<CloisterStatus> {
     return getStatusWithHost(this.statusHost());
   }
 
@@ -690,7 +690,7 @@ export class CloisterService {
   /**
    * Get health for all running agents
    */
-  getAllAgentHealth(): AgentHealth[] {
+  getAllAgentHealth(): Promise<AgentHealth[]> {
     return getAllAgentHealthWithHost(this.statusHost());
   }
 

@@ -12,7 +12,8 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from '../paths.js';
-import { listPaneValuesSync, sessionExistsSync } from '../tmux.js';
+import { Effect } from 'effect';
+import { listPaneValues, sessionExists } from '../tmux.js';
 
 function agentDir(agentId: string): string {
   return join(getOverdeckHome(), 'agents', agentId);
@@ -37,17 +38,17 @@ export function readAgentExitStatus(agentId: string): { code: string; at: string
  * launcher-recorded exit status (preferred), the tmux pane exit status (fallback
  * when the dead pane corpse still exists), and the tail of output.log.
  */
-export function describeAgentDeath(agentId: string): string {
+export async function describeAgentDeath(agentId: string): Promise<string> {
   const parts: string[] = [];
 
   const exit = readAgentExitStatus(agentId);
   if (exit) {
     parts.push(`exit=${exit.code}${exit.at ? ` at ${exit.at}` : ''}`);
-  } else if (sessionExistsSync(agentId)) {
+  } else if (await Effect.runPromise(sessionExists(agentId))) {
     // No exit-status file (e.g. the launcher bash was SIGKILLed before it could
     // write) but the dead pane survives via remain-on-exit — tmux still knows the
     // exit code.
-    const paneExit = listPaneValuesSync(agentId, '#{pane_exit_status}').find((v) => v !== '');
+    const paneExit = (await listPaneValues(agentId, '#{pane_exit_status}')).find((v) => v !== '');
     if (paneExit) parts.push(`pane_exit=${paneExit}`);
   }
 

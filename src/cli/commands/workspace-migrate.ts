@@ -34,8 +34,8 @@ import {
 } from '../../lib/remote/index.js';
 import { PAN_CONTEXT_FILENAME, PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_FEEDBACK_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import { createWorkspace, removeWorkspace } from '../../lib/workspace-manager.js';
-import { stopAgentSync, setAgentPausedSync } from '../../lib/agents.js';
-import { sessionExistsSync } from '../../lib/tmux.js';
+import { stopAgent, setAgentPaused } from '../../lib/agents.js';
+import { sessionExists } from '../../lib/tmux.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { RemoteProvider } from '../../lib/remote/interface.js';
 
@@ -336,12 +336,17 @@ export async function migrateLocalToRemote(
     // it so deacon auto-resume can't respawn a local duplicate while the
     // issue runs remotely. `pan start <id> --remote --force` clears the gate.
     const agentId = `agent-${issueId.toLowerCase()}`;
-    if (sessionExistsSync(agentId)) {
+    // PAN-4012: gate on the backend-aware pane check, not the tmux-only session
+    // probe, and stop through the backend, so a Herdr pane is closed too.
+    const { agentPaneExists } = await import('../../lib/terminal-backends/launch.js');
+    const localLive = (await agentPaneExists(agentId).catch(() => false))
+      || (await Effect.runPromise(sessionExists(agentId)).catch(() => false));
+    if (localLive) {
       spinner.text = 'Stopping local agent...';
-      stopAgentSync(agentId);
+      await Effect.runPromise(stopAgent(agentId));
       result.steps.push(`Stopped local agent ${agentId}`);
     }
-    setAgentPausedSync(agentId, 'migrated to remote (fly.io)');
+    await Effect.runPromise(setAgentPaused(agentId, 'migrated to remote (fly.io)'));
     result.steps.push('Paused local agent (deacon resume gate)');
 
     // 6. Make sure ALL local work reaches origin before anything else:

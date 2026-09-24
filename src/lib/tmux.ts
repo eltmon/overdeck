@@ -1,3 +1,24 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `capturePaneSync` (async: `capturePane`): src/lib/agents/termination.ts:170.
+ * - `getAgentSessionsSync` (async: `getAgentSessions`): src/cli/commands/doctor.ts:511.
+ * - `killSessionSync` (async: `killSession`): src/lib/agents/termination.ts:180,
+ *   src/lib/runtimes/claude-code.ts:331.
+ * - `listPaneValuesSync` (async: `listPaneValues`): src/lib/agents/liveness.ts:161,326.
+ * - `listSessionNamesSync` (async: `listSessionNames`): 9 sites in cli/commands/doctor.ts, cli/commands/pause.ts,
+ *   cli/commands/swarm-status.ts, cli/commands/swarm.ts.
+ * - `listSessionsSync` (async: `listSessions`): src/cli/commands/resources.ts:153, src/lib/agents/queries.ts:36,
+ *   src/lib/hygiene.ts:51, src/lib/runtimes/ohmypi.ts:210, src/lib/tmux.ts:645,956.
+ * - `querySessionSync` (async: `querySession`): src/lib/tmux.ts:715.
+ * - `sessionExistsSync` (async: `sessionExists`): 7 sites in cli/commands/answer.ts, lib/agents/liveness.ts,
+ *   lib/agents/termination.ts, lib/runtimes/claude-code.ts.
+ * Each of these blocks on a child process: never call one from src/dashboard/** or src/lib/cloister/** (FR-8).
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
 import { writeFileSync, appendFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
@@ -664,16 +685,18 @@ export type SessionQueryResult =
   | { status: 'missing'; detail: string }
   | { status: 'error'; detail: string };
 
-function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { status: 'exists' }> {
-  const error = cause as NodeJS.ErrnoException & { stderr?: string | Buffer; status?: number };
+/** Classify a failed `has-session`; the exit code is `status` (execFileSync) or a numeric `code` (promisified execFile). */
+export function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { status: 'exists' }> {
+  const error = cause as Omit<NodeJS.ErrnoException, 'code'> & { code?: string | number; stderr?: string | Buffer; status?: number };
+  const exitCode = typeof error.status === 'number' ? error.status : typeof error.code === 'number' ? error.code : undefined;
   const stderr = String(error.stderr ?? '').trim();
   const detail = [
-    `exit=${error.status ?? 'unknown'}`,
-    error.code ? `code=${error.code}` : '',
+    `exit=${exitCode ?? 'unknown'}`,
+    typeof error.code === 'string' ? `code=${error.code}` : '',
     stderr ? `stderr=${stderr}` : '',
     error.message ? `message=${error.message}` : '',
   ].filter(Boolean).join(' ');
-  return error.status === 1 && /can't find session:/i.test(stderr)
+  return exitCode === 1 && /can't find session:/i.test(stderr)
     ? { status: 'missing', detail }
     : { status: 'error', detail };
 }

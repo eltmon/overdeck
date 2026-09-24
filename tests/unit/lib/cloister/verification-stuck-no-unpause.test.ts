@@ -50,7 +50,7 @@ vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
     h.states.set(id, { ...state, paused: false, pausedReason: undefined });
     return true;
   },
-  clearAgentTroubledSync: h.clearTroubled,
+  clearAgentTroubled: (id: string) => Effect.sync(() => { h.clearTroubled(id); return null; }),
 }));
 
 vi.mock('../../../../src/lib/agents/resume.js', () => ({ resumeAgent: h.resumeAgent }));

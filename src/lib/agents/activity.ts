@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import { getAgentDir, getAgentStateSync } from './agent-state-read.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import { encodeClaudeProjectDir } from '../paths.js';
@@ -271,9 +270,3 @@ export function getLatestSessionIdSync(
 ): string | null {
   return resolveLatestSessionIdSync(agentId, recoveryDeps).sessionId;
 }
-
-export const getLatestSessionId = (
-  agentId: string,
-  recoveryDeps?: Partial<ClaudeSessionRecoveryDeps>,
-): Effect.Effect<string | null> =>
-  Effect.sync(() => resolveLatestSessionIdSync(agentId, recoveryDeps).sessionId);

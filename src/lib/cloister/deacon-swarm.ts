@@ -26,7 +26,7 @@ import { resolvePlanHome } from '../pan-dir/paths.js';
 import { applyItemStatuses } from '../xbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../xbrief/swarm-readiness.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
-import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
+import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { resolveAutomaticSwarmPolicy, resolveSwarmMaxSlots } from '../swarm-policy.js';
 import type { SwarmInferCompletionMode } from './config.js';
 import {
@@ -236,7 +236,7 @@ function defaultReadSlotCompletion(
 }
 
 function defaultShouldDispatch(issueId: string): boolean {
-  return !isDeaconGloballyPausedSync();
+  return !isDeaconGloballyPaused();
 }
 
 export type SwarmSlotLifecycle = 'running' | 'ready-to-merge' | 'failed' | 'stalled' | 'awaiting-completion-signal' | 'failed-merge-blocked';

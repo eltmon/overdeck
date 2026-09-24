@@ -30,15 +30,6 @@ export function resolveConversationWatchDirs(config: RuntimeConversationsConfig)
   };
 }
 
-export function getConversationsConfigSync(): RuntimeConversationsConfig {
-  const { config } = loadConfigSync();
-  return resolveConversationWatchDirs({
-    ...config.conversations,
-    apiKeys: config.apiKeys,
-    enabledProviders: config.enabledProviders,
-  });
-}
-
 export function getConversationSearchConfigSync(): NormalizedConversationSearchConfig {
   const { config } = loadConfigSync();
   return config.conversationSearch;
@@ -560,6 +551,10 @@ export const getOpenInEditorCommand = (): Effect.Effect<string | null> =>
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
+/**
+ * The conversations config block with API keys and enabled providers merged in and `~/` watch dirs resolved.
+ * Reads config without running the deprecated-model migration; fails with `ConfigError` on a read or parse error.
+ */
 export const getConversationsConfig = (): Effect.Effect<
   RuntimeConversationsConfig,
   ConfigError | ConfigParseError

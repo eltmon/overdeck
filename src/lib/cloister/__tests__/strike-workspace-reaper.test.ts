@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const execMock = vi.hoisted(() => vi.fn());
@@ -6,8 +7,8 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock };
 });
 
-const sessionExistsSyncMock = vi.hoisted(() => vi.fn(() => false));
-vi.mock('../../tmux.js', () => ({ sessionExistsSync: sessionExistsSyncMock }));
+const sessionExistsMock = vi.hoisted(() => vi.fn((_session: string) => Effect.succeed(false)));
+vi.mock('../../tmux.js', () => ({ sessionExists: sessionExistsMock }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn() }));
 
 import { reapMergedStrikeWorkspaces } from '../strike-workspace-reaper.js';
@@ -45,7 +46,7 @@ function wireExec(
 
 beforeEach(() => {
   execMock.mockReset();
-  sessionExistsSyncMock.mockReset().mockReturnValue(false);
+  sessionExistsMock.mockReset().mockReturnValue(Effect.succeed(false));
 });
 
 describe('reapMergedStrikeWorkspaces (PAN-1882)', () => {
@@ -65,7 +66,7 @@ describe('reapMergedStrikeWorkspaces (PAN-1882)', () => {
   });
 
   it('never reaps a strike with a live session (and skips before checking merge state)', async () => {
-    sessionExistsSyncMock.mockImplementation((s: string) => s === 'strike-pan-100');
+    sessionExistsMock.mockImplementation((s: string) => Effect.succeed(s === 'strike-pan-100'));
     const calls = wireExec({ 'strike/pan-100': '0', 'strike/pan-200': '0' });
     await reapMergedStrikeWorkspaces('/repo');
     expect(calls.some(c => c.includes('worktree remove') && c.includes('feature-pan-100-strike'))).toBe(false);

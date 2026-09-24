@@ -152,10 +152,10 @@ function tmuxProbeToPane(
 async function probeTmuxPanes(): Promise<readonly TmuxPaneProbe[]> {
   // Imported here, not at module load: the dashboard reads the inventory
   // through the backend adapter, and only the fallback needs tmux.
-  const { listPaneValuesSync, listSessionsSync } = await import('../../../lib/tmux.js');
+  const { listPaneValues, listSessions } = await import('../../../lib/tmux.js');
   const probes: TmuxPaneProbe[] = [];
-  for (const session of listSessionsSync()) {
-    const rows = listPaneValuesSync(session.name, '#{pane_dead}\t#{pane_activity}\t#{pane_current_path}');
+  for (const session of await Effect.runPromise(listSessions())) {
+    const rows = await listPaneValues(session.name, '#{pane_dead}\t#{pane_activity}\t#{pane_current_path}');
     const [first] = rows;
     if (first === undefined) {
       probes.push({ session: session.name, dead: true, activityMs: null });

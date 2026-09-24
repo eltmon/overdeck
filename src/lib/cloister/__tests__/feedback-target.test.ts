@@ -68,7 +68,7 @@ vi.mock('../../agents/agent-state.js', () => ({
     agentState.states.set(id, { ...state, paused: false, pausedReason: undefined });
     return true;
   },
-  clearAgentTroubledSync: agentState.clearTroubled,
+  clearAgentTroubled: (id: string) => Effect.sync(() => { agentState.clearTroubled(id); return null; }),
 }));
 
 const resume = vi.hoisted(() => ({

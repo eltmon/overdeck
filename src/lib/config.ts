@@ -1,3 +1,15 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `loadConfigSync` (async: `loadConfig`): 16 sites in cli/commands/issues.ts, cli/commands/start.ts,
+ *   cli/commands/triage.ts, dashboard/server/routes/misc/trackers.ts, dashboard/server/routes/workspaces.ts,
+ *   lib/cloister/work-agent-prompt.ts, lib/config.ts, lib/remote/remote-completion.ts, lib/smee.ts,
+ *   lib/traefik.ts.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { promises as fs } from 'fs';
 import { join, dirname, parse as parsePath } from 'path';
@@ -491,25 +503,3 @@ export function findDevrootForProjectSync(projectPath: string): string {
   return projectPath;
 }
 
-/**
- * Get the conversations config block, with defaults merged in.
- * Resolves watchDirs ~ to home directory.
- */
-function resolveConversationsConfig(config: OverdeckConfig): ConversationsConfig {
-  const conv = config.conversations ?? (DEFAULT_CONFIG.conversations as ConversationsConfig);
-  return {
-    ...conv,
-    watchDirs: conv.watchDirs.map((d) =>
-      d.startsWith('~/') ? join(homedir(), d.slice(2)) : d,
-    ),
-  };
-}
-
-export function getConversationsConfigSync(): ConversationsConfig {
-  return resolveConversationsConfig(loadConfigSync());
-}
-
-/** Resolve the conversations sub-config from config.toml (async). */
-export async function getConversationsConfig(): Promise<ConversationsConfig> {
-  return resolveConversationsConfig(await loadConfig());
-}

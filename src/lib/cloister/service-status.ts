@@ -1,4 +1,5 @@
 /** Cloister status and health snapshot seam. */
+import { Effect } from 'effect';
 import type { CloisterConfig } from './config.js';
 import { getDeaconLiteStatus, type DeaconLiteStatus } from './deacon-lite.js';
 import {
@@ -8,7 +9,7 @@ import {
   type AgentHealth,
   type HealthSummary,
 } from './health.js';
-import { listRunningAgentsSync } from '../agents.js';
+import { listRunningAgents } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 
 /**
@@ -36,17 +37,17 @@ export interface StatusHost {
 /**
  * Get current status
  *
- * Uses a 3-second TTL cache to avoid blocking the event loop on repeated
- * dashboard polls. The underlying computation does sync file I/O and tmux
- * calls for every agent, which scales poorly with agent count.
+ * Uses a 3-second TTL cache for repeated dashboard polls: the computation
+ * lists running agents and reads every agent's health, which scales poorly
+ * with agent count.
  */
-export function getStatus(host: StatusHost): CloisterStatus {
+export async function getStatus(host: StatusHost): Promise<CloisterStatus> {
   const now = Date.now();
   if (host.statusCache && now - host.statusCacheAt < host.statusCacheTtlMs) {
     return host.statusCache;
   }
 
-  const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
+  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
   const agentIds = runningAgents.map((a) => a.id);
 
   const agentHealths: AgentHealth[] = [];
@@ -93,8 +94,8 @@ export function getServiceAgentHealth(_host: StatusHost, agentId: string): Agent
 /**
  * Get health for all running agents
  */
-export function getAllAgentHealth(_host: StatusHost): AgentHealth[] {
-  const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
+export async function getAllAgentHealth(_host: StatusHost): Promise<AgentHealth[]> {
+  const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
   const agentHealths: AgentHealth[] = [];
 
   for (const agent of runningAgents) {

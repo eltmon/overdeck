@@ -171,9 +171,9 @@ function waitForPortFree(port: number, timeoutMs = 5000): Promise<void> {
 async function startSidecars(): Promise<void> {
   // CLIProxy
   try {
-    const { startCliproxySync, CLIPROXY_PORT } = await import('../../lib/cliproxy.js');
+    const { startCliproxy, CLIPROXY_PORT } = await import('../../lib/cliproxy.js');
     console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
-    startCliproxySync();
+    await startCliproxy();
     console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
   } catch (error: any) {
     console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
@@ -671,8 +671,8 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       // ignore
     }
     try {
-      const { stopCliproxySync } = await import('../../lib/cliproxy.js');
-      stopCliproxySync();
+      const { stopCliproxy } = await import('../../lib/cliproxy.js');
+      await stopCliproxy();
     } catch {
       // ignore
     }

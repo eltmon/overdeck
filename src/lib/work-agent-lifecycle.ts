@@ -1,7 +1,16 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `getWorkAgentLifecycleStateSync` (async: `getWorkAgentLifecycleState`): src/cli/commands/reset-session.ts:19,
+ *   src/lib/work-agent-lifecycle.ts:334,349.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { Effect } from 'effect';
-import { getAgentStateSync, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, getLatestSessionId, normalizeAgentId } from './agents.js';
+import { getAgentStateSync, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, normalizeAgentId } from './agents.js';
 import { hasCompletionMarkerForAgent } from './agents/supervisor-channels.js';
 import { claudeSessionTranscriptExists } from './paths.js';
 import { getPrFacts } from './cloister/pr-facts.js';
@@ -199,7 +208,7 @@ export async function getWorkAgentLifecycleState(agentOrIssueId: string): Promis
   const agentState = getAgentStateSync(agentId);
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId));
   const hasAgentState = !!agentState;
-  const sessionId = await Effect.runPromise(getLatestSessionId(agentId)) ?? null;
+  const sessionId = getLatestSessionIdSync(agentId) ?? null;
   const hasSavedSession = !!sessionId;
   // Same not-dead default as the sync variant above: an indeterminate probe
   // reads as live.

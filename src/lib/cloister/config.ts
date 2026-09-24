@@ -4,6 +4,19 @@
  * Loads and manages Cloister configuration from ~/.overdeck/cloister.toml
  */
 
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `loadCloisterConfigSync` (async: `loadCloisterConfig`): 12 sites in dashboard/server/routes/cloister.ts,
+ *   lib/cloister/concurrency.ts, lib/cloister/config.ts, lib/cloister/cost-monitor.ts,
+ *   lib/cloister/deacon-swarm-completion.ts, lib/cloister/patrol-budget.ts, lib/cloister/service.ts,
+ *   lib/cloister/triggers.ts.
+ * - `saveCloisterConfigSync` (async: `saveCloisterConfig`): src/lib/cloister/config.ts:613.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { parse, stringify } from '@iarna/toml';

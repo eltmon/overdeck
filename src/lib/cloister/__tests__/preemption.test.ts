@@ -20,7 +20,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   loadCloisterConfigSync: vi.fn(),
-  listRunningAgentsSync: vi.fn(),
+  listRunningAgents: vi.fn(),
   listAgentStates: vi.fn(),
   setAgentYieldedSync: vi.fn(),
   clearYieldForResumeSync: vi.fn(),
@@ -37,7 +37,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../agents.js', () => ({
-  listRunningAgentsSync: mocks.listRunningAgentsSync,
+  listRunningAgents: mocks.listRunningAgents,
   listAgentStates: mocks.listAgentStates,
   setAgentYieldedSync: mocks.setAgentYieldedSync,
   clearYieldForResumeSync: mocks.clearYieldForResumeSync,
@@ -172,9 +172,9 @@ describe('yieldWorkAgentFor', () => {
   });
 
   it('yields an idle work agent, pauses+stops it, and emits observability', async () => {
-    mocks.listRunningAgentsSync.mockReturnValue([
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-1000', issueId: 'PAN-1000', role: 'work', status: 'running', lastActivity: '2026-07-08T00:00:00.000Z' },
-    ]);
+    ]));
     mocks.isAgentIdleForNudge.mockReturnValue(true);
 
     const outcome = await yieldWorkAgentFor('review', 'PAN-5678');
@@ -193,9 +193,9 @@ describe('yieldWorkAgentFor', () => {
   });
 
   it('does not yield when no running work agent is idle', async () => {
-    mocks.listRunningAgentsSync.mockReturnValue([
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-1000', issueId: 'PAN-1000', role: 'work', status: 'running', lastActivity: '2026-07-08T00:00:00.000Z' },
-    ]);
+    ]));
     mocks.isAgentIdleForNudge.mockReturnValue(false);
 
     const outcome = await yieldWorkAgentFor('review', 'PAN-5678');
@@ -206,9 +206,9 @@ describe('yieldWorkAgentFor', () => {
 
 describe('tryYieldForAdvancingDispatch', () => {
   beforeEach(() => {
-    mocks.listRunningAgentsSync.mockReturnValue([
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-1000', issueId: 'PAN-1000', role: 'work', status: 'running', lastActivity: '2026-07-08T00:00:00.000Z' },
-    ]);
+    ]));
     mocks.isAgentIdleForNudge.mockReturnValue(true);
   });
 

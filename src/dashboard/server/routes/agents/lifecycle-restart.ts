@@ -16,7 +16,7 @@ import { getIssueStageSync, isTerminalIssueStage } from '../../../../lib/overdec
 
 import {
   getAgentStateSync,
-  getLatestSessionId,
+  getLatestSessionIdSync,
   recoverAgent,
   resumeAgent,
   restartAgent,
@@ -726,7 +726,7 @@ export const postAgentResetSessionRoute = HttpRouter.add(
       return jsonResponse({ error: `Agent ${id} is running. Stop it first.`, lifecycle }, { status: 409 });
     }
 
-    const previousSessionId = yield* getLatestSessionId(id);
+    const previousSessionId = getLatestSessionIdSync(id);
     // Evidence must match the lifecycle assert's: hasSavedSession reads the
     // agents-table session_id column, so a --fresh wipe that cleared only the
     // state-dir files left reset-session refusing (404) while pan start still

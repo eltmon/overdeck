@@ -409,8 +409,8 @@ export function setBootReconciliationGrace(graceDeadline: string, graceExtension
   setSetting(BOOT_RECONCILIATION_GRACE_EXTENSIONS_KEY, String(graceExtensions));
 }
 
-/** Synchronous check of the global Deacon pause flag. */
-export function isDeaconGloballyPausedSync(): boolean {
+/** Synchronous check of the global Deacon pause flag; a failed read logs and reports not paused. */
+export function isDeaconGloballyPaused(): boolean {
   try {
     return getSetting(DEACON_GLOBAL_PAUSE_KEY) === 'true';
   } catch (err) {
@@ -419,19 +419,9 @@ export function isDeaconGloballyPausedSync(): boolean {
   }
 }
 
-/** Drop-in for isDeaconGloballyPaused() from app-settings.ts. */
-export function isDeaconGloballyPaused(): boolean {
-  return isDeaconGloballyPausedSync();
-}
-
 /** Synchronous set of the global Deacon pause flag. */
-export function setDeaconGloballyPausedSync(paused: boolean): void {
-  setSetting(DEACON_GLOBAL_PAUSE_KEY, paused ? 'true' : 'false');
-}
-
-/** Drop-in for setDeaconGloballyPaused() from app-settings.ts. */
 export function setDeaconGloballyPaused(paused: boolean): void {
-  setDeaconGloballyPausedSync(paused);
+  setSetting(DEACON_GLOBAL_PAUSE_KEY, paused ? 'true' : 'false');
 }
 
 /** Synchronous check of the Cloister spawn pause flag. */
@@ -447,11 +437,6 @@ export function isCloisterSpawnsPausedSync(): boolean {
 /** Synchronous set of the Cloister spawn pause flag. */
 export function setCloisterSpawnsPausedSync(paused: boolean): void {
   setSetting(CLOISTER_SPAWNS_PAUSED_KEY, paused ? 'true' : 'false');
-}
-
-/** Drop-in for getFlywheelActiveRunId() from app-settings.ts. */
-export function getFlywheelActiveRunId(): string | null {
-  return getFlywheelActiveRunIdSync();
 }
 
 /** Set the active flywheel run ID. */

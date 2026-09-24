@@ -48,9 +48,9 @@ const readJsonBody = Effect.gen(function* () {
 const getCloisterStatusRoute = HttpRouter.add(
   'GET',
   '/api/cloister/status',
-  httpHandler(Effect.try({
-    try: () => {
-      return jsonResponse(readDurableCloisterStatus());
+  httpHandler(Effect.tryPromise({
+    try: async () => {
+      return jsonResponse(await readDurableCloisterStatus());
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
@@ -209,9 +209,9 @@ const putCloisterConfigRoute = HttpRouter.add(
 const getCloisterAgentsHealthRoute = HttpRouter.add(
   'GET',
   '/api/cloister/agents/health',
-  httpHandler(Effect.try({
-    try: () => {
-      const agentHealths = getCloisterService().getAllAgentHealth();
+  httpHandler(Effect.tryPromise({
+    try: async () => {
+      const agentHealths = await getCloisterService().getAllAgentHealth();
       return jsonResponse({ agents: agentHealths });
     },
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),

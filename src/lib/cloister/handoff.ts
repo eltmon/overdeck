@@ -6,14 +6,15 @@
  * 2. Legacy specialist wake has been removed; all handoffs use role-based respawn.
  */
 
+import { Effect } from 'effect';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Data } from 'effect';
 import type { AgentState } from '../agents.js';
-import { getAgentStateSync, saveAgentStateSync, stopAgentSync, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
+import { getAgentStateSync, saveAgentStateSync, stopAgent, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
-import { sessionExistsSync } from '../tmux.js';
+import { sessionExists } from '../tmux.js';
 import { requireModelOverrideSync } from '../model-validation.js';
 
 /**
@@ -128,7 +129,7 @@ async function performKillAndSpawn(
     const context = await captureHandoffContext(state, options.targetModel, options.reason);
 
     // Step 4: Kill current agent
-    stopAgentSync(state.id);
+    await Effect.runPromise(stopAgent(state.id));
 
     // Step 5: Build handoff prompt
     const prompt = buildHandoffPrompt(context, options.additionalInstructions);
@@ -183,7 +184,7 @@ async function waitForIdle(agentId: string, timeoutMs: number): Promise<boolean>
 
   while (Date.now() - startTime < timeoutMs) {
     // Check if agent session still exists
-    if (!sessionExistsSync(agentId)) {
+    if (!(await Effect.runPromise(sessionExists(agentId)))) {
       return true; // Agent is gone, consider it idle
     }
 

@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -6,7 +5,7 @@ import { join } from 'node:path';
 
 import type { AgentState } from '../agent-state.js';
 import {
-  getLatestSessionId,
+  getLatestSessionIdSync,
   resolveClaudeSessionRecoverySync,
   resolveLatestSessionIdSync,
   type ClaudeSessionRecoveryDeps,
@@ -90,7 +89,7 @@ describe('Claude session reconstruction fallback', () => {
     });
 
     const syncSessionId = resolveLatestSessionIdSync(agentState.id, recoveryDeps).sessionId;
-    const asyncSessionId = await Effect.runPromise(getLatestSessionId(agentState.id, recoveryDeps));
+    const asyncSessionId = getLatestSessionIdSync(agentState.id, recoveryDeps);
 
     expect(syncSessionId).toBe('event-only-session');
     expect(asyncSessionId).toBe(syncSessionId);

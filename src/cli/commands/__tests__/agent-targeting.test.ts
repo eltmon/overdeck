@@ -3,9 +3,9 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
-  setAgentPausedSync: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
-  clearAgentTroubledSync: vi.fn(),
+  setAgentPaused: vi.fn(),
+  clearAgentPaused: vi.fn(),
+  clearAgentTroubled: vi.fn(),
   stopAgent: vi.fn(),
 }));
 
@@ -118,6 +118,9 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  agentMocks.setAgentPaused.mockReturnValue(Effect.succeed(null));
+  agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
+  agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed(null));
   vi.clearAllMocks();
   agentMocks.stopAgent.mockReturnValue(Effect.void);
   FAKE_AGENTS_DIR_LISTING.entries = [];
@@ -149,7 +152,7 @@ describe('pauseCommand agent targeting (PAN-1760)', () => {
   it('pauses a strike session by its full agent ID', async () => {
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('strike-pan-1723', {});
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('strike-pan-1723', undefined, false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('strike-pan-1723', undefined, false);
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),
     );
@@ -158,7 +161,7 @@ describe('pauseCommand agent targeting (PAN-1760)', () => {
   it('still pauses the canonical work agent for a bare issue ID', async () => {
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('PAN-1723', { reason: 'ram' });
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('agent-pan-1723', 'ram', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1723', 'ram', false);
   });
 });
 
@@ -167,7 +170,7 @@ describe('unpauseCommand agent targeting (PAN-1760)', () => {
     agentMocks.getAgentStateSync.mockReturnValue({ ...STOPPED_STATE, paused: true });
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('strike-pan-1723');
-    expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('strike-pan-1723');
+    expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('strike-pan-1723');
   });
 });
 

@@ -9,7 +9,7 @@ import { promisify } from 'util';
 import { exec, execFile, execFileSync, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
+import { clearAgentPaused, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
@@ -415,7 +415,7 @@ async function handleRemoteWorkspace(
   spinner.text = 'Spawning remote agent...';
   try {
     if (clearPauseBeforeSpawn) {
-      clearAgentPausedSync(agentId);
+      await Effect.runPromise(clearAgentPaused(agentId));
     }
 
     const remoteAgent = await spawnRemoteAgent({
@@ -1186,7 +1186,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // After spawnAgent finishes session creation, this command only prints the
     // details below and exits; any remaining pre-spawn delay is tracker/prompt work.
     if (shouldClearPauseBeforeSpawn) {
-      clearAgentPausedSync(agentId);
+      await Effect.runPromise(clearAgentPaused(agentId));
     }
     const agent = await runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
       issueId: id,

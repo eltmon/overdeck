@@ -1027,3 +1027,141 @@ mock provided only `preTrustDirectory` for a deleted call (`agent-state-role`, `
 `conversations-supervisor`), the factory is now empty so the module stays mocked out; where it also provided
 `preTrustDirectorySync` (registration and creation tests), the stale key is dropped. Factory entries for the 31 wrappers that had no production caller are removed as
 stale (26 files). `agents-barrel-exports.test.ts` drops `getAgentState` from the frozen list.
+
+## CH-6b: Shape C twins and no blocking sync in server code (#4012, part 2 of 2)
+
+PRD W8 and W11 part 3. Every Shape C pair outside Oh My Pi was re-decided with import-resolved call sites (the audit's
+`--usage` walk matches names, so it counted, e.g., config.ts and config-yaml's `getConversationsConfigSync` together).
+"Blocks on a child process" is transitive: a twin blocks when it calls `execSync`, `execFileSync`, `spawnSync` or
+`tmuxExecSync`, or another twin that does (`listRunningAgentsSync` → `listSessionsSync`, `stopAgentSync` →
+`capturePaneSync`/`killSessionSync`, `sessionExistsSync` → `querySessionSync`).
+
+Ratchet: C 52 → 35 (34 pairs plus the Oh My Pi runtime row). A 1 and B 4 are Oh My Pi only (#4003). Effect diagnostics
+unchanged at 250. `src/lib/tmux.ts` (1324) and `src/lib/projects.ts` (1253) gain audited file-size exceptions (PAN-4012)
+for their sync-twin headers.
+
+`agents/agent-state.ts` `clearAgentPausedSync` stays (C6 with a stated reason) after the merge of #4045: its
+`onlyIf` compare-and-clear, used by `cloister/feedback-target.ts`, must read and write state.json with no await in
+between, which the Effect variant (async mkdir and write) cannot promise. Its other callers (`pan start` ×2,
+`pan unpause`) moved to the `clearAgentPaused` Effect in this PR, as the C4 rule has it; the compare-and-clear caller
+keeps the sync twin.
+
+A C5 row whose remaining Effect-variant caller is server-reachable keeps the async variant: server callers use the async
+twin. So `cloister/config.ts` `loadCloisterConfig`/`saveCloisterConfig` (caller: `lifecycle/workflows.ts` close-out)
+and `projects.ts` `resolveProjectFromIssue` (caller: `services/read-workspace-file.ts`; its loader exists so dashboard
+resolves avoid sync syscalls, PAN-3330) stay as C6 rows instead of the PRD's C5.
+
+### Deleted twins
+
+| Module | Deleted | Survivor | Rule | Callers moved |
+| --- | --- | --- | --- | --- |
+| `agents/agent-state.ts` | `setAgentPausedSync` | `setAgentPaused` (Effect) | C4 | `cli/commands/pause.ts`, `cli/commands/workspace-migrate.ts`, `cloister/memory-governor.ts`, `cloister/service-crash.ts` (all async) |
+| `agents/agent-state.ts` | `clearAgentTroubledSync` | `clearAgentTroubled` (Effect) | C4 | `cloister/feedback-target.ts` |
+| `agents/activity.ts` | `getLatestSessionId` (Effect.sync) | `getLatestSessionIdSync` | C5 | `routes/agents/lifecycle-restart.ts` (generator), `work-agent-lifecycle.ts` |
+| `cliproxy.ts` | `startCliproxySync` | `startCliproxy` | C4 | `cli/commands/dev.ts`, `cli/up-sidecars.ts`, `cli/commands/restart.ts` (injected) |
+| `cliproxy.ts` | `stopCliproxySync` | `stopCliproxy` | C4 | `cli/commands/dev.ts`, `cli/index.ts`, `cli/commands/restart.ts` (injected) |
+| `cliproxy.ts` | `isCliproxyRunningSync` | `isCliproxyRunning` | C4 | `cli/commands/system-health.ts`, `cli/index.ts`, `cli/commands/restart.ts` (injected) |
+| `cliproxy.ts` | `installCliproxySync` | `installCliproxy` | C4 | `cli/commands/restart.ts` (injected); its other caller was `startCliproxySync` |
+| `cliproxy.ts` | `bridgeCodexAuthToCliproxySync` | `bridgeCodexAuthToCliproxy` | C4 | `startCliproxy`, `openai-auth.ts` `getOpenAIAuthStatus` (both async) |
+| `cliproxy.ts` | private `isCliproxyUpToDateSync` | private `isCliproxyUpToDateTask` | — | only the deleted sync twins used it |
+| `openai-auth.ts` | `getOpenAIAuthStatusSync` (+ private `readCodexAuthSync`) | `getOpenAIAuthStatus` | C2 | no production caller |
+| `cloister/handoff-logger.ts` | `readHandoffEvents` (Effect) + private `ensureLogDirAsync` | `readHandoffEventsSync` | C3 | no caller |
+| `config.ts` | `getConversationsConfigSync`, `getConversationsConfig` | config-yaml's `getConversationsConfig` | C1 | neither had a production caller (every "caller" imported config-yaml's) |
+| `config-yaml/load.ts` | `getConversationsConfigSync` | `getConversationsConfig` (Effect) | C4 | `cli/commands/conversations/{embed,scan}.ts`, `conversations/{embeddings,enrichment}/index.ts`, `conversations/search.ts` (all async) |
+| `overdeck/control-settings.ts` | `isDeaconGloballyPausedSync` | `isDeaconGloballyPaused` | C5 alias | `routes/misc/deacon.ts`, `cloister/deacon-lite.ts`, `cloister/deacon-swarm.ts` |
+| `overdeck/control-settings.ts` | `setDeaconGloballyPausedSync` | `setDeaconGloballyPaused` | C5 alias | `routes/misc/deacon.ts` |
+| `overdeck/control-settings.ts` | `getFlywheelActiveRunId` | `getFlywheelActiveRunIdSync` | C5 alias | `cloister/uat-promote-notify.ts` |
+| `projects.ts` | `renameProjectSync` | `renameProject` | C4 | `cli/commands/project.ts` |
+| `xbrief/acceptance-criteria.ts` | `extractAcceptanceCriteriaSync` | `extractAcceptanceCriteria` (Effect) | C2 | no production caller; its tests now run the Effect variant (a CH-8 dead-export candidate) |
+
+`agents.ts` and `xbrief/index.ts` drop the re-exports of the deleted names; `agents-barrel-exports.test.ts` drops them
+from the frozen list.
+
+### Kept twins (C6) and their header notes
+
+Every module that still has a Shape C pair gets a `Sync twins (PAN-3958)` header naming each twin's synchronous callers
+by `file:line` (by file when a twin has more than six sites; `node scripts/audit-effect-boundary.mjs --json --usage` has
+the lines), and, for twins that block on a child process, a note that server code must not call them. Non-blocking
+sync twins (file reads such as `loadConfigSync`, `getProjectSync`) keep their server callers: FR-8 covers only twins
+that block on a child process. Modules:
+`agents/agent-state.ts`, `agents/liveness.ts` (`isAliveSync`: header only, owned by PAN-3845, semantics unchanged),
+`agents/queries.ts`, `agents/runtime-pid-probe.ts` (its only sync caller is `isAliveSync`, so it stays C6 rather
+than the PRD's C4), `agents/runtime-state.ts`, `agents/termination.ts`, `cloister/config.ts`, `config.ts`, `prd-locations.ts`,
+`projects-config-lock.ts`, `projects-config-write.ts`, `projects.ts`, `runtimes/muse-session.ts`, `tmux.ts`,
+`ui-theme.ts`, `work-agent-lifecycle.ts`, `xbrief/io.ts`. `tmux.ts` `getAgentSessionsSync` stays C6: its Effect twin's
+caller is a sync `overdeck/infra.ts` service slot and the sync twin blocks, so C5 does not apply.
+
+### FR-8: no blocking `*Sync` in `src/dashboard/**` or `src/lib/cloister/**`
+
+Converted to the async twin:
+
+| Site | Was | Now |
+| --- | --- | --- |
+| `services/backend-inventory.ts` `probeTmuxPanes` | `listSessionsSync`, `listPaneValuesSync` | `listSessions` (Effect), `listPaneValues` |
+| `services/cloister-control-surface.ts` `readDurableCloisterStatus` (now `async`) | `listRunningAgentsSync` | `listRunningAgents`; callers `routes/cloister.ts`, `routes/metrics.ts` (2), `overdeck/process-services.ts` await it |
+| `cloister/service-status.ts` `getStatus`, `getAllAgentHealth` (now `async`, and so `CloisterService.getStatus()` / `getAllAgentHealth()`) | `listRunningAgentsSync` | `listRunningAgents`; `routes/cloister.ts` agents-health awaits it |
+| `cloister/agent-death.ts` `describeAgentDeath` (now `async`; no production caller) | `sessionExistsSync`, `listPaneValuesSync` | `sessionExists`, `listPaneValues` |
+| `cloister/confirmed-session-query.ts` `queryConfirmedSession` (now `async`; no production caller) | `querySessionSync` | `querySession` (Effect) — the held `querySession` row |
+| `cloister/handoff.ts` | `stopAgentSync`, `sessionExistsSync` | `stopAgent`, `sessionExists` |
+| `cloister/memory-governor.ts` `shed` | `listRunningAgentsSync`, `stopAgentSync` | `listRunningAgents`, `stopAgent` |
+| `cloister/preemption.ts`, `cloister/service-health.ts` | `listRunningAgentsSync` | `listRunningAgents` |
+| `cloister/strike-workspace-reaper.ts` | `sessionExistsSync` | `sessionExists` |
+| `cloister/swarm-foreman.ts` | dependency `listSessionNamesSync` | dependency `listSessionNames` (Promise) |
+| `cloister/stall-sweeper.ts` `runStallSweeperPatrol` | default `isAgentLive` = `sessionExistsSync` | default awaits `sessionExists`; the dependency may return a Promise |
+| `cloister/concurrency.ts` `countRunningAgents` | `listRunningAgentsSync` | `listRunningAgents` |
+
+Operator decision (#4048): the six remaining sync calls stay as they are. `cloister/concurrency.ts`
+`describeRunningAgents`, `countRunningSwarmSlotsForIssue` and `countWarmIdleAdvancingAgents` (default parameters) and
+`emergencyBrake` (`listRunningAgentsSync`, `stopAgentSync`), and `cloister/service.ts` `emergencyStop`
+(`listRunningAgentsSync`). The emergency brake and stop stay synchronous on purpose; CH-8 handles the dead ones.
+
+### Behaviour notes for reviewers
+
+- `stopAgent` replaces `stopAgentSync` in `handoff.ts` and `memory-governor.ts`: it closes the agent through the
+  selected terminal backend (Herdr or tmux) instead of only killing a tmux session, as `stopAgentSync`'s own doc asks
+  of every caller that can await.
+- Pause/unpause from `pan pause`, `pan unpause`, `pan start`, `workspace-migrate`, the memory governor, the crash
+  escalation and feedback resurrection now save through `saveAgentState` (Effect), which also records the feature
+  registry lifecycle row, as every other state write already does.
+- The five conversations-config callers now read config without the deprecated-model migration (the Effect variant
+  reads with `loadConfigNoMigration`); a failed read rejects with `ConfigError` carrying the same message.
+- `pan project rename` goes through `renameProject`: an I/O failure's message gains the `FsError` prefix
+  ("renameProject failed for <path>: …"); `ProjectRenameError` messages are unchanged.
+- The CLI cliproxy start/stop/status paths use the async lifecycle: `stopCliproxy` waits 500 ms after SIGTERM before
+  clearing the port, `startCliproxy` waits for the child's `spawn` event, and the Codex bridge resolves `false`
+  instead of throwing when the credential write fails (its callers already treated it as best-effort).
+- `routes/agents/lifecycle-restart.ts` restart-with-current-config (from CH-6a's `getAgentStateSync` rewrite): the
+  read is inside the loop's JS `try`/`catch`, so an unreadable agent state now yields an `error` result for that
+  agent instead of failing the whole batch with a 500.
+
+### PRD D3 correction
+
+In effect 4.0.0-beta.73 `Effect.try` accepts only `{ try, catch }`; `Effect.try(() => x)` throws "options.catch is not
+a function" even on success. D3's `yield* Effect.try(() => fooSync(x)).pipe(…)` must read
+`yield* Effect.try({ try: () => fooSync(x), catch: (cause) => cause }).pipe(…)`. Recorded here and in the PR body;
+the PRD branch is not edited from this worktree.
+
+### Tests
+
+None are deleted, and the diff adds and removes no `it()`/`test()` calls. Tests of the deleted twins run the survivor
+(`projects-rename` → `renameProject`, `acceptance-criteria` → `extractAcceptanceCriteria`, `activity-recovery` →
+`getLatestSessionIdSync`). Mocks follow the new shapes: sync-to-Effect mocks return `Effect.succeed`, sync-to-Promise
+mocks resolve, and factories that mocked both a deleted twin and its survivor keep only the survivor. Where a module
+still calls both twins (`concurrency.ts`), tests mock both.
+
+### #4048 review follow-ups
+
+- `tmux.ts` `sessionQueryFailure` (now exported for its test) reads the exit code from `status` (execFileSync) or a
+  numeric `code` (promisified `execFile`). The async `querySession` used to see `code: 1` with `status` unset and
+  classified every missing session as a tmux error, so `queryConfirmedSession` reported "skipped — tmux query failed".
+  `src/lib/__tests__/tmux-session-query-failure.test.ts` builds the errors from real child processes.
+- `stopAgentSync`'s async callers now await `stopAgent`, which closes a Herdr pane as well as a tmux session:
+  `cli/commands/start-fresh-session.ts` (`pan start --fresh`), `cli/commands/workspace-migrate.ts` (migrate to
+  remote) and `health.ts` `handleStuckAgentPromise`. The first two were gated on the tmux-only `sessionExistsSync`,
+  so on Herdr they skipped the stop and left the local pane and harness running (the #3966 symptom); they now gate on
+  `terminal-backends/launch.ts` `agentPaneExists` plus a legacy tmux session. `pan start --fresh`'s "still alive"
+  error no longer names tmux. `termination.ts`'s header now lists only `stopAgentSync`'s real sync callers
+  (`cli/commands/swarm.ts` dependency slots and `concurrency.ts` `emergencyBrake`).
+- `runtime.json`: `stopAgentSync`'s `saveAgentRuntimeState(id, { state: 'stopped' })` writes no file any more; it only
+  emits the `activity: stopped` heartbeat, which `stopAgent` already emits (detached). The two paths match; no change.
+

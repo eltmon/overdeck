@@ -12,6 +12,14 @@
  * land in the canonical lowercase subdirectory format.
  */
 
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `findDraftPrdSync` (async: `findDraftPrd`): src/lib/prd-locations.ts:153.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { existsSync } from 'fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import { join } from 'path';

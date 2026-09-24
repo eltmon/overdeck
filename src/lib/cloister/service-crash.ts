@@ -1,4 +1,5 @@
 /** Cloister crash recovery and poke escalation seam. */
+import { Effect } from 'effect';
 import { createHash } from 'crypto';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -151,9 +152,9 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
 
   // Tier 3 (5th no-progress poke): stop poking — surface to the operator.
   if (ineffective >= 4) {
-    const { setAgentPausedSync } = await import('../agents/agent-state.js');
+    const { setAgentPaused } = await import('../agents/agent-state.js');
     try {
-      setAgentPausedSync(agentId, `needs-you: idle-alive — no observable progress across ${ineffective + 1} pokes (idle-alive escalation)`);
+      await Effect.runPromise(setAgentPaused(agentId, `needs-you: idle-alive — no observable progress across ${ineffective + 1} pokes (idle-alive escalation)`));
       host.emit({ type: 'agent_stuck', agentId, health: undefined as never });
       console.log(`🛑 ${agentId} paused: idle-alive across ${ineffective + 1} pokes`);
     } catch (pauseErr) {

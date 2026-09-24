@@ -30,7 +30,7 @@ import { getPrFacts, isAwaitingReview, type PrFacts } from './pr-facts.js';
 import {
   clearYieldForResumeSync,
   listAgentStates,
-  listRunningAgentsSync,
+  listRunningAgents,
   resumeAgent,
   setAgentYieldedSync,
   stopAgent,
@@ -131,7 +131,7 @@ async function buildCandidates(): Promise<YieldCandidate[]> {
   const sessions = await Effect.runPromise(listSessions());
   const attached = new Set(sessions.filter((s) => s.attached).map((s) => s.name));
 
-  return Promise.all(listRunningAgentsSync()
+  return Promise.all((await Effect.runPromise(listRunningAgents()))
     .filter((s) => s.role === 'work' && s.status === 'running')
     .map(async (s) => ({
       id: s.id,

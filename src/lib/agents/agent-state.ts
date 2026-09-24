@@ -1,3 +1,17 @@
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `clearAgentPausedSync` (async: `clearAgentPaused`): src/lib/cloister/feedback-target.ts:254. Its callers are
+ *   async; it stays because its `onlyIf` compare-and-clear (#4045) must read and write state.json with no await in
+ *   between, which the Effect variant cannot promise.
+ * - `saveAgentStateSync` (async: `saveAgentState`): 13 sites in lib/agents/agent-state.ts,
+ *   lib/agents/messaging.ts, lib/agents/spawn.ts, lib/agents/supervisor-channels.ts, lib/agents/termination.ts,
+ *   lib/lifecycle/teardown-workspace.ts, lib/runtimes/claude-code.ts, lib/runtimes/kimi-code.ts.
+ * Long lists name files under src/; `node scripts/audit-effect-boundary.mjs --json --usage` has the lines.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { mkdirSync, writeFileSync } from 'fs';
 import { readdir, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { join } from 'path';
@@ -266,16 +280,7 @@ function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = f
   }
 }
 
-/** Sets the persistent manual pause gate used before stopping or suppressing resume. */
-export function setAgentPausedSync(agentId: string, reason?: string, stoppedByPause = false): boolean {
-  const state = getAgentStateSync(agentId);
-  if (!state) return false;
-
-  applyAgentPaused(state, reason, stoppedByPause);
-  saveAgentStateSync(state);
-  return true;
-}
-
+/** Sets the persistent manual pause gate used before stopping or suppressing resume; resolves the saved state, or null when the agent has no state. */
 export const setAgentPaused = (
   agentId: string,
   reason?: string,
@@ -368,6 +373,7 @@ export function clearAgentPausedSync(agentId: string, onlyIf?: (state: AgentStat
   return true;
 }
 
+/** Clears the persistent manual pause gate without spawning the agent; resolves the state (unchanged when already clear), or null when the agent has no state. */
 export const clearAgentPaused = (agentId: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* Effect.try({
@@ -405,17 +411,7 @@ function applyAgentUntroubled(state: AgentState): void {
   clearFailureTrackingFields(state);
 }
 
-/** Clears the troubled gate and its accumulated failure state. */
-export function clearAgentTroubledSync(agentId: string): boolean {
-  const state = getAgentStateSync(agentId);
-  if (!state) return false;
-  if (isAgentTroubledClear(state)) return true;
-
-  applyAgentUntroubled(state);
-  saveAgentStateSync(state);
-  return true;
-}
-
+/** Clears the troubled gate and its accumulated failure state; resolves the state (unchanged when already clear), or null when the agent has no state. */
 export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* Effect.try({

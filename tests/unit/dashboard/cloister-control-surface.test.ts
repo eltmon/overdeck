@@ -1,7 +1,8 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  listRunningAgentsSync: vi.fn(() => []),
+  listRunningAgents: vi.fn(() => Effect.succeed([])),
   getRuntimeForAgent: vi.fn(),
   loadCloisterConfigSync: vi.fn(() => ({
     startup: { auto_start: true },
@@ -25,7 +26,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  listRunningAgentsSync: mocks.listRunningAgentsSync,
+  listRunningAgents: mocks.listRunningAgents,
 }));
 
 vi.mock('../../../src/lib/runtimes/index.js', () => ({
@@ -73,7 +74,7 @@ const {
 describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surface)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.listRunningAgentsSync.mockReturnValue([]);
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.readCloisterStateFile.mockReturnValue({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' });
     mocks.getDeaconLiteStatus.mockReturnValue({
       running: true,
@@ -88,7 +89,7 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
   });
 
   it('composes status from the pid file and deacon-lite\'s in-memory status', async () => {
-    const status = readDurableCloisterStatus();
+    const status = await readDurableCloisterStatus();
 
     expect(status.running).toBe(true);
     expect(status.lastCheck?.toISOString()).toBe('2026-07-03T00:00:00.000Z');

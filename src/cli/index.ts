@@ -1197,10 +1197,10 @@ program
 
     // Stop CLIProxyAPI sidecar
     try {
-      const { stopCliproxySync, isCliproxyRunningSync } = await import('../lib/cliproxy.js');
-      if (isCliproxyRunningSync()) {
+      const { stopCliproxy, isCliproxyRunning } = await import('../lib/cliproxy.js');
+      if (await isCliproxyRunning()) {
         console.log(chalk.dim('Stopping CLIProxyAPI sidecar...'));
-        stopCliproxySync();
+        await stopCliproxy();
         console.log(chalk.green('✓ CLIProxyAPI stopped'));
       }
     } catch {

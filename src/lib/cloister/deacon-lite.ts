@@ -18,7 +18,7 @@ import { isAlive, isConfirmedDead, isIdle } from '../agents/liveness.js';
 import { liveAgentInventory } from '../terminal-backends/inventory.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { getWorkspaceGitState } from '../workspaces/git-state.js';
-import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
+import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
@@ -295,7 +295,7 @@ export async function runDeaconLite(): Promise<void> {
   // D7 keeps DeaconPauseToggle / pan admin cloister pause — honor it here so
   // a manual "run patrol now" and the interval both respect it. Host hygiene
   // is unaffected (FR-11 runs it outside deacon-lite).
-  if (isDeaconGloballyPausedSync()) return;
+  if (isDeaconGloballyPaused()) return;
   await checkStuckWorkAgents();
   await checkApiErrorAgents();
   await reconcileAgentLiveness();

@@ -51,9 +51,7 @@ export {
   SESSION_EXITED_BEFORE_KICKOFF,
   __testInternals,
   clearAgentPaused,
-  clearAgentPausedSync,
   clearAgentTroubled,
-  clearAgentTroubledSync,
   getAgentDir,
   getAgentStateFilePath,
   getAgentStateSync,
@@ -68,7 +66,6 @@ export {
   saveAgentState,
   saveAgentStateSync,
   setAgentPaused,
-  setAgentPausedSync,
   setAgentYieldedSync,
   clearYieldForResumeSync,
   wipeAgentStateDirs,
@@ -78,7 +75,7 @@ export {
   type Role,
 } from './agents/agent-state.js';
 export { stopAgentSync, stopAgent } from './agents/termination.js';
-export { type ActivityEntry, appendActivity, getActivity, saveSessionId, getSessionId, getLatestSessionIdSync, getLatestSessionId } from './agents/activity.js';
+export { type ActivityEntry, appendActivity, getActivity, saveSessionId, getSessionId, getLatestSessionIdSync } from './agents/activity.js';
 export { type AgentResolution, type AgentRuntimeState, getAgentRuntimeStateSync, getAgentRuntimeState, saveAgentRuntimeState } from './agents/runtime-state.js';
 export { deliverAgentMessage, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, deliverAgentPermissionDecision, setAgentDeliveryMethod, type DeliveryResult } from './agents/delivery.js';
 export { messageAgent } from './agents/messaging.js';

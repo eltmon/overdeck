@@ -16,9 +16,10 @@
  *     so the pipeline can always drain instead of deadlocking with work agents.
  */
 
+import { Effect } from 'effect';
 import { loadCloisterConfigSync } from './config.js';
 import {
-  listRunningAgentsSync,
+  listRunningAgentsSync, listRunningAgents,
   stopAgentSync,
   getAgentRuntimeStateSync,
 } from '../agents.js';
@@ -176,7 +177,7 @@ export function countWarmIdleAdvancingAgents(
  */
 export async function countRunningAgents(): Promise<RunningCounts> {
   const liveIds = await listLiveAgentIds();
-  const live = listRunningAgentsSync().filter(
+  const live = (await Effect.runPromise(listRunningAgents())).filter(
     agent => agent.status === 'running' && (liveIds === null || liveIds.has(agent.id)),
   );
   const counts: Record<string, number> = {};

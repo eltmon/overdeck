@@ -640,10 +640,10 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       case 'cliproxy': {
         const cliproxy = await import('../../lib/cliproxy.js');
         await restartCliproxy({
-          stopCliproxy: cliproxy.stopCliproxySync,
-          startCliproxy: cliproxy.startCliproxySync,
-          isCliproxyRunning: cliproxy.isCliproxyRunningSync,
-          installCliproxy: cliproxy.installCliproxySync,
+          stopCliproxy: cliproxy.stopCliproxy,
+          startCliproxy: cliproxy.startCliproxy,
+          isCliproxyRunning: cliproxy.isCliproxyRunning,
+          installCliproxy: cliproxy.installCliproxy,
         }, { force: options.force === true });
         if (options.force) {
           console.log(chalk.green('✓ CLIProxy reinstalled at pinned version and restarted'));
@@ -739,10 +739,10 @@ async function runFullRestart(
   // restartCliproxy handles stop-sleep-start-verify in one shot.
   const cliproxy = await import('../../lib/cliproxy.js');
   await restartCliproxy({
-    stopCliproxy: cliproxy.stopCliproxySync,
-    startCliproxy: cliproxy.startCliproxySync,
-    isCliproxyRunning: cliproxy.isCliproxyRunningSync,
-    installCliproxy: cliproxy.installCliproxySync,
+    stopCliproxy: cliproxy.stopCliproxy,
+    startCliproxy: cliproxy.startCliproxy,
+    isCliproxyRunning: cliproxy.isCliproxyRunning,
+    installCliproxy: cliproxy.installCliproxy,
   });
 
   const spawnedDashboard = spawnDashboardDetached(config, opts.bootGateOptions);

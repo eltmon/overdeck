@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
@@ -21,7 +22,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
-  listRunningAgents: vi.fn(() => []),
+  listRunningAgents: vi.fn(() => Effect.succeed([])),
   listRunningAgentsSync: vi.fn(() => []),
   getAgentRuntimeState: vi.fn(() => null),
   getAgentRuntimeStateSync: vi.fn(() => null),

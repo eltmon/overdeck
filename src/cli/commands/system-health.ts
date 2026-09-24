@@ -62,8 +62,8 @@ export async function systemHealthCommand(): Promise<void> {
 
   // CLIProxy sidecar
   try {
-    const { isCliproxyRunningSync } = await import('../../lib/cliproxy.js');
-    if (isCliproxyRunningSync()) {
+    const { isCliproxyRunning } = await import('../../lib/cliproxy.js');
+    if (await isCliproxyRunning()) {
       checks.push({ name: 'CLIProxyAPI', status: 'healthy', message: 'Running' });
     } else {
       checks.push({ name: 'CLIProxyAPI', status: 'degraded', message: 'Not running' });

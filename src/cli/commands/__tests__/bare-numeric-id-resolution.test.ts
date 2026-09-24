@@ -7,9 +7,9 @@ const issueIdMocks = vi.hoisted(() => ({
 
 const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
-  setAgentPausedSync: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
-  clearAgentTroubledSync: vi.fn(),
+  setAgentPaused: vi.fn(),
+  clearAgentPaused: vi.fn(),
+  clearAgentTroubled: vi.fn(),
   stopAgent: vi.fn(),
 }));
 
@@ -78,9 +78,9 @@ vi.mock('../../../lib/agents.js', () => {
   };
   return {
     getAgentStateSync: agentMocks.getAgentStateSync,
-    setAgentPausedSync: agentMocks.setAgentPausedSync,
-    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
-    clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
+    setAgentPaused: agentMocks.setAgentPaused,
+    clearAgentPaused: agentMocks.clearAgentPaused,
+    clearAgentTroubled: agentMocks.clearAgentTroubled,
     stopAgent: agentMocks.stopAgent,
     isQualifiedAgentId,
     normalizeAgentId: (id: string) => (isQualifiedAgentId(id) ? id : `agent-${id.toLowerCase()}`),
@@ -217,9 +217,12 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
       troubled: true,
       consecutiveFailures: 1,
     });
-    agentMocks.setAgentPausedSync.mockReset();
-    agentMocks.clearAgentPausedSync.mockReset();
-    agentMocks.clearAgentTroubledSync.mockReset();
+    agentMocks.setAgentPaused.mockReset();
+    agentMocks.clearAgentPaused.mockReset();
+    agentMocks.clearAgentTroubled.mockReset();
+    agentMocks.setAgentPaused.mockReturnValue(Effect.succeed(null));
+    agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
+    agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed(null));
     agentMocks.stopAgent.mockReset();
     agentMocks.stopAgent.mockReturnValue(Effect.void);
     tmuxMocks.sessionExistsSync.mockReset();
@@ -313,7 +316,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     await pauseCommand('9999', { reason: 'operator' });
 
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('agent-pan-9999', 'operator', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-9999', 'operator', false);
   });
 
   it('resolves bare numeric input before pan unpause clears the pause gate', async () => {
@@ -322,7 +325,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     await unpauseCommand('9999');
 
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
-    expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('agent-pan-9999');
+    expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('agent-pan-9999');
   });
 
   it('resolves bare numeric input before pan reopen resolves the tracker', async () => {
@@ -422,7 +425,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     await expect(pauseCommand('9999', {})).rejects.toThrow('process.exit:1');
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Could not resolve agent target "9999"'));
-    expect(agentMocks.setAgentPausedSync).not.toHaveBeenCalled();
+    expect(agentMocks.setAgentPaused).not.toHaveBeenCalled();
   });
 
   it('prints the shared unresolved-ID error path for pan review restart', async () => {

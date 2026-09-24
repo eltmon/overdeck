@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -14,8 +15,8 @@ const lifecycleMocks = vi.hoisted(() => ({
 
 const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  clearAgentPaused: vi.fn(),
+  stopAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(async () => ({ removed: ['agent-pan-x'], path: '/tmp/agents/agent-pan-x' })),
   spawnAgent: vi.fn(async () => ({
     id: 'agent-pan-x',
@@ -58,8 +59,8 @@ vi.mock('../../../lib/agents.js', async () => {
   return {
     ...actual,
     getAgentStateSync: agentMocks.getAgentStateSync,
-    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
-    stopAgentSync: agentMocks.stopAgentSync,
+    clearAgentPaused: agentMocks.clearAgentPaused,
+    stopAgent: (...args: unknown[]) => Effect.sync(() => { agentMocks.stopAgent(...args); }),
     wipeAgentStateDirs: agentMocks.wipeAgentStateDirs,
     spawnAgent: agentMocks.spawnAgent,
   };
@@ -67,7 +68,17 @@ vi.mock('../../../lib/agents.js', async () => {
 
 vi.mock('../../../lib/tmux.js', async () => {
   const actual = await vi.importActual<typeof import('../../../lib/tmux.js')>('../../../lib/tmux.js');
-  return { ...actual, sessionExistsSync: tmuxMocks.sessionExistsSync };
+  return {
+    ...actual,
+    sessionExistsSync: tmuxMocks.sessionExistsSync,
+    sessionExists: (name: string) => Effect.sync(() => tmuxMocks.sessionExistsSync(name)),
+  };
+});
+
+// PAN-4012: --fresh probes the host's terminal backend; the same liveness world drives it here.
+vi.mock('../../../lib/terminal-backends/launch.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../lib/terminal-backends/launch.js')>('../../../lib/terminal-backends/launch.js');
+  return { ...actual, agentPaneExists: async (name: string) => tmuxMocks.sessionExistsSync(name) };
 });
 
 vi.mock('../../../lib/projects.js', () => ({
@@ -110,8 +121,9 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     lifecycleMocks.getWorkAgentLifecycleStateSync.mockReset();
     lifecycleMocks.assertCanStartFreshSync.mockReset();
     agentMocks.getAgentStateSync.mockReset();
-    agentMocks.clearAgentPausedSync.mockReset();
-    agentMocks.stopAgentSync.mockReset();
+    agentMocks.clearAgentPaused.mockReset();
+    agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
+    agentMocks.stopAgent.mockReset();
     agentMocks.wipeAgentStateDirs.mockReset();
     agentMocks.wipeAgentStateDirs.mockResolvedValue({ removed: ['agent-pan-x'], path: '/tmp/agents/agent-pan-x' });
     agentMocks.spawnAgent.mockReset();
@@ -281,8 +293,8 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
         workspace: join(tmpDir, 'workspaces', 'feature-pan-x'),
       });
       mockLifecycle({ isRunning: true, isRunningButStuck: false });
-      // Live going in; gone once stopAgentSync has run.
-      tmuxMocks.sessionExistsSync.mockImplementation(() => agentMocks.stopAgentSync.mock.calls.length === 0);
+      // Live going in; gone once stopAgent has run.
+      tmuxMocks.sessionExistsSync.mockImplementation(() => agentMocks.stopAgent.mock.calls.length === 0);
       lifecycleMocks.assertCanStartFreshSync.mockReturnValue({ canStartFresh: true });
     }
 
@@ -301,7 +313,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       const { issueCommand } = await import('../start.js');
       await issueCommand('PAN-X', { model: '', plan: 'auto', fresh: true } as any).catch(() => undefined);
 
-      expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-x');
+      expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-x');
       expect(agentMocks.wipeAgentStateDirs).toHaveBeenCalledWith('PAN-X');
       expect(allConsoleOutput(consoleErrorSpy)).not.toMatch(/pan kill/);
       expect(lifecycleMocks.assertCanStartFreshSync).toHaveBeenCalledWith('PAN-X', {
@@ -318,9 +330,9 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
       const { issueCommand } = await import('../start.js');
       await issueCommand('PAN-X', { model: '', plan: 'auto', fresh: true } as any).catch(() => undefined);
 
-      expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-x');
+      expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-x');
       expect(agentMocks.wipeAgentStateDirs).not.toHaveBeenCalled();
-      expect(allConsoleOutput(consoleErrorSpy)).toMatch(/still has a live tmux session/);
+      expect(allConsoleOutput(consoleErrorSpy)).toMatch(/still has a live pane or session/);
     });
   });
 });

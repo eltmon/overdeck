@@ -18,8 +18,6 @@ const agentMocks = vi.hoisted(() => ({
   saveAgentRuntimeState: vi.fn(),
   restartAgent: vi.fn(),
   messageAgent: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
-  clearAgentTroubledSync: vi.fn(),
   clearAgentPaused: vi.fn(),
   clearAgentTroubled: vi.fn(),
 }));
@@ -121,8 +119,6 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
     saveAgentRuntimeState: agentMocks.saveAgentRuntimeState,
     restartAgent: agentMocks.restartAgent,
     messageAgent: agentMocks.messageAgent,
-    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
-    clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
     clearAgentPaused: agentMocks.clearAgentPaused,
     clearAgentTroubled: agentMocks.clearAgentTroubled,
   };
@@ -141,7 +137,9 @@ vi.mock('../../../../lib/lifecycle/index.js', () => ({
   // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
   // synchronously; these tests have no tmux server, so it reads as empty.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
   resetToTodo: lifecycleMocks.resetToTodo,
   cancelIssueWorkflow: vi.fn(),
   closeOut: vi.fn(),
@@ -317,8 +315,6 @@ describe('operator.intervention dashboard routes', () => {
     agentMocks.saveAgentRuntimeState.mockResolvedValue(undefined);
     agentMocks.restartAgent.mockResolvedValue({ success: true });
     agentMocks.messageAgent.mockResolvedValue(undefined);
-    agentMocks.clearAgentPausedSync.mockReturnValue(true);
-    agentMocks.clearAgentTroubledSync.mockReturnValue(true);
     agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed({ ...agentState, paused: false }));
     agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed({ ...agentState, troubled: false, consecutiveFailures: 0 }));
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
@@ -430,8 +426,8 @@ describe('operator.intervention dashboard routes', () => {
       body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
     });
 
-    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
-    expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentTroubled).not.toHaveBeenCalled();
     expect(appendedEvents).not.toContainEqual(expect.objectContaining({ type: 'operator.intervention' }));
   });
 
@@ -446,8 +442,8 @@ describe('operator.intervention dashboard routes', () => {
       response.status,
       response.status === 409 ? '' : await responseBodyForDiagnostics(response),
     ).toBe(409);
-    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
-    expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentTroubled).not.toHaveBeenCalled();
   });
 
   it('does not accept clearGates when the canonical mutation authorization rejects the request', async () => {

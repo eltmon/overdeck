@@ -75,7 +75,9 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
   // PAN-3917 FR-12: the backend inventory's tmux fallback probes panes directly.
   listSessionsSync: () => [],
+  listSessions: () => Effect.succeed([]),
   listPaneValuesSync: () => [],
+  listPaneValues: async () => [],
 }));
 
 vi.mock('../../../../../src/lib/workspaces/resolver.js', () => ({

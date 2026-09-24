@@ -28,6 +28,15 @@
  * process and reports a dead agent alive.
  */
 
+/**
+ * Sync twins (PAN-3958). Each `…Sync` function below has an async twin and exists only because
+ * these callers run in synchronous contexts (sync functions, sync callbacks, or dependency slots typed
+ * as sync) and cannot await:
+ * - `isAliveSync` (async: `isAlive`): src/lib/parked/resolver.ts:258, src/lib/work-agent-lifecycle.ts:104. Owned
+ *   by the PAN-3845 liveness seam work; its semantics are not changed here.
+ * Do not add new synchronous callers; server-reachable code uses the async variants.
+ */
+
 import { Effect } from 'effect';
 
 import { listPaneValues, listPaneValuesSync, sessionExists, sessionExistsSync } from '../tmux.js';

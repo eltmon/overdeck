@@ -37,7 +37,6 @@ vi.mock('../../src/lib/providers.js', async (importOriginal) => {
 });
 
 vi.mock('../../src/lib/openai-auth.js', () => ({
-  getOpenAIAuthStatusSync: mockOpenAIAuthStatus,
   getOpenAIAuthStatus: async (...args: unknown[]) => mockOpenAIAuthStatus(...args),
 }));
 

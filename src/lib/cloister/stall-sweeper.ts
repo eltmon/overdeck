@@ -30,6 +30,7 @@
  *    flood the feed at once;
  *  - this module holds no door to any mutation — there is nothing to force.
  */
+import { Effect } from 'effect';
 import { emitActivityEntrySync, type ActivityLevel } from '../activity-logger.js';
 import {
   PARKED_ORBIT_SEVERITY,
@@ -37,7 +38,7 @@ import {
   type ParkedOrbit,
   type ParkedRow,
 } from '../parked/resolver.js';
-import { sessionExistsSync } from '../tmux.js';
+import { sessionExists } from '../tmux.js';
 import { getCloisterEventStore } from './event-store-provider.js';
 import {
   clearSweeperRowState,
@@ -76,7 +77,7 @@ const NO_ACTION_TRAILER = 'Observability-only: no action taken.';
 export interface StallSweeperDeps {
   now?: number;
   resolveRows?: () => Promise<ParkedRow[]>;
-  isAgentLive?: (agentId: string) => boolean;
+  isAgentLive?: (agentId: string) => boolean | Promise<boolean>;
   emitActivity?: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
 }
@@ -147,7 +148,7 @@ function recordEscalation(issueId: string, orbit: ParkedOrbit, state: StallSweep
 export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promise<string[]> {
   const now = deps.now ?? Date.now();
   const resolveRows = deps.resolveRows ?? resolveParkedPopulation;
-  const isAgentLive = deps.isAgentLive ?? sessionExistsSync;
+  const isAgentLive = deps.isAgentLive ?? ((agentId: string) => Effect.runPromise(sessionExists(agentId)));
   const emitActivity = deps.emitActivity ?? defaultEmitActivity;
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
 
@@ -200,7 +201,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
     }
     if (recommendationBudget <= 0) continue;
 
-    const reported = reportRow(row, state, now, { isAgentLive, emitActivity, emitEvent }, outcome);
+    const reported = await reportRow(row, state, now, { isAgentLive, emitActivity, emitEvent }, outcome);
     if (reported) {
       recordRecommendation(issueId, orbit, state, now);
       recommendationBudget--;
@@ -213,7 +214,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
 // ─── Per-orbit recommendations ────────────────────────────────────────────────
 
 interface ReportDeps {
-  isAgentLive: (agentId: string) => boolean;
+  isAgentLive: (agentId: string) => boolean | Promise<boolean>;
   emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent: (type: string, payload: Record<string, unknown>) => void;
 }
@@ -230,13 +231,13 @@ interface ReportDeps {
  * recommendation says so, so the flywheel's substrate intake files why it
  * keeps parking instead of the symptom being swept forever.
  */
-function reportRow(
+async function reportRow(
   row: ParkedRow,
   state: StallSweeperRowState | null,
   now: number,
   reporting: ReportDeps,
   outcome: ScanOutcome,
-): boolean {
+): Promise<boolean> {
   const { issueId, orbit } = row;
   const recurrence = state?.recommendationCount ?? 0;
   const substrateNote = recurrence >= 1
@@ -251,7 +252,7 @@ function reportRow(
   switch (orbit) {
     case 'zombie-session': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
-      const live = reporting.isAgentLive(agentId);
+      const live = await reporting.isAgentLive(agentId);
       recommend(`reap zombie session ${agentId} via the existing door (pan close ${issueId} owns merged/closed teardown; the reaper is the backstop)`, { agentId, sessionCurrentlyLive: live });
       return true;
     }
@@ -271,7 +272,7 @@ function reportRow(
         previouslyRecommended
           ? `stop or resume ${agentId} via pan kill ${agentId} / pan resume ${agentId} — still idle ${Math.round(lastActivity / 60)}h after a prior recommendation`
           : `nudge ${agentId} via pan tell ${agentId} — idle ${Math.round(lastActivity / 60)}h with no pipeline stage owning its next move`,
-        { agentId, idleMinutes: lastActivity, live: reporting.isAgentLive(agentId) },
+        { agentId, idleMinutes: lastActivity, live: await reporting.isAgentLive(agentId) },
       );
       return true;
     }

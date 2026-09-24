@@ -1,13 +1,19 @@
+import { Effect } from 'effect'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  stopAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(),
 }))
 
 const tmuxMocks = vi.hoisted(() => ({
-  sessionExistsSync: vi.fn(),
+  sessionExists: vi.fn(),
+}))
+
+// The host's terminal backend: a Herdr pane or a tmux session for the agent.
+const backendMocks = vi.hoisted(() => ({
+  agentPaneExists: vi.fn(),
 }))
 
 const lifecycleMocks = vi.hoisted(() => ({
@@ -16,6 +22,7 @@ const lifecycleMocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/agents.js', () => agentMocks)
 vi.mock('../../../lib/tmux.js', () => tmuxMocks)
+vi.mock('../../../lib/terminal-backends/launch.js', () => backendMocks)
 vi.mock('../../../lib/work-agent-lifecycle.js', () => lifecycleMocks)
 
 import { prepareFreshWorkAgentSession } from '../start-fresh-session.js'
@@ -28,12 +35,14 @@ describe('prepareFreshWorkAgentSession', () => {
       removed: ['/tmp/agent-pan-3228'],
       path: '/tmp/agents',
     })
-    tmuxMocks.sessionExistsSync.mockReturnValue(false)
+    agentMocks.stopAgent.mockReturnValue(Effect.void)
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false))
+    backendMocks.agentPaneExists.mockResolvedValue(false)
     lifecycleMocks.assertCanStartFreshSync.mockReturnValue({ canStartFresh: true })
   })
 
   it('refuses to replace a session with a pending operator decision', async () => {
-    tmuxMocks.sessionExistsSync.mockReturnValue(true)
+    backendMocks.agentPaneExists.mockResolvedValue(true)
     const detectPendingOperatorDecision = vi.fn(async () => ({
       source: 'pane' as const,
       reason: 'tool_permission' as const,
@@ -52,7 +61,7 @@ describe('prepareFreshWorkAgentSession', () => {
       error: expect.stringContaining("pan answer PAN-3228"),
     })
     expect(result.error).toContain('tool permission')
-    expect(agentMocks.stopAgentSync).not.toHaveBeenCalled()
+    expect(agentMocks.stopAgent).not.toHaveBeenCalled()
     expect(agentMocks.wipeAgentStateDirs).not.toHaveBeenCalled()
   })
 
@@ -72,14 +81,14 @@ describe('prepareFreshWorkAgentSession', () => {
       allowLiveSessionReplacement: true,
       explicitFresh: true,
     })
-    expect(agentMocks.stopAgentSync).not.toHaveBeenCalled()
+    expect(agentMocks.stopAgent).not.toHaveBeenCalled()
     expect(agentMocks.wipeAgentStateDirs).not.toHaveBeenCalled()
   })
 
   it('allows force to deliberately discard the pending decision', async () => {
-    tmuxMocks.sessionExistsSync
-      .mockReturnValueOnce(true)
-      .mockReturnValueOnce(false)
+    backendMocks.agentPaneExists
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
     const detectPendingOperatorDecision = vi.fn(async () => ({
       source: 'pane' as const,
       reason: 'tool_permission' as const,
@@ -94,7 +103,32 @@ describe('prepareFreshWorkAgentSession', () => {
 
     expect(result.ok).toBe(true)
     expect(detectPendingOperatorDecision).not.toHaveBeenCalled()
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-3228')
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3228')
     expect(agentMocks.wipeAgentStateDirs).toHaveBeenCalledWith('PAN-3228')
+  })
+
+  it('stops a live Herdr pane that has no tmux session (PAN-4012)', async () => {
+    // Herdr host: the agent runs in a Herdr pane, so the tmux probe sees nothing.
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false))
+    let paneLive = true
+    backendMocks.agentPaneExists.mockImplementation(async () => paneLive)
+    agentMocks.stopAgent.mockImplementation(() => Effect.sync(() => { paneLive = false }))
+
+    const result = await prepareFreshWorkAgentSession('PAN-3228', { force: true })
+
+    expect(result.ok).toBe(true)
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3228')
+    expect(result.messages[0]).toContain('replacing the live session for agent-pan-3228')
+    expect(agentMocks.wipeAgentStateDirs).toHaveBeenCalledWith('PAN-3228')
+  })
+
+  it('refuses when the Herdr pane survives the stop', async () => {
+    backendMocks.agentPaneExists.mockResolvedValue(true)
+
+    const result = await prepareFreshWorkAgentSession('PAN-3228', { force: true })
+
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('still has a live pane or session') })
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3228')
+    expect(agentMocks.wipeAgentStateDirs).not.toHaveBeenCalled()
   })
 })

@@ -3,9 +3,9 @@ import { Effect } from 'effect';
 
 const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
-  clearAgentPausedSync: vi.fn(),
-  clearAgentTroubledSync: vi.fn(),
-  setAgentPausedSync: vi.fn(),
+  clearAgentPaused: vi.fn(),
+  clearAgentTroubled: vi.fn(),
+  setAgentPaused: vi.fn(),
   stopAgent: vi.fn(),
 }));
 
@@ -66,9 +66,9 @@ vi.mock('../../../lib/agents.js', () => {
   };
   return {
     getAgentStateSync: agentMocks.getAgentStateSync,
-    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
-    clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
-    setAgentPausedSync: agentMocks.setAgentPausedSync,
+    clearAgentPaused: agentMocks.clearAgentPaused,
+    clearAgentTroubled: agentMocks.clearAgentTroubled,
+    setAgentPaused: agentMocks.setAgentPaused,
     stopAgent: agentMocks.stopAgent,
     isQualifiedAgentId,
     normalizeAgentId: (id: string) => (isQualifiedAgentId(id) ? id : `agent-${id.toLowerCase()}`),
@@ -149,9 +149,12 @@ describe('operator intervention CLI emission', () => {
 
   beforeEach(() => {
     agentMocks.getAgentStateSync.mockReset();
-    agentMocks.clearAgentPausedSync.mockReset();
-    agentMocks.clearAgentTroubledSync.mockReset();
-    agentMocks.setAgentPausedSync.mockReset();
+    agentMocks.clearAgentPaused.mockReset();
+    agentMocks.clearAgentTroubled.mockReset();
+    agentMocks.setAgentPaused.mockReset();
+    agentMocks.setAgentPaused.mockReturnValue(Effect.succeed(null));
+    agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
+    agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed(null));
     agentMocks.stopAgent.mockReset();
     agentMocks.stopAgent.mockReturnValue(Effect.void);
     tmuxMocks.sessionExistsSync.mockReset();
@@ -197,7 +200,7 @@ describe('operator intervention CLI emission', () => {
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('PAN-1', { reason: 'operator requested' });
 
-    expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('agent-pan-1', 'operator requested', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1', 'operator requested', false);
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-1',
       kind: 'pause',
@@ -318,7 +321,7 @@ describe('operator intervention CLI emission', () => {
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('PAN-1');
 
-    expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('agent-pan-1');
+    expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('agent-pan-1');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-1',
       kind: 'unpause',

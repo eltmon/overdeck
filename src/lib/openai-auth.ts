@@ -8,11 +8,11 @@
  * Anthropic-compatible /v1/messages endpoint.
  */
 
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { bridgeCodexAuthToCliproxySync } from './cliproxy.js';
+import { bridgeCodexAuthToCliproxy } from './cliproxy.js';
 
 export interface OpenAIAuthStatus {
   /** True if Codex auth storage exists locally. */
@@ -91,15 +91,6 @@ async function readCodexAuthAsync(authPath: string): Promise<RawAuthFile | null>
   }
 }
 
-function readCodexAuthSync(authPath: string): RawAuthFile | null {
-  if (!existsSync(authPath)) return null;
-  try {
-    return JSON.parse(readFileSync(authPath, 'utf8')) as RawAuthFile;
-  } catch {
-    return null;
-  }
-}
-
 function hasApiKey(raw: RawAuthFile | null): boolean {
   return !!process.env.OPENAI_API_KEY
     || (typeof raw?.OPENAI_API_KEY === 'string' && raw.OPENAI_API_KEY.trim().length > 0);
@@ -136,27 +127,10 @@ export async function getOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
 
   let bridgedFromCodex = false;
   try {
-    if (bridgeCodexAuthToCliproxySync()) {
+    if (await bridgeCodexAuthToCliproxy()) {
       bridgedFromCodex = true;
     }
   } catch { /* non-fatal — cliproxy bridge is best-effort */ }
-
-  return buildStatus(raw, installed, bridgedFromCodex);
-}
-
-/** Synchronous variant for CLI-side code. Dashboard server routes should use {@link getOpenAIAuthStatus}. */
-export function getOpenAIAuthStatusSync(): OpenAIAuthStatus {
-  const codexDir = join(homedir(), '.codex');
-  const authPath = getCodexAuthPath();
-  const installed = existsSync(codexDir) || existsSync(authPath);
-  const raw = readCodexAuthSync(authPath);
-
-  let bridgedFromCodex = false;
-  try {
-    if (bridgeCodexAuthToCliproxySync()) {
-      bridgedFromCodex = true;
-    }
-  } catch { /* non-fatal */ }
 
   return buildStatus(raw, installed, bridgedFromCodex);
 }

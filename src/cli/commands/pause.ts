@@ -1,7 +1,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
-import { getAgentStateSync, listAgentStates, resolveAgentTargetSync, setAgentPausedSync, stopAgent } from '../../lib/agents.js';
+import { getAgentStateSync, listAgentStates, resolveAgentTargetSync, setAgentPaused, stopAgent } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
@@ -36,7 +36,7 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
   const shouldStop = hasLivePane || state.status === 'running' || state.status === 'starting';
 
   try {
-    setAgentPausedSync(agentId, options.reason, shouldStop);
+    await Effect.runPromise(setAgentPaused(agentId, options.reason, shouldStop));
     if (shouldStop) {
       // Async stop terminates through the terminal backend, so a Herdr pane
       // closes too — the sync variant could only reach a tmux session.
