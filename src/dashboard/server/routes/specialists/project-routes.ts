@@ -249,6 +249,8 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       prUrl,
       model,
       harness,
+      // #3853: `pan review restart` is an explicit request for this run.
+      operatorRequested: true,
     });
 
     if (result.gated) {

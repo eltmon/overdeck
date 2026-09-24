@@ -49,11 +49,11 @@ export interface PrFacts {
   reviewDecision: PrReviewDecision;
   approved: boolean;
   /**
-   * #3853: the approval was given on the current head commit, so a rejection
-   * on this head reverses a verdict instead of reviewing new code. A forge
-   * approval is dated against the head commit by its review's `submittedAt`
-   * (an approval the forge kept across a push is not at head); an approval
-   * marker only counts at head already. Unknown dating reads as at head.
+   * #3853: `true` only when the approval is proven to stand on the exact head
+   * commit: an approval marker whose `sha=` names the head. Anything else,
+   * including every forge approval (its review commit is read on the verdict
+   * path only, `forgeApprovalAtHead`) and every GitLab MR, is left unset:
+   * not proven. The verdict guard refuses a rejection only on proof.
    */
   approvedAtHead?: boolean;
   changesRequested: boolean;
@@ -154,16 +154,29 @@ export interface GitLabMrView {
  */
 export type MarkerVerdict = 'APPROVED' | 'CHANGES_REQUESTED';
 
-export function formatVerdictMarker(verdict: MarkerVerdict): string {
-  return `<!-- overdeck-verdict: ${verdict} -->`;
+/**
+ * #3853: the marker names the commit it judged (`sha=`), the way the UAT
+ * marker does, so a reader can tie an approval to the exact head.
+ */
+export function formatVerdictMarker(verdict: MarkerVerdict, sha?: string | null): string {
+  return `<!-- overdeck-verdict: ${verdict}${sha ? ` sha=${sha.toLowerCase()}` : ''} -->`;
 }
 
-const VERDICT_MARKER_RE = /^[ \t]*<!--[ \t]*overdeck-verdict:[ \t]*(APPROVED|CHANGES_REQUESTED)[ \t]*-->[ \t]*(?:\r?\n|$)/i;
+const VERDICT_MARKER_RE = /^[ \t]*<!--[ \t]*overdeck-verdict:[ \t]*(APPROVED|CHANGES_REQUESTED)(?:[ \t]+sha=([0-9a-f]{7,40}))?[ \t]*-->[ \t]*(?:\r?\n|$)/i;
 
 /** The verdict a comment body declares as its whole first line, or null. */
 export function parseVerdictMarker(body: string | null | undefined): MarkerVerdict | null {
+  return parseVerdictMarkerWithSha(body)?.verdict ?? null;
+}
+
+/** The verdict and the commit it names (null for a marker without `sha=`). */
+export function parseVerdictMarkerWithSha(
+  body: string | null | undefined,
+): { verdict: MarkerVerdict; sha: string | null } | null {
   const match = body?.match(VERDICT_MARKER_RE);
-  return match ? (match[1].toUpperCase() as MarkerVerdict) : null;
+  return match
+    ? { verdict: match[1].toUpperCase() as MarkerVerdict, sha: match[2]?.toLowerCase() ?? null }
+    : null;
 }
 
 export function emptyPrFacts(issueId: string, error?: string): PrFacts {
@@ -357,20 +370,21 @@ function uatVerdictAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): Ua
 }
 
 /**
- * #3853: whether the PR's approval was given on its current head. The forge
- * decision rides the newest APPROVED review, dated against the head commit the
- * way the approval marker is; without review or commit dates it reads as at
- * head, so the reversal guard holds rather than guessing the approval stale.
+ * #3853: whether the newest trusted verdict marker is an approval naming the
+ * head commit by `sha=`. Only a sha proves it; a marker without one, or one
+ * dated by its timestamp, proves nothing.
  */
-function forgeApprovalAtHead(pr: IssuePullRequestData): boolean {
-  if (!pr.latestReviews) return true;
-  const headAt = headCommitTime(pr);
-  if (headAt === null) return true;
-  return pr.latestReviews.some((review) => {
-    if (normalize(review.state) !== 'APPROVED') return false;
-    const submittedAt = Date.parse(review.submittedAt ?? '');
-    return Number.isNaN(submittedAt) || submittedAt >= headAt;
-  });
+function approvalMarkerAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): boolean {
+  const head = pr.headRefOid;
+  if (!head) return false;
+  const comments = pr.comments ?? [];
+  for (let index = comments.length - 1; index >= 0; index -= 1) {
+    if (!isTrustedComment(comments[index], trusted)) continue;
+    const marker = parseVerdictMarkerWithSha(comments[index]?.body);
+    if (!marker) continue;
+    return marker.verdict === 'APPROVED' && marker.sha !== null && sameCommit(marker.sha, head);
+  }
+  return false;
 }
 
 function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: TrustedAuthors = new Set()): PrFacts {
@@ -397,9 +411,11 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
     headBranch: pr.headRefName ?? null,
     reviewDecision: effective,
     approved: effective === 'APPROVED',
-    // A marker approval only counts when it is at least as new as the head.
-    approvedAtHead: effective === 'APPROVED'
-      && (forgeDecision === 'APPROVED' ? forgeApprovalAtHead(pr) : true),
+    // #3853: proven only by a marker naming the head. A forge approval's
+    // review commit is read on the verdict path alone (`forgeApprovalAtHead`).
+    ...(effective === 'APPROVED' && forgeDecision === null && approvalMarkerAtHead(pr, trusted)
+      ? { approvedAtHead: true }
+      : {}),
     changesRequested: effective === 'CHANGES_REQUESTED',
     mergeable: mergeable === 'MERGEABLE' ? true : mergeable === 'CONFLICTING' ? false : null,
     mergeableState: pr.mergeable ? pr.mergeable.toLowerCase() : null,
@@ -466,8 +482,6 @@ function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMr
     headBranch: view?.source_branch ?? row.source_branch ?? null,
     reviewDecision: approved ? 'APPROVED' : 'REVIEW_REQUIRED',
     approved,
-    // The MR view carries no approval date to hold against the head.
-    approvedAtHead: approved,
     changesRequested: false,
     mergeable,
     mergeableState: detailed ?? view?.merge_status ?? null,
@@ -614,6 +628,53 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
     }
   } catch (cause) {
     return emptyPrFacts(issueId, `GitLab MR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
+}
+
+/** Reads a PR's reviews with the commit each one judged. */
+export type ReadGitHubReviews = (
+  repo: string,
+  number: number,
+) => Promise<ReadonlyArray<{ state?: string; commit?: { oid?: string } | null }>>;
+
+async function defaultReadGitHubReviews(repo: string, number: number): ReturnType<ReadGitHubReviews> {
+  const { stdout } = await execFileAsync(
+    'gh',
+    [
+      'pr', 'view', String(number), '--repo', repo, '--json', 'reviews',
+      '--jq', '[.reviews[] | {state, commit: {oid: .commit.oid}}]',
+    ],
+    { encoding: 'utf-8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 },
+  );
+  const parsed: unknown = JSON.parse(stdout);
+  return Array.isArray(parsed) ? parsed as Awaited<ReturnType<ReadGitHubReviews>> : [];
+}
+
+/**
+ * #3853: whether a GitHub review approved the exact head commit, by the
+ * review's `commit.oid` (`latestReviews` reports that oid empty; `reviews`
+ * does not). Only the verdict guard asks, and only for an agent's rejection,
+ * so the shared `gh pr view` field list every PR read uses stays as it is.
+ *
+ * `true` is proof. `false` means the reviews were read and none approved the
+ * head, an empty list included. `undefined` means it could not be told: not
+ * GitHub, no head, or the read failed. Only `true` lets the guard refuse.
+ */
+export async function forgeApprovalAtHead(
+  facts: Pick<PrFacts, 'forge' | 'url' | 'number' | 'headSha'>,
+  readReviews: ReadGitHubReviews = defaultReadGitHubReviews,
+): Promise<boolean | undefined> {
+  if (facts.forge !== 'github' || !facts.headSha || !facts.number) return undefined;
+  const repo = facts.url?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
+  if (!repo) return undefined;
+  const head = facts.headSha.toLowerCase();
+  try {
+    const reviews = await readReviews(`${repo[1]}/${repo[2]}`, facts.number);
+    return reviews.some((review) => (
+      normalize(review.state) === 'APPROVED' && review.commit?.oid?.toLowerCase() === head
+    ));
+  } catch {
+    return undefined;
   }
 }
 

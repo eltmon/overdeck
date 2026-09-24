@@ -166,7 +166,7 @@ export async function postReviewVerdict(
       try {
         await runGh([
           'pr', 'comment', String(ref.number), '--repo', repo,
-          '--body', `${formatVerdictMarker(marker)}\n\n${input.body}`,
+          '--body', `${formatVerdictMarker(marker, facts.headSha)}\n\n${input.body}`,
         ], options);
       } catch (commentCause) {
         return {

@@ -117,6 +117,20 @@ describe('postReviewVerdict — self-review refusal fallback', () => {
     expect(args[args.indexOf('--body') + 1]).toContain('<!-- overdeck-verdict: APPROVED -->');
   });
 
+  it('#3853: names the head commit it judged in the marker', async () => {
+    const runGh = vi.fn(async (args: string[]) => {
+      if (args[1] === 'review') throw selfReviewError();
+    });
+    await postReviewVerdict(
+      { issueId: 'PAN-1', verdict: 'approve', body: 'ship it', facts: ghFacts({ headSha: 'CCC97C773F0B1BF70450E9CE0BA4A09CDEB25A54' }) },
+      baseDeps({ runGh }),
+    );
+    const [args] = runGh.mock.calls[1] as unknown as [string[]];
+    expect(args[args.indexOf('--body') + 1].startsWith(
+      '<!-- overdeck-verdict: APPROVED sha=ccc97c773f0b1bf70450e9ce0ba4a09cdeb25a54 -->',
+    )).toBe(true);
+  });
+
   it('does not fall back for any other gh error', async () => {
     const runGh = vi.fn(async () => { throw new Error('HTTP 502 from api.github.com'); });
     const result = await postReviewVerdict(

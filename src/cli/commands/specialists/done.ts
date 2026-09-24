@@ -25,7 +25,8 @@ import {
   discoverArtifact,
   type ForgeType,
 } from '../../../lib/forge.js';
-import { getPrFacts, resetPrFactsCache } from '../../../lib/cloister/pr-facts.js';
+import { forgeApprovalAtHead, getPrFacts, resetPrFactsCache, type PrFacts } from '../../../lib/cloister/pr-facts.js';
+import { getAgentState } from '../../../lib/agents/agent-state-read.js';
 import { formatUatMarker } from '../../../lib/cloister/uat-verdict-marker.js';
 import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/services/pr-tab-cache.js';
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
@@ -208,19 +209,33 @@ export async function doneCommand(
   if (role === 'review') {
     // #3853: the operator's override shares this door with the review agent's
     // verdict. An agent session may not use the override half: it records a
-    // verdict only as the issue's review session, and never reverses the
-    // approval standing on an unchanged head.
+    // verdict only as the issue's review session, and never reverses an
+    // approval proven to stand on the exact head, unless the operator asked
+    // for this run. Unproven means the verdict goes through.
     const caller = verdictCallerFromEnv();
     const facts = caller.kind === 'agent' ? await getPrFacts(normalizedIssueId) : undefined;
+    let guardFacts: Pick<PrFacts, 'approved' | 'approvedAtHead' | 'headSha'> | null = facts ?? null;
+    let operatorRequested = false;
+    if (caller.kind === 'agent' && options.status !== 'passed' && facts?.approved === true) {
+      operatorRequested = getAgentState(`agent-${normalizedIssueId.toLowerCase()}-review`)
+        ?.reviewOperatorRequested === true;
+      // Only this path reads the reviews' commit shas, so the shared PR read
+      // every other caller runs carries no review payload.
+      if (!operatorRequested && facts.approvedAtHead !== true) {
+        const approvedAtHead = await forgeApprovalAtHead(facts);
+        guardFacts = { ...facts, ...(approvedAtHead !== undefined ? { approvedAtHead } : {}) };
+      }
+    }
     const refusal = reviewVerdictRefusal({
       caller,
       issueId: normalizedIssueId,
       status: options.status,
-      facts: facts ?? null,
+      facts: guardFacts,
+      operatorRequested,
     });
     if (refusal) {
       console.error(chalk.red(`Refusing the review verdict: ${refusal}`));
-      console.error(chalk.dim('An operator (a conv-* conversation or a shell outside any agent session) must record it.'));
+      console.error(chalk.dim('Record `passed` with the findings as advisories, or ask the operator.'));
       return exitCli(1);
     }
     const result = await postReviewVerdict({

@@ -271,7 +271,7 @@ function buildSelfReviewPrompt(opts: {
   return prompt;
 }
 async function spawnReviewRoleForIssueBody(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode; operatorRequested?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const dispatchStartedAtMs = Date.now();
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
@@ -537,6 +537,9 @@ async function spawnReviewRoleForIssueBody(
             resumed.reviewRunId = runId;
             // PAN-2584: arm the parent's liveness deadline for this cycle.
             resumed.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+            // #3853: rewritten on every dispatch so a later automatic cycle
+            // never inherits an operator's request.
+            resumed.reviewOperatorRequested = opts.operatorRequested === true ? true : undefined;
             await Effect.runPromise(saveAgentState(resumed));
           }
         } catch { /* non-fatal */ }
@@ -587,6 +590,8 @@ async function spawnReviewRoleForIssueBody(
     run.reviewRunId = runId;
     // PAN-2584: arm the parent's liveness deadline for this cycle.
     run.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+    // #3853: the verdict guard lets an operator-requested run block an approved head.
+    run.reviewOperatorRequested = opts.operatorRequested === true ? true : undefined;
     try {
       await Effect.runPromise(saveAgentState(run));
     } catch (saveErr) {
@@ -749,7 +754,7 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
 const reviewDispatchCoalescer = createPromiseCoalescer<{ success: boolean; message: string; error?: string; gated?: boolean }>();
 
 export const spawnReviewRoleForIssue = (
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode; operatorRequested?: boolean },
 ): Effect.Effect<{ success: boolean; message: string; error?: string; gated?: boolean }> =>
   Effect.promise(() => {
     const key = opts.issueId.toUpperCase();
