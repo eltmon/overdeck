@@ -83,6 +83,9 @@ describe('specialists done command', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // #3853: the caller's identity decides the override door; default to an
+    // operator shell so the suite does not inherit the runner's agent id.
+    vi.stubEnv('OVERDECK_AGENT_ID', '');
 
     mockGetIssueWorkspacePath.mockReturnValue('/project/workspaces/feature-pan-1059');
     mockDiscoverArtifact.mockReturnValue(Effect.succeed({
@@ -112,6 +115,7 @@ describe('specialists done command', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('rejects an unknown specialist role', async () => {
@@ -233,6 +237,74 @@ describe('specialists done command', () => {
       verdict: 'failed',
       notes: 'synthesis crashed',
       prUrl: ARTIFACT_URL,
+    });
+  });
+
+  describe('#3853: the override door refuses agent sessions', () => {
+    const APPROVED_AT_HEAD = {
+      issueId: 'PAN-1059', forge: 'github', url: ARTIFACT_URL, open: true,
+      approved: true, approvedAtHead: true, changesRequested: false, headSha: 'abcdef1234567890',
+    };
+
+    it('refuses the review synthesizer reversing the approval on an unchanged head', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
+      mockGetPrFacts.mockResolvedValue(APPROVED_AT_HEAD);
+      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      const error = vi.spyOn(console, 'error');
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', {
+        status: 'blocked',
+        notes: 'Operator-authorized override: three reproduced correctness blockers',
+        runId: 'agent-pan-1059-review-abcdef12',
+      });
+
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(error.mock.calls.map((c) => String(c[0])).join('\n')).toContain('operator override');
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+      expect(mockAppendPipelineEntry).not.toHaveBeenCalled();
+      expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+    });
+
+    it('refuses a non-review agent session recording any review verdict', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059');
+      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'self-approval' });
+
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+    });
+
+    it('lets the review agent block a head its approval predates', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
+      const facts = { ...APPROVED_AT_HEAD, approvedAtHead: false };
+      mockGetPrFacts.mockResolvedValue(facts);
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'blocked', notes: 'new blocker' });
+
+      expect(mockPostReviewVerdict).toHaveBeenCalledWith({
+        issueId: 'PAN-1059',
+        verdict: 'request-changes',
+        body: expect.stringContaining('new blocker'),
+        facts,
+      });
+    });
+
+    it('accepts the operator override from a conv-* conversation', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'conv-20260916-2706');
+      mockGetPrFacts.mockResolvedValue({ ...APPROVED_AT_HEAD, approved: false, changesRequested: true });
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'blocked', notes: 'operator blocks' });
+
+      expect(mockPostReviewVerdict).toHaveBeenCalledWith({
+        issueId: 'PAN-1059',
+        verdict: 'request-changes',
+        body: expect.stringContaining('operator blocks'),
+      });
     });
   });
 
