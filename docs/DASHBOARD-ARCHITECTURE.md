@@ -289,6 +289,9 @@ door that does not exist; a real record read door would be a separate change.
   delivered, with work activity older than 60 s (`pane-finished`, PAN-3923). When the backend
   has no per-pane state (tmux), the runtime mirror's idle label stands in for Herdr's and passes
   the same `isFinishedRoleRun` rule (`idle`, PAN-4172); the label alone never finishes a run.
+  A codex, kimi-code, pi, ACP or OpenCode sequencer reads `unknown` on Herdr; its transcript's
+  turn-complete marker stands in for the idle label under the same rule (`pane-finished`, #4169,
+  see "Non-Claude harnesses on Herdr" in `docs/TERMINAL-BACKENDS.md`).
   `pane-finished` covers a dashboard restart, which empties the
   in-process mirror, and a pass that failed before writing. After a restart the activity age
   rests on the transcript heartbeat; if no activity signal resolves, the run is refused, never
