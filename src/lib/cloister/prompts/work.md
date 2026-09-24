@@ -339,7 +339,7 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 
 **If you see feedback files in `.pan/feedback/`:** read and address them before resubmitting. Ignore obsolete legacy feedback leftovers if any remain in older workspaces.
 
-**WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan done` to signal completion.
+**WARNING:** Never approve or merge your own PR (`gh pr review --approve`, `gh pr merge`) — approval is a PR review that belongs to the reviewer and the operator. Agents MUST use `pan done` to signal completion.
 {{/LOCAL}}
 {{#REMOTE}}
 When ALL tasks are complete:

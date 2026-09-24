@@ -183,6 +183,17 @@ describe('guard-no-state-layer.sh', () => {
       expect(result.output).toContain('src/lib/cloister/prompts/p.md:1:');
     });
 
+    // PAN-3934: roles/*.md is appended to role sessions as the system prompt.
+    it('fails on a deleted status field in a role prompt', () => {
+      const fixture = makeFixture();
+      writeFixtureFile(fixture.root, 'roles/test.md', 'Record testStatus and uatStatus separately.\n');
+
+      const result = runGuardWithMarkdownPass(fixture.root, fixture.script);
+
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain('roles/test.md:1:');
+    });
+
     it('passes the two by-name exempt files', () => {
       const fixture = makeFixture();
       const content = 'The overdeck-state branch held readyForMerge.\n';

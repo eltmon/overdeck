@@ -453,6 +453,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.conversations?.title_model) {
       result.conversations.titleModel = resolveModelId(config.conversations.title_model);
     }
+    if (config.conversations?.fork_summary_model) {
+      result.conversations.forkSummaryModel = resolveModelId(config.conversations.fork_summary_model);
+    }
     if (config.conversations?.handoff_author_model) {
       result.conversations.handoffAuthorModel = resolveModelId(config.conversations.handoff_author_model);
     }
@@ -649,6 +652,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge default conversation model
     if (config.models?.default_conversation_model) {
       result.defaultConversationModel = config.models.default_conversation_model;
+    }
+    if (config.models?.status_review_model) {
+      result.statusReviewModel = resolveModelId(config.models.status_review_model);
     }
 
     // Merge tracker keys
