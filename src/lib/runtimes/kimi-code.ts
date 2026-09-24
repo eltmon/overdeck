@@ -49,7 +49,10 @@ import { appendSessionIdToHistory } from '../session-history.js';
 import { getOverdeckHome } from '../paths.js';
 import { isPidDead } from '../pan-dir/fs-lock.js';
 import { getRuntimeBehavior } from './behavior.js';
-import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
+import { tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
+import { closeBackendPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
+import { launchRuntimePane, runtimeUsesSupervisor } from './runtime-pane-launch.js';
 import type {
   Agent,
   AgentRuntimeSync,
@@ -412,6 +415,8 @@ export interface KimiCodeRuntimeOptions {
   readonly resolveSupervisorScriptPath?: () => string;
   /** Writes the PTY supervisor's auth token for an agent. Defaults to the real writePtyToken(). */
   readonly writePtyTokenFor?: (agentId: string) => Promise<string>;
+  /** The backend a spawn launches into. Defaults to the host's (`resolveLaunchBackend`). */
+  readonly resolveBackend?: () => Promise<TerminalBackend>;
 }
 
 export class KimiCodeRuntimeSync implements AgentRuntimeSync {
@@ -428,6 +433,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   ) => Promise<{ readonly ok: boolean; readonly failure?: string }>;
   private readonly resolveSupervisorScriptPath: () => string;
   private readonly writePtyTokenFor: (agentId: string) => Promise<string>;
+  private readonly resolveBackend: () => Promise<TerminalBackend>;
 
   constructor(options: KimiCodeRuntimeOptions = {}) {
     this.overdeckHomeOverride = options.overdeckHome;
@@ -440,6 +446,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     ));
     this.resolveSupervisorScriptPath = options.resolveSupervisorScriptPath ?? resolvePtySupervisorScriptPath;
     this.writePtyTokenFor = options.writePtyTokenFor ?? writePtyToken;
+    this.resolveBackend = options.resolveBackend ?? resolveLaunchBackend;
   }
 
   getHarnessBehavior(): HarnessBehavior {
@@ -548,15 +555,19 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       // Bucket doesn't exist yet — every session dir that appears is new.
     }
 
-    // The PTY supervisor tier of deliverAgentMessage requires BOTH the
-    // pty-<id>.sock (created when the supervisor process binds it) AND a
-    // readable pty-token it authenticates requests against — write the token
-    // and resolve the real, package/desktop-safe script path (not a hardcoded
-    // dist/ literal, which silently breaks under desktop packaging or a
-    // mid-reload generation, PAN-3172) before the tmux session exists.
+    // PAN-3936: the PTY supervisor is kimi's delivery path on tmux and on Herdr,
+    // where the pane is pane-bound and `agent.prompt` cannot reach it. Its tier
+    // of deliverAgentMessage requires BOTH the pty-<id>.sock (created when the
+    // supervisor process binds it) AND a readable pty-token it authenticates
+    // requests against — write the token and resolve the real,
+    // package/desktop-safe script path (not a hardcoded dist/ literal, which
+    // silently breaks under desktop packaging or a mid-reload generation,
+    // PAN-3172) before the pane exists.
     mkdirSync(join(this.home(), 'agents', config.agentId), { recursive: true });
-    const supervisorScriptPath = this.resolveSupervisorScriptPath();
-    await this.writePtyTokenFor(config.agentId);
+    const backend = await this.resolveBackend();
+    const useSupervisor = runtimeUsesSupervisor('kimi-code', backend);
+    const supervisorScriptPath = useSupervisor ? this.resolveSupervisorScriptPath() : undefined;
+    if (useSupervisor) await this.writePtyTokenFor(config.agentId);
 
     const launcherContent = generateLauncherScript({
       role: 'work',
@@ -568,7 +579,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       extraEnvExports: [pathExport],
       overdeckEnv: { agentId: config.agentId },
       setTerminalEnv: true,
-      useSupervisor: true,
+      useSupervisor,
       supervisorScriptPath,
       unsetProviderEnv: true,
       kimiContextDelivery: 'initial-message',
@@ -577,13 +588,25 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     const launcherScript = this.agentPath(config.agentId, 'launcher.sh');
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
 
-    await tmuxCreateSession(config.agentId, config.workspace, `bash ${shellQuote(launcherScript)}`, config.env ?? {});
-
+    let pane: AgentPaneRef | null = null;
     try {
+      // Readiness is the new session directory under the kimi home, not the
+      // pane's text, so it holds on Herdr, where a full-screen TUI reads empty.
+      pane = await launchRuntimePane({
+        agentId: config.agentId,
+        workspace: config.workspace,
+        harness: 'kimi-code',
+        model,
+        launcherScript,
+        env: config.env,
+        backend,
+        state: getAgentState(config.agentId),
+        saveState: saveAgentStateSync,
+      });
       const sessionId = await this.waitForNewSessionId(config.workspace, existingBefore);
       if (!sessionId) throw new KimiCodeSpawnTimeout(config.agentId);
       this.writeSessionId(config.agentId, sessionId);
-      this.markSupervisorEnabled(config.agentId);
+      this.markSupervisorEnabled(config.agentId, useSupervisor);
 
       const initialMessage = await prepareKimiMessage(
         config.agentId,
@@ -609,6 +632,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
         startedAt: new Date(),
       };
     } catch (error) {
+      await closeBackendPane(pane);
       if (await tmuxSessionExists(config.agentId)) await tmuxKillSession(config.agentId);
       throw error;
     }
@@ -682,16 +706,18 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 
   /**
-   * Best-effort: mark the persisted agent state as supervisor-enabled so
-   * prepareSupervisorForRelaunch (supervisor-channels.ts) re-supervises this
-   * agent on relaunch instead of falling back to useSupervisor:false. A
-   * no-op when no state has been saved for this agent yet (some callers of
-   * this adapter's spawnAgent create state afterward).
+   * Best-effort: record on the persisted agent state whether this launch is
+   * supervised, so the delivery tiers and prepareSupervisorForRelaunch
+   * (supervisor-channels.ts) match what actually runs. A no-op when no state
+   * has been saved for this agent yet (some callers of this adapter's
+   * spawnAgent create state afterward).
    */
-  private markSupervisorEnabled(agentId: string): void {
+  private markSupervisorEnabled(agentId: string, enabled: boolean): void {
     const state = getAgentState(agentId);
     if (!state) return;
-    state.supervisorEnabled = true;
+    if (enabled) state.supervisorEnabled = true;
+    else if (state.supervisorEnabled === undefined) return;
+    else delete state.supervisorEnabled;
     saveAgentStateSync(state);
   }
 

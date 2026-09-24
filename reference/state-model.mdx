@@ -18,7 +18,7 @@ Everything Overdeck needs — to show you a board, run the pipeline, or recover 
 | **GitHub Issues** | What work exists and its lifecycle (todo / in&nbsp;progress / done) | github.com |
 | **Git repo & workspaces** | The plan, the code, the feature branch, the PR, the per-issue record, task state | Your repo + `origin` |
 | **Agent transcripts** | The conversation history to resume an agent mid-task | On disk, per harness (kept while work is active) |
-| **tmux** | Which agents are alive *right now* | Local tmux server |
+| **Terminal backend** | Which agents are alive *right now*, answered by `src/lib/agents/liveness.ts` (session, live pane, and harness process in the pane) | The selected backend's server: Herdr by default, tmux with `terminal.backend: tmux` |
 
 ## The local database is a cache
 
