@@ -497,7 +497,7 @@ mergeStatus:  pending → merging → merged
 
 ### Specialist initialization
 
-Specialists (review-agent, test-agent, inspect-agent) are Claude Code processes in their own tmux sessions. They initialize once at server startup via `initializeSpecialist()`. Requirements:
+Specialists (review-agent, test-agent) are Claude Code processes in their own tmux sessions. They initialize once at server startup via `initializeSpecialist()`. Requirements:
 
 1. Run from the project root (`getDevrootPath()`)
 2. Have their directory pre-trusted, which project registration does (`preTrustDirectory()`)

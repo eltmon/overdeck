@@ -11,7 +11,7 @@ import {
   listIssuesWithAnyLabel,
   listOpenIssuesWithLabels,
 } from './github-app.js';
-import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
+import { createSettledTtlPromiseCache, withConcurrencyLimit } from './concurrency.js';
 import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
@@ -707,7 +707,7 @@ export async function gatherProjectLensSignals(
     // One call per repo carrying every candidate head — passing [head] instead
     // cost one glab subprocess per (repo × head), which stalled the refresh and
     // failed it outright somewhere in the fan-out every cycle (PAN-3267).
-    const allMergedHeads = await withConcurrencyLimitPromise(
+    const allMergedHeads = await withConcurrencyLimit(
       gitlabRepos.map((repo) => () =>
         withUnavailableReason('forge_unavailable', () =>
           deps.listMergedMergeRequestHeads(repo.path, candidateHeads),
@@ -746,7 +746,7 @@ export async function mapPipelineProjects<T>(
   projects: ProjectConfig[],
   operation: (project: ProjectConfig) => Promise<T>,
 ): Promise<Array<{ project: ProjectConfig; value?: T; error?: unknown }>> {
-  return withConcurrencyLimitPromise(projects.map((project) => async () => {
+  return withConcurrencyLimit(projects.map((project) => async () => {
     try {
       return { project, value: await operation(project) };
     } catch (error) {

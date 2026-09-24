@@ -148,7 +148,7 @@ src/lib/cloister/prompts/*.md → dist/dashboard/prompts/
 
 This copy step is part of `build:dashboard:server` in `package.json`.
 
-**Template catalogue** (as of v0.5.0): `work.md`, `planning.md`, `review.md`, `test.md`, `merge.md`, `sync-main.md`, `resume-work.md`, `handoff-to-work.md`, `identity-wake.md`, plus `inspect-agent.md` (legacy ad-hoc path).
+**Template catalogue** (as of v0.5.0): `work.md`, `planning.md`, `review.md`, `test.md`, `merge.md`, `sync-main.md`, `resume-work.md`, `handoff-to-work.md`, `identity-wake.md`.
 
 **If you add a new prompt template**: Place it in `src/lib/cloister/prompts/`, declare its `requires`/`optional` vars in frontmatter, and call `renderPrompt({ name, vars })`. Missing required vars, unknown vars, and YAML errors all throw `PromptError` at render time (fail loud). See [Prompt Templates reference](../reference/prompts.mdx) for the full authoring guide.
 
@@ -173,7 +173,6 @@ dist/
 │   ├── prompts/               # Specialist prompt templates (copied)
 │   │   ├── handoff-to-work.md
 │   │   ├── identity-wake.md
-│   │   ├── inspect-agent.md
 │   │   ├── merge.md
 │   │   ├── planning.md
 │   │   ├── resume-work.md
