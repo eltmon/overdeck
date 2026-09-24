@@ -13,6 +13,8 @@ function KV({ k, children }: { k: string; children: React.ReactNode }) {
   )
 }
 
+const ATTACH_HINT = "Open the agent's Terminal tab to attach"
+
 /**
  * WorkspaceCard — the issue's workspace at a glance: path · services ·
  * containers · attach, plus the workspace lifecycle actions (sync-main,
@@ -100,7 +102,9 @@ export function WorkspaceCard({ issueId }: { issueId: string }) {
       </div>
       {ws.agentSessionId && (
         <KV k="Attach">
-          <span className="font-mono text-[11px] text-muted-foreground" title={`tmux -L overdeck attach -t ${ws.agentSessionId}`}>
+          {/* The workspace payload does not say which terminal backend (Herdr or
+              tmux) holds the agent's pane, so no shell command is guessed here. */}
+          <span className="font-mono text-[11px] text-muted-foreground" title={ATTACH_HINT}>
             {ws.agentSessionId}
           </span>
         </KV>
