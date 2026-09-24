@@ -127,6 +127,7 @@ async function postRestartFresh(body: Record<string, unknown>) {
 describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837 review fix)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.resolveRoutedSpawnModel.mockReset()
     mocks.getAgentState.mockReturnValue(agentState as any)
     mocks.getIssueStage.mockReturnValue(null)
     mocks.detectPendingOperatorDecision.mockResolvedValue(null)
