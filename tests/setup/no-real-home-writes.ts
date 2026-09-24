@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
 
 const realOverdeckHome = resolve(homedir(), '.overdeck');
+// Claude Code's own config: spawn paths pre-trust workspace dirs in it
+// (PAN-3905), so a test that reaches one with the real HOME would otherwise add
+// its temp paths to the operator's file.
+const realClaudeJson = resolve(homedir(), '.claude.json');
 const allowedRealHomeWrites = new Set<string>();
 
 function pathString(value: unknown): string | null {
@@ -18,6 +22,7 @@ function blockedRealHomeTarget(value: unknown): string | null {
   if (!rawPath) return null;
   const resolved = resolve(rawPath);
   if (allowedRealHomeWrites.has(resolved)) return null;
+  if (resolved === realClaudeJson) return resolved;
   return resolved === realOverdeckHome || resolved.startsWith(`${realOverdeckHome}${sep}`)
     ? resolved
     : null;
@@ -27,7 +32,7 @@ function assertNotRealOverdeckHome(targets: unknown[]): void {
   for (const target of targets) {
     const blocked = blockedRealHomeTarget(target);
     if (blocked) {
-      throw new Error(`[test-guard] write to REAL ~/.overdeck blocked: ${blocked} — set OVERDECK_HOME to a temp dir`);
+      throw new Error(`[test-guard] write to REAL home blocked: ${blocked} — set OVERDECK_HOME (or HOME, for ~/.claude.json) to a temp dir`);
     }
   }
 }
