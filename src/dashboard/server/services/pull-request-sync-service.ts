@@ -20,7 +20,10 @@
  * Started only by a primary dashboard (a peer dashboard never writes).
  */
 
-import type { PullRequestKey, PullRequestSnapshot } from '@overdeck/contracts';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+import type { PullRequestKey, PullRequestLink, PullRequestSnapshot } from '@overdeck/contracts';
 
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { resolveConversationBranch } from '../../../lib/overdeck/conversation-branch.js';
@@ -46,6 +49,9 @@ export const PR_SYNC_BOOT_DELAY_MS = 30_000;
 export const PR_SYNC_INTERVAL_MS = 60_000;
 const BRANCH_READ_CONCURRENCY = 8;
 const LOG_PREFIX = '[pr-sync]';
+
+const execFileAsync = promisify(execFile);
+const GH_PR_VIEW_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
 let bootTimer: ReturnType<typeof setTimeout> | null = null;
 let intervalTimer: ReturnType<typeof setInterval> | null = null;
@@ -154,6 +160,35 @@ async function syncProject(
     }
   }
   return { inserted, updated };
+}
+
+/** `gh pr view` for one PR by key; null when the read fails. */
+async function readGithubPullRequest(key: PullRequestKey): Promise<GhPrRow | null> {
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'pr', 'view', String(key.number), '--repo', `${key.host}/${key.repository}`, '--json', GH_PR_VIEW_FIELDS,
+    ], { encoding: 'utf-8', timeout: 20_000 });
+    return JSON.parse(stdout) as GhPrRow;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Forced refresh right after an explicit link, outside the sweep schedule, so
+ * the badge fills in within seconds, including PRs outside the 200-row listing.
+ * GitHub PRs only; one `gh pr view`. Writes
+ * the snapshot (no event: the caller emits one for the link it just made).
+ */
+export async function refreshPullRequestLinkNow(
+  link: PullRequestLink,
+  readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
+  now: number = Date.now(),
+): Promise<void> {
+  if (!/\/pull\/\d+$/.test(link.url)) return;
+  const row = await readPullRequest(link);
+  if (!row) return;
+  setPullRequestLinkSnapshot(link, snapshotFromGhRow(row, new Date(now).toISOString()));
 }
 
 /** One full sweep. Exported for tests and for a future forced refresh. */

@@ -2,9 +2,11 @@
  * Door for pull requests linked to conversations (PAN-3822).
  *
  * One table, `conversation_pull_requests`, keyed by (conversation_id, host,
- * repository, number). This slice writes only `branch` links, from the
- * pull-request sync sweep; the `source` and `dismissed_at` columns are already
- * in place for explicit links and unlinking. Every write that changes what a
+ * repository, number). The pull-request sync sweep writes `branch` links; the
+ * operator (dashboard, `pan conv link-pr`), agents, and the pipeline write
+ * explicit links (`manual`, `agent`, `created`). Unlinking never deletes a row:
+ * it sets `dismissed_at`, so the sweep cannot re-add a PR the operator removed,
+ * and an explicit relink clears it. Every write that changes what a
  * conversation shows emits `conversation.pull_requests_changed`.
  */
 
@@ -124,6 +126,64 @@ export function upsertBranchPullRequestLink(
     `)
     .run(conversationId, link.host, link.repository, link.number, link.url, now, JSON.stringify(snapshot));
   return Number(result.changes) > 0;
+}
+
+export type ExplicitPullRequestLinkSource = Exclude<PullRequestLinkSource, 'branch'>;
+
+/**
+ * Link a PR to a conversation explicitly. Upserts: an existing row (a branch
+ * link, or an earlier explicit one) takes the new source and keeps its
+ * snapshot. `manual` and `agent` links clear a dismissal; a `created` link
+ * from the pipeline never overrides an operator's unlink. Returns the stored
+ * link, or null when the conversation does not exist.
+ */
+export function linkConversationPullRequest(
+  conversationName: string,
+  link: PullRequestKey & { url: string },
+  source: ExplicitPullRequestLinkSource,
+  now: number = Date.now(),
+): PullRequestLink | null {
+  const db = getOverdeckDatabase();
+  const conversation = db
+    .prepare(`SELECT id FROM conversations WHERE name = ?`)
+    .get<{ id: string }>(conversationName);
+  if (!conversation) return null;
+  const onConflict = source === 'created'
+    ? `DO UPDATE SET source = CASE WHEN dismissed_at IS NULL THEN excluded.source ELSE source END`
+    : `DO UPDATE SET source = excluded.source, url = excluded.url, dismissed_at = NULL`;
+  db.prepare(`
+    INSERT INTO conversation_pull_requests
+      (conversation_id, host, repository, number, url, source, linked_at, dismissed_at, snapshot_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+    ON CONFLICT(conversation_id, host, repository, number) ${onConflict}
+  `).run(conversation.id, link.host, link.repository, link.number, link.url, source, now);
+  return findLink(conversationName, link);
+}
+
+/**
+ * Unlink a PR from a conversation by dismissing its row (any source). Returns
+ * `unlinked: false` when there is no live link for that key.
+ */
+export function unlinkConversationPullRequest(
+  conversationName: string,
+  key: PullRequestKey,
+  now: number = Date.now(),
+): { unlinked: boolean } {
+  const result = getOverdeckDatabase()
+    .prepare(`
+      UPDATE conversation_pull_requests SET dismissed_at = ?
+      WHERE conversation_id = (SELECT id FROM conversations WHERE name = ?)
+        AND host = ? AND repository = ? AND number = ? AND dismissed_at IS NULL
+    `)
+    .run(now, conversationName, key.host, key.repository, key.number);
+  return { unlinked: Number(result.changes) > 0 };
+}
+
+function findLink(conversationName: string, key: PullRequestKey): PullRequestLink | null {
+  const row = getOverdeckDatabase()
+    .prepare(`${LINK_SELECT} WHERE c.name = ? AND l.host = ? AND l.repository = ? AND l.number = ?`)
+    .get<LinkRow>(conversationName, key.host, key.repository, key.number);
+  return row ? rowToLink(row) : null;
 }
 
 function snapshotWithoutSyncTime(snapshot: PullRequestSnapshot | null): string {
