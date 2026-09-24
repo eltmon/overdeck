@@ -11,7 +11,8 @@
  *      listing (a rate limit included) counts toward the same 3-strike backoff
  *      as the fallback reads and leaves that project's links for a later sweep.
  *   3. Branch detection: a PR whose head branch equals the conversation's branch
- *      (`resolveConversationBranch`; never the default branch) becomes a
+ *      (`resolveConversationBranch`: a linked worktree's or agent's branch,
+ *      never the default branch or the primary checkout's) becomes a
  *      `branch` link. A dismissed row blocks re-insertion. A link whose PR drops
  *      out of the listing is never deleted (the listing is capped at 200).
  *   4. Snapshot refresh of every due linked PR: never synced or open → every

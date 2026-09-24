@@ -68,8 +68,10 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   conversation so its row and header show the PR badge. `<query>` resolves like
   `move`; `pan conv current` names your own conversation. Only a repository
   configured for the conversation's project is accepted (`#42` = that repo).
-  Inside an agent the source is `agent`. Unlinking hides the PR from branch
-  detection too. Works with the dashboard down (writes the link directly).
+  Inside an agent the source is `agent`. Branch detection links a PR on its
+  own only for a conversation in a linked git worktree, or an agent
+  conversation, never one in the primary checkout. Unlinking hides the PR from
+  branch detection too. Works with the dashboard down (writes the link directly).
   `auto-archive-on-merge` (default off) archives an operator conversation once
   all its linked PRs are merged or closed; never agent conversations, never a
   live session.

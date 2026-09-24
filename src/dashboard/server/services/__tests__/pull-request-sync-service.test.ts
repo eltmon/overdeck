@@ -22,8 +22,10 @@ vi.mock('../dashboard-poll-snapshots.js', () => ({
 }));
 
 const branchByCwd = new Map<string, string | null>();
+/** Cwds that are the primary checkout; every other cwd is a linked worktree. */
+const primaryCheckoutCwds = new Set<string>();
 vi.mock('../git-info.js', () => ({
-  resolveConversationGitInfo: vi.fn(async (cwd: string) => ({ branch: branchByCwd.get(cwd) ?? null, isWorktree: false })),
+  resolveConversationGitInfo: vi.fn(async (cwd: string) => ({ branch: branchByCwd.get(cwd) ?? null, isWorktree: !primaryCheckoutCwds.has(cwd) })),
 }));
 
 type Row = Record<string, unknown>;
@@ -88,11 +90,12 @@ function pr(number: number, headRefName: string, extra: Row = {}): Row {
 }
 
 let seq = 0;
-function conversation(branch: string | null, opts: { name?: string; issueId?: string } = {}): string {
+function conversation(branch: string | null, opts: { name?: string; issueId?: string; primaryCheckout?: boolean } = {}): string {
   seq += 1;
   const name = opts.name ?? `pr-sync-conv-${seq}`;
-  const cwd = join(REPO_PATH, `wt-${seq}`);
+  const cwd = opts.primaryCheckout ? REPO_PATH : join(REPO_PATH, `wt-${seq}`);
   branchByCwd.set(cwd, branch);
+  if (opts.primaryCheckout) primaryCheckoutCwds.add(cwd);
   createConversation({ name, tmuxSession: `conv-${name}`, cwd, issueId: opts.issueId, title: name });
   return name;
 }
@@ -115,6 +118,7 @@ beforeEach(() => {
   closeOverdeckDatabase();
   getOverdeckDatabase().exec('DELETE FROM conversation_pull_requests; DELETE FROM conversations;');
   branchByCwd.clear();
+  primaryCheckoutCwds.clear();
   prRows = [];
   listRepoPullRequestsMock.mockClear();
   emitOnlyMock.mockClear();
@@ -167,6 +171,24 @@ describe('runPullRequestSyncOnce — branch detection', () => {
     await runPullRequestSyncOnce();
 
     expect(listConversationPullRequests(name)).toEqual([]);
+  });
+
+  it('never links an operator conversation in the primary checkout by branch', async () => {
+    const name = conversation('feature/pan-3822', { primaryCheckout: true });
+    prRows = [pr(12, 'feature/pan-3822')];
+
+    await runPullRequestSyncOnce();
+
+    expect(listConversationPullRequests(name)).toEqual([]);
+  });
+
+  it('links an agent conversation by its cwd branch even outside a linked worktree', async () => {
+    const name = conversation('feature/pan-66', { name: 'agent-pan-66', issueId: 'PAN-66', primaryCheckout: true });
+    prRows = [pr(66, 'feature/pan-66')];
+
+    await runPullRequestSyncOnce();
+
+    expect(listConversationPullRequests(name).map((link) => link.number)).toEqual([66]);
   });
 
   it('falls back to feature/<issue> for an agent conversation whose cwd has no branch', async () => {

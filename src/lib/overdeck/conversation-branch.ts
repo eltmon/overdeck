@@ -15,20 +15,24 @@ export interface ConversationBranchInput {
 /**
  * The conversation's branch, or null when it has none worth matching.
  *
- * - The cwd's current branch wins.
+ * - The cwd's current branch counts only in a linked git worktree or for an
+ *   agent conversation. An operator conversation in the primary checkout
+ *   shares that checkout's branch with every other conversation there, so it
+ *   is never linked to whatever feature branch the checkout happens to be on.
+ *   Explicit links are unaffected.
  * - An agent conversation whose cwd cannot be read falls back to the
  *   `feature/<issue>` workspace convention.
  * - A conversation on the project's default branch (or a detached HEAD) has no
- *   branch for detection, so an operator chat in the primary checkout never
- *   links to whatever PR happens to share that name.
+ *   branch for detection.
  */
 export async function resolveConversationBranch(
   conversation: ConversationBranchInput,
   defaultBranch: string,
 ): Promise<string | null> {
+  const isAgent = isAgentConversationName(conversation.name);
   const info = await resolveConversationGitInfo(conversation.cwd);
-  let branch = info.branch && info.branch !== 'HEAD' ? info.branch : null;
-  if (!branch && conversation.issueId && isAgentConversationName(conversation.name)) {
+  let branch = info.branch && info.branch !== 'HEAD' && (info.isWorktree || isAgent) ? info.branch : null;
+  if (!branch && conversation.issueId && isAgent) {
     branch = `feature/${conversation.issueId.toLowerCase()}`;
   }
   if (!branch || branch === defaultBranch) return null;
