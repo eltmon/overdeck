@@ -330,6 +330,21 @@ requires checking prior fixes first and explaining newly discovered
 blockers. It never suppresses a confirmed blocker solely because a previous
 round missed it.
 
+## The override door is the operator's (#3853)
+
+`pan admin specialists done review` is both the review agent's verdict and
+the operator's override, so the command checks who is calling. The caller is
+read from `OVERDECK_AGENT_ID`, which every managed pane carries on Herdr and
+tmux alike (`cloister/verdict-caller.ts`): no id is an operator shell, a
+`conv-*` id is an operator conversation, and anything else is an agent
+session. An operator may record any review verdict. An agent session may
+record one only as the issue's own review session (`agent-<issue>-review` or
+its convoy), and never a `blocked`/`failed` verdict that reverses the approval
+standing on the current head: with no new commit there is nothing new to
+review. The approval is dated against the head commit (`approvedAtHead` in
+`pr-facts`); an approval the forge kept across a push does not count. A
+refused verdict posts nothing, journals nothing, and delivers no rework.
+
 ## Agent Auto-Resume Gates
 
 Auto-resume is intentionally suppressible:

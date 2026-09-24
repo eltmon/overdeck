@@ -206,6 +206,11 @@ pan admin specialists done review <issueId> --status passed --notes "<one-line s
 pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>" --run-id "<runId>"
 ```
 
+The command refuses a `blocked` verdict on a head that is already approved
+with no commit since (#3853): reversing that approval is the operator's
+override, not yours. Record `passed` with the findings as advisories, or ask
+the operator. Never claim operator authorization in `--notes`.
+
 If the command says the verdict went to the workspace fallback because the
 journal is contended, it is durable; do not re-signal. The host folds it later.
 For Pi sessions, end with exactly one matching sentinel:
