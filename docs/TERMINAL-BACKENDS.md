@@ -188,6 +188,19 @@ Who uses them:
   `stopAgent` for every reviewer it closed or whose row still claims `running`/`starting`. A failed close
   is returned in `failed` and that reviewer's row is left alone. It used to list tmux sessions only, so on
   Herdr it closed nothing and wrote no row (PAN-3939).
+- **`killAllReviewSessions`** (`pan down`; `src/lib/cloister/review-agent.ts`) — the shutdown sweep across
+  every issue. Candidates are tmux sessions with a reviewer name (legacy `review-coordinator-*` and friends
+  included), `agent-<id>-review[-<lane>]` rows that still claim `running`/`starting`, and on Herdr the live
+  panes stamped with a reviewer `agentId` and role `review`; a stopped row is not probed. A candidate whose
+  row names another role is skipped, and `conv-*` panes never match. Each is closed with
+  `closeAgentPaneDetailed` and marked `stopped` through `stopAgent`, and a failed close is returned in
+  `failed` with its row left alone. It used to list and kill tmux sessions only, so on Herdr `pan down`
+  reported no review sessions while their panes survived (#4182).
+- **The failed review spawn teardown** (`teardownFailedReviewSpawn`, PAN-3674) — when a review dispatch
+  throws after creating its runtime, the reviewer this dispatch started is closed with
+  `closeAgentPaneDetailed` and marked `stopped` through `stopAgent`. A failed close is appended to the
+  dispatch error and the row is left alone. It used to kill the tmux session only, so on Herdr the
+  half-started pane stayed up (#4182).
 - **The review synthesis dispatch guard** (`spawnReviewRoleForIssue`) — asks `isAlive` for
   `agent-<id>-review`. A live harness is the review in progress (subject to the run-id and finished-report
   checks); a confirmed death with a pane left behind (`pane-dead`, `runtime-missing`) is closed and
