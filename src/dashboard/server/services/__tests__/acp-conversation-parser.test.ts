@@ -81,6 +81,34 @@ describe('parseAcpConversationMessages', () => {
     expect(result.totalTokens).toBe(0);
   });
 
+  it('projects thought chunks as one thinking work-log row, apart from assistant text', async () => {
+    const path = await writeTranscript([
+      { timestamp: '2026-07-17T10:00:00.000Z', role: 'user', content: 'Pick one', source: 'orchestrator' },
+      { timestamp: '2026-07-17T10:00:01.000Z', role: 'thought', content: 'Weighing ', source: 'agent' },
+      { timestamp: '2026-07-17T10:00:01.100Z', role: 'thought', content: 'both options', source: 'agent' },
+      { timestamp: '2026-07-17T10:00:02.000Z', role: 'assistant', content: 'Option B', source: 'agent' },
+      { timestamp: '2026-07-17T10:00:03.000Z', role: 'thought', content: 'Double-check', source: 'agent' },
+    ]);
+
+    const result = await parseAcpConversationMessages(path);
+
+    expect(result.workLog).toEqual([
+      {
+        id: expect.any(String),
+        createdAt: '2026-07-17T10:00:01.000Z',
+        label: 'thinking',
+        detail: 'Weighing both options',
+        tone: 'thinking',
+        sequence: 2,
+      },
+      expect.objectContaining({ label: 'thinking', detail: 'Double-check', tone: 'thinking', sequence: 4 }),
+    ]);
+    expect(result.messages).toEqual([
+      expect.objectContaining({ role: 'user', text: 'Pick one', sequence: 1 }),
+      expect.objectContaining({ role: 'assistant', text: 'Option B', sequence: 3 }),
+    ]);
+  });
+
   it('uses a durable completion boundary instead of recent-file streaming inference', async () => {
     const path = await writeTranscript([
       {
@@ -330,6 +358,45 @@ describe('parseAcpConversationMessages', () => {
 
     expect(acpParserReadStatsForTests(paths[0]!)).toBeUndefined();
     expect(acpParserReadStatsForTests(paths.at(-1)!)).toBeDefined();
+  });
+
+  it('shows a stalled turn as an error row without completing the turn (PAN-3890)', async () => {
+    const stall = 'opencode is retrying the turn (attempt 4): Rate limit exceeded. Please try again later.';
+    const path = await writeTranscript([
+      {
+        timestamp: '2026-09-18T04:01:11.000Z',
+        role: 'user',
+        content: 'hello muse',
+        source: 'orchestrator',
+        promptId: 'p1',
+      },
+      {
+        timestamp: '2026-09-18T04:01:20.000Z',
+        role: 'tool',
+        content: 'running',
+        toolCalls: [{ toolCallId: 'tool-pending', title: 'Run command', status: 'inProgress', data: {} }],
+      },
+      {
+        timestamp: '2026-09-18T04:02:11.000Z',
+        role: 'system',
+        content: stall,
+        source: 'watchdog',
+        promptId: 'p1',
+        event: 'prompt_stalled',
+      },
+    ]);
+
+    const result = await parseAcpConversationMessages(path);
+
+    expect(result.messages.map((message) => message.role)).toEqual(['user']);
+    expect(result.workLog.at(-1)).toEqual(expect.objectContaining({
+      createdAt: '2026-09-18T04:02:11.000Z',
+      label: 'Prompt stalled',
+      tone: 'error',
+      result: stall,
+    }));
+    expect(result.lastTurnCompletedAt).toBeUndefined();
+    expect(result.pendingToolUse.size).toBe(1);
   });
 
   it('clears pending tools when the prompt fails', async () => {

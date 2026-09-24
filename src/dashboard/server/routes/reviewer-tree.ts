@@ -19,7 +19,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { getAgentState } from '../../../lib/agents.js';
-import { isExtendedReviewEnabled } from '../../../lib/cloister/review-agent.js';
 
 import type { AgentStatus, SessionNodePresence, AgentSnapshot } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
@@ -318,6 +317,45 @@ async function findLatestReviewRunDir(
   }
 }
 
+/** Read `reviewRunId` from an agent's state.json under `agentsRoot`. Reads the
+ *  file directly: getAgentState would escape the agentsDirOverride test seam. */
+async function readReviewRunId(agentsRoot: string, agentId: string): Promise<string | undefined> {
+  try {
+    const raw = await readFile(join(agentsRoot, agentId, 'state.json'), 'utf-8');
+    const runId = (JSON.parse(raw) as { reviewRunId?: unknown }).reviewRunId;
+    return typeof runId === 'string' && runId.length > 0 ? runId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * PAN-4123: did the issue's current review run launch the convoy?
+ *
+ * The current run is the `reviewRunId` on the review parent
+ * (`agent-<issue>-review`). Both modes write to `.pan/review/<runId>/`, so the
+ * run dir alone says nothing; the convoy is what tells them apart. The run is a
+ * convoy run when some reviewer lane carries that `reviewRunId` (written before
+ * the reviewer launches, on fresh spawn and resume alike) or has written its
+ * `<role>.md` report into the run dir. A quick run on a new HEAD gets a new
+ * runId, so an earlier convoy's rows stop matching and its lanes stay hidden.
+ */
+export async function currentRunIsConvoy(
+  issueId: string,
+  workspacePath: string,
+  agentsRoot: string,
+): Promise<boolean> {
+  const parentRunId = await readReviewRunId(agentsRoot, `agent-${issueId.toLowerCase()}-review`);
+  if (!parentRunId) return false;
+  const runDir = join(workspacePath, '.pan', 'review', parentRunId);
+  const matches = await Promise.all(CONVOY_REVIEWER_ROLES.map(async (role) => {
+    if (existsSync(join(runDir, `${role}.md`))) return true;
+    const reviewerId = getReviewerSessionName(role, '', issueId);
+    return (await readReviewRunId(agentsRoot, reviewerId)) === parentRunId;
+  }));
+  return matches.some(Boolean);
+}
+
 export async function readSynthesisRounds(
   issueId: string,
   projectKey: string,
@@ -333,14 +371,15 @@ export async function readSynthesisRounds(
 export async function buildReviewerNodes(
   opts: BuildReviewerNodesOptions,
 ): Promise<ReviewerNode[]> {
-  // Quick review (the only live mode, PAN-1981) never has sub-reviewers — surface
-  // convoy lanes ONLY when extended review actually runs. Otherwise any
-  // agent-<id>-review-<subRole> record is a ghost from a prior convoy run and would
-  // render as a dead phantom lane under the issue. Single seam shared with the spawn
-  // side: isExtendedReviewEnabled(issueId) (review-agent.ts).
-  if (!isExtendedReviewEnabled(opts.issueId)) return [];
-
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.overdeck', 'agents');
+
+  // Quick review never has sub-reviewers — surface convoy lanes ONLY when the
+  // current review run is a convoy run. Otherwise any agent-<id>-review-<subRole>
+  // record is a ghost from a prior convoy run and would render as a dead phantom
+  // lane under the issue. PAN-4123: the mode comes from the run's own records,
+  // not from `roles.review.mode`: the Request review menu (#4118) can run Full
+  // or Quick against config, and nothing persists that choice.
+  if (!(await currentRunIsConvoy(opts.issueId, opts.workspacePath, agentsRoot))) return [];
 
   // PAN-915 — current-round output dir disambiguates "zombie session from prior
   // round" vs "alive session for the round currently in progress". When the

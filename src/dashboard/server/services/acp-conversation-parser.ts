@@ -72,6 +72,7 @@ function isTranscriptEntry(value: unknown): value is AcpTranscriptEntry {
     && typeof entry['content'] === 'string'
     && (entry['role'] === 'user'
       || entry['role'] === 'assistant'
+      || entry['role'] === 'thought'
       || entry['role'] === 'tool'
       || entry['role'] === 'system');
 }
@@ -127,6 +128,26 @@ function processTranscriptEntry(state: AcpParserState, entry: AcpTranscriptEntry
 
   if (entry.event === 'prompt_queued') return;
 
+  // PAN-3890: acp-host saw the turn stall (e.g. opencode retrying a provider
+  // 429). The turn is still in flight, so this is an error row that neither
+  // completes the turn nor clears pending tools.
+  if (entry.event === 'prompt_stalled') {
+    const message = entry.content.trim();
+    if (!message) return;
+    state.sequence += 1;
+    state.workLog.push({
+      id: `acp-prompt-stalled-${state.sequence}`,
+      createdAt,
+      label: 'Prompt stalled',
+      toolTitle: 'Prompt stalled',
+      tone: 'error',
+      sequence: state.sequence,
+      detail: message,
+      result: message,
+    });
+    return;
+  }
+
   if (entry.event === 'turn_completed' || entry.event === 'prompt_failed') {
     state.lastTurnCompletedAt = createdAt;
     if (state.currentTurnAssistantIndex !== undefined) {
@@ -164,6 +185,32 @@ function processTranscriptEntry(state: AcpParserState, entry: AcpTranscriptEntry
       });
     }
     state.currentTurnAssistantIndex = state.messages.length - 1;
+    state.lastRole = entry.role;
+    return;
+  }
+
+  if (entry.role === 'thought') {
+    // Same work-log shape the Claude Code parser emits for `thinking` blocks,
+    // so the feed renders it as an expandable thinking row.
+    if (!entry.content) return;
+    const previousIndex = state.workLog.length - 1;
+    const previous = state.lastRole === 'thought' ? state.workLog[previousIndex] : undefined;
+    if (previous?.tone === 'thinking') {
+      state.workLog[previousIndex] = {
+        ...previous,
+        detail: (previous.detail ?? '') + entry.content,
+      };
+    } else {
+      state.sequence += 1;
+      state.workLog.push({
+        id: `acp-thinking-${state.sequence}`,
+        createdAt,
+        label: 'thinking',
+        detail: entry.content,
+        tone: 'thinking',
+        sequence: state.sequence,
+      });
+    }
     state.lastRole = entry.role;
     return;
   }

@@ -14,12 +14,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BRIDGE_TOKEN_HEADER } from "../../bridge-token.js";
 import { INPUT_PURGE_MAX_CHARS } from "../../channels/injection-budget.js";
 import {
+  ACP_TURN_STALL_CHECK_INTERVAL_MS,
   AcpHost,
+  DEFAULT_ACP_TURN_STALL_TIMEOUT_MS,
   OPENCODE_PERMISSION_WATCHDOG_STALE_MS,
   type AcpHostRuntime,
   parseAcpHostArgs,
+  parseTurnStallTimeoutMs,
   reserveOpenCodePort} from "../host.js";
+import { parseSessionUpdateEvent } from "../runtime-model.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
+import { parseAcpConversationMessages } from "../../../dashboard/server/services/acp-conversation-parser.js";
 import { readSessionIndex } from "../../session-history.js";
 
 // Moved here from src/lib/acp/host.ts, which no production code called (PAN-3958 CH-8).
@@ -40,6 +45,8 @@ interface StubRuntimeOptions {
   readonly configOptions?: EffectAcpSchema.SessionConfigOption[];
   readonly configError?: Error;
   readonly assistantResponse?: string;
+  /** Streamed as ACP `agent_thought_chunk` updates before the assistant response. */
+  readonly thoughtResponse?: ReadonlyArray<string>;
   readonly updateDuringStart?: string;
   readonly startError?: Error;
   readonly promptError?: Error;
@@ -134,6 +141,16 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
         if (options.promptError && remainingPromptErrors > 0) {
           remainingPromptErrors -= 1;
           return yield* Effect.fail(options.promptError);
+        }
+        for (const thought of options.thoughtResponse ?? []) {
+          const parsed = parseSessionUpdateEvent({
+            sessionId,
+            update: {
+              sessionUpdate: "agent_thought_chunk",
+              content: { type: "text", text: thought },
+            },
+          });
+          for (const event of parsed.events) yield* Queue.offer(events, event);
         }
         if (options.assistantResponse) {
           yield* Queue.offer(events, {
@@ -234,6 +251,32 @@ function makeOutput(): { readonly writable: Writable; readonly text: () => strin
     }),
     text: () => output,
   };
+}
+
+/** Serves GET /session/status from `status`; every other URL takes the next queued response. */
+function openCodeFetchMock(
+  queued: Response[],
+  status: () => unknown = () => ({}),
+): ReturnType<typeof vi.fn> {
+  return vi.fn(async (url: string) => {
+    if (url.endsWith("/session/status")) {
+      return new Response(JSON.stringify(status()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    const next = queued.shift();
+    if (!next) throw new Error(`unexpected fetch ${url}`);
+    return next;
+  });
+}
+
+function permissionCalls(fetchMock: ReturnType<typeof vi.fn>): unknown[][] {
+  return fetchMock.mock.calls.filter((call) => !String(call[0]).endsWith("/session/status"));
+}
+
+async function readTranscriptEntries(path: string): Promise<Array<Record<string, unknown>>> {
+  return (await readFile(path, "utf-8")).trim().split("\n").map((line) => JSON.parse(line));
 }
 
 const hosts: AcpHost[] = [];
@@ -582,6 +625,48 @@ describe("AcpHost", () => {
     expect(output.text()).toContain("[assistant] hello from kimi");
   });
 
+  it("records ACP agent thoughts as a thought role that the feed renders as a thinking row", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime({
+      thoughtResponse: ["Weighing the ", "two options"],
+      assistantResponse: "Option B",
+    });
+    const output = makeOutput();
+    const host = new AcpHost({
+      agentId: "agent-thoughts",
+      provider: "opencode",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+      stdout: output.writable,
+    });
+    hosts.push(host);
+    await host.start();
+
+    const agentDir = join(overdeckHome, "agents", "agent-thoughts");
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-thoughts.sock");
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+    await postSocket(socketPath, token, { op: "message", content: "pick one" });
+    await host.waitForIdle();
+
+    const transcriptPath = join(agentDir, "acp-session.jsonl");
+    const transcript = (await readFile(transcriptPath, "utf-8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(transcript.filter((entry) => entry.role === "thought")).toEqual([
+      expect.objectContaining({ content: "Weighing the ", sessionId: "acp-session-1", source: "agent" }),
+      expect.objectContaining({ content: "two options", sessionId: "acp-session-1", source: "agent" }),
+    ]);
+    expect(output.text()).toContain("[thinking] Weighing the ");
+
+    const parsed = await parseAcpConversationMessages(transcriptPath);
+    expect(parsed.workLog).toEqual([
+      expect.objectContaining({ label: "thinking", tone: "thinking", detail: "Weighing the two options" }),
+    ]);
+    expect(parsed.messages.find((message) => message.role === "assistant")?.text).toBe("Option B");
+  });
+
   it("injects materialized Overdeck context into the first fresh prompt only", async () => {
     const overdeckHome = await makeHome();
     const stub = await makeStubRuntime();
@@ -714,13 +799,14 @@ describe("AcpHost", () => {
     const promptStarted = await Effect.runPromise(Deferred.make<void>());
     const promptGate = await Effect.runPromise(Deferred.make<void>());
     const stub = await makeStubRuntime({ promptStarted, promptGate });
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify([{
+    const fetchMock = openCodeFetchMock([
+      new Response(JSON.stringify([{
         id: "per-stuck",
         sessionID: "subagent-session",
         permission: "external_directory",
-      }]), { status: 200, headers: { "content-type": "application/json" } }))
-      .mockResolvedValueOnce(new Response("", { status: 200 }));
+      }]), { status: 200, headers: { "content-type": "application/json" } }),
+      new Response("", { status: 200 }),
+    ]);
     const host = new AcpHost({
       agentId: "agent-opencode-watchdog",
       provider: "opencode",
@@ -741,18 +827,19 @@ describe("AcpHost", () => {
     await host.handleOp({ op: "message", content: "run a task subagent" });
     await Effect.runPromise(Deferred.await(promptStarted));
     await vi.advanceTimersByTimeAsync(OPENCODE_PERMISSION_WATCHDOG_STALE_MS - 1);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(permissionCalls(fetchMock)).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
     vi.useRealTimers();
     await Effect.runPromise(Deferred.succeed(promptGate, undefined));
     await host.waitForIdle();
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, "http://127.0.0.1:43123/permission");
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      "http://127.0.0.1:43123/permission/per-stuck/reply",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ reply: "always" }) }),
-    );
+    expect(permissionCalls(fetchMock)).toEqual([
+      ["http://127.0.0.1:43123/permission"],
+      [
+        "http://127.0.0.1:43123/permission/per-stuck/reply",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ reply: "always" }) }),
+      ],
+    ]);
     const transcript = await readFile(
       join(overdeckHome, "agents", "agent-opencode-watchdog", "acp-session.jsonl"),
       "utf-8",
@@ -796,12 +883,13 @@ describe("AcpHost", () => {
     const promptStarted = await Effect.runPromise(Deferred.make<void>());
     const promptGate = await Effect.runPromise(Deferred.make<void>());
     const stub = await makeStubRuntime({ promptStarted, promptGate });
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify([{
+    const fetchMock = openCodeFetchMock([
+      new Response(JSON.stringify([{
         id: "per-raced",
         sessionID: "subagent-session",
-      }]), { status: 200, headers: { "content-type": "application/json" } }))
-      .mockResolvedValueOnce(new Response("", { status: 404 }));
+      }]), { status: 200, headers: { "content-type": "application/json" } }),
+      new Response("", { status: 404 }),
+    ]);
     const host = new AcpHost({
       agentId: "agent-opencode-watchdog-race",
       provider: "opencode-go",
@@ -826,9 +914,109 @@ describe("AcpHost", () => {
       join(overdeckHome, "agents", "agent-opencode-watchdog-race", "acp-session.jsonl"),
       "utf-8",
     );
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(permissionCalls(fetchMock)).toHaveLength(2);
     expect(transcript).not.toContain('"source":"watchdog"');
     expect(transcript).not.toContain("watchdog failed");
+  });
+
+  it("records a stalled turn with OpenCode's provider retry message without cancelling it (PAN-3890)", async () => {
+    const overdeckHome = await makeHome();
+    const promptStarted = await Effect.runPromise(Deferred.make<void>());
+    const promptGate = await Effect.runPromise(Deferred.make<void>());
+    const stub = await makeStubRuntime({ promptStarted, promptGate, assistantResponse: "finally" });
+    const cancel = vi.fn();
+    const runtime: AcpHostRuntime = { ...stub.runtime, cancel: Effect.sync(cancel) };
+    const retryMessage = "Rate limit exceeded. Please try again later.";
+    let sessionStatus: unknown = { "acp-session-1": { type: "busy" } };
+    const fetchMock = openCodeFetchMock([], () => sessionStatus);
+    const output = makeOutput();
+    const host = new AcpHost({
+      agentId: "agent-opencode-stall",
+      provider: "opencode",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime,
+      stdout: output.writable,
+      openCodePort: 43125,
+      fetch: fetchMock,
+    });
+    hosts.push(host);
+    await host.start();
+    vi.useFakeTimers();
+
+    await host.handleOp({ op: "message", content: "hello muse" });
+    await Effect.runPromise(Deferred.await(promptStarted));
+    await vi.advanceTimersByTimeAsync(ACP_TURN_STALL_CHECK_INTERVAL_MS);
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:43125/session/status");
+    const transcriptPath = join(overdeckHome, "agents", "agent-opencode-stall", "acp-session.jsonl");
+    expect(await readFile(transcriptPath, "utf-8")).not.toContain("prompt_stalled");
+
+    sessionStatus = {
+      "acp-session-1": { type: "retry", attempt: 4, message: retryMessage, next: Date.now() + 8_000 },
+    };
+    await vi.advanceTimersByTimeAsync(ACP_TURN_STALL_CHECK_INTERVAL_MS * 3);
+    vi.useRealTimers();
+    await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+    await host.waitForIdle();
+
+    const entries = await readTranscriptEntries(transcriptPath);
+    const stalled = entries.filter((entry) => entry.event === "prompt_stalled");
+    expect(stalled).toHaveLength(1);
+    expect(stalled[0]).toMatchObject({
+      role: "system",
+      source: "watchdog",
+      promptId: entries.find((entry) => entry.event === "prompt_queued")?.promptId,
+      content: `opencode is retrying the turn (attempt 4): ${retryMessage}`,
+    });
+    expect(output.text()).toContain(`[error] opencode is retrying the turn (attempt 4): ${retryMessage}`);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(entries.at(-1)).toMatchObject({ event: "turn_completed", stopReason: "end_turn" });
+  });
+
+  it("records a stalled turn after the configured inactivity timeout for non-OpenCode providers", async () => {
+    const overdeckHome = await makeHome();
+    const promptStarted = await Effect.runPromise(Deferred.make<void>());
+    const promptGate = await Effect.runPromise(Deferred.make<void>());
+    const stub = await makeStubRuntime({ promptStarted, promptGate });
+    const fetchMock = vi.fn();
+    const host = new AcpHost({
+      agentId: "agent-kimi-stall",
+      provider: "kimi",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+      fetch: fetchMock,
+      turnStallTimeoutMs: 120_000,
+    });
+    hosts.push(host);
+    await host.start();
+    vi.useFakeTimers();
+
+    await host.handleOp({ op: "message", content: "think hard" });
+    await Effect.runPromise(Deferred.await(promptStarted));
+    const transcriptPath = join(overdeckHome, "agents", "agent-kimi-stall", "acp-session.jsonl");
+    await vi.advanceTimersByTimeAsync(120_000 - ACP_TURN_STALL_CHECK_INTERVAL_MS);
+    expect(await readFile(transcriptPath, "utf-8")).not.toContain("prompt_stalled");
+    await vi.advanceTimersByTimeAsync(ACP_TURN_STALL_CHECK_INTERVAL_MS * 4);
+    vi.useRealTimers();
+    await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+    await host.waitForIdle();
+
+    const stalled = (await readTranscriptEntries(transcriptPath))
+      .filter((entry) => entry.event === "prompt_stalled");
+    expect(stalled).toEqual([
+      expect.objectContaining({ content: "No activity from kimi for 2 min; the turn may be stuck." }),
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("parses the turn stall timeout from the environment", () => {
+    expect(parseTurnStallTimeoutMs(undefined)).toBe(DEFAULT_ACP_TURN_STALL_TIMEOUT_MS);
+    expect(parseTurnStallTimeoutMs("")).toBe(DEFAULT_ACP_TURN_STALL_TIMEOUT_MS);
+    expect(parseTurnStallTimeoutMs("90000")).toBe(90_000);
+    expect(parseTurnStallTimeoutMs("0")).toBe(0);
+    expect(parseTurnStallTimeoutMs("soon")).toBe(DEFAULT_ACP_TURN_STALL_TIMEOUT_MS);
+    expect(parseTurnStallTimeoutMs("-5")).toBe(DEFAULT_ACP_TURN_STALL_TIMEOUT_MS);
   });
 
   it("writes one ordered completion boundary for each successful prompt", async () => {

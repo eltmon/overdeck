@@ -2,7 +2,8 @@ import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  listRunningAgents: vi.fn(() => Effect.succeed([])),
+  listRunningAgents: vi.fn(() => Effect.succeed([] as unknown[])),
+  listLiveAgentIds: vi.fn(async (): Promise<ReadonlySet<string> | null> => new Set<string>()),
   getRuntimeForAgent: vi.fn(),
   loadCloisterConfigSync: vi.fn(() => ({
     startup: { auto_start: true },
@@ -22,6 +23,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../src/lib/agents.js', () => ({
   listRunningAgents: mocks.listRunningAgents,
+}));
+
+// Fake terminal backend: the live inventory the status read uses (#4109).
+vi.mock('../../../src/lib/terminal-backends/inventory.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/terminal-backends/inventory.js')>(),
+  listLiveAgentIds: mocks.listLiveAgentIds,
 }));
 
 vi.mock('../../../src/lib/runtimes/index.js', () => ({
@@ -71,6 +78,7 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
+    mocks.listLiveAgentIds.mockResolvedValue(new Set());
     mocks.readCloisterStateFile.mockReturnValue({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' });
     mocks.lastPatrolReport.mockReturnValue({ at: '2026-07-03T00:00:00.000Z', error: null });
     mocks.isChildRunning.mockReturnValue(true);
@@ -90,6 +98,34 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
     expect(mocks.readCloisterStateFile).toHaveBeenCalled();
     expect(mocks.lastPatrolReport).toHaveBeenCalled();
     expect(mocks.isCloisterSpawnsPaused).toHaveBeenCalled();
+  });
+
+  it('#4109: reports health for a live Herdr agent (tmuxActive false) listed by the backend inventory', async () => {
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
+      { id: 'agent-pan-1', status: 'running', tmuxActive: false },
+      { id: 'agent-pan-2', status: 'running', tmuxActive: false },
+    ]));
+    mocks.listLiveAgentIds.mockResolvedValue(new Set(['agent-pan-1']));
+    mocks.getRuntimeForAgent.mockReturnValue(null);
+
+    await readDurableCloisterStatus();
+
+    expect(mocks.getRuntimeForAgent).toHaveBeenCalledWith('agent-pan-1');
+    expect(mocks.getRuntimeForAgent).not.toHaveBeenCalledWith('agent-pan-2');
+  });
+
+  it('#4109: falls back to the running rows when the backend inventory is unreadable', async () => {
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
+      { id: 'agent-pan-1', status: 'running', tmuxActive: false },
+      { id: 'agent-pan-2', status: 'stopped', tmuxActive: false },
+    ]));
+    mocks.listLiveAgentIds.mockResolvedValue(null);
+    mocks.getRuntimeForAgent.mockReturnValue(null);
+
+    await readDurableCloisterStatus();
+
+    expect(mocks.getRuntimeForAgent).toHaveBeenCalledWith('agent-pan-1');
+    expect(mocks.getRuntimeForAgent).not.toHaveBeenCalledWith('agent-pan-2');
   });
 
   it('uses the supervisor for start, stop, and manual patrol', async () => {

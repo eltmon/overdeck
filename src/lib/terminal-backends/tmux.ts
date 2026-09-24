@@ -183,11 +183,14 @@ export class TmuxBackend implements TerminalBackend {
       const snapshots: BackendAgentSnapshot[] = [];
       for (const session of sessions) {
         const verdict = await isAliveOnTmux(session.name);
-        const state: AgentState = !verdict.alive
-          ? 'exited'
-          : isIdle(session.name)
-            ? 'idle'
-            : 'working';
+        // A failed ps/pgrep probe (`runtime-indeterminate`) is unknown, not
+        // exited: the inventory drops exited panes, and a live agent missing
+        // from a readable inventory reads as a crash (#4109 review).
+        const state: AgentState = verdict.alive
+          ? isIdle(session.name) ? 'idle' : 'working'
+          : verdict.reason === 'runtime-indeterminate'
+            ? 'unknown'
+            : 'exited';
         const tokens = tmuxTargetTokens(session.name);
         snapshots.push({
           backend: BACKEND,
