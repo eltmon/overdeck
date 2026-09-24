@@ -13,8 +13,8 @@ describe('prd-draft', () => {
   let originalOverdeckHome: string | undefined;
 
   async function registerTestProject() {
-    const { registerProjectSync } = await import('../../src/lib/projects.js');
-    registerProjectSync('pan', {
+    const { registerProject } = await import('../../src/lib/projects.js');
+    registerProject('pan', {
       name: 'Overdeck Test',
       path: tempDir,
       issue_prefix: 'PAN',
@@ -50,18 +50,18 @@ describe('prd-draft', () => {
 
   describe('getPRDDraftPath', () => {
     it('should return correct path for issue ID', async () => {
-      const { getPRDDraftPathSync } = await import('../../src/lib/prd-draft.js');
+      const { getPRDDraftPath } = await import('../../src/lib/prd-draft.js');
       await registerTestProject();
-      const path = getPRDDraftPathSync('PAN-123');
+      const path = getPRDDraftPath('PAN-123');
 
       expect(path).toContain('pan-123.md');
       expect(path).toContain('drafts');
     });
 
     it('should lowercase the issue ID (PAN-3287)', async () => {
-      const { getPRDDraftPathSync } = await import('../../src/lib/prd-draft.js');
+      const { getPRDDraftPath } = await import('../../src/lib/prd-draft.js');
       await registerTestProject();
-      const path = getPRDDraftPathSync('PAN-456');
+      const path = getPRDDraftPath('PAN-456');
 
       expect(path).toContain('pan-456.md');
     });

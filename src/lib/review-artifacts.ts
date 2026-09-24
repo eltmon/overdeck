@@ -5,16 +5,16 @@ import { join } from 'node:path';
 import { findPlanSync } from './xbrief/io.js';
 import { promisify } from 'node:util';
 import { getForgeAdapter } from './forge.js';
-import { extractNumberSync } from './issue-id.js';
+import { extractNumber } from './issue-id.js';
 import {
-  ensureMergeSetForIssueSync,
-  upsertMergeSetSync,
-  withRepoArtifactUrlSync,
-  withRepoStateSync,
+  ensureMergeSetForIssue,
+  upsertMergeSet,
+  withRepoArtifactUrl,
+  withRepoState,
   type MergeSet,
   type MergeSetRepoState,
 } from './merge-set.js';
-import { emitActivityEntrySync } from './activity-logger.js';
+import { emitActivityEntry } from './activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -38,7 +38,7 @@ async function buildRichReviewArtifactBody(issueId: string, workspacePath: strin
   // reachable from main and races the pipeline's verifying_on_main → close-out
   // lifecycle (the first UAT batch promote closed 2 of 3 member issues
   // mid-handoff, 2026-06-11). Overdeck's close-out owns issue closing.
-  lines.push(`**Issue:** #${extractNumberSync(issueId) ?? issueId}`);
+  lines.push(`**Issue:** #${extractNumber(issueId) ?? issueId}`);
   lines.push('');
 
   try {
@@ -101,7 +101,7 @@ export async function createReviewArtifactsForIssue(
   issueId: string,
   workspacePath: string
 ): Promise<ReviewArtifactCreationResult> {
-  let mergeSet = ensureMergeSetForIssueSync(issueId);
+  let mergeSet = ensureMergeSetForIssue(issueId);
   if (!mergeSet) {
     return { mergeSet: null, artifacts: [] };
   }
@@ -114,7 +114,7 @@ export async function createReviewArtifactsForIssue(
     const hasChanges = await repoHasChanges(repoWorkspacePath, repo.targetBranch);
 
     if (!hasChanges) {
-      mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
+      mergeSet = withRepoState(mergeSet, repo.repoKey, {
         repoReview: 'skipped',
         repoTests: 'skipped',
         rebaseStatus: 'skipped',
@@ -135,9 +135,9 @@ export async function createReviewArtifactsForIssue(
     });
 
     if (artifact.url) {
-      mergeSet = withRepoArtifactUrlSync(mergeSet, repo.repoKey, artifact.url, artifact.id);
+      mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifact.url, artifact.id);
     }
-    mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
+    mergeSet = withRepoState(mergeSet, repo.repoKey, {
       artifactId: artifact.id,
       repoReview: 'pending',
       repoTests: 'pending',
@@ -147,7 +147,7 @@ export async function createReviewArtifactsForIssue(
     });
     if (artifact.created) {
       const repoSuffix = mergeSet.repos.length > 1 ? ` (${repo.repoKey})` : '';
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'ship',
         level: 'info',
         message: `Merge request created for ${issueId}${repoSuffix}`,
@@ -169,7 +169,7 @@ export async function createReviewArtifactsForIssue(
     status: 'reviewing',
     updatedAt: new Date().toISOString(),
   };
-  upsertMergeSetSync(mergeSet);
+  upsertMergeSet(mergeSet);
 
   return { mergeSet, artifacts };
 }

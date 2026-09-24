@@ -34,11 +34,11 @@ export type { RemoteAgentState, SpawnRemoteAgentOptions } from './remote-agents.
 
 // Workspace metadata management
 export {
-  saveWorkspaceMetadataSync,
-  loadWorkspaceMetadataSync,
-  listWorkspaceMetadataSync,
-  deleteWorkspaceMetadataSync,
-  findRemoteWorkspaceMetadataSync,
+  saveWorkspaceMetadata,
+  loadWorkspaceMetadata,
+  listWorkspaceMetadata,
+  deleteWorkspaceMetadata,
+  findRemoteWorkspaceMetadata,
   WORKSPACES_DIR,
 } from './workspace-metadata.js';
 

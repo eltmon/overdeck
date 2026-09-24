@@ -18,9 +18,9 @@ import { tmpdir } from 'os';
 import { join, basename } from 'path';
 import {
   readSettingsOrAbort,
-  backupSettingsSync,
-  pruneBackupsSync,
-  atomicWriteJsonSync,
+  backupSettings,
+  pruneBackups,
+  atomicWriteJson,
   diffJson,
   SETTINGS_BACKUP_KEEP,
 } from '../../../src/cli/commands/setup/safe-settings.js';
@@ -95,14 +95,14 @@ describe('backupSettingsSync + pruneBackupsSync', () => {
     const path = join(h.dir, 'settings.json');
     const original = JSON.stringify({ theme: 'dark' });
     writeFileSync(path, original, 'utf-8');
-    const backupPath = backupSettingsSync(path);
+    const backupPath = backupSettings(path);
     expect(backupPath).toBeTruthy();
     expect(backupPath!.startsWith(`${path}.pan-backup-`)).toBe(true);
     expect(readFileSync(backupPath!, 'utf-8')).toBe(original);
   });
 
   it('returns null when the file does not exist', () => {
-    expect(backupSettingsSync(join(h.dir, 'missing.json'))).toBeNull();
+    expect(backupSettings(join(h.dir, 'missing.json'))).toBeNull();
   });
 
   it(`prunes to ${SETTINGS_BACKUP_KEEP} most recent backups`, () => {
@@ -115,7 +115,7 @@ describe('backupSettingsSync + pruneBackupsSync', () => {
       const ts = `2026-05-${String(15 + i).padStart(2, '0')}T00-00-00-000Z`;
       writeFileSync(`${path}.pan-backup-${ts}`, '{}', 'utf-8');
     }
-    pruneBackupsSync(path);
+    pruneBackups(path);
     const remaining = readdirSync(h.dir).filter((f) => f.startsWith(`${basename(path)}.pan-backup-`));
     expect(remaining.length).toBe(SETTINGS_BACKUP_KEEP);
     // Sort descending — the kept ones must be the newest dates (24th-20th).
@@ -131,7 +131,7 @@ describe('backupSettingsSync + pruneBackupsSync', () => {
       const ts = `2026-05-${String(15 + i).padStart(2, '0')}T00-00-00-000Z`;
       writeFileSync(`${path}.pan-backup-${ts}`, '{}', 'utf-8');
     }
-    pruneBackupsSync(path);
+    pruneBackups(path);
     const remaining = readdirSync(h.dir).filter((f) => f.startsWith(`${basename(path)}.pan-backup-`));
     expect(remaining.length).toBe(3);
   });
@@ -144,20 +144,20 @@ describe('atomicWriteJsonSync', () => {
 
   it('writes JSON content with trailing newline', () => {
     const path = join(h.dir, 'settings.json');
-    atomicWriteJsonSync(path, { theme: 'dark' });
+    atomicWriteJson(path, { theme: 'dark' });
     expect(readFileSync(path, 'utf-8')).toBe(`${JSON.stringify({ theme: 'dark' }, null, 2)}\n`);
   });
 
   it('leaves no .tmp file behind after a successful write', () => {
     const path = join(h.dir, 'settings.json');
-    atomicWriteJsonSync(path, { x: 1 });
+    atomicWriteJson(path, { x: 1 });
     const stragglers = readdirSync(h.dir).filter((f) => f.startsWith('settings.json.tmp-'));
     expect(stragglers).toEqual([]);
   });
 
   it('creates the parent directory if missing', () => {
     const path = join(h.dir, 'nested', 'sub', 'settings.json');
-    atomicWriteJsonSync(path, { ok: true });
+    atomicWriteJson(path, { ok: true });
     expect(existsSync(path)).toBe(true);
   });
 });
@@ -187,9 +187,9 @@ describe('PAN-1137 round-trip: unknown top-level keys survive', () => {
     settings['hooks'].SessionStart = [
       { matcher: '.*', hooks: [{ type: 'command', command: '/home/eltmon/.overdeck/bin/session-start-hook' }] },
     ];
-    backupSettingsSync(path);
-    atomicWriteJsonSync(path, settings);
-    pruneBackupsSync(path);
+    backupSettings(path);
+    atomicWriteJson(path, settings);
+    pruneBackups(path);
 
     const after = JSON.parse(readFileSync(path, 'utf-8'));
     expect(after.statusLine).toEqual(original.statusLine);

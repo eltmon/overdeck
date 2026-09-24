@@ -12,7 +12,7 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../lib/orders/writer.js';
-import { findProjectByPathSync, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
+import { findProjectByPath, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { commitPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
 
@@ -52,7 +52,7 @@ function resolveOrdersProject(deps: OrdersCommandDeps = {}): OrdersProjectResolu
     return { panDir: getProjectPanPaths(resolveProjectPath(project)).panDir, projectConfig: project };
   }
   const cwd = deps.cwd ?? process.cwd();
-  const project = findProjectByPathSync(cwd);
+  const project = findProjectByPath(cwd);
   if (!project) throw new Error(`No configured project contains ${cwd}`);
   return { panDir: getProjectPanPaths(resolveProjectPath(project)).panDir, projectConfig: project };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getBuiltInDefaultHarness, getProviderEnvSync, PROVIDERS, type ProviderName } from '../../../src/lib/providers.js';
+import { getBuiltInDefaultHarness, getProviderEnv, PROVIDERS, type ProviderName } from '../../../src/lib/providers.js';
 import type { RuntimeName } from '../../../src/lib/runtimes/types.js';
 
 const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
@@ -46,7 +46,7 @@ describe('providers', () => {
 
 describe('getProviderEnvSync — kimi-code Anthropic-compat gate (PAN-1837 wi7a)', () => {
   it('AC1: omits ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and KIMI_API_KEY for {kimi, kimi-code}', () => {
-    const env = getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test-key', 'kimi-code');
+    const env = getProviderEnv(PROVIDERS.kimi, 'sk-kimi-test-key', 'kimi-code');
     expect(env.ANTHROPIC_BASE_URL).toBeUndefined();
     expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
     expect(env.KIMI_API_KEY).toBeUndefined();
@@ -62,8 +62,8 @@ describe('getProviderEnvSync — kimi-code Anthropic-compat gate (PAN-1837 wi7a)
   });
 
   it('AC2: still sets ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and KIMI_API_KEY for {kimi, claude-code}', () => {
-    const withHarness = getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test-key', 'claude-code');
-    const withoutHarness = getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test-key');
+    const withHarness = getProviderEnv(PROVIDERS.kimi, 'sk-kimi-test-key', 'claude-code');
+    const withoutHarness = getProviderEnv(PROVIDERS.kimi, 'sk-kimi-test-key');
     for (const env of [withHarness, withoutHarness]) {
       expect(env.ANTHROPIC_BASE_URL).toBeTruthy();
       expect(env.ANTHROPIC_AUTH_TOKEN).toBe('sk-kimi-test-key');
@@ -75,11 +75,11 @@ describe('getProviderEnvSync — kimi-code Anthropic-compat gate (PAN-1837 wi7a)
 
   it('AC3: acp and codex env output is byte-identical whether or not harness is passed', () => {
     const acpProvider = PROVIDERS.kimi;
-    expect(getProviderEnvSync(acpProvider, 'sk-kimi-test-key', 'acp')).toEqual(
-      getProviderEnvSync(acpProvider, 'sk-kimi-test-key'),
+    expect(getProviderEnv(acpProvider, 'sk-kimi-test-key', 'acp')).toEqual(
+      getProviderEnv(acpProvider, 'sk-kimi-test-key'),
     );
-    expect(getProviderEnvSync(PROVIDERS.minimax, 'mm-key', 'codex')).toEqual(
-      getProviderEnvSync(PROVIDERS.minimax, 'mm-key'),
+    expect(getProviderEnv(PROVIDERS.minimax, 'mm-key', 'codex')).toEqual(
+      getProviderEnv(PROVIDERS.minimax, 'mm-key'),
     );
   });
 });

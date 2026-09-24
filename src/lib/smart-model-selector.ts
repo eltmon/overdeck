@@ -14,7 +14,7 @@ import {
   MODEL_CAPABILITIES,
   SkillDimension,
   ModelCapability,
-  getModelCapabilitySync,
+  getModelCapability,
 } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
@@ -270,7 +270,7 @@ function calculateSkillScore(
   model: ModelId,
   requirements: SkillRequirement[]
 ): number {
-  const cap = getModelCapabilitySync(model);
+  const cap = getModelCapability(model);
   let totalScore = 0;
   let totalWeight = 0;
 
@@ -320,7 +320,7 @@ function isAccessibleAtTier(
 /**
  * Select the best model for a work type from available models
  */
-export function selectModelSync(
+export function selectModel(
   workType: string,
   availableModels: ModelId[],
   options: SelectionOptions = {}
@@ -362,7 +362,7 @@ export function selectModelSync(
   const eligible = candidates.filter((c) => {
     if (!c.available || c.skillScore < minCapability) return false;
     if (userTier === undefined) return true; // caller responsible for tier filtering
-    const cap = getModelCapabilitySync(c.model);
+    const cap = getModelCapability(c.model);
     return isAccessibleAtTier(cap.minTier, userTier);
   });
 
@@ -402,7 +402,7 @@ export function selectModelSync(
   }
 
   const selected = eligible[0];
-  const cap = getModelCapabilitySync(selected.model);
+  const cap = getModelCapability(selected.model);
 
   // Generate reason
   const topSkills = requirements
@@ -427,7 +427,7 @@ export function selectModelSync(
 /**
  * Select models for all work types at once
  */
-export function selectAllModelsSync(
+export function selectAllModels(
   availableModels: ModelId[],
   options: SelectionOptions = {}
 ): Record<string, ModelSelectionResult> {
@@ -435,7 +435,7 @@ export function selectAllModelsSync(
   const results: Record<string, ModelSelectionResult> = {};
 
   for (const workType of workTypes) {
-    results[workType] = selectModelSync(workType, availableModels, options);
+    results[workType] = selectModel(workType, availableModels, options);
   }
 
   return results;

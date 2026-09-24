@@ -4,9 +4,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  calculateCostSync,
-  getPricingSync,
-  summarizeCostsSync,
+  calculateCost,
+  getPricing,
+  summarizeCosts,
   DEFAULT_PRICING,
   type TokenUsage,
   type CostEntry,
@@ -125,19 +125,19 @@ describe('cost module', () => {
 
   describe('getPricing', () => {
     it('should get pricing by exact match', () => {
-      const pricing = getPricingSync('anthropic', 'claude-sonnet-4');
+      const pricing = getPricing('anthropic', 'claude-sonnet-4');
       expect(pricing).toBeDefined();
       expect(pricing?.model).toBe('claude-sonnet-4');
     });
 
     it('should get pricing by partial match with date suffix', () => {
-      const pricing = getPricingSync('anthropic', 'claude-sonnet-4-20250101');
+      const pricing = getPricing('anthropic', 'claude-sonnet-4-20250101');
       expect(pricing).toBeDefined();
       expect(pricing?.model).toBe('claude-sonnet-4');
     });
 
     it('should get pricing for 4-6 models with date suffix', () => {
-      const pricing = getPricingSync('anthropic', 'claude-opus-4-6-20250929');
+      const pricing = getPricing('anthropic', 'claude-opus-4-6-20250929');
       expect(pricing).toBeDefined();
       expect(pricing?.model).toBe('claude-opus-4-6');
     });
@@ -145,13 +145,13 @@ describe('cost module', () => {
     it('should fallback claude-haiku-3.5 to claude-haiku-3 via partial match', () => {
       // haiku-3.5 was removed, but getPricing does partial matching,
       // so "claude-haiku-3.5" matches "claude-haiku-3" (legacy fallback)
-      const pricing = getPricingSync('anthropic', 'claude-haiku-3.5');
+      const pricing = getPricing('anthropic', 'claude-haiku-3.5');
       expect(pricing).toBeDefined();
       expect(pricing?.model).toBe('claude-haiku-3');
     });
 
     it('should return null for unknown model', () => {
-      const pricing = getPricingSync('anthropic', 'claude-unknown-model');
+      const pricing = getPricing('anthropic', 'claude-unknown-model');
       expect(pricing).toBeNull();
     });
   });
@@ -173,7 +173,7 @@ describe('cost module', () => {
         inputTokens: 10000,
         outputTokens: 5000,
       };
-      const cost = calculateCostSync(usage, pricing);
+      const cost = calculateCost(usage, pricing);
       // (10000/1000 * 0.003) + (5000/1000 * 0.015) = 0.03 + 0.075 = 0.105
       expect(cost).toBe(0.105);
     });
@@ -184,7 +184,7 @@ describe('cost module', () => {
         outputTokens: 5000,
         cacheReadTokens: 20000,
       };
-      const cost = calculateCostSync(usage, pricing);
+      const cost = calculateCost(usage, pricing);
       // 0.03 + 0.075 + (20000/1000 * 0.0003) = 0.105 + 0.006 = 0.111
       expect(cost).toBe(0.111);
     });
@@ -195,7 +195,7 @@ describe('cost module', () => {
         outputTokens: 5000,
         cacheWriteTokens: 8000,
       };
-      const cost = calculateCostSync(usage, pricing);
+      const cost = calculateCost(usage, pricing);
       // 0.105 + (8000/1000 * 0.00375) = 0.105 + 0.03 = 0.135
       expect(cost).toBe(0.135);
     });
@@ -207,7 +207,7 @@ describe('cost module', () => {
         cacheWriteTokens: 8000,
         cacheTTL: '5m',
       };
-      const cost = calculateCostSync(usage, pricing);
+      const cost = calculateCost(usage, pricing);
       expect(cost).toBe(0.135);
     });
 
@@ -218,7 +218,7 @@ describe('cost module', () => {
         cacheWriteTokens: 8000,
         cacheTTL: '1h',
       };
-      const cost = calculateCostSync(usage, pricing);
+      const cost = calculateCost(usage, pricing);
       // 0.105 + (8000/1000 * 0.006) = 0.105 + 0.048 = 0.153
       expect(cost).toBe(0.153);
     });
@@ -231,7 +231,7 @@ describe('cost module', () => {
         cacheWriteTokens: 8000,
         cacheTTL: '1h',
       };
-      const cost = calculateCostSync(usage, pricing);
+      const cost = calculateCost(usage, pricing);
       // 0.03 + 0.075 + 0.006 + 0.048 = 0.159
       expect(cost).toBe(0.159);
     });
@@ -259,7 +259,7 @@ describe('cost module', () => {
         inputTokens: 200000,
         outputTokens: 10000,
       };
-      const cost = calculateCostSync(usage, sonnet4Pricing);
+      const cost = calculateCost(usage, sonnet4Pricing);
       // (200000/1000 * 0.003) + (10000/1000 * 0.015) = 0.6 + 0.15 = 0.75
       expect(cost).toBe(0.75);
     });
@@ -269,7 +269,7 @@ describe('cost module', () => {
         inputTokens: 250000,
         outputTokens: 10000,
       };
-      const cost = calculateCostSync(usage, sonnet4Pricing);
+      const cost = calculateCost(usage, sonnet4Pricing);
       // (250000/1000 * 0.003 * 2) + (10000/1000 * 0.015 * 1.5)
       // = 1.5 + 0.225 = 1.725
       expect(cost).toBe(1.725);
@@ -280,7 +280,7 @@ describe('cost module', () => {
         inputTokens: 250000,
         outputTokens: 10000,
       };
-      const cost = calculateCostSync(usage, sonnet46Pricing);
+      const cost = calculateCost(usage, sonnet46Pricing);
       expect(cost).toBe(0.9);
     });
 
@@ -291,7 +291,7 @@ describe('cost module', () => {
         cacheReadTokens: 30000,
         cacheWriteTokens: 30000,
       };
-      const cost = calculateCostSync(usage, {
+      const cost = calculateCost(usage, {
         ...sonnet4Pricing,
         cacheReadPer1k: 0.0003,
         cacheWrite5mPer1k: 0.00375,
@@ -317,7 +317,7 @@ describe('cost module', () => {
         inputTokens: 250000,
         outputTokens: 10000,
       };
-      const cost = calculateCostSync(usage, opusPricing);
+      const cost = calculateCost(usage, opusPricing);
       // No multiplier: (250000/1000 * 0.015) + (10000/1000 * 0.075) = 3.75 + 0.75 = 4.5
       expect(cost).toBe(4.5);
     });
@@ -334,7 +334,7 @@ describe('cost module', () => {
         inputTokens: 250000,
         outputTokens: 10000,
       };
-      const cost = calculateCostSync(usage, haikuPricing);
+      const cost = calculateCost(usage, haikuPricing);
       // No multiplier: (250000/1000 * 0.001) + (10000/1000 * 0.005) = 0.25 + 0.05 = 0.3
       expect(cost).toBe(0.3);
     });
@@ -376,7 +376,7 @@ describe('cost module', () => {
     ];
 
     it('should include cache tokens in totalTokens', () => {
-      const summary = summarizeCostsSync(mockEntries);
+      const summary = summarizeCosts(mockEntries);
       expect(summary.totalTokens.input).toBe(15000);
       expect(summary.totalTokens.output).toBe(7000);
       expect(summary.totalTokens.cacheRead).toBe(3000);
@@ -385,7 +385,7 @@ describe('cost module', () => {
     });
 
     it('should populate cache token fields', () => {
-      const summary = summarizeCostsSync(mockEntries);
+      const summary = summarizeCosts(mockEntries);
       expect(summary.totalTokens).toHaveProperty('cacheRead');
       expect(summary.totalTokens).toHaveProperty('cacheWrite');
       expect(summary.totalTokens.cacheRead).toBeGreaterThan(0);
@@ -393,7 +393,7 @@ describe('cost module', () => {
     });
 
     it('should calculate total cost correctly', () => {
-      const summary = summarizeCostsSync(mockEntries);
+      const summary = summarizeCosts(mockEntries);
       expect(summary.totalCost).toBe(0.4); // 0.15 + 0.25, rounded to 2 decimals
     });
 
@@ -413,7 +413,7 @@ describe('cost module', () => {
           currency: 'USD',
         },
       ];
-      const summary = summarizeCostsSync(entries);
+      const summary = summarizeCosts(entries);
       expect(summary.totalTokens.cacheRead).toBe(0);
       expect(summary.totalTokens.cacheWrite).toBe(0);
       expect(summary.totalTokens.total).toBe(15000);
@@ -515,26 +515,26 @@ describe('cost module', () => {
 
   describe('QuantumLlama pricing (PAN-3252)', () => {
     it('should return spec rates for each ql-* model', () => {
-      const reason = getPricingSync('custom', 'ql-reason-70b');
+      const reason = getPricing('custom', 'ql-reason-70b');
       expect(reason).toMatchObject({ inputPer1k: 0.008, outputPer1k: 0.024, cacheReadPer1k: 0.0008, cacheWrite5mPer1k: 0.010 });
 
-      const swift = getPricingSync('custom', 'ql-swift-8b');
+      const swift = getPricing('custom', 'ql-swift-8b');
       expect(swift).toMatchObject({ inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025 });
 
-      const nano = getPricingSync('custom', 'ql-nano-1b');
+      const nano = getPricing('custom', 'ql-nano-1b');
       expect(nano).toMatchObject({ inputPer1k: 0.0004, outputPer1k: 0.0012, cacheReadPer1k: 0.00004, cacheWrite5mPer1k: 0.0005 });
     });
 
     it('should calculate $0.128 for 10k input + 2k output tokens on ql-reason-70b', () => {
-      const pricing = getPricingSync('custom', 'ql-reason-70b');
+      const pricing = getPricing('custom', 'ql-reason-70b');
       expect(pricing).not.toBeNull();
-      const cost = calculateCostSync({ inputTokens: 10000, outputTokens: 2000 }, pricing!);
+      const cost = calculateCost({ inputTokens: 10000, outputTokens: 2000 }, pricing!);
       // (10000/1000 * 0.008) + (2000/1000 * 0.024) = 0.08 + 0.048 = 0.128
       expect(cost).toBeCloseTo(0.128, 10);
     });
 
     it('should price cache-read and 5m cache-write tokens on QL models', () => {
-      const pricing = getPricingSync('custom', 'ql-swift-8b');
+      const pricing = getPricing('custom', 'ql-swift-8b');
       expect(pricing).not.toBeNull();
       const usage: TokenUsage = {
         inputTokens: 1000,
@@ -543,7 +543,7 @@ describe('cost module', () => {
         cacheWriteTokens: 2000,
         cacheTTL: '5m',
       };
-      const cost = calculateCostSync(usage, pricing!);
+      const cost = calculateCost(usage, pricing!);
       // 0.002 + 0.006 + (4000/1000 * 0.0002) + (2000/1000 * 0.0025) = 0.008 + 0.0008 + 0.005 = 0.0138
       expect(cost).toBeCloseTo(0.0138, 10);
     });

@@ -37,7 +37,7 @@ export interface ParsedIssueId {
  * @param projectConfig - Optional project config for custom patterns
  * @returns ParsedIssueId or null if no format matches
  */
-export function parseIssueIdSync(issueId: string, projectConfig?: ProjectConfig): ParsedIssueId | null {
+export function parseIssueId(issueId: string, projectConfig?: ProjectConfig): ParsedIssueId | null {
   // Standard format first (most common): PREFIX-NUMBER
   const standardMatch = issueId.match(/^([A-Za-z]+)-(\d+)$/);
   if (standardMatch) {
@@ -85,8 +85,8 @@ export function parseIssueIdSync(issueId: string, projectConfig?: ProjectConfig)
  * Extract just the team/project prefix from an issue ID.
  * Handles standard (MIN-123), Rally (F29698), and custom formats.
  */
-export function extractPrefixSync(issueId: string): string | null {
-  const parsed = parseIssueIdSync(issueId);
+export function extractPrefix(issueId: string): string | null {
+  const parsed = parseIssueId(issueId);
   return parsed?.prefix ?? null;
 }
 
@@ -94,8 +94,8 @@ export function extractPrefixSync(issueId: string): string | null {
  * Extract the numeric portion of an issue ID.
  * Handles standard (MIN-123), Rally (F29698), and custom formats.
  */
-export function extractNumberSync(issueId: string): number | null {
-  const parsed = parseIssueIdSync(issueId);
+export function extractNumber(issueId: string): number | null {
+  const parsed = parseIssueId(issueId);
   return parsed?.number ?? null;
 }
 
@@ -103,8 +103,8 @@ export function extractNumberSync(issueId: string): number | null {
  * Get the normalized (lowercase, filesystem-safe) form of an issue ID.
  * Standard IDs keep the dash: "min-123". Rally IDs stay concatenated: "f29698".
  */
-export function normalizeIssueIdSync(issueId: string): string {
-  const parsed = parseIssueIdSync(issueId);
+export function normalizeIssueId(issueId: string): string {
+  const parsed = parseIssueId(issueId);
   return parsed?.normalized ?? issueId.toLowerCase();
 }
 
@@ -120,7 +120,7 @@ export function normalizeIssueIdSync(issueId: string): string {
  *   resolveIssueIdSync("pan-123")       → "PAN-123"
  *   resolveIssueIdSync("agent-pan-123") → "PAN-123"
  */
-export function resolveIssueIdSync(input: string): string {
+export function resolveIssueId(input: string): string {
   const stripped = input.replace(/^agent-/i, '');
   return stripped.toUpperCase();
 }
@@ -140,7 +140,7 @@ export function resolveIssueIdSync(input: string): string {
  *
  * Pure-sync, safe to call from CLI entry points. Reads filesystem only.
  */
-export function resolveBareNumericIdSync(input: string, overdeckHome?: string): string | null {
+export function resolveBareNumericId(input: string, overdeckHome?: string): string | null {
   if (/^\d+$/.test(input)) {
     const home = overdeckHome ?? `${process.env.HOME}/.overdeck`;
     const agentsDir = `${home}/agents`;
@@ -175,5 +175,5 @@ export function resolveBareNumericIdSync(input: string, overdeckHome?: string): 
       return null;
     }
   }
-  return resolveIssueIdSync(input);
+  return resolveIssueId(input);
 }

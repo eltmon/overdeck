@@ -46,15 +46,15 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
 import { resolveIssueFeedbackTarget } from './feedback-target.js';
 import { messageAgent } from '../agents.js';
-import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
-import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
-import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
+import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
+import { getXBriefACStatus } from '../xbrief/acceptance-criteria.js';
 import { XBriefMergeConflictError } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
-import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
+import { checkIncompletePlanItems } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
-import { parseCompositeSnapshot, snapshotWorkspaceHeadsPromise, type HeadAnchor } from '../git-utils.js';
+import { parseCompositeSnapshot, snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -178,7 +178,7 @@ function buildSyncFailureFeedback(
 
 function getSyncTargetBranch(
   workspacePath: string,
-  projectConfig: ReturnType<typeof findProjectByPathSync>,
+  projectConfig: ReturnType<typeof findProjectByPath>,
   repoName?: string,
 ): string {
   if (!projectConfig) return 'main';
@@ -233,7 +233,7 @@ export async function workspaceChangesetHasContent(
   issueId: string,
   workspacePath: string,
 ): Promise<boolean | undefined> {
-  const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  const roots = resolveWorkspaceRepoRoots(issueId, workspacePath);
   let diffFailed = false;
 
   for (const root of roots) {
@@ -275,7 +275,7 @@ async function reportVerificationCheckRun(
   logPrefix: string,
 ): Promise<void> {
   try {
-    const project = findProjectByPathSync(workspacePath);
+    const project = findProjectByPath(workspacePath);
     const repo = project?.github_repo;
     if (!repo || !repo.includes('/')) return;
     const [owner, name] = repo.split('/');
@@ -337,14 +337,14 @@ export async function runVerificationForIssueInProcess(
   };
 
   try {
-    const projectConfig = findProjectByPathSync(workspacePath);
-    const repoRoots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+    const projectConfig = findProjectByPath(workspacePath);
+    const repoRoots = resolveWorkspaceRepoRoots(issueId, workspacePath);
     const isPolyrepo = repoRoots.some(root => root.isPolyrepo);
 
     // PAN-3906: the head a test-skip waiver is pinned to. Snapshotted BEFORE the
     // sync below, which merges `origin/<target>` in and moves HEAD — that would
     // expire a waiver the operator just recorded. The gate diff is three-dot.
-    const testSkipHead = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
+    const testSkipHead = await snapshotWorkspaceHeads(issueId, workspacePath);
 
     // === Sync target branch ===
     if (options.syncTargetBranch !== false) {
@@ -683,9 +683,9 @@ export async function runVerificationForIssueInProcess(
     // xBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
     // Wrap in try-catch to detect merge conflict markers in the xBRIEF document and send
     // actionable feedback rather than falling through to a generic infrastructure error.
-    let acStatus: ReturnType<typeof getXBriefACStatusSync>;
+    let acStatus: ReturnType<typeof getXBriefACStatus>;
     try {
-      acStatus = getXBriefACStatusSync(workspacePath);
+      acStatus = getXBriefACStatus(workspacePath);
     } catch (xbriefErr: any) {
       if (xbriefErr instanceof XBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
@@ -774,7 +774,7 @@ export async function runVerificationForIssueInProcess(
 
     const taskBlockers = options.skipPlanChecklist
       ? []
-      : await checkIncompletePlanItemsPromise(workspacePath, issueId);
+      : await checkIncompletePlanItems(workspacePath, issueId);
     const postChecklistMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (postChecklistMergedOutcome) return postChecklistMergedOutcome;
 
@@ -862,8 +862,8 @@ export async function runVerificationForIssueInProcess(
     // snapshotting it would make this comparison report "no drift" forever.
     let lastVerifiedCommit: HeadAnchor | undefined;
     try {
-      const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-      lastVerifiedCommit = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
+      const { snapshotWorkspaceHeads } = await import('../git-utils.js');
+      lastVerifiedCommit = await snapshotWorkspaceHeads(issueId, workspacePath);
     } catch { /* non-fatal — skip optimization if we can't get HEAD */ }
 
     const prePassMergedOutcome = await skipMergedVerification(issueId, logPrefix);
@@ -912,7 +912,7 @@ export async function runVerificationForIssueInProcess(
     // proof. Non-fatal on failure.
     void (async () => {
       try {
-        const project = findProjectByPathSync(workspacePath);
+        const project = findProjectByPath(workspacePath);
         const repo = project?.github_repo;
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');

@@ -4,7 +4,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import type { AgentState } from '../agents.js';
-import { readSessionIndexSync } from '../session-history.js';
+import { readSessionIndex } from '../session-history.js';
 
 // Spawn/resume flows preflight the harness binary; CI runners have no claude/omp
 // installed, so stub the filesystem probes while keeping the pure helpers real.
@@ -166,7 +166,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('requires role and strips legacy state fields when persisting state.json', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
 
     saveAgentStateSync({
       id: 'agent-pan-role',
@@ -186,7 +186,7 @@ describe('AgentState role persistence', () => {
       type: 'work',
     } as any);
 
-    const state = getAgentStateSync('agent-pan-role');
+    const state = getAgentState('agent-pan-role');
     expect(state?.role).toBe('work');
     expect((state as any).runtime).toBeUndefined();
     expect((state as any).phase).toBeUndefined();
@@ -204,7 +204,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('persists lastResumeAt through normal state save and load', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
     const lastResumeAt = '2026-06-10T00:01:00.000Z';
 
     saveAgentStateSync({
@@ -219,13 +219,13 @@ describe('AgentState role persistence', () => {
       lastResumeAt,
     } as any);
 
-    expect(getAgentStateSync('agent-pan-resume-state')?.lastResumeAt).toBe(lastResumeAt);
+    expect(getAgentState('agent-pan-resume-state')?.lastResumeAt).toBe(lastResumeAt);
     const rawState = JSON.parse(readFileSync(join(tempHome, 'agents', 'agent-pan-resume-state', 'state.json'), 'utf-8'));
     expect(rawState.lastResumeAt).toBe(lastResumeAt);
   });
 
   it('accepts flywheel role in persisted state.json', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
 
     saveAgentStateSync({
       id: 'agent-flywheel-orchestrator',
@@ -238,11 +238,11 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-18T00:00:00.000Z',
     } as any);
 
-    expect(getAgentStateSync('agent-flywheel-orchestrator')?.role).toBe('flywheel');
+    expect(getAgentState('agent-flywheel-orchestrator')?.role).toBe('flywheel');
   });
 
   it('PAN-3920: persists a worker parentId through save and read', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
 
     saveAgentStateSync({
       id: 'agent-pan-9-worker-1',
@@ -257,7 +257,7 @@ describe('AgentState role persistence', () => {
       parentId: 'conv-orchestrator',
     });
 
-    expect(getAgentStateSync('agent-pan-9-worker-1')).toMatchObject({
+    expect(getAgentState('agent-pan-9-worker-1')).toMatchObject({
       role: 'worker',
       parentId: 'conv-orchestrator',
       startedBy: 'pan-worker',
@@ -575,7 +575,7 @@ describe('AgentState role persistence', () => {
     }));
 
     try {
-      const { getAgentStateSync, spawnAgent } = await import('../agents.js');
+      const { getAgentState, spawnAgent } = await import('../agents.js');
       const spawn = spawnAgent({
         issueId: 'PAN-2771',
         workspace,
@@ -591,7 +591,7 @@ describe('AgentState role persistence', () => {
       expect(writeOhmypiCommandSync).toHaveBeenCalled();
       expect(killSessionAsync).toHaveBeenCalled();
       expect(sessionAlive).toBe(false);
-      expect(getAgentStateSync(agentId)).toMatchObject({
+      expect(getAgentState(agentId)).toMatchObject({
         status: 'stopped',
         kickoffDelivered: false,
         lastFailureReason: 'kickoff delivery failed',
@@ -794,7 +794,7 @@ describe('AgentState role persistence', () => {
     }));
 
     try {
-      const { getAgentStateSync, resumeAgent, saveAgentStateSync } = await import('../agents.js');
+      const { getAgentState, resumeAgent, saveAgentStateSync } = await import('../agents.js');
       saveAgentStateSync({
         id: agentId,
         issueId: 'PAN-2895',
@@ -826,13 +826,13 @@ describe('AgentState role persistence', () => {
         }),
       );
       expect(deliverInitialPromptWithRetry).toHaveBeenCalled();
-      const sessionIndex = readSessionIndexSync(agentId);
+      const sessionIndex = readSessionIndex(agentId);
       const freshSessionId = sessionIndex.at(-1)?.sessionId;
       expect(freshSessionId).not.toBe('missing-session');
       const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf-8');
       expect(launcher).not.toContain("--resume 'missing-session'");
       expect(launcher).toContain(`--session-id '${freshSessionId}'`);
-      expect(getAgentStateSync(agentId)?.sessionId).toBe(freshSessionId);
+      expect(getAgentState(agentId)?.sessionId).toBe(freshSessionId);
       expect(emitAgentEvent).toHaveBeenCalledWith(
         agentId,
         expect.objectContaining({ kind: 'model_set', claudeSessionId: null }),
@@ -1019,7 +1019,7 @@ describe('AgentState role persistence', () => {
   });
 
   it('treats state.json without a valid role as missing', async () => {
-    const { getAgentStateSync } = await import('../agents.js');
+    const { getAgentState } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'state.json'), JSON.stringify({
@@ -1031,7 +1031,7 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-09T00:00:00.000Z',
     }));
 
-    const state = getAgentStateSync('agent-pan-legacy');
+    const state = getAgentState('agent-pan-legacy');
     expect(state).toBeNull();
   });
 

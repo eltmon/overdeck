@@ -1,7 +1,7 @@
 import { Context, Effect, Schema } from 'effect';
 import { real } from 'drizzle-orm/sqlite-core';
 
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 import { IssueId } from './issues.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
@@ -250,7 +250,7 @@ export interface MergeQueueEntry {
 }
 
 function overdeckDb() {
-  return getOverdeckDatabaseSync();
+  return getOverdeckDatabase();
 }
 
 function nowIso(): string {

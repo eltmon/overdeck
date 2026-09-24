@@ -42,9 +42,9 @@ afterEach(() => {
 
 describe('notifyPipeline', () => {
   it('forwards lifecycle events across the process boundary', async () => {
-    const { notifyPipelineSync } = await import('../pipeline-notifier.js');
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
 
-    notifyPipelineSync({ type: 'review.approved', issueId: 'PAN-1381' });
+    notifyPipeline({ type: 'review.approved', issueId: 'PAN-1381' });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       'http://dashboard.test/api/internal/pipeline/notify',

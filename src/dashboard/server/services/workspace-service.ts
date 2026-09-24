@@ -306,10 +306,10 @@ export const WorkspaceServiceLive = Layer.effect(
               // implementation re-ran the full workspace-create flow (worktrees,
               // bun install, etc.), which is the wrong granularity for
               // "compose file is missing".
-              const { ensureDevcontainerSync } = await import(
+              const { ensureDevcontainer } = await import(
                 '../../../lib/workspace/ensure-devcontainer.js'
               );
-              const ensure = ensureDevcontainerSync({ workspacePath, issueId });
+              const ensure = ensureDevcontainer({ workspacePath, issueId });
               if (!ensure.step.success) {
                 throw new WorkspaceCreateError({
                   id: issueId,

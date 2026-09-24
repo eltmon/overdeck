@@ -14,7 +14,7 @@ function getBridgeTokenPath(agentId: string): string {
   return join(bridgeTokensDir(), `${agentId}.token`);
 }
 
-export function readBridgeTokenSync(agentId: string): string | null {
+export function readBridgeToken(agentId: string): string | null {
   const path = getBridgeTokenPath(agentId);
   if (!existsSync(path)) return null;
   try {
@@ -25,7 +25,7 @@ export function readBridgeTokenSync(agentId: string): string | null {
   }
 }
 
-export function writeBridgeTokenSync(agentId: string): string {
+export function writeBridgeToken(agentId: string): string {
   const dir = bridgeTokensDir();
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });

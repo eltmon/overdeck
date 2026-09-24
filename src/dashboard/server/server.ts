@@ -88,7 +88,7 @@ import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { retryDashboardBind } from './server-bind.js';
 import { buildDashboardHealthResponse } from './health-response.js';
 
@@ -460,12 +460,12 @@ export const makeServerLayer = Layer.unwrap(
           console.log(`[boot-timing] HTTP server listening at +${Math.round(performance.now())}ms (since process start)`);
           console.log(`[overdeck] Dashboard listening on http://${config.host}:${config.port}`);
           const mode = process.env['OVERDECK_MODE'] === 'production' ? 'production mode' : 'development mode';
-          emitActivityEntrySync({
+          emitActivityEntry({
             source: 'dashboard',
             level: 'success',
             message: `Dashboard started in ${mode}`,
           });
-          emitActivityTtsSync({
+          emitActivityTts({
             utterance: `Dashboard started in ${mode}`,
             priority: 2,
             source: 'dashboard',

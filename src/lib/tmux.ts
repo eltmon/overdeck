@@ -29,7 +29,7 @@ import { Effect } from 'effect';
 import { getCanonicalOverdeckHome, getOverdeckHome } from './paths.js';
 import { DEFAULT_INSTANCE_NAME, managedInstanceName } from './instance-name.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
-import { buildChildEnvSync } from './child-env.js';
+import { buildChildEnv } from './child-env.js';
 import { MessageDeliveryFailed, TmuxError } from './errors.js';
 
 export { MessageDeliveryFailed } from './errors.js';
@@ -152,7 +152,7 @@ function isManagedServerAliveSync(): boolean {
  * MainPID when we manage it; fall back to pgrep so the founder guard still
  * fires on pre-fix or manually-founded servers.
  */
-export function findManagedServerPidSync(): number | undefined {
+export function findManagedServerPid(): number | undefined {
   try {
     const mainPidOut = execFileSync(
       'systemctl',
@@ -215,7 +215,7 @@ function readServerCmdlineSync(pid: number): string {
  * restart — the operator must decide when to migrate off the live founder.
  */
 function warnIfServerInTmuxSpawnScopeSync(): boolean {
-  const pid = findManagedServerPidSync();
+  const pid = findManagedServerPid();
   if (pid === undefined) return false;
   const cgroup = readServerCgroupSync(pid);
   if (!cgroup.includes('tmux-spawn-')) return false;
@@ -235,7 +235,7 @@ function warnIfServerInTmuxSpawnScopeSync(): boolean {
  * (pkill -f, pgrep -f) can hit the server itself. Never auto-restart.
  */
 function warnIfServerCmdlineIsDirtySync(): boolean {
-  const pid = findManagedServerPidSync();
+  const pid = findManagedServerPid();
   if (pid === undefined) return false;
   const cmdline = readServerCmdlineSync(pid);
   // A clean dedicated founding looks like `tmux -L overdeck -f ... start-server`.
@@ -266,7 +266,7 @@ function warnIfServerCmdlineIsDirtySync(): boolean {
  * captured env; only future sessions change.
  */
 /** @internal Exported only for focused sanitizer tests. */
-export function sanitizeManagedServerGlobalEnvSync(cleanEnv: NodeJS.ProcessEnv): void {
+export function sanitizeManagedServerGlobalEnv(cleanEnv: NodeJS.ProcessEnv): void {
   const sock = getManagedTmuxSocketName();
   const canonicalOverdeckHome = getCanonicalOverdeckHome();
   const sharedSocket = sock === DEFAULT_MANAGED_TMUX_SOCKET;
@@ -336,7 +336,7 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
   if (isManagedServerAliveSync()) {
     // PAN-1798: repair a poisoned global environment so new sessions spawn clean,
     // even on a server founded by a stray client `new-session`.
-    sanitizeManagedServerGlobalEnvSync(cleanEnv);
+    sanitizeManagedServerGlobalEnv(cleanEnv);
     // Surface the dirty-founding teardown hazard once per process (not per spawn).
     if (!warnedManagedServerTmuxSpawnScope) {
       warnedManagedServerTmuxSpawnScope = warnIfServerInTmuxSpawnScopeSync();
@@ -435,7 +435,7 @@ function reloadManagedTmuxConfigSync(): void {
     // the tmux server doesn't inherit stale provider config. Without this,
     // every session spawned by the server inherits the parent's env — and tmux
     // -e can only override, not unset, so stale vars leak through.
-    const cleanEnv = buildChildEnvSync();
+    const cleanEnv = buildChildEnv();
     ensureOverdeckTmuxServerSync(cleanEnv);
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
@@ -447,7 +447,7 @@ function reloadManagedTmuxConfigSync(): void {
 
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
-    const cleanEnv = buildChildEnvSync();
+    const cleanEnv = buildChildEnv();
     await ensureOverdeckTmuxServerAsync(cleanEnv);
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
@@ -683,7 +683,7 @@ export function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult,
     : { status: 'error', detail };
 }
 
-export function querySessionSync(name: string): SessionQueryResult {
+export function querySession(name: string): SessionQueryResult {
   try {
     // Explicit stdio — without it execFileSync echoes the routine "can't find session" stderr of dead-session probes into the server log.
     tmuxExecSync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -694,7 +694,7 @@ export function querySessionSync(name: string): SessionQueryResult {
 }
 
 export function sessionExistsSync(name: string): boolean {
-  return querySessionSync(name).status === 'exists';
+  return querySession(name).status === 'exists';
 }
 
 export function killSessionSync(name: string): void {
@@ -939,7 +939,7 @@ export const createSession = (
     try: async () => {
       // PAN-1798: every spawn path must ensure the shared server lives in its
       // dedicated unit before creating a session, so no client becomes the founder.
-      await ensureOverdeckTmuxServerAsync(buildChildEnvSync());
+      await ensureOverdeckTmuxServerAsync(buildChildEnv());
       await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
       // Stamp the initial window's background with the dashboard theme so tmux
       // answers OSC 11 background queries even with no client attached. Claude

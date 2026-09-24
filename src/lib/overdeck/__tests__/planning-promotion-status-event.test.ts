@@ -82,7 +82,7 @@ vi.mock('../issue-reads.js', () => ({
   resolveIssueProjectPathSync: () => testState.projectPath,
 }));
 
-import { getAgentStateSync } from '../../agents.js';
+import { getAgentState } from '../../agents.js';
 import { saveAgentStateAndEmitEvent } from '../../../dashboard/server/services/agent-projection.js';
 import { completePlanningForIssue } from '../planning-promotion.js';
 
@@ -180,7 +180,7 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
 
     expect(response.status).toBe(200);
     expect(responseJson(response)).toMatchObject({ success: true, issueId: 'PAN-3230' });
-    expect(getAgentStateSync).toHaveBeenCalledWith('planning-pan-3230');
+    expect(getAgentState).toHaveBeenCalledWith('planning-pan-3230');
     expect(saveAgentStateAndEmitEvent).toHaveBeenCalledTimes(1);
     expect(saveAgentStateAndEmitEvent).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'planning-pan-3230', status: 'stopped', stoppedAt: expect.any(String) }),

@@ -3,7 +3,7 @@ import { existsSync, readdirSync, realpathSync, symlinkSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
 import { installGitHooksInDir } from '../git-hooks.js';
-import { registerProjectSync } from '../projects.js';
+import { registerProject } from '../projects.js';
 import type { RepoConfig } from '../workspace-config.js';
 import type {
   AddNewRepoToWorkspaceOptions,
@@ -18,7 +18,7 @@ type RunGit = (args: string[], cwd: string) => Promise<{ stdout: string }>;
 
 interface AddNewRepoDeps {
   runGit?: RunGit;
-  persistProject?: typeof registerProjectSync;
+  persistProject?: typeof registerProject;
 }
 
 const defaultRunGit: RunGit = async (args, cwd) => {
@@ -175,7 +175,7 @@ export async function addNewRepoToWorkspace(
   }
 
   try {
-    (deps.persistProject ?? registerProjectSync)(projectKey, updatedProjectConfig);
+    (deps.persistProject ?? registerProject)(projectKey, updatedProjectConfig);
     result.steps.push(`Registered ${repoName} in project ${projectKey}`);
   } catch (error) {
     return {

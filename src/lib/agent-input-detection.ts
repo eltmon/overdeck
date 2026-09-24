@@ -226,7 +226,7 @@ function looksLikeCodexApprovalHeader(line: string): boolean {
   return /Would you like to (?:run the following command|grant these permissions?|make the following edits|allow|apply)\b/i.test(line)
 }
 
-export function detectAwaitingInputFromPaneSync(
+export function detectAwaitingInputFromPane(
   pane: string,
   options: { isPlanning?: boolean } = {},
 ): AwaitingInputDetection | null {
@@ -353,7 +353,7 @@ export async function detectAwaitingInputForAgent(
 
   const detectionPromise = withPaneDetectionSlot(async () => {
     const pane = await capturePane(agentId, options.lines ?? 90)
-    const detection = detectAwaitingInputFromPaneSync(pane, options)
+    const detection = detectAwaitingInputFromPane(pane, options)
     if (cacheEnabled) {
       paneDetectionCache.set(cacheKey, {
         expiresAt: Date.now() + PANE_DETECTION_CACHE_TTL_MS,

@@ -6,7 +6,7 @@
  * network issues BEFORE the agent enters Claude Code's opaque retry loop.
  */
 
-import { getProviderEnvSync, getProviderForModelSync, type ProviderConfig } from './providers.js';
+import { getProviderEnv, getProviderForModel, type ProviderConfig } from './providers.js';
 import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
 import type { ModelId } from './settings.js';
@@ -103,7 +103,7 @@ export async function probeProvider(
  *
  * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function invalidateProbeCacheSync(provider?: string): void {
+export function invalidateProbeCache(provider?: string): void {
   if (provider) {
     for (const k of cache.keys()) {
       if (k.startsWith(`${provider}:`)) cache.delete(k);
@@ -132,7 +132,7 @@ async function doProbe(
     return probeModelsEndpoint(provider, apiKey);
   }
 
-  const providerEnv = getProviderEnvSync(provider, apiKey);
+  const providerEnv = getProviderEnv(provider, apiKey);
   const baseUrl = providerEnv.ANTHROPIC_BASE_URL ?? provider.baseUrl;
   if (!baseUrl) return { ok: true };
 
@@ -241,7 +241,7 @@ async function validateProviderHealthBody(
   model: string,
   apiKey?: string,
 ): Promise<void> {
-  const provider = getProviderForModelSync(model as ModelId);
+  const provider = getProviderForModel(model as ModelId);
 
   // Skip: Anthropic native and OpenAI subscription routing have their own checks.
   if (provider.name === 'anthropic' || provider.name === 'openai') {
@@ -286,7 +286,7 @@ export async function validateProviderHealth(model: string, apiKey?: string): Pr
     await validateProviderHealthBody(model, apiKey);
   } catch (cause) {
     if (cause instanceof ProviderHealthError) throw cause;
-    const provider = getProviderForModelSync(model as ModelId);
+    const provider = getProviderForModel(model as ModelId);
     throw new ProviderHealthError(provider, model, {
       ok: false,
       kind: 'unknown',

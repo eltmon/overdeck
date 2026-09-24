@@ -1,7 +1,7 @@
 /** Muse Code 1.0.2 session envelopes. Only committed run events contribute usage. */
 import { basename, dirname } from 'node:path';
 import { readFileSync } from 'node:fs';
-import { getPricingSync } from '../cost.js';
+import { getPricing } from '../cost.js';
 import type { SessionUsage } from './jsonl-parser.js';
 
 export interface MuseEvent {
@@ -72,7 +72,7 @@ export function summarizeMuseRecords(records: MuseRecord[], sessionFile: string)
     output += Math.max(0, usage.output_tokens ?? 0);
   }
   if (!reported || !model) return null;
-  const pricing = getPricingSync('custom', model);
+  const pricing = getPricing('custom', model);
   const cost = (input * (pricing?.inputPer1k ?? 0) + output * (pricing?.outputPer1k ?? 0) + cached * (pricing?.cacheReadPer1k ?? 0)) / 1000;
   return {
     sessionId: basename(dirname(sessionFile)), sessionFile, model, cwd,
@@ -83,7 +83,7 @@ export function summarizeMuseRecords(records: MuseRecord[], sessionFile: string)
   };
 }
 
-export function parseMuseSessionSync(path: string): SessionUsage | null {
+export function parseMuseSession(path: string): SessionUsage | null {
   try { return summarizeMuseRecords(parseMuseRecords(readFileSync(path, 'utf8')), path); }
   catch { return null; }
 }

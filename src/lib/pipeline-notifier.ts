@@ -13,7 +13,7 @@
  * dashboard read derives the current state from the tracker, git and the PR.
  */
 
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =
   | { type: 'review.approved'; issueId: string }
@@ -37,11 +37,11 @@ export type PipelineEvent =
 type Handler = (event: PipelineEvent) => void;
 let handler: Handler | null = null;
 
-export function setPipelineHandlerSync(fn: Handler): void {
+export function setPipelineHandler(fn: Handler): void {
   handler = fn;
 }
 
-export function notifyPipelineSync(event: PipelineEvent): void {
+export function notifyPipeline(event: PipelineEvent): void {
   if (handler) {
     try {
       handler(event);
@@ -63,7 +63,7 @@ export function notifyPipelineSync(event: PipelineEvent): void {
 
   // Resolve shared secret (PAN-891). If the dashboard hasn't started in this
   // home (no token file, no env), skip the forward — DB write is durable.
-  const token = getInternalTokenSync();
+  const token = getInternalToken();
   if (!token) return;
 
   // PAN-915 — forward the full event; each type carries its own payload.

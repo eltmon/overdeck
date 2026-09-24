@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import type { CanonicalState } from '../../core/state-mapping.js';
 import { Effect } from 'effect';
 import { listRunningAgents, type AgentState } from '../agents.js';
-import { getDashboardApiUrlSync } from '../config.js';
+import { getDashboardApiUrl } from '../config.js';
 import {
   getIssueWorkspacePath,
   getProjectConfigFromWorkspacePath,
@@ -25,7 +25,7 @@ import {
   type IssuePullRequestData,
 } from '../overdeck/pull-requests.js';
 import { getForgeAdapter } from '../forge.js';
-import { resolveProjectReposForIssueSync } from '../project-repos.js';
+import { resolveProjectReposForIssue } from '../project-repos.js';
 import {
   gatherIssueBranchContainment,
   type IssueBranchContainment,
@@ -101,7 +101,7 @@ const defaultMergedRowDeps: MergedRowDeps = {
     return response.pr ?? {};
   },
   readMergedForgeArtifacts: async ctx => {
-    const repos = resolveProjectReposForIssueSync(ctx.issueId)?.filter(repo => repo.required) ?? [];
+    const repos = resolveProjectReposForIssue(ctx.issueId)?.filter(repo => repo.required) ?? [];
     const artifacts = await Promise.all(repos.map(repo => getForgeAdapter(repo.forge).findMergedArtifact({
       sourceBranch: repo.sourceBranch,
       targetBranch: repo.targetBranch,
@@ -266,7 +266,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
 };
 
 const defaultDeployRowDeps: DeployRowDeps = {
-  dashboardUrl: getDashboardApiUrlSync,
+  dashboardUrl: getDashboardApiUrl,
   readJson: async url => {
     const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
@@ -935,8 +935,8 @@ export async function evaluateDodGate(
 export async function readCompletedCloseOut(issueId: string, projectPath: string): Promise<string | null> {
   void projectPath;
   try {
-    const { resolveGitHubIssueSync } = await import('../tracker-utils.js');
-    const gh = resolveGitHubIssueSync(issueId);
+    const { resolveGitHubIssue } = await import('../tracker-utils.js');
+    const gh = resolveGitHubIssue(issueId);
     if (!gh.isGitHub || !gh.number) return null;
     const { stdout } = await execFileAsync(
       'gh',

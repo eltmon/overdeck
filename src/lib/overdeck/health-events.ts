@@ -12,7 +12,7 @@
  * ISO-string contract for callers so no call-site changes are needed.
  */
 
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 import type { HealthState } from '../runtimes/types.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ function fromMs(ms: number | null | undefined): string | null {
 
 /** Drop-in for writeHealthEvent() from database/health-events-db.ts. */
 export function writeHealthEvent(event: Omit<HealthEvent, 'id'>): number {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const result = db.prepare(`
     INSERT INTO health_events (agent_id, timestamp, state, source, metadata)
     VALUES (?, ?, ?, ?, ?)
@@ -84,7 +84,7 @@ export function getHealthHistory(
   startTime: string,
   endTime: string,
 ): HealthEventWithMetadata[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db.prepare(`
     SELECT id, agent_id, timestamp, state, source, metadata
     FROM health_events

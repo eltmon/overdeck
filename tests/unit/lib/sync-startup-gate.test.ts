@@ -80,33 +80,33 @@ describe('isStartupSyncNeededSync', () => {
   });
 
   it('returns needed when no manifest exists', async () => {
-    const { isStartupSyncNeededSync } = await import('../../../src/lib/sync.js');
-    const result = isStartupSyncNeededSync();
+    const { isStartupSyncNeeded } = await import('../../../src/lib/sync.js');
+    const result = isStartupSyncNeeded();
     expect(result.needed).toBe(true);
     expect(result.reason).toMatch(/inputs changed or no manifest/);
   });
 
   it('returns not needed after writing the manifest with unchanged inputs', async () => {
-    const { isStartupSyncNeededSync, writeSyncManifestSync } = await import('../../../src/lib/sync.js');
-    writeSyncManifestSync();
-    const result = isStartupSyncNeededSync();
+    const { isStartupSyncNeeded, writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
+    const result = isStartupSyncNeeded();
     expect(result.needed).toBe(false);
     expect(result.reason).toBe('inputs unchanged');
   });
 
   it('returns needed when a sync source file changes', async () => {
-    const { isStartupSyncNeededSync, writeSyncManifestSync } = await import('../../../src/lib/sync.js');
-    writeSyncManifestSync();
+    const { isStartupSyncNeeded, writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
     write(join(dirs.syncSources, 'skills', 'foo.md'), 'changed');
-    const result = isStartupSyncNeededSync();
+    const result = isStartupSyncNeeded();
     expect(result.needed).toBe(true);
   });
 
   it('returns needed when global.md changes', async () => {
-    const { isStartupSyncNeededSync, writeSyncManifestSync } = await import('../../../src/lib/sync.js');
-    writeSyncManifestSync();
+    const { isStartupSyncNeeded, writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
     write(join(dirs.overdeck, 'context', 'global.md'), '# global changed\n');
-    const result = isStartupSyncNeededSync();
+    const result = isStartupSyncNeeded();
     expect(result.needed).toBe(true);
   });
 
@@ -116,10 +116,10 @@ describe('isStartupSyncNeededSync', () => {
     write(join(projectPath, '.pan', 'context', 'project.md'), '# project\n');
     dirs.projects = [{ config: { path: projectPath, name: 'project-a' } }];
 
-    const { isStartupSyncNeededSync, writeSyncManifestSync } = await import('../../../src/lib/sync.js');
-    writeSyncManifestSync();
+    const { isStartupSyncNeeded, writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
     write(join(projectPath, '.pan', 'context', 'project.md'), '# project changed\n');
-    const result = isStartupSyncNeededSync();
+    const result = isStartupSyncNeeded();
     expect(result.needed).toBe(true);
   });
 
@@ -129,10 +129,10 @@ describe('isStartupSyncNeededSync', () => {
     write(join(projectPath, '.pan', 'skills', 'local-skill', 'SKILL.md'), '# local skill\n');
     dirs.projects = [{ config: { path: projectPath, name: 'project-skills' } }];
 
-    const { isStartupSyncNeededSync, writeSyncManifestSync } = await import('../../../src/lib/sync.js');
-    writeSyncManifestSync();
+    const { isStartupSyncNeeded, writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
     write(join(projectPath, '.pan', 'skills', 'local-skill', 'SKILL.md'), '# local skill changed\n');
-    const result = isStartupSyncNeededSync();
+    const result = isStartupSyncNeeded();
     expect(result.needed).toBe(true);
   });
 
@@ -146,10 +146,10 @@ describe('isStartupSyncNeededSync', () => {
     const previousCwd = process.cwd();
     process.chdir(nestedPath);
     try {
-      const { isStartupSyncNeededSync, writeSyncManifestSync } = await import('../../../src/lib/sync.js');
-      writeSyncManifestSync();
+      const { isStartupSyncNeeded, writeSyncManifest } = await import('../../../src/lib/sync.js');
+      writeSyncManifest();
       write(join(projectPath, 'skills', 'local-skill', 'SKILL.md'), '# top-level skill changed\n');
-      const result = isStartupSyncNeededSync();
+      const result = isStartupSyncNeeded();
       expect(result.needed).toBe(true);
     } finally {
       process.chdir(previousCwd);
@@ -158,8 +158,8 @@ describe('isStartupSyncNeededSync', () => {
 
   it('falls back to needed when a sync source directory is missing', async () => {
     rmSync(join(dirs.syncSources, 'rules'), { recursive: true, force: true });
-    const { isStartupSyncNeededSync } = await import('../../../src/lib/sync.js');
-    const result = isStartupSyncNeededSync();
+    const { isStartupSyncNeeded } = await import('../../../src/lib/sync.js');
+    const result = isStartupSyncNeeded();
     expect(result.needed).toBe(true);
     expect(result.reason).toMatch(/hash computation failed/);
   });

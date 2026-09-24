@@ -24,7 +24,7 @@ vi.mock('../../agents/agent-state.js', () => ({
 }));
 
 import {
-  createKimiCodeRuntimeSync,
+  createKimiCodeRuntime,
   kimiCaptureLockPath,
   launchAndCaptureManagedKimiSession,
   KimiCodeRuntimeSync,
@@ -40,7 +40,7 @@ import {
   kimiSessionsRoot,
   kimiWorkDirKey,
 } from '../storage/kimi-code.js';
-import { readSessionIndexSync } from '../../session-history.js';
+import { readSessionIndex } from '../../session-history.js';
 
 const tempHomes: string[] = [];
 
@@ -140,7 +140,7 @@ describe('launchAndCaptureManagedKimiSession', () => {
     expect(sessionId).toBe('session-managed-fresh');
     expect(readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8'))
       .toBe('session-managed-fresh');
-    expect(readSessionIndexSync(agentId)).toEqual([
+    expect(readSessionIndex(agentId)).toEqual([
       expect.objectContaining({
         sessionId: 'session-managed-fresh',
         source: 'capture',
@@ -173,7 +173,7 @@ describe('launchAndCaptureManagedKimiSession', () => {
     expect(readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8'))
       .toBe('session-existing-resume');
     expect(existsSync(kimiSessionsRoot(kimiHome, workspace))).toBe(false);
-    expect(readSessionIndexSync(agentId)).toEqual([
+    expect(readSessionIndex(agentId)).toEqual([
       expect.objectContaining({
         sessionId: 'session-existing-resume',
         source: 'capture',
@@ -340,7 +340,7 @@ describe('KimiCodeRuntimeSync', () => {
 
     const persistedId = readFileSync(join(overdeckHome, 'agents', 'agent-kimi-spawn', 'kimi-session-id'), 'utf-8');
     expect(persistedId).toBe('session_fresh');
-    expect(readSessionIndexSync('agent-kimi-spawn')).toEqual([
+    expect(readSessionIndex('agent-kimi-spawn')).toEqual([
       expect.objectContaining({
         sessionId: 'session_fresh',
         source: 'capture',
@@ -497,7 +497,7 @@ describe('KimiCodeRuntimeSync', () => {
   });
 
   it('createKimiCodeRuntimeSync builds a usable instance named kimi-code', () => {
-    const runtime = createKimiCodeRuntimeSync();
+    const runtime = createKimiCodeRuntime();
     expect(runtime.name).toBe('kimi-code');
     expect(runtime.getHarnessBehavior().transcriptKind).toBe('kimi-wire-jsonl');
   });

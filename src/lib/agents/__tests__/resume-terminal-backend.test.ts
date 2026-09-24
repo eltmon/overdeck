@@ -130,7 +130,7 @@ vi.mock('../pending-decision-gate.js', () => ({
 
 import { resumeAgent } from '../resume.js';
 import { registerTerminalBackend } from '../../terminal-backends/registry.js';
-import { getAgentDir, getAgentStateSync, saveAgentStateSync } from '../agent-state.js';
+import { getAgentDir, getAgentState, saveAgentStateSync } from '../agent-state.js';
 import { appendSessionIdToHistory } from '../../session-history.js';
 import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 
@@ -226,7 +226,7 @@ describe('resumeAgent relaunches on the host backend (PAN-3960)', () => {
     });
     expect(selected.starts[0]!.workspace.issueId).toBe('PAN-3960');
     expect(mocks.tmuxCreateSession).not.toHaveBeenCalled();
-    expect(getAgentStateSync(agentId)?.backend).toBe(host);
+    expect(getAgentState(agentId)?.backend).toBe(host);
   });
 });
 

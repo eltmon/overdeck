@@ -12,11 +12,11 @@ import { findPlanSync, readTierOverrides, readWorkspacePlanSync } from '../../..
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
 import { getDispatchableItems } from '../../../../lib/xbrief/dag.js';
 import { loadConfigSync } from '../../../../lib/config-yaml.js';
-import { getIssueStageSync, isTerminalIssueStage } from '../../../../lib/overdeck/agents.js';
+import { getIssueStage, isTerminalIssueStage } from '../../../../lib/overdeck/agents.js';
 
 import {
-  getAgentStateSync,
-  getLatestSessionIdSync,
+  getAgentState,
+  getLatestSessionId,
   recoverAgent,
   resumeAgent,
   restartAgent,
@@ -24,8 +24,8 @@ import {
   listRunningAgents,
   wipeAgentStateDirs,
 } from '../../../../lib/agents.js';
-import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
-import { normalizeModelOverrideSync, requireModelOverrideSync } from '../../../../lib/model-validation.js';
+import { canUseHarness } from '../../../../lib/harness-policy.js';
+import { normalizeModelOverride, requireModelOverride } from '../../../../lib/model-validation.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
@@ -66,7 +66,7 @@ export const postAgentResumeRoute = HttpRouter.add(
     const { message, model, harness, compact } = body as { message?: string; model?: string; harness?: RuntimeName; compact?: boolean };
     let resumeModel: string | undefined;
     try {
-      resumeModel = normalizeModelOverrideSync(model);
+      resumeModel = normalizeModelOverride(model);
     } catch (err) {
       console.warn(`[agents/resume] ${id} model validation failed: ${err instanceof Error ? err.message : String(err)}`);
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
@@ -110,7 +110,7 @@ export const postAgentResumeRoute = HttpRouter.add(
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction so the read model transitions agent
       // status from 'stopped' → 'running' and the frontend updates immediately.
-      const agentState = getAgentStateSync(id);
+      const agentState = getAgentState(id);
       if (agentState) {
         yield* saveAgentStateAndEmitEventProgram(agentState, {
           type: 'agent.started',
@@ -180,12 +180,12 @@ export const postAgentRecoverRoute = HttpRouter.add(
     const { model, force = false } = body as { model?: string; force?: boolean };
     let recoveryModel: string | undefined;
     try {
-      recoveryModel = normalizeModelOverrideSync(model);
+      recoveryModel = normalizeModelOverride(model);
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const stateBeforeRecover = getAgentStateSync(id);
+    const stateBeforeRecover = getAgentState(id);
     if (!stateBeforeRecover) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
@@ -214,7 +214,7 @@ export const postAgentRecoverRoute = HttpRouter.add(
       return jsonResponse({ success: false, error }, { status: result ? 409 : 400 });
     }
 
-    const updatedState = getAgentStateSync(id);
+    const updatedState = getAgentState(id);
     if (updatedState) {
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction.
@@ -268,12 +268,12 @@ export const postAgentRestartRoute = HttpRouter.add(
     };
     let restartModel: string | undefined;
     try {
-      restartModel = normalizeModelOverrideSync(model);
+      restartModel = normalizeModelOverride(model);
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
@@ -315,7 +315,7 @@ export const postAgentRestartRoute = HttpRouter.add(
           const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message, force });
 
           if (result.success || result.code === 'pending-operator-decision') {
-            const updatedState = result.success ? getAgentStateSync(id) : agentState;
+            const updatedState = result.success ? getAgentState(id) : agentState;
             // PAN-1908: write-through projection — preserve running state when a
             // late operator decision aborts before the destructive stop boundary.
             if (updatedState) {
@@ -362,7 +362,7 @@ export const postAgentRestartRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, graceful: false, message, force }));
 
     if (result.success) {
-      const updatedState = getAgentStateSync(id);
+      const updatedState = getAgentState(id);
       yield* eventStore.appendAsync(operatorInterventionEvent({
         issueId: updatedState?.issueId || agentState.issueId,
         kind: 'restart',
@@ -458,18 +458,18 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     let newModel: string | undefined;
     if (wantsSpawn && rawModel) {
       try {
-        newModel = requireModelOverrideSync(rawModel);
+        newModel = requireModelOverride(rawModel);
       } catch (err) {
         return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
       }
     }
 
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
     const issueId = agentState.issueId ?? id.replace(/^agent-/, '').toUpperCase();
-    const issueStage = getIssueStageSync(issueId);
+    const issueStage = getIssueStage(issueId);
     if (wantsSpawn && isTerminalIssueStage(issueStage)) {
       return jsonResponse({
         error: `${issueId} is already ${issueStage?.replaceAll('_', ' ')}. Reopen the issue before starting fresh work.`,
@@ -487,7 +487,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null = null;
     if (wantsSpawn && harness) {
       const harnessDecision = yield* Effect.promise(async () =>
-        canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
+        canUseHarness(harness, spawnModel, await getProviderAuthMode(spawnModel)),
       );
       if (!harnessDecision.allowed) {
         return jsonResponse({ error: harnessDecision.reason ?? `Harness "${harness}" is not allowed for model "${spawnModel}".` }, { status: 400 });
@@ -717,7 +717,7 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found`, lifecycle }, { status: 404 });
     }
@@ -726,7 +726,7 @@ export const postAgentResetSessionRoute = HttpRouter.add(
       return jsonResponse({ error: `Agent ${id} is running. Stop it first.`, lifecycle }, { status: 409 });
     }
 
-    const previousSessionId = getLatestSessionIdSync(id);
+    const previousSessionId = getLatestSessionId(id);
     // Evidence must match the lifecycle assert's: hasSavedSession reads the
     // agents-table session_id column, so a --fresh wipe that cleared only the
     // state-dir files left reset-session refusing (404) while pan start still
@@ -942,7 +942,7 @@ export const postAgentsRestartWithConfigRoute = HttpRouter.add(
           continue;
         }
 
-        const agentState = getAgentStateSync(agentId);
+        const agentState = getAgentState(agentId);
         if (!agentState) {
           results.push({ id: agentId, status: 'not_found', error: `Agent state not found` });
           continue;

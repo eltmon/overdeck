@@ -38,7 +38,7 @@ function tokenFilePath(): string {
  * is present. Callers (CLI senders) should treat null as "no dashboard available
  * to authenticate against" and skip the cross-process forward.
  */
-export function getInternalTokenSync(): string | null {
+export function getInternalToken(): string | null {
   if (cachedToken !== undefined) return cachedToken;
 
   const fromEnv = process.env.OVERDECK_INTERNAL_TOKEN;
@@ -70,10 +70,10 @@ export function getInternalTokenSync(): string | null {
  * to call on every server startup.
  *
  * Called from the dashboard server's main.ts so that CLI senders started
- * afterwards can read the same value via {@link getInternalTokenSync}.
+ * afterwards can read the same value via {@link getInternalToken}.
  */
-export function ensureInternalTokenSync(): string {
-  const existing = getInternalTokenSync();
+export function ensureInternalToken(): string {
+  const existing = getInternalToken();
   if (existing) return existing;
 
   const home = getOverdeckHome();

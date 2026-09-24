@@ -1,9 +1,9 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
-import { resolveGitHubIssueSync } from './tracker-utils.js';
+import { resolveGitHubIssue } from './tracker-utils.js';
 import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
-import { findProjectByPathSync, getProjectSwarmHotspots } from './projects.js';
+import { findProjectByPath, getProjectSwarmHotspots } from './projects.js';
 import type { ResolvedProjectRepo } from './project-repos.js';
 
 export interface MergeQueueItem {
@@ -177,7 +177,7 @@ export interface ComputeMergeQueueOptions {
  */
 export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): string | undefined {
   if (item.pr === undefined) return undefined;
-  const githubIssue = resolveGitHubIssueSync(item.issueId.toUpperCase());
+  const githubIssue = resolveGitHubIssue(item.issueId.toUpperCase());
   if (!githubIssue.isGitHub) return undefined;
   return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${item.pr}`;
 }
@@ -213,7 +213,7 @@ export const computeMergeQueueFromCandidates = (
       existing.map(({ branch }) => changedFilesVsMain(branch, projectRoot)),
       { concurrency: gitConcurrency },
     );
-    const hotspots = options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot));
+    const hotspots = options.hotspots ?? getProjectSwarmHotspots(findProjectByPath(projectRoot));
     const conflictSignals = computePredictedConflictSignals(
       existing.map((e, i) => ({ issueId: e.item.issueId, source: 'actual' as const, files: fileSets[i]! })),
       { hotspots },
@@ -478,7 +478,7 @@ export const computePolyrepoMergeQueueFromCandidates = (
 
     if (contributing.length === 0) return [] as PolyrepoMergeQueueItem[];
 
-    const hotspots = (options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot))).map(compileGlob);
+    const hotspots = (options.hotspots ?? getProjectSwarmHotspots(findProjectByPath(projectRoot))).map(compileGlob);
 
     // Flattened to ONE concurrency-governed collection: nesting Effect.all
     // inside Effect.all applies the limit at both levels, so the real ceiling

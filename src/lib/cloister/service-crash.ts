@@ -5,8 +5,8 @@ import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { DomainEvent } from '@overdeck/contracts';
 import { CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
-import { getAgentRuntimeStateSync, getAgentStateSync, saveAgentStateSync } from '../agents.js';
-import { setCloisterSpawnsPausedSync } from '../overdeck/control-settings.js';
+import { getAgentRuntimeStateSync, getAgentState, saveAgentStateSync } from '../agents.js';
+import { setCloisterSpawnsPaused } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { exactPaneTarget, getManagedTmuxSocketName } from '../tmux.js';
 import { advancingPhaseFromPrFacts, isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
@@ -104,13 +104,13 @@ export function pokeAgent(host: CrashHost, agentId: string): void {
 /** PAN-2452: fingerprint of observable progress — workspace HEAD + pane tail.
  * Unchanged fingerprint across pokes = the poke did nothing. */
 export async function progressFingerprint(_host: CrashHost, agentId: string): Promise<string> {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   let head = '';
   if (state?.workspace) {
     try {
       if (state.issueId) {
-        const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-        head = await snapshotWorkspaceHeadsPromise(state.issueId, state.workspace) ?? '';
+        const { snapshotWorkspaceHeads } = await import('../git-utils.js');
+        head = await snapshotWorkspaceHeads(state.issueId, state.workspace) ?? '';
       } else {
         const { stdout } = await execAsync('git rev-parse HEAD', { cwd: state.workspace, encoding: 'utf-8' });
         head = stdout.trim();
@@ -231,7 +231,7 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
   // Both state.json and runtime.json must be checked — stopAgent writes both,
   // but a race between the CLI kill and this health check poll could see one
   // but not the other if only one file is consulted.
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!agentState || agentState.status === 'stopped') {
     console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
     return;
@@ -368,7 +368,7 @@ export async function restartAgent(_host: CrashHost, agentId: string): Promise<v
   }
 
   // Get agent state to find session ID and workspace
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!agentState?.sessionId) {
     throw new Error(`No session ID found for agent ${agentId}`);
   }
@@ -431,7 +431,7 @@ export function checkForMassDeaths(host: CrashHost): void {
  */
 export function pauseSpawns(host: CrashHost, reason: string): void {
   host.spawnsPaused = true;
-  setCloisterSpawnsPausedSync(true);
+  setCloisterSpawnsPaused(true);
   host.emit({ type: 'spawn_paused', reason });
   console.log(`🔔 Agent spawns paused: ${reason}`);
 }

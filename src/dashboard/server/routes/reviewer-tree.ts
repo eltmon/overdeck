@@ -18,7 +18,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentState } from '../../../lib/agents.js';
 import { isExtendedReviewEnabled } from '../../../lib/cloister/review-agent.js';
 
 import type { AgentStatus, SessionNodePresence, AgentSnapshot } from '@overdeck/contracts';
@@ -88,7 +88,7 @@ async function readReviewerStoppedAt(
   _agentsRoot?: string,
 ): Promise<string | undefined> {
   try {
-    const state = getAgentStateSync(sessionId);
+    const state = getAgentState(sessionId);
     return state?.stoppedAt;
   } catch {
     return undefined;

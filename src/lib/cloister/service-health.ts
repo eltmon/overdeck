@@ -1,13 +1,13 @@
 /** Cloister health monitoring seam. */
 import { Effect } from 'effect';
-import { getAgentStateSync, listRunningAgents } from '../agents.js';
+import { getAgentState, listRunningAgents } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import type { HealthState } from '../runtimes/types.js';
 import { writeHealthEvent } from '../overdeck/health-events.js';
 import type { CloisterConfig } from './config.js';
 import { checkCostLimits, type CostAlert } from './cost-monitor.js';
 import { performHandoff } from './handoff.js';
-import { createHandoffEvent, logHandoffEventSync } from './handoff-logger.js';
+import { createHandoffEvent, logHandoffEvent } from './handoff-logger.js';
 import { getAgentHealth, getAgentsNeedingAttention, type AgentHealth } from './health.js';
 import { reconcilePiCostEventsForRunningAgents } from './pi-cost-reconciler.js';
 import { checkAndRotateIfNeeded, type SessionRotationResult } from './session-rotation.js';
@@ -107,7 +107,7 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
         // state, not a stall. Never poke or kill it (it was spamming itself with
         // "are you stuck?" nudges every cooldown). Health is still recorded above;
         // only the attention/poke/kill action is skipped.
-        const idleAgentState = getAgentStateSync(health.agentId);
+        const idleAgentState = getAgentState(health.agentId);
         if (idleAgentState?.role === 'sequencer') continue;
 
         // Warm-idle on a pipeline-owned issue is expected, not a stall.
@@ -237,7 +237,7 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
     for (const health of agentHealths) {
       try {
         // Get agent state
-        const agentState = getAgentStateSync(health.agentId);
+        const agentState = getAgentState(health.agentId);
         if (!agentState) continue;
 
         // Skip if no workspace (can't determine context)
@@ -290,7 +290,7 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
               result.success,
               result.error
             );
-            logHandoffEventSync(event);
+            logHandoffEvent(event);
           }
 
           if (result.success) {

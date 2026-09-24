@@ -7,20 +7,20 @@
  * this sync path mirrors only the cache-table insert into overdeck.db.
  */
 import type { CostEvent } from '../costs/events.js';
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
-export { getAgentCostStatsSync, type AgentCostStats } from './cost-agent-stats.js';
+export { getAgentCostStats, type AgentCostStats } from './cost-agent-stats.js';
 /**
  * Query total memory-extraction cost in USD for an issue within a time window.
  * Mirrors the queryMemoryExtractionCostUsd function from cost-events-db.
  * startTs/endTs are ISO timestamp strings; overdeck stores ts as epoch milliseconds.
  */
-export function queryMemoryExtractionCostUsdSync(opts: {
+export function queryMemoryExtractionCostUsd(opts: {
   issueId: string;
   startTs: string;
   endTs?: string;
 }): number {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const startMillis = new Date(opts.startTs).getTime();
   const conditions = [
     'UPPER(issue_id) = UPPER(?)',
@@ -45,8 +45,8 @@ export function queryMemoryExtractionCostUsdSync(opts: {
  * Returns true on success, false if row was a duplicate (request_id conflict).
  * Throws on unexpected errors — caller wraps in try/catch.
  */
-export function insertCostEventSync(event: CostEvent): boolean {
-  const db = getOverdeckDatabaseSync();
+export function insertCostEvent(event: CostEvent): boolean {
+  const db = getOverdeckDatabase();
   const tsMillis = new Date(event.ts).getTime();
   const result = db
     .prepare(
@@ -77,7 +77,7 @@ export function insertCostEventSync(event: CostEvent): boolean {
 // ── Records-layer helpers ─────────────────────────────────────────────────────
 
 function getCostSinceSync(startTs: Date): number {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db
     .prepare(
       `SELECT COALESCE(SUM(cost), 0) AS total_cost FROM cost_events
@@ -87,7 +87,7 @@ function getCostSinceSync(startTs: Date): number {
   return row?.total_cost ?? 0;
 }
 
-export function getTodayCostSync(now = new Date()): number {
+export function getTodayCost(now = new Date()): number {
   const utcMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   return getCostSinceSync(utcMidnight);
 }
@@ -96,8 +96,8 @@ export function getTodayCostSync(now = new Date()): number {
  * Returns the total cost in USD for an issue (for records.ts projectUsage).
  * Returns null if no cost events exist.
  */
-export function getCostForIssueSync(issueId: string): { totalCost: number } | null {
-  const db = getOverdeckDatabaseSync();
+export function getCostForIssue(issueId: string): { totalCost: number } | null {
+  const db = getOverdeckDatabase();
   const row = db
     .prepare(
       `SELECT COALESCE(SUM(cost), 0) AS total_cost FROM cost_events
@@ -138,7 +138,7 @@ export interface IssueAggregate {
 }
 
 function getModelBreakdownForIssueSync(issueId: string): Record<string, ModelBreakdown> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(
       `SELECT model,
@@ -158,7 +158,7 @@ function getModelBreakdownForIssueSync(issueId: string): Record<string, ModelBre
 }
 
 function getStageBreakdownForIssueSync(issueId: string): Record<string, StageBreakdown> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(
       `SELECT session_type AS stage,
@@ -178,7 +178,7 @@ function getStageBreakdownForIssueSync(issueId: string): Record<string, StageBre
 }
 
 function getProviderBreakdownForIssueSync(issueId: string): Record<string, number> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(
       `SELECT COALESCE(provider, 'unknown') AS provider,
@@ -199,8 +199,8 @@ function getProviderBreakdownForIssueSync(issueId: string): Record<string, numbe
  * Get aggregated costs by issue. Mirrors getCostsByIssueFromDb from cost-events-db.
  * overdeck stores ts as epoch milliseconds — MAX(ts) is converted to ISO string for lastUpdated.
  */
-export function getCostsByIssueSync(): Record<string, IssueAggregate> {
-  const db = getOverdeckDatabaseSync();
+export function getCostsByIssue(): Record<string, IssueAggregate> {
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(
       `SELECT UPPER(issue_id) AS issue_id,
@@ -303,8 +303,8 @@ export function getCostsByIssueSync(): Record<string, IssueAggregate> {
 /**
  * Get aggregated costs for a single issue. Mirrors getCostForIssueFromDb.
  */
-export function getCostForIssueAggregateSync(issueId: string): IssueAggregate | null {
-  const db = getOverdeckDatabaseSync();
+export function getCostForIssueAggregate(issueId: string): IssueAggregate | null {
+  const db = getOverdeckDatabase();
   const row = db
     .prepare(
       `SELECT UPPER(issue_id) AS issue_id,
@@ -356,7 +356,7 @@ export interface DailyTrend {
  * Get daily cost totals for trend charts.
  */
 export function getDailyTrendsSync(opts: { days?: number; issueId?: string } = {}): DailyTrend[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const days = opts.days ?? 30;
   const sinceMillis = Date.now() - days * 86_400_000;
   const conditions = ['ts >= ?'];
@@ -390,8 +390,8 @@ export function getDailyTrendsSync(opts: { days?: number; issueId?: string } = {
  * Get today's (last 24 hours) cost for a specific agent.
  * Used for per-agent cost limit checks to match the cap's daily window.
  */
-export function getAgentDailyCostSync(agentId: string): number {
-  const db = getOverdeckDatabaseSync();
+export function getAgentDailyCost(agentId: string): number {
+  const db = getOverdeckDatabase();
   const sinceMillis = Date.now() - 24 * 60 * 60 * 1000; // Last 24 hours
   const row = db
     .prepare(
@@ -413,8 +413,8 @@ export interface ModelRollup {
  * Get model-level rollup across all issues or for a specific issue.
  * Mirrors getModelRollup from cost-events-db.
  */
-export function getModelRollupSync(issueId?: string): ModelRollup[] {
-  const db = getOverdeckDatabaseSync();
+export function getModelRollup(issueId?: string): ModelRollup[] {
+  const db = getOverdeckDatabase();
   const where = issueId ? 'WHERE UPPER(issue_id) = UPPER(?)' : '';
   const params = issueId ? [issueId] : [];
   const rows = db
@@ -442,8 +442,8 @@ export function getModelRollupSync(issueId?: string): ModelRollup[] {
  * Mirrors getBackgroundCostBySource from cost-events-db.
  * overdeck stores ts as epoch milliseconds.
  */
-export function getBackgroundCostBySourceSync(hours = 24): Record<string, number> {
-  const db = getOverdeckDatabaseSync();
+export function getBackgroundCostBySource(hours = 24): Record<string, number> {
+  const db = getOverdeckDatabase();
   const sinceMillis = Date.now() - hours * 3_600_000;
   const rows = db
     .prepare(
@@ -477,7 +477,7 @@ export interface AgentRollup {
 }
 
 export function getAgentRollup(issueId?: string): AgentRollup[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const where = issueId ? 'WHERE UPPER(issue_id) = UPPER(?)' : '';
   const params = issueId ? [issueId] : [];
   const rows = db
@@ -530,6 +530,6 @@ export interface CavemanExperimentRow {
   totalCost: number;
 }
 
-export function getCavemanExperimentDataSync(): CavemanExperimentRow[] {
+export function getCavemanExperimentData(): CavemanExperimentRow[] {
   return [];
 }

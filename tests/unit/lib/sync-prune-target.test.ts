@@ -96,8 +96,8 @@ describe('executeSyncSync stale target pruning', () => {
       },
     });
 
-    const { executeSyncSync } = await import('../../../src/lib/sync.js');
-    const result = executeSyncSync();
+    const { executeSync } = await import('../../../src/lib/sync.js');
+    const result = executeSync();
 
     expect(result.pruned).toEqual([relativePath]);
     expect(result.keptModified).toEqual([]);
@@ -116,8 +116,8 @@ describe('executeSyncSync stale target pruning', () => {
       },
     });
 
-    const { executeSyncSync } = await import('../../../src/lib/sync.js');
-    const result = executeSyncSync();
+    const { executeSync } = await import('../../../src/lib/sync.js');
+    const result = executeSync();
 
     expect(result.pruned).toEqual([]);
     expect(result.keptModified).toEqual([relativePath]);
@@ -142,8 +142,8 @@ describe('executeSyncSync stale target pruning', () => {
       },
     });
 
-    const { executeSyncSync } = await import('../../../src/lib/sync.js');
-    const result = executeSyncSync();
+    const { executeSync } = await import('../../../src/lib/sync.js');
+    const result = executeSync();
     const manifest = readTargetManifest();
 
     expect(result.pruned).toEqual(['rules/beads-dolt-authority.md']);
@@ -172,8 +172,8 @@ describe('executeAgentSkillsSync stale target pruning', () => {
       },
     }));
 
-    const { executeAgentSkillsSync } = await import('../../../src/lib/harness-skill-sync.js');
-    const result = executeAgentSkillsSync({}, targetSkillsDir, sourceSkillsDir);
+    const { executeAgentSkills } = await import('../../../src/lib/harness-skill-sync.js');
+    const result = executeAgentSkills({}, targetSkillsDir, sourceSkillsDir);
 
     expect(result.pruned).toEqual(['skills/old-skill/SKILL.md']);
     expect(result.keptModified).toEqual([]);
@@ -199,8 +199,8 @@ describe('executeAgentSkillsSync stale target pruning', () => {
       },
     }));
 
-    const { executeAgentSkillsSync } = await import('../../../src/lib/harness-skill-sync.js');
-    const result = executeAgentSkillsSync({}, targetSkillsDir, sourceSkillsDir);
+    const { executeAgentSkills } = await import('../../../src/lib/harness-skill-sync.js');
+    const result = executeAgentSkills({}, targetSkillsDir, sourceSkillsDir);
 
     expect(result.pruned).toEqual([]);
     expect(result.keptModified).toEqual(['skills/modified/SKILL.md']);

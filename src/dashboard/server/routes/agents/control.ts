@@ -11,13 +11,13 @@ import { HandoffError, performHandoff } from '../../../../lib/cloister/handoff.j
 import { loadCloisterConfigSync } from '../../../../lib/cloister/config.js';
 import { getCloisterService } from '../../../../lib/cloister/service.js';
 import { checkAllTriggers } from '../../../../lib/cloister/triggers.js';
-import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../../lib/cost.js';
+import { calculateCost, getPricing, type TokenUsage } from '../../../../lib/cost.js';
 import { normalizeModelName } from '../../../../lib/cost-parsers/jsonl-parser.js';
-import { requireModelOverrideSync } from '../../../../lib/model-validation.js';
+import { requireModelOverride } from '../../../../lib/model-validation.js';
 import { claudeProjectsRoot, encodeClaudeProjectDir } from '../../../../lib/runtimes/storage/claude-code.js';
 import { getRuntimeForAgent } from '../../../../lib/runtimes/index.js';
 import {
-  getAgentStateSync,
+  getAgentState,
   setAgentDeliveryMethod,
 } from '../../../../lib/agents.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -52,7 +52,7 @@ export const getAgentHandoffSuggestionRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -106,7 +106,7 @@ export const postAgentHandoffRoute = HttpRouter.add(
     const { toModel, reason } = body as any;
     let targetModel: string;
     try {
-      targetModel = requireModelOverrideSync(toModel);
+      targetModel = requireModelOverride(toModel);
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
@@ -147,7 +147,7 @@ export const getAgentCostRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
@@ -218,7 +218,7 @@ export const getAgentCostRoute = HttpRouter.add(
 
     if (inputTokens > 0 || outputTokens > 0) {
       const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
-      const pricing = getPricingSync(modelInfo.provider, modelInfo.model);
+      const pricing = getPricing(modelInfo.provider, modelInfo.model);
       if (pricing) {
         const usage: TokenUsage = {
           inputTokens,
@@ -226,7 +226,7 @@ export const getAgentCostRoute = HttpRouter.add(
           cacheReadTokens,
           cacheWriteTokens,
         };
-        cost = calculateCostSync(usage, pricing);
+        cost = calculateCost(usage, pricing);
       }
     }
 
@@ -274,7 +274,7 @@ export const postAgentDeliveryMethodRoute = HttpRouter.add(
       return jsonResponse({ error: 'deliveryMethod must be auto, channels, or tmux' }, { status: 400 });
     }
 
-    const agentState = getAgentStateSync(id);
+    const agentState = getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }

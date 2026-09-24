@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
-import { recoverAgent, stopAgent, getAgentStateSync, getAgentRuntimeStateSync } from './agents.js';
+import { recoverAgent, stopAgent, getAgentState, getAgentRuntimeStateSync } from './agents.js';
 import { listSessionNames, sessionExists } from './tmux.js';
 import { getAgentEffectiveLastActivityMs } from './agents/liveness.js';
 
@@ -93,7 +93,7 @@ async function isAgentAlive(agentId: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(agentId));
 }
 
-async function pingAgentPromise(
+async function pingAgentBody(
   agentId: string,
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
@@ -106,7 +106,7 @@ async function pingAgentPromise(
   const now = new Date();
   health.lastPing = now.toISOString();
 
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   const runtime = getAgentRuntimeStateSync(agentId);
   const alive = await isAgentAlive(agentId);
   const runtimeLastActivity = runtime?.lastActivity ? new Date(runtime.lastActivity) : null;
@@ -185,7 +185,7 @@ async function pingAgentPromise(
   return health;
 }
 
-async function handleStuckAgentPromise(
+async function handleStuckAgentBody(
   agentId: string,
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
@@ -244,7 +244,7 @@ async function handleStuckAgentPromise(
   return { action: 'recovered', reason: 'Force killed (respawn failed)' };
 }
 
-async function runHealthCheckPromise(
+async function runHealthCheckBody(
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
     consecutiveFailures: DEFAULT_CONSECUTIVE_FAILURES,
@@ -337,7 +337,7 @@ export function startHealthDaemon(
     cooldownMs: DEFAULT_COOLDOWN_MS,
     checkIntervalMs: DEFAULT_CHECK_INTERVAL_MS,
   },
-  onCheck?: (results: Awaited<ReturnType<typeof runHealthCheckPromise>>) => void
+  onCheck?: (results: Awaited<ReturnType<typeof runHealthCheckBody>>) => void
 ): () => void {
   let running = true;
 
@@ -433,7 +433,7 @@ export const pingAgent = (
   config?: HealthConfig,
 ): Effect.Effect<AgentHealth, HealthError> =>
   Effect.tryPromise({
-    try: () => (config ? pingAgentPromise(agentId, config) : pingAgentPromise(agentId)),
+    try: () => (config ? pingAgentBody(agentId, config) : pingAgentBody(agentId)),
     catch: healthCatch(agentId, 'pingAgent'),
   });
 
@@ -443,7 +443,7 @@ export const handleStuckAgent = (
   config?: HealthConfig,
 ): Effect.Effect<{ action: 'recovered' | 'cooldown' | 'skipped'; reason: string }, HealthError> =>
   Effect.tryPromise({
-    try: () => (config ? handleStuckAgentPromise(agentId, config) : handleStuckAgentPromise(agentId)),
+    try: () => (config ? handleStuckAgentBody(agentId, config) : handleStuckAgentBody(agentId)),
     catch: healthCatch(agentId, 'handleStuckAgent'),
   });
 
@@ -462,6 +462,6 @@ export const runHealthCheck = (
   HealthError
 > =>
   Effect.tryPromise({
-    try: () => (config ? runHealthCheckPromise(config) : runHealthCheckPromise()),
+    try: () => (config ? runHealthCheckBody(config) : runHealthCheckBody()),
     catch: healthCatch('*', 'runHealthCheck'),
   });

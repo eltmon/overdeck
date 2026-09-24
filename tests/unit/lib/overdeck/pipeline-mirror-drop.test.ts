@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
 import {
   PIPELINE_MIRROR_DROPPED_SETTING,
-  dropPipelineStateMirrorTablesSync,
-  readPipelineMirrorMarkerSync,
+  dropPipelineStateMirrorTables,
+  readPipelineMirrorMarker,
 } from '../../../../src/lib/overdeck/infra.js';
 
 /**
@@ -54,24 +54,24 @@ afterEach(() => {
 
 describe('dropPipelineStateMirrorTablesSync', () => {
   it('leaves every table alone in peer mode', () => {
-    const result = dropPipelineStateMirrorTablesSync(db, PEER_ENV);
+    const result = dropPipelineStateMirrorTables(db, PEER_ENV);
 
     expect(result).toEqual({ dropped: false, skipped: 'peer' });
     for (const table of MIRROR_TABLES) expect(tableNames()).toContain(table);
-    expect(readPipelineMirrorMarkerSync(db)).toBeNull();
+    expect(readPipelineMirrorMarker(db)).toBeNull();
   });
 
   it('treats any truthy OVERDECK_DISABLE_DEACON as peer, not just "1"', () => {
-    expect(dropPipelineStateMirrorTablesSync(db, { OVERDECK_DISABLE_DEACON: 'true' }).skipped).toBe('peer');
+    expect(dropPipelineStateMirrorTables(db, { OVERDECK_DISABLE_DEACON: 'true' }).skipped).toBe('peer');
     expect(tableNames()).toContain('agents');
   });
 
   it('drops the mirror tables once in primary mode and writes the marker', () => {
-    const result = dropPipelineStateMirrorTablesSync(db, PRIMARY_ENV);
+    const result = dropPipelineStateMirrorTables(db, PRIMARY_ENV);
 
     expect(result).toEqual({ dropped: true });
     for (const table of MIRROR_TABLES) expect(tableNames()).not.toContain(table);
-    expect(readPipelineMirrorMarkerSync(db)).not.toBeNull();
+    expect(readPipelineMirrorMarker(db)).not.toBeNull();
 
     const setting = db
       .prepare('SELECT value FROM app_settings WHERE key = ?')
@@ -80,18 +80,18 @@ describe('dropPipelineStateMirrorTablesSync', () => {
   });
 
   it('is a no-op on the next open once the marker exists', () => {
-    dropPipelineStateMirrorTablesSync(db, PRIMARY_ENV);
-    const marker = readPipelineMirrorMarkerSync(db);
+    dropPipelineStateMirrorTables(db, PRIMARY_ENV);
+    const marker = readPipelineMirrorMarker(db);
 
     // A table recreated by an older peer must not be dropped again: the marker
     // says this database already converged.
     db.exec('CREATE TABLE `agents` (`id` text PRIMARY KEY NOT NULL)');
 
-    const second = dropPipelineStateMirrorTablesSync(db, PRIMARY_ENV);
+    const second = dropPipelineStateMirrorTables(db, PRIMARY_ENV);
 
     expect(second).toEqual({ dropped: false, skipped: 'already-dropped' });
     expect(tableNames()).toContain('agents');
-    expect(readPipelineMirrorMarkerSync(db)).toBe(marker);
+    expect(readPipelineMirrorMarker(db)).toBe(marker);
   });
 
   it('does not run from a plain database open', () => {

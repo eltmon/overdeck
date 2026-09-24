@@ -68,7 +68,7 @@ vi.mock('../../../lib/restart-gate-client.js', () => ({
 import { reloadCommand } from '../reload.js';
 import {
   activeDashboardBundleFile,
-  readActiveDashboardBundleSync,
+  readActiveDashboardBundle,
 } from '../../../lib/deploy/active-dashboard-bundle.js';
 
 async function reservePort(): Promise<number> {
@@ -192,7 +192,7 @@ describe('reloadCommand health-timeout recovery', () => {
 
     expect(process.exitCode).toBe(1);
     expect(mocks.removeDashboardDeployment).not.toHaveBeenCalled();
-    expect(readActiveDashboardBundleSync()).toEqual({ repoRoot, deployRoot, serverPath });
+    expect(readActiveDashboardBundle()).toEqual({ repoRoot, deployRoot, serverPath });
     await expect(fs.readFile(serverPath, 'utf8')).resolves.toBe('canonical bundle');
     await expect(fs.readFile(join(repoRoot, 'dist', 'dashboard', 'server.js'), 'utf8'))
       .resolves.toBe('canonical bundle');

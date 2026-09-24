@@ -14,9 +14,9 @@ import { Effect } from 'effect';
 import { loadConfigSync } from './config.js';
 import { createFlyProviderFromConfig } from './remote/index.js';
 import { writeRemoteFile } from './remote/remote-agents.js';
-import { saveWorkspaceMetadataSync } from './remote/workspace-metadata.js';
+import { saveWorkspaceMetadata } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
+import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
 
 const execAsync = promisify(exec);
 
@@ -45,7 +45,7 @@ export async function createRemoteWorkspace(
 
   // Determine project context
   const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
   const projectRoot = projectConfig?.path || process.cwd();
   // Determine project identifier for VM name
   let projectId = teamPrefix?.toLowerCase();
@@ -209,7 +209,7 @@ export async function createRemoteWorkspace(
     location: 'remote',
   };
 
-  saveWorkspaceMetadataSync(metadata);
+  saveWorkspaceMetadata(metadata);
 
   return metadata;
 }

@@ -15,15 +15,15 @@ vi.mock('../../../src/lib/project-repos.js', async () => {
 import {
   type HeadAnchor,
   parseWorkspaceHeadAnchor,
-  renderWorkspaceGitShowPromise,
-  snapshotWorkspaceHeadsPromise,
+  renderWorkspaceGitShow,
+  snapshotWorkspaceHeads,
 } from '../../../src/lib/git-utils.js';
 
 const FE_SHA = 'a'.repeat(40);
 const API_SHA = 'b'.repeat(40);
 
 type ProducedHeadAnchor = Exclude<
-  Awaited<ReturnType<typeof snapshotWorkspaceHeadsPromise>>,
+  Awaited<ReturnType<typeof snapshotWorkspaceHeads>>,
   undefined
 >;
 
@@ -46,7 +46,7 @@ describe('polyrepo workspace head anchors', () => {
     const gitShow = vi.fn().mockResolvedValue('plain diff\n');
 
     expect(parseWorkspaceHeadAnchor(FE_SHA)).toBeNull();
-    await expect(renderWorkspaceGitShowPromise(
+    await expect(renderWorkspaceGitShow(
       'PAN-2956',
       '/workspace',
       FE_SHA,
@@ -82,7 +82,7 @@ describe('polyrepo workspace head anchors', () => {
       { repoKey: 'fe', sha: FE_SHA },
       { repoKey: 'api', sha: API_SHA },
     ]);
-    await expect(renderWorkspaceGitShowPromise(
+    await expect(renderWorkspaceGitShow(
       'MIN-882',
       '/workspace',
       anchor,
@@ -99,7 +99,7 @@ describe('polyrepo workspace head anchors', () => {
   it('rejects malformed composites before invoking git', async () => {
     const gitShow = vi.fn();
 
-    await expect(renderWorkspaceGitShowPromise(
+    await expect(renderWorkspaceGitShow(
       'MIN-882',
       '/workspace',
       `fe@${FE_SHA} invalid`,
@@ -113,7 +113,7 @@ describe('polyrepo workspace head anchors', () => {
     repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([]);
     const gitShow = vi.fn();
 
-    await expect(renderWorkspaceGitShowPromise(
+    await expect(renderWorkspaceGitShow(
       'MIN-882',
       '/workspace',
       `fe@${FE_SHA}`,

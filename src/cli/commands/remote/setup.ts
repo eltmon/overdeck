@@ -12,7 +12,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { loadConfigSync, saveConfigSync } from '../../../lib/config.js';
+import { loadConfigSync, saveConfig } from '../../../lib/config.js';
 import { createFlyProvider } from '../../../lib/remote/index.js';
 
 const execAsync = promisify(exec);
@@ -104,7 +104,7 @@ export async function setupCommand(): Promise<void> {
       },
     };
 
-    saveConfigSync(config);
+    saveConfig(config);
     console.log(`  ${chalk.green('✓')} Remote configuration added to config.toml`);
     console.log('');
     console.log(chalk.dim('  Edit ~/.overdeck/config.toml to customize:'));

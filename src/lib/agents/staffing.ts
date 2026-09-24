@@ -22,8 +22,8 @@ import type { XBriefItem } from '../xbrief/types.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { NormalizedConfig } from '../config-yaml/schema.js';
 import { resolveModel } from '../config-yaml/roles.js';
-import { requireModelOverrideSync } from '../model-validation.js';
-import { getBuiltInDefaultHarness, getProviderForModelSync } from '../providers.js';
+import { requireModelOverride } from '../model-validation.js';
+import { getBuiltInDefaultHarness, getProviderForModel } from '../providers.js';
 import { fmix32, fnv1a32 } from '../config-yaml/percent.js';
 import type { TierOverridesMap } from '../xbrief/io.js';
 import { applyEffectiveDifficulty } from './tier-escalation.js';
@@ -67,7 +67,7 @@ function providerDefaultHarnessSync(
   model: string,
   config: Pick<NormalizedConfig, 'providerHarnesses'>,
 ): RuntimeName {
-  const provider = getProviderForModelSync(model).name;
+  const provider = getProviderForModel(model).name;
   return config.providerHarnesses?.[provider] ?? getBuiltInDefaultHarness(provider);
 }
 
@@ -90,7 +90,7 @@ export function resolveImplicitStaffing(
   config: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'providerHarnesses'>,
   spawnKey?: string,
 ): Staffing {
-  const model = requireModelOverrideSync(resolveModel('work', undefined, config, spawnKey));
+  const model = requireModelOverride(resolveModel('work', undefined, config, spawnKey));
   return {
     tierName: IMPLICIT_TIER_NAME,
     model,

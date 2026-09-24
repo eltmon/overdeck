@@ -1,16 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
-import { getAgentDir, getAgentStateSync } from './agent-state-read.js';
+import { getAgentDir, getAgentState } from './agent-state-read.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import { claudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { codexAgentHome, extractThreadIdFromRollout, findLatestRollout } from '../runtimes/storage/codex.js';
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { readLatestAgentClaudeSessionIdEventSync } from '../overdeck/event-reads.js';
+import { readLatestAgentClaudeSessionIdEvent } from '../overdeck/event-reads.js';
 import {
   appendSessionIdToHistory,
   isSessionResetMarker,
-  readLatestIndexedSessionIdSync,
+  readLatestIndexedSessionId,
 } from '../session-history.js';
 
 /** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
@@ -81,7 +81,7 @@ export function saveSessionId(
   sessionId: string,
   source: 'rotation' | 'recovered' = 'rotation',
 ): void {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   appendSessionIdToHistory(agentId, sessionId, source, {
     harness: state?.harness,
     model: state?.model,
@@ -92,7 +92,7 @@ export function saveSessionId(
  * Get saved Claude session ID
  */
 export function getSessionId(agentId: string): string | null {
-  return readLatestIndexedSessionIdSync(agentId);
+  return readLatestIndexedSessionId(agentId);
 }
 
 /**
@@ -128,9 +128,9 @@ export interface SessionResolutionResult {
 }
 
 export interface ClaudeSessionRecoveryDeps {
-  getAgentState?: typeof getAgentStateSync;
+  getAgentState?: typeof getAgentState;
   isSessionReset?: (agentId: string) => boolean;
-  readEventSessionId: typeof readLatestAgentClaudeSessionIdEventSync;
+  readEventSessionId: typeof readLatestAgentClaudeSessionIdEvent;
   transcriptExists: (workspace: string, sessionId: string) => boolean;
   log: (message: string) => void;
 }
@@ -138,7 +138,7 @@ export interface ClaudeSessionRecoveryDeps {
 function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {
   return {
     isSessionReset: isSessionResetMarker,
-    readEventSessionId: readLatestAgentClaudeSessionIdEventSync,
+    readEventSessionId: readLatestAgentClaudeSessionIdEvent,
     transcriptExists: (workspace, sessionId) => existsSync(join(claudeProjectDir(workspace), `${sessionId}.jsonl`)),
     log: (message) => console.warn(message),
   };
@@ -151,9 +151,9 @@ function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {
  * record first — that door (pan-dir/agents.ts) and its writer are gone with the
  * record plane, so the event-store check is the only surviving source.
  */
-export function resolveClaudeSessionRecoverySync(
+export function resolveClaudeSessionRecovery(
   agentId: string,
-  agentState: ReturnType<typeof getAgentStateSync>,
+  agentState: ReturnType<typeof getAgentState>,
   deps: ClaudeSessionRecoveryDeps = defaultClaudeSessionRecoveryDeps(),
 ): SessionResolutionResult {
   const checked: string[] = [];
@@ -179,7 +179,7 @@ export function resolveClaudeSessionRecoverySync(
   return { sessionId: null, checked };
 }
 
-export function resolveLatestSessionIdSync(
+export function resolveLatestSessionId(
   agentId: string,
   recoveryDeps?: Partial<ClaudeSessionRecoveryDeps>,
 ): SessionResolutionResult {
@@ -188,7 +188,7 @@ export function resolveLatestSessionIdSync(
     return { sessionId: null, checked: ['session reset marker'] };
   }
 
-  const agentState = deps.getAgentState?.(agentId) ?? getAgentStateSync(agentId);
+  const agentState = deps.getAgentState?.(agentId) ?? getAgentState(agentId);
   const sessionIdSource = getHarnessBehavior(agentState?.harness).sessionIdSource;
   const checked: string[] = [];
 
@@ -255,13 +255,13 @@ export function resolveLatestSessionIdSync(
   if (runtimeSessionId) return { sessionId: runtimeSessionId, checked };
   if (agentState?.sessionId) return { sessionId: agentState.sessionId, checked };
 
-  const recovered = resolveClaudeSessionRecoverySync(agentId, agentState, deps);
+  const recovered = resolveClaudeSessionRecovery(agentId, agentState, deps);
   return { sessionId: recovered.sessionId, checked: [...checked, ...recovered.checked] };
 }
 
-export function getLatestSessionIdSync(
+export function getLatestSessionId(
   agentId: string,
   recoveryDeps?: Partial<ClaudeSessionRecoveryDeps>,
 ): string | null {
-  return resolveLatestSessionIdSync(agentId, recoveryDeps).sessionId;
+  return resolveLatestSessionId(agentId, recoveryDeps).sessionId;
 }

@@ -11,7 +11,7 @@ process.env.OVERDECK_HOME = TEST_HOME;
 const ROOT_PATH = join(TEST_HOME, 'projects', 'root');
 const NESTED_PATH = join(ROOT_PATH, 'packages', 'nested');
 
-const { getOverdeckDatabaseSync, closeOverdeckDatabaseSync } = await import('../infra.js');
+const { getOverdeckDatabase, closeOverdeckDatabase } = await import('../infra.js');
 const { createConversation, getConversationByName, setConversationProjectKey } = await import('../conversations.js');
 const { resolveRegisteredProject } = await import('../conversation-runtime.js');
 const { resolveProjectKeyForCwdAsync } = await import('../../projects.js');
@@ -35,14 +35,14 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   rmSync(TEST_HOME, { recursive: true, force: true });
   delete process.env.OVERDECK_HOME;
 });
 
 describe('conversation project association (PAN-3419)', () => {
   it('adds a nullable project_key column to conversations', () => {
-    const columns = getOverdeckDatabaseSync()
+    const columns = getOverdeckDatabase()
       .prepare('PRAGMA table_info(conversations)')
       .all() as Array<{ name: string; notnull: number }>;
 

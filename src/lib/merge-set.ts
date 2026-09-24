@@ -4,8 +4,8 @@ import {
 } from './overdeck/merge-sync.js';
 import type { ForgeType } from './forge.js';
 import { resolveProjectFromIssueSync } from './projects.js';
-import { resolveProjectReposFromResolvedIssueSync } from './project-repos.js';
-import { resolveIssueIdSync } from './issue-id.js';
+import { resolveProjectReposFromResolvedIssue } from './project-repos.js';
+import { resolveIssueId } from './issue-id.js';
 
 export type MergeSetStatus = 'draft' | 'reviewing' | 'ready' | 'merging' | 'merged' | 'failed';
 export type MergeSetGateStatus = 'pending' | 'running' | 'passed' | 'failed' | 'blocked' | 'skipped';
@@ -40,20 +40,20 @@ export interface MergeSet {
   repos: MergeSetRepoState[];
 }
 
-export function upsertMergeSetSync(mergeSet: MergeSet): void {
-  dbUpsert({ ...mergeSet, issueId: resolveIssueIdSync(mergeSet.issueId) });
+export function upsertMergeSet(mergeSet: MergeSet): void {
+  dbUpsert({ ...mergeSet, issueId: resolveIssueId(mergeSet.issueId) });
 }
 
 /** Fetch a merge-set by issue id; throws on a merge-set DB failure. */
-export function getMergeSetSync(issueId: string): MergeSet | null {
-  return getMergeSetFromDb(resolveIssueIdSync(issueId));
+export function getMergeSet(issueId: string): MergeSet | null {
+  return getMergeSetFromDb(resolveIssueId(issueId));
 }
 
-export function buildMergeSetForIssueSync(issueId: string, labels: string[] = []): MergeSet | null {
+export function buildMergeSetForIssue(issueId: string, labels: string[] = []): MergeSet | null {
   const resolved = resolveProjectFromIssueSync(issueId, labels);
   if (!resolved) return null;
 
-  const repos = resolveProjectReposFromResolvedIssueSync(issueId, resolved);
+  const repos = resolveProjectReposFromResolvedIssue(issueId, resolved);
   if (!repos) return null;
 
   const now = new Date().toISOString();
@@ -82,18 +82,18 @@ export function buildMergeSetForIssueSync(issueId: string, labels: string[] = []
   };
 }
 
-export function ensureMergeSetForIssueSync(issueId: string, labels: string[] = []): MergeSet | null {
-  const existing = getMergeSetSync(issueId);
+export function ensureMergeSetForIssue(issueId: string, labels: string[] = []): MergeSet | null {
+  const existing = getMergeSet(issueId);
   if (existing) return existing;
 
-  const built = buildMergeSetForIssueSync(issueId, labels);
+  const built = buildMergeSetForIssue(issueId, labels);
   if (built) {
-    upsertMergeSetSync(built);
+    upsertMergeSet(built);
   }
   return built;
 }
 
-export function withRepoArtifactUrlSync(
+export function withRepoArtifactUrl(
   mergeSet: MergeSet,
   repoKey: string,
   artifactUrl: string,
@@ -110,7 +110,7 @@ export function withRepoArtifactUrlSync(
   };
 }
 
-export function withRepoStateSync(
+export function withRepoState(
   mergeSet: MergeSet,
   repoKey: string,
   patch: Partial<MergeSetRepoState>

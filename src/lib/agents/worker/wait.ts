@@ -22,7 +22,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { getDashboardApiUrlSync } from '../../config.js';
+import { getDashboardApiUrl } from '../../config.js';
 import { idleAgeMs as defaultIdleAgeMs, isAlive as defaultIsAlive, isConfirmedDead, type LivenessVerdict } from '../liveness.js';
 import { resolveJsonlPath } from '../transcript-resolver.js';
 import { workerDir } from './ids.js';
@@ -70,7 +70,7 @@ function defaultSleep(ms: number): Promise<void> {
 
 /** The last `role === 'assistant'` message of the agent transcript route (D18). */
 export async function fetchLastAssistantMessageFromDashboard(id: string): Promise<string | null> {
-  const url = `${getDashboardApiUrlSync()}/api/agents/${encodeURIComponent(id)}/conversation`;
+  const url = `${getDashboardApiUrl()}/api/agents/${encodeURIComponent(id)}/conversation`;
   const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error(`dashboard answered ${response.status}`);
   // ConversationResponse: `messages` are ChatMessage `{ role, text }` (packages/contracts rpc.ts).

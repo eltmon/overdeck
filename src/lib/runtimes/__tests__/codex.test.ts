@@ -5,10 +5,10 @@ import { join } from 'node:path'
 
 import { CodexRuntimeSync, writeThreadId, recordCodexRolloutSession, initCodexHome, toCodexSandboxValue } from '../codex.js'
 import { findRolloutPath, extractThreadIdFromRollout, findLatestRollout } from '../storage/codex.js'
-import { readSessionIndexSync } from '../../session-history.js'
+import { readSessionIndex } from '../../session-history.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
-import { createClaudeCodeRuntimeSync } from '../claude-code.js'
-import { createCodexRuntimeSync } from '../codex.js'
+import { createClaudeCodeRuntime } from '../claude-code.js'
+import { createCodexRuntime } from '../codex.js'
 
 function withFakeCodexHome(): { codexHome: string; agentsHome: string; sharedSkills: string; cleanup: () => void } {
   const base = mkdtempSync(join(tmpdir(), 'pan-codex-runtime-'))
@@ -92,7 +92,7 @@ describe('CodexRuntimeSync — session path resolution', () => {
 
     const rt = new CodexRuntimeSync()
     expect(rt.getSessionPath('agent-test-03')).toBe(rolloutPath)
-    expect(readSessionIndexSync('agent-test-03')).toEqual([
+    expect(readSessionIndex('agent-test-03')).toEqual([
       expect.objectContaining({ sessionId: threadId, source: 'capture', harness: 'codex', path: rolloutPath }),
     ])
   })
@@ -631,8 +631,8 @@ describe('CodexRuntimeSync.getTokenUsage + getSessionCost', () => {
 describe('getRuntimeForAgent — codex dispatch', () => {
   it('returns the Codex runtime for an agent whose state has harness=codex', () => {
     const registry = new RuntimeRegistry()
-    registry.register(createClaudeCodeRuntimeSync())
-    registry.register(createCodexRuntimeSync())
+    registry.register(createClaudeCodeRuntime())
+    registry.register(createCodexRuntime())
     setGlobalRegistry(registry)
 
     // The registry dispatches by harness from agent state. We verify the

@@ -27,8 +27,8 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { getAgentStateSync, messageAgent } from '../agents.js';
-import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
+import { getAgentState, messageAgent } from '../agents.js';
+import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
 import type { FailedCheck, PrFacts } from './pr-facts.js';
@@ -204,7 +204,7 @@ function workspaceFor(issueId: string): { projectPath?: string; workspacePath?: 
 }
 
 function isCiTestsProject(projectPath: string | undefined): boolean {
-  return Boolean(projectPath) && resolveVerificationTestsMode(findProjectByPathSync(projectPath!)) === 'ci';
+  return Boolean(projectPath) && resolveVerificationTestsMode(findProjectByPath(projectPath!)) === 'ci';
 }
 
 /**
@@ -623,7 +623,7 @@ async function relayCiFailureFeedbackInQueue(
   // feedback: it goes through the local gate's delivery door, which finds the
   // work agent (or slot) and resurrects it, so no role check applies.
   const agentId = agentIdForIssue(issueId);
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!testGateFailed && (!agentState || agentState.role !== 'work')) {
     return { agentMessageSent: false, ...testGateFlag };
   }

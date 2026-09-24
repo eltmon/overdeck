@@ -129,7 +129,7 @@ type DashboardStopOptions = {
   pidSurvivorProbe?: PidSurvivorProbe;
 };
 
-export function readPlatformConfigSync(): PlatformConfig {
+export function readPlatformConfig(): PlatformConfig {
   const defaults: PlatformConfig = {
     dashboardPort: 3010,
     dashboardApiPort: 3011,

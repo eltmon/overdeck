@@ -10,7 +10,7 @@
  */
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
+import { findProjectByPath, getProjectSwarmHotspots } from '../projects.js';
 import { analyzeSwarmReadiness } from '../xbrief/swarm-readiness.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { listAgentStates } from '../agents/queries.js';
@@ -95,7 +95,7 @@ export async function reconcileSlotState(
   const releasedSlotIndexes = new Set(Object.keys(swarm?.releasedBlockedSlots ?? {}).map(Number));
   const branchesBySlot = new Map(branches.map(branch => [branch.slotIndex, branch]));
   const agentsBySlot = new Map(agents.map(agent => [agent.slotIndex, agent]));
-  const hotspots = getProjectSwarmHotspots(findProjectByPathSync(workspace));
+  const hotspots = getProjectSwarmHotspots(findProjectByPath(workspace));
   const slotEligibleItemIds = new Set(analyzeSwarmReadiness(doc, { hotspots }).items
     .filter(item => item.slotEligible)
     .map(item => item.id));

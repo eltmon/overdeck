@@ -5,13 +5,13 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import {
-  replacePlaceholdersSync,
-  getDefaultWorkspaceConfigSync,
+  replacePlaceholders,
+  getDefaultWorkspaceConfig,
 } from '../workspace-config.js';
 import { addDnsEntry, syncDnsToWindows } from '../dns.js';
 import { addTunnelIngress } from '../tunnel.js';
 import { createHumeConfig } from '../hume.js';
-import { mergeSkillsIntoWorkspaceSync, mergePanSkillsIntoWorkspaceSync } from '../skills-merge.js';
+import { mergeSkillsIntoWorkspace, mergePanSkillsIntoWorkspace } from '../skills-merge.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import {
   PAN_CONTEXT_FILENAME,
@@ -20,16 +20,16 @@ import {
   PAN_FEEDBACK_DIRNAME,
   PAN_SESSIONS_FILENAME,
 } from '../pan-dir/index.js';
-import { copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync } from './migration.js';
+import { copyOverdeckSettingsToWorkspace, ensurePanGitignore } from './migration.js';
 import {
   assignPort,
   copyProjectTemplateDirs,
   createWorktree,
   installPreRebaseHook,
-  preTrustDirectorySync,
+  preTrustDirectory,
   relocateVenvScripts,
-  restorePreWorktreeMetadataSync,
-  stagePreWorktreeMetadataSync,
+  restorePreWorktreeMetadata,
+  stagePreWorktreeMetadata,
   validateFeatureName,
 } from './worktree-ops.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
@@ -37,10 +37,10 @@ import { getProjectByPath, getWorkspaceForIssue } from '../workspaces/resolver.j
 import { createWorkspace as createWorkspaceRow, deleteWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
 import { listProjectsSync } from '../projects.js';
 import {
-  createWorkspacePlaceholdersSync as createPlaceholders,
-  sanitizeComposeFileSync,
-  renderDevcontainerSync,
-  processTemplatesSync,
+  createWorkspacePlaceholders as createPlaceholders,
+  sanitizeComposeFile,
+  renderDevcontainer,
+  processTemplates,
 } from '../workspace/devcontainer-renderer.js';
 
 export { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
@@ -60,7 +60,7 @@ interface PolyrepoWorkspaceRepoRef {
  * Returns the entries that were added (the `removed` half is kept in the return
  * shape for callers that still report it; nothing is removed any more).
  */
-export function ensurePolyrepoWorkspaceGitignoreSync(
+export function ensurePolyrepoWorkspaceGitignore(
   workspacePath: string,
   repos: readonly PolyrepoWorkspaceRepoRef[],
 ): { added: string[]; removed: string[] } {
@@ -183,7 +183,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     return result;
   }
 
-  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfigSync();
+  const workspaceConfig = projectConfig.workspace || getDefaultWorkspaceConfig();
   const workspacesDir = join(projectConfig.path, workspaceConfig.workspaces_dir || 'workspaces');
   const featureFolder = `feature-${featureName}`;
   const workspacePath = join(workspacesDir, featureFolder);
@@ -251,7 +251,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // then merge it back into the real worktree after creation.
   let stagedMetadataPath: string | null = null;
   if (existsSync(workspacePath)) {
-    stagedMetadataPath = stagePreWorktreeMetadataSync(workspacePath);
+    stagedMetadataPath = stagePreWorktreeMetadata(workspacePath);
     if (stagedMetadataPath) {
       result.steps.push('Staged pre-worktree .pan metadata');
     } else {
@@ -331,7 +331,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   }
 
   if (!result.success) {
-    restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
+    restorePreWorktreeMetadata(stagedMetadataPath, workspacePath);
     progress('Creating git worktree', 'Worktree creation failed', 'error');
     return result;
   }
@@ -339,7 +339,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // The worktree (or every polyrepo sub-repo worktree/symlink) now exists on
   // disk — any failure from here on must not delete the workspace row.
   worktreeCreated = true;
-  restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
+  restorePreWorktreeMetadata(stagedMetadataPath, workspacePath);
 
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     // PAN-2386: polyrepo scaffold workspaces are separate git repos that check out
@@ -347,7 +347,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     // sub-repo directories show as untracked and block agent auto-start. Write a
     // scaffold .gitignore before any git status checks.
     try {
-      const { added, removed } = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, workspaceConfig.repos);
+      const { added, removed } = ensurePolyrepoWorkspaceGitignore(workspacePath, workspaceConfig.repos);
       if (added.length > 0 || removed.length > 0) {
         result.steps.push(`Updated .gitignore for polyrepo workspace (${added.length} added, ${removed.length} removed)`);
         // The .gitignore itself must be committed or it becomes the untracked file
@@ -397,7 +397,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Ensure runtime-only Overdeck and Claude Code sync paths are in the project's .gitignore
   try {
-    ensurePanGitignoreSync(projectConfig.path);
+    ensurePanGitignore(projectConfig.path);
     result.steps.push('Verified runtime-only Overdeck and Claude Code sync paths are in .gitignore');
   } catch (gitignoreErr: any) {
     // Non-fatal — log but don't block workspace creation
@@ -411,7 +411,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     const composeFiles = readdirSync(devcontainerDir)
       .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
     for (const composeFile of composeFiles) {
-      sanitizeComposeFileSync(join(devcontainerDir, composeFile));
+      sanitizeComposeFile(join(devcontainerDir, composeFile));
     }
     if (composeFiles.length > 0) {
       result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
@@ -547,8 +547,8 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       }
 
       // Start TLDR daemon for this workspace
-      const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
-      const tldrService = getTldrDaemonServiceSync(workspacePath, venvPath);
+      const { getTldrDaemonService } = await import('../tldr-daemon.js');
+      const tldrService = getTldrDaemonService(workspacePath, venvPath);
       await tldrService.start(true);
       result.steps.push('Started TLDR daemon');
 
@@ -575,7 +575,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   if (workspaceConfig.dns) {
     const dnsMethod = workspaceConfig.dns.sync_method || 'wsl2hosts';
     for (const entryPattern of workspaceConfig.dns.entries) {
-      const hostname = replacePlaceholdersSync(entryPattern, placeholders);
+      const hostname = replacePlaceholders(entryPattern, placeholders);
 
       if (addDnsEntry(dnsMethod, hostname)) {
         result.steps.push(`Added DNS entry: ${hostname} (${dnsMethod})`);
@@ -608,14 +608,14 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Install base Overdeck skills/agents/rules from cache
   progress('Installing skills & templates', 'Overdeck skills, agents, rules');
-  const mergeResult = mergeSkillsIntoWorkspaceSync(workspacePath);
+  const mergeResult = mergeSkillsIntoWorkspace(workspacePath);
   const mergeTotal = mergeResult.added.length + mergeResult.updated.length;
   if (mergeTotal > 0) {
     result.steps.push(`Installed ${mergeTotal} Overdeck files (${mergeResult.added.length} new, ${mergeResult.updated.length} updated)`);
   }
 
   // Overlay project-local skills from .pan/skills/ (higher precedence than global cache)
-  const panMergeResult = mergePanSkillsIntoWorkspaceSync(projectConfig.path, workspacePath);
+  const panMergeResult = mergePanSkillsIntoWorkspace(projectConfig.path, workspacePath);
   if (panMergeResult.added.length > 0) {
     result.steps.push(`Installed ${panMergeResult.added.length} project-local skill file(s) from .pan/skills/ (${panMergeResult.overlayed.join(', ')})`);
   }
@@ -632,7 +632,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
         .map((source) => ({ source, target: source.slice(0, -'.template'.length) }))
       : configuredTemplates;
     const safeTemplates = discoveredTemplates.filter(({ target }) => !isHarnessNativeTarget(target));
-    const templateSteps = processTemplatesSync(
+    const templateSteps = processTemplates(
       templateDir,
       workspacePath,
       placeholders,
@@ -651,7 +651,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Generate .env file
   if (workspaceConfig.env?.template) {
-    const envContent = replacePlaceholdersSync(workspaceConfig.env.template, placeholders);
+    const envContent = replacePlaceholders(workspaceConfig.env.template, placeholders);
     writeFileSync(join(workspacePath, '.env'), envContent);
     result.steps.push('Created .env file');
   }
@@ -663,7 +663,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // re-render command. See `./workspace/devcontainer-renderer.ts`.
   if (workspaceConfig.docker?.compose_template) {
     try {
-      const renderResult = renderDevcontainerSync({
+      const renderResult = renderDevcontainer({
         workspacePath,
         projectConfig,
         featureName,
@@ -764,7 +764,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt
   try {
-    preTrustDirectorySync(workspacePath);
+    preTrustDirectory(workspacePath);
     result.steps.push('Pre-trusted workspace in Claude Code');
   } catch {
     // Non-fatal — agent can still work, user will just see trust prompt
@@ -790,7 +790,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // Copy Overdeck global settings into workspace so agents testing Overdeck
   // itself have the same projects, model assignments, and hooks.
   try {
-    const settingsResult = copyOverdeckSettingsToWorkspaceSync(workspacePath);
+    const settingsResult = copyOverdeckSettingsToWorkspace(workspacePath);
     if (settingsResult.copied.length > 0) {
       result.steps.push(`Copied Overdeck settings into workspace (${settingsResult.copied.length} file(s))`);
     }

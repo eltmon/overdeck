@@ -37,7 +37,7 @@ import { validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
-import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
+import { MODEL_CAPABILITIES, hasModelCapability, MODEL_DEPRECATIONS, resolveModelId, getModelEffortLevels } from './model-capabilities.js';
 import { resolveTelemetryEnabled, telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { getOrCreateInstallId } from './telemetry/install-id.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
@@ -292,7 +292,7 @@ export interface ApiSettingsConfig {
 export function getDefaultConversationModelApi(): ModelId | undefined {
   const { config } = loadConfigSync();
 
-  if (config.defaultConversationModel) return resolveModelIdSync(config.defaultConversationModel);
+  if (config.defaultConversationModel) return resolveModelId(config.defaultConversationModel);
   // Unset is legal (fresh install) — Settings must still render so the operator can set it (PAN-2589).
   return undefined;
 }
@@ -511,8 +511,8 @@ function validateModelRef(
     return;
   }
 
-  const resolved = resolveModelIdSync(ref);
-  if (!/^opencode(?:-go)?\/[^\s/]+$/.test(resolved) && !hasModelCapabilitySync(resolved)) {
+  const resolved = resolveModelId(ref);
+  if (!/^opencode(?:-go)?\/[^\s/]+$/.test(resolved) && !hasModelCapability(resolved)) {
     errors.push(`Invalid model reference "${ref}" at ${fieldPath}`);
   }
 }
@@ -551,9 +551,9 @@ function resolveModelRefToId(ref: unknown, workhorses: WorkhorsesConfig): ModelI
   if (isWorkhorseRef(ref)) {
     const resolved = workhorses[workhorseSlotFromRef(ref) as WorkhorseSlot];
     if (!resolved || isWorkhorseRef(resolved)) return undefined;
-    return resolveModelIdSync(resolved);
+    return resolveModelId(resolved);
   }
-  return resolveModelIdSync(ref);
+  return resolveModelId(ref);
 }
 
 function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[], warnings: string[]): void {
@@ -601,7 +601,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
             for (const entry of modelRef as WeightedModelRef[]) {
               const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
               if (resolvedModel) {
-                const supported = getModelEffortLevelsSync(resolvedModel);
+                const supported = getModelEffortLevels(resolvedModel);
                 if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                   errors.push(
                     `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
@@ -612,7 +612,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
           } else {
             const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
             if (resolvedModel) {
-              const supported = getModelEffortLevelsSync(resolvedModel);
+              const supported = getModelEffortLevels(resolvedModel);
               if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                 errors.push(
                   `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,

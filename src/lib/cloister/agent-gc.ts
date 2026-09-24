@@ -4,7 +4,7 @@ import { Effect } from 'effect';
 
 import { listAgentStatesSync } from '../agents/agent-state.js';
 import { getOverdeckHome } from '../paths.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import {
   hasRetainedTranscriptsMarker,
   listAgentStateFilesForRemoval,
@@ -15,7 +15,7 @@ import {
 import { readLiveTrackerIssueState, type LiveTrackerIssueState } from './issue-closed.js';
 import { sessionExists } from '../tmux.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { resolveProjectReposForIssueSync } from '../project-repos.js';
+import { resolveProjectReposForIssue } from '../project-repos.js';
 import { listOpenPullRequestsSnapshot } from '../pipeline-membership-gather.js';
 import { listOpenGitLabMergeRequests } from '../gitlab-merge-requests.js';
 
@@ -91,7 +91,7 @@ async function hasOpenChangeRequest(agent: AgentGcRow): Promise<boolean> {
   if (!resolved) throw new Error(`No configured project resolves ${agent.issueId}`);
   const project = getProjectSync(resolved.projectKey);
   if (!project) throw new Error(`Project ${resolved.projectKey} is not configured`);
-  const repos = resolveProjectReposForIssueSync(agent.issueId);
+  const repos = resolveProjectReposForIssue(agent.issueId);
   if (!repos?.length) throw new Error(`No configured repositories resolve ${agent.issueId}`);
 
   const githubRepos = repos.filter((repo) => repo.forge === 'github');
@@ -188,7 +188,7 @@ function emitAgentGcPruneEvent(
   agent: AgentGcRow,
   entry: AgentGcPruneEntry,
 ): void {
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'cloister',
     level: 'info',
     status: 'completed',

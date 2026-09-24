@@ -21,7 +21,7 @@ function isInside(parent: string, candidate: string): boolean {
   );
 }
 
-export function readActiveDashboardBundleSync(): ActiveDashboardBundle | null {
+export function readActiveDashboardBundle(): ActiveDashboardBundle | null {
   try {
     const parsed = JSON.parse(readFileSync(activeDashboardBundleFile(), 'utf8')) as Partial<ActiveDashboardBundle>;
     if (

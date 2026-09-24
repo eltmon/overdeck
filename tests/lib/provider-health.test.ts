@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildAnthropicMessagesUrl, invalidateProbeCacheSync, probeProvider } from '../../src/lib/provider-health.js';
+import { buildAnthropicMessagesUrl, invalidateProbeCache, probeProvider } from '../../src/lib/provider-health.js';
 import { PROVIDERS } from '../../src/lib/providers.js';
 
 describe('provider health endpoint construction', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    invalidateProbeCacheSync();
+    invalidateProbeCache();
   });
 
   it('appends /v1/messages for provider roots that are not versioned', () => {

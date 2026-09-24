@@ -28,7 +28,7 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
-import { parseIssueIdSync } from '../../../../lib/issue-id.js';
+import { parseIssueId } from '../../../../lib/issue-id.js';
 import { findWorkspacePath } from '../../../../lib/lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -100,7 +100,7 @@ const postWorkspaceReviewPurgeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
 
@@ -137,7 +137,7 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     if (!issueId) {
@@ -179,7 +179,7 @@ const deleteWorkspacePendingRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     clearPendingOperation(issueId);

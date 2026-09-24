@@ -3,7 +3,7 @@ import type { OrderBook } from '@overdeck/contracts';
 import type { SequenceNode } from '../backlog/types.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { LEGACY_PARKED_LABELS, PARKED_LABEL } from '../backlog/pickup.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPath } from '../projects.js';
 import { backlogSequencePath, listOrderBookIds, readOrderBook, readOrderBookAsync, readOrderBookIndex } from './io.js';
 import type { OrderBookProgress, OrderIssueLookup, OrderIssueState } from './types.js';
 
@@ -16,7 +16,7 @@ const COMPLETE_STATUS = 'complete';
  */
 function issuePrefixForStateRoot(panDir: string): string | null {
   try {
-    const byPath = findProjectByPathSync(panDir);
+    const byPath = findProjectByPath(panDir);
     return byPath?.issue_prefix ? byPath.issue_prefix.toUpperCase() : null;
   } catch {
     return null;

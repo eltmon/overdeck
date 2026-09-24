@@ -12,7 +12,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
   CACHE_RULES_DIR: cacheDirs.rules,
 }));
 
-let mergeSkillsIntoWorkspaceSync: typeof import('../../../src/lib/skills-merge.js').mergeSkillsIntoWorkspaceSync;
+let mergeSkillsIntoWorkspaceSync: typeof import('../../../src/lib/skills-merge.js').mergeSkillsIntoWorkspacemergeSkillsIntoWorkspaceSyncmergeSkillsIntoWorkspace;
 
 function hash(content: string): string {
   return `sha256:${createHash('sha256').update(content).digest('hex')}`;
@@ -33,7 +33,7 @@ describe('skills-merge', () => {
     cacheDirs.agents = join(cacheBase, 'agent-definitions');
     cacheDirs.rules = join(cacheBase, 'rules');
     const module = await import('../../../src/lib/skills-merge.js');
-    mergeSkillsIntoWorkspaceSync = module.mergeSkillsIntoWorkspaceSync;
+    mergeSkillsIntoWorkspaceSync = module.mergeSkillsIntoWorkspace;
   });
 
   beforeEach(() => {

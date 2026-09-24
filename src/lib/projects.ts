@@ -71,7 +71,7 @@ import {
   updateProjectsConfigTextSync,
   withProjectsConfigWriteSync,
 } from './projects-config-write.js';
-import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
+import { extractPrefix, parseIssueId } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
 import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 
@@ -581,7 +581,7 @@ async function updateProjectsConfigAsync<T>(
 /**
  * Save projects configuration
  */
-export function saveProjectsConfigSync(config: ProjectsConfig): void {
+export function saveProjectsConfig(config: ProjectsConfig): void {
   const yaml = stringifyYaml(config, { indent: 2 });
   withProjectsConfigWriteSync(PROJECTS_CONFIG_FILE, () => {
     atomicWriteProjectsConfigSync(PROJECTS_CONFIG_FILE, yaml);
@@ -630,7 +630,7 @@ export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string 
 /**
  * Add or update a project in the registry
  */
-export function registerProjectSync(key: string, projectConfig: ProjectConfig): void {
+export function registerProject(key: string, projectConfig: ProjectConfig): void {
   updateProjectsConfigSync(config => {
     config.projects[key] = projectConfig;
     return { config, result: undefined, changed: true };
@@ -753,7 +753,7 @@ export async function setProjectMergeTrain(key: string, value: 'enabled' | 'disa
 /**
  * Remove a project from the registry
  */
-export function unregisterProjectSync(key: string): boolean {
+export function unregisterProject(key: string): boolean {
   return updateProjectsConfigSync(config => {
     if (!config.projects[key]) return { config, result: false, changed: false };
     delete config.projects[key];
@@ -767,13 +767,13 @@ export function unregisterProjectSync(key: string): boolean {
  * @deprecated Use extractPrefix from issue-id.ts for unified parsing
  */
 export function extractTeamPrefix(issueId: string): string | null {
-  return extractPrefixSync(issueId);
+  return extractPrefix(issueId);
 }
 
 /**
  * Find project by Linear team prefix
  */
-export function findProjectByTeamSync(teamPrefix: string): ProjectConfig | null {
+export function findProjectByTeam(teamPrefix: string): ProjectConfig | null {
   if (!teamPrefix) return null;
   const config = loadProjectsConfigSync();
 
@@ -791,7 +791,7 @@ export function findProjectByTeamSync(teamPrefix: string): ProjectConfig | null 
  * Matches any project whose root path is an ancestor of the given path.
  * Used to resolve the tracker (GitHub/GitLab) from a workspace directory.
  */
-export function findProjectByPathSync(workspacePath: string): ProjectConfig | null {
+export function findProjectByPath(workspacePath: string): ProjectConfig | null {
   const config = loadProjectsConfigSync();
   const normalizedTarget = resolve(workspacePath);
 
@@ -888,7 +888,7 @@ export function resolveProjectFromIssueSync(
   issueId: string,
   labels: string[] = []
 ): ResolvedProject | null {
-  const parsed = parseIssueIdSync(issueId);
+  const parsed = parseIssueId(issueId);
   if (!parsed) {
     return null;
   }
@@ -948,7 +948,7 @@ export function getProjectSync(key: string): ProjectConfig | null {
 /**
  * Check if projects.yaml exists and has any projects
  */
-export function hasProjectsSync(): boolean {
+export function hasProjects(): boolean {
   const config = loadProjectsConfigSync();
   return Object.keys(config.projects).length > 0;
 }
@@ -956,7 +956,7 @@ export function hasProjectsSync(): boolean {
 /**
  * Initialize projects.yaml with example configuration
  */
-export function initializeProjectsConfigSync(): void {
+export function initializeProjectsConfig(): void {
   if (existsSync(PROJECTS_CONFIG_FILE)) {
     console.log(`Projects config already exists at ${PROJECTS_CONFIG_FILE}`);
     return;
@@ -1169,7 +1169,7 @@ export const resolveProjectFromIssue = (
 ): Effect.Effect<ResolvedProject | null, ConfigParseError | FsError> =>
   loadProjectsConfig().pipe(
     Effect.map((config) => {
-      const parsed = parseIssueIdSync(issueId);
+      const parsed = parseIssueId(issueId);
       if (!parsed) return null;
       for (const [key, projectConfig] of Object.entries(config.projects)) {
         const singlePrefix = getIssuePrefix(projectConfig);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getPricingSync, calculateCostSync, type TokenUsage } from '../../cost.js';
+import { getPricing, calculateCost, type TokenUsage } from '../../cost.js';
 import { extractPiCostEvents } from '../reconciler.js';
 
 // PAN-1935: pi/kimi work agents recorded $0 cost because (a) the reconciler
@@ -11,14 +11,14 @@ import { extractPiCostEvents } from '../reconciler.js';
 describe('PAN-1935: pi-harness cost capture', () => {
   describe('pricing table covers pi-routed models', () => {
     it('returns pricing for glm-5.2 (zai)', () => {
-      const pricing = getPricingSync('custom', 'glm-5.2');
+      const pricing = getPricing('custom', 'glm-5.2');
       expect(pricing).not.toBeNull();
       expect(pricing!.inputPer1k).toBe(0.0014); // $1.4/M
       expect(pricing!.outputPer1k).toBe(0.0044); // $4.4/M
     });
 
     it('returns pricing for kimi-k2.7-code', () => {
-      const pricing = getPricingSync('custom', 'kimi-k2.7-code');
+      const pricing = getPricing('custom', 'kimi-k2.7-code');
       expect(pricing).not.toBeNull();
       expect(pricing!.inputPer1k).toBe(0.00095); // $0.95/M cache-miss
       expect(pricing!.outputPer1k).toBe(0.004); // $4.00/M
@@ -26,7 +26,7 @@ describe('PAN-1935: pi-harness cost capture', () => {
 
     it('returns pricing for K3 model ids', () => {
       for (const model of ['k3', 'k3[1m]']) {
-        const pricing = getPricingSync('custom', model);
+        const pricing = getPricing('custom', model);
         expect(pricing).not.toBeNull();
         expect(pricing!.inputPer1k).toBe(0.003); // $3.00/M cache-miss
         expect(pricing!.outputPer1k).toBe(0.015); // $15.00/M
@@ -35,8 +35,8 @@ describe('PAN-1935: pi-harness cost capture', () => {
     });
 
     it('returns pricing for glm-5.1 and glm-4.7', () => {
-      expect(getPricingSync('custom', 'glm-5.1')).not.toBeNull();
-      expect(getPricingSync('custom', 'glm-4.7')).not.toBeNull();
+      expect(getPricing('custom', 'glm-5.1')).not.toBeNull();
+      expect(getPricing('custom', 'glm-4.7')).not.toBeNull();
     });
   });
 
@@ -90,8 +90,8 @@ describe('PAN-1935: pi-harness cost capture', () => {
 
     it('computes cost correctly for glm-5.2 (matches calculateCostSync)', () => {
       const usage: TokenUsage = { inputTokens: 18404, outputTokens: 234, cacheReadTokens: 9472, cacheWriteTokens: 0, cacheTTL: '5m' };
-      const pricing = getPricingSync('custom', 'glm-5.2')!;
-      const expected = calculateCostSync(usage, pricing);
+      const pricing = getPricing('custom', 'glm-5.2')!;
+      const expected = calculateCost(usage, pricing);
       expect(expected).toBeGreaterThan(0);
 
       const content = piMessage('glm-5.2', 'zai', { input: 18404, output: 234, cacheRead: 9472, cacheWrite: 0, totalTokens: 28110 }, 'resp-2', 'abc1');

@@ -45,10 +45,10 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
     // by default, so this stateful endpoint must be unreachable without the
     // server-issued token. Same token is read by CLI senders via getInternalTokenSync().
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const { INTERNAL_TOKEN_HEADER, getInternalTokenSync } = yield* Effect.promise(() =>
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
       import('../../../../lib/internal-token.js'),
     );
-    const expected = getInternalTokenSync();
+    const expected = getInternalToken();
     if (!expected) {
       return jsonResponse({ ok: false, error: 'internal token not configured' }, 503);
     }
@@ -63,7 +63,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
     const event = body as Record<string, unknown>;
     const type = event.type as string | undefined;
 
-    const { notifyPipelineSync } = yield* Effect.promise(() =>
+    const { notifyPipeline } = yield* Effect.promise(() =>
       import('../../../../lib/pipeline-notifier.js'),
     );
 
@@ -81,7 +81,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !entry || typeof entry.type !== 'string' || typeof entry.at !== 'string') {
           return jsonResponse({ ok: false, error: 'pipeline.entry requires issueId and a stamped entry' }, 400);
         }
-        notifyPipelineSync({ type: 'pipeline.entry', issueId, entry: entry as never });
+        notifyPipeline({ type: 'pipeline.entry', issueId, entry: entry as never });
         return jsonResponse({ ok: true });
       }
       case 'review.approved':
@@ -95,7 +95,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         // "notifyPipeline is not defined" and silently dropped EVERY forwarded review.approved /
         // test.passed event — breaking the reactive review→test and test→ship handoffs for any
         // CLI-originated verdict. The in-process dashboard handler routes these to reactive Cloister.
-        notifyPipelineSync({ type, issueId });
+        notifyPipeline({ type, issueId });
         return jsonResponse({ ok: true });
       }
       case 'task_queued': {
@@ -104,7 +104,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !specialist) {
           return jsonResponse({ ok: false, error: 'task_queued requires issueId and specialist' }, 400);
         }
-        notifyPipelineSync({ type: 'task_queued', specialist, issueId });
+        notifyPipeline({ type: 'task_queued', specialist, issueId });
         return jsonResponse({ ok: true });
       }
       case 'reviewer_started': {
@@ -114,7 +114,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !role || !sessionName) {
           return jsonResponse({ ok: false, error: 'reviewer_started requires issueId, role, sessionName' }, 400);
         }
-        notifyPipelineSync({ type: 'reviewer_started', issueId, role, sessionName });
+        notifyPipeline({ type: 'reviewer_started', issueId, role, sessionName });
         return jsonResponse({ ok: true });
       }
       case 'reviewer_completed': {
@@ -123,7 +123,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !role) {
           return jsonResponse({ ok: false, error: 'reviewer_completed requires issueId, role' }, 400);
         }
-        notifyPipelineSync({ type: 'reviewer_completed', issueId, role });
+        notifyPipeline({ type: 'reviewer_completed', issueId, role });
         return jsonResponse({ ok: true });
       }
       case 'reviewer_timed_out': {
@@ -136,7 +136,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !role || !sessionName || attempt === undefined || maxRetries === undefined || willRetry === undefined) {
           return jsonResponse({ ok: false, error: 'reviewer_timed_out requires issueId, role, sessionName, attempt, maxRetries, willRetry' }, 400);
         }
-        notifyPipelineSync({ type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry });
+        notifyPipeline({ type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry });
         return jsonResponse({ ok: true });
       }
       case 'coordinator_started': {
@@ -145,7 +145,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !sessionName) {
           return jsonResponse({ ok: false, error: 'coordinator_started requires issueId, sessionName' }, 400);
         }
-        notifyPipelineSync({ type: 'coordinator_started', issueId, sessionName });
+        notifyPipeline({ type: 'coordinator_started', issueId, sessionName });
         return jsonResponse({ ok: true });
       }
       case 'coordinator_died': {
@@ -155,7 +155,7 @@ export const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId || !sessionName || !reason) {
           return jsonResponse({ ok: false, error: 'coordinator_died requires issueId, sessionName, reason' }, 400);
         }
-        notifyPipelineSync({ type: 'coordinator_died', issueId, sessionName, reason });
+        notifyPipeline({ type: 'coordinator_died', issueId, sessionName, reason });
         return jsonResponse({ ok: true });
       }
       default:

@@ -9,8 +9,8 @@
 
 import { MemoryPressureBand, MemoryVerdict, assessMemoryPressure, readGovernorPsiCalmConfig, readGovernorReserves, readGovernorWatchReserveBytes } from './memory-governor.js';
 import { RuntimeCensus, getRuntimeCensus } from '../runtime-census.js';
-import { emitActivityEntrySync, EmitActivityOptions } from '../activity-logger.js';
-import { logDeaconEventSync } from '../persistent-logger.js';
+import { emitActivityEntry, EmitActivityOptions } from '../activity-logger.js';
+import { logDeaconEvent } from '../persistent-logger.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
@@ -171,7 +171,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     readPsiCalmConfig: deps.readPsiCalmConfig || (() => readGovernorPsiCalmConfig()),
     census: deps.census || (() => getRuntimeCensus()),
     readNewKernelJournal: deps.readNewKernelJournal || readNewKernelJournal,
-    emit: deps.emit || emitActivityEntrySync,
+    emit: deps.emit || emitActivityEntry,
   };
 
   const verdict = await d.assess();
@@ -215,7 +215,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
 
       const action = `memory-pressure-patrol: oom-kills (${overdeckKills.length} in Overdeck tree)`;
       actions.push(action);
-      logDeaconEventSync(`[deacon] ${action}`);
+      logDeaconEvent(`[deacon] ${action}`);
     }
 
     // Emit host kills as warn (less urgent)
@@ -241,7 +241,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
 
       const action = `memory-pressure-patrol: oom-kills (${hostKills.length} outside Overdeck)`;
       actions.push(action);
-      logDeaconEventSync(`[deacon] ${action}`);
+      logDeaconEvent(`[deacon] ${action}`);
     }
   }
 
@@ -297,7 +297,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
 
     const action = `memory-pressure-patrol: watch-level (${formatGib(verdict.availableBytes)} available)`;
     actions.push(action);
-    logDeaconEventSync(`[deacon] ${action}`);
+    logDeaconEvent(`[deacon] ${action}`);
   } else if (level === 'holding') {
     const message =
       `${formatTrigger(verdict)} ${formatGib(verdict.availableBytes)} is available now. ` +
@@ -315,7 +315,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
 
     const action = `memory-pressure-patrol: admission-hold (${formatGib(verdict.availableBytes)} available)`;
     actions.push(action);
-    logDeaconEventSync(`[deacon] ${action}`);
+    logDeaconEvent(`[deacon] ${action}`);
   } else if (level === 'shedding') {
     const message =
       `${formatTrigger(verdict)} ${formatGib(verdict.availableBytes)} is available now. ` +
@@ -333,7 +333,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
 
     const action = `memory-pressure-patrol: shedding-level (${formatGib(verdict.availableBytes)} available)`;
     actions.push(action);
-    logDeaconEventSync(`[deacon] ${action}`);
+    logDeaconEvent(`[deacon] ${action}`);
   } else if (level === 'ok') {
     const message =
       `Memory pressure cleared — ${formatGib(verdict.availableBytes)} available, at or above the ${formatGib(watchBytes)} watch reserve. ` +
@@ -350,7 +350,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
 
     const action = `memory-pressure-patrol: recovered (${formatGib(verdict.availableBytes)} available)`;
     actions.push(action);
-    logDeaconEventSync(`[deacon] ${action}`);
+    logDeaconEvent(`[deacon] ${action}`);
   }
 
   return actions;

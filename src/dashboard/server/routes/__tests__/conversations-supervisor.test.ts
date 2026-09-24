@@ -188,8 +188,8 @@ function decodeJsonResponse(response: { body: unknown }): Record<string, unknown
 }
 
 async function resetConversationDb(): Promise<void> {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 describe('spawnConversationSession PTY supervisor wiring', () => {

@@ -58,13 +58,13 @@ describe('runForkPipeline fallback resilience', () => {
     process.env.OVERDECK_HOME = TEST_HOME;
     mkdirSync(TEST_HOME, { recursive: true });
 
-    const { closeOverdeckDatabaseSync } = await import('../../../../../src/lib/overdeck/infra.js');
-    closeOverdeckDatabaseSync();
+    const { closeOverdeckDatabase } = await import('../../../../../src/lib/overdeck/infra.js');
+    closeOverdeckDatabase();
   });
 
   afterEach(async () => {
-    const { closeOverdeckDatabaseSync } = await import('../../../../../src/lib/overdeck/infra.js');
-    closeOverdeckDatabaseSync();
+    const { closeOverdeckDatabase } = await import('../../../../../src/lib/overdeck/infra.js');
+    closeOverdeckDatabase();
     if (ORIGINAL_HOME !== undefined) {
       process.env.HOME = ORIGINAL_HOME;
     } else {
@@ -266,13 +266,13 @@ describe('runForkPipeline spawn-pending window (PAN-3860)', () => {
     process.env.OVERDECK_HOME = TEST_HOME;
     mkdirSync(TEST_HOME, { recursive: true });
 
-    const { closeOverdeckDatabaseSync } = await import('../../../../../src/lib/overdeck/infra.js');
-    closeOverdeckDatabaseSync();
+    const { closeOverdeckDatabase } = await import('../../../../../src/lib/overdeck/infra.js');
+    closeOverdeckDatabase();
   });
 
   afterEach(async () => {
-    const { closeOverdeckDatabaseSync } = await import('../../../../../src/lib/overdeck/infra.js');
-    closeOverdeckDatabaseSync();
+    const { closeOverdeckDatabase } = await import('../../../../../src/lib/overdeck/infra.js');
+    closeOverdeckDatabase();
     if (ORIGINAL_HOME !== undefined) {
       process.env.HOME = ORIGINAL_HOME;
     } else {

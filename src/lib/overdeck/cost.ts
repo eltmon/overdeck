@@ -8,10 +8,10 @@ import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { CostArchive, CostArchiveLive, Db, DbLive, EventBus, EventBusLive } from './infra.js';
 import { IssueId, type IssueId as IssueIdType } from './issues.js';
 import {
-  getAllBudgetsSync,
-  checkBudgetSync,
-  createBudgetSync,
-  deleteBudgetSync,
+  getAllBudgets,
+  checkBudget,
+  createBudget,
+  deleteBudget,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
 import { parseOhmypiSessionCostResultSync } from '../cost-parsers/ohmypi-parser.js';
@@ -479,11 +479,11 @@ export const CostResolverLive = Layer.effect(
       });
 
     const listBudgets = () =>
-      Effect.sync(() => getAllBudgetsSync().map(mapBudget));
+      Effect.sync(() => getAllBudgets().map(mapBudget));
 
     const checkBudget = (id: string) =>
       Effect.gen(function* () {
-        const result = yield* Effect.sync(() => checkBudgetSync(id));
+        const result = yield* Effect.sync(() => checkBudget(id));
         if (!result.budget) return yield* Effect.fail(new BudgetNotFound({ id }));
         return {
           budget:      mapBudget(result.budget),
@@ -818,14 +818,14 @@ export const CostWriterLive = Layer.effect(
     const createBudget = (spec: BudgetSpec) =>
       Effect.gen(function* () {
         const created = yield* Effect.sync(() =>
-          createBudgetSync({ ...spec, enabled: true }),
+          createBudget({ ...spec, enabled: true }),
         );
         return mapBudget(created);
       });
 
     const deleteBudget = (id: string) =>
       Effect.gen(function* () {
-        const deleted = yield* Effect.sync(() => deleteBudgetSync(id));
+        const deleted = yield* Effect.sync(() => deleteBudget(id));
         if (!deleted) return yield* Effect.fail(new BudgetNotFound({ id }));
       });
 

@@ -116,7 +116,7 @@ async function resolveCheckpointCommit(cwd: string, agentId: string, turnId: str
   }
 }
 
-async function captureCheckpointPromise(cwd: string, agentId: string, turnId: string): Promise<void> {
+async function captureCheckpointBody(cwd: string, agentId: string, turnId: string): Promise<void> {
   assertSafeAgentId(agentId)
   const tempDir = await mkdtemp(join(tmpdir(), 'pan-checkpoint-'))
   const tempIndex = join(tempDir, `index-${randomUUID()}`)
@@ -187,7 +187,7 @@ async function captureCheckpointPromise(cwd: string, agentId: string, turnId: st
   }
 }
 
-async function deleteCheckpointPromise(cwd: string, agentId: string, turnId: string): Promise<void> {
+async function deleteCheckpointBody(cwd: string, agentId: string, turnId: string): Promise<void> {
   assertSafeAgentId(agentId)
   try {
     await execFileAsync('git', ['update-ref', '-d', checkpointRef(agentId, turnId)], {
@@ -199,7 +199,7 @@ async function deleteCheckpointPromise(cwd: string, agentId: string, turnId: str
   }
 }
 
-async function diffCheckpointsPromise(cwd: string, agentId: string, fromTurnId: string, toTurnId: string, filePath?: string): Promise<string> {
+async function diffCheckpointsBody(cwd: string, agentId: string, fromTurnId: string, toTurnId: string, filePath?: string): Promise<string> {
   assertSafeAgentId(agentId)
   const fromCommit = await resolveCheckpointCommit(cwd, agentId, fromTurnId)
   const toCommit = await resolveCheckpointCommit(cwd, agentId, toTurnId)
@@ -216,7 +216,7 @@ async function diffCheckpointsPromise(cwd: string, agentId: string, fromTurnId: 
   return stdout
 }
 
-async function diffCheckpointFilesPromise(
+async function diffCheckpointFilesBody(
   cwd: string,
   agentId: string,
   fromTurnId: string,
@@ -268,7 +268,7 @@ async function diffCheckpointFilesPromise(
   return files.sort((a, b) => a.path.localeCompare(b.path))
 }
 
-async function getCheckpointTimestampPromise(cwd: string, agentId: string, turnId: string): Promise<string> {
+async function getCheckpointTimestampBody(cwd: string, agentId: string, turnId: string): Promise<string> {
   assertSafeAgentId(agentId)
   try {
     const commit = await resolveCheckpointCommit(cwd, agentId, turnId)
@@ -283,7 +283,7 @@ async function getCheckpointTimestampPromise(cwd: string, agentId: string, turnI
   }
 }
 
-async function listCheckpointsPromise(cwd: string, agentId: string): Promise<string[]> {
+async function listCheckpointsBody(cwd: string, agentId: string): Promise<string[]> {
   assertSafeAgentId(agentId)
   const { stdout } = await execFileAsync('git', [
     'for-each-ref', '--format=%(refname:strip=4)', `${CHECKPOINT_REF_PREFIX}/${agentId}/`,
@@ -485,7 +485,7 @@ export function captureCheckpoint(
     // Never spawn git again for a workspace already known not to be a git repo.
     if (isCheckpointTargetDisabled(cwd)) return
     yield* Effect.tryPromise({
-      try: () => captureCheckpointPromise(cwd, agentId, turnId),
+      try: () => captureCheckpointBody(cwd, agentId, turnId),
       catch: (cause) => {
         noteCheckpointCaptureFailure(cwd, cause)
         return new CheckpointError({ agentId, operation: 'capture', message: String(cause), cause })
@@ -502,7 +502,7 @@ function deleteCheckpoint(
 ): Effect.Effect<void, InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdProgram(agentId)
-    yield* Effect.promise(() => deleteCheckpointPromise(cwd, agentId, turnId))
+    yield* Effect.promise(() => deleteCheckpointBody(cwd, agentId, turnId))
   })
 }
 
@@ -517,7 +517,7 @@ export function diffCheckpoints(
   return Effect.gen(function* () {
     yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.tryPromise({
-      try: () => diffCheckpointsPromise(cwd, agentId, fromTurnId, toTurnId, filePath),
+      try: () => diffCheckpointsBody(cwd, agentId, fromTurnId, toTurnId, filePath),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'diff', message: String(cause), cause }),
     })
@@ -534,7 +534,7 @@ export function diffCheckpointFiles(
   return Effect.gen(function* () {
     yield* assertSafeAgentIdProgram(agentId)
     return yield* Effect.tryPromise({
-      try: () => diffCheckpointFilesPromise(cwd, agentId, fromTurnId, toTurnId),
+      try: () => diffCheckpointFilesBody(cwd, agentId, fromTurnId, toTurnId),
       catch: (cause) =>
         new CheckpointError({ agentId, operation: 'diff-files', message: String(cause), cause }),
     })
@@ -549,7 +549,7 @@ export function getCheckpointTimestamp(
 ): Effect.Effect<string, InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdProgram(agentId)
-    return yield* Effect.promise(() => getCheckpointTimestampPromise(cwd, agentId, turnId))
+    return yield* Effect.promise(() => getCheckpointTimestampBody(cwd, agentId, turnId))
   })
 }
 
@@ -560,6 +560,6 @@ export function listCheckpoints(
 ): Effect.Effect<string[], InvalidAgentIdError> {
   return Effect.gen(function* () {
     yield* assertSafeAgentIdProgram(agentId)
-    return yield* Effect.promise(() => listCheckpointsPromise(cwd, agentId))
+    return yield* Effect.promise(() => listCheckpointsBody(cwd, agentId))
   })
 }

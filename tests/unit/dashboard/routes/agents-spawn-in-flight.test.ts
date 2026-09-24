@@ -22,7 +22,7 @@ import {
   teardownOverdeckTestDb,
   type OverdeckTestDb,
 } from '../../../helpers/overdeck-test-db.js';
-import { getAgentStateSync } from '../../../../src/lib/agents/agent-state.js';
+import { getAgentState } from '../../../../src/lib/agents/agent-state.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../src/lib/work-agent-lifecycle.js';
 
 const AGENT = 'agent-pan-3849';
@@ -76,7 +76,7 @@ describe('no-placeholder invariant (AC2)', () => {
     expect(claimAgentStart(AGENT)).toBe(true);
     releaseAgentStart(AGENT);
 
-    expect(getAgentStateSync(AGENT)).toBeNull();
+    expect(getAgentState(AGENT)).toBeNull();
 
     // No 'resumable session' refusal: the lifecycle classifier offers a fresh start.
     const lifecycle = getWorkAgentLifecycleStateSync(AGENT);

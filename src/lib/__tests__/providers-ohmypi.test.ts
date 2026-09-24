@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getProviderForModelSync, PROVIDERS } from '../providers.js';
+import { getProviderForModel, PROVIDERS } from '../providers.js';
 
 // AC(PAN-1989) — new ohmypi-routed providers added to the registry
 
@@ -17,19 +17,19 @@ describe('providers-ohmypi: new omp-routable providers in registry', () => {
   });
 
   it('getProviderForModelSync resolves a groq model to the groq provider', () => {
-    const p = getProviderForModelSync('llama-3.3-70b-versatile');
+    const p = getProviderForModel('llama-3.3-70b-versatile');
     expect(p.name).toBe('groq');
     expect(p.defaultHarness).toBe('ohmypi');
   });
 
   it('getProviderForModelSync resolves a cerebras model to the cerebras provider', () => {
-    const p = getProviderForModelSync('llama3.3-70b');
+    const p = getProviderForModel('llama3.3-70b');
     expect(p.name).toBe('cerebras');
     expect(p.defaultHarness).toBe('ohmypi');
   });
 
   it('getProviderForModelSync resolves a mistral model to the mistral provider', () => {
-    const p = getProviderForModelSync('mistral-large-latest');
+    const p = getProviderForModel('mistral-large-latest');
     expect(p.name).toBe('mistral');
     expect(p.defaultHarness).toBe('ohmypi');
   });

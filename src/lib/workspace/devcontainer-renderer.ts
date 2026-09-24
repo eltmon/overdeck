@@ -33,7 +33,7 @@ import {
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
 import {
-  replacePlaceholdersSync,
+  replacePlaceholders,
   type ProjectConfig,
   type TemplatePlaceholders,
 } from '../workspace-config.js';
@@ -50,7 +50,7 @@ export const DEVCONTAINER_DIRNAME = '.devcontainer';
  * for a workspace. Keeping this in one place stops two renderers from
  * disagreeing on what `{{FEATURE_FOLDER}}` means.
  */
-export function createWorkspacePlaceholdersSync(
+export function createWorkspacePlaceholders(
   projectConfig: ProjectConfig,
   featureName: string,
   workspacePath: string,
@@ -86,7 +86,7 @@ export function createWorkspacePlaceholdersSync(
  * mounts like `.codex` (PAN-1619) and the shared caches (PAN-1764) to a path
  * the in-container `node` user never reads.
  */
-export function sanitizeComposeFileSync(filePath: string): void {
+export function sanitizeComposeFile(filePath: string): void {
   if (!existsSync(filePath)) return;
 
   let content = readFileSync(filePath, 'utf-8');
@@ -121,7 +121,7 @@ interface TemplateMapping {
  *
  * Files named `dev` or ending in `.sh` get +x mode so they're executable.
  */
-export function processTemplatesSync(
+export function processTemplates(
   templateDir: string,
   targetDir: string,
   placeholders: TemplatePlaceholders,
@@ -138,7 +138,7 @@ export function processTemplatesSync(
       const sourcePath = join(templateDir, source);
       const targetPath = join(targetDir, target);
       if (!existsSync(sourcePath)) continue;
-      const processed = replacePlaceholdersSync(readFileSync(sourcePath, 'utf-8'), placeholders);
+      const processed = replacePlaceholders(readFileSync(sourcePath, 'utf-8'), placeholders);
       mkdirSync(dirname(targetPath), { recursive: true });
       writeFileSync(targetPath, processed);
       steps.push(`Processed template: ${source} -> ${target}`);
@@ -151,7 +151,7 @@ export function processTemplatesSync(
     const sourcePath = join(templateDir, file);
     const baseName = file.replace('.template', '');
     const targetPath = join(targetDir, baseName);
-    const processed = replacePlaceholdersSync(readFileSync(sourcePath, 'utf-8'), placeholders);
+    const processed = replacePlaceholders(readFileSync(sourcePath, 'utf-8'), placeholders);
     writeFileSync(targetPath, processed);
     if (baseName === 'dev' || baseName.endsWith('.sh')) {
       chmodSync(targetPath, 0o755);
@@ -194,7 +194,7 @@ export interface DevcontainerRenderOptions {
  * Throws if the project doesn't define a compose template (then there is
  * nothing to render and the caller should handle that gracefully).
  */
-export function renderDevcontainerSync(
+export function renderDevcontainer(
   opts: DevcontainerRenderOptions,
 ): DevcontainerRenderResult {
   const result: DevcontainerRenderResult = {
@@ -226,7 +226,7 @@ export function renderDevcontainerSync(
     });
   }
 
-  const placeholders = createWorkspacePlaceholdersSync(
+  const placeholders = createWorkspacePlaceholders(
     opts.projectConfig,
     opts.featureName,
     opts.workspacePath,
@@ -235,7 +235,7 @@ export function renderDevcontainerSync(
 
   // 1. Render every *.template file.
   result.steps.push(
-    ...processTemplatesSync(templateDir, result.devcontainerDir, placeholders),
+    ...processTemplates(templateDir, result.devcontainerDir, placeholders),
   );
 
   // 2. Copy non-template files (Dockerfile, scripts, etc.).
@@ -251,7 +251,7 @@ export function renderDevcontainerSync(
   let sanitized = 0;
   for (const file of readdirSync(result.devcontainerDir)) {
     if (file.includes('compose') && (file.endsWith('.yml') || file.endsWith('.yaml'))) {
-      sanitizeComposeFileSync(join(result.devcontainerDir, file));
+      sanitizeComposeFile(join(result.devcontainerDir, file));
       sanitized++;
     }
   }

@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { clearAgentPaused, getAgentStateSync, resolveAgentTargetSync } from '../../lib/agents.js';
+import { clearAgentPaused, getAgentState, resolveAgentTarget } from '../../lib/agents.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 import { resumeAgent } from '../../lib/agents/resume.js';
@@ -9,7 +9,7 @@ import { resumeAgent } from '../../lib/agents/resume.js';
 export async function unpauseCommand(id: string): Promise<void> {
   // PAN-1760: resolve through normalizeAgentId so full agent IDs
   // (strike-pan-1723, inspect-…, agent-…-ship) are addressable, not just issue IDs.
-  const agentId = resolveAgentTargetSync(id);
+  const agentId = resolveAgentTarget(id);
   if (!agentId) {
     console.error(chalk.red(`Could not resolve agent target "${id}"`));
     console.error(chalk.dim(
@@ -17,7 +17,7 @@ export async function unpauseCommand(id: string): Promise<void> {
     ));
     return exitCli(1);
   }
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
 
   if (!state) {
     console.error(chalk.red(`Agent ${agentId} not found.`));

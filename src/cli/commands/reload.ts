@@ -15,7 +15,7 @@ import {
   type DashboardDeploymentActivation,
 } from '../../lib/deploy/build-from-origin.js';
 import {
-  readActiveDashboardBundleSync,
+  readActiveDashboardBundle,
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
@@ -25,7 +25,7 @@ import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-loc
 import {
   leavesDashboardRunning,
   parseHealthTimeoutMs,
-  readPlatformConfigSync,
+  readPlatformConfig,
   restartDashboard,
   StageError,
   type DashboardRestartResult,
@@ -207,11 +207,11 @@ async function runReload(
       }
     }
 
-    const config = readPlatformConfigSync();
+    const config = readPlatformConfig();
     let repoRoot = process.cwd();
     let deployment: DashboardDeployment | null = null;
     let activation: DashboardDeploymentActivation | null = null;
-    const previousBundle = readActiveDashboardBundleSync();
+    const previousBundle = readActiveDashboardBundle();
     if (!options.skipBuild) {
       try {
         repoRoot = await resolvePrimaryRepoRoot(process.cwd());

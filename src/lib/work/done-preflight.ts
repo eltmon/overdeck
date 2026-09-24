@@ -35,7 +35,7 @@ export function checkIncompletePlanItemsSync(workspacePath: string): string[] {
   return evaluateIncompletePlanItems(readWorkspacePlanSync(workspacePath));
 }
 
-export async function checkIncompletePlanItemsPromise(workspacePath: string, _issueId?: string): Promise<string[]> {
+export async function checkIncompletePlanItems(workspacePath: string, _issueId?: string): Promise<string[]> {
   return evaluateIncompletePlanItems(await Effect.runPromise(readWorkspacePlan(workspacePath)));
 }
 
@@ -60,7 +60,7 @@ export function filterUncommittedPorcelainLines(porcelain: string): string[] {
     .filter((line) => !isGeneratedHarnessStatus(line));
 }
 
-async function checkUncommittedChangesPromise(workspacePath: string): Promise<string[]> {
+async function checkUncommittedChanges(workspacePath: string): Promise<string[]> {
   if (existsSync(join(workspacePath, '.git'))) {
     try {
       // -uall: list untracked files individually instead of collapsing dirs, so
@@ -89,7 +89,7 @@ async function checkUncommittedChangesPromise(workspacePath: string): Promise<st
 export async function runPreflightChecks(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
   return [
     ...checkIncompletePlanItemsSync(workspacePath),
-    ...await checkUncommittedChangesPromise(workspacePath),
+    ...await checkUncommittedChanges(workspacePath),
     ...await Effect.runPromise(runTestRequirementCheck(workspacePath, issueId, testWaived)),
   ];
 }

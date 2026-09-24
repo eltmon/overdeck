@@ -23,11 +23,11 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { loadConfigSync } from '../../lib/config.js';
-import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, type ProjectConfig } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam, type ProjectConfig } from '../../lib/projects.js';
 import {
-  loadWorkspaceMetadataSync,
-  saveWorkspaceMetadataSync,
-  deleteWorkspaceMetadataSync,
+  loadWorkspaceMetadata,
+  saveWorkspaceMetadata,
+  deleteWorkspaceMetadata,
 } from '../../lib/remote/workspace-metadata.js';
 import {
   createFlyProviderFromConfig,
@@ -63,7 +63,7 @@ function detectWorkspaceLocation(issueId: string): 'local' | 'remote' | 'none' {
   const normalizedId = issueId.toLowerCase();
 
   // Check for remote workspace metadata
-  const remoteMetadata = loadWorkspaceMetadataSync(issueId);
+  const remoteMetadata = loadWorkspaceMetadata(issueId);
   if (remoteMetadata) {
     return 'remote';
   }
@@ -292,7 +292,7 @@ export async function migrateLocalToRemote(
     result.steps.push(`Found local workspace: ${localPath}`);
 
     // 2. Check if remote already exists
-    const existingRemote = loadWorkspaceMetadataSync(issueId);
+    const existingRemote = loadWorkspaceMetadata(issueId);
     if (existingRemote && !options.force) {
       spinner.fail('Remote workspace already exists');
       result.errors.push(`Remote workspace already exists for ${issueId}. Use --force to overwrite.`);
@@ -322,7 +322,7 @@ export async function migrateLocalToRemote(
     // is single-repo. The old polyrepo path was already broken on fly (SSH
     // URLs on keyless VMs, macOS-only creds) — refuse honestly instead.
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeam(teamPrefix) : null;
     const subRepos = readdirSync(localPath, { withFileTypes: true })
       .filter(d => d.isDirectory() && !d.name.startsWith('.') && existsSync(join(localPath, d.name, '.git')));
     if (subRepos.length > 0) {
@@ -382,7 +382,7 @@ export async function migrateLocalToRemote(
       } catch (error: any) {
         result.steps.push(`Warning: could not destroy old VM: ${error.message}`);
       }
-      deleteWorkspaceMetadataSync(issueId);
+      deleteWorkspaceMetadata(issueId);
     }
 
     // 8. Create the remote workspace via the shared module: VM, credential
@@ -470,7 +470,7 @@ export async function migrateRemoteToLocal(
 
   try {
     // 1. Load remote workspace metadata
-    const remoteMetadata = loadWorkspaceMetadataSync(issueId);
+    const remoteMetadata = loadWorkspaceMetadata(issueId);
     if (!remoteMetadata) {
       spinner.fail('Remote workspace not found');
       result.errors.push(`No remote workspace found for ${issueId}`);
@@ -509,7 +509,7 @@ export async function migrateRemoteToLocal(
     spinner.text = 'Creating local workspace...';
     const resolved = resolveProjectFromIssueSync(issueId, []);
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig: ProjectConfig | null = teamPrefix ? findProjectByTeam(teamPrefix) : null;
     if (!projectConfig) {
       spinner.fail('Cannot resolve project config');
       result.errors.push(`Cannot resolve project config for ${issueId}`);
@@ -554,7 +554,7 @@ export async function migrateRemoteToLocal(
       } catch (error: any) {
         result.errors.push(`Warning: Failed to delete VM: ${error.message}`);
       }
-      deleteWorkspaceMetadataSync(issueId);
+      deleteWorkspaceMetadata(issueId);
       result.steps.push('Deleted workspace metadata');
     } else {
       result.steps.push('Remote workspace kept (--keep flag)');

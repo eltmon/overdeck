@@ -1,13 +1,13 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { getAgentStateSync, messageAgent, resolveAgentTargetSync } from '../../lib/agents.js';
+import { getAgentState, messageAgent, resolveAgentTarget } from '../../lib/agents.js';
 import { issueOwesRework } from '../../lib/work-agent-lifecycle.js';
 import { loadRemoteAgentState, sendToRemoteAgent } from '../../lib/remote/index.js';
 
 export async function tellCommand(id: string, message: string): Promise<void> {
   // Resolve through the same target path as lifecycle commands so issue IDs can
   // address non-work agents such as strike-pan-* when that is the registered run.
-  const agentId = resolveAgentTargetSync(id);
+  const agentId = resolveAgentTarget(id);
   if (!agentId) {
     console.error(chalk.red(`Could not resolve agent target "${id}"`));
     console.error(chalk.dim(
@@ -33,7 +33,7 @@ export async function tellCommand(id: string, message: string): Promise<void> {
       return;
     }
 
-    const issueId = getAgentStateSync(agentId)?.issueId;
+    const issueId = getAgentState(agentId)?.issueId;
     const outcome = await messageAgent(agentId, message, 'pan-tell', {
       owesRework: await issueOwesRework(issueId),
     });

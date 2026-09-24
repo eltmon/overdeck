@@ -11,15 +11,15 @@ import { HttpServerResponse } from 'effect/unstable/http';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
-import { parseIssueIdSync } from '../issue-id.js';
+import { parseIssueId } from '../issue-id.js';
 import { operatorInterventionEvent } from '../operator-interventions.js';
-import { getAgentStateSync } from '../agents.js';
+import { getAgentState } from '../agents.js';
 import {
   getIssueForCleanup,
   isOrphanedIssue,
   runDestructiveIssueLifecycle,
 } from './issue-transitions.js';
-import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { resolveIssueProjectPath } from './issue-reads.js';
 import { getWorkspaceForIssue } from '../workspaces/resolver.js';
 import { archiveWorkspace } from '../workspaces/writer.js';
 
@@ -59,7 +59,7 @@ export async function removeCompletionMarker(markerPath: string): Promise<void> 
 }
 
 export async function cleanupWorkspaceForIssue(rawId: string, eventStore: EventStoreLike): Promise<HttpServerResponse.HttpServerResponse> {
-  const parsedIssueId = parseIssueIdSync(rawId);
+  const parsedIssueId = parseIssueId(rawId);
   if (!parsedIssueId) {
     return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
   }
@@ -71,7 +71,7 @@ export async function cleanupWorkspaceForIssue(rawId: string, eventStore: EventS
   const cleanupLog: string[] = [];
 
   const issueLower = id.toLowerCase();
-  const projectRoot = resolveIssueProjectPathSync(id) || null;
+  const projectRoot = resolveIssueProjectPath(id) || null;
 
   // Git worktree/workspace and agent dir cleanup (all async with meaningful branching on error)
   if (projectRoot) {
@@ -125,7 +125,7 @@ export async function deepWipeIssue(
   body: unknown,
   eventStore: EventStoreLike,
 ): Promise<HttpServerResponse.HttpServerResponse> {
-  if (!parseIssueIdSync(id)) {
+  if (!parseIssueId(id)) {
     return jsonResponse({ error: 'Invalid issue id: ' + id }, { status: 400 });
   }
 
@@ -135,7 +135,7 @@ export async function deepWipeIssue(
   // be projected through the transactional boundary after the wipe succeeds.
   const workAgentId = `agent-${id.toLowerCase()}`;
   const planningAgentId = `planning-${id.toLowerCase()}`;
-  const workAgentStateBeforeWipe = getAgentStateSync(workAgentId);
+  const workAgentStateBeforeWipe = getAgentState(workAgentId);
 
   const encoder = new TextEncoder();
   const nodeStream = new ReadableStream<Uint8Array>({
@@ -216,11 +216,11 @@ export async function deepWipeIssue(
 }
 
 export async function copySettingsToWorkspace(id: string): Promise<HttpServerResponse.HttpServerResponse> {
-  if (!parseIssueIdSync(id)) {
+  if (!parseIssueId(id)) {
     return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
   }
 
-  const projectPath = resolveIssueProjectPathSync(id);
+  const projectPath = resolveIssueProjectPath(id);
 
   const workspacePath = projectPath
     ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
@@ -230,9 +230,9 @@ export async function copySettingsToWorkspace(id: string): Promise<HttpServerRes
     return jsonResponse({ success: false, error: 'Workspace not found' }, { status: 404 });
   }
 
-  const { copyOverdeckSettingsToWorkspaceSync } = await import('../workspace-manager.js');
+  const { copyOverdeckSettingsToWorkspace } = await import('../workspace-manager.js');
 
-  const result = copyOverdeckSettingsToWorkspaceSync(workspacePath);
+  const result = copyOverdeckSettingsToWorkspace(workspacePath);
   return jsonResponse({
     success: result.errors.length === 0 || result.copied.length > 0,
     copied: result.copied.map(p => p.replace(workspacePath + '/', '')),

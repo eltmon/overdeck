@@ -3,7 +3,7 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { isClaudeCodeChannelsMcpEnabled, loadConfigSync } from '../config-yaml.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -12,13 +12,13 @@ import type { TerminalBackendName } from '../terminal-backends/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { getOverdeckHome } from '../paths.js';
-import { getProviderForModelSync } from '../providers.js';
+import { getProviderForModel } from '../providers.js';
 import { writePtyToken } from '../pty-token.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
 import { capturePane, sendRawKeystroke } from '../tmux.js';
 import {
   getAgentDir,
-  getAgentStateSync,
+  getAgentState,
   recordAgentFailure,
   saveAgentState,
   saveAgentStateSync,
@@ -109,7 +109,7 @@ export function markKickoffRedelivered(state: AgentState): void {
 
 export async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<void> {
   await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
-  const failedState = getAgentStateSync(state.id);
+  const failedState = getAgentState(state.id);
   if (failedState) {
     failedState.status = 'running';
     failedState.kickoffDelivered = false;
@@ -117,7 +117,7 @@ export async function recordKickoffDeliveryFailure(state: AgentState, issueId: s
   }
   state.status = 'running';
   state.kickoffDelivered = false;
-  emitActivityEntrySync({
+  emitActivityEntry({
     source,
     level: 'error',
     message: `${state.id}: kickoff delivery failed`,
@@ -304,7 +304,7 @@ export function decideChannelsForWorkAgent(
   // Auth gate. The Channels capability is gated by Anthropic auth in the
   // compiled Claude Code binary; we only attempt the bridge when the model
   // routes to the anthropic provider.
-  const provider = getProviderForModelSync(state.model as ModelId);
+  const provider = getProviderForModel(state.model as ModelId);
   if (provider.name !== 'anthropic') {
     log(false, `provider-${provider.name}`);
     return { eligible: false, reason: `provider-${provider.name}` };

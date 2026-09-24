@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createCodexConversationAccumulator } from '../codex-conversation-parser.js';
 import { createIncrementalTranscriptReader } from '../incremental-transcript-reader.js';
-import { parseCodexSessionSync } from '../../../../lib/cost-parsers/codex-parser.js';
+import { parseCodexSession } from '../../../../lib/cost-parsers/codex-parser.js';
 
 const line = (type: string, payload: object) => JSON.stringify({ type, timestamp: '2026-09-09T00:00:00Z', payload }) + '\n';
 const message = (text: string) => line('event_msg', { type: 'user_message', message: text });
@@ -38,7 +38,7 @@ describe('incremental Codex history', () => {
     expect(first.workLog[0].result).toBeUndefined();
     expect(next.totalTokens).toBe(1100);
     expect(next.totalCost).toBeGreaterThan(0);
-    expect(next.totalCost).toBe(parseCodexSessionSync(file)?.cost_v2);
+    expect(next.totalCost).toBe(parseCodexSession(file)?.cost_v2);
     expect(next.transcriptGeneration).toBe(first.transcriptGeneration);
   });
 

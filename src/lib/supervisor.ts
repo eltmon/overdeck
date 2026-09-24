@@ -16,20 +16,20 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 
 import { LOGS_DIR, OVERDECK_HOME, packageRoot } from './paths.js';
-import { readPlatformConfigSync } from './platform-lifecycle.js';
-import { readActiveDashboardBundleSync } from './deploy/active-dashboard-bundle.js';
+import { readPlatformConfig } from './platform-lifecycle.js';
+import { readActiveDashboardBundle } from './deploy/active-dashboard-bundle.js';
 
 const SUPERVISOR_PID_PATH = join(OVERDECK_HOME, 'supervisor.pid');
 const SUPERVISOR_LOG_PATH = join(LOGS_DIR, 'supervisor.log');
 
 /** Compute the supervisor's port from the configured dashboard API port. */
-export function getSupervisorPortSync(): number {
-  return readPlatformConfigSync().dashboardApiPort + 1;
+export function getSupervisorPort(): number {
+  return readPlatformConfig().dashboardApiPort + 1;
 }
 
 /** Public URL the frontend hits for the Force Restart fallback. */
-export function getSupervisorUrlSync(): string {
-  return `http://127.0.0.1:${getSupervisorPortSync()}`;
+export function getSupervisorUrl(): string {
+  return `http://127.0.0.1:${getSupervisorPort()}`;
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -60,13 +60,13 @@ function readSupervisorPid(): number | null {
   }
 }
 
-export function isSupervisorRunningSync(): boolean {
+export function isSupervisorRunning(): boolean {
   const pid = readSupervisorPid();
   return pid !== null && isProcessAlive(pid);
 }
 
 export function resolveSupervisorPrimaryRepoRoot(): string {
-  return readActiveDashboardBundleSync()?.repoRoot ?? packageRoot;
+  return readActiveDashboardBundle()?.repoRoot ?? packageRoot;
 }
 
 export function resolveSupervisorBundle(): string {
@@ -85,8 +85,8 @@ export function resolveSupervisorBundle(): string {
 }
 
 /** Idempotent start. No-op if the supervisor is already running. */
-export function startSupervisorProcessSync(): void {
-  if (isSupervisorRunningSync()) return;
+export function startSupervisorProcess(): void {
+  if (isSupervisorRunning()) return;
 
   // Stale pidfile from a previous crash — clear it so writeFile below succeeds cleanly.
   try {
@@ -111,7 +111,7 @@ export function startSupervisorProcessSync(): void {
     logFd = openSync('/dev/null', 'w');
   }
 
-  const port = getSupervisorPortSync();
+  const port = getSupervisorPort();
   const child = spawn(process.execPath, [bundle], {
     cwd: resolveSupervisorPrimaryRepoRoot(),
     detached: true,
@@ -160,7 +160,7 @@ export function startSupervisorProcessSync(): void {
   }
 }
 
-export function stopSupervisorProcessSync(): void {
+export function stopSupervisorProcess(): void {
   const pid = readSupervisorPid();
   if (pid && isProcessAlive(pid)) {
     try {

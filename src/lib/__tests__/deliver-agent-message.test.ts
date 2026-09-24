@@ -55,7 +55,7 @@ vi.mock('../paths.js', async (importOriginal) => {
   };
 });
 
-import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
+import { BRIDGE_TOKEN_HEADER, writeBridgeToken } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
 import { deliverAgentMessage, deliverAgentPermissionDecision, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, getAgentDir, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
@@ -750,7 +750,7 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-supervisor-budget';
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
-    writeBridgeTokenSync(agentId);
+    writeBridgeToken(agentId);
     const capture: { lastBody?: string } = {};
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 200,
@@ -873,7 +873,7 @@ describe('channel bridge delivery', () => {
   it('supervisor missing: falls through to channels when channels are enabled', async () => {
     const agentId = 'agent-supervisor-missing';
     writeAgentState(agentId, { channelsEnabled: true });
-    writeBridgeTokenSync(agentId);
+    writeBridgeToken(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
     try {
@@ -909,7 +909,7 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-supervisor-500';
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
-    writeBridgeTokenSync(agentId);
+    writeBridgeToken(agentId);
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 500,
       body: 'broken',
@@ -974,7 +974,7 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-supervisor-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
-    writeBridgeTokenSync(agentId);
+    writeBridgeToken(agentId);
     const message = 'timeout fallback';
     const clientTimeout = supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS;
     const capture: { lastBody?: string } = {};
@@ -1034,7 +1034,7 @@ describe('channel bridge delivery', () => {
   it('flag-on, socket-success: posts to bridge and does NOT call sendKeysProgram', async () => {
     const agentId = 'agent-channels';
     writeAgentState(agentId, { channelsEnabled: true });
-    const token = writeBridgeTokenSync(agentId);
+    const token = writeBridgeToken(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const capture: { lastBody?: string } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
@@ -1064,7 +1064,7 @@ describe('channel bridge delivery', () => {
   it('flag-on, socket-timeout: falls back to sendKeysProgram', async () => {
     const agentId = 'agent-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
-    writeBridgeTokenSync(agentId);
+    writeBridgeToken(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const capture: { lastBody?: string } = {};
     // Bridge that delays its response longer than the deliver timeout.
@@ -1100,7 +1100,7 @@ describe('channel bridge delivery', () => {
   it('deliverAgentPermissionDecision posts permission_response payload to bridge', async () => {
     const agentId = 'agent-perm-ok';
     writeAgentState(agentId, { channelsEnabled: true });
-    const token = writeBridgeTokenSync(agentId);
+    const token = writeBridgeToken(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const capture: { lastBody?: string } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });

@@ -13,7 +13,7 @@ import {
 } from '../test-requirement-gate.js';
 import { getLinearApiKey } from '../../shadow-utils.js';
 import { LinearClient } from '@linear/sdk';
-import { resolveGitHubIssueSync } from '../../tracker-utils.js';
+import { resolveGitHubIssue } from '../../tracker-utils.js';
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -187,12 +187,12 @@ describe('countTestDeltaInDiff', () => {
 
 describe('fetchIssueBodyForGate', () => {
   it('returns the GitHub issue body via gh issue view (AC1)', async () => {
-    vi.mocked(resolveGitHubIssueSync).mockReturnValue({
+    vi.mocked(resolveGitHubIssue).mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
       repo: 'overdeck',
       number: 1501,
-    } as ReturnType<typeof resolveGitHubIssueSync>);
+    } as ReturnType<typeof resolveGitHubIssue>);
 
     vi.mocked(exec).mockImplementation(((cmd: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
       const callback = (typeof optionsOrCallback === 'function'
@@ -207,12 +207,12 @@ describe('fetchIssueBodyForGate', () => {
   });
 
   it('returns null when gh issue view fails (AC3)', async () => {
-    vi.mocked(resolveGitHubIssueSync).mockReturnValue({
+    vi.mocked(resolveGitHubIssue).mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
       repo: 'overdeck',
       number: 1501,
-    } as ReturnType<typeof resolveGitHubIssueSync>);
+    } as ReturnType<typeof resolveGitHubIssue>);
 
     vi.mocked(exec).mockImplementation(((cmd: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
       const callback = (typeof optionsOrCallback === 'function'
@@ -227,7 +227,7 @@ describe('fetchIssueBodyForGate', () => {
   });
 
   it('returns the Linear issue description (AC2)', async () => {
-    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(resolveGitHubIssue).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssue>);
     vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed('test-key'));
 
     const mockDescription = Promise.resolve('Linear description');
@@ -245,7 +245,7 @@ describe('fetchIssueBodyForGate', () => {
   });
 
   it('returns null when Linear API key is missing (AC3)', async () => {
-    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(resolveGitHubIssue).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssue>);
     vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed(null));
 
     const body = await Effect.runPromise(fetchIssueBodyForGate('MIN-123'));
@@ -253,7 +253,7 @@ describe('fetchIssueBodyForGate', () => {
   });
 
   it('returns null when Linear issue is missing (AC3)', async () => {
-    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(resolveGitHubIssue).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssue>);
     vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed('test-key'));
     vi.mocked(LinearClient).mockImplementation(
       function () {
@@ -268,7 +268,7 @@ describe('fetchIssueBodyForGate', () => {
   });
 
   it('fails with TrackerFetchError for an unparseable issue ID', async () => {
-    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(resolveGitHubIssue).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssue>);
 
     await expect(Effect.runPromise(fetchIssueBodyForGate('not-an-issue'))).rejects.toBeInstanceOf(
       TrackerFetchError,
@@ -277,7 +277,7 @@ describe('fetchIssueBodyForGate', () => {
 });
 
 function mockLinearIssue(description: string) {
-  vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+  vi.mocked(resolveGitHubIssue).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssue>);
   vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed('test-key'));
   vi.mocked(LinearClient).mockImplementation(
     function () {
@@ -367,7 +367,7 @@ describe('runTestRequirementCheck', () => {
   });
 
   it('soft-fails with [] when the tracker is unreachable or unauthenticated (AC4)', async () => {
-    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(resolveGitHubIssue).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssue>);
     vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed(null));
 
     const result = await Effect.runPromise(runTestRequirementCheck(workspacePath, 'MIN-123'));

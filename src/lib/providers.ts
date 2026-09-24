@@ -414,7 +414,7 @@ function nearestKnownModelId(modelId: string): string | undefined {
 /**
  * Get provider for a given model ID
  */
-export function getProviderForModelSync(modelId: ModelId | string): ProviderConfig {
+export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   if (PROVIDERS.meta.models.includes(modelId)) return PROVIDERS.meta;
   // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free'),
   // except for explicitly supported slash-delimited providers such as Nous Portal.
@@ -511,7 +511,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
  * `kimi login` / ~/.kimi-code/config.toml, and leaking these vars into the
  * native binary's env would risk silently redirecting or breaking its auth.
  */
-export function getProviderEnvSync(
+export function getProviderEnv(
   provider: ProviderConfig,
   apiKey: string,
   harness?: RuntimeName,
@@ -629,7 +629,7 @@ export function getProviderEnvSync(
  * This writes to .claude/settings.local.json in the workspace directory.
  * Must be called before spawning the agent.
  */
-export function setupCredentialFileAuthSync(provider: ProviderConfig, workspacePath: string): void {
+export function setupCredentialFileAuth(provider: ProviderConfig, workspacePath: string): void {
   if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
 
   const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
@@ -662,7 +662,7 @@ export function setupCredentialFileAuthSync(provider: ProviderConfig, workspaceP
  * .claude/settings.local.json. Otherwise Claude Code will keep using the stale
  * token helper and fail with "Invalid API key".
  */
-export function clearCredentialFileAuthSync(workspacePath: string): void {
+export function clearCredentialFileAuth(workspacePath: string): void {
   const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
   if (!existsSync(settingsPath)) return;
 
@@ -687,7 +687,7 @@ export function clearCredentialFileAuthSync(workspacePath: string): void {
  * constrain WHICH Pi provider is used — we never inject keys.
  */
 export function piProviderForModel(modelId: string): string | undefined {
-  const provider = getProviderForModelSync(modelId).name;
+  const provider = getProviderForModel(modelId).name;
   switch (provider) {
     case 'openai':
       return 'openai-codex';

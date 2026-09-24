@@ -15,7 +15,7 @@ vi.mock('../../harness-binary.js', () => harnessMocks)
 
 import { OhmypiRuntimeSync, createOhmypiRuntimeSync, OhmypiSpawnTimeout } from '../ohmypi.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
-import { createClaudeCodeRuntimeSync } from '../claude-code.js'
+import { createClaudeCodeRuntime } from '../claude-code.js'
 import { createOhmypiFifo } from '../ohmypi-fifo.js'
 import { OhmypiNotReady } from '../ohmypi-fifo.js'
 import { sessionExists } from '../../tmux.js'
@@ -52,7 +52,7 @@ describe('OhmypiRuntime registry registration (AC1)', () => {
 
   it('default global registry contains both claude-code and ohmypi (AC1)', () => {
     const fresh = new RuntimeRegistry()
-    fresh.register(createClaudeCodeRuntimeSync())
+    fresh.register(createClaudeCodeRuntime())
     fresh.register(createOhmypiRuntimeSync())
     setGlobalRegistry(fresh)
     expect(getRuntime('ohmypi')?.name).toBe('ohmypi')

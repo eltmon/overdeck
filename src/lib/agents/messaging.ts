@@ -2,13 +2,13 @@ import { createHash } from 'crypto';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { appendOperatorInterventionEvent } from '../operator-interventions.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { logAgentLifecycle } from '../persistent-logger.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
@@ -25,14 +25,14 @@ import {
   decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
-  getAgentStateSync,
+  getAgentState,
   markAgentRunning,
   saveAgentStateSync,
   type AgentState,
   type MessageAgentRedriveOptions,
   type Role,
 } from './agent-state.js';
-import { getLatestSessionIdSync } from './activity.js';
+import { getLatestSessionId } from './activity.js';
 import {
   deliverAgentMessage,
   deliverMessageWithTranscriptConfirmation,
@@ -151,7 +151,7 @@ function claimCodexIdleTurn(agentId: string): boolean {
 async function appendTellInterventionForUserSource(normalizedId: string, caller: string): Promise<void> {
   if (!USER_MESSAGE_INTERVENTION_SOURCES.has(caller)) return;
 
-  const agentState = getAgentStateSync(normalizedId);
+  const agentState = getAgentState(normalizedId);
   if (!agentState?.issueId) {
     console.debug(`[agents] Skipping tell intervention for ${normalizedId}; state.json has no issueId`);
     return;
@@ -227,7 +227,7 @@ export async function messageAgent(
   opts: MessageAgentRedriveOptions = {},
 ): Promise<MessageDeliveryOutcome> {
   const normalizedId = normalizeAgentId(agentId);
-  const agentState = getAgentStateSync(normalizedId);
+  const agentState = getAgentState(normalizedId);
 
   // PAN-3879: conversations (conv-*) have no agents/<id>/state.json, so the
   // harness must come from the conversation row — the same resolver the
@@ -264,7 +264,7 @@ export async function messageAgent(
     });
     if (decision.decision === 'proceed' && decision.clearStoppedByUser && agentState) {
       console.log(`[agents] ${normalizedId} was operator-stopped but owes rework after a completed handoff — clearing stop gate to deliver feedback (PAN-2668)`);
-      logAgentLifecycleSync(normalizedId, 'stoppedByUser cleared: completed handoff owes rework; delivering pipeline feedback (PAN-2668)');
+      logAgentLifecycle(normalizedId, 'stoppedByUser cleared: completed handoff owes rework; delivering pipeline feedback (PAN-2668)');
       delete agentState.stoppedByUser;
       saveAgentStateSync(agentState);
     }
@@ -273,7 +273,7 @@ export async function messageAgent(
   if (agentState?.paused === true) {
     const gateBlockReason = getAgentResumeGateBlockReason(agentState)?.reason ?? 'agent is paused';
     queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
-    logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+    logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
     console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
     return { delivered: false, queuedToMail: true, reason: gateBlockReason };
   }
@@ -285,7 +285,7 @@ export async function messageAgent(
     if (suspendedGate.decision !== 'proceed') {
       const gateBlockReason = suspendedGate.reason ?? 'agent is gated';
       queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
-      logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+      logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
@@ -324,7 +324,7 @@ export async function messageAgent(
     if (stoppedGate.decision !== 'proceed') {
       const gateBlockReason = stoppedGate.reason ?? 'agent is gated';
       queueAgentMail(normalizedId, message, 'queued', opts.dedupKey);
-      logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+      logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
@@ -370,17 +370,17 @@ export async function messageAgent(
         : 'resume succeeded but message delivery timed out';
       const stopMsg = `Not restarting ${normalizedId} with a fresh session — ${why}; session rotation is disabled (PAN-1980). Agent left stopped; feedback queued in mail.`;
       console.warn(`[agents] ${stopMsg}`);
-      emitActivityEntrySync({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${stopMsg}`, issueId: agentState.issueId });
+      emitActivityEntry({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${stopMsg}`, issueId: agentState.issueId });
       return { delivered: false, queuedToMail: true, reason: stopMsg };
     }
 
     const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
     if (agentState.model) {
-      const provider = getProviderForModelSync(agentState.model as ModelId);
+      const provider = getProviderForModel(agentState.model as ModelId);
       if (provider.authType === 'credential-file') {
-        setupCredentialFileAuthSync(provider, agentState.workspace);
+        setupCredentialFileAuth(provider, agentState.workspace);
       } else {
-        clearCredentialFileAuthSync(agentState.workspace);
+        clearCredentialFileAuth(agentState.workspace);
       }
     }
 
@@ -418,7 +418,7 @@ export async function messageAgent(
       ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
-    const fallbackContent = generateLauncherScriptSync({
+    const fallbackContent = generateLauncherScript({
       role: resumeRole,
       workingDir: agentState.workspace,
       changeDir: false,
@@ -480,7 +480,7 @@ export async function messageAgent(
     if (resumeMessage.error) {
       reason = resumeMessage.error;
       console.error(`[agents] Fallback-restarted ${normalizedId} but ${resumeMessage.error}`);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'work-agent',
         level: 'error',
         message: `${normalizedId}: ${resumeMessage.error}`,
@@ -488,7 +488,7 @@ export async function messageAgent(
       });
     } else if (ready && resumeMessage.message) {
       if (fallbackHarness === 'claude-code') {
-        const fallbackSessionId = getLatestSessionIdSync(
+        const fallbackSessionId = getLatestSessionId(
           normalizedId,
           { getAgentState: () => agentState },
         );
@@ -582,7 +582,7 @@ export async function messageAgent(
       // stays deterministic, it just carries the drainable suffix now.
       const mailPath = queueAgentMail(normalizedId, message, 'pending', opts.dedupKey);
       const busyReason = busyAgentQueuedReason(mailPath);
-      logAgentLifecycleSync(normalizedId, `messageAgent: ${busyReason}`);
+      logAgentLifecycle(normalizedId, `messageAgent: ${busyReason}`);
       console.log(`[agents] ${normalizedId}: ${busyReason}`);
       await appendTellInterventionForUserSource(normalizedId, caller);
       return { delivered: true, queuedToMail: true, reason: busyReason };
@@ -627,7 +627,7 @@ export async function messageAgent(
       // shell), so skip the zombie resume and hand off.
       if (expectedHarness === 'opencode' || expectedHarness === 'acp' || expectedHarness === 'codex') {
         console.warn(`[agents] ${normalizedId} pane shows no ${expectedHarness} runtime (${liveness.reason}) — skipping the zombie resume and handing off to the harness delivery door`);
-        logAgentLifecycleSync(normalizedId, `messageAgent: pane shows no ${expectedHarness} runtime; handing off to the delivery door (conversations are never resumed, PAN-3879)`);
+        logAgentLifecycle(normalizedId, `messageAgent: pane shows no ${expectedHarness} runtime; handing off to the delivery door (conversations are never resumed, PAN-3879)`);
       } else {
         throw new Error(`Conversation ${normalizedId} tmux session is dead (no ${expectedHarness} runtime in its pane) and conversations cannot be resumed by pan tell — resume it from the dashboard, then send again.`);
       }
@@ -661,7 +661,7 @@ export async function messageAgent(
   const deliveryMethod = resolveAgentDeliveryMethod(agentState);
   const deliveryCaller = `messageAgent:${caller}`;
   const transcriptSessionId = getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl'
-    ? getLatestSessionIdSync(normalizedId, { getAgentState: () => agentState })
+    ? getLatestSessionId(normalizedId, { getAgentState: () => agentState })
     : undefined;
 
   if (agentState?.workspace && transcriptSessionId && opts.dedupKey === undefined) {
@@ -683,10 +683,10 @@ export async function messageAgent(
     await appendTellInterventionForUserSource(normalizedId, caller);
     if (!confirmedDelivery.delivered) {
       const reason = `message was injected but no turn appeared in transcript ${transcriptSessionId} within the confirmation window (${confirmedDelivery.attempts} attempts)`;
-      logAgentLifecycleSync(normalizedId, `messageAgent NOT confirmed: ${reason}`);
+      logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);
       return { delivered: false, queuedToMail: true, confirmed: false, reason };
     }
-    logAgentLifecycleSync(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
+    logAgentLifecycle(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
     return { delivered: true, queuedToMail: true, confirmed: true };
   }
 
@@ -697,7 +697,7 @@ export async function messageAgent(
   // deliveries keep the composer-level contract below.
   if (agentState && getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl' && opts.dedupKey === undefined) {
     const reason = `cannot confirm delivery: no Claude transcript identifiable for ${normalizedId} (workspace: ${agentState.workspace ?? 'none'}, sessionId: ${transcriptSessionId ?? 'none'})`;
-    logAgentLifecycleSync(normalizedId, `messageAgent NOT confirmed: ${reason}`);
+    logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);
     queueAgentMail(normalizedId, message, 'queued', undefined, caller);
     await appendTellInterventionForUserSource(normalizedId, caller);
     return { delivered: false, queuedToMail: true, confirmed: false, reason };

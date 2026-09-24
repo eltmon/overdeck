@@ -12,8 +12,8 @@ import {
   type OverdeckTestDb,
 } from '../../helpers/overdeck-test-db.js';
 import {
-  getMergeSetSync,
-  upsertMergeSetSync,
+  getMergeSet,
+  upsertMergeSet,
 } from '../../../src/lib/merge-set.js';
 import type { MergeSet, MergeSetRepoState } from '../../../src/lib/merge-set.js';
 
@@ -65,9 +65,9 @@ function repo(repoKey: string, patch: Partial<MergeSetRepoState> = {}): MergeSet
 describe('merge-set sync accessors', () => {
   it('getMergeSetSync normalizes lowercase IDs to uppercase', () => {
     seedIssue('PAN-399');
-    upsertMergeSetSync(makeMergeSet());
+    upsertMergeSet(makeMergeSet());
 
-    const loaded = getMergeSetSync('pan-399');
+    const loaded = getMergeSet('pan-399');
 
     expect(loaded).not.toBeNull();
     expect(loaded!.issueId).toBe('PAN-399');
@@ -75,7 +75,7 @@ describe('merge-set sync accessors', () => {
 
   it('upsertMergeSetSync stores the canonical uppercase issue ID', () => {
     seedIssue('PAN-399');
-    upsertMergeSetSync(makeMergeSet({ issueId: 'pan-399' }));
+    upsertMergeSet(makeMergeSet({ issueId: 'pan-399' }));
 
     const row = odb.raw().prepare('SELECT issue_id FROM merge_sets WHERE issue_id = ?').get('PAN-399') as { issue_id: string } | undefined;
 

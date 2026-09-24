@@ -44,7 +44,7 @@ function isWithin(root: string, target: string): boolean {
 }
 
 /** The projects.yaml key of the project containing `path` (the deepest root wins), or null. */
-export function findProjectKeyByPathSync(path: string): string | null {
+export function findProjectKeyByPath(path: string): string | null {
   if (!path) return null;
   const config = loadProjectsConfigSync();
   const target = canonicalPath(path);

@@ -64,7 +64,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should remove hooks whose absolute path does not exist', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -75,7 +75,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.copied).toContain(join(workspaceDir, '.claude', 'settings.json'));
     expect(result.errors.some((e) => e.includes('Removed broken hook'))).toBe(true);
@@ -85,7 +85,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should preserve hooks whose absolute path exists', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const hookPath = join(homeDir, '.claude', 'hooks', 'valid-hook.py');
     mkdirSync(join(homeDir, '.claude', 'hooks'), { recursive: true });
@@ -100,7 +100,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -110,7 +110,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should not validate relative hook paths', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -121,7 +121,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -131,7 +131,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should not validate shell commands with pipes', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -142,7 +142,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -152,7 +152,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should handle mixed valid and invalid hooks', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const validHookPath = join(homeDir, '.claude', 'hooks', 'valid-hook.py');
     mkdirSync(join(homeDir, '.claude', 'hooks'), { recursive: true });
@@ -169,7 +169,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Removed broken hook');
@@ -181,7 +181,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should remove empty hook categories after filtering', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -191,7 +191,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(2);
 
@@ -200,7 +200,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
   });
 
   it('should detect broken script path inside wrapper command', async () => {
-    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspace } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -211,7 +211,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspace(workspaceDir);
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Removed broken hook');
@@ -252,8 +252,8 @@ describe('createWorkspace', () => {
     // PAN-1990 FR-6/AC-4: create.ts now guarantees the workspace row exists
     // before the worktree — it must resolve this project's projects.yaml
     // entry to seed the row rather than skipping silently when unseeded.
-    const { registerProjectSync, unregisterProjectSync } = await import('../../src/lib/projects.js');
-    registerProjectSync('workspace-manager-test-project', { name: 'Test', path: tempDir });
+    const { registerProject, unregisterProject } = await import('../../src/lib/projects.js');
+    registerProject('workspace-manager-test-project', { name: 'Test', path: tempDir });
 
     try {
       const { createWorkspace } = await import('../../src/lib/workspace-manager.js');
@@ -277,7 +277,7 @@ describe('createWorkspace', () => {
       );
       expect(readFileSync(recordPath, 'utf8')).toBe('{"issueId":"PAN-2050"}\n');
     } finally {
-      unregisterProjectSync('workspace-manager-test-project');
+      unregisterProject('workspace-manager-test-project');
     }
   });
 });

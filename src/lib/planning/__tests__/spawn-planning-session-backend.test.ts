@@ -77,7 +77,7 @@ vi.mock('../../agents.js', async (importOriginal) => {
 
 import { spawnPlanningSession } from '../spawn-planning-session.js';
 import { registerTerminalBackend } from '../../terminal-backends/registry.js';
-import { getAgentStateSync } from '../../agents.js';
+import { getAgentState } from '../../agents.js';
 
 let herdr: FakeTerminalBackend;
 let tmux: FakeTerminalBackend;
@@ -165,7 +165,7 @@ describe('spawnPlanningSession launches through the host backend (PAN-3960)', ()
     });
     // Never a direct tmux session, on either host.
     expect(mocks.tmuxCreateSession).not.toHaveBeenCalled();
-    expect(getAgentStateSync(sessionName)).toMatchObject({ backend: host, role: 'plan', status: 'running' });
+    expect(getAgentState(sessionName)).toMatchObject({ backend: host, role: 'plan', status: 'running' });
 
     // The keep-alive sleep loop is tmux-only: on Herdr it would be a non-shell
     // foreground process and a finished planner would read alive forever.

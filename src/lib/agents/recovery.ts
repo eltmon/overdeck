@@ -4,15 +4,15 @@ import { readdir as readdirAsync } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { getLatestSessionIdSync } from './activity.js';
+import { getLatestSessionId } from './activity.js';
 import { sendGracefulRestartWarning } from '../graceful-restart.js';
-import { checkHookSync, generateFixedPointPromptSync } from '../hooks.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { checkHook, generateFixedPointPrompt } from '../hooks.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
-import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
+import { logAgentLifecycle } from '../persistent-logger.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { normalizeHarness } from '../overdeck/conversations.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -28,7 +28,7 @@ import {
   decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
-  getAgentStateSync,
+  getAgentState,
   markAgentRunning,
   saveAgentStateSync,
   type AgentState,
@@ -79,8 +79,8 @@ export interface RestartAgentResult {
 
 export interface RestartAgentDeps {
   detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
-  getAgentStateSync?: typeof getAgentStateSync;
-  logAgentLifecycleSync?: typeof logAgentLifecycleSync;
+  getAgentStateSync?: typeof getAgentState;
+  logAgentLifecycleSync?: typeof logAgentLifecycle;
   assertWorkspaceStackHealthyForSpawn?: typeof assertWorkspaceStackHealthyForSpawn;
   resolveHarness?: typeof resolveHarness;
   prepareHarnessLaunch?: typeof prepareHarnessLaunch;
@@ -108,11 +108,11 @@ export function resolveRecoveryResumeSessionId(agentId: string, harness: Runtime
     return path ? museSessionId(path) : undefined;
   }
   if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') return undefined;
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   const resolutionState = state
     ? { ...state, harness }
     : { id: agentId, harness } as AgentState;
-  return getLatestSessionIdSync(agentId, { getAgentState: () => resolutionState }) ?? undefined;
+  return getLatestSessionId(agentId, { getAgentState: () => resolutionState }) ?? undefined;
 }
 
 /**
@@ -159,10 +159,10 @@ export async function restartAgent(
 ): Promise<RestartAgentResult> {
   const normalizedId = normalizeAgentId(agentId);
   const { graceful = true, model: rawNewModel, harness: newHarness, message, force = false } = opts;
-  const newModel = normalizeModelOverrideSync(rawNewModel);
-  const readAgentState = deps.getAgentStateSync ?? getAgentStateSync;
+  const newModel = normalizeModelOverride(rawNewModel);
+  const readAgentState = deps.getAgentStateSync ?? getAgentState;
   const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
-  const logLifecycle = deps.logAgentLifecycleSync ?? logAgentLifecycleSync;
+  const logLifecycle = deps.logAgentLifecycleSync ?? logAgentLifecycle;
   const assertWorkspaceHealthy = deps.assertWorkspaceStackHealthyForSpawn
     ?? assertWorkspaceStackHealthyForSpawn;
   const resolveRestartHarness = deps.resolveHarness ?? resolveHarness;
@@ -223,7 +223,7 @@ export async function restartAgent(
     return { success: false, error: reason };
   }
 
-  const effectiveModel = newModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
+  const effectiveModel = newModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
   const effectiveHarness = await resolveRestartHarness({
     explicit: newHarness ?? agentState.harness,
     role: agentState.role,
@@ -425,11 +425,11 @@ export async function recoverAgent(
   opts: { modelOverride?: string; force?: boolean } = {},
 ): Promise<RecoverAgentResult | null> {
   const normalizedId = normalizeAgentId(agentId);
-  logAgentLifecycleSync(normalizedId, 'recoverAgent called');
-  const state = getAgentStateSync(normalizedId);
+  logAgentLifecycle(normalizedId, 'recoverAgent called');
+  const state = getAgentState(normalizedId);
 
   if (!state) {
-    logAgentLifecycleSync(normalizedId, 'recoverAgent BLOCKED: no state.json');
+    logAgentLifecycle(normalizedId, 'recoverAgent BLOCKED: no state.json');
     return null;
   }
 
@@ -437,25 +437,25 @@ export async function recoverAgent(
   if (!state.id) state.id = normalizedId;
   const gateDecision = decideResumeGate(getAgentResumeGateBlockReason(state), 'operator-start');
   if (gateDecision.decision === 'block') {
-    logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateDecision.reason}. Clear the gate before recovering.`);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateDecision.reason}. Clear the gate before recovering.`);
     return null;
   }
   if (!opts.force) {
     const pendingDecision = await detectPendingOperatorDecision(normalizedId);
     if (pendingDecision) {
-      logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: pending operator decision (${pendingDecision.reason})`);
+      logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: pending operator decision (${pendingDecision.reason})`);
       return null;
     }
   }
-  const modelOverride = normalizeModelOverrideSync(opts.modelOverride);
+  const modelOverride = normalizeModelOverride(opts.modelOverride);
   if (modelOverride) {
     state.model = modelOverride;
-    logAgentLifecycleSync(normalizedId, `recoverAgent: model overridden → ${modelOverride}`);
+    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${modelOverride}`);
   }
   if (!state.workspace || !state.model) {
     const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
     console.error(reason);
-    logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: ${reason}`);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: ${reason}`);
     return null;
   }
 
@@ -470,7 +470,7 @@ export async function recoverAgent(
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: ${reason}`);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: ${reason}`);
     return null;
   }
 
@@ -483,11 +483,11 @@ export async function recoverAgent(
   // switch) answers alive, so it is never reaped (review of #3992, M3).
   const liveness = await isAlive(normalizedId);
   if (liveness.alive) {
-    logAgentLifecycleSync(normalizedId, 'recoverAgent NO_ACTION: live harness runtime is already running');
+    logAgentLifecycle(normalizedId, 'recoverAgent NO_ACTION: live harness runtime is already running');
     return { action: 'already-running', state };
   }
   if (liveness.reason === 'runtime-indeterminate') {
-    logAgentLifecycleSync(normalizedId, 'recoverAgent NO_ACTION: liveness probe was indeterminate — not reaping a possibly-live agent');
+    logAgentLifecycle(normalizedId, 'recoverAgent NO_ACTION: liveness probe was indeterminate — not reaping a possibly-live agent');
     return { action: 'already-running', state };
   }
   if (await closeAgentPane(normalizedId)) {
@@ -515,11 +515,11 @@ export async function recoverAgent(
   // For credential-file providers, ensure apiKeyHelper is configured.
   // For all other providers, clear stale apiKeyHelper from previous runs.
   if (state.model) {
-    const provider = getProviderForModelSync(state.model as ModelId);
+    const provider = getProviderForModel(state.model as ModelId);
     if (provider.authType === 'credential-file') {
-      setupCredentialFileAuthSync(provider, state.workspace);
+      setupCredentialFileAuth(provider, state.workspace);
     } else {
-      clearCredentialFileAuthSync(state.workspace);
+      clearCredentialFileAuth(state.workspace);
     }
   }
 
@@ -573,7 +573,7 @@ export async function recoverAgent(
     }
     markAgentRunning(state);
     saveAgentStateSync(state);
-    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (ohmypi)`);
+    logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (ohmypi)`);
     return { action: 'respawned', state };
   }
 
@@ -627,7 +627,7 @@ export async function recoverAgent(
     }
     markAgentRunning(state);
     saveAgentStateSync(state);
-    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (${recoveryHarness})`);
+    logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (${recoveryHarness})`);
     return { action: 'respawned', state };
   }
 
@@ -734,14 +734,14 @@ export async function recoverAgent(
     }
     markAgentRunning(state);
     saveAgentStateSync(state);
-    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (kimi-code)`);
+    logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (kimi-code)`);
     return { action: 'respawned', state };
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
     ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole)
     : {};
-  const recoveryLauncherContent = generateLauncherScriptSync({
+  const recoveryLauncherContent = generateLauncherScript({
     role: recoveryRole,
     workingDir: state.workspace,
     changeDir: false,
@@ -784,7 +784,7 @@ export async function recoverAgent(
   markAgentRunning(state);
   saveAgentStateSync(state);
 
-  logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount}`);
+  logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount}`);
   return { action: 'respawned', state };
 }
 
@@ -814,9 +814,9 @@ function generateRecoveryPrompt(state: AgentState): string {
   ];
 
   // Add FPP work if available
-  const { hasWork } = checkHookSync(state.id);
+  const { hasWork } = checkHook(state.id);
   if (hasWork) {
-    const fixedPointPrompt = generateFixedPointPromptSync(state.id);
+    const fixedPointPrompt = generateFixedPointPrompt(state.id);
     if (fixedPointPrompt) {
       lines.push('---');
       lines.push('');

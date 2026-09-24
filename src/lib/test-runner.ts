@@ -10,7 +10,7 @@ import { join, basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
-import { ProjectConfig, TestConfig, TemplatePlaceholders, replacePlaceholdersSync } from './workspace-config.js';
+import { ProjectConfig, TestConfig, TemplatePlaceholders, replacePlaceholders } from './workspace-config.js';
 
 const execAsync = promisify(exec);
 
@@ -132,13 +132,13 @@ async function runTestSuite(
 
   if (testConfig.env) {
     for (const [key, value] of Object.entries(testConfig.env)) {
-      env[key] = replacePlaceholdersSync(value, placeholders);
+      env[key] = replacePlaceholders(value, placeholders);
     }
   }
 
   // If running in container, wrap command
   if (testConfig.container && testConfig.container_name) {
-    const containerName = replacePlaceholdersSync(testConfig.container_name, placeholders);
+    const containerName = replacePlaceholders(testConfig.container_name, placeholders);
     command = `docker exec "${containerName}" ${command}`;
   }
 

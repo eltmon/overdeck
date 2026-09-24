@@ -6,7 +6,7 @@
  * JSONL file was spawned by Overdeck.
  */
 
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { getOverdeckDatabase } from '../overdeck/infra.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 
 export interface CorrelationResult {
@@ -23,11 +23,11 @@ export interface CorrelationResult {
  *
  * @param jsonlPaths  All JSONL paths discovered in this scan run
  */
-export function buildCorrelationMapSync(
+export function buildCorrelationMap(
   jsonlPaths: string[],
   sessionIdsByPath: ReadonlyMap<string, string | null | undefined> = new Map(),
 ): Map<string, CorrelationResult> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const map = new Map<string, CorrelationResult>();
 
   if (jsonlPaths.length === 0) return map;
@@ -121,8 +121,8 @@ export function buildCorrelationMapSync(
   return map;
 }
 
-export function buildLocatorCorrelationMapSync(): Map<string, CorrelationResult> {
-  const db = getOverdeckDatabaseSync();
+export function buildLocatorCorrelationMap(): Map<string, CorrelationResult> {
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(
       `SELECT c.name, cf.locator, c.issue_id

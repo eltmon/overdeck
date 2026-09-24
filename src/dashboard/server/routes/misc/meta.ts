@@ -10,7 +10,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import type { IssueDataService } from '../../services/issue-data-service.js';
-import { extractPrefixSync } from '../../../../lib/issue-id.js';
+import { extractPrefix } from '../../../../lib/issue-id.js';
 import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
 import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import { sendKeys } from '../../../../lib/tmux.js';
@@ -67,8 +67,8 @@ const getVersionRoute = HttpRouter.add(
     // is healthy, then use it as a fallback when the dashboard is dead.
     let supervisorUrl: string | null = null;
     try {
-      const { getSupervisorUrlSync } = await import('../../../../lib/supervisor.js');
-      supervisorUrl = getSupervisorUrlSync();
+      const { getSupervisorUrl } = await import('../../../../lib/supervisor.js');
+      supervisorUrl = getSupervisorUrl();
     } catch {
       // supervisor module not available in this build — benign
     }

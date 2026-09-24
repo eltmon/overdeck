@@ -66,7 +66,7 @@ function readLogLines(logFile: string, startByte?: number, startLine = 0): { lin
  * @param workspacePath - Workspace root (where .tldr/ lives)
  * @param sinceCheckpoint - Only return metrics since the last captured checkpoint
  */
-export function getTldrMetricsSync(workspacePath: string, sinceCheckpoint = false): TldrSessionMetrics {
+export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): TldrSessionMetrics {
   const tldrDir = join(workspacePath, '.tldr');
   const interceptionsLog = join(tldrDir, 'interceptions.log');
   const bypassesLog = join(tldrDir, 'bypasses.log');
@@ -136,13 +136,13 @@ export function getTldrMetricsSync(workspacePath: string, sinceCheckpoint = fals
  * @param workspacePath - Workspace root (where .tldr/ lives)
  * @returns Metrics delta since last capture, or null if no .tldr/ directory exists
  */
-export function captureTldrMetricsSync(workspacePath: string): TldrSessionMetrics | null {
+export function captureTldrMetrics(workspacePath: string): TldrSessionMetrics | null {
   const tldrDir = join(workspacePath, '.tldr');
   if (!existsSync(tldrDir)) {
     return null;
   }
 
-  const metrics = getTldrMetricsSync(workspacePath, true);
+  const metrics = getTldrMetrics(workspacePath, true);
 
   // Advance checkpoint to current byte offsets without rescanning historical logs.
   const interceptionsLog = join(tldrDir, 'interceptions.log');
@@ -464,7 +464,7 @@ const daemonRegistry = new Map<string, TldrDaemonService>();
  * @param workspacePath - Path to the workspace
  * @param venvPath - Path to the Python venv
  */
-export function getTldrDaemonServiceSync(workspacePath: string, venvPath: string): TldrDaemonService {
+export function getTldrDaemonService(workspacePath: string, venvPath: string): TldrDaemonService {
   const existing = daemonRegistry.get(workspacePath);
   if (existing) {
     return existing;
@@ -478,6 +478,6 @@ export function getTldrDaemonServiceSync(workspacePath: string, venvPath: string
 /**
  * List all registered daemon services
  */
-export function listTldrDaemonServicesSync(): TldrDaemonService[] {
+export function listTldrDaemonServices(): TldrDaemonService[] {
   return Array.from(daemonRegistry.values());
 }

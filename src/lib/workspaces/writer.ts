@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join, resolve as resolvePath } from 'node:path';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { getOverdeckDatabase } from '../overdeck/infra.js';
 import { writeWorkspaceIdentity } from '../memory/identity-record.js';
 import type { ProjectConfig } from '../projects.js';
 import type { PinScope, WorkspaceKind } from './types.js';
@@ -24,7 +24,7 @@ import { getMainWorkspace, getProjectByKey, getWorkspaceById } from './resolver.
 
 /** Upsert a projects.yaml entry into the projects table, keyed by its yaml key. */
 export function upsertProjectFromConfig(key: string, config: ProjectConfig): void {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const now = Date.now();
   if (getProjectByKey(key)) {
     db.prepare(`UPDATE projects SET name = ?, primary_path = ? WHERE id = ?`).run(config.name, config.path, key);
@@ -38,7 +38,7 @@ export function upsertProjectFromConfig(key: string, config: ProjectConfig): voi
 
 /** Add (or update) a secondary target path for a project. isPrimary demotes any existing primary. */
 export function addProjectTarget(projectId: string, path: string, isPrimary: boolean): void {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const now = Date.now();
   const run = db.transaction(() => {
     if (isPrimary) {
@@ -74,7 +74,7 @@ export interface CreateWorkspaceOptions {
 
 /** Create a workspace row. Generates a fresh UUID and enforces main-singleton per project. */
 export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<string> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   if (opts.kind === 'main' && getMainWorkspace(opts.projectId)) {
     throw new Error(`Project ${opts.projectId} already has a main workspace`);
   }
@@ -116,24 +116,24 @@ export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<str
 }
 
 export function touchWorkspaceAccessed(id: string): void {
-  getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET last_accessed_at = ? WHERE id = ?`).run(Date.now(), id);
+  getOverdeckDatabase().prepare(`UPDATE workspaces SET last_accessed_at = ? WHERE id = ?`).run(Date.now(), id);
 }
 
 export function updateWorkspaceLayout(id: string, layoutConfig: string): void {
-  getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET layout_config = ? WHERE id = ?`).run(layoutConfig, id);
+  getOverdeckDatabase().prepare(`UPDATE workspaces SET layout_config = ? WHERE id = ?`).run(layoutConfig, id);
 }
 
 /** Set (or clear, with null) the workspace's run command — PAN-3331 quick-action band. */
 export function setWorkspaceRunCommand(id: string, command: string | null): void {
-  getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET run_command = ? WHERE id = ?`).run(command, id);
+  getOverdeckDatabase().prepare(`UPDATE workspaces SET run_command = ? WHERE id = ?`).run(command, id);
 }
 
 export function setWorkspaceFavorite(id: string, isFavorite: boolean): void {
-  getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_favorite = ? WHERE id = ?`).run(isFavorite ? 1 : 0, id);
+  getOverdeckDatabase().prepare(`UPDATE workspaces SET is_favorite = ? WHERE id = ?`).run(isFavorite ? 1 : 0, id);
 }
 
 export async function archiveWorkspace(id: string): Promise<void> {
-  getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_archived = 1 WHERE id = ?`).run(id);
+  getOverdeckDatabase().prepare(`UPDATE workspaces SET is_archived = 1 WHERE id = ?`).run(id);
   const workspace = getWorkspaceById(id);
   if (workspace) {
     await writeWorkspaceIdentity({
@@ -151,7 +151,7 @@ export async function archiveWorkspace(id: string): Promise<void> {
 }
 
 export function unarchiveWorkspace(id: string): void {
-  getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_archived = 0 WHERE id = ?`).run(id);
+  getOverdeckDatabase().prepare(`UPDATE workspaces SET is_archived = 0 WHERE id = ?`).run(id);
 }
 
 export interface RelocateWorkspaceOptions {
@@ -188,7 +188,7 @@ export async function relocateWorkspace(id: string, path: string, options: Reloc
 
   const isGitRepository = existsSync(join(resolvedPath, '.git'));
   const now = Date.now();
-  getOverdeckDatabaseSync()
+  getOverdeckDatabase()
     .prepare(`UPDATE workspaces SET path = ?, is_git_repository = ?, last_accessed_at = ? WHERE id = ?`)
     .run(resolvedPath, isGitRepository ? 1 : 0, now, id);
 
@@ -219,7 +219,7 @@ export async function relocateWorkspace(id: string, path: string, options: Reloc
  * only copy now, so a plain transactional delete is sufficient.
  */
 export async function deleteWorkspace(id: string): Promise<void> {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const workspace = getWorkspaceById(id);
   if (!workspace) return;
   if (workspace.kind === 'main') {
@@ -242,7 +242,7 @@ export async function deleteWorkspace(id: string): Promise<void> {
 
 export async function pinDoc(scope: PinScope, scopeId: string, docPath: string): Promise<void> {
   const createdAt = Date.now();
-  getOverdeckDatabaseSync().prepare(`
+  getOverdeckDatabase().prepare(`
     INSERT INTO pinned_docs (id, scope, scope_id, doc_path, created_at)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT (scope, scope_id, doc_path) DO NOTHING
@@ -250,7 +250,7 @@ export async function pinDoc(scope: PinScope, scopeId: string, docPath: string):
 }
 
 export async function unpinDoc(scope: PinScope, scopeId: string, docPath: string): Promise<void> {
-  getOverdeckDatabaseSync()
+  getOverdeckDatabase()
     .prepare(`DELETE FROM pinned_docs WHERE scope = ? AND scope_id = ? AND doc_path = ?`)
     .run(scope, scopeId, docPath);
 }

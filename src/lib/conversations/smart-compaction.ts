@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as self from './smart-compaction.js';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
-import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
+import { getClaudePermissionFlags } from '../claude-permissions.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
@@ -708,7 +708,7 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
     '-p',
     '--output-format', 'json',
     '--model', useModel,
-    ...getClaudePermissionFlagsSync(),
+    ...getClaudePermissionFlags(),
     // Plain summary generation uses no tools; callers that instruct the model
     // to write a file (e.g. external handoff authoring) pass an allowlist so
     // the tool is auto-approved instead of stalling on a permission prompt

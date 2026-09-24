@@ -180,7 +180,7 @@ export const DEFAULT_PRICING: ModelPricing[] = [
 /**
  * Calculate cost for token usage
  */
-export function calculateCostSync(usage: TokenUsage, pricing: ModelPricing): number {
+export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number {
   let cost = 0;
   let inputMultiplier = 1;
   let outputMultiplier = 1;
@@ -226,7 +226,7 @@ export function calculateCostSync(usage: TokenUsage, pricing: ModelPricing): num
 /**
  * Get pricing for a model
  */
-export function getPricingSync(provider: AIProvider, model: string): ModelPricing | null {
+export function getPricing(provider: AIProvider, model: string): ModelPricing | null {
   // Try exact match first
   let pricing = DEFAULT_PRICING.find(
     p => p.provider === provider && p.model === model
@@ -287,7 +287,7 @@ function readCostsSync(startDate: string, endDate: string): CostEntry[] {
 /**
  * Read costs for today
  */
-export function readTodayCostsSync(): CostEntry[] {
+export function readTodayCosts(): CostEntry[] {
   const today = getCurrentDateString();
   return readCostsSync(today, today);
 }
@@ -295,7 +295,7 @@ export function readTodayCostsSync(): CostEntry[] {
 /**
  * Read costs for an issue
  */
-export function readIssueCostsSync(issueId: string, days: number = 30): CostEntry[] {
+export function readIssueCosts(issueId: string, days: number = 30): CostEntry[] {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - days);
@@ -313,7 +313,7 @@ export function readIssueCostsSync(issueId: string, days: number = 30): CostEntr
 /**
  * Calculate cost summary for a set of entries
  */
-export function summarizeCostsSync(entries: CostEntry[]): CostSummary {
+export function summarizeCosts(entries: CostEntry[]): CostSummary {
   const summary: CostSummary = {
     totalCost: 0,
     currency: 'USD',
@@ -378,16 +378,16 @@ export function summarizeCostsSync(entries: CostEntry[]): CostSummary {
 /**
  * Get daily cost summary
  */
-export function getDailySummarySync(date?: string): CostSummary {
+export function getDailySummary(date?: string): CostSummary {
   const targetDate = date || getCurrentDateString();
   const entries = readCostsSync(targetDate, targetDate);
-  return summarizeCostsSync(entries);
+  return summarizeCosts(entries);
 }
 
 /**
  * Get weekly cost summary
  */
-export function getWeeklySummarySync(): CostSummary {
+export function getWeeklySummary(): CostSummary {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - 7);
@@ -397,13 +397,13 @@ export function getWeeklySummarySync(): CostSummary {
     end.toISOString().split('T')[0]
   );
 
-  return summarizeCostsSync(entries);
+  return summarizeCosts(entries);
 }
 
 /**
  * Get monthly cost summary
  */
-export function getMonthlySummarySync(): CostSummary {
+export function getMonthlySummary(): CostSummary {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - 30);
@@ -413,7 +413,7 @@ export function getMonthlySummarySync(): CostSummary {
     end.toISOString().split('T')[0]
   );
 
-  return summarizeCostsSync(entries);
+  return summarizeCosts(entries);
 }
 
 // ============== Cost Budgets ==============
@@ -441,7 +441,7 @@ function saveBudgets(budgets: CostBudget[]): void {
 /**
  * Create a cost budget
  */
-export function createBudgetSync(budget: Omit<CostBudget, 'id' | 'spent'>): CostBudget {
+export function createBudget(budget: Omit<CostBudget, 'id' | 'spent'>): CostBudget {
   const budgets = loadBudgets();
 
   const newBudget: CostBudget = {
@@ -467,14 +467,14 @@ function getBudgetSync(id: string): CostBudget | null {
 /**
  * Get all budgets
  */
-export function getAllBudgetsSync(): CostBudget[] {
+export function getAllBudgets(): CostBudget[] {
   return loadBudgets();
 }
 
 /**
  * Check budget status
  */
-export function checkBudgetSync(id: string): {
+export function checkBudget(id: string): {
   budget: CostBudget | null;
   remaining: number;
   percentUsed: number;
@@ -508,7 +508,7 @@ export function checkBudgetSync(id: string): {
 /**
  * Delete a budget
  */
-export function deleteBudgetSync(id: string): boolean {
+export function deleteBudget(id: string): boolean {
   const budgets = loadBudgets();
   const index = budgets.findIndex(b => b.id === id);
 
@@ -525,9 +525,9 @@ export function deleteBudgetSync(id: string): boolean {
 /**
  * Generate a cost report
  */
-export function generateReportSync(startDate: string, endDate: string): string {
+export function generateReport(startDate: string, endDate: string): string {
   const entries = readCostsSync(startDate, endDate);
-  const summary = summarizeCostsSync(entries);
+  const summary = summarizeCosts(entries);
 
   const lines: string[] = [
     '# Cost Report',
@@ -577,7 +577,7 @@ export function generateReportSync(startDate: string, endDate: string): string {
 /**
  * Format cost for display
  */
-export function formatCostSync(cost: number, currency: string = 'USD'): string {
+export function formatCost(cost: number, currency: string = 'USD'): string {
   if (currency === 'USD') {
     return `$${cost.toFixed(4)}`;
   }

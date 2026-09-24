@@ -17,7 +17,7 @@ export const WORKSPACES_DIR = join(homedir(), '.overdeck', 'workspaces');
 /**
  * Save workspace metadata to ~/.overdeck/workspaces/{issueId}.yaml
  */
-export function saveWorkspaceMetadataSync(metadata: RemoteWorkspaceMetadata): void {
+export function saveWorkspaceMetadata(metadata: RemoteWorkspaceMetadata): void {
   if (!existsSync(WORKSPACES_DIR)) {
     mkdirSync(WORKSPACES_DIR, { recursive: true });
   }
@@ -29,7 +29,7 @@ export function saveWorkspaceMetadataSync(metadata: RemoteWorkspaceMetadata): vo
 /**
  * Load workspace metadata from ~/.overdeck/workspaces/{issueId}.yaml
  */
-export function loadWorkspaceMetadataSync(issueId: string): RemoteWorkspaceMetadata | null {
+export function loadWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata | null {
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
 
@@ -48,7 +48,7 @@ export function loadWorkspaceMetadataSync(issueId: string): RemoteWorkspaceMetad
 /**
  * List all workspace metadata files
  */
-export function listWorkspaceMetadataSync(): RemoteWorkspaceMetadata[] {
+export function listWorkspaceMetadata(): RemoteWorkspaceMetadata[] {
   if (!existsSync(WORKSPACES_DIR)) {
     return [];
   }
@@ -72,14 +72,14 @@ export function listWorkspaceMetadataSync(): RemoteWorkspaceMetadata[] {
  * Check if a workspace exists (local or remote)
  * Returns metadata if remote workspace exists, null otherwise
  */
-export function findRemoteWorkspaceMetadataSync(issueId: string): RemoteWorkspaceMetadata | null {
-  return loadWorkspaceMetadataSync(issueId);
+export function findRemoteWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata | null {
+  return loadWorkspaceMetadata(issueId);
 }
 
 /**
  * Delete workspace metadata
  */
-export function deleteWorkspaceMetadataSync(issueId: string): boolean {
+export function deleteWorkspaceMetadata(issueId: string): boolean {
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
 

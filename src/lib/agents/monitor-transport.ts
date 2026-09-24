@@ -169,7 +169,7 @@ export interface InboxMessage extends ParsedMailMessage {
  * Full-body re-read for `pan inbox` — unread mail plus the read archive,
  * oldest first, most recent `limit` entries. Moves nothing, truncates nothing.
  */
-export function listInboxMessagesSync(agentId: string, limit: number): InboxMessage[] {
+export function listInboxMessages(agentId: string, limit: number): InboxMessage[] {
   const collect = (dir: string, read: boolean): InboxMessage[] => {
     if (!existsSync(dir)) return [];
     return readdirSync(dir)

@@ -22,18 +22,18 @@ vi.mock('../projects.js', async (importOriginal) => {
   };
 });
 
-import { findProjectByTeamSync } from '../projects.js';
+import { findProjectByTeam } from '../projects.js';
 
 describe('findProjectByTeamSync PAN-1872 guards', () => {
   it('returns null when teamPrefix is undefined', () => {
-    expect(findProjectByTeamSync(undefined as any)).toBeNull();
+    expect(findProjectByTeam(undefined as any)).toBeNull();
   });
 
   it('returns null when teamPrefix is null', () => {
-    expect(findProjectByTeamSync(null as any)).toBeNull();
+    expect(findProjectByTeam(null as any)).toBeNull();
   });
 
   it('returns null when teamPrefix is an empty string', () => {
-    expect(findProjectByTeamSync('')).toBeNull();
+    expect(findProjectByTeam('')).toBeNull();
   });
 });

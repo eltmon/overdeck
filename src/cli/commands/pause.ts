@@ -1,7 +1,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { Effect } from 'effect';
-import { getAgentStateSync, listAgentStates, resolveAgentTargetSync, setAgentPaused, stopAgent } from '../../lib/agents.js';
+import { getAgentState, listAgentStates, resolveAgentTarget, setAgentPaused, stopAgent } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
 import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
@@ -13,7 +13,7 @@ interface PauseOptions {
 export async function pauseCommand(id: string, options: PauseOptions): Promise<void> {
   // PAN-1760: resolve through normalizeAgentId so full agent IDs
   // (strike-pan-1723, inspect-…, agent-…-ship) are addressable, not just issue IDs.
-  const agentId = resolveAgentTargetSync(id);
+  const agentId = resolveAgentTarget(id);
   if (!agentId) {
     if (printSwarmPauseGuidance(id)) return exitCli(1);
     console.error(chalk.red(`Could not resolve agent target "${id}"`));
@@ -22,7 +22,7 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
     ));
     return exitCli(1);
   }
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
 
   if (!state) {
     if (printSwarmPauseGuidance(id)) return exitCli(1);

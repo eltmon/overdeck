@@ -14,7 +14,7 @@ vi.mock('../../xbrief/io.js', () => ({
 }));
 
 import {
-  checkIncompletePlanItemsPromise,
+  checkIncompletePlanItems,
   checkIncompletePlanItemsSync,
   evaluateIncompletePlanItems,
 } from '../done-preflight.js';
@@ -71,7 +71,7 @@ describe('plan checklist evaluation', () => {
       throw new Error('synchronous plan reader must not run');
     });
 
-    const incomplete = await checkIncompletePlanItemsPromise('/project/workspaces/feature-pan-3451', 'PAN-3451');
+    const incomplete = await checkIncompletePlanItems('/project/workspaces/feature-pan-3451', 'PAN-3451');
 
     expect(incomplete).toEqual([
       '  Incomplete plan items (1):',

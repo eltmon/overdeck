@@ -8,7 +8,7 @@
  */
 import { basename, isAbsolute } from 'node:path';
 
-import { parseIssueIdSync } from '../issue-id.js';
+import { parseIssueId } from '../issue-id.js';
 import { checkTranscriptPath } from './external-paths.js';
 import {
   EXTERNAL_FIELD_ID_RE,
@@ -101,7 +101,7 @@ export function parseExternalRegisterFields(fields: ExternalRegisterFields): Par
   }
   let issueId: string | null = null;
   if (typeof issueRaw === 'string') {
-    if (!parseIssueIdSync(issueRaw)) return { ok: false, error: `issue ${issueRaw} is not an issue id` };
+    if (!parseIssueId(issueRaw)) return { ok: false, error: `issue ${issueRaw} is not an issue id` };
     issueId = issueRaw.toUpperCase();
   }
 

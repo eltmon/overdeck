@@ -17,8 +17,8 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { logDeaconEventSync } from '../persistent-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { logDeaconEvent } from '../persistent-logger.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { loadConfig } from '../config.js';
 
@@ -175,8 +175,8 @@ export async function reapOrphanedDashboardServers(deps: ReapDeps = {}): Promise
       try { kill(pid, 'SIGKILL'); } catch { /* race: gone between check and kill */ }
     }
     const message = `Reaped orphan dashboard server pid ${pid}`;
-    logDeaconEventSync(`[orphan-server-reaper] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Deacon ${message.toLowerCase()}` });
+    logDeaconEvent(`[orphan-server-reaper] ${message}`);
+    emitActivityEntry({ source: 'cloister', level: 'warn', message: `Deacon ${message.toLowerCase()}` });
     actions.push(message);
   }
   return actions;

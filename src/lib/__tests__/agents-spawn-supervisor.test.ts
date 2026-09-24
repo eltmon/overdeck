@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState } from '../agents.js';
 import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
-import { closeOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { closeOverdeckDatabase } from '../overdeck/infra.js';
 
 let tmpHome: string;
 let workspace: string;
@@ -217,9 +217,9 @@ beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-workspace-'));
   packageRootDir = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-package-'));
   // Seed overdeck.db so saveAgentStateSync can find the migration SQL
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   process.env.OVERDECK_HOME = tmpHome;
   // fix10: this suite drives the real spawn path. Pin tmux so no selection
   // can reach a Herdr session and start a live agent in it.
@@ -261,7 +261,7 @@ afterEach(() => {
   vi.doUnmock('../provider-health.js');
   vi.doUnmock('../overdeck/control-settings.js');
   vi.doUnmock('../projects.js');
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   delete process.env.OVERDECK_AGENT_STARTED_BY;
   delete process.env.PAN_DOCKER;
@@ -332,11 +332,11 @@ describe('spawnAgent PTY supervisor wiring', () => {
   });
 
   it('persists supervisorEnabled through state read/write', async () => {
-    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const { getAgentState, saveAgentStateSync } = await import('../agents.js');
 
     saveAgentStateSync({ ...baseState(), supervisorEnabled: true });
 
-    expect(getAgentStateSync('agent-pan-1405')?.supervisorEnabled).toBe(true);
+    expect(getAgentState('agent-pan-1405')?.supervisorEnabled).toBe(true);
   });
 
   it('writes pty-token, skips Channels MCP by default, persists supervisorEnabled, and wraps the launcher', async () => {

@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 import { IssueId } from './issues.js';
 import type { ProjectConfig as RawProjectConfig } from '../projects.js';
 import { getProjectSync, loadProjectsConfigSync } from '../projects.js';
@@ -114,7 +114,7 @@ export const ConfigResolverLive = Layer.succeed(
 // ── Sync helpers (for call sites that cannot use Effect) ─────────────────────
 
 function overdeckDb() {
-  return getOverdeckDatabaseSync();
+  return getOverdeckDatabase();
 }
 
 const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
@@ -162,7 +162,7 @@ const BOOT_RECONCILIATION_DECISIONS = new Set<BootReconciliationDecision>([
 
 /** Read a raw app_settings value synchronously. Returns null if not set. */
 export function getSetting(key: string): string | null {
-  const row = getOverdeckDatabaseSync(undefined, { readOnly: true })
+  const row = getOverdeckDatabase(undefined, { readOnly: true })
     .prepare('SELECT value FROM app_settings WHERE key = ?')
     .get(key) as { value: string } | undefined;
   return row ? row.value : null;
@@ -245,7 +245,7 @@ export function setDeaconGloballyPaused(paused: boolean): void {
 }
 
 /** Synchronous check of the Cloister spawn pause flag. */
-export function isCloisterSpawnsPausedSync(): boolean {
+export function isCloisterSpawnsPaused(): boolean {
   try {
     return getSetting(CLOISTER_SPAWNS_PAUSED_KEY) === 'true';
   } catch (err) {
@@ -255,7 +255,7 @@ export function isCloisterSpawnsPausedSync(): boolean {
 }
 
 /** Synchronous set of the Cloister spawn pause flag. */
-export function setCloisterSpawnsPausedSync(paused: boolean): void {
+export function setCloisterSpawnsPaused(paused: boolean): void {
   setSetting(CLOISTER_SPAWNS_PAUSED_KEY, paused ? 'true' : 'false');
 }
 
@@ -312,8 +312,8 @@ export function setMergeTrainEnabled(enabled: boolean): void {
  * Returns the currently-active flywheel run ID from overdeck.db, or null.
  * Sync version of SettingsResolver.getFlywheelRuntime().activeRunId.
  */
-export function getFlywheelActiveRunIdSync(): string | null {
-  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
+export function getFlywheelActiveRunId(): string | null {
+  const db = getOverdeckDatabase(undefined, { readOnly: true });
   const row = db
     .prepare(`SELECT value FROM app_settings WHERE key = 'flywheel.active_run_id'`)
     .get() as { value: string | null } | undefined;

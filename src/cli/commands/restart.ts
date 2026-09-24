@@ -39,13 +39,13 @@ import {
 } from '../../lib/restart-gate-client.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
-import { readActiveDashboardBundleSync, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
+import { readActiveDashboardBundle, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 
 import {
   DASHBOARD_LOG_FILE,
   openDashboardLogStdio,
-  readPlatformConfigSync,
+  readPlatformConfig,
   restartDashboard,
   restartCliproxy,
   restartTraefik,
@@ -179,7 +179,7 @@ let warnedActiveBundleFailure: string | null = null;
  * node_modules, so a restart recovers on its own.
  */
 function usableActiveDashboardBundle(): ActiveDashboardBundle | null {
-  const activeBundle = readActiveDashboardBundleSync();
+  const activeBundle = readActiveDashboardBundle();
   if (!activeBundle) return null;
 
   const failure = dashboardServerBootFailure(activeBundle.serverPath);
@@ -538,7 +538,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   if ((scope === 'dashboard' || scope === 'full') && refuseNonPrimaryDashboardCwd(process.cwd(), 'restart')) {
     return;
   }
-  const config = readPlatformConfigSync();
+  const config = readPlatformConfig();
   let healthTimeoutMs: number | undefined;
   try {
     healthTimeoutMs = options.healthTimeout
@@ -620,9 +620,9 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       case 'dashboard': {
         if (await shouldRunManualSupervisorCycle()) {
           try {
-            const { stopSupervisorProcessSync, startSupervisorProcessSync } = await import('../../lib/supervisor.js');
-            stopSupervisorProcessSync();
-            startSupervisorProcessSync();
+            const { stopSupervisorProcess, startSupervisorProcess } = await import('../../lib/supervisor.js');
+            stopSupervisorProcess();
+            startSupervisorProcess();
           } catch { /* non-fatal */ }
         }
 
@@ -709,16 +709,16 @@ async function runFullRestart(
   await stopDashboard(config);
 
   try {
-    const { stopSupervisorProcessSync } = await import('../../lib/supervisor.js');
-    stopSupervisorProcessSync();
+    const { stopSupervisorProcess } = await import('../../lib/supervisor.js');
+    stopSupervisorProcess();
   } catch {
     // non-fatal
   }
 
   if (tldrAvailable) {
     try {
-      const { getTldrDaemonServiceSync } = await import('../../lib/tldr-daemon.js');
-      await getTldrDaemonServiceSync(projectRoot, venvPath).stop();
+      const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+      await getTldrDaemonService(projectRoot, venvPath).stop();
     } catch {
       // non-fatal — daemon may already be down
     }
@@ -759,16 +759,16 @@ async function runFullRestart(
   }
 
   try {
-    const { startSupervisorProcessSync } = await import('../../lib/supervisor.js');
-    startSupervisorProcessSync();
+    const { startSupervisorProcess } = await import('../../lib/supervisor.js');
+    startSupervisorProcess();
   } catch {
     // non-fatal
   }
 
   if (tldrAvailable) {
     try {
-      const { getTldrDaemonServiceSync } = await import('../../lib/tldr-daemon.js');
-      await getTldrDaemonServiceSync(projectRoot, venvPath).start(true);
+      const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+      await getTldrDaemonService(projectRoot, venvPath).start(true);
     } catch {
       // non-fatal — dashboard is already healthy; TLDR just won't be available
     }

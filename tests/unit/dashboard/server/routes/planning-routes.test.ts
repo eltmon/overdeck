@@ -98,7 +98,7 @@ vi.mock('../../../../../src/lib/tmux.js', async (importOriginal) => {
   return { ...actual, resizeWindow: () => Effect.succeed(undefined) };
 });
 
-import { getAgentStateSync, saveAgentStateSync } from '../../../../../src/lib/agents/agent-state.js';
+import { getAgentState, saveAgentStateSync } from '../../../../../src/lib/agents/agent-state.js';
 import { planningRouteLayer } from '../../../../../src/dashboard/server/routes/misc/planning.js';
 import { EventStoreService } from '../../../../../src/dashboard/server/services/domain-services.js';
 
@@ -189,7 +189,7 @@ describe('POST /api/planning/:issueId/message (M1)', () => {
 
     await call('POST', `/api/planning/${ISSUE}/message`, { message: 'continue' });
 
-    expect(getAgentStateSync(PLANNER)).toMatchObject({
+    expect(getAgentState(PLANNER)).toMatchObject({
       status: 'running',
       harness: 'claude-code',
       model: 'claude-sonnet-5',
@@ -204,7 +204,7 @@ describe('POST /api/planning/:issueId/message (M1)', () => {
     mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
     const seen: Array<Record<string, unknown> | null> = [];
     mocks.closeAgentPane.mockImplementation(async () => {
-      seen.push(getAgentStateSync(PLANNER) as Record<string, unknown> | null);
+      seen.push(getAgentState(PLANNER) as Record<string, unknown> | null);
       return true;
     });
 
@@ -251,7 +251,7 @@ describe('POST /api/planning/:issueId/message (M1)', () => {
 
     const failed = await call('POST', `/api/planning/${ISSUE}/message`, { message: 'first' });
     expect(failed.status).toBe(500);
-    expect(getAgentStateSync(PLANNER)?.status).toBe('error');
+    expect(getAgentState(PLANNER)?.status).toBe('error');
 
     await call('POST', `/api/planning/${ISSUE}/message`, { message: 'retry' });
     expect(mocks.launchAgentPane).toHaveBeenCalledTimes(2);

@@ -11,10 +11,10 @@ import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig, getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { getAgentStateSync } from '../agents.js';
-import { extractPrefixSync } from '../issue-id.js';
+import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
+import { getAgentState } from '../agents.js';
+import { extractPrefix } from '../issue-id.js';
 import { reopenWorkspaceState } from '../reopen.js';
 import { removeCompletionMarker } from './workspace-hygiene.js';
 
@@ -27,7 +27,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -108,7 +108,7 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Ove
 function buildLifecycleContext(id: string, issueSource: string | undefined) {
   const issuePrefix = extractTeamPrefix(id);
   const projectPath = getProjectPath(undefined, issuePrefix ?? undefined);
-  const projectConfig = issuePrefix ? findProjectByTeamSync(issuePrefix) : null;
+  const projectConfig = issuePrefix ? findProjectByTeam(issuePrefix) : null;
   const githubCheck = isGitHubIssue(id);
 
   const ctx: any = {
@@ -259,7 +259,7 @@ export function closeIssueTransition(options: {
   return Effect.gen(function* () {
     const { issueId, body, eventStore } = options;
     const { reason } = body as any;
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
 
     const { close: closeWorkflow } = yield* Effect.promise(() => import('../lifecycle/index.js'));
@@ -332,7 +332,7 @@ export function abortIssueTransition(options: {
     // be projected through the transactional boundary after the reset succeeds.
     const workAgentId = `agent-${id.toLowerCase()}`;
     const planningAgentId = `planning-${id.toLowerCase()}`;
-    const workAgentStateBeforeAbort = getAgentStateSync(workAgentId);
+    const workAgentStateBeforeAbort = getAgentState(workAgentId);
 
     const result = yield* Effect.promise(() => runDestructiveIssueLifecycle(id, 'reset', { deleteWorkspace: true }));
 
@@ -389,7 +389,7 @@ export function resetIssueTransition(options: {
     // be projected through the transactional boundary after the reset succeeds.
     const workAgentId = `agent-${id.toLowerCase()}`;
     const planningAgentId = `planning-${id.toLowerCase()}`;
-    const workAgentStateBeforeReset = getAgentStateSync(workAgentId);
+    const workAgentStateBeforeReset = getAgentState(workAgentId);
 
     const encoder = new TextEncoder();
     const nodeStream = new ReadableStream<Uint8Array>({
@@ -574,7 +574,7 @@ export function reopenIssueTransition(options: {
       // via reopenWorkspaceState (shared logic with `pan reopen` CLI command)
       try {
         const teamPrefix = extractTeamPrefix(id);
-        const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+        const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
         const projectPath = projectConfig?.path || '';
         const workspacePath = projectPath
           ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)

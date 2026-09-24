@@ -7,17 +7,17 @@ import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
-  loadCacheSync,
-  saveCacheSync,
-  updateCacheFromEventsSync,
-  rebuildCacheSync,
-  getCostsByIssueSync,
-  getCostsForIssueSync,
-  setIssueBudgetSync,
+  loadCache,
+  saveCache,
+  updateCacheFromEvents,
+  rebuildCache,
+  getCostsByIssue,
+  getCostsForIssue,
+  setIssueBudget,
   getCacheStatus,
   CostCache
 } from '../aggregator.js';
-import { appendCostEventSync, CostEvent } from '../events.js';
+import { appendCostEvent, CostEvent } from '../events.js';
 
 let TEST_ROOT: string;
 const originalHomedir = process.env.HOME;
@@ -58,7 +58,7 @@ function makeCostEvent(overrides: Partial<CostEvent> = {}): CostEvent {
 describe('Aggregator Cache Management', () => {
   describe('Cache Loading and Saving', () => {
     it('should create empty cache if none exists', () => {
-      const cache = loadCacheSync();
+      const cache = loadCache();
 
       expect(cache.version).toBe(4);
       expect(cache.status).toBe('live');
@@ -68,7 +68,7 @@ describe('Aggregator Cache Management', () => {
     });
 
     it('should save and load cache', () => {
-      const cache = loadCacheSync();
+      const cache = loadCache();
       cache.issues['TEST-1'] = {
         totalCost: 10.5,
         budgetWarning: false,
@@ -90,9 +90,9 @@ describe('Aggregator Cache Management', () => {
         lastUpdated: new Date().toISOString()
       };
 
-      saveCacheSync(cache);
+      saveCache(cache);
 
-      const loaded = loadCacheSync();
+      const loaded = loadCache();
       expect(loaded.issues['TEST-1']).toBeDefined();
       expect(loaded.issues['TEST-1'].totalCost).toBe(10.5);
     });
@@ -104,7 +104,7 @@ describe('Aggregator Cache Management', () => {
         JSON.stringify({ version: 1, status: 'live', issues: {} })
       );
 
-      const cache = loadCacheSync();
+      const cache = loadCache();
 
       // Should create new cache with correct version
       expect(cache.version).toBe(4);
@@ -145,7 +145,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEventsSync(events);
+      const cache = updateCacheFromEvents(events);
 
       expect(cache.issues['TEST-1']).toBeDefined();
       expect(cache.issues['TEST-1'].totalCost).toBeCloseTo(0.03, 6);
@@ -185,7 +185,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEventsSync(events);
+      const cache = updateCacheFromEvents(events);
 
       expect(cache.issues['TEST-2'].models['claude-sonnet-4']).toBeDefined();
       expect(cache.issues['TEST-2'].models['claude-haiku-4-5']).toBeDefined();
@@ -225,7 +225,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEventsSync(events);
+      const cache = updateCacheFromEvents(events);
 
       expect(cache.issues['TEST-3'].providers.anthropic).toBeCloseTo(0.01, 6);
       expect(cache.issues['TEST-3'].providers.openai).toBeCloseTo(0.0125, 6);
@@ -249,7 +249,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEventsSync(events);
+      const cache = updateCacheFromEvents(events);
 
       // Should be stored as uppercase
       expect(cache.issues['TEST-4']).toBeDefined();
@@ -277,12 +277,12 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      updateCacheFromEventsSync(events);
+      updateCacheFromEvents(events);
 
       // Set budget
-      setIssueBudgetSync('TEST-5', 100.0);
+      setIssueBudget('TEST-5', 100.0);
 
-      const cache = loadCacheSync();
+      const cache = loadCache();
       expect(cache.issues['TEST-5'].budget).toBe(100.0);
     });
 
@@ -304,10 +304,10 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      updateCacheFromEventsSync(events);
-      setIssueBudgetSync('TEST-6', 100.0);
+      updateCacheFromEvents(events);
+      setIssueBudget('TEST-6', 100.0);
 
-      const cache = loadCacheSync();
+      const cache = loadCache();
       expect(cache.issues['TEST-6'].budgetWarning).toBe(true);
     });
 
@@ -329,10 +329,10 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      updateCacheFromEventsSync(events);
-      setIssueBudgetSync('TEST-7', 100.0);
+      updateCacheFromEvents(events);
+      setIssueBudget('TEST-7', 100.0);
 
-      const cache = loadCacheSync();
+      const cache = loadCache();
       expect(cache.issues['TEST-7'].budgetWarning).toBe(false);
     });
   });
@@ -356,7 +356,7 @@ describe('Aggregator Cache Management', () => {
         }
       ];
 
-      const cache = updateCacheFromEventsSync(events);
+      const cache = updateCacheFromEvents(events);
 
       // Cost should be rounded to 6 decimal places
       const costStr = cache.issues['TEST-8'].totalCost.toString();
@@ -387,7 +387,7 @@ describe('Aggregator Cache Management', () => {
         });
       }
 
-      const cache = updateCacheFromEventsSync(events);
+      const cache = updateCacheFromEvents(events);
 
       // Should accumulate correctly without floating point errors
       expect(cache.issues['TEST-9'].totalCost).toBeCloseTo(0.001, 6);
@@ -421,21 +421,21 @@ describe('Aggregator Cache Management', () => {
       };
 
       // Write to events file - syncCache will pick it up
-      appendCostEventSync(event);
+      appendCostEvent(event);
 
-      const issueData = getCostsForIssueSync('TEST-10');
+      const issueData = getCostsForIssue('TEST-10');
       expect(issueData).toBeDefined();
       expect(issueData?.totalCost).toBeCloseTo(0.01, 6);
     });
 
     it('should advance the byte cursor using only appended events', () => {
-      appendCostEventSync(makeCostEvent({ issueId: 'TEST-DELTA', cost: 0.01 }));
-      expect(getCostsForIssueSync('TEST-DELTA')?.totalCost).toBeCloseTo(0.01, 6);
-      const first = loadCacheSync();
+      appendCostEvent(makeCostEvent({ issueId: 'TEST-DELTA', cost: 0.01 }));
+      expect(getCostsForIssue('TEST-DELTA')?.totalCost).toBeCloseTo(0.01, 6);
+      const first = loadCache();
 
-      appendCostEventSync(makeCostEvent({ issueId: 'TEST-DELTA', cost: 0.02 }));
-      expect(getCostsForIssueSync('TEST-DELTA')?.totalCost).toBeCloseTo(0.03, 6);
-      const second = loadCacheSync();
+      appendCostEvent(makeCostEvent({ issueId: 'TEST-DELTA', cost: 0.02 }));
+      expect(getCostsForIssue('TEST-DELTA')?.totalCost).toBeCloseTo(0.03, 6);
+      const second = loadCache();
 
       expect(first.lastEventLine).toBe(1);
       expect(second.lastEventLine).toBe(2);
@@ -459,10 +459,10 @@ describe('Aggregator Cache Management', () => {
       };
 
       // Write to events file - syncCache will pick it up
-      appendCostEventSync(event);
+      appendCostEvent(event);
 
       // Should find with lowercase query
-      const issueData = getCostsForIssueSync('test-11');
+      const issueData = getCostsForIssue('test-11');
       expect(issueData).toBeDefined();
       expect(issueData?.totalCost).toBeCloseTo(0.01, 6);
     });

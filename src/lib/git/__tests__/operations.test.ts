@@ -21,8 +21,8 @@ vi.mock('child_process', async (importOriginal) => {
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 /**
@@ -84,12 +84,12 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
     await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-DIV' }))
       .rejects.toThrow();
 
-    const ops = listGitOperationsSync({ issueId: 'PAN-DIV', operation: 'main_diverged' });
+    const ops = listGitOperations({ issueId: 'PAN-DIV', operation: 'main_diverged' });
     expect(ops).toHaveLength(1);
     expect(ops[0].status).toBe('aborted');
     expect(ops[0].beforeSha).toBe('local123');
@@ -106,12 +106,12 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
     await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OK' }))
       .resolves.not.toThrow();
 
-    const ops = listGitOperationsSync({ issueId: 'PAN-OK', operation: 'push' });
+    const ops = listGitOperations({ issueId: 'PAN-OK', operation: 'push' });
     expect(ops).toHaveLength(1);
     expect(ops[0].status).toBe('success');
   });
@@ -126,12 +126,12 @@ describe('gitPush — divergence guard (AC1/AC3)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
     await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-NFF' }))
       .rejects.toThrow('non-fast-forward');
 
-    const failures = listGitOperationsSync({ issueId: 'PAN-NFF', status: 'failure' });
+    const failures = listGitOperations({ issueId: 'PAN-NFF', status: 'failure' });
     expect(failures.length).toBeGreaterThan(0);
     const pushFail = failures.find((op) => op.operation === 'push');
     expect(pushFail).toBeDefined();

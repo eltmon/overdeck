@@ -34,14 +34,14 @@ import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { initRestartGate } from './services/restart-gate.js';
-import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
-import { ensureInternalTokenSync } from '../../lib/internal-token.js';
+import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
+import { ensureInternalToken } from '../../lib/internal-token.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier } from '../../lib/cloister/deacon-lite.js';
-import { getAgentStateSync, type AgentState } from '../../lib/agents.js';
+import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
@@ -73,10 +73,10 @@ import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
-import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync, dropDeadIssuesForeignKeysSync } from '../../lib/overdeck/infra.js';
+import { RecordsLive, TmuxLive, dropPipelineStateMirrorTables, dropDeadIssuesForeignKeys } from '../../lib/overdeck/infra.js';
 import { startServerBootTelemetry } from './telemetry.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
-import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
+import { isSmeeConfigured, startSmeeProcess } from '../../lib/smee.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
 import { broadcastServerRestarting } from './ws-terminal.js';
@@ -117,7 +117,7 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // Ensure the internal token exists before any in-process CLI sender resolves it (PAN-891).
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
-ensureInternalTokenSync();
+ensureInternalToken();
 
 // PAN-785 prepared the managed tmux context here, before any code path could spawn
 // tmux. Since PAN-1379 made that boot hook an Effect, the `await` here returned
@@ -148,7 +148,7 @@ try {
 // dashboard's overdeck.db; running it there dropped `agents` out from under the
 // live 0.51.0 server, which then crash-looped. See infra.ts for both gates.
 try {
-  const drop = dropPipelineStateMirrorTablesSync();
+  const drop = dropPipelineStateMirrorTables();
   if (drop.dropped) {
     console.log('[overdeck] Dropped the pipeline-state mirror tables (once; marker written)');
   } else if (drop.skipped === 'peer') {
@@ -162,7 +162,7 @@ try {
 // every post-cut issue id (nothing writes `issues` since the Cut). Same gates
 // as the mirror drop above: once, and only in a primary dashboard.
 try {
-  const fkDrop = dropDeadIssuesForeignKeysSync();
+  const fkDrop = dropDeadIssuesForeignKeys();
   if (fkDrop.dropped) {
     console.log(`[overdeck] Dropped the dead issues FKs (once; marker written) — rebuilt: ${fkDrop.tables.join(', ') || 'none (already clean)'}`);
   } else if (fkDrop.skipped === 'peer') {
@@ -267,7 +267,7 @@ if (process.env.OVERDECK_MODE === 'desktop') {
 // Wire up pipeline notifier → domain events, so the frontend Zustand store
 // updates on review and test outcomes. PAN-3917: there is no `status_changed`
 // variant — nothing stores a status to change.
-setPipelineHandlerSync((event) => {
+setPipelineHandler((event) => {
   switch (event.type) {
     case 'review.approved':
     case 'test.passed': {
@@ -449,7 +449,7 @@ setAgentStoppedNotifier((agentId) => {
   void (async () => {
     try {
       const es = getEventStore();
-      const state = getAgentStateSync(agentId);
+      const state = getAgentState(agentId);
       if (state) {
         // heartbeat_dead only updates runtime snapshot; emit it directly.
         es.append({
@@ -637,13 +637,13 @@ if (startCliproxyWatchdogForDashboard(isPeerDashboard)) {
 
 if (isPeerDashboard) {
   console.log('[overdeck] smee-client webhook relay skipped — peer dashboard (OVERDECK_DISABLE_DEACON=1)');
-} else if (isSmeeConfiguredSync()) {
+} else if (isSmeeConfigured()) {
   try {
-    startSmeeProcessSync();
+    startSmeeProcess();
     console.log('[overdeck] smee-client webhook relay ensured');
   } catch (err) {
     console.warn('[overdeck] Failed to ensure smee-client webhook relay:', err instanceof Error ? err.message : String(err));
-    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Failed to ensure smee-client webhook relay: ${err instanceof Error ? err.message : String(err)}` });
+    emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Failed to ensure smee-client webhook relay: ${err instanceof Error ? err.message : String(err)}` });
   }
 } else {
   console.log('[overdeck] smee-client webhook relay not configured');
@@ -652,12 +652,12 @@ if (isPeerDashboard) {
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'dashboard',
       level: 'info',
       message: 'Dashboard stopping',
     });
-    emitActivityTtsSync({
+    emitActivityTts({
       utterance: 'Dashboard stopping',
       priority: 2,
       source: 'dashboard',
@@ -743,12 +743,12 @@ setTimeout(() => {
     .then((n) => {
       if (n > 0) {
         console.log(`[overdeck] Recovered ${n} stuck fork(s)`);
-        emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Recovered ${n} stuck fork(s) on startup` });
+        emitActivityEntry({ source: 'dashboard', level: 'info', message: `Recovered ${n} stuck fork(s) on startup` });
       }
     })
     .catch((err) => {
       console.warn('[overdeck] Failed to recover stuck forks:', err);
-      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
+      emitActivityEntry({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
     });
 }, 1000);
 // PAN-3537: seed the per-project CI chip before the first webhook arrives, and
@@ -774,14 +774,14 @@ if (isPeerDashboard) {
     const resetCount = resetProcessingToQueued();
     if (resetCount > 0) {
       console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
-      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+      emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
     }
     // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
     // problems endpoint and to the deacon reconciler — requeue it so it is retried.
     const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
     if (requeuedAutoMerges > 0) {
       console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
-      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
+      emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
     }
     await resumeQueuedMerges();
   } catch (err: any) {
@@ -826,15 +826,15 @@ if (startAutoMergeExecutor()) {
 
 if (isPeerDashboard) {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
-  emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
+  emitActivityEntry({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
   // PAN-3917: there is no state plane left to migrate, so nothing gates the
   // Deacon's boot any more — deacon-lite reads the forge and the terminal
   // backend and writes no status.
   startDeaconChild().catch((err) => {
     console.error('[overdeck] Cloister auto-start failed:', err);
-    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
+    emitActivityEntry({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
   });
   console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
-  emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }

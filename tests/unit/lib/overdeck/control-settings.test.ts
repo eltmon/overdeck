@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { Effect } from 'effect';
 
-import { closeOverdeckDatabaseSync } from '../../../../src/lib/overdeck/infra.js';
+import { closeOverdeckDatabase } from '../../../../src/lib/overdeck/infra.js';
 import { ConfigResolver, ConfigResolverLive, setLastCleanShutdownAt, DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY, getSetting } from '../../../../src/lib/overdeck/control-settings.js';
 import type { IssueId } from '../../../../src/lib/overdeck/issues.js';
 
@@ -30,14 +30,14 @@ describe('clean shutdown marker', () => {
     const previousHome = process.env.OVERDECK_HOME;
     const testHome = mkdtempSync(join(tmpdir(), 'pan-3184-control-settings-'));
     const marker = '2026-07-27T05:00:00.000Z';
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
     process.env.OVERDECK_HOME = testHome;
 
     try {
       setLastCleanShutdownAt(marker);
       expect(getLastCleanShutdownAt()).toBe(marker);
     } finally {
-      closeOverdeckDatabaseSync();
+      closeOverdeckDatabase();
       if (previousHome === undefined) delete process.env.OVERDECK_HOME;
       else process.env.OVERDECK_HOME = previousHome;
       rmSync(testHome, { recursive: true, force: true });

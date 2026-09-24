@@ -108,8 +108,8 @@ async function postSwitchModel(conversationName: string, body: Record<string, un
 }
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 describe('POST /api/conversations/:name/switch-model', () => {

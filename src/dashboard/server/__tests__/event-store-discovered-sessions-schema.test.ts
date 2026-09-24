@@ -13,7 +13,7 @@ import {
   upsertDiscoveredSession,
 } from '../../../lib/overdeck/discovered-sessions.js';
 import { openDatabase } from '../../../lib/database/driver.js';
-import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../../../lib/overdeck/infra.js';
+import { closeOverdeckDatabase, getOverdeckDatabase } from '../../../lib/overdeck/infra.js';
 
 let TEST_HOME: string;
 let odb: OverdeckTestDb;
@@ -29,8 +29,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   teardownOverdeckTestDb(odb);
-  const { closeOverdeckDatabaseSync } = await import('../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../../lib/overdeck/infra.js');
+  closeOverdeckDatabase();
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
@@ -96,12 +96,12 @@ describe('event-store database startup schema', () => {
       seedDb.close();
     }
 
-    const db = getOverdeckDatabaseSync(dbPath);
+    const db = getOverdeckDatabase(dbPath);
     const row = db
       .prepare(`SELECT harness FROM discovered_sessions WHERE jsonl_path = ?`)
       .get('/legacy/existing.jsonl') as { harness: string };
 
     expect(row.harness).toBe('claude-code');
-    closeOverdeckDatabaseSync();
+    closeOverdeckDatabase();
   });
 });

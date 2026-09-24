@@ -39,7 +39,7 @@ export function waiverCoversHead(waiver: TestSkipWaiver | undefined, head: strin
  * a decision id of `D-test-removal-waived:<sha>`. Read-only and best-effort:
  * an unreadable continue file simply means no waiver.
  */
-export function resolveActiveTestSkipWaiverSync(issueId: string, head: string | undefined): TestSkipWaiver | null {
+export function resolveActiveTestSkipWaiver(issueId: string, head: string | undefined): TestSkipWaiver | null {
   if (!head) return null;
   try {
     const project = resolveProjectForIssue(issueId);

@@ -23,9 +23,9 @@ function fakeChild(pid: number) {
 describe('supervisor lifecycle', () => {
   let home: string;
   let prevHome: string | undefined;
-  let startSupervisorProcessSync: typeof supervisor.startSupervisorProcessSync;
-  let stopSupervisorProcessSync: typeof supervisor.stopSupervisorProcessSync;
-  let isSupervisorRunningSync: typeof supervisor.isSupervisorRunningSync;
+  let startSupervisorProcessSync: typeof supervisor.startSupervisorProcess;
+  let stopSupervisorProcessSync: typeof supervisor.stopSupervisorProcess;
+  let isSupervisorRunningSync: typeof supervisor.isSupervisorRunning;
   let resolveSupervisorPrimaryRepoRoot: typeof supervisor.resolveSupervisorPrimaryRepoRoot;
 
   beforeEach(async () => {
@@ -48,9 +48,9 @@ describe('supervisor lifecycle', () => {
     vi.resetModules();
 
     const mod = await import('../../../src/lib/supervisor.js');
-    startSupervisorProcessSync = mod.startSupervisorProcessSync;
-    stopSupervisorProcessSync = mod.stopSupervisorProcessSync;
-    isSupervisorRunningSync = mod.isSupervisorRunningSync;
+    startSupervisorProcessSync = mod.startSupervisorProcess;
+    stopSupervisorProcessSync = mod.stopSupervisorProcess;
+    isSupervisorRunningSync = mod.isSupervisorRunning;
     resolveSupervisorPrimaryRepoRoot = mod.resolveSupervisorPrimaryRepoRoot;
   });
 

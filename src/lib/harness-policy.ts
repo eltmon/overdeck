@@ -24,7 +24,7 @@
 
 import type { RuntimeName } from './runtimes/types.js'
 import type { AuthMode } from './subscription-types.js'
-import { getProviderForModelSync } from './providers.js'
+import { getProviderForModel } from './providers.js'
 
 export type HarnessPolicyDecision = {
   allowed: boolean
@@ -74,23 +74,23 @@ const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5', 'gpt-5.6-sol', 'gpt-
  * Check whether a (model, authMode) pair is allowed, independent of harness.
  * Use this in pickers to lock model options that the current auth setup can't reach.
  */
-export function canUseModelWithAuthSync(
+export function canUseModelWithAuth(
   model: string,
   authMode: AuthMode | undefined,
 ): HarnessPolicyDecision {
-  const provider = getProviderForModelSync(model)
+  const provider = getProviderForModel(model)
   if (provider.name === 'openai' && SUBSCRIPTION_ONLY_OPENAI_MODELS.has(model) && authMode === 'api-key') {
     return SUBSCRIPTION_ONLY_MODEL_BLOCK
   }
   return ALLOWED
 }
 
-export function canUseHarnessSync(
+export function canUseHarness(
   harness: RuntimeName,
   model: string,
   authMode: AuthMode | undefined,
 ): HarnessPolicyDecision {
-  const providerName = getProviderForModelSync(model).name;
+  const providerName = getProviderForModel(model).name;
   const isOpenCodeProvider = providerName === 'opencode' || providerName === 'opencode-go';
   if (harness === 'opencode' || isOpenCodeProvider) {
     return harness === 'opencode' && isOpenCodeProvider
@@ -105,7 +105,7 @@ export function canUseHarnessSync(
     };
   }
   // Model-level auth restrictions apply to every harness.
-  const modelAuth = canUseModelWithAuthSync(model, authMode)
+  const modelAuth = canUseModelWithAuth(model, authMode)
   if (!modelAuth.allowed) return modelAuth
 
   // kimi-code/* ids live only in the native kimi CLI's catalog (served by the
@@ -127,15 +127,15 @@ export function canUseHarnessSync(
   }
 
   if (harness === 'acp') {
-    return getProviderForModelSync(model).name === 'kimi' ? ALLOWED : ACP_KIMI_ONLY_BLOCK
+    return getProviderForModel(model).name === 'kimi' ? ALLOWED : ACP_KIMI_ONLY_BLOCK
   }
 
   if (harness === 'kimi-code') {
-    return getProviderForModelSync(model).name === 'kimi' ? ALLOWED : KIMI_CODE_KIMI_ONLY_BLOCK
+    return getProviderForModel(model).name === 'kimi' ? ALLOWED : KIMI_CODE_KIMI_ONLY_BLOCK
   }
 
   if (harness === 'ohmypi') {
-    const provider = getProviderForModelSync(model)
+    const provider = getProviderForModel(model)
     if (provider.name === 'anthropic' && authMode === 'subscription') {
       return OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK
     }

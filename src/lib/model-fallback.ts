@@ -7,7 +7,7 @@
  */
 
 import { ModelId, AnthropicModel } from './settings.js';
-import { resolveModelIdSync, MODEL_CAPABILITIES, MODEL_DEPRECATIONS } from './model-capabilities.js';
+import { resolveModelId, MODEL_CAPABILITIES, MODEL_DEPRECATIONS } from './model-capabilities.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
 /**
@@ -247,20 +247,20 @@ const TIER_RANK: Record<SubscriptionPlan, number> = {
  * OpenRouter model IDs use the format "organization/model-name" (e.g., "qwen/qwen3.6-plus:free").
  * This is distinct from all other providers which use simple identifiers without slashes.
  */
-export function isOpenRouterModelSync(modelId: string): boolean {
+export function isOpenRouterModel(modelId: string): boolean {
   return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
 }
 
 /**
  * Get the provider for a model ID
  */
-export function getModelProviderSync(modelId: ModelId | string): ModelProvider {
+export function getModelProvider(modelId: ModelId | string): ModelProvider {
   if (modelId.startsWith('opencode/')) return 'opencode';
   if (modelId.startsWith('opencode-go/')) return 'opencode-go';
-  if (isOpenRouterModelSync(modelId)) return 'openrouter';
+  if (isOpenRouterModel(modelId)) return 'openrouter';
   const direct = (MODEL_PROVIDERS as Record<string, ModelProvider>)[modelId];
   if (direct) return direct;
-  const resolved = resolveModelIdSync(modelId);
+  const resolved = resolveModelId(modelId);
   const resolvedProvider = (MODEL_PROVIDERS as Record<string, ModelProvider>)[resolved];
   if (resolvedProvider) return resolvedProvider;
 
@@ -278,7 +278,7 @@ export function getModelProviderSync(modelId: ModelId | string): ModelProvider {
 /**
  * Get all models for a specific provider
  */
-export function getModelsByProviderSync(provider: ModelProvider): ModelId[] {
+export function getModelsByProvider(provider: ModelProvider): ModelId[] {
   return Object.entries(MODEL_PROVIDERS)
     .filter(([_, p]) => p === provider)
     .map(([modelId]) => modelId as ModelId);
@@ -365,7 +365,7 @@ function applyTierAwareFallbackSync(
   enabledProviders: Set<ModelProvider>,
   userTier?: SubscriptionPlan
 ): ModelId {
-  const provider = getModelProviderSync(modelId);
+  const provider = getModelProvider(modelId);
   // Native Muse credentials are resolved by its CLI; never substitute another tier or provider.
   if (provider === 'meta') {
     if (!isProviderEnabled(provider, enabledProviders)) throw new Error('Meta (Muse) is disabled; enable it in Settings before selecting a Muse model');
@@ -374,7 +374,7 @@ function applyTierAwareFallbackSync(
 
   // Case 1: Provider disabled — use Anthropic equivalent if available
   if (!isProviderEnabled(provider, enabledProviders)) {
-    const fallback = getFallbackModelSync(modelId);
+    const fallback = getFallbackModel(modelId);
     if (isProviderEnabled('anthropic', enabledProviders)) {
       console.warn(
         `Model ${modelId} requires ${provider} API key which is not configured, falling back to ${fallback}`
@@ -403,7 +403,7 @@ function applyTierAwareFallbackSync(
   }
 
   // Case 4: User tier too low — find best available model at user's tier in same provider
-  const providerModels = getModelsByProviderSync(provider);
+  const providerModels = getModelsByProvider(provider);
   const candidates = providerModels.filter((m) => {
     const mRank = MODEL_TIER_RANK[m] ?? 0;
     return mRank <= userRank;
@@ -444,7 +444,7 @@ function applyTierAwareFallbackSync(
  * @param enabledProviders Set of enabled provider names
  * @returns Original model if provider enabled, otherwise Anthropic fallback
  */
-export function applyFallbackSync(
+export function applyFallback(
   modelId: ModelId,
   enabledProviders: Set<ModelProvider>
 ): ModelId {
@@ -457,9 +457,9 @@ export function applyFallbackSync(
  * @param modelId Model to get fallback for
  * @returns Anthropic fallback model
  */
-export function getFallbackModelSync(modelId: ModelId): AnthropicModel {
+export function getFallbackModel(modelId: ModelId): AnthropicModel {
   // Anthropic models fallback to themselves
-  if (getModelProviderSync(modelId) === 'anthropic') {
+  if (getModelProvider(modelId) === 'anthropic') {
     return modelId as AnthropicModel;
   }
 
@@ -472,7 +472,7 @@ export function getFallbackModelSync(modelId: ModelId): AnthropicModel {
  * @param enabledProviders Set of enabled provider names
  * @returns List of available model IDs
  */
-export function getAvailableModelsSync(enabledProviders: Set<ModelProvider>): ModelId[] {
+export function getAvailableModels(enabledProviders: Set<ModelProvider>): ModelId[] {
   return Object.entries(MODEL_CAPABILITIES)
     .filter(([id, capability]) => !(id in MODEL_DEPRECATIONS) && !capability.displayName.includes('(deprecated)') && isProviderEnabled(capability.provider, enabledProviders))
     .map(([id]) => id as ModelId);

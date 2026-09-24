@@ -22,7 +22,7 @@ vi.mock('../../projects.js', () => ({
   loadProjectsConfigSync: () => ({ projects: fixture.projects }),
 }));
 
-import { findProjectKeyByPathSync } from '../project-key.js';
+import { findProjectKeyByPath } from '../project-key.js';
 
 describe('findProjectKeyByPathSync', () => {
   let root: string;
@@ -42,36 +42,36 @@ describe('findProjectKeyByPathSync', () => {
   it('expands a ~ project root before matching', () => {
     fixture.projects = { overdeck: { name: 'Overdeck', path: '~/Projects/overdeck' } };
     const workspace = join(fixture.home, 'Projects', 'overdeck', 'workspaces', 'feature-pan-1');
-    expect(findProjectKeyByPathSync(workspace)).toBe('overdeck');
+    expect(findProjectKeyByPath(workspace)).toBe('overdeck');
   });
 
   it('expands a ~ target path', () => {
     fixture.projects = { overdeck: { name: 'Overdeck', path: join(fixture.home, 'Projects', 'overdeck') } };
-    expect(findProjectKeyByPathSync('~/Projects/overdeck/workspaces/feature-pan-1')).toBe('overdeck');
+    expect(findProjectKeyByPath('~/Projects/overdeck/workspaces/feature-pan-1')).toBe('overdeck');
   });
 
   it('matches the project root itself', () => {
     fixture.projects = { overdeck: { name: 'Overdeck', path: '~/Projects/overdeck' } };
-    expect(findProjectKeyByPathSync(join(fixture.home, 'Projects', 'overdeck'))).toBe('overdeck');
+    expect(findProjectKeyByPath(join(fixture.home, 'Projects', 'overdeck'))).toBe('overdeck');
   });
 
   it('does not treat a sibling sharing the name prefix as contained', () => {
     fixture.projects = { overdeck: { name: 'Overdeck', path: '~/Projects/overdeck' } };
-    expect(findProjectKeyByPathSync(join(fixture.home, 'Projects', 'overdeck-knowledge'))).toBeNull();
+    expect(findProjectKeyByPath(join(fixture.home, 'Projects', 'overdeck-knowledge'))).toBeNull();
   });
 
   it('resolves a symlinked path to the project it really lives in', () => {
     fixture.projects = { overdeck: { name: 'Overdeck', path: '~/Projects/overdeck' } };
     const link = join(root, 'linked-workspace');
     symlinkSync(join(fixture.home, 'Projects', 'overdeck', 'workspaces', 'feature-pan-1'), link);
-    expect(findProjectKeyByPathSync(link)).toBe('overdeck');
+    expect(findProjectKeyByPath(link)).toBe('overdeck');
   });
 
   it('resolves a symlinked project root', () => {
     const linkedRoot = join(root, 'overdeck-link');
     symlinkSync(join(fixture.home, 'Projects', 'overdeck'), linkedRoot);
     fixture.projects = { overdeck: { name: 'Overdeck', path: linkedRoot } };
-    expect(findProjectKeyByPathSync(join(fixture.home, 'Projects', 'overdeck', 'workspaces'))).toBe('overdeck');
+    expect(findProjectKeyByPath(join(fixture.home, 'Projects', 'overdeck', 'workspaces'))).toBe('overdeck');
   });
 
   it('prefers the deepest containing root', () => {
@@ -79,18 +79,18 @@ describe('findProjectKeyByPathSync', () => {
       outer: { name: 'Outer', path: '~/Projects' },
       overdeck: { name: 'Overdeck', path: '~/Projects/overdeck' },
     };
-    expect(findProjectKeyByPathSync(join(fixture.home, 'Projects', 'overdeck', 'workspaces'))).toBe('overdeck');
-    expect(findProjectKeyByPathSync(join(fixture.home, 'Projects', 'overdeck-knowledge'))).toBe('outer');
+    expect(findProjectKeyByPath(join(fixture.home, 'Projects', 'overdeck', 'workspaces'))).toBe('overdeck');
+    expect(findProjectKeyByPath(join(fixture.home, 'Projects', 'overdeck-knowledge'))).toBe('outer');
   });
 
   it('contains everything under a filesystem-root project', () => {
     fixture.projects = { everything: { name: 'Everything', path: '/' } };
-    expect(findProjectKeyByPathSync(join(fixture.home, 'Projects'))).toBe('everything');
+    expect(findProjectKeyByPath(join(fixture.home, 'Projects'))).toBe('everything');
   });
 
   it('matches a path that no longer exists by its lexical form', () => {
     fixture.projects = { overdeck: { name: 'Overdeck', path: '~/Projects/overdeck' } };
-    expect(findProjectKeyByPathSync(join(fixture.home, 'Projects', 'overdeck', 'workspaces', 'deleted'))).toBe('overdeck');
+    expect(findProjectKeyByPath(join(fixture.home, 'Projects', 'overdeck', 'workspaces', 'deleted'))).toBe('overdeck');
   });
 
   it('matches a deleted path under a symlinked root', () => {
@@ -103,12 +103,12 @@ describe('findProjectKeyByPathSync', () => {
     fixture.home = linkedHome;
     fixture.projects = { overdeck: { name: 'Overdeck', path: '~/Projects/overdeck' } };
 
-    expect(findProjectKeyByPathSync('~/Projects/overdeck/workspaces/feature-gone/src')).toBe('overdeck');
-    expect(findProjectKeyByPathSync(join(realProjects, 'overdeck', 'workspaces', 'feature-gone'))).toBe('overdeck');
-    expect(findProjectKeyByPathSync(join(linkedHome, 'Projects', 'overdeck-gone'))).toBeNull();
+    expect(findProjectKeyByPath('~/Projects/overdeck/workspaces/feature-gone/src')).toBe('overdeck');
+    expect(findProjectKeyByPath(join(realProjects, 'overdeck', 'workspaces', 'feature-gone'))).toBe('overdeck');
+    expect(findProjectKeyByPath(join(linkedHome, 'Projects', 'overdeck-gone'))).toBeNull();
   });
 
   it('returns null for an empty path', () => {
-    expect(findProjectKeyByPathSync('')).toBeNull();
+    expect(findProjectKeyByPath('')).toBeNull();
   });
 });

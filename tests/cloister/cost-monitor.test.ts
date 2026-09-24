@@ -16,28 +16,28 @@ vi.mock('../../src/lib/overdeck/cost-sync.js', () => ({
 import {
   getAgentRollup,
   getDailyTrendsSync as getDailyTrends,
-  getCostForIssueSync as getCostForIssueFromDb,
-  getAgentDailyCostSync,
+  getCostForIssue as getCostForIssueFromDb,
+  getAgentDailyCost,
 } from '../../src/lib/overdeck/cost-sync.js';
 import {
-  recordCostSync,
+  recordCost,
   checkCostLimits,
   getAgentCost,
   getIssueCost,
   getDailyTotal,
   getCostSummary,
-  resetCostTrackingSync,
+  resetCostTracking,
 } from '../../src/lib/cloister/cost-monitor.js';
 
 describe('cost-monitor', () => {
   beforeEach(() => {
     // Reset in-memory tracking before each test
-    resetCostTrackingSync();
+    resetCostTracking();
     // Reset DB mocks to default (no spend)
     vi.mocked(getAgentRollup).mockReturnValue([]);
     vi.mocked(getDailyTrends).mockReturnValue([]);
     vi.mocked(getCostForIssueFromDb).mockReturnValue(null);
-    vi.mocked(getAgentDailyCostSync).mockReturnValue(0);
+    vi.mocked(getAgentDailyCost).mockReturnValue(0);
   });
 
   afterEach(() => {
@@ -46,48 +46,48 @@ describe('cost-monitor', () => {
 
   describe('recordCost', () => {
     it('should record agent cost', () => {
-      recordCostSync('agent-1', 1.5);
+      recordCost('agent-1', 1.5);
       expect(getAgentCost('agent-1')).toBe(1.5);
     });
 
     it('should record issue cost', () => {
-      recordCostSync('agent-1', 2.0, 'issue-1');
+      recordCost('agent-1', 2.0, 'issue-1');
       expect(getIssueCost('issue-1')).toBe(2.0);
     });
 
     it('should accumulate costs for same agent', () => {
-      recordCostSync('agent-1', 1.0);
-      recordCostSync('agent-1', 0.5);
-      recordCostSync('agent-1', 0.25);
+      recordCost('agent-1', 1.0);
+      recordCost('agent-1', 0.5);
+      recordCost('agent-1', 0.25);
       expect(getAgentCost('agent-1')).toBe(1.75);
     });
 
     it('should accumulate costs for same issue', () => {
-      recordCostSync('agent-1', 1.0, 'issue-1');
-      recordCostSync('agent-2', 2.0, 'issue-1');
-      recordCostSync('agent-3', 0.5, 'issue-1');
+      recordCost('agent-1', 1.0, 'issue-1');
+      recordCost('agent-2', 2.0, 'issue-1');
+      recordCost('agent-3', 0.5, 'issue-1');
       expect(getIssueCost('issue-1')).toBe(3.5);
     });
 
     it('should update daily total', () => {
-      recordCostSync('agent-1', 1.0);
-      recordCostSync('agent-2', 2.0);
-      recordCostSync('agent-3', 0.5);
+      recordCost('agent-1', 1.0);
+      recordCost('agent-2', 2.0);
+      recordCost('agent-3', 0.5);
       expect(getDailyTotal()).toBe(3.5);
     });
   });
 
   describe('checkCostLimits', () => {
     it('returns no alerts and reads no cost data when limits are not configured (opt-in, PAN-2642)', () => {
-      vi.mocked(getAgentDailyCostSync).mockReturnValue(9999);
+      vi.mocked(getAgentDailyCost).mockReturnValue(9999);
       const alerts = checkCostLimits('agent-1', 'pan-1', undefined);
       expect(alerts).toHaveLength(0);
-      expect(getAgentDailyCostSync).not.toHaveBeenCalled();
+      expect(getAgentDailyCost).not.toHaveBeenCalled();
       expect(getDailyTrends).not.toHaveBeenCalled();
     });
 
     it('skips unset limit dimensions and defaults the warn threshold to 0.8', () => {
-      vi.mocked(getAgentDailyCostSync).mockReturnValue(9.0);
+      vi.mocked(getAgentDailyCost).mockReturnValue(9.0);
       const alerts = checkCostLimits('agent-1', undefined, { per_agent_usd: 10.0 });
       expect(alerts).toHaveLength(1);
       expect(alerts[0]).toMatchObject({ type: 'per_agent', level: 'warning' });
@@ -95,7 +95,7 @@ describe('cost-monitor', () => {
     });
 
     it('should not alert when under threshold', () => {
-      vi.mocked(getAgentDailyCostSync).mockReturnValue(1.0);
+      vi.mocked(getAgentDailyCost).mockReturnValue(1.0);
       vi.mocked(getDailyTrends).mockReturnValue([
         { date: '2026-06-17', totalCost: 1.0, eventCount: 1, totalTokens: 100 },
       ]);
@@ -109,7 +109,7 @@ describe('cost-monitor', () => {
     });
 
     it('should warn at 80% threshold for agent', () => {
-      vi.mocked(getAgentDailyCostSync).mockReturnValue(8.0);
+      vi.mocked(getAgentDailyCost).mockReturnValue(8.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 10.0,
         per_issue_usd: 25.0,
@@ -125,7 +125,7 @@ describe('cost-monitor', () => {
     });
 
     it('should alert at 100% limit for agent', () => {
-      vi.mocked(getAgentDailyCostSync).mockReturnValue(10.0);
+      vi.mocked(getAgentDailyCost).mockReturnValue(10.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 10.0,
         per_issue_usd: 25.0,
@@ -140,7 +140,7 @@ describe('cost-monitor', () => {
     });
 
     it('should warn for multiple limit types when exceeded', () => {
-      vi.mocked(getAgentDailyCostSync).mockReturnValue(10.0);
+      vi.mocked(getAgentDailyCost).mockReturnValue(10.0);
       vi.mocked(getCostForIssueFromDb).mockReturnValue({
         issueId: 'issue-1',
         totalCost: 10.0,
@@ -171,7 +171,7 @@ describe('cost-monitor', () => {
     });
 
     it('should not check disabled limits (set to 0)', () => {
-      vi.mocked(getAgentDailyCostSync).mockReturnValue(100.0);
+      vi.mocked(getAgentDailyCost).mockReturnValue(100.0);
       vi.mocked(getDailyTrends).mockReturnValue([
         { date: '2026-06-17', totalCost: 100.0, eventCount: 1, totalTokens: 0 },
       ]);
@@ -195,9 +195,9 @@ describe('cost-monitor', () => {
     });
 
     it('should return sorted top agents', () => {
-      recordCostSync('agent-1', 5.0);
-      recordCostSync('agent-2', 10.0);
-      recordCostSync('agent-3', 2.0);
+      recordCost('agent-1', 5.0);
+      recordCost('agent-2', 10.0);
+      recordCost('agent-3', 2.0);
 
       const summary = getCostSummary();
       expect(summary.topAgents).toHaveLength(3);
@@ -207,7 +207,7 @@ describe('cost-monitor', () => {
 
     it('should limit to top 10 agents', () => {
       for (let i = 1; i <= 15; i++) {
-        recordCostSync(`agent-${i}`, i * 1.0);
+        recordCost(`agent-${i}`, i * 1.0);
       }
 
       const summary = getCostSummary();
@@ -217,10 +217,10 @@ describe('cost-monitor', () => {
 
   describe('resetCostTracking', () => {
     it('should clear all cost data', () => {
-      recordCostSync('agent-1', 5.0, 'issue-1');
-      recordCostSync('agent-2', 3.0, 'issue-2');
+      recordCost('agent-1', 5.0, 'issue-1');
+      recordCost('agent-2', 3.0, 'issue-2');
 
-      resetCostTrackingSync();
+      resetCostTracking();
 
       expect(getAgentCost('agent-1')).toBe(0);
       expect(getIssueCost('issue-1')).toBe(0);
@@ -254,7 +254,7 @@ describe('cost-monitor', () => {
       it('should scope per-agent limit to daily total (today only), not lifetime', () => {
         // Simulate an agent with $683 lifetime (causing the original 68× overrun issue)
         // but only $5 spent today
-        vi.mocked(getAgentDailyCostSync).mockReturnValue(5.0);
+        vi.mocked(getAgentDailyCost).mockReturnValue(5.0);
         vi.mocked(getDailyTrends).mockReturnValue([
           { date: '2026-07-06', totalCost: 5.0, eventCount: 5, totalTokens: 1000 },
         ]);
@@ -272,7 +272,7 @@ describe('cost-monitor', () => {
       });
 
       it('should alert when per-agent daily total exceeds cap', () => {
-        vi.mocked(getAgentDailyCostSync).mockReturnValue(10.5);
+        vi.mocked(getAgentDailyCost).mockReturnValue(10.5);
 
         const alerts = checkCostLimits('agent-1', undefined, {
           per_agent_usd: 10.0,

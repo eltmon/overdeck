@@ -45,9 +45,9 @@ describe('traefik config generation', () => {
       '',
     ].join('\n'));
 
-    const { generateOverdeckTraefikConfigSync } = await import('../../src/lib/traefik.js');
+    const { generateOverdeckTraefikConfig } = await import('../../src/lib/traefik.js');
 
-    expect(generateOverdeckTraefikConfigSync()).toBe(true);
+    expect(generateOverdeckTraefikConfig()).toBe(true);
 
     const rendered = readFileSync(join(tempDir, 'traefik', 'dynamic', 'overdeck.yml'), 'utf-8');
 

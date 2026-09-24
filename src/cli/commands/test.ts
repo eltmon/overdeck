@@ -5,7 +5,7 @@ import ora from 'ora';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { runTests } from '../../lib/test-runner.js';
-import { findProjectByTeamSync, extractTeamPrefix, listProjectsSync } from '../../lib/projects.js';
+import { findProjectByTeam, extractTeamPrefix, listProjectsSync } from '../../lib/projects.js';
 
 export function registerTestCommands(program: Command): void {
   const test = program.command('test').description('Test running and management');
@@ -50,7 +50,7 @@ async function runCommand(target: string | undefined, options: RunOptions): Prom
       // Try to extract team prefix from target (e.g., "min-123")
       const prefix = extractTeamPrefix(target);
       if (prefix) {
-        const found = findProjectByTeamSync(prefix);
+        const found = findProjectByTeam(prefix);
         if (found) {
           projectConfig = found;
         }

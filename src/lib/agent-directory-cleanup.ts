@@ -32,8 +32,8 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { listSessionNames } from './tmux.js';
-import { parseIssueIdSync } from './issue-id.js';
-import { getAgentStateSync } from './agents.js';
+import { parseIssueId } from './issue-id.js';
+import { getAgentState } from './agents.js';
 import { pruneAgentStateDir } from './agents/state-dir-removal.js';
 
 export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -74,7 +74,7 @@ export function isValidAgentDirectoryName(name: string): boolean {
   if (suffix !== suffix.toLowerCase()) return false;
 
   // Direct agent-<issueId> directories (work agents, role orchestrators without suffix)
-  if (parseIssueIdSync(suffix) !== null) return true;
+  if (parseIssueId(suffix) !== null) return true;
 
   // Specialist directories: agent-<issueId>-<role> or agent-<issueId>-<role>-<subRole>
   // e.g. agent-pan-457-review-correctness, agent-pan-457-test, agent-pan-457-ship
@@ -82,7 +82,7 @@ export function isValidAgentDirectoryName(name: string): boolean {
   const parts = suffix.split('-');
   for (let i = 2; i <= parts.length; i++) {
     const candidate = parts.slice(0, i).join('-');
-    if (parseIssueIdSync(candidate) !== null) {
+    if (parseIssueId(candidate) !== null) {
       const remainder = parts.slice(i).join('-');
       if (remainder && /^[a-z0-9-]+$/.test(remainder)) return true;
     }
@@ -121,13 +121,13 @@ export function getAgentDirectoryIssueId(name: string): string | null {
   const suffix = match[1]!;
   if (suffix !== suffix.toLowerCase()) return null;
 
-  const direct = parseIssueIdSync(suffix);
+  const direct = parseIssueId(suffix);
   if (direct) return direct.raw.toUpperCase();
 
   const parts = suffix.split('-');
   for (let i = 1; i <= parts.length; i++) {
     const candidate = parts.slice(0, i).join('-');
-    const parsed = parseIssueIdSync(candidate);
+    const parsed = parseIssueId(candidate);
     if (parsed) return parsed.raw.toUpperCase();
   }
 
@@ -272,7 +272,7 @@ function normalizeIssueId(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
-  const parsed = parseIssueIdSync(trimmed);
+  const parsed = parseIssueId(trimmed);
   return (parsed?.raw ?? trimmed).toUpperCase();
 }
 
@@ -331,7 +331,7 @@ async function pathExists(path: string): Promise<boolean> {
 async function readAgentStateIssueId(dirPath: string): Promise<string | null> {
   try {
     const agentId = dirPath.split('/').pop() ?? '';
-    const issueId = getAgentStateSync(agentId)?.issueId;
+    const issueId = getAgentState(agentId)?.issueId;
     return issueId ? normalizeIssueId(issueId) : null;
   } catch {
     return null;
@@ -394,7 +394,7 @@ export async function findClosedIssueAgentDirs(options: {
       closedAt: new Date(closedAtMs).toISOString(),
       ageMs,
       hasRunningSession: sessionSet.has(entry.name),
-      hasStateFile: getAgentStateSync(entry.name) !== null,
+      hasStateFile: getAgentState(entry.name) !== null,
       containsJsonl: await directoryContainsJsonl(dirPath),
     });
   }

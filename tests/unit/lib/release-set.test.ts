@@ -12,8 +12,8 @@ import {
   type OverdeckTestDb,
 } from '../../helpers/overdeck-test-db.js';
 import {
-  getReleaseSetSync,
-  upsertReleaseSetSync,
+  getReleaseSet,
+  upsertReleaseSet,
 } from '../../../src/lib/release-set.js';
 import type { ReleaseSet } from '../../../src/lib/release-set-types.js';
 
@@ -58,9 +58,9 @@ function makeReleaseSet(overrides: Partial<ReleaseSet> = {}): ReleaseSet {
 describe('release-set sync accessors', () => {
   it('getReleaseSetSync normalizes lowercase IDs to uppercase', () => {
     seedIssue('PAN-399');
-    upsertReleaseSetSync(makeReleaseSet());
+    upsertReleaseSet(makeReleaseSet());
 
-    const loaded = getReleaseSetSync('pan-399');
+    const loaded = getReleaseSet('pan-399');
 
     expect(loaded).not.toBeNull();
     expect(loaded!.issueId).toBe('PAN-399');
@@ -68,7 +68,7 @@ describe('release-set sync accessors', () => {
 
   it('upsertReleaseSetSync stores the canonical uppercase issue ID', () => {
     seedIssue('PAN-399');
-    upsertReleaseSetSync(makeReleaseSet({ issueId: 'pan-399' }));
+    upsertReleaseSet(makeReleaseSet({ issueId: 'pan-399' }));
 
     const row = odb.raw().prepare('SELECT issue_id FROM release_sets WHERE issue_id = ?').get('PAN-399') as { issue_id: string } | undefined;
 

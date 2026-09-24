@@ -10,7 +10,7 @@ import {
   buildReviewerNodes,
 } from '../reviewer-tree.js';
 import { REVIEWER_ROLES, getReviewerSessionName } from '../../../../lib/cloister/specialists.js';
-import { getAgentStateSync } from '../../../../lib/agents.js';
+import { getAgentState } from '../../../../lib/agents.js';
 
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentStateSync: vi.fn(() => null),
@@ -43,7 +43,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(testDir, { recursive: true, force: true });
-  vi.mocked(getAgentStateSync).mockImplementation(() => null);
+  vi.mocked(getAgentState).mockImplementation(() => null);
 });
 
 
@@ -428,7 +428,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
     // Without per-node endedAt, the frontend renders "Starting…" over the JSONL.
     const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
     // PAN-1938: stoppedAt now read via getAgentStateSync (overdeck DB), not state.json directly.
-    vi.mocked(getAgentStateSync).mockImplementation((id) =>
+    vi.mocked(getAgentState).mockImplementation((id) =>
       id === correctness
         ? { id: correctness, issueId: ISSUE_ID, role: 'review', model: 'sonnet', status: 'stopped', startedAt: '2026-01-01T00:00:00Z', workspace: WORKSPACE_PATH, stoppedAt: '2026-01-01T00:05:00Z' } as any
         : null,

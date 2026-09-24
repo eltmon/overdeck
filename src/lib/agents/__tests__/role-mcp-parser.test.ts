@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getCodexLauncherFields, getRoleRuntimeBaseCommand, parseRoleMcpServersSync, roleSystemPromptInjectionSync } from '../runtime-command.js';
+import { getCodexLauncherFields, getRoleRuntimeBaseCommand, parseRoleMcpServers, roleSystemPromptInjection } from '../runtime-command.js';
 
 const ROLE = `---
 name: test
@@ -45,7 +45,7 @@ describe('parseRoleMcpServersSync', () => {
     const rolePath = join(tempDir, 'test.md');
     writeFileSync(rolePath, ROLE);
 
-    expect(parseRoleMcpServersSync(rolePath)).toEqual({
+    expect(parseRoleMcpServers(rolePath)).toEqual({
       playwright: {
         type: 'stdio',
         command: 'npx',
@@ -60,22 +60,22 @@ describe('parseRoleMcpServersSync', () => {
     writeFileSync(absentPath, 'No frontmatter here.');
     writeFileSync(malformedPath, '---\nmcpServers: [\n---\nBody');
 
-    expect(parseRoleMcpServersSync(join(tempDir, 'missing.md'))).toEqual({});
-    expect(parseRoleMcpServersSync(absentPath)).toEqual({});
-    expect(parseRoleMcpServersSync(malformedPath)).toEqual({});
+    expect(parseRoleMcpServers(join(tempDir, 'missing.md'))).toEqual({});
+    expect(parseRoleMcpServers(absentPath)).toEqual({});
+    expect(parseRoleMcpServers(malformedPath)).toEqual({});
   });
 
   it('preserves Claude role MCP config and allowed-tools flags', () => {
     const rolePath = join(tempDir, 'test.md');
     writeFileSync(rolePath, ROLE);
 
-    const flags = roleSystemPromptInjectionSync(rolePath);
+    const flags = roleSystemPromptInjection(rolePath);
     const mcpPath = join(tempDir, 'role-prompts', 'test.mcp.json');
 
     expect(flags).toContain(` --mcp-config '${mcpPath}'`);
     expect(flags).toContain(" --allowedTools 'Read,Bash,mcp__playwright'");
     expect(JSON.parse(readFileSync(mcpPath, 'utf8'))).toEqual({
-      mcpServers: parseRoleMcpServersSync(rolePath),
+      mcpServers: parseRoleMcpServers(rolePath),
     });
   });
 

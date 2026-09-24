@@ -6,15 +6,15 @@ import { join } from 'path';
 import { listRunningAgentsSync } from '../../lib/agents.js';
 import {
   extractTeamPrefix,
-  findProjectByTeamSync,
+  findProjectByTeam,
   getProjectSync,
   listProjectsSync,
 } from '../../lib/projects.js';
-import { applyProjectTemplateOverlaySync, mergeSkillsIntoWorkspaceSync } from '../../lib/skills-merge.js';
+import { applyProjectTemplateOverlay, mergeSkillsIntoWorkspace } from '../../lib/skills-merge.js';
 import {
   addNewRepoToWorkspace,
   addReposToWorkspace,
-  copyOverdeckSettingsToWorkspaceSync,
+  copyOverdeckSettingsToWorkspace,
 } from '../../lib/workspace-manager.js';
 
 interface UseConfigOptions {
@@ -36,7 +36,7 @@ export async function useConfigCommand(issueId: string, options: UseConfigOption
       workspacePath = join(workspacesDir, folderName);
     } else {
       const teamPrefix = extractTeamPrefix(issueId);
-      const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
       if (projectConfig) {
         const workspacesDir = join(projectConfig.path, projectConfig.workspace?.workspaces_dir || 'workspaces');
@@ -52,7 +52,7 @@ export async function useConfigCommand(issueId: string, options: UseConfigOption
     }
 
     spinner.text = 'Copying config...';
-    const result = copyOverdeckSettingsToWorkspaceSync(workspacePath);
+    const result = copyOverdeckSettingsToWorkspace(workspacePath);
 
     if (result.errors.length > 0) {
       spinner.warn('Config copied with errors');
@@ -89,7 +89,7 @@ export async function updateCommand(issueId: string, options: UpdateOptions): Pr
 
     // Resolve project and workspace path
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
     if (!projectConfig) {
       spinner.fail(`No project found for issue ${issueId}`);
@@ -123,13 +123,13 @@ export async function updateCommand(issueId: string, options: UpdateOptions): Pr
 
     // Merge skills, agents, and rules
     spinner.text = 'Merging skills and agents...';
-    const result = mergeSkillsIntoWorkspaceSync(workspacePath);
+    const result = mergeSkillsIntoWorkspace(workspacePath);
 
     // Apply project template overlay if configured
     if (workspaceConfig?.agent?.template_dir && (workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks)) {
       spinner.text = 'Applying project template overlay...';
       const templateDir = join(projectConfig.path, workspaceConfig.agent.template_dir);
-      const overlayed = applyProjectTemplateOverlaySync(workspacePath, templateDir);
+      const overlayed = applyProjectTemplateOverlay(workspacePath, templateDir);
       result.overlayed = overlayed;
     }
 
@@ -188,7 +188,7 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
 
     // Resolve project
     let projectKey: string | null = null;
-    let projectConfig: ReturnType<typeof findProjectByTeamSync> = null;
+    let projectConfig: ReturnType<typeof findProjectByTeam> = null;
     if (options.project) {
       projectKey = options.project;
       projectConfig = getProjectSync(projectKey);

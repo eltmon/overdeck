@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildTtsSpeakPayloadSync, resolveAndSpeak } from '../tts-speak.js';
+import { buildTtsSpeakPayload, resolveAndSpeak } from '../tts-speak.js';
 import type { NormalizedTtsDaemonConfig } from '../config-yaml.js';
 import type { TtsVoice } from '../tts-voices.js';
 
@@ -58,7 +58,7 @@ function findVoiceById(id: string): Promise<TtsVoice | undefined> {
 
 describe('buildTtsSpeakPayload', () => {
   it('builds daemon payloads for preset, design, and clone voices', () => {
-    expect(buildTtsSpeakPayloadSync(PRESET_VOICE, 'hello', CONFIG)).toEqual({
+    expect(buildTtsSpeakPayload(PRESET_VOICE, 'hello', CONFIG)).toEqual({
       text: 'hello',
       voice: 'Vivian',
       instruct: 'calm',
@@ -67,7 +67,7 @@ describe('buildTtsSpeakPayload', () => {
       mode: 'custom',
     });
 
-    expect(buildTtsSpeakPayloadSync({ ...PRESET_VOICE, kind: 'design', description: 'warm narrator' }, 'hello', CONFIG)).toEqual({
+    expect(buildTtsSpeakPayload({ ...PRESET_VOICE, kind: 'design', description: 'warm narrator' }, 'hello', CONFIG)).toEqual({
       text: 'hello',
       voice: 'warm narrator',
       instruct: 'calm',
@@ -76,7 +76,7 @@ describe('buildTtsSpeakPayload', () => {
       mode: 'design',
     });
 
-    expect(buildTtsSpeakPayloadSync(CLONE_VOICE, 'hello', CONFIG)).toEqual({
+    expect(buildTtsSpeakPayload(CLONE_VOICE, 'hello', CONFIG)).toEqual({
       text: 'hello',
       voice: 'clone',
       instruct: 'bright',

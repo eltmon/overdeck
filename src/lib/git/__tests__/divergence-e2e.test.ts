@@ -29,8 +29,8 @@ vi.mock('child_process', async (importOriginal) => {
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 function installExecMock(responses: Record<string, string | Error>) {
@@ -149,8 +149,8 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     expect(divergedErr!.remoteSha).toBe('remoteXYZ');
 
     // Step 4: main_diverged event was written to git_operations
-    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
-    const ops = listGitOperationsSync({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
+    const ops = listGitOperations({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
     expect(ops.length).toBeGreaterThan(0);
     expect(ops[0].status).toBe('aborted');
     expect(ops[0].beforeSha).toBe('localABC');
@@ -158,7 +158,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
 
     // The main_diverged record survives a dashboard restart.
     await resetDb();
-    const opsAfterRestart = listGitOperationsSync({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
+    const opsAfterRestart = listGitOperations({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
     expect(opsAfterRestart.length).toBeGreaterThan(0);
   });
 
@@ -171,12 +171,12 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     const { gitPush } = await import('../operations.js');
-    const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
+    const { listGitOperations } = await import('../../../lib/git-activity.js');
 
     await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' }))
       .rejects.toThrow();
 
-    const allOps = listGitOperationsSync({ issueId: 'PAN-OPS' });
+    const allOps = listGitOperations({ issueId: 'PAN-OPS' });
     // fetch and main_diverged should be recorded (rev_parse is unfiltered by issueId)
     const opTypes = allOps.map((o) => o.operation);
     expect(opTypes).toContain('fetch');

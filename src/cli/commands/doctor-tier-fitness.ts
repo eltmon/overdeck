@@ -9,9 +9,9 @@ interface CheckResult {
 import { loadConfigSync } from '../../lib/config-yaml/load.js';
 import { TIERED_EXECUTION_DIFFICULTIES } from '../../lib/agents/tier-table.js';
 import { resolveModel } from '../../lib/config-yaml/roles.js';
-import { requireModelOverrideSync } from '../../lib/model-validation.js';
+import { requireModelOverride } from '../../lib/model-validation.js';
 import { checkTierFitness, type TierFitnessWarning } from '../../lib/agents/tier-fitness.js';
-import { buildTierFitnessContextSync } from '../../lib/agents/tier-fitness-context.js';
+import { buildTierFitnessContext } from '../../lib/agents/tier-fitness-context.js';
 
 export interface TierFitnessDoctorDeps {
   loadConfig: () => ReturnType<typeof loadConfigSync>;
@@ -34,7 +34,7 @@ export function checkTierFitnessConfig(deps: TierFitnessDoctorDeps = { loadConfi
     };
   }
   const tiered = config.tieredExecution;
-  const ctx = buildTierFitnessContextSync(config);
+  const ctx = buildTierFitnessContext(config);
   let warnings: TierFitnessWarning[];
   if (tiered.enabled) {
     warnings = checkTierFitness(tiered, ctx);
@@ -43,7 +43,7 @@ export function checkTierFitnessConfig(deps: TierFitnessDoctorDeps = { loadConfi
     // as resolveImplicitStaffing (staffing.ts:83) — fails loudly, never falls back.
     let model: string;
     try {
-      model = requireModelOverrideSync(resolveModel('work', undefined, config));
+      model = requireModelOverride(resolveModel('work', undefined, config));
     } catch (error) {
       return {
         name: 'Tiered execution',

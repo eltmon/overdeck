@@ -28,10 +28,10 @@ describe('teardownWorkspaceDockerByNamePromise', () => {
   });
 
   async function loadTeardown() {
-    const { teardownWorkspaceDockerByNamePromise } = await import(
+    const { teardownWorkspaceDockerByName } = await import(
       '../docker.js'
     );
-    return teardownWorkspaceDockerByNamePromise;
+    return teardownWorkspaceDockerByName;
   }
 
   it('runs docker compose down for the named project', async () => {

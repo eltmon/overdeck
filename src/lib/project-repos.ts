@@ -16,7 +16,7 @@ export interface ResolvedProjectRepo {
   required: boolean;
 }
 
-export function normalizeForgeSync(value?: string | null): ForgeType | null {
+export function normalizeForge(value?: string | null): ForgeType | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase();
   if (normalized === 'github' || normalized.includes('github.com')) return 'github';
@@ -29,7 +29,7 @@ export function normalizeForgeSync(value?: string | null): ForgeType | null {
  * host naming GitLab (gitlab.com or a self-hosted `gitlab.example.com`),
  * `github` for one naming GitHub. Null when the host says neither.
  */
-export function forgeFromRemoteUrlSync(url?: string | null): ForgeType | null {
+export function forgeFromRemoteUrl(url?: string | null): ForgeType | null {
   if (!url) return null;
   const trimmed = url.trim().toLowerCase();
   // https://host/…, ssh://user@host:port/…, or scp-style user@host:path
@@ -42,7 +42,7 @@ export function forgeFromRemoteUrlSync(url?: string | null): ForgeType | null {
   return null;
 }
 
-export function inferProjectForgeSync(projectConfig: Pick<ProjectConfig, 'github_repo' | 'gitlab_repo'>): ForgeType | null {
+export function inferProjectForge(projectConfig: Pick<ProjectConfig, 'github_repo' | 'gitlab_repo'>): ForgeType | null {
   if (projectConfig.github_repo && !projectConfig.gitlab_repo) return 'github';
   if (projectConfig.gitlab_repo && !projectConfig.github_repo) return 'gitlab';
   return null;
@@ -68,14 +68,14 @@ export function getRepoTargetBranch(
 
 export function getRepoForge(repo: Partial<RepoConfig> | undefined, projectConfig: ProjectConfig): ForgeType {
   return (
-    normalizeForgeSync(repo?.forge) ||
-    normalizeForgeSync(repo?.remote) ||
-    inferProjectForgeSync(projectConfig) ||
+    normalizeForge(repo?.forge) ||
+    normalizeForge(repo?.remote) ||
+    inferProjectForge(projectConfig) ||
     'github'
   );
 }
 
-export function resolveConfiguredReposSync(
+export function resolveConfiguredRepos(
   projectKey: string,
   projectPath: string,
   projectConfig: ProjectConfig,
@@ -88,7 +88,7 @@ export function resolveConfiguredReposSync(
       projectPath,
       repoKey: projectKey,
       repoPath: projectPath,
-      forge: inferProjectForgeSync(projectConfig) || 'github',
+      forge: inferProjectForge(projectConfig) || 'github',
       sourceBranch: `feature/${issueId.toLowerCase()}`,
       targetBranch: projectConfig.workspace?.pr_target || projectConfig.workspace?.default_branch || 'main',
       mergeOrder: 0,
@@ -109,24 +109,24 @@ export function resolveConfiguredReposSync(
   }));
 }
 
-export function resolveProjectReposForIssueSync(
+export function resolveProjectReposForIssue(
   issueId: string,
   labels: string[] = []
 ): ResolvedProjectRepo[] | null {
   const resolvedProject = resolveProjectFromIssueSync(issueId, labels);
   if (!resolvedProject) return null;
 
-  return resolveProjectReposFromResolvedIssueSync(issueId, resolvedProject);
+  return resolveProjectReposFromResolvedIssue(issueId, resolvedProject);
 }
 
-export function resolveProjectReposFromResolvedIssueSync(
+export function resolveProjectReposFromResolvedIssue(
   issueId: string,
   resolvedProject: ResolvedProject
 ): ResolvedProjectRepo[] | null {
   const projectConfig = getProjectSync(resolvedProject.projectKey);
   if (!projectConfig) return null;
 
-  return resolveConfiguredReposSync(
+  return resolveConfiguredRepos(
     resolvedProject.projectKey,
     resolvedProject.projectPath,
     projectConfig,
@@ -159,7 +159,7 @@ export interface WorkspaceRepoRoot {
 }
 
 /** Pure mapping from resolved repos + workspace path to on-disk repo roots. */
-export function computeWorkspaceRepoRootsSync(
+export function computeWorkspaceRepoRoots(
   repos: ResolvedProjectRepo[] | null,
   issueId: string,
   workspacePath: string
@@ -203,23 +203,23 @@ export function computeWorkspaceRepoRootsSync(
 }
 
 /** Resolve the git roots inside a workspace for an issue (polyrepo-aware). */
-export function resolveWorkspaceRepoRootsSync(
+export function resolveWorkspaceRepoRoots(
   issueId: string,
   workspacePath: string
 ): WorkspaceRepoRoot[] {
-  return computeWorkspaceRepoRootsSync(
-    resolveProjectReposForIssueSync(issueId),
+  return computeWorkspaceRepoRoots(
+    resolveProjectReposForIssue(issueId),
     issueId,
     workspacePath
   );
 }
 
 /** Resolve the primary git checkout used by single-repo workspace probes. */
-export function resolvePrimaryWorkspaceRepoDirSync(
+export function resolvePrimaryWorkspaceRepoDir(
   issueId: string,
   workspacePath: string
 ): string {
-  return resolveWorkspaceRepoRootsSync(issueId, workspacePath)[0].dir;
+  return resolveWorkspaceRepoRoots(issueId, workspacePath)[0].dir;
 }
 
 // ─── Slot workspace worktrees (PAN-3686) ─────────────────────────────────────
@@ -253,15 +253,15 @@ export interface SlotWorkspaceWorktrees {
  * the polyrepo workspace abstraction. Monorepo slots resolve to zero nested
  * worktrees; callers then remove the slot workspace root directly.
  */
-export function resolveSlotWorkspaceWorktreesSync(
+export function resolveSlotWorkspaceWorktrees(
   issueId: string,
   slotWorkspace: string
 ): SlotWorkspaceWorktrees {
-  const repos = resolveProjectReposForIssueSync(issueId);
+  const repos = resolveProjectReposForIssue(issueId);
   const isPolyrepo = (repos?.length ?? 0) > 1;
   if (!repos || !isPolyrepo) return { isPolyrepo, nested: [] };
   const repoByKey = new Map(repos.map(repo => [repo.repoKey, repo]));
-  const nested = computeWorkspaceRepoRootsSync(repos, issueId, slotWorkspace)
+  const nested = computeWorkspaceRepoRoots(repos, issueId, slotWorkspace)
     .filter(root => root.isPolyrepo)
     .flatMap(root => {
       const repo = repoByKey.get(root.repoKey);

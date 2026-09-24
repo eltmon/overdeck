@@ -3,8 +3,8 @@ import { promisify } from 'node:util';
 
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
-import { getMergeSetSync } from '../merge-set.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { getMergeSet } from '../merge-set.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { assessMergeCompleteness, hasPositiveMergedEvidence } from './merge-completeness.js';
 
 const execAsync = promisify(exec);
@@ -101,7 +101,7 @@ async function requireCompletePolyrepoMerge(
   mergedResult: { merged: true; reason: string },
 ): Promise<{ merged: boolean; reason: string }> {
   try {
-    const mergeSet = getMergeSetSync(issueId);
+    const mergeSet = getMergeSet(issueId);
     if (!mergeSet || mergeSet.repos.length <= 1) return mergedResult;
 
     const completeness = await assessMergeCompleteness(issueId);
@@ -155,7 +155,7 @@ export async function verifyMergedBeforeLifecycle(
     return { merged: false, reason: `batch promotion unverified: ${unproven.join('; ')}` };
   }
 
-  const ghResolved = resolveGitHubIssueSync(issueId);
+  const ghResolved = resolveGitHubIssue(issueId);
   if (!ghResolved.isGitHub) {
     try {
       const completeness = await assessMergeCompleteness(issueId);

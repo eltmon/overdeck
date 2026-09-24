@@ -56,8 +56,8 @@ async function loadBackfill(home: string) {
   process.env.CODEX_HOME = join(home, '.codex');
   const infra = await import('../../../lib/overdeck/infra.js');
   const cost = await import('../cost.js');
-  infra.getOverdeckDatabaseSync();
-  return { ...cost, closeOverdeckDatabaseSync: infra.closeOverdeckDatabaseSync };
+  infra.getOverdeckDatabase();
+  return { ...cost, closeOverdeckDatabaseSync: infra.closeOverdeckDatabase };
 }
 
 describe('pan cost backfill', () => {
@@ -106,7 +106,7 @@ describe('pan cost backfill', () => {
       const infra = await import('../../../lib/overdeck/infra.js');
       const first = await runCostBackfill({ write: true });
       const second = await runCostBackfill({ write: true });
-      const rows = infra.getOverdeckDatabaseSync()
+      const rows = infra.getOverdeckDatabase()
         .prepare('SELECT request_id, issue_id, model FROM cost_events ORDER BY id')
         .all() as Array<{ request_id: string; issue_id: string; model: string }>;
       closeOverdeckDatabaseSync();

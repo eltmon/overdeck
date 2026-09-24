@@ -1,4 +1,4 @@
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { getPrFacts } from './pr-facts.js';
 
 const RETRY_BASE_MS = 60_000;
@@ -33,7 +33,7 @@ function recordSuccess(issueId: string, steps: string[]): void {
   const message = `Removed merged-issue Docker stack/network for ${issueId}: ${steps.join('; ')}`;
   console.log(`[deacon] ${message}`);
   try {
-    emitActivityEntrySync({ source: 'cloister', level: 'info', issueId, message: `[deacon] ${message}` });
+    emitActivityEntry({ source: 'cloister', level: 'info', issueId, message: `[deacon] ${message}` });
   } catch (error) {
     console.warn(`[deacon] Could not record merged Docker cleanup activity for ${issueId}: ${error}`);
   }
@@ -50,7 +50,7 @@ function recordFailure(entry: CleanupEntry, reason: string): void {
 }
 
 async function drainQueue(): Promise<void> {
-  const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
+  const { teardownWorkspaceDockerByName } = await import('../workspace-manager/docker.js');
   for (let entry = nextEligibleEntry(); entry; entry = nextEligibleEntry()) {
     entry.running = true;
     // PAN-3917: the forge says whether the PR merged. A lookup failure holds
@@ -72,7 +72,7 @@ async function drainQueue(): Promise<void> {
       continue;
     }
     try {
-      const result = await teardownWorkspaceDockerByNamePromise(entry.issueId.toLowerCase());
+      const result = await teardownWorkspaceDockerByName(entry.issueId.toLowerCase());
       if (result.networkRemoved) {
         queue.delete(entry.issueId);
         recordSuccess(entry.issueId, result.steps);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { conversationRuntimeRootPids } from '../../../../lib/overdeck/conversation-runtime.js';
-import { findManagedServerPidSync } from '../../../../lib/tmux.js';
+import { findManagedServerPid } from '../../../../lib/tmux.js';
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>('node:os');
@@ -18,7 +18,7 @@ vi.mock('../../../../lib/tmux.js', async (importOriginal) => {
   };
 });
 
-const mockedFindManagedServerPidSync = vi.mocked(findManagedServerPidSync);
+const mockedFindManagedServerPidSync = vi.mocked(findManagedServerPid);
 
 describe('conversationRuntimeRootPids', () => {
   beforeEach(() => {

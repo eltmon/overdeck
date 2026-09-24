@@ -17,9 +17,9 @@ vi.mock('../../../../lib/overdeck/cost-sync.js', async (importOriginal) => {
   return { ...actual, getCavemanExperimentDataSync: vi.fn() };
 });
 
-import { getCavemanExperimentDataSync } from '../../../../lib/overdeck/cost-sync.js';
+import { getCavemanExperimentData } from '../../../../lib/overdeck/cost-sync.js';
 
-const mockGetExperimentData = vi.mocked(getCavemanExperimentDataSync);
+const mockGetExperimentData = vi.mocked(getCavemanExperimentData);
 
 /** Run an Effect route handler and extract status + JSON body */
 async function runRoute(
@@ -34,7 +34,7 @@ async function runRoute(
 /** Replicate the exact handler logic from costs.ts for testability */
 function makeExperimentsHandler() {
   return Effect.try({
-    try: () => jsonResponse({ experiments: getCavemanExperimentDataSync() }),
+    try: () => jsonResponse({ experiments: getCavemanExperimentData() }),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   });
 }

@@ -47,7 +47,7 @@ export interface XBriefACStatus {
   totalCount: number;
 }
 
-export function getXBriefACStatusSync(workspacePath: string): XBriefACStatus | null {
+export function getXBriefACStatus(workspacePath: string): XBriefACStatus | null {
   const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return null;
   const allCriteria = extractACFromDocument(doc);

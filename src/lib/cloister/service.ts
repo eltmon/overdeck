@@ -7,10 +7,10 @@ import { loadCloisterConfigSync } from './config.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgentsSync, getAgentStateSync, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
+import { listRunningAgentsSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import {
-  isCloisterSpawnsPausedSync,
-  setCloisterSpawnsPausedSync,
+  isCloisterSpawnsPaused,
+  setCloisterSpawnsPaused,
   setDeaconGloballyPaused,
   setFlywheelGloballyPaused,
 } from '../overdeck/control-settings.js';
@@ -38,7 +38,7 @@ import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { sessionExists } from '../tmux.js';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { handleCloisterDomainEvent, parseSpecialistAgentSession } from './service-reactive.js';
 import {
   checkHandoffTriggers,
@@ -327,7 +327,7 @@ export class CloisterService {
         }
       }
       if (clearedSpecialistCount > 0) {
-        emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Cleared ${clearedSpecialistCount} stale specialist state(s) on startup` });
+        emitActivityEntry({ source: 'cloister', level: 'warn', message: `Cleared ${clearedSpecialistCount} stale specialist state(s) on startup` });
       }
     } catch (error) {
       console.error('  ✗ Failed to clear stale specialist states:', error);
@@ -344,17 +344,17 @@ export class CloisterService {
       startDeaconLite();
       startHygieneScheduler();
       console.log('  ✓ Deacon-lite started');
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Deacon-lite and hygiene scheduler started' });
+      emitActivityEntry({ source: 'cloister', level: 'info', message: 'Deacon-lite and hygiene scheduler started' });
     } catch (error) {
       console.error('  ✗ Failed to start deacon-lite:', error);
-      emitActivityEntrySync({ source: 'cloister', level: 'error', message: `Failed to start deacon-lite: ${error instanceof Error ? error.message : String(error)}` });
+      emitActivityEntry({ source: 'cloister', level: 'error', message: `Failed to start deacon-lite: ${error instanceof Error ? error.message : String(error)}` });
     }
 
     this.running = true;
     this.starting = false;
     writeStateFile(true);
     this.emit({ type: 'started' });
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
+    emitActivityEntry({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
 
     await this.subscribeToDomainEvents();
 
@@ -381,7 +381,7 @@ export class CloisterService {
           this.domainEventUnsubscribe = injected.subscribe((event) => {
             void handleCloisterDomainEvent(event).catch((error) => {
               console.error('[cloister] Reactive lifecycle event handling failed:', error);
-              emitActivityEntrySync({
+              emitActivityEntry({
                 source: 'cloister',
                 level: 'error',
                 message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -399,7 +399,7 @@ export class CloisterService {
       this.domainEventUnsubscribe = store.subscribe((event) => {
         void handleCloisterDomainEvent(event).catch((error) => {
           console.error('[cloister] Reactive lifecycle event handling failed:', error);
-          emitActivityEntrySync({
+          emitActivityEntry({
             source: 'cloister',
             level: 'error',
             message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -409,7 +409,7 @@ export class CloisterService {
       console.log('  ✓ Cloister reactive lifecycle scheduler subscribed to domain events');
     } catch (error) {
       console.error('  ✗ Failed to subscribe Cloister reactive lifecycle scheduler:', error);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'cloister',
         level: 'error',
         message: `Failed to subscribe reactive lifecycle scheduler: ${error instanceof Error ? error.message : String(error)}`,
@@ -596,7 +596,7 @@ export class CloisterService {
    */
   resumeSpawns(): void {
     this.spawnsPaused = false;
-    setCloisterSpawnsPausedSync(false);
+    setCloisterSpawnsPaused(false);
     this.deathTimestamps = []; // Clear death window
     this.emit({ type: 'spawn_resumed' });
     console.log(`🔔 Agent spawns resumed`);
@@ -606,7 +606,7 @@ export class CloisterService {
    * Check if spawns are currently paused
    */
   isSpawnPaused(): boolean {
-    return this.spawnsPaused || isCloisterSpawnsPausedSync();
+    return this.spawnsPaused || isCloisterSpawnsPaused();
   }
 
   /**

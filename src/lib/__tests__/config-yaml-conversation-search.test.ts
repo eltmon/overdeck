@@ -20,7 +20,7 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-import { getConversationSearchConfigSync, loadConfigSync, mergeConfigs } from '../config-yaml.js';
+import { getConversationSearchConfig, loadConfigSync, mergeConfigs } from '../config-yaml.js';
 
 describe('conversationSearch configuration', () => {
   it('defaults to enabled with openai provider and text-embedding-3-small', () => {
@@ -61,7 +61,7 @@ describe('conversationSearch configuration', () => {
   });
 
   it('getConversationSearchConfigSync returns the normalized conversationSearch block', () => {
-    const result = getConversationSearchConfigSync();
+    const result = getConversationSearchConfig();
     const expected = loadConfigSync().config.conversationSearch;
 
     expect(result).toEqual(expected);

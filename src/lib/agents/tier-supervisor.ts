@@ -30,7 +30,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { renderWorkspaceGitShowPromise } from '../git-utils.js';
+import { renderWorkspaceGitShow } from '../git-utils.js';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
 import type { XBriefItem, XBriefSubItem } from '../xbrief/types.js';
 import type { AgentState } from './agent-state.js';
@@ -354,7 +354,7 @@ Rules:
 }
 
 async function getCommitDiff(issueId: string, workspacePath: string, sha: string): Promise<string> {
-  return renderWorkspaceGitShowPromise(issueId, workspacePath, sha, [], async (repoPath, repoSha, args) => {
+  return renderWorkspaceGitShow(issueId, workspacePath, sha, [], async (repoPath, repoSha, args) => {
     const { stdout } = await execFileAsync('git', ['show', repoSha, ...args], {
       cwd: repoPath,
       encoding: 'utf-8',

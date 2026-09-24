@@ -17,11 +17,11 @@ import { randomUUID } from 'node:crypto';
 import { Context, Effect, Schema, Stream } from 'effect';
 
 import type { RuntimeName } from '../runtimes/types.js';
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
-import { readLatestIndexedSessionIdSync } from '../session-history.js';
+import { readLatestIndexedSessionId } from '../session-history.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
 // Mirror locked schema (docs/overdeck-remodel/overdeck-schema.ts:97-163).
@@ -409,11 +409,11 @@ function resolveLiveSessionId(conv: {
   claudeSessionId: string | null;
 }): string | null {
   if (!isAgentConversationName(conv.name)) return conv.claudeSessionId;
-  return readLatestIndexedSessionIdSync(conv.tmuxSession) ?? conv.claudeSessionId;
+  return readLatestIndexedSessionId(conv.tmuxSession) ?? conv.claudeSessionId;
 }
 
 function overdeckDb() {
-  return getOverdeckDatabaseSync();
+  return getOverdeckDatabase();
 }
 
 function toIso(value: number | Date | null | undefined): string | null {
@@ -583,7 +583,7 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Legac
     .get(claudeSessionId) as LegacyConversationRow | undefined;
   return row ? rowToLegacyConversation(row) : null;
 }
-export { findConversationForCostSessionSync } from './conversation-cost-session.js';
+export { findConversationForCostSession } from './conversation-cost-session.js';
 export function getConversationByTmuxSession(tmuxSession: string): LegacyConversation | null {
   const name = tmuxSession.startsWith('conv-') ? tmuxSession.slice(5) : tmuxSession;
   const row = overdeckDb()

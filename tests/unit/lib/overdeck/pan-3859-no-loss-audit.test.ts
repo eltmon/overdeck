@@ -45,8 +45,8 @@ describe('PAN-3859 dead-code no-loss audit', () => {
     // Types are erased at runtime, so assert on the resolved settings object:
     // defaults carry no complexity key. (Settings validation had no production
     // caller and was deleted in PAN-3958 CH-8.)
-    const { getDefaultSettingsSync } = await import('../../../../src/lib/settings.js');
-    const defaults = getDefaultSettingsSync();
+    const { getDefaultSettings } = await import('../../../../src/lib/settings.js');
+    const defaults = getDefaultSettings();
     expect('complexity' in defaults.models).toBe(false);
   });
 });

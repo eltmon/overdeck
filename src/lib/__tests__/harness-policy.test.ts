@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canUseHarnessSync } from '../harness-policy.js'
+import { canUseHarness } from '../harness-policy.js'
 import type { RuntimeName } from '../runtimes/types.js'
 import type { AuthMode } from '../subscription-types.js'
 
@@ -23,7 +23,7 @@ const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', unde
 
 describe('canUseHarness', () => {
   it('AC(PAN-1989): blocks ohmypi + Anthropic + subscription with a non-empty human-readable reason', () => {
-    const decision = canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    const decision = canUseHarness('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
     expect(decision.allowed).toBe(false)
     expect(decision.reason).toBeTruthy()
     expect(decision.reason!.length).toBeGreaterThan(20)
@@ -32,24 +32,24 @@ describe('canUseHarness', () => {
   })
 
   it('AC(PAN-2528): ohmypi + Anthropic + subscription reason names the Claude Code subscription Terms of Service', () => {
-    const decision = canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    const decision = canUseHarness('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
     expect(decision.allowed).toBe(false)
     expect(decision.reason).toContain('Terms of Service')
   })
 
   it('AC(PAN-2528): the ohmypi subscription-block reason still tells the user how to proceed', () => {
-    const decision = canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    const decision = canUseHarness('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
     const reason = decision.reason!.toLowerCase()
     expect(reason).toContain('api-key')
     expect(reason).toContain('non-anthropic')
   })
 
   it('allows ohmypi + Anthropic + api-key', () => {
-    expect(canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('ohmypi', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
   })
 
   it('allows ohmypi + Anthropic + undefined authMode (no subscription engaged)', () => {
-    expect(canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
+    expect(canUseHarness('ohmypi', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
   })
 
   it.each(['openai', 'google', 'minimax', 'openrouter'] as const)(
@@ -57,7 +57,7 @@ describe('canUseHarness', () => {
     provider => {
       const model = MODEL_BY_PROVIDER[provider]
       for (const authMode of AUTH_MODES) {
-        expect(canUseHarnessSync('ohmypi', model, authMode)).toEqual({ allowed: true })
+        expect(canUseHarness('ohmypi', model, authMode)).toEqual({ allowed: true })
       }
     },
   )
@@ -65,54 +65,54 @@ describe('canUseHarness', () => {
   it.each(PROVIDERS)('allows claude-code + %s on every authMode', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
-      expect(canUseHarnessSync('claude-code', model, authMode)).toEqual({ allowed: true })
+      expect(canUseHarness('claude-code', model, authMode)).toEqual({ allowed: true })
     }
   })
 
   it.each(PROVIDERS)('allows codex + %s on every authMode', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
-      expect(canUseHarnessSync('codex', model, authMode)).toEqual({ allowed: true })
+      expect(canUseHarness('codex', model, authMode)).toEqual({ allowed: true })
     }
   })
 
   it.each(PROVIDERS)('allows pi (legacy) + %s on every authMode (normalizer converts pi→ohmypi before policy check)', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
-      expect(canUseHarnessSync('pi', model, authMode)).toEqual({ allowed: true })
+      expect(canUseHarness('pi', model, authMode)).toEqual({ allowed: true })
     }
   })
 
   it('explicitly allows canUseHarnessSync("codex", ...) — no ToS block', () => {
-    expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.anthropic, 'subscription')).toEqual({ allowed: true })
-    expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.openai, 'api-key')).toEqual({ allowed: true })
-    expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
+    expect(canUseHarness('codex', MODEL_BY_PROVIDER.anthropic, 'subscription')).toEqual({ allowed: true })
+    expect(canUseHarness('codex', MODEL_BY_PROVIDER.openai, 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('codex', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
   })
 
   it('allows ACP + Kimi under API-key and subscription-backed OAuth auth', () => {
-    expect(canUseHarnessSync('acp', 'kimi-k2.7-code', 'api-key')).toEqual({ allowed: true })
-    expect(canUseHarnessSync('acp', 'kimi-k2.7-code', 'subscription')).toEqual({ allowed: true })
+    expect(canUseHarness('acp', 'kimi-k2.7-code', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('acp', 'kimi-k2.7-code', 'subscription')).toEqual({ allowed: true })
   })
 
   it.each(PROVIDERS)('blocks ACP + unsupported %s provider', (provider) => {
-    const decision = canUseHarnessSync('acp', MODEL_BY_PROVIDER[provider], 'subscription')
+    const decision = canUseHarness('acp', MODEL_BY_PROVIDER[provider], 'subscription')
     expect(decision.allowed).toBe(false)
     expect(decision.reason).toContain('Kimi')
   })
 
   it('allows Kimi Code + Kimi under API-key and subscription-backed OAuth auth', () => {
-    expect(canUseHarnessSync('kimi-code', 'kimi-k2.7-code', 'api-key')).toEqual({ allowed: true })
-    expect(canUseHarnessSync('kimi-code', 'kimi-k2.7-code', 'subscription')).toEqual({ allowed: true })
+    expect(canUseHarness('kimi-code', 'kimi-k2.7-code', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('kimi-code', 'kimi-k2.7-code', 'subscription')).toEqual({ allowed: true })
   })
 
   it.each(PROVIDERS)('blocks Kimi Code + unsupported %s provider', (provider) => {
-    const decision = canUseHarnessSync('kimi-code', MODEL_BY_PROVIDER[provider], 'subscription')
+    const decision = canUseHarness('kimi-code', MODEL_BY_PROVIDER[provider], 'subscription')
     expect(decision.allowed).toBe(false)
     expect(decision.reason).toContain('Kimi')
   })
 
   it('never coerces the harness for a blocked kimi-code + non-Kimi model combination', () => {
-    const decision = canUseHarnessSync('kimi-code', MODEL_BY_PROVIDER.openai, 'api-key')
+    const decision = canUseHarness('kimi-code', MODEL_BY_PROVIDER.openai, 'api-key')
     expect(decision).toEqual({
       allowed: false,
       reason: 'The Kimi Code harness runs Kimi (Moonshot) models only. Pick a Kimi model, or use the model\'s supported harness.',
@@ -122,7 +122,7 @@ describe('canUseHarness', () => {
   it.each(['claude-code', 'codex', 'ohmypi', 'pi'] as const)(
     'blocks %s + a kimi-code/* native-catalog id (2026-08-02 id-space correctness)',
     (harness) => {
-      const decision = canUseHarnessSync(harness, 'kimi-code/k3', 'api-key')
+      const decision = canUseHarness(harness, 'kimi-code/k3', 'api-key')
       expect(decision.allowed).toBe(false)
       expect(decision.reason).toContain('kimi-code/*')
       expect(decision.reason).toContain('native Kimi Code CLI catalog')
@@ -130,21 +130,21 @@ describe('canUseHarness', () => {
   )
 
   it('allows kimi-code and acp + a kimi-code/* native-catalog id', () => {
-    expect(canUseHarnessSync('kimi-code', 'kimi-code/k3', 'api-key')).toEqual({ allowed: true })
-    expect(canUseHarnessSync('acp', 'kimi-code/k3', 'api-key')).toEqual({ allowed: true })
-    expect(canUseHarnessSync('kimi-code', 'kimi-code/kimi-for-coding', undefined)).toEqual({ allowed: true })
+    expect(canUseHarness('kimi-code', 'kimi-code/k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('acp', 'kimi-code/k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('kimi-code', 'kimi-code/kimi-for-coding', undefined)).toEqual({ allowed: true })
   })
 
   it('still allows claude-code + bare Kimi ids (they translate into the native catalog, never back)', () => {
-    expect(canUseHarnessSync('claude-code', 'k3', 'api-key')).toEqual({ allowed: true })
-    expect(canUseHarnessSync('claude-code', 'k3[1m]', undefined)).toEqual({ allowed: true })
-    expect(canUseHarnessSync('kimi-code', 'k3', 'api-key')).toEqual({ allowed: true })
-    expect(canUseHarnessSync('acp', 'k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('claude-code', 'k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('claude-code', 'k3[1m]', undefined)).toEqual({ allowed: true })
+    expect(canUseHarness('kimi-code', 'k3', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('acp', 'k3', 'api-key')).toEqual({ allowed: true })
   })
 
   it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
     for (const harness of HARNESSES) {
-      const decision = canUseHarnessSync(harness, 'gpt-5.5', 'api-key')
+      const decision = canUseHarness(harness, 'gpt-5.5', 'api-key')
       expect(decision.allowed).toBe(false)
       expect(decision.reason).toBeTruthy()
       expect(decision.reason!.toLowerCase()).toContain('subscription')
@@ -153,13 +153,13 @@ describe('canUseHarness', () => {
 
   it('allows gpt-5.5 + subscription on every supported non-ACP harness', () => {
     for (const harness of HARNESSES_WITHOUT_ACP) {
-      expect(canUseHarnessSync(harness, 'gpt-5.5', 'subscription')).toEqual({ allowed: true })
+      expect(canUseHarness(harness, 'gpt-5.5', 'subscription')).toEqual({ allowed: true })
     }
   })
 
   it('allows gpt-5.5 + undefined authMode on every supported non-ACP harness', () => {
     for (const harness of HARNESSES_WITHOUT_ACP) {
-      expect(canUseHarnessSync(harness, 'gpt-5.5', undefined)).toEqual({ allowed: true })
+      expect(canUseHarness(harness, 'gpt-5.5', undefined)).toEqual({ allowed: true })
     }
   })
 
@@ -167,7 +167,7 @@ describe('canUseHarness', () => {
     'blocks %s + api-key on every harness (subscription-only model)',
     (model) => {
       for (const harness of HARNESSES) {
-        const decision = canUseHarnessSync(harness, model, 'api-key')
+        const decision = canUseHarness(harness, model, 'api-key')
         expect(decision.allowed).toBe(false)
         expect(decision.reason).toBeTruthy()
         expect(decision.reason!.toLowerCase()).toContain('subscription')
@@ -179,7 +179,7 @@ describe('canUseHarness', () => {
     'allows %s + subscription on every supported non-ACP harness',
     (model) => {
       for (const harness of HARNESSES_WITHOUT_ACP) {
-        expect(canUseHarnessSync(harness, model, 'subscription')).toEqual({ allowed: true })
+        expect(canUseHarness(harness, model, 'subscription')).toEqual({ allowed: true })
       }
     },
   )
@@ -188,7 +188,7 @@ describe('canUseHarness', () => {
     'allows %s + undefined authMode on every supported non-ACP harness',
     (model) => {
       for (const harness of HARNESSES_WITHOUT_ACP) {
-        expect(canUseHarnessSync(harness, model, undefined)).toEqual({ allowed: true })
+        expect(canUseHarness(harness, model, undefined)).toEqual({ allowed: true })
       }
     },
   )
@@ -209,7 +209,7 @@ describe('canUseHarness', () => {
     expect(cells).toHaveLength(6 * 5 * 3)
     for (const cell of cells) {
       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
-      const decision = canUseHarnessSync(cell.harness, model, cell.authMode)
+      const decision = canUseHarness(cell.harness, model, cell.authMode)
       expect(
         decision.allowed,
         `${cell.harness} / ${cell.provider} / ${cell.authMode ?? 'unset'} should be ${cell.allowed ? 'allowed' : 'blocked'}`,

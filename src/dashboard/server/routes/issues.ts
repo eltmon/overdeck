@@ -36,8 +36,8 @@ import { Duration, Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import type { IssuePipelineMembership } from '@overdeck/contracts';
 
-import { extractTeamPrefix, findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
+import { extractTeamPrefix, findProjectByTeam, getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
 import { isPlanningComplete, readPlanSync } from '../../../lib/xbrief/io.js';
 import { appendContinueSessionEntryForIssue } from '../../../lib/xbrief/lifecycle-io.js';
@@ -51,13 +51,13 @@ import {
   startPlanningForIssue,
 } from '../../../lib/overdeck/planning-sessions.js';
 import { generateTasksForIssue } from '../../../lib/overdeck/task-generation.js';
-import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
-import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
+import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
-import { getCostForIssueAggregateSync } from '../../../lib/overdeck/cost-sync.js';
+import { getCostForIssueAggregate } from '../../../lib/overdeck/cost-sync.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { CacheService } from '../services/cache-service.js';
@@ -80,8 +80,8 @@ import { killSession, listSessionNames, sessionExists } from '../../../lib/tmux.
 import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichment.js';
-import { canUseHarnessSync } from '../../../lib/harness-policy.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { canUseHarness } from '../../../lib/harness-policy.js';
+import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import {
@@ -139,7 +139,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -266,7 +266,7 @@ const getIssueVerificationRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     return yield* Effect.promise(async () => {
@@ -295,7 +295,7 @@ const postIssueCloseRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -314,7 +314,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -339,7 +339,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -360,7 +360,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -386,7 +386,7 @@ const postIssueAbortRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const eventStore = yield* EventStoreService;
@@ -403,7 +403,7 @@ const postIssueResetRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -421,7 +421,7 @@ const postIssueCancelRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -439,7 +439,7 @@ const postIssueReopenRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -464,7 +464,7 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const lifecycle = yield* IssueLifecycle;
@@ -482,7 +482,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const body = yield* readJsonBody;
@@ -540,7 +540,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -593,7 +593,7 @@ const getIssuePrdRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -609,7 +609,7 @@ const getIssueTasksRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -630,7 +630,7 @@ const getIssuePlanningStateRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -652,7 +652,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -666,7 +666,7 @@ const getIssuePrRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const result = yield* Effect.promise(() => fetchIssuePullRequest(id));
@@ -680,7 +680,7 @@ const getIssuePrDiffRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const result = yield* Effect.promise(() => fetchIssuePullRequestDiff(id));
@@ -694,7 +694,7 @@ const getIssuePrDetailsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const result = yield* Effect.promise(() => fetchIssuePullRequestDetails(id));
@@ -708,7 +708,7 @@ const getIssueCheckRunsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const result = yield* Effect.promise(() => fetchIssueCheckRuns(id));
@@ -723,7 +723,7 @@ const getIssueDiscussionsRoute = HttpRouter.add(
     const linear = yield* LinearClient;
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
@@ -763,11 +763,11 @@ const getIssueCostsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
+    if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    const issueData = getCostForIssueAggregateSync(id);
+    const issueData = getCostForIssueAggregate(id);
     const agents = yield* Effect.promise(() => getCachedRunningAgents());
     const resolvedCost = resolveIssueHeadlineCost({
       issueId: id,

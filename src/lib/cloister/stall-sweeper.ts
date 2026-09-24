@@ -30,7 +30,7 @@
  *    flood the feed at once;
  *  - this module holds no door to any mutation — there is nothing to force.
  */
-import { emitActivityEntrySync, type ActivityLevel } from '../activity-logger.js';
+import { emitActivityEntry, type ActivityLevel } from '../activity-logger.js';
 import {
   PARKED_ORBIT_SEVERITY,
   resolveParkedPopulation,
@@ -102,7 +102,7 @@ function defaultEmitEvent(type: string, payload: Record<string, unknown>): void 
 function defaultEmitActivity(entry: { level: ActivityLevel; issueId?: string; message: string }): void {
   // Source is cloister — the sweeper is cloister machinery; the 🧹 message
   // prefix carries the sweeper identity in the feed.
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: 'cloister',
     level: entry.level,
     ...(entry.issueId ? { issueId: entry.issueId } : {}),

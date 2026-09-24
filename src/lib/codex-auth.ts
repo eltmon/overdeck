@@ -300,7 +300,7 @@ export function combineCodexAuthStatuses(
 export async function checkCodexAuthStatus(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
   const now = Date.now();
   const native = await probeNativeCodexAuth(now);
-  const cliproxy = await checkCliproxyCodexAuthStatusPromise(options);
+  const cliproxy = await checkCliproxyCodexAuthStatus(options);
 
   // Live pane-burn is the strongest signal for the native store: the JWT can
   // still be unexpired while the refresh token is revoked, so it beats the
@@ -348,7 +348,7 @@ export function assertCodexNativeAuthForSpawn(
   );
 }
 
-async function checkCliproxyCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
+async function checkCliproxyCodexAuthStatus(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
   const credPath = join(getCliproxyAuthDir(), 'codex-primary.json');
 
   let raw: string;

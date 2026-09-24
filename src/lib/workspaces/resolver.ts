@@ -8,7 +8,7 @@
  */
 import { existsSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { getOverdeckDatabase } from '../overdeck/infra.js';
 import type { PinnedDocRow, PinScope, ProjectRow, ProjectTargetRow, WorkspaceKind, WorkspaceRow } from './types.js';
 
 const PROJECT_COLUMNS = `id, name, primary_path, created_at, last_accessed_at, is_system`;
@@ -74,7 +74,7 @@ function rowToPinnedDoc(row: Record<string, unknown>): PinnedDocRow {
 // ─── Workspaces ────────────────────────────────────────────────────────────
 
 export function getWorkspaceById(id: string): WorkspaceRow | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db.prepare(`SELECT ${WORKSPACE_COLUMNS} FROM workspaces WHERE id = ?`).get(id) as
     | Record<string, unknown>
     | undefined;
@@ -83,7 +83,7 @@ export function getWorkspaceById(id: string): WorkspaceRow | null {
 
 /** Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8). */
 export function getWorkspaceByName(projectId: string, name: string): WorkspaceRow | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db
     .prepare(`SELECT ${WORKSPACE_COLUMNS} FROM workspaces WHERE project_id = ? AND name = ?`)
     .get(projectId, name) as Record<string, unknown> | undefined;
@@ -113,7 +113,7 @@ export function resolveWorkspaceRef(ref: string): WorkspaceRefResolution {
 
 /** The non-archived kind='issue' workspace row for an issue, or null. */
 export function getWorkspaceForIssue(issueId: string): WorkspaceRow | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db
     .prepare(
       `SELECT ${WORKSPACE_COLUMNS} FROM workspaces
@@ -196,7 +196,7 @@ export function resolveIssueWorkspaceSyncTarget(
 
 /** The singleton kind='main' workspace row for a project, or null. */
 export function getMainWorkspace(projectId: string): WorkspaceRow | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db
     .prepare(`SELECT ${WORKSPACE_COLUMNS} FROM workspaces WHERE project_id = ? AND kind = 'main'`)
     .get(projectId) as Record<string, unknown> | undefined;
@@ -208,7 +208,7 @@ export function listWorkspaces(options?: {
   kind?: WorkspaceKind;
   includeArchived?: boolean;
 }): WorkspaceRow[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const conditions: string[] = [];
   const params: string[] = [];
   if (options?.projectId) {
@@ -233,7 +233,7 @@ export function listWorkspaces(options?: {
 
 /** A project by its stable key (projects.yaml key / the row's id). */
 export function getProjectByKey(key: string): ProjectRow | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db.prepare(`SELECT ${PROJECT_COLUMNS} FROM projects WHERE id = ?`).get(key) as
     | Record<string, unknown>
     | undefined;
@@ -241,7 +241,7 @@ export function getProjectByKey(key: string): ProjectRow | null {
 }
 
 export function getProjectByPath(path: string): ProjectRow | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const row = db.prepare(`SELECT ${PROJECT_COLUMNS} FROM projects WHERE primary_path = ?`).get(path) as
     | Record<string, unknown>
     | undefined;
@@ -249,7 +249,7 @@ export function getProjectByPath(path: string): ProjectRow | null {
 }
 
 export function listProjects(): ProjectRow[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db.prepare(`SELECT ${PROJECT_COLUMNS} FROM projects ORDER BY name`).all() as Record<
     string,
     unknown
@@ -258,7 +258,7 @@ export function listProjects(): ProjectRow[] {
 }
 
 export function listProjectTargets(projectId: string): ProjectTargetRow[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(`SELECT ${PROJECT_TARGET_COLUMNS} FROM project_targets WHERE project_id = ? ORDER BY path`)
     .all(projectId) as Record<string, unknown>[];
@@ -268,7 +268,7 @@ export function listProjectTargets(projectId: string): ProjectTargetRow[] {
 // ─── Pinned docs ───────────────────────────────────────────────────────────
 
 export function listPinnedDocs(scope: PinScope, scopeId: string): PinnedDocRow[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(`SELECT ${PINNED_DOC_COLUMNS} FROM pinned_docs WHERE scope = ? AND scope_id = ? ORDER BY doc_path`)
     .all(scope, scopeId) as Record<string, unknown>[];
@@ -298,7 +298,7 @@ function realpathOrResolve(path: string): string {
  */
 export function listWorkspacesForPath(path: string): WorkspaceRow[] {
   const resolvedPath = realpathOrResolve(path);
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const rows = db
     .prepare(`SELECT ${WORKSPACE_COLUMNS} FROM workspaces WHERE is_archived = 0`)
     .all() as Record<string, unknown>[];
@@ -311,7 +311,7 @@ export function listWorkspacesForPath(path: string): WorkspaceRow[] {
  * capture to attribute a session with no workspace_id yet, FR-8).
  */
 export function resolveWorkspaceForCwd(cwd: string): WorkspaceRow | null {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
 
   const workspaceRows = db.prepare(`SELECT ${WORKSPACE_COLUMNS} FROM workspaces`).all() as Record<
     string,

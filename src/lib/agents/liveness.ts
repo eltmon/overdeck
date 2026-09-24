@@ -44,7 +44,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { hostTerminalBackendName } from '../terminal-backends/select.js';
 import type { HerdrLivenessProbe } from '../terminal-backends/herdr.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
-import { getAgentStateSync } from './agent-state.js';
+import { getAgentState } from './agent-state.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   LEGACY_TMUX_PROBE_TIMEOUT_MS,
@@ -145,7 +145,7 @@ export interface LivenessSyncDeps {
 }
 
 function readHarnessDefault(agentId: string): RuntimeName {
-  return getAgentStateSync(agentId)?.harness ?? 'claude-code';
+  return getAgentState(agentId)?.harness ?? 'claude-code';
 }
 
 async function sessionExistsDefault(agentId: string): Promise<boolean> {

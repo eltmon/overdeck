@@ -21,8 +21,8 @@ import { patchConversationTitle } from '../../src/lib/overdeck/conversation-read
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../src/lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { closeOverdeckDatabase } = await import('../../src/lib/overdeck/infra.js');
+  closeOverdeckDatabase();
 }
 
 beforeEach(() => {

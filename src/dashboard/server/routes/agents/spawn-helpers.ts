@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import type { Role } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
-import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
+import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
 import {
   saveAgentState,
 } from '../../../../lib/agents.js';
@@ -363,7 +363,7 @@ export function handleContainerOrchestration(input: {
                   const containerChild = spawn('./dev', ['all'], {
                     cwd: workspacePath,
                     stdio: 'ignore',
-                    env: buildChildEnvWithoutTmuxSync(process.env, { UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` }),
+                    env: buildChildEnvWithoutTmux(process.env, { UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` }),
                     detached: true,
                   });
                   containerChild.unref();

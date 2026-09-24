@@ -18,9 +18,9 @@ import {
   ohmypiExtensionCandidates,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
-import { normalizeAgentId, getAgentStateSync } from '../../lib/agents.js';
+import { normalizeAgentId, getAgentState } from '../../lib/agents.js';
 import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
@@ -478,7 +478,7 @@ function readDoctorAgentStates(agentsDir: string): DoctorAgentState[] {
   for (const dir of readdirSync(agentsDir, { withFileTypes: true })) {
     if (!dir.isDirectory()) continue;
     try {
-      const state = getAgentStateSync(dir.name);
+      const state = getAgentState(dir.name);
       if (state) states.push(state);
     } catch {
       // Ignore unreadable agent state; other doctor checks surface broader FS health.
@@ -489,7 +489,7 @@ function readDoctorAgentStates(agentsDir: string): DoctorAgentState[] {
 
 async function getDashboardAgentRowsForDoctor(): Promise<DoctorDashboardAgent[] | null> {
   try {
-    const response = await fetch(`${getDashboardApiUrlSync().replace(/\/$/, '')}/api/agents`, {
+    const response = await fetch(`${getDashboardApiUrl().replace(/\/$/, '')}/api/agents`, {
       signal: AbortSignal.timeout(1000),
     });
     if (!response.ok) return null;
@@ -615,7 +615,7 @@ function hasInFlightAgent(issueId: string, _agentsDir: string, tmuxSessionNames:
   const agentId = `agent-${issueId.toLowerCase()}`;
   if (tmuxSessionNames.includes(agentId)) return true;
 
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   return state?.status === 'starting' || state?.status === 'running';
 }
 
@@ -878,7 +878,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   checks.push(...await checkMainDivergence());
   checks.push(await checkPlanHomePanIgnore()); // PAN-3996
   try {
-    const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
+    const { isSmeeProcessRunning } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');
     if (!existsSync(smeeUrlPath)) {
       checks.push({
@@ -887,7 +887,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
         message: 'Not configured (optional)',
         fix: 'Create ~/.overdeck/github-app/smee-url with your smee.io channel URL',
       });
-    } else if (isSmeeProcessRunningSync()) {
+    } else if (isSmeeProcessRunning()) {
       checks.push({
         name: 'smee-client Webhook Relay',
         status: 'ok',

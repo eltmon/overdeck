@@ -12,8 +12,8 @@ import { loadCloisterConfigSync, type CostLimitsConfig } from './config.js';
 import {
   getAgentRollup,
   getDailyTrendsSync as getDailyTrends,
-  getCostForIssueSync as getCostForIssueFromDb,
-  getAgentDailyCostSync,
+  getCostForIssue as getCostForIssueFromDb,
+  getAgentDailyCost,
 } from '../overdeck/cost-sync.js';
 
 /**
@@ -161,7 +161,7 @@ function checkDailyReset(): void {
  *
  * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function recordCostSync(agentId: string, cost: number, issueId?: string): void {
+export function recordCost(agentId: string, cost: number, issueId?: string): void {
   checkDailyReset();
 
   // Update per-agent cost
@@ -210,7 +210,7 @@ export function checkCostLimits(
   // Read agent cost from DB (scoped to today, matching the cap's window)
   // The accumulator should match the cap's window: per-agent daily cap compares daily spend
   if (perAgentUsd > 0) {
-    const agentCost = getAgentDailyCostSync(agentId);
+    const agentCost = getAgentDailyCost(agentId);
     const agentPercent = agentCost / perAgentUsd;
 
     if (agentPercent >= 1.0) {
@@ -364,7 +364,7 @@ export function getCostSummary(): {
 /**
  * Reset cost tracking (for testing)
  */
-export function resetCostTrackingSync(): void {
+export function resetCostTracking(): void {
   costData = {
     perAgent: new Map(),
     perIssue: new Map(),

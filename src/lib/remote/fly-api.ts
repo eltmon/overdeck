@@ -338,7 +338,7 @@ function readFlyctlConfigToken(): string | undefined {
 }
 
 /** Create a FlyApiClient from an explicit token, env, or flyctl's stored auth */
-export function createFlyApiClientSync(token?: string): FlyApiClient {
+export function createFlyApiClient(token?: string): FlyApiClient {
   const tok = token ?? process.env.FLY_API_TOKEN ?? readFlyctlConfigToken();
   if (!tok) {
     throw new Error(

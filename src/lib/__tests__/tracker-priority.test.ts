@@ -27,11 +27,11 @@ vi.mock('../config.js', () => ({
   loadConfigSync: vi.fn(() => ({ trackers: { linear: { apiKey: 'fake-key' } } })),
 }));
 
-import { findProjectByPathSync, getIssuePrefix } from '../projects.js';
+import { findProjectByPath, getIssuePrefix } from '../projects.js';
 import { createTracker, createTrackerFromConfig } from '../tracker/factory.js';
 import { transitionIssueToInReview } from '../agents.js';
 
-const mockFindProjectByPath = vi.mocked(findProjectByPathSync);
+const mockFindProjectByPath = vi.mocked(findProjectByPath);
 const mockGetIssuePrefix = vi.mocked(getIssuePrefix);
 const mockCreateTracker = vi.mocked(createTracker);
 const mockCreateTrackerFromConfig = vi.mocked(createTrackerFromConfig);

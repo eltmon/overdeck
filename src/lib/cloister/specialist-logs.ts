@@ -89,7 +89,7 @@ function ensureRunsDirectory(projectKey: string, specialistType: string): void {
  *
  * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function createRunLogSync(
+export function createRunLog(
   projectKey: string,
   specialistType: string,
   issueId: string,
@@ -129,7 +129,7 @@ ${contextSeed ? contextSeed : '[No context digest available]'}
  *
  * Test seam: no production caller; tests use it to set up or observe module state (PAN-3958 CH-8).
  */
-export function appendToRunLogSync(
+export function appendToRunLog(
   projectKey: string,
   specialistType: string,
   runId: string,
@@ -152,7 +152,7 @@ export function appendToRunLogSync(
  * @param runId - Run identifier
  * @param result - Run result
  */
-export function finalizeRunLogSync(
+export function finalizeRunLog(
   projectKey: string,
   specialistType: string,
   runId: string,
@@ -201,7 +201,7 @@ Finished: ${finishedAt.toISOString()}
  * @param runId - Run identifier
  * @returns Log content or null if not found
  */
-export function getRunLogSync(
+export function getRunLog(
   projectKey: string,
   specialistType: string,
   runId: string
@@ -268,7 +268,7 @@ export function parseLogMetadata(logContent: string): Partial<RunLogMetadata> {
  * @param options - Listing options
  * @returns Array of run log entries, sorted by most recent first
  */
-export function listRunLogsSync(
+export function listRunLogs(
   projectKey: string,
   specialistType: string,
   options: {
@@ -346,7 +346,7 @@ export function getRecentRunLogs(
   specialistType: string,
   count: number
 ): RunLogEntry[] {
-  return listRunLogsSync(projectKey, specialistType, { limit: count });
+  return listRunLogs(projectKey, specialistType, { limit: count });
 }
 
 /**
@@ -361,7 +361,7 @@ export function getRecentRunLogs(
  * @param retention - Retention policy
  * @returns Number of logs deleted
  */
-export function cleanupOldLogsSync(
+export function cleanupOldLogs(
   projectKey: string,
   specialistType: string,
   retention: { maxDays: number; maxRuns: number }
@@ -375,7 +375,7 @@ export function cleanupOldLogsSync(
   const now = new Date();
   const cutoffDate = new Date(now.getTime() - maxDays * 24 * 60 * 60 * 1000);
 
-  const allLogs = listRunLogsSync(projectKey, specialistType);
+  const allLogs = listRunLogs(projectKey, specialistType);
 
   if (allLogs.length === 0) {
     return 0;
@@ -425,7 +425,7 @@ export function isRunLogActive(
   specialistType: string,
   runId: string
 ): boolean {
-  const content = getRunLogSync(projectKey, specialistType, runId);
+  const content = getRunLog(projectKey, specialistType, runId);
 
   if (!content) {
     return false;
@@ -443,7 +443,7 @@ export function isRunLogActive(
  *
  * @returns Summary of cleanup results
  */
-export function cleanupAllLogsSync(): {
+export function cleanupAllLogs(): {
   totalDeleted: number;
   byProject: Record<string, Record<string, number>>;
 } {
@@ -467,7 +467,7 @@ export function cleanupAllLogsSync(): {
     const specialistTypes = ['review-agent', 'test-agent', 'merge-agent'];
 
     for (const specialistType of specialistTypes) {
-      const deleted = cleanupOldLogsSync(projectKey, specialistType, retention);
+      const deleted = cleanupOldLogs(projectKey, specialistType, retention);
 
       if (deleted > 0) {
         results.byProject[projectKey][specialistType] = deleted;

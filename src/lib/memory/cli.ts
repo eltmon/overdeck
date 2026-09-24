@@ -17,7 +17,7 @@ import {
 import { readVerifiedPinFile, resolveContainedPinPath } from './pin-path.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { readArchivedStatusEntries, readCurrentStatus, readObservationsSince, type ArchivedStatusEntry } from './rollup.js';
-import { getAgentStateSync } from '../agents.js';
+import { getAgentState } from '../agents.js';
 import {
   getWorkspaceForIssue,
   listProjects,
@@ -653,7 +653,7 @@ async function readActiveAgents(): Promise<Array<{ id: string; issueId: string }
   const agents: Array<{ id: string; issueId: string }> = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const state = getAgentStateSync(entry.name);
+    const state = getAgentState(entry.name);
     if ((state?.status === 'running' || state?.status === 'starting') && state?.issueId) {
       agents.push({ id: entry.name, issueId: state.issueId });
     }

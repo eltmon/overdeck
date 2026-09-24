@@ -38,7 +38,7 @@ import {
 import {
   spawnRun,
   determineModel,
-  getAgentStateSync,
+  getAgentState,
   getAgentRuntimeStateSync,
 } from '../../../lib/agents.js';
 import { isAlive } from '../../agents/liveness.js';
@@ -52,7 +52,7 @@ beforeEach(() => {
 
 describe('spawnSequencerAgent', () => {
   it('honors the persistent pause before collecting or spawning background work', async () => {
-    vi.mocked(getAgentStateSync).mockReturnValueOnce({ paused: true } as never);
+    vi.mocked(getAgentState).mockReturnValueOnce({ paused: true } as never);
     const { collectOpenBacklog } = await import('../backlog-input.js');
     await expect(spawnSequencerAgent('incremental', { issues: [] })).rejects.toThrow('Sequencer is paused');
     expect(collectOpenBacklog).not.toHaveBeenCalled();
@@ -60,7 +60,7 @@ describe('spawnSequencerAgent', () => {
   });
 
   it('honors a pause applied while preparing a pass', async () => {
-    vi.mocked(getAgentStateSync).mockReturnValueOnce(null).mockReturnValueOnce({ paused: true } as never);
+    vi.mocked(getAgentState).mockReturnValueOnce(null).mockReturnValueOnce({ paused: true } as never);
     await expect(spawnSequencerAgent('review', { projectRoot: '/tmp/proj', issues: [] })).rejects.toThrow('Sequencer is paused');
     expect(spawnRun).not.toHaveBeenCalled();
   });
@@ -156,7 +156,7 @@ describe('spawnSequencerAgent', () => {
 
   it('treats a live sequencer with fresh sequence.md as done', async () => {
     livePane();
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:01.000Z').getTime() });
 
@@ -170,7 +170,7 @@ describe('spawnSequencerAgent', () => {
 
   it('clears a finished lingering sequencer before a retry', async () => {
     livePane();
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:01.000Z').getTime() });
 
@@ -183,7 +183,7 @@ describe('spawnSequencerAgent', () => {
 
   it('does not clear an active sequencer pass', async () => {
     livePane();
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
     (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'active' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:00.000Z').getTime() });
@@ -197,7 +197,7 @@ describe('spawnSequencerAgent', () => {
 
   it('treats an idle live sequencer as done even without a fresh sequence file', async () => {
     livePane();
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
     (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
@@ -211,7 +211,7 @@ describe('spawnSequencerAgent', () => {
 
   it('treats a pane whose harness exited as present and done', async () => {
     vi.mocked(isAlive).mockResolvedValue({ alive: false, reason: 'pane-dead' });
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
     expect(await getSequencerRunStatus('/tmp/proj')).toMatchObject({
@@ -226,7 +226,7 @@ describe('spawnSequencerAgent', () => {
     // The auto-trigger reaches spawnSequencerAgent directly (never the route),
     // so the reap has to live inside the spawn itself.
     livePane();
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:00.000Z' });
     (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'idle' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:01.000Z').getTime() });
@@ -242,7 +242,7 @@ describe('spawnSequencerAgent', () => {
 
   it('does not reap an active pass before spawning', async () => {
     livePane();
-    (getAgentStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
+    (getAgentState as ReturnType<typeof vi.fn>).mockReturnValue({ startedAt: '2026-01-01T00:00:01.000Z' });
     (getAgentRuntimeStateSync as ReturnType<typeof vi.fn>).mockReturnValue({ state: 'active' });
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (statSync as ReturnType<typeof vi.fn>).mockReturnValue({ mtimeMs: new Date('2026-01-01T00:00:00.000Z').getTime() });

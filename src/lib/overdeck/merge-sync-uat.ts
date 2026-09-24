@@ -14,7 +14,7 @@
  * `repos` without branching on project type.
  */
 
-import { getOverdeckDatabaseSync } from './infra.js';
+import { getOverdeckDatabase } from './infra.js';
 import {
   isoFromMillis,
   isoFromMillisRequired,
@@ -215,19 +215,19 @@ function rowToUatGeneration(
   };
 }
 
-function loadMembersForUat(db: ReturnType<typeof getOverdeckDatabaseSync>, uatName: string): OverdeckUatMemberRow[] {
+function loadMembersForUat(db: ReturnType<typeof getOverdeckDatabase>, uatName: string): OverdeckUatMemberRow[] {
   return db.prepare('SELECT * FROM uat_generation_members WHERE uat_name = ?').all(uatName) as OverdeckUatMemberRow[];
 }
 
-function loadResolutionsForUat(db: ReturnType<typeof getOverdeckDatabaseSync>, uatName: string): OverdeckUatResolutionRow[] {
+function loadResolutionsForUat(db: ReturnType<typeof getOverdeckDatabase>, uatName: string): OverdeckUatResolutionRow[] {
   return db.prepare('SELECT * FROM uat_generation_resolutions WHERE uat_name = ?').all(uatName) as OverdeckUatResolutionRow[];
 }
 
-function loadReposForUat(db: ReturnType<typeof getOverdeckDatabaseSync>, uatName: string): OverdeckUatRepoRow[] {
+function loadReposForUat(db: ReturnType<typeof getOverdeckDatabase>, uatName: string): OverdeckUatRepoRow[] {
   return db.prepare('SELECT * FROM uat_generation_repos WHERE uat_name = ?').all(uatName) as OverdeckUatRepoRow[];
 }
 
-function loadMemberReposForUat(db: ReturnType<typeof getOverdeckDatabaseSync>, uatName: string): OverdeckUatMemberRepoRow[] {
+function loadMemberReposForUat(db: ReturnType<typeof getOverdeckDatabase>, uatName: string): OverdeckUatMemberRepoRow[] {
   return db.prepare('SELECT * FROM uat_generation_member_repos WHERE uat_name = ?').all(uatName) as OverdeckUatMemberRepoRow[];
 }
 
@@ -241,7 +241,7 @@ function loadMemberReposForUat(db: ReturnType<typeof getOverdeckDatabaseSync>, u
  * reconciler, and cleanup, which walks the full retained history.
  */
 function loadUatGenerations(
-  db: ReturnType<typeof getOverdeckDatabaseSync>,
+  db: ReturnType<typeof getOverdeckDatabase>,
   rows: OverdeckUatGenerationRow[],
 ): UatGeneration[] {
   if (rows.length === 0) return [];
@@ -279,7 +279,7 @@ function loadUatGenerations(
 
 /** Load one generation with every child table it owns. */
 function loadUatGeneration(
-  db: ReturnType<typeof getOverdeckDatabaseSync>,
+  db: ReturnType<typeof getOverdeckDatabase>,
   row: OverdeckUatGenerationRow,
 ): UatGeneration {
   return rowToUatGeneration(
@@ -297,7 +297,7 @@ function loadUatGeneration(
  * write can never leave repo rows pointing at a missing generation.
  */
 function writeUatGenerationRepoRows(
-  db: ReturnType<typeof getOverdeckDatabaseSync>,
+  db: ReturnType<typeof getOverdeckDatabase>,
   name: string,
   repos: UatGenerationRepo[] | undefined,
 ): void {
@@ -332,7 +332,7 @@ function writeUatGenerationRepoRows(
  * rebuilding from a reconstructed list would silently drop every contribution.
  */
 function writeUatMemberRepoRows(
-  db: ReturnType<typeof getOverdeckDatabaseSync>,
+  db: ReturnType<typeof getOverdeckDatabase>,
   name: string,
   members: UatGenerationMember[],
 ): void {
@@ -351,10 +351,10 @@ function writeUatMemberRepoRows(
 }
 
 /** Drop-in for insertUatGenerationSync() from uat-generations-db.ts. */
-export function insertUatGenerationSync(
+export function insertUatGeneration(
   gen: Omit<UatGeneration, 'createdAt' | 'updatedAt'> & { createdAt?: string },
 ): UatGeneration {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const nowMs = nowMillis();
   const createdAt = gen.createdAt ?? new Date(nowMs).toISOString();
   const createdAtMs = millisFromIso(createdAt) ?? nowMs;
@@ -411,8 +411,8 @@ export function insertUatGenerationSync(
 }
 
 /** Drop-in for getUatGenerationSync() from uat-generations-db.ts. */
-export function getUatGenerationSync(name: string): UatGeneration | null {
-  const db = getOverdeckDatabaseSync();
+export function getUatGeneration(name: string): UatGeneration | null {
+  const db = getOverdeckDatabase();
   const row = db.prepare('SELECT * FROM uat_generations WHERE name = ?').get(name) as
     | OverdeckUatGenerationRow
     | undefined;
@@ -421,12 +421,12 @@ export function getUatGenerationSync(name: string): UatGeneration | null {
 }
 
 /** Drop-in for listUatGenerationsSync() from uat-generations-db.ts. */
-export function listUatGenerationsSync(options: {
+export function listUatGenerations(options: {
   projectRoot?: string;
   statuses?: readonly UatGenerationStatus[];
   limit?: number;
 } = {}): UatGeneration[] {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   const where: string[] = [];
   const params: unknown[] = [];
   if (options.projectRoot) {
@@ -447,18 +447,18 @@ export function listUatGenerationsSync(options: {
 }
 
 /** Drop-in for listUatGenerationNamesSync() from uat-generations-db.ts. */
-export function listUatGenerationNamesSync(): string[] {
-  const db = getOverdeckDatabaseSync();
+export function listUatGenerationNames(): string[] {
+  const db = getOverdeckDatabase();
   const rows = db.prepare('SELECT name FROM uat_generations').all() as Array<{ name: string }>;
   return rows.map((r) => r.name);
 }
 
 /** Drop-in for updateUatGenerationSync() from uat-generations-db.ts. */
-export function updateUatGenerationSync(
+export function updateUatGeneration(
   name: string,
   patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos'>>,
 ): void {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
 
   const tx = db.transaction(() => {
     // Update scalar fields on the generation row
@@ -554,13 +554,13 @@ export function updateUatGenerationSync(
  * partially-published generation resumable: a retry skips every repo that
  * already carries a `promoted_at`.
  */
-export function markUatGenerationRepoPromotedSync(
+export function markUatGenerationRepoPromoted(
   name: string,
   repoKey: string,
   promotedAt: string,
   mergeSha?: string,
 ): void {
-  const db = getOverdeckDatabaseSync();
+  const db = getOverdeckDatabase();
   // The merge SHA is stamped with the timestamp, not separately: a promote
   // interrupted between the two would otherwise leave a landed repo whose merge
   // commit is unknown, and finalization needs that ref.
@@ -581,8 +581,8 @@ export function markUatGenerationRepoPromotedSync(
  * child tables to answer a yes/no question means the cost of an idle minute
  * grows with history forever, on the event loop.
  */
-export function hasUncleanedTerminalUatGenerationSync(projectRoot: string): boolean {
-  const db = getOverdeckDatabaseSync();
+export function hasUncleanedTerminalUatGeneration(projectRoot: string): boolean {
+  const db = getOverdeckDatabase();
   const row = db.prepare(
     `SELECT 1 FROM uat_generations
       WHERE project_root = ?
@@ -594,8 +594,8 @@ export function hasUncleanedTerminalUatGenerationSync(projectRoot: string): bool
 }
 
 /** Drop-in for setUatGenerationStackStartedAtSync() from uat-generations-db.ts. */
-export function setUatGenerationStackStartedAtSync(name: string, startedAt: string | null): void {
-  const db = getOverdeckDatabaseSync();
+export function setUatGenerationStackStartedAt(name: string, startedAt: string | null): void {
+  const db = getOverdeckDatabase();
   const result = db.prepare(
     'UPDATE uat_generations SET stack_started_at = ?, updated_at = ? WHERE name = ?',
   ).run(startedAt ? millisFromIso(startedAt) : null, nowMillis(), name);
@@ -605,8 +605,8 @@ export function setUatGenerationStackStartedAtSync(name: string, startedAt: stri
 }
 
 /** Drop-in for listUatGenerationsWithStacksSync() from uat-generations-db.ts. */
-export function listUatGenerationsWithStacksSync(): UatGeneration[] {
-  const db = getOverdeckDatabaseSync();
+export function listUatGenerationsWithStacks(): UatGeneration[] {
+  const db = getOverdeckDatabase();
   const rows = db.prepare(
     'SELECT * FROM uat_generations WHERE stack_started_at IS NOT NULL ORDER BY stack_started_at ASC',
   ).all() as OverdeckUatGenerationRow[];

@@ -19,13 +19,13 @@ import { join, dirname, basename } from 'path';
 import { readFile } from 'node:fs/promises';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { ensureDevcontainerSync } from '../workspace/ensure-devcontainer.js';
+import { ensureDevcontainer } from '../workspace/ensure-devcontainer.js';
 import {
-  listUatGenerationsWithStacksSync,
-  setUatGenerationStackStartedAtSync,
+  listUatGenerationsWithStacks,
+  setUatGenerationStackStartedAt,
   type UatGeneration,
 } from '../overdeck/merge-sync.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPath } from '../projects.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -87,7 +87,7 @@ function defaultDeps(): UatStackDeps {
 
   return {
     ensureDevcontainer: (workspacePath, issueId) => {
-      const result = ensureDevcontainerSync({ workspacePath, issueId });
+      const result = ensureDevcontainer({ workspacePath, issueId });
       return result.step.success
         ? { ok: true }
         : { ok: false, error: result.step.error ?? 'devcontainer render failed' };
@@ -126,8 +126,8 @@ function defaultDeps(): UatStackDeps {
     },
     readComposeFile: (composeFile) => readFile(composeFile, 'utf-8'),
     store: {
-      setStack: (name, startedAt) => setUatGenerationStackStartedAtSync(name, startedAt),
-      listWithStacks: () => listUatGenerationsWithStacksSync(),
+      setStack: (name, startedAt) => setUatGenerationStackStartedAt(name, startedAt),
+      listWithStacks: () => listUatGenerationsWithStacks(),
     },
   };
 }
@@ -158,7 +158,7 @@ export async function uatFrontendUrl(gen: UatGeneration, deps: Partial<UatStackD
   }
   // Resolve project config to get DNS domain (PAN-1696). Keep the fallback
   // neutral so a missing project domain cannot fabricate a branded dead link.
-  const project = findProjectByPathSync(gen.projectRoot);
+  const project = findProjectByPath(gen.projectRoot);
   const domain = project?.workspace?.dns?.domain ?? 'localhost';
   return `https://${folder}.${domain}`;
 }

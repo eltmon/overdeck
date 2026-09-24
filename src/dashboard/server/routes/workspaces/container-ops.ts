@@ -19,12 +19,12 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
-import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
+import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
+import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { generateDailySummary } from '../../../../lib/memory/cli.js';
 import {
   extractTeamPrefix,
-  findProjectByTeamSync,
+  findProjectByTeam,
   listProjectsSync,
 } from '../../../../lib/projects.js';
 import {
@@ -64,10 +64,10 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
@@ -145,7 +145,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
           cwd: workspaceDir,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
-          env: buildChildEnvWithoutTmuxSync(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
+          env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
         });
 
         devUp.stdout?.on('data', (data) => {
@@ -196,7 +196,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const containerName = params['containerName'] ?? '';
@@ -210,7 +210,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
     }
 
     const teamPrefix = extractTeamPrefix(issueId);
-    const containerProjectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const containerProjectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
     const projectPaths = containerProjectConfig
       ? [
           join(
@@ -254,10 +254,10 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
     // Self-heal: if .devcontainer/ is missing for start/restart, re-render
     // from the project template so docker compose can operate on containers.
     if (!composeFile && ['start', 'restart'].includes(action)) {
-      const { ensureDevcontainerSync } = yield* Effect.promise(() =>
+      const { ensureDevcontainer } = yield* Effect.promise(() =>
         import('../../../../lib/workspace/ensure-devcontainer.js')
       );
-      const ensure = ensureDevcontainerSync({ workspacePath, issueId });
+      const ensure = ensureDevcontainer({ workspacePath, issueId });
       if (ensure.rendered) {
         console.log(`[container-control] Re-rendered ${DEVCONTAINER_DIRNAME}/ from project template`);
       }
@@ -322,7 +322,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
       ['start', 'restart'].includes(action)
     ) {
       const tPrefix = extractTeamPrefix(issueId);
-      const pConfig = tPrefix ? findProjectByTeamSync(tPrefix) : null;
+      const pConfig = tPrefix ? findProjectByTeam(tPrefix) : null;
       const dbConfig = pConfig?.workspace?.database;
       const provisioner = getDatabaseProvisioner(dbConfig);
       if (pConfig && dbConfig && provisioner && projectName) {
@@ -391,11 +391,11 @@ const postWorkspaceMemorySummaryRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
 
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const result = yield* Effect.promise(() => generateDailySummary({
       projectId: basename(projectPath),
@@ -413,12 +413,12 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
+    if (!parseIssueId(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
     if (!projectConfig) {
       return jsonResponse(

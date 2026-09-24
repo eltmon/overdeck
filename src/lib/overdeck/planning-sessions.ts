@@ -13,25 +13,25 @@ import { invalidateAgentsCache } from '../../dashboard/server/routes/agents.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { cleanupAgentStateDirs } from './workspace-hygiene.js';
-import { getAgentStateSync, getProviderAuthMode, saveAgentStateSync } from '../agents.js';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { getAgentState, getProviderAuthMode, saveAgentStateSync } from '../agents.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { isPlanningComplete, findPlan } from '../xbrief/io.js';
-import { extractPrefixSync } from '../issue-id.js';
+import { extractPrefix } from '../issue-id.js';
 import { spawnPlanningSession, type PlanningIssue } from '../planning/spawn-planning-session.js';
-import { findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { requireModelOverrideSync } from '../model-validation.js';
-import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../tracker-utils.js';
+import { findProjectByTeam, getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { requireModelOverride } from '../model-validation.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
 import { killSession, listSessionNames, sessionExists } from '../tmux.js';
 import { closeAgentPane } from '../terminal-backends/launch.js';
-import { canUseHarnessSync } from '../harness-policy.js';
+import { canUseHarness } from '../harness-policy.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import { saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
 import { TrackerApiError } from '../../dashboard/server/services/typed-errors.js';
 import type { GitHubClientError, GitHubClientShape, GitHubIssue } from '../../dashboard/server/services/github-client.js';
 import { buildChildStoriesFromRally } from './task-generation.js';
-import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { resolveIssueProjectPath } from './issue-reads.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -77,7 +77,7 @@ function isGitHubIssue(issueId: string): {
   repo?: string;
   number?: number;
 } {
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
     return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
@@ -138,7 +138,7 @@ export function resolvePlanningEffectiveHarness(
   authMode: AuthMode | undefined,
 ): RuntimeName {
   if (typeof modelOverride === 'string' && modelOverride.trim()) {
-    const decision = canUseHarnessSync(requestedHarness, modelOverride.trim(), authMode);
+    const decision = canUseHarness(requestedHarness, modelOverride.trim(), authMode);
     if (!decision.allowed) {
       throw new Error(decision.reason ?? `Harness "${requestedHarness}" is not allowed for model "${modelOverride.trim()}".`);
     }
@@ -199,7 +199,7 @@ export function startPlanningForIssue(options: {
     const workModelRaw = (body as any).workModel;
     if (typeof workModelRaw === 'string' && workModelRaw.trim()) {
       try {
-        requireModelOverrideSync(workModelRaw.trim());
+        requireModelOverride(workModelRaw.trim());
       } catch (err) {
         return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
       }
@@ -208,13 +208,13 @@ export function startPlanningForIssue(options: {
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
     // TTS announcement so the operator hears the lifecycle without watching the dashboard
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: 'plan',
       level: 'info',
       message: `${id} planning agent starting`,
       issueId: id,
     });
-    emitActivityTtsSync({
+    emitActivityTts({
       utterance: `Planning agent starting for ${id}`,
       priority: 2,
       issueId: id,
@@ -237,7 +237,7 @@ export function startPlanningForIssue(options: {
       }, { status: 409 });
     }
 
-    const trackerTypeForIssue = resolveTrackerTypeSync(id);
+    const trackerTypeForIssue = resolveTrackerType(id);
     const githubCheck = isGitHubIssue(id);
 
     let issue: {
@@ -316,7 +316,7 @@ export function startPlanningForIssue(options: {
       };
     }
 
-    const issuePrefix = extractPrefixSync(issue.identifier) ?? issue.identifier.split('-')[0];
+    const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issue.identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -525,7 +525,7 @@ export function abortPlanningForIssue(options: {
     if (deleteWorkspace && issueIdentifier) {
       const wipeResult = yield* Effect.promise(async (): Promise<{ deleted: boolean; error?: string }> => {
         try {
-          const projectPath = resolveIssueProjectPathSync(issueIdentifier!) || undefined;
+          const projectPath = resolveIssueProjectPath(issueIdentifier!) || undefined;
 
           if (projectPath) {
             const featureWorkspacePath = join(projectPath, 'workspaces', `feature-${issueIdentifier!.toLowerCase()}`);
@@ -591,7 +591,7 @@ export function restartFromPlan(options: {
     const issueLower = id.toLowerCase();
 
     // 1. Resolve workspace path
-    const projectPath = resolveIssueProjectPathSync(id);
+    const projectPath = resolveIssueProjectPath(id);
 
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)
@@ -760,7 +760,7 @@ export function restartFromPlan(options: {
     // 7. Emit events
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
     // append in one SQLite transaction.
-    const restartAgentState = getAgentStateSync(`agent-${issueLower}`);
+    const restartAgentState = getAgentState(`agent-${issueLower}`);
     if (restartAgentState) {
       yield* saveAgentStateAndEmitEventProgram(restartAgentState, {
         type: 'agent.stopped',
@@ -789,7 +789,7 @@ export function getPlanningState(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
 
-    const projectPath = resolveIssueProjectPathSync(id);
+    const projectPath = resolveIssueProjectPath(id);
 
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)

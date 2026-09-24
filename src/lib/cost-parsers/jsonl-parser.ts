@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
-import { TokenUsage, calculateCostSync, getPricingSync, AIProvider } from '../cost.js';
+import { TokenUsage, calculateCost, getPricing, AIProvider } from '../cost.js';
 
 // Claude Code JSONL message format
 export interface ClaudeMessage {
@@ -77,7 +77,7 @@ function getClaudeProjectsDir(): string {
 /**
  * Get all Claude Code project directories
  */
-export function getProjectDirsSync(): string[] {
+export function getProjectDirs(): string[] {
   const claudeProjectsDir = getClaudeProjectsDir();
   if (!existsSync(claudeProjectsDir)) {
     return [];
@@ -97,7 +97,7 @@ export function getProjectDirsSync(): string[] {
 /**
  * Get session JSONL files for a project directory
  */
-export function getSessionFilesSync(projectDir: string): string[] {
+export function getSessionFiles(projectDir: string): string[] {
   if (!existsSync(projectDir)) {
     return [];
   }
@@ -117,11 +117,11 @@ export function getSessionFilesSync(projectDir: string): string[] {
 /**
  * Get all session files across all projects
  */
-export function getAllSessionFilesSync(): string[] {
+export function getAllSessionFiles(): string[] {
   const files: string[] = [];
 
-  for (const projectDir of getProjectDirsSync()) {
-    files.push(...getSessionFilesSync(projectDir));
+  for (const projectDir of getProjectDirs()) {
+    files.push(...getSessionFiles(projectDir));
   }
 
   return files.sort((a, b) => {
@@ -236,7 +236,7 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
  * @param sessionFile - Path to the .jsonl session file
  * @returns Session usage summary with accurate multi-model costing, or null if no usage found
  */
-export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null {
+export function parseClaudeSession(sessionFile: string): SessionUsage | null {
   if (!existsSync(sessionFile)) {
     return null;
   }
@@ -310,7 +310,7 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
         if (modelId) {
           // Normalize model name for pricing lookup
           const { provider, model: normalizedModel } = normalizeModelName(modelId);
-          const pricing = getPricingSync(provider, normalizedModel);
+          const pricing = getPricing(provider, normalizedModel);
 
           if (pricing) {
             // Create message-specific usage object
@@ -326,7 +326,7 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
             };
 
             // Calculate cost for this message
-            const msgCost = calculateCostSync(msgUsage, pricing);
+            const msgCost = calculateCost(msgUsage, pricing);
             totalCostV2 += msgCost;
 
             // Track breakdown by exact model ID
@@ -387,8 +387,8 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
 
   // DEPRECATED: Calculate cost using first model (for backward compatibility)
   const { provider, model } = normalizeModelName(primaryModel);
-  const pricing = getPricingSync(provider, model);
-  const cost = pricing ? calculateCostSync(totalUsage, pricing) : 0;
+  const pricing = getPricing(provider, model);
+  const cost = pricing ? calculateCost(totalUsage, pricing) : 0;
 
   return {
     sessionId,
@@ -411,7 +411,7 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
  * NOTE: Claude Max can auto-upgrade models mid-session (e.g., Sonnet → Opus).
  * We read from the END of the file to get the CURRENT model, not the initial one.
  */
-export function getActiveSessionModelSync(workspacePath: string): string | null {
+export function getActiveSessionModel(workspacePath: string): string | null {
   try {
     // Convert workspace path to Claude project dir name
     // e.g., /home/user/projects/myn/workspaces/feature-min-664
@@ -421,7 +421,7 @@ export function getActiveSessionModelSync(workspacePath: string): string | null 
     const projectDir = join(getClaudeProjectsDir(), projectDirName);
 
     // Find most recently modified session file
-    const sessions = getSessionFilesSync(projectDir);
+    const sessions = getSessionFiles(projectDir);
     if (sessions.length === 0) {
       return null;
     }

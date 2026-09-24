@@ -6,16 +6,16 @@ import { join } from 'node:path';
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { getClaudePermissionFlagsStringSync } from '../../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsString } from '../../../../lib/claude-permissions.js';
 import { normalizeModelName } from '../../../../lib/cost-parsers/jsonl-parser.js';
-import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../../lib/cost.js';
+import { calculateCost, getPricing, type TokenUsage } from '../../../../lib/cost.js';
 import { loadConfigSync, resolveModel } from '../../../../lib/config-yaml.js';
 import { encodeClaudeProjectDir } from '../../../../lib/runtimes/storage/claude-code.js';
-import { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } from '../../../../lib/project-repos.js';
+import { resolvePrimaryWorkspaceRepoDir, resolveWorkspaceRepoRoots } from '../../../../lib/project-repos.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { getAgentCommandSync } from '../../../../lib/settings.js';
+import { getAgentCommand } from '../../../../lib/settings.js';
 import { killSession } from '../../../../lib/tmux.js';
-import { getAgentStateSync, saveAgentRuntimeState } from '../../../../lib/agents.js';
+import { getAgentState, saveAgentRuntimeState } from '../../../../lib/agents.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from '../../../../lib/cloister/review-monitor.js';
@@ -136,8 +136,8 @@ const getProjectSpecialistRunsRoute = HttpRouter.add(
       if (offsetParam) offset = parseInt(offsetParam, 10);
     }
 
-    const { listRunLogsSync } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-    const runs = listRunLogsSync(project, type, { limit, offset });
+    const { listRunLogs } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
+    const runs = listRunLogs(project, type, { limit, offset });
     return jsonResponse(runs);
   })),
 );
@@ -247,9 +247,9 @@ const getProjectSpecialistRunRoute = HttpRouter.add(
     const type = params['type'] as string;
     const runId = params['runId'] as string;
 
-    const { getRunLogSync, parseLogMetadata } =
+    const { getRunLog, parseLogMetadata } =
       yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
-    const content = getRunLogSync(project, type, runId);
+    const content = getRunLog(project, type, runId);
 
     if (!content) {
       return jsonResponse({ error: 'Run log not found' }, { status: 404 });
@@ -409,11 +409,11 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    const { cleanupOldLogsSync } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
+    const { cleanupOldLogs } = yield* Effect.promise(() => import('../../../../lib/cloister/specialist-logs.js'));
     const { getSpecialistRetention } = yield* Effect.promise(() => import('../../../../lib/projects.js'));
 
     const retention = getSpecialistRetention(project);
-    const deleted = cleanupOldLogsSync(project, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
+    const deleted = cleanupOldLogs(project, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
 
     return jsonResponse({
       success: true,
@@ -478,12 +478,12 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     }
 
     // Detect branch from the primary code repo; fall back to configured source branch.
-    const primaryRepo = resolveWorkspaceRepoRootsSync(issueId, workspacePath)[0];
+    const primaryRepo = resolveWorkspaceRepoRoots(issueId, workspacePath)[0];
     let branch = primaryRepo.sourceBranch;
     try {
       const { stdout } = yield* Effect.promise(() => execAsync(
         'git branch --show-current',
-        { cwd: resolvePrimaryWorkspaceRepoDirSync(issueId, workspacePath), encoding: 'utf-8', timeout: 5000 },
+        { cwd: resolvePrimaryWorkspaceRepoDir(issueId, workspacePath), encoding: 'utf-8', timeout: 5000 },
       ));
       branch = stdout.trim() || primaryRepo.sourceBranch;
     } catch { /* non-fatal */ }
@@ -592,7 +592,7 @@ const postProjectReviewerRoleRestartRoute = HttpRouter.add(
 
     const parentId = `agent-${issueId.toLowerCase()}-review`;
     const reviewerId = `${parentId}-${role}`;
-    const parentState = getAgentStateSync(parentId);
+    const parentState = getAgentState(parentId);
     const parent = parentState
       ? yield* Effect.promise(() => resolveReviewParentRunState(parentState))
       : null;
@@ -605,7 +605,7 @@ const postProjectReviewerRoleRestartRoute = HttpRouter.add(
 
     const body = yield* readJsonBody;
     const { model } = body as { model?: string };
-    const reviewer = getAgentStateSync(reviewerId);
+    const reviewer = getAgentState(reviewerId);
     yield* Effect.promise(() => Effect.runPromise(killSession(reviewerId)).catch(() => undefined));
 
     const { spawnReviewSubRoleForIssue } = yield* Effect.promise(

@@ -14,7 +14,7 @@ import {
   type TurnOptions,
 } from '../app-server-manager.js';
 import { createFakeAppServer } from './fake-app-server.js';
-import { readSessionIndexSync } from '../../session-history.js';
+import { readSessionIndex } from '../../session-history.js';
 import { createCodexCompanionAdapter } from '../../overdeck/companion-terminal/codex-adapter.js';
 import { createCompanionTerminalLifecycle, type CompanionOwner } from '../../overdeck/companion-terminal/lifecycle.js';
 import type { CompanionCreateSpec, CompanionTerminalHost } from '../../overdeck/companion-terminal/host.js';
@@ -254,7 +254,7 @@ describe('CodexAppServerHost', () => {
       expect.objectContaining({ type: 'notification', method: 'item/completed' }),
     ]));
     await vi.waitFor(() => {
-      expect(readSessionIndexSync('agent-host-test')).toEqual(expect.arrayContaining([
+      expect(readSessionIndex('agent-host-test')).toEqual(expect.arrayContaining([
         expect.objectContaining({
           sessionId: 'thread-started',
           source: 'app-server',

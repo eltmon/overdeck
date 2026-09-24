@@ -74,10 +74,10 @@ vi.mock('fs', () => ({
 }));
 
 import { getRuntimeForAgent } from '../../src/lib/runtimes/index.js';
-import { getAgentStateSync } from '../../src/lib/agents.js';
+import { getAgentState } from '../../src/lib/agents.js';
 
 const mockGetRuntimeForAgent = vi.mocked(getRuntimeForAgent);
-const mockGetAgentState = vi.mocked(getAgentStateSync);
+const mockGetAgentState = vi.mocked(getAgentState);
 const mockExecSync = execMock;
 
 describe('session-rotation', () => {

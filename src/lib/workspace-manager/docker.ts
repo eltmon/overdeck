@@ -139,7 +139,7 @@ export async function stopWorkspaceDocker(
  * primitive: it removes containers AND the `_devnet` network and verifies the
  * network is gone.
  */
-export async function teardownWorkspaceDockerByNamePromise(
+export async function teardownWorkspaceDockerByName(
   issueIdLower: string,
 ): Promise<WorkspaceDockerTeardownResult> {
   const featureFolder = `feature-${issueIdLower}`;

@@ -7,7 +7,7 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { backupFileSync, createBackupTimestamp } from '../backup.js';
+import { backupFile, createBackupTimestamp } from '../backup.js';
 import { getOverdeckHome } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
 import { codexAgentHome } from '../runtimes/storage/codex.js';
@@ -96,7 +96,7 @@ function historicalCodexHomes(): string[] {
  * have no trustworthy region marker, so they are reported for manual cleanup
  * and never changed automatically.
  */
-export function detachManagedContextSync(apply: boolean): ContextDetachItem[] {
+export function detachManagedContext(apply: boolean): ContextDetachItem[] {
   const results: ContextDetachItem[] = [];
   const timestamp = apply ? createBackupTimestamp() : '';
   for (const file of nativeTargets()) {
@@ -112,7 +112,7 @@ export function detachManagedContextSync(apply: boolean): ContextDetachItem[] {
       results.push(plan);
       continue;
     }
-    const backupPath = backupFileSync(file, timestamp);
+    const backupPath = backupFile(file, timestamp);
     if (!backupPath) {
       results.push({ ...plan, status: 'ambiguous', reason: 'backup could not be created' });
       continue;

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getAgentJsonlPath } from '../../../../src/lib/agent-enrichment.js';
-import { getLatestSessionIdSync, saveSessionId } from '../../../../src/lib/agents/activity.js';
+import { getLatestSessionId, saveSessionId } from '../../../../src/lib/agents/activity.js';
 import { restartAgent } from '../../../../src/lib/agents/recovery.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 import { markAgentRunning } from '../../../../src/lib/agents/agent-state.js';
@@ -18,8 +18,8 @@ import {
   latestSessionResetTime,
   orderedTranscriptCandidates,
   parseSessionIndex,
-  readSessionIndexSync,
-  readSessionIndexWithLegacySync,
+  readSessionIndex,
+  readSessionIndexWithLegacy,
   resetSessionIndex,
   SESSION_RESET_MARKER,
   transcriptCandidateKey,
@@ -52,18 +52,18 @@ describe('sessions.json index', () => {
     appendSessionIdToHistory('agent-pan-3950', 'session-b', 'session-start');
     saveSessionId('agent-pan-3950', 'session-a');
 
-    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+    expect(readSessionIndex('agent-pan-3950')).toEqual([
       expect.objectContaining({ sessionId: 'session-b', source: 'session-start' }),
       expect.objectContaining({ sessionId: 'session-a', source: 'rotation' }),
     ]);
-    expect(readSessionIndexSync('agent-pan-3950').every((entry) => entry.harness && entry.model)).toBe(true);
+    expect(readSessionIndex('agent-pan-3950').every((entry) => entry.harness && entry.model)).toBe(true);
   });
 
   it('uses the newest indexed entry as the current session', () => {
     appendSessionIdToHistory('agent-pan-3950', 'session-old', 'launcher');
     appendSessionIdToHistory('agent-pan-3950', 'session-new', 'session-start');
 
-    expect(getLatestSessionIdSync('agent-pan-3950')).toBe('session-new');
+    expect(getLatestSessionId('agent-pan-3950')).toBe('session-new');
   });
 
   it('reads a legacy pointer only when sessions.json is absent and never rewrites it', () => {
@@ -72,8 +72,8 @@ describe('sessions.json index', () => {
     const legacyPath = join(agentDir, 'session.id');
     writeFileSync(legacyPath, 'legacy-session\n');
 
-    expect(getLatestSessionIdSync('agent-pan-3950')).toBe('legacy-session');
-    expect(readSessionIndexWithLegacySync('agent-pan-3950')).toEqual([
+    expect(getLatestSessionId('agent-pan-3950')).toBe('legacy-session');
+    expect(readSessionIndexWithLegacy('agent-pan-3950')).toEqual([
       { sessionId: 'legacy-session', at: '', source: 'legacy-pointer' },
     ]);
     expect(readFileSync(legacyPath, 'utf8')).toBe('legacy-session\n');
@@ -122,7 +122,7 @@ describe('sessions.json index', () => {
     writeFileSync(indexPath, '{malformed\n');
 
     appendSessionIdToHistory('agent-pan-3950', 'session-new', 'launcher');
-    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+    expect(readSessionIndex('agent-pan-3950')).toEqual([
       expect.objectContaining({ sessionId: 'session-new', source: 'launcher' }),
     ]);
   });
@@ -135,13 +135,13 @@ describe('sessions.json index', () => {
       { sessionId: 'legacy-object', at: '2026-09-20T00:00:00.000Z', source: 'launcher' },
     ]));
 
-    expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual([
+    expect(readSessionIndex('agent-pan-3950').map((entry) => entry.sessionId)).toEqual([
       'legacy-string',
       'legacy-object',
     ]);
 
     appendSessionIdToHistory('agent-pan-3950', 'jsonl-after-legacy', 'session-start');
-    expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual([
+    expect(readSessionIndex('agent-pan-3950').map((entry) => entry.sessionId)).toEqual([
       'legacy-string',
       'legacy-object',
       'jsonl-after-legacy',
@@ -155,9 +155,9 @@ describe('sessions.json index', () => {
     appendSessionIdToHistory('agent-pan-3950', 'after-reset', 'session-start');
 
     expect(isSessionResetMarker('agent-pan-3950')).toBe(true);
-    expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual(['after-reset']);
+    expect(readSessionIndex('agent-pan-3950').map((entry) => entry.sessionId)).toEqual(['after-reset']);
     clearSessionResetMarker('agent-pan-3950');
-    expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual(['after-reset']);
+    expect(readSessionIndex('agent-pan-3950').map((entry) => entry.sessionId)).toEqual(['after-reset']);
   });
 
   it('writes a reset on its own line after a legacy array without a trailing newline', async () => {
@@ -171,7 +171,7 @@ describe('sessions.json index', () => {
     const raw = readFileSync(indexPath, 'utf8');
     expect(raw).toMatch(/^\["legacy-session"\]\n\{"reset":true,/);
     expect(latestSessionResetTime(raw)).not.toBeNull();
-    expect(readSessionIndexSync('agent-pan-3950')).toEqual([]);
+    expect(readSessionIndex('agent-pan-3950')).toEqual([]);
   });
 
   it('throws without changing status when a directory occupies the reset marker path', () => {
@@ -222,7 +222,7 @@ describe('sessions.json index', () => {
 
     const raw = readFileSync(indexPath, 'utf8');
     expect(raw).toMatch(/\}\n\{"reset":true,/);
-    expect(readSessionIndexSync('agent-pan-3950')).toEqual([]);
+    expect(readSessionIndex('agent-pan-3950')).toEqual([]);
     expect(latestSessionResetTime(raw)).not.toBeNull();
   });
 
@@ -386,7 +386,7 @@ describe('sessions.json index', () => {
   it('round-trips an appended transcript path through the index', () => {
     appendSessionIdToHistory('agent-pan-3950', 'session-a', 'session-start', { path: '/abs/path/to/session-a.jsonl' });
 
-    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+    expect(readSessionIndex('agent-pan-3950')).toEqual([
       expect.objectContaining({ sessionId: 'session-a', path: '/abs/path/to/session-a.jsonl' }),
     ]);
   });
@@ -395,7 +395,7 @@ describe('sessions.json index', () => {
     appendSessionIdToHistory('agent-pan-3950', 'session-a', 'launcher', { path: '/abs/path/to/session-a.jsonl' });
     appendSessionIdToHistory('agent-pan-3950', 'session-a', 'observed');
 
-    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+    expect(readSessionIndex('agent-pan-3950')).toEqual([
       expect.objectContaining({ sessionId: 'session-a', source: 'observed', path: '/abs/path/to/session-a.jsonl' }),
     ]);
   });
@@ -404,7 +404,7 @@ describe('sessions.json index', () => {
     appendSessionIdToHistory('agent-pan-3950', 'session-a', 'launcher', { path: '/abs/old.jsonl' });
     appendSessionIdToHistory('agent-pan-3950', 'session-a', 'observed', { path: '/abs/new.jsonl' });
 
-    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+    expect(readSessionIndex('agent-pan-3950')).toEqual([
       expect.objectContaining({ sessionId: 'session-a', source: 'observed', path: '/abs/new.jsonl' }),
     ]);
   });
@@ -414,7 +414,7 @@ describe('sessions.json index', () => {
 
     await resetSessionIndex('agent-pan-3950');
 
-    expect(readSessionIndexSync('agent-pan-3950')).toEqual([]);
+    expect(readSessionIndex('agent-pan-3950')).toEqual([]);
     expect(parseSessionIndex(`${JSON.stringify({ reset: true })}\n`)).toEqual([]);
   });
 

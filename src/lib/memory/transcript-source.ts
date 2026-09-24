@@ -7,7 +7,7 @@ import {
   listRunningAgents,
   type AgentState,
 } from '../agents.js';
-import { resolveLatestSessionIdSync } from '../agents/activity.js';
+import { resolveLatestSessionId } from '../agents/activity.js';
 import { sessionFilePath } from '../runtimes/storage/claude-code.js';
 import { extractPiTranscript, extractCodexTranscript } from '../session-format-converter.js';
 import { writeThreadId as _writeThreadId } from '../runtimes/codex.js';
@@ -66,7 +66,7 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   constructor(options: ClaudeCodeTranscriptSourceOptions = {}) {
     this.listAgents = options.listAgents ?? listRunningAgentsFromStore;
     this.resolveSessionId = options.resolveSessionId
-      ?? ((agent) => resolveLatestSessionIdSync(agent.id, { getAgentState: () => agent }).sessionId);
+      ?? ((agent) => resolveLatestSessionId(agent.id, { getAgentState: () => agent }).sessionId);
     this.resolveTranscriptPath = options.resolveTranscriptPath ?? sessionFilePath;
     this.statTranscript = options.statTranscript ?? stat;
     this.isSubagentSession = options.isSubagentSession ?? isClaudeCodeSubagentSession;
@@ -301,7 +301,7 @@ function listRunningAgentsFromStore(): Promise<RunningAgent[]> {
 }
 
 async function readPiSessionId(agent: RunningAgent): Promise<string | null> {
-  return resolveLatestSessionIdSync(agent.id, { getAgentState: () => agent }).sessionId;
+  return resolveLatestSessionId(agent.id, { getAgentState: () => agent }).sessionId;
 }
 
 async function resolvePiTranscriptPath(agent: RunningAgent, sessionId: string): Promise<string | null> {

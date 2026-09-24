@@ -6,7 +6,7 @@ import { spawn, spawnSync, ChildProcess } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
-import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../../bridge-token.js';
+import { BRIDGE_TOKEN_HEADER, writeBridgeToken } from '../../bridge-token.js';
 import {
   handlePermissionRequestNotification,
   pushChannelNotification,
@@ -249,7 +249,7 @@ describe('overdeck-bridge subprocess (Bun.serve unix listener)', () => {
     'binds socket at 0o600 and unlinks on SIGTERM',
     async () => {
       const agentId = 'int-1';
-      writeBridgeTokenSync(agentId);
+      writeBridgeToken(agentId);
       proc = spawn('bun', ['run', BRIDGE_ENTRY], {
         env: {
           ...process.env,
@@ -298,7 +298,7 @@ describe('overdeck-bridge subprocess (Bun.serve unix listener)', () => {
     'rejects unauthenticated Unix socket posts with 403 and no notification delivery',
     async () => {
       const agentId = 'int-2';
-      const token = writeBridgeTokenSync(agentId);
+      const token = writeBridgeToken(agentId);
       proc = spawn('bun', ['run', BRIDGE_ENTRY], {
         env: {
           ...process.env,

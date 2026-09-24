@@ -165,8 +165,8 @@ async function stopTldrDaemonImpl(workspacePath: string): Promise<StepResult> {
     return stepSkipped(step, ['No .venv found']);
   }
   try {
-    const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
-    const tldrService = getTldrDaemonServiceSync(workspacePath, venvPath);
+    const { getTldrDaemonService } = await import('../tldr-daemon.js');
+    const tldrService = getTldrDaemonService(workspacePath, venvPath);
     await tldrService.stop();
     return stepOk(step, ['Stopped TLDR daemon']);
   } catch {

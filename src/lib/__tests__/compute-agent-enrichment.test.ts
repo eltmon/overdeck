@@ -41,14 +41,14 @@ function makeAgentDir(role: string) {
 
 describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
   const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
-  const getAgentStateSyncMock = vi.mocked(agentState.getAgentStateSync)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
   const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
 
   it('produces pendingInputKinds for a review-role agent even when hasActiveSpecialist is true', async () => {
     const agentDir = makeAgentDir('review')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'review' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'review' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'rate_limit', prompt: 'Switch model?' })
 
@@ -66,7 +66,7 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'tool_permission', prompt: 'Allow background operator?' })
 
@@ -86,7 +86,7 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'tool_permission', prompt: 'Allow background operator?' })
     const scanWithStalePlan = {
@@ -108,7 +108,7 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue(null)
     const scanWithQuestion = {
@@ -138,7 +138,7 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue(null)
     const scanWithQuestion = {
@@ -167,14 +167,14 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
 
 describe('computeAgentEnrichment pendingQuestionCount folding', () => {
   const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
-  const getAgentStateSyncMock = vi.mocked(agentState.getAgentStateSync)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
   const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
 
   it('counts 1 for a blocking pane detection with no JSONL questions', async () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'tool_permission', prompt: 'Allow?' })
 
@@ -189,7 +189,7 @@ describe('computeAgentEnrichment pendingQuestionCount folding', () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'needs_input', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue(null)
 
@@ -205,7 +205,7 @@ describe('computeAgentEnrichment pendingQuestionCount folding', () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue(null)
     const scanWithQuestion = {
@@ -231,14 +231,14 @@ describe('computeAgentEnrichment pendingQuestionCount folding', () => {
 
 describe('computeAgentEnrichment paneQuestion kind', () => {
   const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
-  const getAgentStateSyncMock = vi.mocked(agentState.getAgentStateSync)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
   const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
 
   it('surfaces paneQuestion for a runtime user_question detection', async () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(
       Effect.succeed({ state: 'waiting-on-human', waitingReason: 'user_question', resolution: 'working', resolutionCount: 0 }),
     )
@@ -263,7 +263,7 @@ describe('computeAgentEnrichment paneQuestion kind', () => {
  */
 describe('computeAgentEnrichment cached-scan replay', () => {
   const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
-  const getAgentStateSyncMock = vi.mocked(agentState.getAgentStateSync)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
   const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
 
   const scanWithQuestion = {
@@ -288,7 +288,7 @@ describe('computeAgentEnrichment cached-scan replay', () => {
   function arrange(role: string, agentId: string) {
     const agentDir = makeAgentDir(role)
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue(null)
     return agentDir
@@ -356,13 +356,13 @@ describe('computeAgentEnrichment cached-scan replay', () => {
  */
 describe('computeAgentEnrichment interactive turn-end', () => {
   const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
-  const getAgentStateSyncMock = vi.mocked(agentState.getAgentStateSync)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
   const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
 
   function arrange(role: string, agentId: string, state: string) {
     const agentDir = makeAgentDir(role)
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state, resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue(null)
     return agentDir
@@ -430,7 +430,7 @@ describe('computeAgentEnrichment interactive turn-end', () => {
  */
 describe('computeAgentEnrichment plan payload', () => {
   const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
-  const getAgentStateSyncMock = vi.mocked(agentState.getAgentStateSync)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
   const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
 
   const scanWithPlan = {
@@ -443,7 +443,7 @@ describe('computeAgentEnrichment plan payload', () => {
   function arrange(role: string, agentId: string) {
     const dir = makeAgentDir(role)
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(dir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'active', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockResolvedValue(null)
     return dir
@@ -481,13 +481,13 @@ describe('computeAgentEnrichment plan payload', () => {
  */
 describe('computeAgentEnrichment blocking-prompt resolution', () => {
   const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
-  const getAgentStateSyncMock = vi.mocked(agentState.getAgentStateSync)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
   const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
 
   function arrange(agentId: string) {
     const agentDir = makeAgentDir('work')
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentState>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'active', resolution: 'working', resolutionCount: 3 }))
     return agentDir
   }

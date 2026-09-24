@@ -33,7 +33,7 @@ export type FileStatus =
 /**
  * Compute SHA-256 hash of a file, prefixed with "sha256:".
  */
-export function hashFileSync(filePath: string): string {
+export function hashFile(filePath: string): string {
   const content = readFileSync(filePath);
   const hex = createHash('sha256').update(content).digest('hex');
   return `sha256:${hex}`;
@@ -53,7 +53,7 @@ export function createEmptyManifest(): Manifest {
 /**
  * Read a manifest from disk. Returns empty manifest if file doesn't exist or is invalid.
  */
-export function readManifestSync(manifestPath: string): Manifest {
+export function readManifest(manifestPath: string): Manifest {
   if (!existsSync(manifestPath)) {
     return createEmptyManifest();
   }
@@ -72,7 +72,7 @@ export function readManifestSync(manifestPath: string): Manifest {
 /**
  * Write a manifest to disk (creates parent directories if needed).
  */
-export function writeManifestSync(manifestPath: string, manifest: Manifest): void {
+export function writeManifest(manifestPath: string, manifest: Manifest): void {
   mkdirSync(join(manifestPath, '..'), { recursive: true });
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
 }
@@ -112,7 +112,7 @@ export interface PruneResult {
  * source set. Modified files lose Overdeck ownership in the manifest but remain
  * on disk, so later syncs treat them as user-owned.
  */
-export function pruneStaleManifestEntriesSync(
+export function pruneStaleManifestEntries(
   targetBase: string,
   manifest: Manifest,
   currentSourceRelPaths: ReadonlySet<string>,
@@ -226,7 +226,7 @@ export function pruneStaleManifestEntriesSync(
       continue;
     }
 
-    if (!targetStatus.isFile() || hashFileSync(canonicalTarget) !== entry.hash) {
+    if (!targetStatus.isFile() || hashFile(canonicalTarget) !== entry.hash) {
       releaseOwnership(relativePath);
       continue;
     }
@@ -268,7 +268,7 @@ export function compareFileToManifest(
     return { action: 'user-owned' };
   }
 
-  const currentHash = hashFileSync(targetFile);
+  const currentHash = hashFile(targetFile);
   if (currentHash === entry.hash) {
     return { action: 'update', currentHash };
   }
@@ -284,7 +284,7 @@ export function compareFileToManifest(
  * @param prefix - Prefix for relative paths (e.g., "skills/" or "agents/")
  * @returns Array of { absolutePath, relativePath } for each file found
  */
-export function collectSourceFilesSync(
+export function collectSourceFiles(
   sourceDir: string,
   prefix: string,
 ): Array<{ absolutePath: string; relativePath: string }> {
@@ -331,9 +331,9 @@ export function buildManifestFromDirectory(
 
   for (const category of categories) {
     const categoryDir = join(baseDir, category);
-    const files = collectSourceFilesSync(categoryDir, `${category}/`);
+    const files = collectSourceFiles(categoryDir, `${category}/`);
     for (const file of files) {
-      const hash = hashFileSync(file.absolutePath);
+      const hash = hashFile(file.absolutePath);
       setManifestEntry(manifest, file.relativePath, hash, source);
     }
   }

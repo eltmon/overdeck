@@ -8,21 +8,21 @@ import { randomUUID } from 'crypto';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
+import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { isTldrEnabledSync, loadConfigSync } from '../config-yaml.js';
+import { isTldrEnabled, loadConfigSync } from '../config-yaml.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn, setConversationClaudeSessionId } from '../overdeck/conversations.js';
-import { startWorkSync } from '../cv.js';
-import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { startWork } from '../cv.js';
+import { generateFixedPointPrompt, checkHook, initHook } from '../hooks.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { writeBridgeTokenSync } from '../bridge-token.js';
+import { writeBridgeToken } from '../bridge-token.js';
 import { exactPaneTarget, sessionExists, setOption } from '../tmux.js';
 import { agentPaneExists, closeBackendPane, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import { toPaneRole } from '../terminal-backends/tmux.js';
@@ -75,7 +75,7 @@ import {
 } from './spawn-prep.js';
 import { getConcurrencyLimits } from '../cloister/concurrency.js';
 import { listAgentStates } from './queries.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPath } from '../projects.js';
 import {
   decideChannelsForWorkAgent,
   dismissDevChannelsDialog,
@@ -195,7 +195,7 @@ async function spawnRunWithoutConsentClaim(
     await Effect.runPromise(killSession(agentId)).catch(() => {});
   }
   await prepareWorkspaceForAgentSpawn(issueId, role, options.allowHost, workspace);
-  initHookSync(agentId);
+  initHook(agentId);
 
   const resolvedHarness: RuntimeName = await resolveHarness({
     explicit: options.harness,
@@ -209,7 +209,7 @@ async function spawnRunWithoutConsentClaim(
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   if (
-    getProviderForModelSync(selectedModel).name === 'openai'
+    getProviderForModel(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
     const { isCliproxyRunning } = await import('../cliproxy.js');
@@ -284,11 +284,11 @@ async function spawnRunWithoutConsentClaim(
   }
 
   if (!isAcp) {
-    const provider = getProviderForModelSync(selectedModel as ModelId);
+    const provider = getProviderForModel(selectedModel as ModelId);
     if (provider.authType === 'credential-file') {
-      setupCredentialFileAuthSync(provider, workspace);
+      setupCredentialFileAuth(provider, workspace);
     } else {
-      clearCredentialFileAuthSync(workspace);
+      clearCredentialFileAuth(workspace);
     }
   }
 
@@ -389,7 +389,7 @@ async function spawnRunWithoutConsentClaim(
     extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
   }
 
-  const launcherContent = generateLauncherScriptSync({
+  const launcherContent = generateLauncherScript({
     role,
     workingDir: workspace,
     changeDir: false,
@@ -577,8 +577,8 @@ async function spawnRunWithoutConsentClaim(
   // A non-fatal probe failure leaves the marker absent and preserves the
   // status-only fallback.
   try {
-    const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-    const headAnchor = await snapshotWorkspaceHeadsPromise(issueId, workspace);
+    const { snapshotWorkspaceHeads } = await import('../git-utils.js');
+    const headAnchor = await snapshotWorkspaceHeads(issueId, workspace);
     if (headAnchor) state.roleRunHead = headAnchor;
   } catch { /* non-fatal — marker stays absent */ }
 
@@ -589,7 +589,7 @@ async function spawnRunWithoutConsentClaim(
   // "role started" for review so the orchestrator + 4 convoy sub-reviewers
   // don't each spam the session feed and bury conversations.
   if (role !== 'review') {
-    emitActivityEntrySync({
+    emitActivityEntry({
       source: role,
       level: 'info',
       message: `${role} role started for ${issueId}`,
@@ -634,7 +634,7 @@ async function spawnAgentWithoutConsentClaim(
   await prepareWorkspaceForAgentSpawn(options.issueId, role, options.allowHost, options.workspace);
 
   // Initialize hook for this agent (FPP support)
-  initHookSync(agentId);
+  initHook(agentId);
 
   if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined && !readWorkspacePlanSync(options.workspace)) {
     throw new Error(`The required xBRIEF checklist for ${options.issueId} is missing or unreadable. Run planning before spawning a work agent.`);
@@ -656,7 +656,7 @@ async function spawnAgentWithoutConsentClaim(
   // route handlers where blocking on curl/tar would freeze the event loop
   // (see PAN-70 / PAN-446 — no blocking I/O in server code).
   if (
-    getProviderForModelSync(selectedModel).name === 'openai'
+    getProviderForModel(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
     const { isCliproxyRunning } = await import('../cliproxy.js');
@@ -731,9 +731,9 @@ async function spawnAgentWithoutConsentClaim(
   let prompt = options.prompt || '';
 
   // FPP: Check for pending work on hook
-  const { hasWork } = checkHookSync(agentId);
+  const { hasWork } = checkHook(agentId);
   if (hasWork) {
-    const fixedPointPrompt = generateFixedPointPromptSync(agentId);
+    const fixedPointPrompt = generateFixedPointPrompt(agentId);
     if (fixedPointPrompt) {
       prompt = fixedPointPrompt + '\n\n---\n\n' + prompt;
     }
@@ -767,9 +767,9 @@ async function spawnAgentWithoutConsentClaim(
   // file reads.
   try {
     const venvPath = join(options.workspace, '.venv');
-    if (isTldrEnabledSync() && existsSync(venvPath)) {
-      const { getTldrDaemonServiceSync } = await import('../tldr-daemon.js');
-      const tldrService = getTldrDaemonServiceSync(options.workspace, venvPath);
+    if (isTldrEnabled() && existsSync(venvPath)) {
+      const { getTldrDaemonService } = await import('../tldr-daemon.js');
+      const tldrService = getTldrDaemonService(options.workspace, venvPath);
       const status = await tldrService.getStatus();
       if (!status.running) {
         await tldrService.start(true);
@@ -793,7 +793,7 @@ async function spawnAgentWithoutConsentClaim(
   let channelsBridgeMcpConfig: string | undefined;
   if (channelsDecision.eligible) {
     channelsBridgeMcpConfig = join(options.workspace, '.pan', 'agent-mcp.json');
-    writeBridgeTokenSync(agentId);
+    writeBridgeToken(agentId);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, agentId);
     state.channelsEnabled = true;
     saveAgentStateSync(state);
@@ -826,8 +826,8 @@ async function spawnAgentWithoutConsentClaim(
   try {
     const { isGitHubAppConfigured, generateInstallationToken, configureWorkspaceForBot } = await import('../github-app.js');
     if (isGitHubAppConfigured()) {
-      const { findProjectByPathSync } = await import('../projects.js');
-      const project = findProjectByPathSync(resolve(options.workspace, '..', '..'));
+      const { findProjectByPath } = await import('../projects.js');
+      const project = findProjectByPath(resolve(options.workspace, '..', '..'));
       const ghRepo = project?.github_repo;
       if (ghRepo) {
         const [owner, repo] = ghRepo.split('/');
@@ -1019,16 +1019,16 @@ async function spawnAgentWithoutConsentClaim(
   saveAgentStateSync(state);
 
   // Track work in CV
-  startWorkSync(agentId, options.issueId);
+  startWork(agentId, options.issueId);
 
   // Emit activity + TTS so the user knows an agent has started
-  emitActivityEntrySync({
+  emitActivityEntry({
     source: role,
     level: 'info',
     message: `Work agent started for ${options.issueId}`,
     issueId: options.issueId,
   });
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: `Work agent started for ${options.issueId}`,
     priority: 2,
     issueId: options.issueId,

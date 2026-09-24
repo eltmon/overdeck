@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import type { LegacyConversation as Conversation } from '../../overdeck/conversations.js';
 import { createConversation } from '../../overdeck/conversations.js';
 import { createOverdeckDatabase } from '../../../../scripts/create-overdeck-db.js';
-import { closeOverdeckDatabaseSync } from '../../overdeck/infra.js';
+import { closeOverdeckDatabase } from '../../overdeck/infra.js';
 import { resetDiscoveredSessionsSchemaBootstrap } from '../../overdeck/discovered-sessions.js';
 import { sessionFilePath } from '../../runtimes/storage/claude-code.js';
 import { createHandoffPaths } from '../handoff-paths.js';
@@ -147,7 +147,7 @@ const _testDbPaths: string[] = [];
 
 async function createSourceConversation(home: string, overrides: Partial<Conversation> = {}): Promise<Conversation> {
   // Set up a fresh overdeck.db at this test's home directory.
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   resetDiscoveredSessionsSchemaBootstrap();
   mkdirSync(home, { recursive: true });
   const dbPath = join(home, 'overdeck.db');
@@ -181,7 +181,7 @@ afterEach(() => {
   vi.mocked(deliverAgentMessage).mockReset();
   vi.mocked(deliverAgentMessage).mockResolvedValue(undefined);
   vi.mocked(mockedSummarizeSerializedText).mockClear();
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   resetDiscoveredSessionsSchemaBootstrap();
   _testDbPaths.length = 0;
   if (originalOverdeckHome === undefined) {

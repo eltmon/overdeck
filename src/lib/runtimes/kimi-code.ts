@@ -33,17 +33,17 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { AgentState } from '../agents/agent-state.js';
-import { getAgentStateSync, saveAgentStateSync } from '../agents/agent-state.js';
+import { getAgentState, saveAgentStateSync } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents/queries.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { writePtyToken } from '../pty-token.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { claudeSystemPromptFiles } from '../agents/runtime-command.js';
 import { markKimiContextDelivered, prepareKimiMessage } from './kimi-context-envelope.js';
 import { findKimiWirePath, kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from './storage/kimi-code.js';
-import { parseKimiSessionSync } from '../cost-parsers/kimi-parser.js';
+import { parseKimiSession } from '../cost-parsers/kimi-parser.js';
 import { appendSessionIdToHistory } from '../session-history.js';
 import { getOverdeckHome } from '../paths.js';
 import { isPidDead } from '../pan-dir/fs-lock.js';
@@ -475,13 +475,13 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   getTokenUsage(agentId: string): TokenUsage | null {
     const path = this.getSessionPath(agentId);
     if (!path) return null;
-    return parseKimiSessionSync(path)?.usage ?? null;
+    return parseKimiSession(path)?.usage ?? null;
   }
 
   getSessionCost(agentId: string): CostBreakdown | null {
     const path = this.getSessionPath(agentId);
     if (!path) return null;
-    const parsed = parseKimiSessionSync(path);
+    const parsed = parseKimiSession(path);
     if (!parsed) return null;
     return {
       inputCost: 0,
@@ -557,7 +557,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     const supervisorScriptPath = this.resolveSupervisorScriptPath();
     await this.writePtyTokenFor(config.agentId);
 
-    const launcherContent = generateLauncherScriptSync({
+    const launcherContent = generateLauncherScript({
       role: 'work',
       workingDir: config.workspace,
       harness: 'kimi-code',
@@ -660,7 +660,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 
   private workspaceFor(agentId: string): string | null {
-    return getAgentStateSync(agentId)?.workspace ?? null;
+    return getAgentState(agentId)?.workspace ?? null;
   }
 
   private readSessionId(agentId: string): string | null {
@@ -688,7 +688,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
    * this adapter's spawnAgent create state afterward).
    */
   private markSupervisorEnabled(agentId: string): void {
-    const state = getAgentStateSync(agentId);
+    const state = getAgentState(agentId);
     if (!state) return;
     state.supervisorEnabled = true;
     saveAgentStateSync(state);
@@ -699,6 +699,6 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 }
 
-export function createKimiCodeRuntimeSync(options: KimiCodeRuntimeOptions = {}): KimiCodeRuntimeSync {
+export function createKimiCodeRuntime(options: KimiCodeRuntimeOptions = {}): KimiCodeRuntimeSync {
   return new KimiCodeRuntimeSync(options);
 }

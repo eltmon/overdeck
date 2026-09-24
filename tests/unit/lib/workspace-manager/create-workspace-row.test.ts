@@ -27,7 +27,7 @@ const isWorktreeAddCall = (command: unknown, args?: unknown): boolean =>
 import { createWorkspace } from '../../../../src/lib/workspace-manager/create.js';
 import { getWorkspaceForIssue, getProjectByPath } from '../../../../src/lib/workspaces/resolver.js';
 import { upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
-import { registerProjectSync, unregisterProjectSync } from '../../../../src/lib/projects.js';
+import { registerProject, unregisterProject } from '../../../../src/lib/projects.js';
 
 let odb: OverdeckTestDb;
 let tempDir: string;
@@ -98,7 +98,7 @@ describe('createWorkspace: workspace row creation (PAN-1990)', () => {
     // Registered in projects.yaml (registerProjectSync) but deliberately NOT
     // upserted into the DB — simulates a project the dashboard hasn't
     // boot-seeded against yet.
-    registerProjectSync('pan-4000-project', { name: 'Unseeded', path: tempDir });
+    registerProject('pan-4000-project', { name: 'Unseeded', path: tempDir });
     try {
       expect(getProjectByPath(tempDir)).toBeNull();
 
@@ -119,7 +119,7 @@ describe('createWorkspace: workspace row creation (PAN-1990)', () => {
       expect(rowExistedDuringWorktreeAdd).toBe(true);
       expect(getWorkspaceForIssue('PAN-4000')?.kind).toBe('issue');
     } finally {
-      unregisterProjectSync('pan-4000-project');
+      unregisterProject('pan-4000-project');
     }
   });
 

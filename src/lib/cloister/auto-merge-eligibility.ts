@@ -18,7 +18,7 @@ import { Effect } from 'effect';
 
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import type { TrackerType } from '../tracker/interface.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 import { getProjectAutoMergeDefault, projectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
 import { evaluateMergeReadiness, getPrFacts, type PrFacts } from './pr-facts.js';
 import { issueRunsTestsOnCi } from './verification-tests-mode.js';
@@ -61,7 +61,7 @@ async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
   const config = project ? getProjectSync(project.projectKey) : null;
   if (config?.tracker && config.tracker !== 'github') return readTrackerIssueLabels(issueId, config.tracker);
 
-  const resolved = resolveGitHubIssueSync(issueId);
+  const resolved = resolveGitHubIssue(issueId);
   if (!resolved.isGitHub) return [];
   if (config?.github_repo && `${resolved.owner}/${resolved.repo}`.toLowerCase() !== config.github_repo.toLowerCase()) {
     return [];

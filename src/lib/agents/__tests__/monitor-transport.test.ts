@@ -9,7 +9,7 @@ import {
   drainMailOnce,
   formatAgentMessageBlock,
   formatMailFileContent,
-  listInboxMessagesSync,
+  listInboxMessages,
   parseMailFile,
 } from '../monitor-transport.js';
 
@@ -121,14 +121,14 @@ describe('listInboxMessagesSync', () => {
     await drainMailOnce(AGENT_ID, () => {}); // moves "old" into read/
     writeMail('2026-01-02T00-00-00-000Z.md', formatMailFileContent('x'.repeat(6000), 'deacon', new Date('2026-01-02T00:00:00Z')));
 
-    const messages = listInboxMessagesSync(AGENT_ID, 10);
+    const messages = listInboxMessages(AGENT_ID, 10);
     expect(messages.map((m) => [m.read, m.body.length])).toEqual([
       [true, 3],
       [false, 6000], // full body — inbox never truncates
     ]);
 
     expect(existsSync(join(agentMailDir(AGENT_ID), '2026-01-02T00-00-00-000Z.md'))).toBe(true);
-    expect(listInboxMessagesSync(AGENT_ID, 1)).toHaveLength(1);
-    expect(listInboxMessagesSync(AGENT_ID, 1)[0].read).toBe(false);
+    expect(listInboxMessages(AGENT_ID, 1)).toHaveLength(1);
+    expect(listInboxMessages(AGENT_ID, 1)[0].read).toBe(false);
   });
 });

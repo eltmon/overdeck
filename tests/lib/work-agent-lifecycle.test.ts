@@ -10,7 +10,7 @@ import {
 } from '../../src/lib/agents.js';
 import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../src/lib/agent-runtime-mirror.js';
-import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../src/lib/work-agent-lifecycle.js';
+import { assertCanStartFresh, getWorkAgentLifecycleStateSync } from '../../src/lib/work-agent-lifecycle.js';
 import * as claudeStorage from '../../src/lib/runtimes/storage/claude-code.js';
 import * as tmux from '../../src/lib/tmux.js';
 import * as liveness from '../../src/lib/agents/liveness.js';
@@ -75,8 +75,8 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.recommendedAction).toBe('resume');
     expect(lifecycle.reason).toContain(`pan reset-session ${agentId}`);
     expect(lifecycle.reason).not.toContain('--fresh');
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/resumable Claude session/);
-    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
+    expect(() => assertCanStartFresh(agentId)).toThrow(/resumable Claude session/);
+    expect(() => assertCanStartFresh(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
@@ -115,8 +115,8 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(true);
     expect(lifecycle.canStartFresh).toBe(false);
     expect(lifecycle.recommendedAction).toBe('resume');
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/handed off/);
-    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
+    expect(() => assertCanStartFresh(agentId)).toThrow(/handed off/);
+    expect(() => assertCanStartFresh(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
@@ -396,8 +396,8 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.canResumeSession).toBe(true);
     expect(lifecycle.canStartFresh).toBe(false);
     expect(lifecycle.recommendedAction).toBe('resume');
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/handed off/);
-    expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
+    expect(() => assertCanStartFresh(agentId)).toThrow(/handed off/);
+    expect(() => assertCanStartFresh(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();

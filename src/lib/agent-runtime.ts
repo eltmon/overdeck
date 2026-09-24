@@ -18,7 +18,7 @@ import type {
   ChannelReplyKind,
   WaitingReason,
 } from '@overdeck/contracts'
-import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js'
+import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js'
 
 // Use 127.0.0.1 explicitly: when /etc/hosts resolves `localhost` to ::1
 // (IPv6 first), Node's undici-based fetch() connects to [::1]:3011 and
@@ -91,7 +91,7 @@ export const emitAgentEvent = (
     // classified finished slots as still running, forever. The bash hooks
     // attach this same header; the lib emitter must too.
     const token = yield* Effect.try({
-      try: (): string => ensureInternalTokenSync(),
+      try: (): string => ensureInternalToken(),
       catch: (cause) => new AgentRuntimeFetchError({ url, cause }),
     }).pipe(Effect.orElseSucceed((): string | null => null))
     if (!token) return false

@@ -18,8 +18,8 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { AGENTS_DIR, getOverdeckHome } from '../paths.js';
 import { FsError } from '../errors.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
+import { logAgentLifecycle } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { normalizeAgentId } from './identity.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
@@ -35,7 +35,7 @@ import {
   type AgentStopCause,
   getAgentDir,
   getAgentStateFilePath,
-  getAgentStateSync,
+  getAgentState,
   listAgentStatesSync,
   cleanAgentState,
 } from './agent-state-read.js';
@@ -46,7 +46,7 @@ export type { Role } from './role.js';
 // agent-state-read.ts (lint:circular fixup — see that file's header). This
 // keeps every existing `from './agent-state.js'` import working unchanged.
 export type { AgentState, AgentStopCause } from './agent-state-read.js';
-export { getAgentDir, getAgentStateFilePath, getAgentStateSync, listAgentStatesSync } from './agent-state-read.js';
+export { getAgentDir, getAgentStateFilePath, getAgentState, listAgentStatesSync } from './agent-state-read.js';
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
@@ -105,10 +105,10 @@ export async function wipeAgentStateDirs(
 
 export { isRole } from './role.js';
 
-registerPipelineTelemetryAgentReader(getAgentStateSync);
+registerPipelineTelemetryAgentReader(getAgentState);
 registerFeedbackAgentStateReader(listAgentStatesSync);
 registerActiveReviewArtifactContextReader((issueId) => {
-  const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+  const state = getAgentState(`agent-${issueId.toLowerCase()}-review`);
   if (!state?.reviewRunId) return null;
   return {
     runId: state.reviewRunId,
@@ -126,7 +126,7 @@ function prepareAgentStateForSave(state: AgentState): AgentState {
   return state;
 }
 
-export function writeAgentStateJsonSync(state: AgentState): void {
+export function writeAgentStateJson(state: AgentState): void {
   const stateFile = getAgentStateFilePath(state.id);
   mkdirSync(join(getOverdeckHome(), 'agents', state.id), { recursive: true });
   writeFileSync(stateFile, JSON.stringify(cleanAgentState(state), null, 2));
@@ -134,15 +134,15 @@ export function writeAgentStateJsonSync(state: AgentState): void {
 
 export function saveAgentStateSync(state: AgentState): void {
   // Detect status transition for audit trail
-  const oldState = getAgentStateSync(state.id);
+  const oldState = getAgentState(state.id);
   const oldStatus = oldState?.status;
 
   prepareAgentStateForSave(state);
 
-  writeAgentStateJsonSync(state);
+  writeAgentStateJson(state);
 
   if (oldStatus && oldStatus !== state.status) {
-    logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
+    logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
 }
 
@@ -161,7 +161,7 @@ export function saveAgentStateSync(state: AgentState): void {
  */
 export async function markSpawnFailed(agentId: string, reason: string): Promise<void> {
   try {
-    const current = getAgentStateSync(agentId);
+    const current = getAgentState(agentId);
     if (!current) return;
     current.id ||= agentId;
     current.status = 'stopped';
@@ -178,18 +178,18 @@ export async function markSpawnFailed(agentId: string, reason: string): Promise<
  * Persist observed harness activity through the agent-state write door without
  * re-running lifecycle side effects such as harness/model record mirroring.
  */
-export function recordAgentActivitySync(
+export function recordAgentActivity(
   agentId: string,
   activity: { at?: string; costSoFar?: number },
 ): boolean {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (!state) return false;
 
   state.lastActivity = activity.at ?? new Date().toISOString();
   if (activity.costSoFar !== undefined && Number.isFinite(activity.costSoFar)) {
     state.costSoFar = activity.costSoFar;
   }
-  writeAgentStateJsonSync(state);
+  writeAgentStateJson(state);
   return true;
 }
 
@@ -204,7 +204,7 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
     });
 
     const oldState = yield* Effect.try({
-      try: () => getAgentStateSync(state.id),
+      try: () => getAgentState(state.id),
       catch: (cause) => toAgentFsError('read', `agents-db:${state.id}`, cause),
     });
     const oldStatus = oldState?.status;
@@ -222,7 +222,7 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
     recordFeatureRegistryAgentState(state);
 
     if (oldStatus && oldStatus !== state.status) {
-      logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateProgram)`);
+      logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateProgram)`);
     }
   });
 };
@@ -288,7 +288,7 @@ export const setAgentPaused = (
 ): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* Effect.try({
-      try: () => getAgentStateSync(agentId),
+      try: () => getAgentState(agentId),
       catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
     });
     if (!state) return null;
@@ -310,8 +310,8 @@ function applyAgentYielded(state: AgentState, reason: string): void {
 }
 
 /** PAN-2507: set the yield gate (pause + scheduler attribution) in one write. */
-export function setAgentYieldedSync(agentId: string, reason: string): boolean {
-  const state = getAgentStateSync(agentId);
+export function setAgentYielded(agentId: string, reason: string): boolean {
+  const state = getAgentState(agentId);
   if (!state) return false;
   applyAgentYielded(state, reason);
   saveAgentStateSync(state);
@@ -323,8 +323,8 @@ export function setAgentYieldedSync(agentId: string, reason: string): boolean {
  * attribution (so `resumeAgent`'s pause gate passes) and stamps
  * `lastYieldResumeAt` to arm the re-yield cooldown, in a single write.
  */
-export function clearYieldForResumeSync(agentId: string): boolean {
-  const state = getAgentStateSync(agentId);
+export function clearYieldForResume(agentId: string): boolean {
+  const state = getAgentState(agentId);
   if (!state) return false;
   applyAgentUnpaused(state);
   state.lastYieldResumeAt = new Date().toISOString();
@@ -363,7 +363,7 @@ function isAgentPauseClear(state: AgentState): boolean {
  * process can still land between this read and the write.
  */
 export function clearAgentPausedSync(agentId: string, onlyIf?: (state: AgentState) => boolean): boolean {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (!state) return false;
   if (isAgentPauseClear(state)) return true;
   if (onlyIf && !onlyIf(state)) return false;
@@ -377,7 +377,7 @@ export function clearAgentPausedSync(agentId: string, onlyIf?: (state: AgentStat
 export const clearAgentPaused = (agentId: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* Effect.try({
-      try: () => getAgentStateSync(agentId),
+      try: () => getAgentState(agentId),
       catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
     });
     if (!state) return null;
@@ -390,7 +390,7 @@ export const clearAgentPaused = (agentId: string): Effect.Effect<AgentState | nu
 
 /** Marks an agent as troubled after repeated resume failures. */
 export function markAgentTroubled(agentId: string): boolean {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (!state) return false;
 
   if (!state.troubled) {
@@ -415,7 +415,7 @@ function applyAgentUntroubled(state: AgentState): void {
 export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* Effect.try({
-      try: () => getAgentStateSync(agentId),
+      try: () => getAgentState(agentId),
       catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
     });
     if (!state) return null;
@@ -440,7 +440,7 @@ export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | 
  * scan per terminal issue (review finding, PAN-3727) — cost scales with the
  * agent table once per patrol run, not with the number of terminal issues.
  */
-export function clearAgentOperatorGatesForIssuesSync(issueIds: ReadonlySet<string>): Map<string, string[]> {
+export function clearAgentOperatorGatesForIssues(issueIds: ReadonlySet<string>): Map<string, string[]> {
   const mutated = new Map<string, string[]>();
   if (issueIds.size === 0) return mutated;
 
@@ -472,10 +472,10 @@ export function clearAgentOperatorGatesForIssuesSync(issueIds: ReadonlySet<strin
   return mutated;
 }
 
-/** Single-issue convenience wrapper over {@link clearAgentOperatorGatesForIssuesSync}. */
-export function clearAgentOperatorGatesForIssueSync(issueId: string): string[] {
+/** Single-issue convenience wrapper over {@link clearAgentOperatorGatesForIssues}. */
+export function clearAgentOperatorGatesForIssue(issueId: string): string[] {
   const normalized = issueId.toUpperCase();
-  return clearAgentOperatorGatesForIssuesSync(new Set([normalized])).get(normalized) ?? [];
+  return clearAgentOperatorGatesForIssues(new Set([normalized])).get(normalized) ?? [];
 }
 
 /**
@@ -525,7 +525,7 @@ function applyAgentFailure(state: AgentState, reason: string): void {
 export const recordAgentFailure = (agentId: string, reason: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* Effect.try({
-      try: () => getAgentStateSync(agentId),
+      try: () => getAgentState(agentId),
       catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
     });
     if (!state) return null;
@@ -537,7 +537,7 @@ export const recordAgentFailure = (agentId: string, reason: string): Effect.Effe
 
 /** Resets failure tracking after an agent reaches running state. */
 export function resetAgentFailureCount(agentId: string): boolean {
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   if (!state) return false;
   if ((state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined) return true;
 
@@ -548,17 +548,17 @@ export function resetAgentFailureCount(agentId: string): boolean {
 
 /** Reports whether callers should block start, resume, auto-resume, or message delivery on the manual pause gate. */
 export function isAgentPaused(agentId: string): boolean {
-  return getAgentStateSync(agentId)?.paused === true;
+  return getAgentState(agentId)?.paused === true;
 }
 
 /** Reports whether callers should block start, resume, auto-resume, or message delivery on the troubled gate. */
 export function isAgentTroubled(agentId: string): boolean {
-  return getAgentStateSync(agentId)?.troubled === true;
+  return getAgentState(agentId)?.troubled === true;
 }
 
 export async function recordStartupSessionExit(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<never> {
   await Effect.runPromise(recordAgentFailure(state.id, SESSION_EXITED_BEFORE_KICKOFF));
-  const failedState = getAgentStateSync(state.id);
+  const failedState = getAgentState(state.id);
   if (failedState) {
     failedState.status = 'stopped';
     failedState.stoppedAt = new Date().toISOString();
@@ -570,7 +570,7 @@ export async function recordStartupSessionExit(state: AgentState, issueId: strin
   state.stoppedAt = new Date().toISOString();
   state.kickoffDelivered = false;
   state.lastFailureReason = SESSION_EXITED_BEFORE_KICKOFF;
-  emitActivityEntrySync({
+  emitActivityEntry({
     source,
     level: 'error',
     message: `${state.id}: session exited before kickoff could be delivered`,
@@ -723,7 +723,7 @@ export function markAgentRunning(state: AgentState, options?: { preserveFailureT
   // this the flag is sticky across the stop→resume→crash sequence and autoResume
   // would permanently skip the agent on any subsequent orphan recovery.
   delete state.stoppedByUser;
-  logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → running (markAgentRunning)`);
+  logAgentLifecycle(state.id, `status changed: ${oldStatus} → running (markAgentRunning)`);
 }
 
 function markAgentStopped(state: AgentState, cause: AgentStopCause): void {
@@ -738,7 +738,7 @@ function markAgentStopped(state: AgentState, cause: AgentStopCause): void {
     // transient resource event into a permanent stall no patrol can recover.
     delete state.stoppedByUser;
   }
-  logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → stopped (markAgentStopped, cause=${cause})`);
+  logAgentLifecycle(state.id, `status changed: ${oldStatus} → stopped (markAgentStopped, cause=${cause})`);
 }
 
 export function markAgentStoppedState(state: AgentState, cause: AgentStopCause = 'system'): AgentState {

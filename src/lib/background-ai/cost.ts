@@ -15,8 +15,8 @@
  *   agentId = 'background', issueId = 'background'.
  */
 
-import { appendCostEventSync, type CostEvent } from '../costs/events.js';
-import { calculateCostSync, getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
+import { appendCostEvent, type CostEvent } from '../costs/events.js';
+import { calculateCost, getPricing, type AIProvider, type TokenUsage } from '../cost.js';
 import type { BackgroundAiFeature } from './features.js';
 
 const BACKGROUND_COST_AGENT_ID = 'background';
@@ -59,8 +59,8 @@ export function recordBackgroundAiCost(input: RecordBackgroundAiCostInput): numb
 
   let cost = input.costUsd;
   if (cost === undefined) {
-    const pricing = getPricingSync(provider, input.model);
-    cost = pricing ? calculateCostSync(usage, pricing) : 0;
+    const pricing = getPricing(provider, input.model);
+    cost = pricing ? calculateCost(usage, pricing) : 0;
   }
 
   const event: CostEvent = {
@@ -81,7 +81,7 @@ export function recordBackgroundAiCost(input: RecordBackgroundAiCostInput): numb
   };
 
   try {
-    appendCostEventSync(event);
+    appendCostEvent(event);
   } catch (err) {
     console.warn(`[background-ai] failed to record cost for ${input.feature}:`, err);
   }

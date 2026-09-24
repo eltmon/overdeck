@@ -32,8 +32,8 @@ import type { Layer } from 'effect';
 
 import { createOverdeckDatabase } from '../../scripts/create-overdeck-db.js';
 import {
-  closeOverdeckDatabaseSync,
-  getOverdeckDatabaseSync,
+  closeOverdeckDatabase,
+  getOverdeckDatabase,
   makeDbLive,
   type Db,
 } from '../../src/lib/overdeck/infra.js';
@@ -74,7 +74,7 @@ function getTemplateDbPath(): string {
  */
 export function setupOverdeckTestDb(): OverdeckTestDb {
   // Drop any cached sync handle from a prior test before we swap the home.
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   // Reset the schema-bootstrap flag so ensureSchema() runs DDL on the new DB
   // (the FTS table is NOT in the migration SQL, only in ensureSchema()).
   resetDiscoveredSessionsSchemaBootstrap();
@@ -91,13 +91,13 @@ export function setupOverdeckTestDb(): OverdeckTestDb {
     home,
     dbPath,
     dbLayer: makeDbLive(dbPath),
-    raw: () => getOverdeckDatabaseSync(dbPath),
+    raw: () => getOverdeckDatabase(dbPath),
   };
 }
 
 /** `afterEach`: close the cached handle, remove the temp home, restore prior env. */
 export function teardownOverdeckTestDb(db: OverdeckTestDb): void {
-  closeOverdeckDatabaseSync();
+  closeOverdeckDatabase();
   rmSync(db.home, { recursive: true, force: true });
   if (savedHome.present) {
     process.env.OVERDECK_HOME = savedHome.value;
@@ -111,7 +111,7 @@ export function teardownOverdeckTestDb(db: OverdeckTestDb): void {
 // now. Re-export the production sync writers/readers from there instead, so
 // tests still seed through the real path rather than hand-rolling JSON writes.
 export {
-  getAgentStateSync as getOverdeckAgentStateSync,
+  getAgentState as getOverdeckAgentStateSync,
   listAgentStatesSync as listOverdeckAgentStatesSync,
   saveAgentStateSync as saveOverdeckAgentStateSync,
 } from '../../src/lib/agents/agent-state.js';

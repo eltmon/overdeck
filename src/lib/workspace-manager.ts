@@ -16,8 +16,8 @@ export type {
   WorkspaceRemoveOptions,
   WorkspaceRemoveResult,
 } from './workspace-manager/types.js';
-export { copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync, migrateOverdeckToPanSync } from './workspace-manager/migration.js';
-export { installPreRebaseHook, preTrustDirectorySync, relocateVenvScripts } from './workspace-manager/worktree-ops.js';
+export { copyOverdeckSettingsToWorkspace, ensurePanGitignore, migrateOverdeckToPan } from './workspace-manager/migration.js';
+export { installPreRebaseHook, preTrustDirectory, relocateVenvScripts } from './workspace-manager/worktree-ops.js';
 export { createWorkspace } from './workspace-manager/create.js';
 export { addNewRepoToWorkspace, addReposToWorkspace } from './workspace-manager/repos.js';
 export { getContainersReferencingWorkspacePath, stopWorkspaceDocker } from './workspace-manager/docker.js';

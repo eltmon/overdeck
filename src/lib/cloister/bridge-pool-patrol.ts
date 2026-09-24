@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import {
   assessBridgePoolPressure,
   bridgePoolLimitFromPools,
@@ -52,7 +52,7 @@ function defaultDeps(): BridgePoolPatrolDeps {
     },
     readPools: readDockerDaemonPools,
     emit: (level, message) => {
-      emitActivityEntrySync({ source: 'cloister', level, message });
+      emitActivityEntry({ source: 'cloister', level, message });
     },
   };
 }

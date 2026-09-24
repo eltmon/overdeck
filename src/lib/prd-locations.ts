@@ -74,7 +74,7 @@ function statusRoot(projectPath: string, status: Exclude<PrdStatus, 'draft'>): s
  * Canonical lowercase subdirectory path. Always use this for NEW writes.
  * Does not check existence — callers create the directory as needed.
  */
-export function canonicalPrdSubdirSync(
+export function canonicalPrdSubdir(
   projectPath: string,
   issueId: string,
   status: Exclude<PrdStatus, 'draft'>,
@@ -86,7 +86,7 @@ export function canonicalPrdSubdirSync(
  * Find an existing PRD for an issue under a single lifecycle status.
  * Checks all four legacy/buggy formats, preferring canonical.
  */
-export function findPrdAtStatusSync(
+export function findPrdAtStatus(
   projectPath: string,
   issueId: string,
   status: Exclude<PrdStatus, 'draft'>,
@@ -142,12 +142,12 @@ export async function findDraftPrd(projectPath: string, issueId: string): Promis
  * Find a PRD across all lifecycle statuses, in priority order:
  * active → completed → planned → draft. Returns the first match or null.
  */
-export function findPrdAnywhereSync(
+export function findPrdAnywhere(
   projectPath: string,
   issueId: string,
 ): PrdLocation | null {
   for (const status of ['active', 'completed', 'planned'] as const) {
-    const loc = findPrdAtStatusSync(projectPath, issueId, status);
+    const loc = findPrdAtStatus(projectPath, issueId, status);
     if (loc) return loc;
   }
   return findDraftPrdSync(projectPath, issueId)

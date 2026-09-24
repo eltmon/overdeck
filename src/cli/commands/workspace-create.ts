@@ -18,11 +18,11 @@ import {
 } from '../../lib/pan-dir/index.js';
 import {
   extractTeamPrefix,
-  findProjectByTeamSync,
-  hasProjectsSync,
+  findProjectByTeam,
+  hasProjects,
   resolveProjectFromIssueSync,
 } from '../../lib/projects.js';
-import { mergeSkillsIntoWorkspaceSync } from '../../lib/skills-merge.js';
+import { mergeSkillsIntoWorkspace } from '../../lib/skills-merge.js';
 import { createWorkspace as createWorkspaceFromConfig } from '../../lib/workspace-manager.js';
 import { createWorktree } from '../../lib/worktree.js';
 import { createRemoteWorkspace } from './workspace-remote.js';
@@ -80,7 +80,7 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
 
     // Try to find project config from registry
     const teamPrefix = extractTeamPrefix(issueId);
-    const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
     // Priority 1: Use workspace-manager if project has workspace config
     if (projectConfig?.workspace) {
@@ -199,7 +199,7 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
         projectRoot = resolved.projectPath;
         projectName = resolved.projectName;
         spinner.text = `Resolved project: ${projectName} (${projectRoot})`;
-      } else if (hasProjectsSync()) {
+      } else if (hasProjects()) {
         spinner.warn(`No project found for ${issueId} in registry. Using current directory.`);
         spinner.start('Creating workspace...');
         projectRoot = process.cwd();
@@ -297,7 +297,7 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
     };
     if (options.skills !== false) {
       spinner.text = 'Merging skills and agents...';
-      skillsResult = mergeSkillsIntoWorkspaceSync(workspacePath);
+      skillsResult = mergeSkillsIntoWorkspace(workspacePath);
     }
 
     // Start Docker containers if requested
@@ -319,8 +319,8 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
       // it from the project template before looking for a compose file.
       // Idempotent — no-op when `.devcontainer/` is already present.
       if (!composeLocations.some(f => existsSync(f))) {
-        const { ensureDevcontainerSync } = await import('../../lib/workspace/ensure-devcontainer.js');
-        const ensure = ensureDevcontainerSync({ workspacePath, issueId });
+        const { ensureDevcontainer } = await import('../../lib/workspace/ensure-devcontainer.js');
+        const ensure = ensureDevcontainer({ workspacePath, issueId });
         if (ensure.rendered) {
           spinner.text = 'Regenerated .devcontainer/ from project template';
         }

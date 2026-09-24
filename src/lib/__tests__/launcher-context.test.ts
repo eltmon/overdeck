@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { shellQuote } from '../shell-quote.js';
 
 describe('Claude launch context delivery', () => {
@@ -25,7 +25,7 @@ describe('Claude launch context delivery', () => {
     for (const [file, body] of [[role, 'ROLE_SENTINEL'], [layers, 'LAYER_SENTINEL'], [briefing, 'BRIEFING_SENTINEL'], [native, 'USER_OWNED']]) writeFileSync(file!, body!);
     const harness = join(root, 'harness.cjs');
     writeFileSync(harness, `const fs=require('fs');const args=process.argv.slice(2);const i=args.indexOf('--append-system-prompt-file');fs.writeFileSync(${JSON.stringify(join(root, 'received.json'))},JSON.stringify({args,body:fs.readFileSync(args[i+1],'utf8')}));`);
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       workingDir: root,
       spawnMode,
       harness: 'claude-code',
@@ -52,7 +52,7 @@ describe('Claude launch context delivery', () => {
     writeFileSync(join(root, 'omp'), `#!/usr/bin/env node\nrequire('fs').writeFileSync(${JSON.stringify(output)}, JSON.stringify(process.argv.slice(2)));`, { mode: 0o755 });
     vi.stubEnv('PATH', `${root}:${process.env.PATH}`);
     const launcher = join(root, 'omp-launcher.sh');
-    writeFileSync(launcher, generateLauncherScriptSync({
+    writeFileSync(launcher, generateLauncherScript({
       workingDir: root, spawnMode: 'conversation', harness: 'ohmypi',
       piMode: 'tui', piSessionDir: join(root, 'sessions'),
       appendSystemPromptFiles: [first, second], promptInline: 'ROLE_SENTINEL',
@@ -66,7 +66,7 @@ describe('Claude launch context delivery', () => {
 
   it('does not start the harness when an instruction source is missing', () => {
     const marker = join(root, 'started');
-    const script = generateLauncherScriptSync({
+    const script = generateLauncherScript({
       workingDir: root,
       spawnMode: 'conversation',
       baseCommand: `touch ${shellQuote(marker)}`,

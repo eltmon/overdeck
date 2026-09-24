@@ -260,7 +260,7 @@ describe('resolveHarness — PAN-1984 + explicit-pick refinement: provider defau
     configMock.loadConfigSync.mockReturnValue({ config: {} });
 
     // Mock policy to allow ohmypi (kimi is non-Anthropic, so no ToS block).
-    vi.mocked(await import('../harness-policy.js')).canUseHarnessSync = vi.fn(() => ({ allowed: true }));
+    vi.mocked(await import('../harness-policy.js')).canUseHarness = vi.fn(() => ({ allowed: true }));
 
     const { resolveHarness } = await import('../harness-resolve.js');
     // child_process.exec is mocked above to make `command -v omp` succeed,

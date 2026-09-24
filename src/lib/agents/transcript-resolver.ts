@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 
 import { getOverdeckHome } from '../paths.js';
 import { claudeProjectDir, claudeProjectsRoot } from '../runtimes/storage/claude-code.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
+import { logAgentLifecycle } from '../persistent-logger.js';
 import { acpTranscriptPath } from '../runtimes/storage/acp.js';
 import { codexSessionsRoot, findLatestRollout, findRolloutPath } from '../runtimes/storage/codex.js';
 import { findKimiWirePathAsync, kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/storage/kimi-code.js';
@@ -35,7 +35,7 @@ import {
   type SessionIndexEntry,
   type TranscriptCandidate,
 } from '../session-history.js';
-import { getAgentStateSync } from './agent-state-read.js';
+import { getAgentState } from './agent-state-read.js';
 
 export interface ResolveJsonlPathOptions {
   agentsDirOverride?: string;
@@ -60,7 +60,7 @@ function logTranscriptResolution(
   const signatureKey = `${agentId}:${opts.agentsDirOverride ?? 'live'}`;
   if (transcriptResolutionSignatures.get(signatureKey) === signature) return;
   transcriptResolutionSignatures.set(signatureKey, signature);
-  const logger = opts.logDiagnostic ?? (opts.agentsDirOverride ? undefined : logAgentLifecycleSync);
+  const logger = opts.logDiagnostic ?? (opts.agentsDirOverride ? undefined : logAgentLifecycle);
   logger?.(agentId, `transcript resolution: ${message}`);
 }
 
@@ -130,7 +130,7 @@ async function readRecordedState(
       return { harness: null };
     }
   }
-  const state = getAgentStateSync(agentId);
+  const state = getAgentState(agentId);
   return {
     harness: state?.harness ?? null,
     workspace: state?.workspace,

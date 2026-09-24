@@ -3,11 +3,11 @@ import {
   decideResumeGate,
   getAgentResumeGateBlockReason,
   markAgentRunning,
-  clearAgentOperatorGatesForIssueSync,
-  clearAgentOperatorGatesForIssuesSync,
+  clearAgentOperatorGatesForIssue,
+  clearAgentOperatorGatesForIssues,
   clearAgentPausedSync,
   saveAgentStateSync,
-  getAgentStateSync,
+  getAgentState,
   type AgentState,
   type ResumeGateBlock,
 } from '../../../../src/lib/agents/agent-state.js';
@@ -198,19 +198,19 @@ describe('clearAgentOperatorGatesForIssueSync', () => {
   it('clears stoppedByUser on a stopped row and returns its id', () => {
     saveAgentStateSync(stoppedState({ stoppedByUser: true }));
 
-    const mutated = clearAgentOperatorGatesForIssueSync('PAN-3727');
+    const mutated = clearAgentOperatorGatesForIssue('PAN-3727');
 
     expect(mutated).toEqual(['agent-pan-3727-work']);
-    expect(getAgentStateSync('agent-pan-3727-work')?.stoppedByUser).toBeUndefined();
+    expect(getAgentState('agent-pan-3727-work')?.stoppedByUser).toBeUndefined();
   });
 
   it('leaves a running agent row untouched and omits it from the returned ids', () => {
     saveAgentStateSync(stoppedState({ id: 'agent-pan-3727-review', status: 'running', stoppedByUser: true }));
 
-    const mutated = clearAgentOperatorGatesForIssueSync('PAN-3727');
+    const mutated = clearAgentOperatorGatesForIssue('PAN-3727');
 
     expect(mutated).toEqual([]);
-    expect(getAgentStateSync('agent-pan-3727-review')?.stoppedByUser).toBe(true);
+    expect(getAgentState('agent-pan-3727-review')?.stoppedByUser).toBe(true);
   });
 
   it('preserves a scheduler yield (paused + yieldedByScheduler) on a stopped row', () => {
@@ -222,10 +222,10 @@ describe('clearAgentOperatorGatesForIssueSync', () => {
       yieldedAt: '2026-08-01T00:00:00.000Z',
     }));
 
-    const mutated = clearAgentOperatorGatesForIssueSync('PAN-3727');
+    const mutated = clearAgentOperatorGatesForIssue('PAN-3727');
 
     expect(mutated).toEqual([]);
-    const loaded = getAgentStateSync('agent-pan-3727-yielded');
+    const loaded = getAgentState('agent-pan-3727-yielded');
     expect(loaded?.paused).toBe(true);
     expect(loaded?.yieldedByScheduler).toBe(true);
   });
@@ -254,24 +254,24 @@ describe('clearAgentOperatorGatesForIssuesSync (batch, PAN-3727 review finding)'
     saveAgentStateSync(stoppedState({ id: 'agent-pan-2-work', issueId: 'PAN-2', troubled: true, troubledAt: '2026-08-01T00:00:00.000Z' }));
     saveAgentStateSync(stoppedState({ id: 'agent-pan-3-work', issueId: 'PAN-3', stoppedByUser: true }));
 
-    const mutated = clearAgentOperatorGatesForIssuesSync(new Set(['PAN-1', 'PAN-2']));
+    const mutated = clearAgentOperatorGatesForIssues(new Set(['PAN-1', 'PAN-2']));
 
     expect([...mutated.keys()].sort()).toEqual(['PAN-1', 'PAN-2']);
     expect(mutated.get('PAN-1')).toEqual(['agent-pan-1-work']);
     expect(mutated.get('PAN-2')).toEqual(['agent-pan-2-work']);
-    expect(getAgentStateSync('agent-pan-1-work')?.stoppedByUser).toBeUndefined();
-    expect(getAgentStateSync('agent-pan-2-work')?.troubled).toBeUndefined();
+    expect(getAgentState('agent-pan-1-work')?.stoppedByUser).toBeUndefined();
+    expect(getAgentState('agent-pan-2-work')?.troubled).toBeUndefined();
     // PAN-3 was not in the requested set — left untouched.
-    expect(getAgentStateSync('agent-pan-3-work')?.stoppedByUser).toBe(true);
+    expect(getAgentState('agent-pan-3-work')?.stoppedByUser).toBe(true);
   });
 
   it('returns an empty map without scanning when given an empty issue set', () => {
     saveAgentStateSync(stoppedState({ id: 'agent-pan-1-work', issueId: 'PAN-1', stoppedByUser: true }));
 
-    const mutated = clearAgentOperatorGatesForIssuesSync(new Set());
+    const mutated = clearAgentOperatorGatesForIssues(new Set());
 
     expect(mutated.size).toBe(0);
-    expect(getAgentStateSync('agent-pan-1-work')?.stoppedByUser).toBe(true);
+    expect(getAgentState('agent-pan-1-work')?.stoppedByUser).toBe(true);
   });
 });
 
@@ -298,14 +298,14 @@ describe('clearAgentPausedSync compare-and-clear', () => {
     saveAgentStateSync(paused('needs-you: verification failed 3x'));
 
     expect(clearAgentPausedSync('agent-pan-4045', (state) => state.pausedReason?.startsWith('needs-you:') === true)).toBe(true);
-    expect(getAgentStateSync('agent-pan-4045')?.paused).toBeUndefined();
+    expect(getAgentState('agent-pan-4045')?.paused).toBeUndefined();
   });
 
   it('leaves the pause and returns false when the predicate refuses the state it reads', () => {
     saveAgentStateSync(paused('needs-you: verification stuck after 3/3 attempts (test)'));
 
     expect(clearAgentPausedSync('agent-pan-4045', (state) => !state.pausedReason?.startsWith('needs-you: verification stuck'))).toBe(false);
-    expect(getAgentStateSync('agent-pan-4045')).toMatchObject({
+    expect(getAgentState('agent-pan-4045')).toMatchObject({
       paused: true,
       pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
     });
@@ -315,6 +315,6 @@ describe('clearAgentPausedSync compare-and-clear', () => {
     saveAgentStateSync(paused('operator: hold'));
 
     expect(clearAgentPausedSync('agent-pan-4045')).toBe(true);
-    expect(getAgentStateSync('agent-pan-4045')?.paused).toBeUndefined();
+    expect(getAgentState('agent-pan-4045')?.paused).toBeUndefined();
   });
 });

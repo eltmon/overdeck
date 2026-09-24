@@ -13,11 +13,11 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { messageAgent, getAgentStateSync, type AgentState } from '../../lib/agents.js';
+import { messageAgent, getAgentState, type AgentState } from '../../lib/agents.js';
 import type { DerivedIssueState } from '@overdeck/contracts';
 import { getDerivedIssueState } from './services/derived-issue-state.js';
 import { getOverdeckHome } from '../../lib/paths.js';
-import { emitActivityEntrySync } from '../../lib/activity-logger.js';
+import { emitActivityEntry } from '../../lib/activity-logger.js';
 
 const PENDING_FEEDBACK_FILE = join(getOverdeckHome(), 'pending-feedback-deliveries.json');
 const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -120,7 +120,7 @@ export async function processPendingFeedbackDeliveries(options?: {
   const staleThresholdMs = options?.staleThresholdMs ?? STALE_THRESHOLD_MS;
   const now = options?.now ?? Date.now();
   const deliver = options?._deliver ?? messageAgent;
-  const getAgentState = options?._getAgentState ?? (async (agentId: string) => getAgentStateSync(agentId));
+  const getAgentState = options?._getAgentState ?? (async (agentId: string) => getAgentState(agentId));
   const getState = options?._getState
     ?? ((issueId: string) => getDerivedIssueState(issueId).catch(() => null));
 
@@ -159,7 +159,7 @@ export async function processPendingFeedbackDeliveries(options?: {
 
     try {
       await deliver(delivery.agentId, delivery.message);
-      emitActivityEntrySync({
+      emitActivityEntry({
         source: 'dashboard',
         level: 'warn',
         message: `${delivery.issueId} — replayed missed ${delivery.kind} feedback after restart`,

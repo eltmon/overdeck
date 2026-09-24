@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { resolveLatestSessionIdSync } from '../../../../src/lib/agents/activity.js';
+import { resolveLatestSessionId } from '../../../../src/lib/agents/activity.js';
 import { discoverJsonlFiles } from '../../../../src/lib/conversations/harness-discovery.js';
 import { collectCodexCostEvents } from '../../../../src/lib/costs/codex-collector.js';
 import { CodexTranscriptSource } from '../../../../src/lib/memory/transcript-source.js';
@@ -79,7 +79,7 @@ describe('golden per-agent codex home (PAN-4013)', () => {
     const threadId = '019eaaec-4dfa-7ab1-90ba-9104d1650003';
     touch(rolloutFor('agent-golden-c', threadId),
       `${JSON.stringify({ type: 'session_meta', payload: { id: threadId } })}\n`);
-    const result = resolveLatestSessionIdSync('agent-golden-c', {
+    const result = resolveLatestSessionId('agent-golden-c', {
       isSessionReset: () => false,
       getAgentState: () => ({ id: 'agent-golden-c', harness: 'codex' }) as never,
     });

@@ -13,11 +13,11 @@ vi.mock('node:util', () => ({
 }));
 
 import { applyIssueParkedLabel, PARKED_LABEL } from '../label-ops.js';
-import { resolveGitHubIssueSync } from '../../tracker-utils.js';
+import { resolveGitHubIssue } from '../../tracker-utils.js';
 import { exec } from 'node:child_process';
 
 const mockExec = vi.mocked(exec) as unknown as ReturnType<typeof vi.fn>;
-const mockResolve = vi.mocked(resolveGitHubIssueSync);
+const mockResolve = vi.mocked(resolveGitHubIssue);
 
 beforeEach(() => {
   vi.clearAllMocks();

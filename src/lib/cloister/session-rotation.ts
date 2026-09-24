@@ -13,7 +13,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { OVERDECK_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
-import { getAgentStateSync } from '../agents.js';
+import { getAgentState } from '../agents.js';
 import type { SpecialistAgentName } from './specialists.js';
 import { getTmuxSessionName } from './specialists.js';
 import { killSession } from '../tmux.js';
@@ -206,7 +206,7 @@ export async function rotateSpecialistSession(
     };
   }
 
-  const agentState = getAgentStateSync(agentId);
+  const agentState = getAgentState(agentId);
   if (!agentState?.sessionId) {
     return {
       success: false,

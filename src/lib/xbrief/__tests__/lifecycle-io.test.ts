@@ -10,7 +10,7 @@ import {
   updatePlanStatus,
 } from '../lifecycle-io.js';
 import {
-  ensureXBriefDirsSync,
+  ensureXBriefDirs,
   generateXBriefFilename,
   resolveXBriefDir,
 } from '../lifecycle.js';
@@ -64,7 +64,7 @@ afterEach(() => {
 
 describe('findXBriefByIssue', () => {
   it('finds an xBRIEF in proposed/', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-946', 'foo', '2026-05-03');
     writePlan(resolveXBriefDir(TEST_DIR, 'proposed'), filename, makePlan('PAN-946', 'foo'));
     const found = findXBriefByIssueSync(TEST_DIR, 'PAN-946');
@@ -76,7 +76,7 @@ describe('findXBriefByIssue', () => {
   });
 
   it('finds an xBRIEF in active/', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     writePlan(
       resolveXBriefDir(TEST_DIR, 'active'),
       generateXBriefFilename('PAN-100', 'bar', '2026-05-03'),
@@ -87,12 +87,12 @@ describe('findXBriefByIssue', () => {
   });
 
   it('returns null when no xBRIEF exists', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     expect(findXBriefByIssueSync(TEST_DIR, 'PAN-999')).toBeNull();
   });
 
   it('prefers proposed/ over active/ when both contain a match', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
       generateXBriefFilename('PAN-1', 'foo', '2026-05-03'),
@@ -108,7 +108,7 @@ describe('findXBriefByIssue', () => {
   });
 
   it('ignores files that do not match the canonical naming convention', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     writeFileSync(
       join(resolveXBriefDir(TEST_DIR, 'proposed'), 'plan.vbrief.json'),
       JSON.stringify(makePlan('PAN-1', 'foo')),
@@ -117,7 +117,7 @@ describe('findXBriefByIssue', () => {
   });
 
   it('skips corrupt files matching the naming convention', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     writeFileSync(
       join(resolveXBriefDir(TEST_DIR, 'proposed'), generateXBriefFilename('PAN-1', 'corrupt', '2026-05-03')),
       'not valid json',
@@ -135,7 +135,7 @@ describe('findXBriefByIssue', () => {
 
 describe('updatePlanStatus', () => {
   it('updates plan.status, increments sequence, refreshes timestamps', async () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const path = writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -152,7 +152,7 @@ describe('updatePlanStatus', () => {
   });
 
   it('writes atomically (no .tmp left behind)', () => {
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const path = writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -168,7 +168,7 @@ describe('updatePlanStatus', () => {
 describe('transitionXBriefOnMain', () => {
   it('moves xBRIEF between dirs and updates status, without committing', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -235,7 +235,7 @@ describe('transitionXBriefOnMain', () => {
 
   it('updates status only when already in target dir but status differs', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'active'),
@@ -263,7 +263,7 @@ describe('transitionXBriefOnMain', () => {
 
   it('leaves continue file at canonical path during lifecycle transitions', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),
@@ -288,13 +288,13 @@ describe('transitionXBriefOnMain', () => {
 
   it('throws when no xBRIEF exists for the issue', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     await expect(transitionXBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 xBRIEF')).rejects.toThrow();
   });
 
   it('does NOT commit when projectRoot is not on main', async () => {
     initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
+    ensureXBriefDirs(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
       resolveXBriefDir(TEST_DIR, 'proposed'),

@@ -15,7 +15,7 @@
 import { mkdir, readFile, rm } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
@@ -153,7 +153,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
   allowHost?: boolean;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { saveAgentState, spawnRun, getAgentStateSync, getLatestSessionIdSync, resumeAgent, stopAgent } = await import('../agents.js');
+    const { saveAgentState, spawnRun, getAgentState, getLatestSessionId, resumeAgent, stopAgent } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
@@ -191,21 +191,21 @@ export async function spawnReviewSubRoleForIssue(opts: {
     // lane keeps its prior round's context so a re-review checks the fix instead of re-reading
     // the whole diff. Fresh-spawn only on a harness/model change or when no session exists.
     const reviewerAgent = reviewerAgentId(opts.issueId, opts.subRole);
-    const savedReviewer = getAgentStateSync(reviewerAgent);
+    const savedReviewer = getAgentState(reviewerAgent);
     const canResumeReviewer = reviewResumeDecision({
       requestedModel: opts.model ?? model,
       requestedHarness: opts.harness,
       savedModel: savedReviewer?.model,
       savedHarness: savedReviewer?.harness,
       hasSavedState: !!savedReviewer,
-      hasSavedSession: !!getLatestSessionIdSync(reviewerAgent),
+      hasSavedSession: !!getLatestSessionId(reviewerAgent),
     });
     if (canResumeReviewer) {
       console.log(`[review-agent] Resuming convoy sub-reviewer ${opts.subRole} for ${opts.issueId} — preserving context (PAN-1862)`);
       const resumeResult = await resumeAgent(reviewerAgent, prompt);
       if (resumeResult.success && resumeResult.messageDelivered !== false) {
         try {
-          const resumed = getAgentStateSync(reviewerAgent);
+          const resumed = getAgentState(reviewerAgent);
           if (resumed) {
             resumed.reviewSubRole = opts.subRole;
             resumed.reviewRunId = opts.runId;
@@ -277,8 +277,8 @@ export async function spawnReviewSubRoleForIssue(opts: {
       }
     }
     try {
-      const { notifyPipelineSync } = await import('../pipeline-notifier.js');
-      notifyPipelineSync({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
+      const { notifyPipeline } = await import('../pipeline-notifier.js');
+      notifyPipeline({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
     } catch {
       // Non-fatal
     }
@@ -307,7 +307,7 @@ export interface ConvoyLaunchParams {
 }
 
 /** Launch all four independent reviewers for one review run. */
-export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): Promise<Array<{ success: boolean; message: string }>> {
+export async function launchConvoyReviewers(params: ConvoyLaunchParams): Promise<Array<{ success: boolean; message: string }>> {
   const reviewerResults = await Promise.all((params.subRoles ?? REVIEW_SUB_ROLES).map(async (subRole) => {
     const outputPath = reviewerAgentOutputPath(params.workspace, params.runId, subRole);
 
@@ -365,8 +365,8 @@ export async function recoverMissingConvoyReviewers(
 ): Promise<{ success: boolean; message: string; launched?: number }> {
   const normalized = issueId.toUpperCase();
   const parentId = `agent-${normalized.toLowerCase()}-review`;
-  const { saveAgentState, getAgentStateSync } = await import('../agents.js');
-  const parentState = getAgentStateSync(parentId);
+  const { saveAgentState, getAgentState } = await import('../agents.js');
+  const parentState = getAgentState(parentId);
   if (!parentState) {
     return { success: false, message: `No review parent state for ${normalized} — cannot recover reviewers` };
   }
@@ -409,7 +409,7 @@ export async function recoverMissingConvoyReviewers(
   const reviewersToLaunch: ReviewSubRole[] = [];
   for (const subRole of REVIEW_SUB_ROLES) {
     const reviewerId = reviewerAgentId(normalized, subRole);
-    const reviewer = getAgentStateSync(reviewerId);
+    const reviewer = getAgentState(reviewerId);
     const stateClaimsLive = reviewer?.status === 'running' || reviewer?.status === 'starting';
     if (existsSync(reviewerAgentOutputPath(workspace, runId, subRole))) continue;
     if (liveReviewers.has(reviewerId)) continue;
@@ -440,7 +440,7 @@ export async function recoverMissingConvoyReviewers(
   // configured model — deliberately not `parent.model`, which is the parent's
   // resolved model and would override every sub-role.
   const reviewModel = opts.model;
-  const results = await launchConvoyReviewersPromise({
+  const results = await launchConvoyReviewers({
     issueId: normalized,
     workspace,
     runId,
@@ -455,6 +455,6 @@ export async function recoverMissingConvoyReviewers(
   const launched = results.filter(r => r.success).length;
   const message = `Convoy recovery for ${normalized}${opts.source ? ` (${opts.source})` : ''}: launched ${launched}/${reviewersToLaunch.length} missing reviewer(s)`;
   console.log(`[review-agent] ${message}`);
-  emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: normalized });
+  emitActivityEntry({ source: 'review', level: 'info', message, issueId: normalized });
   return { success: launched === reviewersToLaunch.length, message, launched };
 }

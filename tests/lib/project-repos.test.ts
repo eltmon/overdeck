@@ -22,12 +22,12 @@ vi.mock('../../src/lib/projects.js', async () => {
 });
 
 import {
-  computeWorkspaceRepoRootsSync,
-  inferProjectForgeSync,
-  normalizeForgeSync,
-  resolveConfiguredReposSync,
-  resolvePrimaryWorkspaceRepoDirSync,
-  resolveProjectReposForIssueSync,
+  computeWorkspaceRepoRoots,
+  inferProjectForge,
+  normalizeForge,
+  resolveConfiguredRepos,
+  resolvePrimaryWorkspaceRepoDir,
+  resolveProjectReposForIssue,
   type ResolvedProjectRepo,
 } from '../../src/lib/project-repos.js';
 
@@ -35,16 +35,16 @@ type ResolvedRepoT = ResolvedProjectRepo;
 
 describe('project-repos', () => {
   it('normalizes forge values from config-friendly strings', () => {
-    expect(normalizeForgeSync('github')).toBe('github');
-    expect(normalizeForgeSync('git@gitlab.com:foo/bar.git')).toBe('gitlab');
-    expect(normalizeForgeSync('https://github.com/foo/bar')).toBe('github');
-    expect(normalizeForgeSync('unknown')).toBeNull();
+    expect(normalizeForge('github')).toBe('github');
+    expect(normalizeForge('git@gitlab.com:foo/bar.git')).toBe('gitlab');
+    expect(normalizeForge('https://github.com/foo/bar')).toBe('github');
+    expect(normalizeForge('unknown')).toBeNull();
   });
 
   it('infers a project-level forge when only one forge is configured', () => {
-    expect(inferProjectForgeSync({ github_repo: 'owner/repo', gitlab_repo: undefined })).toBe('github');
-    expect(inferProjectForgeSync({ github_repo: undefined, gitlab_repo: 'group/repo' })).toBe('gitlab');
-    expect(inferProjectForgeSync({ github_repo: 'owner/repo', gitlab_repo: 'group/repo' })).toBeNull();
+    expect(inferProjectForge({ github_repo: 'owner/repo', gitlab_repo: undefined })).toBe('github');
+    expect(inferProjectForge({ github_repo: undefined, gitlab_repo: 'group/repo' })).toBe('gitlab');
+    expect(inferProjectForge({ github_repo: 'owner/repo', gitlab_repo: 'group/repo' })).toBeNull();
   });
 
   it('resolves polyrepo repos from configured metadata', () => {
@@ -64,7 +64,7 @@ describe('project-repos', () => {
       },
     };
 
-    const repos = resolveConfiguredReposSync('mind-your-now', '/tmp/myn', projectConfig, 'MIN-632');
+    const repos = resolveConfiguredRepos('mind-your-now', '/tmp/myn', projectConfig, 'MIN-632');
     expect(repos).toHaveLength(3);
     expect(repos[0]).toMatchObject({
       repoKey: 'fe',
@@ -88,7 +88,7 @@ describe('project-repos', () => {
       },
     };
 
-    const repos = resolveConfiguredReposSync('overdeck', '/tmp/overdeck', projectConfig, 'PAN-632');
+    const repos = resolveConfiguredRepos('overdeck', '/tmp/overdeck', projectConfig, 'PAN-632');
     expect(repos).toEqual([
       expect.objectContaining({
         repoKey: 'overdeck',
@@ -119,7 +119,7 @@ describe('project-repos', () => {
     projectsMocks.resolveProjectFromIssueSync.mockReturnValue(resolvedProject);
     projectsMocks.getProject.mockReturnValue(projectConfig);
 
-    const repos = resolveProjectReposForIssueSync('MIN-632');
+    const repos = resolveProjectReposForIssue('MIN-632');
     expect(repos).toHaveLength(1);
     expect(repos?.[0]).toMatchObject({
       projectKey: 'mind-your-now',
@@ -159,7 +159,7 @@ describe('computeWorkspaceRepoRootsSync', () => {
     mkdirSync(join(workspace, 'api', '.git'), { recursive: true });
     mkdirSync(join(workspace, 'infra'), { recursive: true }); // no .git — skipped
 
-    const roots = computeWorkspaceRepoRootsSync(
+    const roots = computeWorkspaceRepoRoots(
       [makeRepo('fe'), makeRepo('api'), makeRepo('infra'), makeRepo('docs', { required: false })],
       'MIN-999',
       workspace
@@ -175,28 +175,28 @@ describe('computeWorkspaceRepoRootsSync', () => {
     mkdirSync(join(workspace, 'fe'), { recursive: true });
     writeFileSync(join(workspace, 'fe', '.git'), 'gitdir: /tmp/myn/frontend/.git/worktrees/fe\n');
 
-    const roots = computeWorkspaceRepoRootsSync([makeRepo('fe'), makeRepo('api')], 'MIN-999', workspace);
+    const roots = computeWorkspaceRepoRoots([makeRepo('fe'), makeRepo('api')], 'MIN-999', workspace);
     expect(roots).toEqual([
       expect.objectContaining({ repoKey: 'fe', dir: join(workspace, 'fe'), isPolyrepo: true }),
     ]);
   });
 
   it('falls back to the workspace root when no polyrepo sub-repo is on disk', () => {
-    const roots = computeWorkspaceRepoRootsSync([makeRepo('fe'), makeRepo('api')], 'MIN-999', workspace);
+    const roots = computeWorkspaceRepoRoots([makeRepo('fe'), makeRepo('api')], 'MIN-999', workspace);
     expect(roots).toEqual([
       expect.objectContaining({ repoKey: 'fe', dir: workspace, isPolyrepo: false }),
     ]);
   });
 
   it('resolves a monorepo (single configured repo) to the workspace root', () => {
-    const roots = computeWorkspaceRepoRootsSync([makeRepo('overdeck', { targetBranch: 'develop' })], 'PAN-1', workspace);
+    const roots = computeWorkspaceRepoRoots([makeRepo('overdeck', { targetBranch: 'develop' })], 'PAN-1', workspace);
     expect(roots).toEqual([
       expect.objectContaining({ repoKey: 'overdeck', dir: workspace, sourceBranch: 'feature/min-999', targetBranch: 'develop', isPolyrepo: false }),
     ]);
   });
 
   it('defaults sensibly when repo resolution returned null', () => {
-    const roots = computeWorkspaceRepoRootsSync(null, 'MIN-999', workspace);
+    const roots = computeWorkspaceRepoRoots(null, 'MIN-999', workspace);
     expect(roots).toEqual([
       expect.objectContaining({ repoKey: 'min-999', dir: workspace, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: false }),
     ]);
@@ -229,7 +229,7 @@ describe('resolvePrimaryWorkspaceRepoDirSync', () => {
       workspace: { type: 'monorepo' },
     });
 
-    expect(resolvePrimaryWorkspaceRepoDirSync('PAN-3037', workspace)).toBe(workspace);
+    expect(resolvePrimaryWorkspaceRepoDir('PAN-3037', workspace)).toBe(workspace);
   });
 
   it('returns the first required repo directory for a polyrepo workspace', () => {
@@ -254,6 +254,6 @@ describe('resolvePrimaryWorkspaceRepoDirSync', () => {
       },
     });
 
-    expect(resolvePrimaryWorkspaceRepoDirSync('MIN-850', workspace)).toBe(join(workspace, 'api'));
+    expect(resolvePrimaryWorkspaceRepoDir('MIN-850', workspace)).toBe(join(workspace, 'api'));
   });
 });

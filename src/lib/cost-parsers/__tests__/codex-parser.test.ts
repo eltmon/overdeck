@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { parseCodexSessionCostEventsSync, parseCodexSessionSync } from '../codex-parser.js';
+import { parseCodexSessionCostEvents, parseCodexSession } from '../codex-parser.js';
 
 const FIXTURE_DIR = join(__dirname, 'fixtures', 'codex');
 const NONEXISTENT = join(__dirname, 'fixtures', 'codex', 'no-such-file.jsonl');
@@ -43,12 +43,12 @@ const FIXTURES = [
 
 describe('parseCodexSessionSync', () => {
   it('returns null for a nonexistent file', () => {
-    expect(parseCodexSessionSync(NONEXISTENT)).toBeNull();
+    expect(parseCodexSession(NONEXISTENT)).toBeNull();
   });
 
   describe.each(FIXTURES)('$name', (fixture) => {
     it('returns exact model, cumulative tokens, and hand-computed cost', () => {
-      const result = parseCodexSessionSync(join(FIXTURE_DIR, fixture.file));
+      const result = parseCodexSession(join(FIXTURE_DIR, fixture.file));
 
       expect(result).not.toBeNull();
       expect(result?.model).toBe(fixture.model);
@@ -71,7 +71,7 @@ describe('parseCodexSessionSync', () => {
       writeFileSync(file, content, 'utf-8');
 
       try {
-        const result = parseCodexSessionSync(file);
+        const result = parseCodexSession(file);
         expect(result).not.toBeNull();
         expect(result!.model).toBe('unknown');
         expect(result!.cost_v2).toBe(0);
@@ -95,7 +95,7 @@ describe('parseCodexSessionSync', () => {
 
   it('emits one cost event per token_count record with stable request ids', () => {
     const file = join(FIXTURE_DIR, 'rollout-nested-multi-turn.jsonl');
-    const events = parseCodexSessionCostEventsSync(file);
+    const events = parseCodexSessionCostEvents(file);
 
     expect(events).toHaveLength(2);
     expect(events.map((event) => event.requestId)).toEqual([
@@ -125,8 +125,8 @@ describe('parseCodexSessionSync', () => {
 
   it('event token sums equal the session-level cumulative totals', () => {
     const file = join(FIXTURE_DIR, 'rollout-nested-multi-turn.jsonl');
-    const session = parseCodexSessionSync(file);
-    const events = parseCodexSessionCostEventsSync(file);
+    const session = parseCodexSession(file);
+    const events = parseCodexSessionCostEvents(file);
     const sums = events.reduce(
       (acc, event) => ({
         input: acc.input + event.input,
@@ -146,7 +146,7 @@ describe('parseCodexSessionSync', () => {
 
   it('truncated reparse returns a strict prefix of the full event list', () => {
     const file = join(FIXTURE_DIR, 'rollout-nested-multi-turn.jsonl');
-    const full = parseCodexSessionCostEventsSync(file);
+    const full = parseCodexSessionCostEvents(file);
     const lines = readFileSync(file, 'utf-8').trim().split('\n');
     const secondTurnStart = lines.findIndex((line) => line.includes('"turn_id":"019e7cf2-5022-7631-ab0e-77a116900dfe"'));
     const dir = mkdtempSync(join(tmpdir(), 'codex-events-'));
@@ -155,7 +155,7 @@ describe('parseCodexSessionSync', () => {
     expect(secondTurnStart).toBeGreaterThan(0);
     try {
       writeFileSync(truncatedPath, `${lines.slice(0, secondTurnStart).join('\n')}\n`, 'utf-8');
-      expect(parseCodexSessionCostEventsSync(truncatedPath)).toEqual(full.slice(0, 1).map((event) => ({
+      expect(parseCodexSessionCostEvents(truncatedPath)).toEqual(full.slice(0, 1).map((event) => ({
         ...event,
         sessionFile: truncatedPath,
       })));
@@ -174,8 +174,8 @@ describe('parseCodexSessionSync', () => {
 
     try {
       writeFileSync(file, `${content}\n`, 'utf-8');
-      const session = parseCodexSessionSync(file);
-      const events = parseCodexSessionCostEventsSync(file);
+      const session = parseCodexSession(file);
+      const events = parseCodexSessionCostEvents(file);
 
       expect(session).toMatchObject({
         model: 'unknown',
@@ -198,19 +198,19 @@ describe('parseCodexSessionSync', () => {
 
 describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
   it('returns an empty array for a nonexistent file', () => {
-    expect(parseCodexSessionCostEventsSync(NONEXISTENT)).toEqual([]);
+    expect(parseCodexSessionCostEvents(NONEXISTENT)).toEqual([]);
   });
 
   it('AC1: emits one event per token_count record with distinct codex:<threadId>:<seq> requestIds', () => {
-    const events = parseCodexSessionCostEventsSync(FIXTURE);
+    const events = parseCodexSessionCostEvents(FIXTURE);
     expect(events).toHaveLength(2);
     expect(events[0].requestId).toBe('codex:abc1234567890def:0');
     expect(events[1].requestId).toBe('codex:abc1234567890def:1');
   });
 
   it('AC2: event token sums equal session totals and each event has a positive cost', () => {
-    const events = parseCodexSessionCostEventsSync(FIXTURE);
-    const session = parseCodexSessionSync(FIXTURE);
+    const events = parseCodexSessionCostEvents(FIXTURE);
+    const session = parseCodexSession(FIXTURE);
     expect(session).not.toBeNull();
 
     expect(events.reduce((sum, e) => sum + e.input, 0)).toBe(session!.usage.inputTokens);
@@ -226,7 +226,7 @@ describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
   });
 
   it('AC3: truncating the fixture returns a strict prefix of the full event list', () => {
-    const fullEvents = parseCodexSessionCostEventsSync(FIXTURE);
+    const fullEvents = parseCodexSessionCostEvents(FIXTURE);
     expect(fullEvents).toHaveLength(2);
 
     const raw = readFileSync(FIXTURE, 'utf-8');
@@ -238,7 +238,7 @@ describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
     writeFileSync(truncatedFile, truncated, 'utf-8');
 
     try {
-      const prefixEvents = parseCodexSessionCostEventsSync(truncatedFile);
+      const prefixEvents = parseCodexSessionCostEvents(truncatedFile);
       expect(prefixEvents).toHaveLength(1);
       expect(prefixEvents[0]).toMatchObject({
         requestId: fullEvents[0].requestId,
@@ -263,7 +263,7 @@ describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
     writeFileSync(file, content, 'utf-8');
 
     try {
-      const events = parseCodexSessionCostEventsSync(file);
+      const events = parseCodexSessionCostEvents(file);
       expect(events).toHaveLength(1);
       expect(events[0].model).toBe('unknown');
       expect(events[0].requestId).toBe('codex:thread-no-model:0');
@@ -288,7 +288,7 @@ describe('parseCodexSessionCostEventsSync (PAN-2388)', () => {
     writeFileSync(file, content, 'utf-8');
 
     try {
-      const events = parseCodexSessionCostEventsSync(file);
+      const events = parseCodexSessionCostEvents(file);
       expect(events).toHaveLength(2);
       expect(events[0].input).toBe(100);
       expect(events[0].output).toBe(10);

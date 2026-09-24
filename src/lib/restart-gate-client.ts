@@ -26,7 +26,7 @@
  * shapes here without changing them there.
  */
 
-import { getDashboardApiUrlSync } from './config.js';
+import { getDashboardApiUrl } from './config.js';
 
 /** Poll/TTL-refresh cadence. The server expires a request not refreshed for 20s. */
 export const RESTART_GATE_POLL_INTERVAL_MS = 5_000;
@@ -111,7 +111,7 @@ type GateCallResult<T> =
   | { readonly kind: 'unavailable'; readonly detail: string };
 
 function gateBaseUrl(options: RestartGateHttpOptions): string {
-  return options.dashboardUrl ?? getDashboardApiUrlSync();
+  return options.dashboardUrl ?? getDashboardApiUrl();
 }
 
 function sleep(ms: number): Promise<void> {

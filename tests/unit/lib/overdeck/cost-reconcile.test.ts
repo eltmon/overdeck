@@ -43,7 +43,7 @@ vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
 
 import { existsSync, readdirSync } from 'node:fs';
 import { parseOhmypiSessionCostEventsSync, parseOhmypiSessionCostResultSync, parseOhmypiSessionSync } from '../../../../src/lib/cost-parsers/ohmypi-parser.js';
-import { parseCodexSessionCostEventsSync } from '../../../../src/lib/cost-parsers/codex-parser.js';
+import { parseCodexSessionCostEvents } from '../../../../src/lib/cost-parsers/codex-parser.js';
 import { Db, EventBus, CostArchive } from '../../../../src/lib/overdeck/infra.js';
 import { CostWriter, CostWriterLive } from '../../../../src/lib/overdeck/cost.js';
 
@@ -345,7 +345,7 @@ describe('CostWriter.reconcile — codex source', () => {
   beforeEach(() => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([]);
-    vi.mocked(parseCodexSessionCostEventsSync).mockReturnValue([]);
+    vi.mocked(parseCodexSessionCostEvents).mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -367,7 +367,7 @@ describe('CostWriter.reconcile — codex source', () => {
       return [];
     });
 
-    vi.mocked(parseCodexSessionCostEventsSync).mockReturnValue(makeCodexCostEvents(rolloutFile));
+    vi.mocked(parseCodexSessionCostEvents).mockReturnValue(makeCodexCostEvents(rolloutFile));
 
     const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
     const layer = CostWriterLive.pipe(
@@ -414,7 +414,7 @@ describe('CostWriter.reconcile — codex source', () => {
       return [];
     });
 
-    vi.mocked(parseCodexSessionCostEventsSync)
+    vi.mocked(parseCodexSessionCostEvents)
       .mockReturnValueOnce(events.slice(0, 1))
       .mockReturnValueOnce(events);
 
@@ -454,7 +454,7 @@ describe('CostWriter.reconcile — codex source', () => {
         return [makeDirent('rollout-abc.jsonl', false)];
       return [];
     });
-    vi.mocked(parseCodexSessionCostEventsSync).mockReturnValue([{ ...event!, model: 'unknown', cost: 0 }]);
+    vi.mocked(parseCodexSessionCostEvents).mockReturnValue([{ ...event!, model: 'unknown', cost: 0 }]);
 
     const { dbLayer, busLayer, archiveLayer, insertedValues } = makeTestLayer();
     const layer = CostWriterLive.pipe(

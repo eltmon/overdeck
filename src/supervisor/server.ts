@@ -20,7 +20,7 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { appendFile } from 'node:fs/promises';
-import { readPlatformConfigSync } from '../lib/platform-lifecycle.js';
+import { readPlatformConfig } from '../lib/platform-lifecycle.js';
 import { resolveSupervisorPrimaryRepoRoot } from '../lib/supervisor.js';
 import { readWatchdogConfig, SupervisorWatchdog } from './watchdog.js';
 import { createSupervisorRestartSpawner, resolveBundledPanInvocation } from './restart-spawn.js';
@@ -31,7 +31,7 @@ const PAN_INVOCATION = process.env.OVERDECK_PAN_BINARY
   ? { panBinary: process.env.OVERDECK_PAN_BINARY, panArgsPrefix: [] }
   : resolveBundledPanInvocation();
 const LOG_FILE = path.join(os.homedir(), '.overdeck', 'logs', 'supervisor.log');
-const platformConfig = readPlatformConfigSync();
+const platformConfig = readPlatformConfig();
 const primaryRepoRoot = resolveSupervisorPrimaryRepoRoot();
 const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort, primaryRepoRoot);
 const ttsWatchdogConfig = readTtsWatchdogConfig(process.env);

@@ -25,7 +25,7 @@ import { hasDashboardInternalToken, rejectUnsafeDashboardMutationRequest } from 
 import { getProjectSync, listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
 import type { MergeQueueItem } from '../../../lib/flywheel-merge-order.js';
 import { gatherMergeEligibility, isMergeEligible } from '../../../lib/cloister/merge-eligibility.js';
-import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { emitActivityTts } from '../../../lib/activity-logger.js';
 import { parseArtifactRef } from '../../../lib/forge.js';
 import { validateOrigin } from './origin-validation.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
@@ -288,8 +288,8 @@ export async function postMergeTrainGenerationShipPayload(
   name: string,
   version: string,
 ): Promise<{ status: number; body: unknown }> {
-  const { getUatGenerationSync } = await import('../../../lib/overdeck/merge-sync.js');
-  const generation = getUatGenerationSync(name);
+  const { getUatGeneration } = await import('../../../lib/overdeck/merge-sync.js');
+  const generation = getUatGeneration(name);
   if (!generation) return { status: 404, body: { error: `No UAT generation named ${name}` } };
 
   const { shipPromotedBatch, ShipPromotedBatchError } = await import('../services/generation-ship.js');
@@ -499,7 +499,7 @@ export interface AutoMergeCancelDeps {
 }
 
 function announceAutoMergeScheduled(issueId: string, _entry: PendingAutoMerge): void {
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
     priority: 1,
     issueId,
@@ -509,7 +509,7 @@ function announceAutoMergeScheduled(issueId: string, _entry: PendingAutoMerge): 
 }
 
 function announceAutoMergeCancelled(issueId: string): void {
-  emitActivityTtsSync({
+  emitActivityTts({
     utterance: `auto-merge cancelled for ${issueId}`,
     priority: 1,
     issueId,

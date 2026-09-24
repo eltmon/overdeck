@@ -1,6 +1,6 @@
 import { open, readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
-import { calculateCostSync, getPricingSync } from '../../../../lib/cost.js';
+import { calculateCost, getPricing } from '../../../../lib/cost.js';
 import { summarizeToolInputForWorkLog } from '../format-tool-input.js';
 import { findLastCompactBoundary } from './compact-boundary.js';
 import { renderableUserText } from './message-filters.js';
@@ -309,9 +309,9 @@ export async function parseConversationMessages(
           (msg.usage.cache_read_input_tokens ?? 0) +
           (msg.usage.cache_creation_input_tokens ?? 0);
         if (msg.model) {
-          const pricing = getPricingSync(providerFromModel(msg.model), msg.model);
+          const pricing = getPricing(providerFromModel(msg.model), msg.model);
           if (pricing) {
-            totalCost += calculateCostSync({
+            totalCost += calculateCost({
               inputTokens: msg.usage.input_tokens ?? 0,
               outputTokens: msg.usage.output_tokens ?? 0,
               cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
