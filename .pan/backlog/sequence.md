@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T23:34:58.346Z · model: claude-opus-5 · open: 803_
+_Last sequenced: 2026-09-24T23:39:33.603Z · model: claude-opus-5 · open: 804_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -35,6 +35,7 @@ _Last sequenced: 2026-09-24T23:34:58.346Z · model: claude-opus-5 · open: 803_
 | 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
 | 60 | PAN-2700 | S | high | needs-refinement |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
 | 61 | PAN-1560 | XS | high | needs-refinement |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
+| 64 | PAN-4186 | S | high | ok |  | PAN-3952 | Herdr is the default backend but pan tell's idle probe never succeeds there: every send burns 5s and can type into a busy agent. |
 | 66 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
@@ -931,6 +932,10 @@ Triage: the stored reviewStatus flip is gone; the stale-artifact freshness conce
 
 Triage: review_status is gone but verification still writes a check run to the PR; the re-post-on-head-move concern may still apply to that flow (PAN-3946 covers the approval-on-old-commit side). Rank held.
 
+### PAN-4186 (rank 64)
+
+New this run, filed from the #4104 live check. pan tell delivers to a Herdr claude-code conversation, but the idle-prompt wait always times out and logs 'not at idle prompt after 5s — sending message anyway', so every operator and agent message pays a 5s stall and, worse, can be typed into an agent that is mid-turn. Herdr is the default terminal backend, so this is on the hot path for feedback routing, operator nudges and worker replies. The stated cause is a tmux-only pane read in the probe; the fix is to use the backend's agent status or readAgentPaneText with source 'visible' when the backend is Herdr, with a test mocked at the terminal-backend boundary. Ranked below PAN-3630 (pan tell reporting deliveries it never made) and PAN-3952 (Herdr unviewed panes read as empty) because delivery itself still works here — and because a readAgentPaneText-based probe stays blind until PAN-3952 lands, which is why that edge is inferred rather than cosmetic.
+
 ### PAN-2806 (rank 66)
 
 Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.
@@ -1107,10 +1112,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 
 Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
 
-### PAN-2333 (rank 117)
-
-Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1118,10 +1119,10 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T23:34:58.346Z",
+  "generatedAt": "2026-09-24T23:39:33.603Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 803,
+  "openCount": 804,
   "nodes": [
     {
       "issue": "PAN-3930",
@@ -11048,6 +11049,21 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "rationale": "New operator request filed 2026-09-24; inserted at the free rank 479 in the medium Command Deck band, between PAN-3700 and PAN-1164. Well-specified (what to skip, what must still work, persistence on the conversation record), so condition is ok — the native ~/.claude/CLAUDE.md question is scoped inside the issue as investigate-then-document, not an unresolved requirement. Convenience and launch latency, not a pipeline unblocker, so medium rather than high. It touches the conversation spawn path that PAN-3921 rewrote; that work merged 2026-09-24, so the informs relationship is now satisfied and the checkbox lands on the Herdr-routed spawn path. Rank unchanged at 479 — an informs edge closing unblocks nothing that was blocked.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4186",
+      "rank": 64,
+      "size": "S",
+      "importance": "high",
+      "score": 81,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3952"
+      ],
+      "why": "Herdr is the default backend but pan tell's idle probe never succeeds there: every send burns 5s and can type into a busy agent.",
+      "rationale": "New this run, filed from the #4104 live check. pan tell delivers to a Herdr claude-code conversation, but the idle-prompt wait always times out and logs 'not at idle prompt after 5s — sending message anyway', so every operator and agent message pays a 5s stall and, worse, can be typed into an agent that is mid-turn. Herdr is the default terminal backend, so this is on the hot path for feedback routing, operator nudges and worker replies. The stated cause is a tmux-only pane read in the probe; the fix is to use the backend's agent status or readAgentPaneText with source 'visible' when the backend is Herdr, with a test mocked at the terminal-backend boundary. Ranked below PAN-3630 (pan tell reporting deliveries it never made) and PAN-3952 (Herdr unviewed panes read as empty) because delivery itself still works here — and because a readAgentPaneText-based probe stays blind until PAN-3952 lands, which is why that edge is inferred rather than cosmetic.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12065,6 +12081,20 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-3952",
+      "to": "PAN-4186",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3630",
+      "to": "PAN-4186",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
