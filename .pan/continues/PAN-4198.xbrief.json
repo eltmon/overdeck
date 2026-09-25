@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4198",
   "created": "2026-09-25T06:47:47.581Z",
-  "updated": "2026-09-25T08:33:31.443Z",
+  "updated": "2026-09-25T09:00:04.462Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
       "claimedBy": "agent-pan-4198",
       "claimedAt": "2026-09-25T08:32:07.205Z",
       "doneAt": "2026-09-25T08:33:31.443Z"
+    },
+    "wi-1-registry-reshape.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:00:04.461Z"
     }
   }
 }
