@@ -5,15 +5,34 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const OVERDECK_SEGMENT = `.${'overdeck'}`;
-const REAL_HOME_TARGET = join(homedir(), OVERDECK_SEGMENT, 'pan-test-guard');
-const REAL_CLAUDE_PROJECTS_TARGET = join(homedir(), '.claude', 'projects', '-pan-test-guard');
+// tests/setup/overdeck-home.ts points HOME at a temp dir; this is the real one.
+const REAL_HOME = process.env.OVERDECK_TEST_REAL_HOME ?? homedir();
+const REAL_HOME_TARGET = join(REAL_HOME, OVERDECK_SEGMENT, 'pan-test-guard');
+const REAL_CLAUDE_PROJECTS_TARGET = join(REAL_HOME, '.claude', 'projects', '-pan-test-guard');
+const REAL_CLAUDE_JSON = join(REAL_HOME, '.claude.json');
 
 describe('real OVERDECK_HOME test guard', () => {
   it('sets OVERDECK_HOME to a per-worker temp directory', () => {
     expect(process.env.OVERDECK_HOME).toBeTruthy();
     expect(process.env.OVERDECK_HOME).toContain('pan-test-root-');
     expect(process.env.OVERDECK_HOME).toContain('worker-');
-    expect(process.env.OVERDECK_HOME).not.toBe(join(homedir(), OVERDECK_SEGMENT));
+    expect(process.env.OVERDECK_HOME).not.toBe(join(REAL_HOME, OVERDECK_SEGMENT));
+  });
+
+  // PAN-3905: spawn paths pre-trust dirs in ~/.claude.json, so HOME itself is
+  // a per-worker temp dir, apart from OVERDECK_HOME.
+  it('sets HOME to a per-worker temp directory', () => {
+    expect(process.env.OVERDECK_TEST_REAL_HOME).toBeTruthy();
+    expect(homedir()).toContain('pan-test-root-');
+    expect(homedir()).not.toBe(REAL_HOME);
+    expect(join(homedir(), OVERDECK_SEGMENT)).not.toBe(process.env.OVERDECK_HOME);
+  });
+
+  it('blocks writes to the real ~/.claude.json, its temp files and its lock', async () => {
+    expect(() => writeFileSync(REAL_CLAUDE_JSON, '{}')).toThrow('[test-guard]');
+    expect(() => writeFileSync(`${REAL_CLAUDE_JSON}.tmp-${process.pid}`, '{}')).toThrow('[test-guard]');
+    expect(() => mkdirSync(`${REAL_CLAUDE_JSON}.lock`)).toThrow('[test-guard]');
+    await expect(writeFile(`${REAL_CLAUDE_JSON}.tmp-${process.pid}`, '{}')).rejects.toThrow('[test-guard]');
   });
 
   it('blocks sync writes to the real ~/.overdeck tree', () => {

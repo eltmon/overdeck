@@ -25,12 +25,15 @@ import {
   discoverArtifact,
   type ForgeType,
 } from '../../../lib/forge.js';
-import { getPrFacts, resetPrFactsCache } from '../../../lib/cloister/pr-facts.js';
+import { forgeApprovalAtHead, getPrFacts, resetPrFactsCache, type PrFacts } from '../../../lib/cloister/pr-facts.js';
+import { getAgentState } from '../../../lib/agents/agent-state-read.js';
 import { formatUatMarker } from '../../../lib/cloister/uat-verdict-marker.js';
 import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/services/pr-tab-cache.js';
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
+import { reviewedHeadFromRunId, reviewVerdictRefusal, verdictCallerFromEnv } from '../../../lib/cloister/verdict-caller.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
 import { appendPipelineEntry } from '../../../lib/cloister/pipeline-journal.js';
+import { emitActivityEntry } from '../../../lib/activity-logger.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -205,10 +208,86 @@ export async function doneCommand(
   // `CHANGES_REQUESTED` (rework delivery, the review-stale gate) sees nothing.
   // Completion fails when the post fails: an unrecorded verdict is not done.
   if (role === 'review') {
+    // #3853: the operator's override shares this door with the review agent's
+    // verdict. An agent session may not use the override half: it records a
+    // verdict only as the issue's review session, and never reverses an
+    // approval proven to stand on the exact head, unless the operator asked
+    // for this run. Unproven means the verdict goes through.
+    const caller = verdictCallerFromEnv();
+    const facts = caller.kind === 'agent' ? await getPrFacts(normalizedIssueId) : undefined;
+    let guardFacts: Pick<PrFacts, 'approved' | 'approvedAtHead' | 'headSha'> | null = facts ?? null;
+    let operatorRequested = false;
+    if (caller.kind === 'agent' && options.status !== 'passed' && facts?.approved === true) {
+      try {
+        operatorRequested = getAgentState(`agent-${normalizedIssueId.toLowerCase()}-review`)
+          ?.reviewOperatorRequested === true;
+      } catch {
+        // An unreadable state file is no operator request; the approval must
+        // still be proven at head before anything is refused.
+      }
+      // Only this path reads the reviews' commit shas, so the shared PR read
+      // every other caller runs carries no review payload.
+      if (!operatorRequested && facts.approvedAtHead !== true) {
+        const approvedAtHead = await forgeApprovalAtHead(facts);
+        guardFacts = { ...facts, ...(approvedAtHead !== undefined ? { approvedAtHead } : {}) };
+      }
+    }
+    const refusal = reviewVerdictRefusal({
+      caller,
+      issueId: normalizedIssueId,
+      status: options.status,
+      facts: guardFacts,
+      operatorRequested,
+    });
+    if (refusal) {
+      // A refusal is a pipeline fact the operator must be able to find later:
+      // journal it (append-only, fires `pipeline.entry`) and raise it in the
+      // activity feed. Never steer the agent to record `passed` instead — when
+      // the refusal is wrong, that turns a real blocker into an approval.
+      appendPipelineEntry(workspacePath, {
+        type: 'review.verdict-refused',
+        issueId: normalizedIssueId,
+        source: 'pan-specialists-done',
+        data: {
+          status: options.status,
+          reason: refusal,
+          caller: caller.id,
+          ...(options.runId ? { runId: options.runId } : {}),
+          ...(options.notes ? { notes: options.notes } : {}),
+        },
+      });
+      emitActivityEntry({
+        source: 'review',
+        level: 'warn',
+        issueId: normalizedIssueId,
+        message: `${normalizedIssueId} review verdict (${options.status}) refused: ${refusal}`,
+      });
+      console.error(chalk.red(`Refusing the review verdict: ${refusal}`));
+      console.error(chalk.dim(
+        `Stop here and record no verdict. Post your findings as a plain PR comment for the operator `
+        + `(\`gh pr comment ${artifact.url} --body-file <your report>\`), then exit.`,
+      ));
+      return exitCli(1);
+    }
+    // #3853: the marker's `sha=` must name the commit this run reviewed, not
+    // whatever the head is when the verdict is posted. The run id carries the
+    // reviewed head; without `--run-id`, the review parent's current run.
+    let runId = options.runId;
+    if (!runId) {
+      try {
+        runId = getAgentState(`agent-${normalizedIssueId.toLowerCase()}-review`)?.reviewRunId;
+      } catch {
+        // No readable run: the reviewed commit is unknown and the marker
+        // carries no sha, so it proves nothing.
+      }
+    }
+    const reviewedHead = reviewedHeadFromRunId(runId, normalizedIssueId);
     const result = await postReviewVerdict({
       issueId: normalizedIssueId,
       verdict: options.status === 'passed' ? 'approve' : 'request-changes',
       body,
+      ...(facts ? { facts } : {}),
+      ...(reviewedHead ? { reviewedHead } : {}),
     });
     if (!result.posted) {
       console.error(chalk.red(

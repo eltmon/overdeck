@@ -196,6 +196,11 @@ export interface AgentState {
   reviewOutputPath?: string;
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
+  /**
+   * #3853: the operator asked for the review parent's current run (a forced
+   * re-review). Rewritten on every dispatch, so an automatic cycle clears it.
+   */
+  reviewOperatorRequested?: boolean;
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
   /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
   reviewRetryAttempt?: number;
@@ -282,6 +287,7 @@ export function cleanAgentState(raw: AgentState): AgentState {
     reviewOutputPath: raw.reviewOutputPath,
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
+    reviewOperatorRequested: raw.reviewOperatorRequested,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,
     reviewContextManifestPath: raw.reviewContextManifestPath,

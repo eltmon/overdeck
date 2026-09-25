@@ -6362,3 +6362,11 @@
   white-space: nowrap;
   max-width: 200px;
 }
+
+/* PAN-4185: context opt-outs for new conversations, under the deck header row. */
+.newConversationOptions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}

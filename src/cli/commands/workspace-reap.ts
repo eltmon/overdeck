@@ -8,6 +8,12 @@ import chalk from 'chalk';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { getAgentState } from '../../lib/agents.js';
 import { inferIssueIdFromStackContainerName } from '../../lib/workspace/stack-health.js';
+import { removeComposeProjectNetworks } from '../../lib/workspace-manager/docker.js';
+import {
+  findOrphanedWorkspaceNetworks,
+  removeOrphanedWorkspaceNetwork,
+  type OrphanedWorkspaceNetwork,
+} from '../../lib/workspace/orphan-networks.js';
 
 const execFileAsync = promisify(execFile);
 const ACTIVE_AGENT_STATUSES = new Set(['running', 'starting']);
@@ -211,7 +217,7 @@ async function inspectContainers(ids: string[]): Promise<DockerInspectContainer[
   return stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
 }
 
-async function confirmApply(candidates: ReapCandidate[], yes: boolean | undefined): Promise<boolean> {
+async function confirmApply(total: number, yes: boolean | undefined): Promise<boolean> {
   if (yes) {
     console.log(chalk.dim('  --yes given; skipping interactive confirmation.'));
     return true;
@@ -224,9 +230,9 @@ async function confirmApply(candidates: ReapCandidate[], yes: boolean | undefine
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const expected = String(candidates.length);
+    const expected = String(total);
     const answer = (
-      await rl.question(chalk.bold(`Type "${expected}" to reap these workspace stack(s), anything else to cancel: `))
+      await rl.question(chalk.bold(`Type "${expected}" to reap these workspace stack(s) and network(s), anything else to cancel: `))
     ).trim();
     return answer === expected;
   } finally {
@@ -250,6 +256,9 @@ async function composeDown(candidate: ReapCandidate): Promise<void> {
     timeout: 60_000,
     maxBuffer: 10 * 1024 * 1024,
   });
+  // PAN-3900: compose down leaves the project's networks behind when a
+  // foreign container (traefik) is attached; remove them explicitly.
+  await removeComposeProjectNetworks(candidate.project);
 }
 
 function printCandidates(candidates: ReapCandidate[], apply: boolean | undefined): void {
@@ -272,6 +281,22 @@ function printCandidates(candidates: ReapCandidate[], apply: boolean | undefined
   console.log('');
   if (!apply) {
     console.log(chalk.dim('Dry run only. Re-run with --apply to run docker compose down -v --remove-orphans.'));
+  }
+}
+
+function printOrphanNetworks(networks: OrphanedWorkspaceNetwork[], apply: boolean | undefined): void {
+  if (networks.length === 0) {
+    console.log(chalk.green('No orphaned workspace Docker networks found.'));
+    return;
+  }
+  console.log(chalk.bold(`${apply ? 'Will remove' : 'Would remove'} ${networks.length} orphaned workspace Docker network(s):`));
+  console.log(chalk.dim('  (compose-labeled workspace network, no attached containers, workspace directory gone)'));
+  for (const network of networks) {
+    console.log(`${chalk.cyan(network.name)} (${network.issueId}; ${network.workspacePath} absent)`);
+  }
+  console.log('');
+  if (!apply) {
+    console.log(chalk.dim('Dry run only. Re-run with --apply to remove these networks.'));
   }
 }
 
@@ -302,12 +327,23 @@ export async function workspaceReapCommand(options: WorkspaceReapOptions = {}): 
       return false;
     });
 
-  printCandidates(candidates, options.apply);
-  if (!options.apply || candidates.length === 0) return;
+  let orphanNetworks: OrphanedWorkspaceNetwork[] = [];
+  try {
+    orphanNetworks = await findOrphanedWorkspaceNetworks(
+      new Set([...activeAgentIssueIds].map(id => id.toUpperCase())),
+    );
+  } catch (error: any) {
+    console.error(chalk.yellow(`Could not list Docker networks: ${error.message ?? error}`));
+  }
 
-  const confirmed = await confirmApply(candidates, options.yes);
+  printCandidates(candidates, options.apply);
+  printOrphanNetworks(orphanNetworks, options.apply);
+  const total = candidates.length + orphanNetworks.length;
+  if (!options.apply || total === 0) return;
+
+  const confirmed = await confirmApply(total, options.yes);
   if (!confirmed) {
-    console.log(chalk.green('Cancelled — no Docker stacks were reaped.'));
+    console.log(chalk.green('Cancelled — no Docker stacks or networks were reaped.'));
     return;
   }
 
@@ -317,6 +353,16 @@ export async function workspaceReapCommand(options: WorkspaceReapOptions = {}): 
       console.log(chalk.green(`✓ Reaped ${candidate.project}`));
     } catch (error: any) {
       console.error(chalk.red(`✗ Failed to reap ${candidate.project}: ${error.message ?? error}`));
+      process.exitCode = 1;
+    }
+  }
+
+  for (const network of orphanNetworks) {
+    try {
+      await removeOrphanedWorkspaceNetwork(network);
+      console.log(chalk.green(`✓ Removed network ${network.name}`));
+    } catch (error: any) {
+      console.error(chalk.red(`✗ Failed to remove network ${network.name}: ${error.message ?? error}`));
       process.exitCode = 1;
     }
   }

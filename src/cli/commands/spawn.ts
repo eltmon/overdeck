@@ -105,6 +105,19 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
     return exitCli(1);
   }
 
+  // PAN-3905: an item worktree is a fresh directory Claude Code has never
+  // seen; trust it before launch or the worker stops at the trust dialog.
+  // This path calls the backend directly, not launchAgentPane, so it does it
+  // itself.
+  if (harness === 'claude-code') {
+    try {
+      const { preTrustDirectory } = await import('../../lib/workspace-manager/worktree-ops.js');
+      await preTrustDirectory(cwd);
+    } catch {
+      // Non-fatal: the worker still starts and the prompt is visible.
+    }
+  }
+
   const pane = await Effect.runPromise(
     backend.startAgent(workspace, {
       kind: harness,

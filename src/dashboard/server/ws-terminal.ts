@@ -27,12 +27,12 @@ import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { validateOriginHeaders } from './routes/origin-validation.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
-import { HerdrTerminalProcess, resolveHerdrTerminalId } from './services/terminal-service.js';
+import { HerdrTerminalProcess, resolveHerdrTerminalId, resolveTerminalAttachTarget } from './services/terminal-service.js';
 
-// Worst-case respawn window for switch-model / resume / restart-all is
-// dominated by `waitForReadySignal`'s 30s ceiling. 35s gives a comfortable
-// margin for the surrounding kill + spawn + tmux-up overhead.
-const RESPAWN_WAIT_MS = 35_000;
+// Worst-case respawn window for switch-model / resume / restart-all: on Herdr
+// the launch itself waits up to 60s for detection, then readiness runs (up to
+// 30s). The wait ends early once the respawn finishes (PAN-3921).
+const RESPAWN_WAIT_MS = 95_000;
 
 type ClientControlMessage =
   | { type: 'attach'; cols: number; rows: number }
@@ -344,29 +344,23 @@ export function setupTerminalWebSocket(server: http.Server): void {
     // Check if tmux session exists and set up PTY (async)
     (async () => {
       // PAN-3917: on a Herdr host the session name is a live Herdr agent, not a
-      // tmux session. Resolve it first; a null answer means tmux, and the PTY
-      // path below is exactly what it always was.
-      const herdrTerminalId = await resolveHerdrTerminalId(sessionName);
+      // tmux session. A session that is missing may be mid switch-model /
+      // resume / restart-all; the respawn is waited out and the Herdr terminal
+      // resolved again after it (PAN-3921), since a 4404 ends the panel.
+      let herdrTerminalId: string | null = null;
       try {
-        const sessions = herdrTerminalId ? [sessionName] : await Effect.runPromise(listSessionNames());
-        if (!sessions.includes(sessionName)) {
-          // The session may legitimately be gone, OR it may be in the
-          // middle of a switch-model / resume / restart-all kill→spawn
-          // cycle. The frontend treats 4404 as fatal (no retry), so
-          // emitting it during a respawn gap leaves the terminal panel
-          // stuck on "Could not reconnect" even after the new session
-          // is up. Wait for the respawn to land before deciding.
-          if (isRespawnPending(sessionName)) {
-            const cameBack = await waitForSessionRespawn(sessionName, RESPAWN_WAIT_MS);
-            if (!cameBack) {
-              ws.close(SESSION_NOT_FOUND_CLOSE_CODE, 'session-not-found');
-              return;
-            }
-          } else {
-            ws.close(SESSION_NOT_FOUND_CLOSE_CODE, 'session-not-found');
-            return;
-          }
+        const target = await resolveTerminalAttachTarget(sessionName, RESPAWN_WAIT_MS, {
+          resolveHerdr: resolveHerdrTerminalId,
+          listTmuxSessions: () => Effect.runPromise(listSessionNames()),
+          tmuxSessionExists: (name) => Effect.runPromise(sessionExists(name)).catch(() => false),
+          isRespawnPending,
+          waitForRespawn: waitForSessionRespawn,
+        });
+        if (target.kind === 'missing') {
+          ws.close(SESSION_NOT_FOUND_CLOSE_CODE, 'session-not-found');
+          return;
         }
+        if (target.kind === 'herdr') herdrTerminalId = target.terminalId;
       } catch (err) {
         ws.close(1008, `Failed to list tmux sessions: ${err}`);
         return;
@@ -568,7 +562,9 @@ export function setupTerminalWebSocket(server: http.Server): void {
           // an in-progress respawn rather than emitting fatal 4404 the
           // client won't retry.
           if (!exists && isRespawnPending(sessionName)) {
-            exists = await waitForSessionRespawn(sessionName, RESPAWN_WAIT_MS);
+            // The respawn may land on Herdr; only a tmux session can back this PTY.
+            exists = await waitForSessionRespawn(sessionName, RESPAWN_WAIT_MS)
+              && await Effect.runPromise(sessionExists(sessionName));
           }
           if (!exists) {
             console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);

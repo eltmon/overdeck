@@ -501,7 +501,12 @@ export async function listHerdrAgents(
     if (!agentId) continue;
     record(agent, agentId, false);
   }
-  return [...byAgentId.values()];
+  // Herdr keeps a pane-bound pane `unknown` after its shell is back at the prompt: the
+  // foreground process decides; an unanswered probe keeps the state (PAN-3921).
+  return Promise.all([...byAgentId.values()].map(async (agent) => {
+    if (!agent.paneBound || agent.state === 'exited') return agent;
+    return (await paneProcessLiveness(agent.paneId, api)) === 'exited' ? { ...agent, state: 'exited' as const } : agent;
+  }));
 }
 
 /** Overdeck agent id: the `agentId` token; Herdr's own agent name only on an Overdeck-tokened pane (PAN-3920). */
@@ -510,13 +515,13 @@ const agentIdOf = (pane: HerdrPaneInfo): string | undefined => pane.tokens?.[AGE
 
 /** The recent terminal text of a Herdr pane — the backend's `capture-pane`. */
 export async function readHerdrPaneText(
-  paneId: string,
-  lines: number,
+  paneId: string, lines: number,
+  source: 'recent' | 'visible' = 'recent', // `visible` includes a full-screen TUI's alternate screen
   api: HerdrApiClient = getHerdrApiClient(),
 ): Promise<string> {
   const result = await api.call<{ text?: string }>('pane.read', {
     pane_id: paneId,
-    source: 'recent',
+    source,
     lines,
     strip_ansi: true,
   });

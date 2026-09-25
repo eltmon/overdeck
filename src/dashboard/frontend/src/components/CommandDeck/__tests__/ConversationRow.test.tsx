@@ -30,6 +30,9 @@ const mutations: ConversationMutations = {
   retitle: vi.fn(),
   isRetitlePending: vi.fn(() => false),
   toggleFavorite: vi.fn(),
+  move: vi.fn(),
+  linkPullRequest: vi.fn(),
+  unlinkPullRequest: vi.fn(),
   openForkModal: vi.fn(),
   submitFork: vi.fn(),
   forkTarget: null,
@@ -147,5 +150,93 @@ describe('ConversationRow overflow-menu focus return (PAN-3941)', () => {
     fireEvent.keyDown(menu, { key: 'Escape' });
     expect(screen.queryByRole('menu', { name: 'Actions for Test conversation' })).not.toBeInTheDocument();
     expect(row).toHaveFocus();
+  });
+});
+
+describe('ConversationRow pull request badge (PAN-3822)', () => {
+  const link = {
+    host: 'github.com',
+    repository: 'eltmon/overdeck',
+    number: 42,
+    url: 'https://github.com/eltmon/overdeck/pull/42',
+    source: 'branch' as const,
+    linkedAt: '2026-09-20T00:00:00.000Z',
+    dismissedAt: null,
+    snapshot: {
+      state: 'merged' as const,
+      isDraft: false,
+      title: 'Ship it',
+      headBranch: 'feature/pan-42',
+      baseBranch: 'main',
+      reviewState: 'approved' as const,
+      checks: 'green' as const,
+      mergeable: null,
+      additions: null,
+      deletions: null,
+      changedFiles: null,
+      author: null,
+      updatedAt: null,
+      mergedAt: '2026-09-20T01:00:00.000Z',
+      closedAt: null,
+      syncedAt: '2026-09-20T02:00:00.000Z',
+    },
+  };
+
+  it('renders the effective PR from its snapshot and opens it without selecting the row', () => {
+    const onSelect = vi.fn();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    render(
+      <ConversationRow
+        conv={{ ...conversation, pullRequest: link, pullRequestCount: 2 }}
+        isSelected={false}
+        onSelect={onSelect}
+        mutations={mutations}
+      />,
+    );
+
+    const badge = screen.getByRole('link', { name: /eltmon\/overdeck #42 · merged/ });
+    expect(badge).toHaveAttribute('data-tone', 'success');
+    expect(badge).toHaveClass('badge-bg-success');
+    expect(badge).toHaveTextContent('#42');
+    expect(badge).toHaveTextContent('+1');
+
+    fireEvent.click(badge);
+    expect(openSpy).toHaveBeenCalledWith('https://github.com/eltmon/overdeck/pull/42', '_blank', 'noopener,noreferrer');
+    expect(onSelect).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('uses the warning tone for an open PR with changes requested', () => {
+    renderRow({ pullRequest: { ...link, snapshot: { ...link.snapshot, state: 'open', reviewState: 'changes-requested' } } });
+    expect(screen.getByRole('link', { name: /#42 · open/ })).toHaveAttribute('data-tone', 'warning');
+  });
+
+  it('renders no badge when the conversation has no linked PR', () => {
+    renderRow({ pullRequest: null });
+    expect(screen.queryByRole('link', { name: /#\d+/ })).not.toBeInTheDocument();
+  });
+
+  it('links a pull request from the action menu inline input', () => {
+    vi.mocked(mutations.linkPullRequest).mockClear();
+    renderRow({ pullRequest: null });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(screen.queryByText(/^Unlink #/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Link pull request…'));
+    const input = screen.getByLabelText('Pull request URL or #42');
+    fireEvent.change(input, { target: { value: ' #42 ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(mutations.linkPullRequest).toHaveBeenCalledWith({ name: 'test-conversation', ref: '#42' });
+    expect(screen.queryByRole('menu', { name: 'Actions for Test conversation' })).not.toBeInTheDocument();
+  });
+
+  it('unlinks the effective pull request from the action menu', () => {
+    vi.mocked(mutations.unlinkPullRequest).mockClear();
+    renderRow({ pullRequest: link });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(screen.getByText('Unlink #42'));
+
+    expect(mutations.unlinkPullRequest).toHaveBeenCalledWith({ name: 'test-conversation', ref: 'https://github.com/eltmon/overdeck/pull/42' });
   });
 });

@@ -94,6 +94,8 @@ describe('dashboard restart with a live port squatter', () => {
         healthTimeoutMs: 200,
         expectedIdentity: { repoRoot: '/expected/repo', mode: 'primary' },
         eaddrinuseLogPath: join(tempDir, 'dashboard.log'),
+        // The fake spawn pid is not a real process; treat it as still booting.
+        spawnedPidAlive: async () => true,
       },
     );
     const rejection = expect(restart).rejects.toSatisfy((error: StageError) =>

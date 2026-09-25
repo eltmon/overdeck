@@ -791,6 +791,21 @@ describe('generateLauncherScript', () => {
     `);
   });
 
+  it('conversation panel execs Claude Code when asked (Herdr, PAN-3921)', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      spawnMode: 'conversation',
+      workingDir: '/workspace/project',
+      baseCommand: 'claude',
+      sessionId: 'sess-conv',
+      keepAlive: false,
+      execConversationHarness: true,
+    });
+    expect(script).toContain("exec claude --session-id 'sess-conv'");
+    expect(script).not.toContain('while true; do sleep 60; done');
+  });
+
   it('conversation panel (resume)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,

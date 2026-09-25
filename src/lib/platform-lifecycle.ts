@@ -286,6 +286,36 @@ async function describeSurvivingPid(pid: number): Promise<string | null> {
   }
 }
 
+/** kill(0) failed with ESRCH: no process has this pid. EPERM means it exists. */
+function pidProvenGone(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ESRCH';
+  }
+}
+
+/**
+ * Is a spawned dashboard pid PROVEN dead (PAN-3899)? Only positive evidence
+ * counts: kill(0) answering ESRCH, or ps reporting a zombie (`Z`/`X`). A ps
+ * that fails (fork failing under memory pressure, no ps binary) proves
+ * nothing, so the pid stays "not proven dead" and a timed-out reload keeps the
+ * PAN-3128 left-running promotion instead of deleting a live server's tree.
+ */
+async function spawnedPidProvenDead(pid: number): Promise<boolean> {
+  if (pidProvenGone(pid)) return true;
+  try {
+    const { stdout } = await execAsync(`ps -p ${pid} -o stat=`);
+    const state = stdout.trim();
+    return state.startsWith('Z') || state.startsWith('X');
+  } catch {
+    // ps also exits non-zero when the pid vanished after the kill(0) sample;
+    // only a fresh ESRCH turns that into "dead".
+    return pidProvenGone(pid);
+  }
+}
+
 async function fileSizeOrZero(path: string): Promise<number> {
   try {
     return (await stat(path)).size;
@@ -564,6 +594,12 @@ async function restartDashboardBody(
     portOwnerProbe?: (port: number) => Promise<number[]>;
     pidDescriptor?: (pid: number) => Promise<string>;
     pidSurvivorProbe?: PidSurvivorProbe;
+    /**
+     * Is the spawned server still alive after a failed health wait? Resolve
+     * false only for a pid proven dead; the default is a kill(0) probe with ps
+     * used only to spot a zombie.
+     */
+    spawnedPidAlive?: (pid: number) => Promise<boolean>;
   } = {},
 ): Promise<DashboardRestartResult> {
   try {
@@ -604,6 +640,20 @@ async function restartDashboardBody(
     // own, a genuinely broken one is visible for inspection, and the next
     // `pan restart` stops whatever holds the port anyway.
     const healthFailure = error instanceof Error ? error.message : String(error);
+    // A spawned server that already exited (e.g. refused at config load) is
+    // not "left running": say so, and drop the recovery label so a deploy does
+    // not promote the build it was running (PAN-3899). An unknown pid, or a
+    // liveness probe that could not decide, keeps the label: nothing proves
+    // the spawn died.
+    const spawnedPidAlive = opts.spawnedPidAlive
+      ?? (async (pid: number) => !(await spawnedPidProvenDead(pid)));
+    if (spawnedPid !== null && !(await spawnedPidAlive(spawnedPid))) {
+      throw new StageError({
+        stage: 'dashboard',
+        reason: `${healthFailure}; the newly spawned dashboard (pid ${spawnedPid}) exited before it became healthy — `
+          + `check ${logPath}`,
+      });
+    }
     throw new StageError({
       stage: 'dashboard',
       reason:
@@ -723,6 +773,7 @@ export function restartDashboard(
     portOwnerProbe?: (port: number) => Promise<number[]>;
     pidDescriptor?: (pid: number) => Promise<string>;
     pidSurvivorProbe?: PidSurvivorProbe;
+    spawnedPidAlive?: (pid: number) => Promise<boolean>;
   } = {},
 ): Promise<DashboardRestartResult> {
   return asStage('restartDashboard', () => restartDashboardBody(config, startDashboardFn, opts));

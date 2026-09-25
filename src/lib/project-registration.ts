@@ -75,7 +75,7 @@ export async function registerProjectFromPath(
   // Pre-trust the project directory in Claude Code (non-fatal — H7).
   try {
     const { preTrustDirectory } = await import('./workspace-manager.js');
-    preTrustDirectory(fullPath);
+    await preTrustDirectory(fullPath);
   } catch { /* non-fatal */ }
 
   // Install git hooks where .git exists.

@@ -282,6 +282,72 @@ describe('handoffCommand', () => {
     expect(output).toContain('Project: mind-your-now');
   });
 
+  it('forwards --role to the fork server and prints it (PAN-3921)', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['review the PR'], { issue: 'PAN-1', role: 'review' });
+
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ issueId: 'PAN-1', role: 'review' }),
+    );
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Role: review');
+  });
+
+  it('sends no role without --role (PAN-3921)', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['continue'], { issue: 'PAN-1' });
+
+    const opts = forkMocks.forkConversationViaServer.mock.calls[0]![1] as Record<string, unknown>;
+    expect(opts).not.toHaveProperty('role');
+  });
+
+  it('rejects an invalid --role and does not fork (PAN-3921)', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await expect(handoffCommand('123', [], { role: 'bogus' })).rejects.toThrow('process.exit');
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Invalid --role: bogus. Expected one of conversation, work, review, test, plan.');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(forkMocks.forkConversationViaServer).not.toHaveBeenCalled();
+  });
+
   it('rejects an invalid --issue and does not fork', async () => {
     conversationMocks.getConversationById.mockReturnValue({
       id: 123,

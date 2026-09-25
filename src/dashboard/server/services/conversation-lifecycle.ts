@@ -38,6 +38,9 @@ import {
 } from '../../../lib/runtime-census.js';
 import { isRespawnPending } from './pending-respawn.js';
 import { isHarnessProcessAlive } from '../../../lib/tmux.js';
+import { hostTerminalBackendName } from '../../../lib/terminal-backends/select.js';
+import { listHerdrAgents } from '../../../lib/terminal-backends/herdr.js';
+import { conversationHarnessAlive } from '../../../lib/overdeck/conversation-liveness.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 import { claudeProjectDir, sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
@@ -49,6 +52,8 @@ const POLL_INTERVAL_MS = 10_000;
 // New conversations that have not yet had time to start their tmux session should
 // not be marked ended — the session is still spawning in the background.
 const SPAWN_GRACE_PERIOD_MS = 30_000;
+/** AGENT_DETECT_TIMEOUT_MS (60s, terminal-backends/herdr.ts) + SPAWN_GRACE_PERIOD_MS (PAN-3921). */
+const HERDR_SPAWN_GRACE_PERIOD_MS = 90_000;
 
 // Roles whose live `agent-*` tmux session must own a conversation row so the
 // dashboard can map the session to its JSONL transcript. `work` is included
@@ -126,6 +131,100 @@ interface AgentStateFile {
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
+ * One tick's liveness verdicts (PAN-3921 FR-8). On tmux it is the runtime
+ * census, plus Herdr's inventory when its socket answers: after a flip back to
+ * tmux, a conversation launched on Herdr still runs there and must not be
+ * ended while its harness lives (rollback safety). On Herdr it is Herdr's agent inventory, with the
+ * tmux census consulted only for a conversation Herdr does not hold — one
+ * launched before the host moved to Herdr still runs in its tmux session.
+ */
+interface ConversationLivenessView {
+  readonly sampledAt: number;
+  readonly census: RuntimeCensus;
+  readonly graceMs: number;
+  /** The session/pane is gone entirely. */
+  sessionGone(tmuxSession: string): boolean;
+  /** The session/pane is there but its harness has exited. */
+  harnessGone(tmuxSession: string): Promise<boolean>;
+  /** Fresh probe used before resurrecting an ended row. */
+  harnessAlive(tmuxSession: string): Promise<boolean>;
+}
+
+interface HerdrConversationInventory {
+  readonly alive: ReadonlySet<string>;
+  readonly exited: ReadonlySet<string>;
+}
+
+/** Herdr's live and exited agents by name, or null when the socket did not answer. */
+async function readHerdrConversationInventory(): Promise<HerdrConversationInventory | null> {
+  try {
+    const agents = await listHerdrAgents();
+    return {
+      alive: new Set(agents.filter((agent) => agent.state !== 'exited').map((agent) => agent.agentId)),
+      exited: new Set(agents.filter((agent) => agent.state === 'exited').map((agent) => agent.agentId)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function tmuxView(census: RuntimeCensus, herdr: HerdrConversationInventory | null): ConversationLivenessView {
+  const onHerdr = (name: string) => herdr?.alive.has(name) ?? false;
+  return {
+    sampledAt: census.sampledAt,
+    census,
+    graceMs: SPAWN_GRACE_PERIOD_MS,
+    sessionGone: (name) => !census.sessionNames.has(name) && !onHerdr(name),
+    harnessGone: async (name) => !onHerdr(name) && census.sessionNames.has(name)
+      && !(await runtimeCensusHasHarnessProcess(census, name)),
+    harnessAlive: async (name) => (await isHarnessProcessAlive(name)) || onHerdr(name),
+  };
+}
+
+/** tmux's own answer when no server runs on the socket (as opposed to a probe that failed). */
+const NO_TMUX_SERVER = /no server running|error connecting to/i;
+
+/**
+ * Whether the census can answer for legacy tmux sessions. No tmux server at
+ * all is the normal state of a Herdr host and means "no legacy session"; any
+ * other census failure (a `list-panes` timeout under load) means "unknown".
+ */
+function legacyCensusKnown(census: RuntimeCensus): boolean {
+  return census.available || NO_TMUX_SERVER.test(census.error ?? '');
+}
+
+function herdrView(inventory: HerdrConversationInventory, census: RuntimeCensus, sampledAt: number): ConversationLivenessView {
+  const legacySession = (name: string) => census.available && census.sessionNames.has(name);
+  // A name Herdr does not list, while the census could not answer, is unknown:
+  // never gone (review of #4104, F1 — a failed census once ended every legacy conversation).
+  const unknown = (name: string) => !inventory.alive.has(name) && !inventory.exited.has(name) && !legacyCensusKnown(census);
+  return {
+    sampledAt,
+    census,
+    graceMs: HERDR_SPAWN_GRACE_PERIOD_MS,
+    sessionGone: (name) => !unknown(name) && !inventory.alive.has(name) && !inventory.exited.has(name) && !legacySession(name),
+    harnessGone: async (name) => {
+      if (inventory.alive.has(name)) return false;
+      if (inventory.exited.has(name)) return true;
+      if (unknown(name)) return false;
+      return legacySession(name) && !(await runtimeCensusHasHarnessProcess(census, name));
+    },
+    harnessAlive: (name) => conversationHarnessAlive(name),
+  };
+}
+
+/** The tick's liveness view, or null when the backend could not be read (mark nothing). */
+async function readLivenessView(fresh: boolean): Promise<ConversationLivenessView | null> {
+  const census = fresh ? await refreshRuntimeCensus() : await getRuntimeCensus();
+  if ((await hostTerminalBackendName()) !== 'herdr') {
+    return census.available ? tmuxView(census, await readHerdrConversationInventory()) : null;
+  }
+  const sampledAt = Date.now();
+  const inventory = await readHerdrConversationInventory();
+  return inventory ? herdrView(inventory, census, sampledAt) : null;
+}
+
+/**
  * Whether an ended row whose session and harness looked alive in `census`
  * should be resurrected. The census is up to RUNTIME_CENSUS_TTL_MS old, and
  * the supervisor's exit event now ends a row within milliseconds, so the
@@ -135,13 +234,13 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
  * - a row whose harness a fresh probe finds gone, or that another writer
  *   changed while the probe ran.
  */
-async function shouldResurrect(conv: Conversation, census: RuntimeCensus): Promise<boolean> {
+async function shouldResurrect(conv: Conversation, view: ConversationLivenessView): Promise<boolean> {
   if (conv.clearedToConvId != null) return false;
   const fresh = getConversationByName(conv.name) ?? conv;
   if (fresh.status !== 'ended' || fresh.clearedToConvId != null) return false;
   const endedAtMs = fresh.endedAt ? Date.parse(fresh.endedAt) : Number.NaN;
-  if (endedAtMs >= census.sampledAt) return false;
-  if (!(await isHarnessProcessAlive(conv.tmuxSession))) return false;
+  if (endedAtMs >= view.sampledAt) return false;
+  if (!(await view.harnessAlive(conv.tmuxSession))) return false;
   const after = getConversationByName(conv.name) ?? fresh;
   return after.status === 'ended' && after.endedAt === fresh.endedAt;
 }
@@ -161,10 +260,10 @@ export async function pollConversations(): Promise<void> {
     const conversations = listConversations();
     if (conversations.length === 0) return;
 
-    const census = await getRuntimeCensus();
-    if (!census.available) return;
-    const aliveSessions = new Set(census.sessionNames);
-    let revalidationCensus: RuntimeCensus | null = null;
+    const view = await readLivenessView(false);
+    // A backend that did not answer must never end every conversation at once.
+    if (!view) return;
+    let revalidationView: ConversationLivenessView | null | undefined;
 
     const endedConversations: typeof conversations = [];
     let sessionGoneCount = 0;
@@ -175,15 +274,14 @@ export async function pollConversations(): Promise<void> {
       const ageMs = now - new Date(conv.createdAt).getTime();
       // Grace protects a just-spawned conversation: its pane may still be the
       // launcher shell before the harness process takes the foreground.
-      if (ageMs < SPAWN_GRACE_PERIOD_MS) continue;
-      let sessionGone = !aliveSessions.has(conv.tmuxSession);
+      if (ageMs < view.graceMs) continue;
+      let sessionGone = view.sessionGone(conv.tmuxSession);
       // Session exists but the harness process has exited — only the launcher
       // keep-alive loop (`while true; do sleep 60; done`) is left. tmux still
       // reports the session, so the gone-check misses it. Mark ended so the
       // dashboard stops showing a dead conversation as active and resume
       // respawns it. PAN-1638.
-      let harnessGone = !sessionGone
-        && !(await runtimeCensusHasHarnessProcess(census, conv.tmuxSession));
+      let harnessGone = !sessionGone && await view.harnessGone(conv.tmuxSession);
       if (!sessionGone && !harnessGone) {
         // PAN-1972: the poller used to be one-directional — it only ever marked
         // conversations 'ended'. A transient blip (a dashboard restart that
@@ -192,7 +290,7 @@ export async function pollConversations(): Promise<void> {
         // UI showed a gray dot + "Resume Session" on a conversation in active use.
         // tmux is the liveness oracle: a conversation whose session AND harness are
         // both alive must read 'active'. Resurrect it. Idempotent when already active.
-        if (conv.status === 'ended' && await shouldResurrect(conv, census)) {
+        if (conv.status === 'ended' && await shouldResurrect(conv, view)) {
           console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} alive but row marked ended — resurrecting to active`);
           markConversationRunning(conv.name);
         }
@@ -226,13 +324,12 @@ export async function pollConversations(): Promise<void> {
         new Date(fresh.createdAt).getTime() || 0,
         fresh.lastAttachedAt ? new Date(fresh.lastAttachedAt).getTime() || 0 : 0,
       );
-      if (Date.now() - lastAliveSignalMs < SPAWN_GRACE_PERIOD_MS) continue;
+      if (Date.now() - lastAliveSignalMs < view.graceMs) continue;
 
-      revalidationCensus ??= await refreshRuntimeCensus();
-      if (!revalidationCensus.available) continue;
-      sessionGone = !revalidationCensus.sessionNames.has(conv.tmuxSession);
-      harnessGone = !sessionGone
-        && !(await runtimeCensusHasHarnessProcess(revalidationCensus, conv.tmuxSession));
+      if (revalidationView === undefined) revalidationView = await readLivenessView(true);
+      if (!revalidationView) continue;
+      sessionGone = revalidationView.sessionGone(conv.tmuxSession);
+      harnessGone = !sessionGone && await revalidationView.harnessGone(conv.tmuxSession);
       if (!sessionGone && !harnessGone) continue;
 
       if (process.env.DEBUG?.includes('conversation-lifecycle')) {
@@ -247,7 +344,7 @@ export async function pollConversations(): Promise<void> {
         // while tmux kept the (now dead) pane. Capture the death evidence — pane
         // exit status + output.log tail — instead of the old reasonless line, so
         // an ENOSPC/uncaught-exception death is diagnosable from this log alone.
-        const diag = await captureCorpseDiagnostics(conv.tmuxSession, revalidationCensus);
+        const diag = await captureCorpseDiagnostics(conv.tmuxSession, revalidationView.census);
         if (diag) keepAliveCorpseDiagnostics.push(`${conv.tmuxSession}${diag}`);
       }
       // The supervisor's exit event may have ended the row (and run its
@@ -283,7 +380,7 @@ export async function pollConversations(): Promise<void> {
     // Self-healing backfill: create rows for live specialist agents that are
     // missing them. Runs every poll so it converges over time even if any
     // single attempt fails partially.
-    await backfillOrphanedSpecialistConversations(Array.from(aliveSessions));
+    await backfillOrphanedSpecialistConversations(view.census.available ? Array.from(view.census.sessionNames) : []);
 
     // PAN-1458: detect Claude Code /clear orphans and link them to their parent.
     // Reuses the conversations list already fetched above — do not re-query.

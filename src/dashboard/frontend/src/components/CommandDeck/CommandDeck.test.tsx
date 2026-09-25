@@ -717,6 +717,28 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     ]));
   });
 
+  it('sends the remembered No context choice with a conversation created from the header + (PAN-4185)', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findByTestId('stage');
+
+    const noContext = screen.getByRole('checkbox', { name: 'No context' });
+    expect(noContext).not.toBeChecked();
+    fireEvent.click(noContext);
+    expect(noContext).toBeChecked();
+    expect(JSON.parse(localStorage.getItem('overdeck.commandDeck.newConversationContext') ?? '{}')).toEqual({
+      bareContext: true,
+      skipClaudeMd: false,
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'New conversation' }));
+    });
+
+    const post = vi.mocked(fetch).mock.calls.find(([url, init]) => url === '/api/conversations' && init?.method === 'POST');
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ projectKey: 'test-project', bareContext: true });
+    expect(JSON.parse(String(post?.[1]?.body))).not.toHaveProperty('skipClaudeMd');
+  });
+
   it('returns the server error while preserving the existing error signals', async () => {
     conversationCreateResponse = {
       ok: false,

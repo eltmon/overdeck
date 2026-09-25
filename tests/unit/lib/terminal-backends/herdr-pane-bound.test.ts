@@ -17,6 +17,7 @@ import {
   HerdrBackend,
   listHerdrAgents,
   probeHerdrAgentLiveness,
+  readHerdrPaneText,
 } from '../../../../src/lib/terminal-backends/herdr.js';
 import { HerdrApiError } from '../../../../src/lib/terminal-backends/herdr-api.js';
 import { detectionPolicyFor, launchAgentPane } from '../../../../src/lib/terminal-backends/launch.js';
@@ -264,6 +265,24 @@ describe('finding a pane-bound agent', () => {
     }]);
   });
 
+  it('reports a pane-bound pane whose shell is back at its prompt as exited (PAN-3921)', async () => {
+    const { api } = paneBoundApi([], idleShellProcessInfo);
+    const agents = await listHerdrAgents(api as never);
+    expect(agents).toHaveLength(1);
+    expect(agents[0]).toMatchObject({ agentId: 'agent-pan-3705-review', state: 'exited', paneBound: true });
+  });
+
+  it('keeps the reported state when the process probe cannot answer (PAN-3921)', async () => {
+    const { api } = fakeApi(({ method }) => {
+      if (method === 'agent.list') return { agents: [] };
+      if (method === 'session.snapshot') return { snapshot: { panes: [boundPane] } };
+      if (method === 'pane.process_info') return new HerdrApiError({ method, code: 'timeout', message: 'timed out' });
+      return {};
+    });
+    const agents = await listHerdrAgents(api as never);
+    expect(agents[0]).toMatchObject({ state: 'unknown', paneBound: true });
+  });
+
   it('counts a pane Herdr later detected once, not twice', async () => {
     // Herdr names a detected agent itself; the agentId token is what keys it.
     const detected = { ...boundPane, agent: 'codex', agent_status: 'working', name: 'codex-1' };
@@ -361,5 +380,14 @@ describe('HerdrBackend.prompt for a pane-bound agent', () => {
       // would drop the real delivery as a duplicate.
       expect(isUnsupported(result)).toBe(true);
     }
+  });
+});
+
+describe('readHerdrPaneText source (PAN-3921)', () => {
+  it('reads recent output by default and the visible screen when asked', async () => {
+    const { api, log } = fakeApi(({ method }) => (method === 'pane.read' ? { text: 'screen' } : {}));
+    await expect(readHerdrPaneText('wE:p2', 40, undefined, api as never)).resolves.toBe('screen');
+    await readHerdrPaneText('wE:p2', 40, 'visible', api as never);
+    expect(log.map((call) => call.params['source'])).toEqual(['recent', 'visible']);
   });
 });

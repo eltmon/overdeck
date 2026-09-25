@@ -1,13 +1,13 @@
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 
-import { Effect } from 'effect';
+import { resolveEffectivePullRequest } from '@overdeck/contracts';
 
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { isHarnessProcessAlive, listSessionNames } from '../tmux.js';
+import { conversationHarnessAlive, listLiveConversationSessions } from './conversation-liveness.js';
 import { resolveConversationGitInfo } from '../../dashboard/server/services/git-info.js';
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
 import { summarizeConversationActivity } from '../../dashboard/server/services/conversation-service.js';
@@ -17,6 +17,7 @@ import {
   conversationSessionAliveFromState,
 } from './conversation-runtime.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
+import { listPullRequestLinksForConversations } from './conversation-pull-requests.js';
 import {
   listConversations,
   listFavoritedIds,
@@ -98,18 +99,21 @@ export function getEnrichedConversationList(limit: number, offset: number): Prom
 async function enrichConversationList(limit: number, offset: number): Promise<readonly unknown[]> {
   const conversations = listConversations({ limit, offset });
   const favoritedNames = getCachedFavoritedIds();
-  const [ledgerEntries, sessionNames] = await Promise.all([
-    getConversationLedgerCostsSnapshot(), Effect.runPromise(listSessionNames()),
+  const [ledgerEntries, liveSessionNames] = await Promise.all([
+    getConversationLedgerCostsSnapshot(), listLiveConversationSessions(),
   ]);
   const ledgerCosts = new Map(ledgerEntries);
-  const liveSessionNames = new Set(sessionNames);
+  // PAN-3822: one query for the whole page's PR links, never one per row.
+  const pullRequestLinks = listPullRequestLinksForConversations(conversations.map((conv) => conv.name));
   return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
-      const tmuxSessionAlive = liveSessionNames.has(conv.tmuxSession);
+      // Null: the backend did not answer, so liveness is unknown — keep the
+      // row's stored status and repair nothing (PAN-3921).
+      const tmuxSessionAlive = liveSessionNames ? liveSessionNames.has(conv.tmuxSession) : row.status === 'active';
       let sessionAlive = conversationSessionAliveFromState(row, tmuxSessionAlive);
-      if (!sessionAlive && row.status === 'ended' && !row.forkStatus && tmuxSessionAlive) {
-        const harnessAlive = await isHarnessProcessAlive(row.tmuxSession);
+      if (liveSessionNames && !sessionAlive && row.status === 'ended' && !row.forkStatus && tmuxSessionAlive) {
+        const harnessAlive = await conversationHarnessAlive(row.tmuxSession);
         if (conversationNeedsRunningRepair(row, tmuxSessionAlive, harnessAlive)) {
           markConversationRunning(row.name);
           row = { ...row, status: 'active', endedAt: null };
@@ -205,6 +209,8 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         lastActivityAt,
         branch: gitInfo.branch,
         isWorktree: gitInfo.isWorktree,
+        pullRequest: resolveEffectivePullRequest(pullRequestLinks.get(row.name) ?? []),
+        pullRequestCount: (pullRequestLinks.get(row.name) ?? []).filter((link) => link.dismissedAt === null).length,
         pendingInputCount,
         pendingInputKinds,
         pendingAskUserQuestion,

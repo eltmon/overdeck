@@ -20,6 +20,8 @@ import {
   resolvePrimaryDashboardIdentity,
   spawnDashboardDetached,
 } from '../restart.js';
+import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
+import { shouldRefuseHostDashboardPort } from '../../../dashboard/server/identity.js';
 
 const fixtureRoots: string[] = [];
 
@@ -101,6 +103,56 @@ describe('resolvePrimaryDashboardIdentity', () => {
       [serverPath],
       expect.objectContaining({ cwd: repoRoot }),
     );
+  });
+
+  it('stamps reload\'s resolved gates so the spawned server is a primary that may bind the host port (PAN-3899)', () => {
+    const bundle = createDashboardBundleFixture();
+    const child = { unref: vi.fn() };
+    processMocks.execFileSync.mockImplementation(() => { throw new Error('systemd unavailable'); });
+    processMocks.spawn.mockReturnValue(child);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // A stray peer marker in the invoking shell must not reach the replacement.
+    vi.stubEnv('OVERDECK_DISABLE_DEACON', '1');
+    vi.stubEnv('OVERDECK_NO_RESUME', undefined);
+    const config = {
+      dashboardPort: 3010,
+      dashboardApiPort: 3011,
+      traefikEnabled: false,
+      traefikDomain: 'overdeck.localhost',
+    } as Parameters<typeof spawnDashboardDetached>[0];
+    const bootGates = {
+      deacon: { enabled: true, source: 'default' as const },
+      resume: { enabled: false, source: 'flag' as const },
+    };
+
+    try {
+      spawnDashboardDetached(config, { ...bundle, bootGates });
+      spawnDashboardDetached(config, { ...bundle, bootGates, resume: true });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    const env = processMocks.spawn.mock.calls[0][2].env as NodeJS.ProcessEnv;
+    expect(env.OVERDECK_DISABLE_DEACON).toBeUndefined();
+    expect(env).toMatchObject({
+      OVERDECK_DEACON_GATE_SOURCE: 'default',
+      OVERDECK_NO_RESUME: '1',
+      OVERDECK_RESUME_GATE_SOURCE: 'flag',
+    });
+    // The config-load guard the server runs: a peer is refused the host port.
+    const mode = isPeerDashboardProcess(env) ? 'peer' : 'primary';
+    expect(mode).toBe('primary');
+    expect(shouldRefuseHostDashboardPort({
+      repoRoot: bundle.repoRoot,
+      mode,
+      port: 3011,
+      hostDashboardApiPort: 3011,
+      runningInContainer: false,
+    })).toBe(false);
+
+    const overridden = processMocks.spawn.mock.calls[1][2].env as NodeJS.ProcessEnv;
+    expect(overridden.OVERDECK_NO_RESUME).toBeUndefined();
+    expect(overridden).toMatchObject({ OVERDECK_RESUME: '1', OVERDECK_RESUME_GATE_SOURCE: 'flag' });
   });
 
   it('returns a handle that stops the spawned systemd unit', () => {

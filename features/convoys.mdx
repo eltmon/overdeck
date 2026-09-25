@@ -112,7 +112,8 @@ The review parent, `agent-<issue>-review`, waits for the four reports. Then it:
 The PR review is the verdict. Overdeck stores no review status of its own.
 When GitHub refuses a review on your own PR (a single-account install), the
 verdict is posted as a PR comment that starts with
-`<!-- overdeck-verdict: APPROVED -->` or `<!-- overdeck-verdict: CHANGES_REQUESTED -->`.
+`<!-- overdeck-verdict: APPROVED sha=<head> -->` or `<!-- overdeck-verdict: CHANGES_REQUESTED sha=<head> -->`,
+naming the commit it reviewed when that commit is still the head.
 See [docs/REVIEW-AGENT-ARCHITECTURE.md](https://github.com/eltmon/overdeck/blob/main/docs/REVIEW-AGENT-ARCHITECTURE.md).
 
 ## What is Synthesis?

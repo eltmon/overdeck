@@ -28,7 +28,7 @@ import {
   resolveLaunchBackend,
 } from '../terminal-backends/launch.js';
 import type { AgentPaneRef } from '../terminal-backends/types.js';
-import { createWorkspace, preTrustDirectory } from '../workspace-manager.js';
+import { createWorkspace } from '../workspace-manager.js';
 import { isWorkspaceSetupIncomplete } from '../workspace-manager/setup-marker.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentState } from '../agents.js';
@@ -614,17 +614,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     console.log(`[claude-invoke] purpose=planning-agent | model=${planningModel} | source=spawn-planning-session.ts | session=${sessionName} | command="bash '${launcherScript}'"`);
 
-    // PAN-3905: createWorkspace pre-trusts only on its full success path, and
-    // is skipped when the workspace already exists, so trust the workspace
-    // here too. Otherwise the planner, or the first agent spawned into the
-    // workspace later, stalls at Claude Code's trust dialog. Idempotent.
-    try {
-      preTrustDirectory(workspacePath);
-    } catch {
-      // Non-fatal, matching createWorkspace: the agent can still run, the
-      // operator just sees the trust prompt.
-    }
-
+    // PAN-3905: launchAgentPane pre-trusts the workspace in Claude Code, so an
+    // existing workspace createWorkspace skipped is trusted too.
     await prepareTmuxServer(launchBackend, PLANNING_TMUX_GLOBAL_ENV_TO_UNSET);
     // PAN-3960: the planner goes through the same launch path as every other
     // agent — the issue workspace on the host's backend, stamped role=plan.

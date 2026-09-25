@@ -4,8 +4,11 @@ import {
   applyBootGateEnv,
   DEACON_GATE_SOURCE_ENV,
   isPeerDashboardProcess,
+  parseBootGateState,
   RESUME_GATE_SOURCE_ENV,
   resolveBootGates,
+  writeBootGateEnv,
+  type BootGateState,
 } from '../boot-gates.js';
 
 describe('boot gate env resolution', () => {
@@ -92,5 +95,44 @@ describe('isPeerDashboardProcess', () => {
   it('is false for a falsy value', () => {
     expect(isPeerDashboardProcess({ OVERDECK_DISABLE_DEACON: '0' })).toBe(false);
     expect(isPeerDashboardProcess({ OVERDECK_DISABLE_DEACON: '' })).toBe(false);
+  });
+});
+
+// PAN-3899: `pan reload` seeds the replacement server's env with the running
+// server's gates; the stamp must read back unchanged, source included.
+describe('writeBootGateEnv', () => {
+  it('round-trips every gate state through the env, source included', () => {
+    const states: BootGateState[] = [
+      { deacon: { enabled: true, source: 'flag' }, resume: { enabled: false, source: 'flag' } },
+      { deacon: { enabled: false, source: 'env' }, resume: { enabled: true, source: 'env' } },
+      { deacon: { enabled: true, source: 'default' }, resume: { enabled: true, source: 'default' } },
+      { deacon: { enabled: false, source: 'flag' }, resume: { enabled: false, source: 'default' } },
+    ];
+    for (const state of states) {
+      const env = writeBootGateEnv({ OVERDECK_DISABLE_DEACON: '1', OVERDECK_NO_RESUME: '1' }, state);
+      expect(resolveBootGates({}, env)).toEqual(state);
+    }
+  });
+
+  it('lets explicit flags win over a seeded state', () => {
+    const env = writeBootGateEnv({}, {
+      deacon: { enabled: false, source: 'flag' },
+      resume: { enabled: false, source: 'flag' },
+    });
+    expect(resolveBootGates({ deacon: true, resume: true }, env)).toEqual({
+      deacon: { enabled: true, source: 'flag' },
+      resume: { enabled: true, source: 'flag' },
+    });
+  });
+});
+
+describe('parseBootGateState', () => {
+  it('accepts a well-formed state and rejects malformed ones', () => {
+    const state = { deacon: { enabled: true, source: 'flag' }, resume: { enabled: false, source: 'env' } };
+    expect(parseBootGateState(state)).toEqual(state);
+    expect(parseBootGateState(undefined)).toBeNull();
+    expect(parseBootGateState({ deacon: state.deacon })).toBeNull();
+    expect(parseBootGateState({ ...state, resume: { enabled: 'no', source: 'env' } })).toBeNull();
+    expect(parseBootGateState({ ...state, deacon: { enabled: true, source: 'guess' } })).toBeNull();
   });
 });

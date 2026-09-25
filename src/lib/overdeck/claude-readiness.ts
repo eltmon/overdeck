@@ -1,6 +1,8 @@
 import { CONVERSATION_SESSION_ENDED_MARKER } from '../launcher-generator.js';
 import { LEGACY_TMUX_PROBE_TIMEOUT_MS, queryTmuxSession } from '../agents/tmux-session-query.js';
-import { capturePane, exactPaneTarget, tmuxExecAsync } from '../tmux.js';
+import { readAgentPaneText } from '../terminal-backends/agent-pane-io.js';
+import { hostTerminalBackendName } from '../terminal-backends/select.js';
+import { exactPaneTarget, tmuxExecAsync } from '../tmux.js';
 import { paneTreeHasHarnessProcess, readProcessTable } from '../tmux-process-tree.js';
 
 /**
@@ -41,11 +43,31 @@ function harnessEarlyExitError(paneText: string, sessionGone = false): Error {
 type HarnessExitProbe = 'alive' | 'session-gone' | 'harness-gone' | 'unknown';
 
 /**
- * Tmux-only: conversations run in tmux on every host until PAN-3921. When they
- * move to Herdr, this probe must switch to the backend-aware liveness module
- * (`src/lib/agents/liveness.ts`), or every slow start would read as `unknown`.
+ * The deadline probe on the host's backend. On Herdr (PAN-3921) the
+ * backend-aware liveness module answers; the tmux path below keeps its
+ * three-part session query, so a tmux error stays `unknown`.
  */
 async function probeHarnessExit(tmuxSession: string): Promise<HarnessExitProbe> {
+  if ((await hostTerminalBackendName()) === 'herdr') return probeHarnessExitOnHerdr(tmuxSession);
+  return probeHarnessExitOnTmux(tmuxSession);
+}
+
+/**
+ * A Herdr conversation execs its harness with no keep-alive loop, so a harness
+ * that exited leaves no pane (`no-session`) or an exited agent: both are
+ * `harness-gone` (the tmux wording about a launcher exit does not apply). Only
+ * a confirmed answer counts; an indeterminate probe is `unknown`.
+ */
+async function probeHarnessExitOnHerdr(agentId: string): Promise<HarnessExitProbe> {
+  const { isAlive } = await import('../agents/liveness.js');
+  const verdict = await isAlive(agentId, { backend: 'herdr' }).catch(() => null);
+  if (!verdict) return 'unknown';
+  if (verdict.alive) return 'alive';
+  if (verdict.reason === 'no-session' || verdict.reason === 'pane-dead' || verdict.reason === 'runtime-missing') return 'harness-gone';
+  return 'unknown';
+}
+
+async function probeHarnessExitOnTmux(tmuxSession: string): Promise<HarnessExitProbe> {
   const session = await queryTmuxSession(tmuxSession);
   if (session === 'missing') return 'session-gone';
   if (session === 'error') return 'unknown';
@@ -84,7 +106,9 @@ export async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   // empty, and the launcher's last words are in the capture before that.
   let output = '';
   while (Date.now() < deadline) {
-    const capture = await capturePane(tmuxSession, 200);
+    // The host's backend (PAN-3921): tmux `capture-pane`, or Herdr `pane.read`
+    // of the visible screen. A pane that cannot be read yet polls on.
+    const capture = await readAgentPaneText(tmuxSession, 200, undefined, 'visible').catch(() => '');
     if (capture.trim()) output = capture;
     if (capture.includes(SESSION_ENDED_PREFIX)) throw harnessEarlyExitError(capture);
     if (capture.includes('❯')) {

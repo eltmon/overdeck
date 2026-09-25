@@ -197,6 +197,14 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/archive',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive' },
   { surface: 'POST /api/conversations/:name/unarchive',                  kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unarchive' },
   { surface: 'POST /api/conversations/:name/clear-fork-state',           kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.clearForkState' },
+
+  // ── conversation-pull-requests.ts (PAN-3822) ─────────────────────────────
+  { surface: 'GET /api/conversations/:name/pull-requests',              kind: 'http', disposition: 'READ',        door: 'getConversationPullRequests (lib/overdeck/conversation-pull-request-commands.js, PAN-3822)' },
+  { surface: 'POST /api/conversations/:name/pull-requests',             kind: 'http', disposition: 'WRITE',       door: 'linkPullRequestToConversation (lib/overdeck/conversation-pull-request-commands.js, PAN-3822)' },
+  { surface: 'DELETE /api/conversations/:name/pull-requests',           kind: 'http', disposition: 'WRITE',       door: 'unlinkPullRequestFromConversation: sets dismissed_at, never deletes (PAN-3822)' },
+  { surface: 'POST /api/conversations/:name/pull-requests/sync',        kind: 'http', disposition: 'WRITE',       door: 'syncConversationPullRequests: refreshes linked PR snapshots (PAN-3822)' },
+  { surface: 'GET /api/pull-requests',                                  kind: 'http', disposition: 'READ',        door: 'listPullRequestLinks (lib/overdeck/conversation-pull-request-commands.js, PAN-3822)' },
+  { surface: 'GET /api/pull-requests/conversations',                    kind: 'http', disposition: 'READ',        door: 'getPullRequestConversations: PR URL to linked conversations (PAN-3822)' },
   { surface: 'POST /api/conversations/restart-all',                      kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.restart fan-out' },
   { surface: 'POST /api/conversations/:name/favorite',                   kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setFavorite' },
   { surface: 'DELETE /api/conversations/:name/favorite',                 kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unsetFavorite' },

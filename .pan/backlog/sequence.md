@@ -1,14 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-24T22:54:34.002Z · model: claude-opus-5 · open: 804_
+_Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
-| 22 | PAN-4182 | S | critical | ok |  |  | pan down's review sweep and failed-spawn teardown still speak tmux, so on Herdr they close no reviewer pane and write no stopped row |
 | 23 | PAN-4134 | S | critical | ok |  |  | All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -32,7 +30,6 @@ _Last sequenced: 2026-09-24T22:54:34.002Z · model: claude-opus-5 · open: 804_
 | 52 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
 | 53 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
 | 54 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
-| 56 | PAN-3905 | S | critical | ok |  |  | Planner-created workspaces are not pre-trusted; first agent spawned into them dies at the Claude trust dialog |
 | 57 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
 | 58 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
 | 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
@@ -88,6 +85,7 @@ _Last sequenced: 2026-09-24T22:54:34.002Z · model: claude-opus-5 · open: 804_
 | 115 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
 | 116 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
 | 117 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
+| 118 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
 | 119 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
 | 120 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
 | 121 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
@@ -812,10 +810,6 @@ _Last sequenced: 2026-09-24T22:54:34.002Z · model: claude-opus-5 · open: 804_
 
 ## Rationale detail
 
-### PAN-3921 (rank 1)
-
-In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.
-
 ### PAN-3930 (rank 15)
 
 In pipeline — rank pinned.
@@ -823,10 +817,6 @@ In pipeline — rank pinned.
 ### PAN-3983 (rank 19)
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
-
-### PAN-4182 (rank 22)
-
-New since the prior pass and the second half of the work PR #4180 (PAN-3939) landed, so it takes the rank that issue vacated and nothing renumbers. #4180 made the synthesis dispatch guard and the per-issue killAllReviewerSessions ask the host's terminal backend, but two teardown paths in src/lib/cloister/review-agent.ts were left on the tmux door: killAllReviewSessions (~L734-772, called only by pan down at src/cli/index.ts:1155) builds its candidate list from listSessionNames() and kills through killSession, and the PAN-3674 failed-spawn catch block (~L641-644) checks listSessionNames().includes(reviewSessionName) before calling killSession and swallows every error. Herdr is the default backend, so on a normal host neither path finds anything: pan down prints 'No review sessions running' while reviewer panes and their idle harnesses survive the shutdown, and because #4180 made the dispatch guard isAlive-based, the next boot reads those survivors as live reviewers and refuses to dispatch review. That is the same wedge PAN-3674 was written to prevent, reintroduced from the close side, which is why this is critical rather than cleanup: a wedged review never reaches the merge gate, and the operator's only signal is a shutdown message that claims success. It is small and fully specified: route both paths through closeAgentPaneDetailed and stopAgent as killAllReviewerSessions already does, surface a failed close in the returned failed list or the dispatch error instead of swallowing it, leave that reviewer's row alone when the close fails, and scope the sweep to review agents only (agent-<issue>-review[-<lane>] rows with role review, legacy review tmux names, and Herdr panes whose agentId matches that pattern) so it can never touch a work agent or a conv-* pane. It shares the backend-abstraction door with PAN-3921 (rank 1) and the liveness read with PAN-4134 (rank 23), so landing it alongside them keeps one guard instead of three.
 
 ### PAN-4134 (rank 23)
 
@@ -919,10 +909,6 @@ New this pass. A transient upstream stream error benches CLIProxy's only auth en
 ### PAN-3282 (rank 54)
 
 New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.
-
-### PAN-3905 (rank 56)
-
-preTrustDirectorySync exists but only the worktree-creation path calls it; every spawn path (spawnRun, foreman, slot, strike) must call it before launch or a swarm foreman dies with ready-signal-timeout. Small, verified, and it kills whole swarms.
 
 ### PAN-2695 (rank 57)
 
@@ -1112,6 +1098,18 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 
 New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
 
+### PAN-2639 (rank 115)
+
+codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
+
+### PAN-2331 (rank 116)
+
+Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
+
+### PAN-2333 (rank 117)
+
+Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1119,24 +1117,11 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-24T22:54:34.002Z",
-  "model": "claude-opus-5",
+  "generatedAt": "2026-09-25T02:32:55.628Z",
+  "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 804,
+  "openCount": 802,
   "nodes": [
-    {
-      "issue": "PAN-3921",
-      "rank": 1,
-      "size": "M",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane",
-      "rationale": "In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-3930",
       "rank": 15,
@@ -1459,19 +1444,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "dependsOn": [],
       "why": "Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it.",
       "rationale": "New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3905",
-      "rank": 56,
-      "size": "S",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Planner-created workspaces are not pre-trusted; first agent spawned into them dies at the Claude trust dialog",
-      "rationale": "preTrustDirectorySync exists but only the worktree-creation path calls it; every spawn path (spawnRun, foreman, slot, strike) must call it before launch or a swarm foreman dies with ready-signal-timeout. Small, verified, and it kills whole swarms.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8630,7 +8602,7 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "condition": "stale",
       "dependsOn": [],
       "why": "Conversation view does not surface terminal command responses",
-      "rationale": "Condition ok -> stale: crossed the 90-day age line this run (90.0 days) with no body or comment activity since 2026-06-24, and it describes conversation-view delivery feedback in a path substantially rebuilt by the Herdr terminal-backend work (PAN-3921, PAN-3962). Rank unchanged at 672 — staleness alone does not justify a move, and it already sits deep in the tail at low importance.",
+      "rationale": "Condition stale: crossed the 90-day age line with no body or comment activity since 2026-06-24, and it describes conversation-view delivery feedback in a path the Herdr terminal-backend work has now largely rebuilt — PAN-3921 (route conversations and pan handoff through the terminal backend) merged 2026-09-24, while PAN-3962 is still open. Rank unchanged at 674: staleness alone does not justify a move, it sits deep in the tail at low importance, and the rebuild means the issue must be re-read against the new conversation path before anyone works it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11051,15 +11023,15 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "planning": "auto"
     },
     {
-      "issue": "PAN-4182",
-      "rank": 22,
+      "issue": "PAN-4184",
+      "rank": 118,
       "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
+      "importance": "high",
+      "score": 81,
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "pan down's review sweep and failed-spawn teardown still speak tmux, so on Herdr they close no reviewer pane and write no stopped row",
-      "rationale": "New since the prior pass and the second half of the work PR #4180 (PAN-3939) landed, so it takes the rank that issue vacated and nothing renumbers. #4180 made the synthesis dispatch guard and the per-issue killAllReviewerSessions ask the host's terminal backend, but two teardown paths in src/lib/cloister/review-agent.ts were left on the tmux door: killAllReviewSessions (~L734-772, called only by pan down at src/cli/index.ts:1155) builds its candidate list from listSessionNames() and kills through killSession, and the PAN-3674 failed-spawn catch block (~L641-644) checks listSessionNames().includes(reviewSessionName) before calling killSession and swallows every error. Herdr is the default backend, so on a normal host neither path finds anything: pan down prints 'No review sessions running' while reviewer panes and their idle harnesses survive the shutdown, and because #4180 made the dispatch guard isAlive-based, the next boot reads those survivors as live reviewers and refuses to dispatch review. That is the same wedge PAN-3674 was written to prevent, reintroduced from the close side, which is why this is critical rather than cleanup: a wedged review never reaches the merge gate, and the operator's only signal is a shutdown message that claims success. It is small and fully specified: route both paths through closeAgentPaneDetailed and stopAgent as killAllReviewerSessions already does, surface a failed close in the returned failed list or the dispatch error instead of swallowing it, leave that reviewer's row alone when the close fails, and scope the sweep to review agents only (agent-<issue>-review[-<lane>] rows with role review, legacy review tmux names, and Herdr panes whose agentId matches that pattern) so it can never touch a work agent or a conv-* pane. It shares the backend-abstraction door with PAN-3921 (rank 1) and the liveness read with PAN-4134 (rank 23), so landing it alongside them keeps one guard instead of three.",
+      "why": "--no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked",
+      "rationale": "New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified (\"very likely\"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).",
       "gate": "auto",
       "planning": "auto"
     }
@@ -11696,13 +11668,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "confidence": 0.7
     },
     {
-      "from": "PAN-3905",
-      "to": "PAN-3916",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-3899",
       "to": "PAN-3902",
       "type": "informs",
@@ -12081,18 +12046,11 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "confidence": 1
     },
     {
-      "from": "PAN-3921",
-      "to": "PAN-4151",
+      "from": "PAN-3899",
+      "to": "PAN-4184",
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
-    },
-    {
-      "from": "PAN-4182",
-      "to": "PAN-4134",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     }
   ]
 }

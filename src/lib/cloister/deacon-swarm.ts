@@ -50,7 +50,7 @@ import {
 } from './deacon-swarm-completion.js';
 import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 export type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
-import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
+import { gcMergedSlots, reapMergedSlotAgent, teardownSlotWorkspaceDocker } from './deacon-swarm-gc.js';
 import { gcMergedSlotsAndAdvance } from './deacon-swarm-advance.js';
 import {
   clearReleasedBlockedSwarmSlot,
@@ -143,6 +143,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   recordSlotAssignment,
   clearSlotAssignment,
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
+  teardownSlotDocker: teardownSlotWorkspaceDocker,
   registeredSlotCapacityAvailable: async (issueId, n) => registeredSlotCapacityAvailable(issueId, n, await countLiveSwarmSlotsForIssue(issueId)),
   tryReserveSwarmSlot: async () => tryReserveSwarmSlot(await countRunningAgents()),
   releaseSwarmSlot,

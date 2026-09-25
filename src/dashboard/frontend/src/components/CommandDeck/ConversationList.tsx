@@ -9,6 +9,7 @@ import type { ContextUsage } from '../chat/chat-types';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects } from './UnknownProjectState';
+import type { PullRequestLink } from '@overdeck/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,10 @@ export interface Conversation {
   branch?: string | null;
   /** PAN-1523: true when cwd is a secondary git worktree (not the primary checkout). */
   isWorktree?: boolean;
+  /** PAN-3822: the effective linked pull request (explicit before branch-detected), from its stored snapshot. */
+  pullRequest?: PullRequestLink | null;
+  /** PAN-3822: number of live (non-dismissed) pull-request links. */
+  pullRequestCount?: number;
   /** PAN-1520 — unified pending-input surfaces (same shape as AgentSnapshot). */
   pendingInputCount?: number;
   pendingInputKinds?: ReadonlyArray<string>;

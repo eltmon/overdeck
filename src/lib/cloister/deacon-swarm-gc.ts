@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { Effect } from 'effect';
 import type { ReconciledSlotItem } from './swarm-slot-reconcile.js';
 import { getAgentState } from '../agents/agent-state.js';
@@ -29,6 +30,16 @@ export async function reapMergedSlotAgent(
   }
 }
 
+/**
+ * Production slot Docker teardown (PAN-3900), wired into the deacon's default
+ * swarm deps: removes the `<prefix>-feature-<issue>-slot-<n>` stack and its
+ * compose networks by name, whether or not the slot directory still exists.
+ */
+export async function teardownSlotWorkspaceDocker(slotIssueLower: string): Promise<unknown> {
+  const { teardownWorkspaceDockerByName } = await import('../workspace-manager/docker.js');
+  return teardownWorkspaceDockerByName(slotIssueLower);
+}
+
 export interface MergedSlotGcResult {
   actions: string[];
   /**
@@ -53,7 +64,7 @@ export async function gcMergedSlotsWithStatus(
   issueId: string,
   workspacePath: string,
   slots: ReconciledSlotItem[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames'> & {
+  deps: Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'clearSlotAssignment' | 'listSessionNames' | 'teardownSlotDocker'> & {
     slotWorktreeExists?: (path: string) => boolean;
     getAgentLastActivity?: (agentId: string) => string | undefined;
     stopSlotAgent?: (agentId: string) => Promise<void>;
@@ -154,7 +165,7 @@ async function slotBranchExists(
   }
 }
 
-export type SlotRemovalDeps = Pick<CoordinateSwarmSlotsDeps, 'runGitCommand'> & {
+export type SlotRemovalDeps = Pick<CoordinateSwarmSlotsDeps, 'runGitCommand' | 'teardownSlotDocker'> & {
   listSlotWorkspaceWorktrees?: (issueId: string, slotWorkspace: string) => SlotWorkspaceWorktrees;
   listFeatureWorkspaceRepoRoots?: (issueId: string, workspacePath: string) => WorkspaceRepoRoot[];
   removeDirectory?: (path: string) => Promise<void>;
@@ -284,6 +295,19 @@ export async function detachAndRemoveSlotWorkspace(
   }
 
   // ── Mutation: preflight proved every nested worktree safe and removable. ──
+
+  // PAN-3900: a slot workspace can own a Docker stack (`<prefix>-feature-
+  // <issue>-slot-<n>`). Removing the worktree alone leaks its bridge network,
+  // and nothing reaches it once the directory is gone. Best-effort: a Docker
+  // failure is noted but never blocks the git cleanup.
+  if (deps.teardownSlotDocker) {
+    const slotIssueLower = basename(slotWorkspace).toLowerCase().replace(/^feature-/, '');
+    try {
+      await deps.teardownSlotDocker(slotIssueLower);
+    } catch (error) {
+      note(`docker teardown for ${slotIssueLower} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   const detached: string[] = [];
   for (const worktree of nested) {
