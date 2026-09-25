@@ -4,17 +4,17 @@
     "created": "2026-09-25T06:04:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4198: Trim the issue right-click menu to state-relevant actions (Replan split to #4203, sync-main conflict UX split to #4204)",
-    "updated": "2026-09-25T06:10:19.107Z"
+    "updated": "2026-09-25T06:40:49.035Z"
   },
   "plan": {
     "id": "pan-4198",
     "title": "Trim the issue right-click menu to state-relevant actions; add Replan (archive branch + fresh plan from main)",
-    "status": "proposed",
+    "status": "running",
     "uid": "dc229c5e-e568-43d3-a9e1-f4a144453451",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-25T06:04:54Z",
-    "updated": "2026-09-25T06:10:19.107Z",
+    "updated": "2026-09-25T06:40:49.035Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4198",
