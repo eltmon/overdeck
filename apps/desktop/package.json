@@ -58,6 +58,7 @@
   "build": {
     "appId": "com.overdeck.app",
     "productName": "Overdeck",
+    "executableName": "overdeck",
     "generateUpdatesFilesForAllChannels": true,
     "publish": {
       "provider": "github",
@@ -90,8 +91,24 @@
         "to": "package.json"
       },
       {
+        "from": "cli/node_modules",
+        "to": "dist/node_modules",
+        "filter": [
+          "**/*",
+          "!**/*.map"
+        ]
+      },
+      {
         "from": "server",
         "to": "server",
+        "filter": [
+          "**/*",
+          "!**/*.map"
+        ]
+      },
+      {
+        "from": "server/node_modules",
+        "to": "server/node_modules",
         "filter": [
           "**/*",
           "!**/*.map"

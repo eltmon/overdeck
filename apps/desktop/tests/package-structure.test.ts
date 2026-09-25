@@ -226,4 +226,30 @@ describe("desktop packaging dependencies (PAN-4200)", () => {
     expect(script).not.toContain('tool: "notarytool"');
     expect(script).toContain("appleApiKey: APPLE_API_KEY");
   });
+
+  it("sets a path-safe build.executableName (electron-builder 26 rejects the scoped package name)", () => {
+    const pkg = readPkg();
+    const build = pkg.build as Record<string, unknown> | undefined;
+    expect(build?.executableName).toMatch(/^[a-zA-Z0-9._ -]+$/);
+  });
+
+  it("ships cli/node_modules and server/node_modules as their own extraResources entries", () => {
+    // electron-builder's file matcher special-cases a directory literally
+    // named "node_modules" sitting at the root of an extraResources "from"
+    // and silently drops it, so "cli" -> "dist" and "server" -> "server"
+    // alone never ship their node_modules. Each needs its own entry with
+    // "node_modules" as the "from" root instead of a child of it.
+    const pkg = readPkg();
+    const build = pkg.build as Record<string, unknown> | undefined;
+    const extraResources = build?.extraResources as
+      | Array<{ from?: string; to?: string }>
+      | undefined;
+
+    expect(extraResources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: "cli/node_modules", to: "dist/node_modules" }),
+        expect.objectContaining({ from: "server/node_modules", to: "server/node_modules" }),
+      ]),
+    );
+  });
 });
