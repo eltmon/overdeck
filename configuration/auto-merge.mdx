@@ -70,9 +70,13 @@ operator merges it (PAN-3973). For each one it checks, in order:
    a trusted reviewer's standing GitHub review approving that exact commit, so
    a repo without branch protection still qualifies. "Trusted" is the marker
    rule: `OWNER`, `MEMBER` or `COLLABORATOR`, or the identity Overdeck posts
-   as. With the GitHub App configured, an approving marker counts only from
-   the App's bot: agents hold the operator's `gh` credentials and could post
-   one as the owner. A review from any other account never counts, and each reviewer's
+   as. The App's bot is the installed App's own (`<slug>[bot]`, from the
+   `app-slug` file beside its credentials in `~/.overdeck/github-app/`, else
+   `GET /app`), matched as a GitHub `Bot` account, never by login alone. Its
+   reviews arrive as `CONTRIBUTOR` and count through that match. With the
+   GitHub App configured, an approving marker counts only from the App's bot:
+   agents hold the operator's `gh` credentials and could post one as the
+   owner. If the App's slug cannot be read, no bot approval counts. A review from any other account never counts, and each reviewer's
    latest review stands: a later "Request changes" or a dismissal withdraws an
    approval. An approval of an older commit, or a marker without `sha=`, never
    counts. A GitLab MR needs a named approver in `approved_by` (what

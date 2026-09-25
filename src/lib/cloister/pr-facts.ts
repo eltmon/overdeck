@@ -22,8 +22,23 @@ import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitl
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssue, type ResolvedProjectRepo } from '../project-repos.js';
 import { approvalProvenAtHead, recordReadApprovalAtHead } from './approval-at-head.js';
+import {
+  NO_TRUSTED_AUTHORS,
+  defaultAppBotLogin,
+  defaultOverdeckLogins,
+  defaultReadAuthorKinds,
+  isOverdeckIdentity,
+  normalizeLogin,
+  trustedAuthorsFrom,
+  withAuthorKinds,
+  type ForgeAuthor,
+  type ReadAuthorKinds,
+  type TrustedAuthors,
+} from './forge-identity.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestCheckName } from './verification-tests-mode.js';
+
+export type { ForgeAuthor, ReadAuthorKinds, TrustedAuthors } from './forge-identity.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -129,8 +144,14 @@ export interface PrFactsDeps {
    * whose association alone does not make it trusted.
    */
   overdeckLogins?: () => Promise<readonly string[]>;
-  /** #4066 review: the GitHub App's bot login, null without the App (`markerApproversFor`). */
+  /**
+   * #4066 review: the GitHub App's bot login (`<slug>[bot]`), null without
+   * the App; it throws when the App is configured but its slug is unknown
+   * (`markerApproversFor`).
+   */
   appBotLogin?: () => Promise<string | null>;
+  /** #4066 review (R3-2): the account type of comment authors, by comment node id. */
+  readAuthorKinds?: ReadAuthorKinds;
 }
 
 export interface PrFactsOptions {
@@ -312,15 +333,8 @@ type PrComment = NonNullable<IssuePullRequestData['comments']>[number];
 /** GitHub author associations whose comments carry verdicts (#4040 review). */
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
-/** The logins Overdeck posts as, lower-cased with any `[bot]` suffix dropped. */
-export type TrustedAuthors = ReadonlySet<string>;
-
-/** Who may approve by marker: any trusted author (no App), or these normalized logins. */
+/** Who may approve by marker: any trusted author (no App), or the App's bot (its slug). */
 type MarkerApprovers = 'any-trusted' | ReadonlySet<string>;
-
-function normalizeLogin(login: string): string {
-  return login.trim().toLowerCase().replace(/\[bot\]$/, '');
-}
 
 /**
  * Whether a comment may declare a verdict. The repository is public and anyone
@@ -331,15 +345,13 @@ function normalizeLogin(login: string): string {
 function isTrustedComment(comment: PrComment | undefined, trusted: TrustedAuthors): boolean {
   if (!comment) return false;
   if (TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))) return true;
-  const login = comment.author?.login;
-  return Boolean(login) && trusted.has(normalizeLogin(login!));
+  return isOverdeckIdentity(comment.author, trusted);
 }
 
-/** A trusted comment's marker counts, except an `APPROVED` one from outside `approvers`. */
+/** A trusted comment's marker counts, except an `APPROVED` one from other than the App's bot. */
 function markerCounts(comment: PrComment | undefined, verdict: MarkerVerdict, approvers: MarkerApprovers): boolean {
   if (verdict !== 'APPROVED' || approvers === 'any-trusted') return true;
-  const login = comment?.author?.login;
-  return Boolean(login) && approvers.has(normalizeLogin(login!));
+  return isOverdeckIdentity(comment?.author, { users: new Set(), bots: approvers });
 }
 
 function carriesMarker(comment: PrComment | undefined): boolean {
@@ -431,7 +443,7 @@ function approvalMarkerAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors,
 function gitHubFacts(
   issueId: string,
   pr: IssuePullRequestData,
-  trusted: TrustedAuthors = new Set(),
+  trusted: TrustedAuthors = NO_TRUSTED_AUTHORS,
   approvers: MarkerApprovers = new Set(),
 ): PrFacts {
   const state = normalize(pr.state);
@@ -608,44 +620,18 @@ export async function getPrFacts(
   return facts;
 }
 
-/**
- * The logins Overdeck posts verdicts as: the authenticated `gh` user and, when
- * the GitHub App is configured, its bot. Resolved once per process; an empty
- * answer (gh unreachable) is not cached, so the next read tries again.
- */
-let overdeckLoginsPromise: Promise<readonly string[]> | null = null;
-
-async function readOverdeckLogins(): Promise<readonly string[]> {
-  const logins: string[] = [];
-  try {
-    const { stdout } = await execFileAsync('gh', ['api', 'user', '--jq', '.login'], {
-      encoding: 'utf-8', timeout: 15_000,
-    });
-    if (stdout.trim()) logins.push(stdout.trim());
-  } catch {
-    // Not authenticated as a user (or offline): association alone decides.
-  }
-  try {
-    const { getBotIdentity, isGitHubAppConfigured } = await import('../github-app.js');
-    if (isGitHubAppConfigured()) logins.push(getBotIdentity().name);
-  } catch {
-    // No app configuration readable.
-  }
-  return logins;
-}
-
-async function defaultOverdeckLogins(): Promise<readonly string[]> {
-  overdeckLoginsPromise ??= readOverdeckLogins();
-  const logins = await overdeckLoginsPromise;
-  if (logins.length === 0) overdeckLoginsPromise = null;
-  return logins;
-}
-
 let warnedMarkerApprovalTrust = false;
 
-async function defaultAppBotLogin(): Promise<string | null> {
-  const { getBotIdentity, isGitHubAppConfigured } = await import('../github-app.js');
-  return isGitHubAppConfigured() ? getBotIdentity().name : null;
+/** Whether a marker comment's author is trusted only if it is one of Overdeck's identities. */
+function markerNeedsIdentity(comment: PrComment): boolean {
+  return carriesMarker(comment) && !TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation));
+}
+
+/** The PR with the account type of every marker author that needs one. */
+async function withCommentAuthorKinds(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<IssuePullRequestData> {
+  const comments = pr.comments ?? [];
+  if (!comments.some(markerNeedsIdentity)) return pr;
+  return { ...pr, comments: await withAuthorKinds(comments, markerNeedsIdentity, deps.readAuthorKinds ?? defaultReadAuthorKinds) };
 }
 
 /**
@@ -661,6 +647,7 @@ async function markerApproversFor(pr: IssuePullRequestData, deps: PrFactsDeps): 
   try {
     bot = await (deps.appBotLogin ?? defaultAppBotLogin)();
   } catch {
+    // The App is configured but its bot is unknown: no marker approves.
     return new Set();
   }
   if (bot) return new Set([normalizeLogin(bot)]);
@@ -674,14 +661,11 @@ async function markerApproversFor(pr: IssuePullRequestData, deps: PrFactsDeps): 
 
 /** Resolve Overdeck's own logins only when some marker's author needs it. */
 async function trustedAuthorsFor(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<TrustedAuthors> {
-  const needsIdentity = (pr.comments ?? []).some((comment) => (
-    carriesMarker(comment) && !TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))
-  ));
-  if (!needsIdentity) return new Set();
+  if (!(pr.comments ?? []).some(markerNeedsIdentity)) return NO_TRUSTED_AUTHORS;
   try {
-    return new Set((await (deps.overdeckLogins ?? defaultOverdeckLogins)()).map(normalizeLogin));
+    return trustedAuthorsFrom(await (deps.overdeckLogins ?? defaultOverdeckLogins)());
   } catch {
-    return new Set();
+    return NO_TRUSTED_AUTHORS;
   }
 }
 
@@ -690,7 +674,8 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
   try {
     const gh = await fetchGitHubPr(issueId, options.preferBranch ? { preferBranch: options.preferBranch } : {});
     if (gh.pr) {
-      return gitHubFacts(issueId, gh.pr, await trustedAuthorsFor(gh.pr, deps), await markerApproversFor(gh.pr, deps));
+      const pr = await withCommentAuthorKinds(gh.pr, deps);
+      return gitHubFacts(issueId, pr, await trustedAuthorsFor(pr, deps), await markerApproversFor(pr, deps));
     }
     if (gh.error) return emptyPrFacts(issueId, gh.error);
   } catch (cause) {
@@ -741,12 +726,17 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
   }
 }
 
-/** One GitHub review as `gh pr view --json reviews` reports it. */
+/**
+ * One GitHub review as `gh pr view --json reviews` reports it, with the
+ * author's account type (`__typename`) added where the trust rule needs it.
+ */
 export interface GitHubReviewRecord {
+  /** The review's GraphQL node id, by which its author's type is read. */
+  id?: string | null;
   state?: string;
   submittedAt?: string | null;
   authorAssociation?: string | null;
-  author?: { login?: string | null } | null;
+  author?: ForgeAuthor | null;
   commit?: { oid?: string } | null;
 }
 
@@ -758,21 +748,34 @@ export interface GitHubReviewsAtHead {
 
 export type ReadGitHubReviews = (repo: string, number: number) => Promise<GitHubReviewsAtHead>;
 
-async function defaultReadGitHubReviews(repo: string, number: number): Promise<GitHubReviewsAtHead> {
+/** Review states that are a verdict; `COMMENTED` and `PENDING` do not replace one. */
+const VERDICT_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED']);
+
+/** A verdict review trusted only if its author is one of Overdeck's identities. */
+function reviewNeedsIdentity(review: GitHubReviewRecord): boolean {
+  return VERDICT_REVIEW_STATES.has(normalize(review.state))
+    && !TRUSTED_ASSOCIATIONS.has(normalize(review.authorAssociation));
+}
+
+async function defaultReadGitHubReviews(
+  repo: string,
+  number: number,
+  readAuthorKinds: ReadAuthorKinds = defaultReadAuthorKinds,
+): Promise<GitHubReviewsAtHead> {
   const { stdout } = await execFileAsync(
     'gh',
     [
       'pr', 'view', String(number), '--repo', repo, '--json', 'headRefOid,reviews',
       '--jq',
-      '{headRefOid, reviews: [.reviews[] | {state, submittedAt, authorAssociation, author: {login: .author.login}, commit: {oid: .commit.oid}}]}',
+      '{headRefOid, reviews: [.reviews[] | {id, state, submittedAt, authorAssociation, author: {login: .author.login}, commit: {oid: .commit.oid}}]}',
     ],
     { encoding: 'utf-8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 },
   );
-  return JSON.parse(stdout) as GitHubReviewsAtHead;
+  const read = JSON.parse(stdout) as GitHubReviewsAtHead;
+  // #4066 review (R3-2): the review agent's verdicts are the App bot's
+  // reviews (`CONTRIBUTOR`), trusted only as a typed `Bot`.
+  return { ...read, reviews: await withAuthorKinds(read.reviews ?? [], reviewNeedsIdentity, readAuthorKinds) };
 }
-
-/** Review states that are a verdict; `COMMENTED` and `PENDING` do not replace one. */
-const VERDICT_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED']);
 
 /**
  * Whether a review may count toward a merge: the same rule verdict markers
@@ -782,8 +785,7 @@ const VERDICT_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISS
  */
 function isTrustedReview(review: GitHubReviewRecord, trusted: TrustedAuthors): boolean {
   if (TRUSTED_ASSOCIATIONS.has(normalize(review.authorAssociation))) return true;
-  const login = review.author?.login;
-  return Boolean(login) && trusted.has(normalizeLogin(login!));
+  return isOverdeckIdentity(review.author, trusted);
 }
 
 /**
@@ -802,7 +804,8 @@ function latestTrustedVerdicts(
     if (!VERDICT_REVIEW_STATES.has(normalize(review.state))) return;
     const login = review.author?.login;
     if (!login || !isTrustedReview(review, trusted)) return;
-    const key = normalizeLogin(login);
+    // A person and a bot may share a login; each is its own reviewer.
+    const key = `${review.author?.__typename ?? ''}:${normalizeLogin(login)}`;
     const parsed = Date.parse(review.submittedAt ?? '');
     const at = Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
     const current = latest.get(key);
@@ -848,16 +851,12 @@ export async function forgeApprovalAtHead(
     const reviews = read.reviews ?? [];
     // Overdeck's own logins are resolved only when some review's author is
     // not trusted by association alone.
-    const needsIdentity = reviews.some((review) => (
-      VERDICT_REVIEW_STATES.has(normalize(review.state))
-      && !TRUSTED_ASSOCIATIONS.has(normalize(review.authorAssociation))
-    ));
-    let trusted: TrustedAuthors = new Set();
-    if (needsIdentity) {
+    let trusted: TrustedAuthors = NO_TRUSTED_AUTHORS;
+    if (reviews.some(reviewNeedsIdentity)) {
       try {
-        trusted = new Set((await overdeckLogins()).map(normalizeLogin));
+        trusted = trustedAuthorsFrom(await overdeckLogins());
       } catch {
-        trusted = new Set();
+        trusted = NO_TRUSTED_AUTHORS;
       }
     }
     const standing = latestTrustedVerdicts(reviews, trusted);

@@ -308,7 +308,23 @@ on a PR, so a verdict marker counts only when its comment's author is `OWNER`,
 Overdeck posts verdicts as: the authenticated `gh` user or the GitHub App bot,
 resolved once per process and only when some marker needs it. Every other
 author's marker is ignored, whether it approves, requests changes, passes UAT
-or fails it. This applies to the `overdeck-verdict` review marker as well as the
+or fails it.
+
+**Overdeck's identities are matched as accounts, not logins (#4066 review,
+R3-2).** The App's bot is `<slug>[bot]`, with the slug read from the App
+itself: the `app-slug` file its setup writes to `~/.overdeck/github-app/`,
+else `GET /app` under the App's JWT (`resolveAppBotLogin`). Nothing hard-codes
+it. On this deployment it is `overdeck-agent[bot]`, and the review agent's
+verdicts are that bot's reviews, which GitHub reports as `CONTRIBUTOR`, so
+they count only through this identity rule. `gh pr view` reports only a
+login, and strips a bot's `[bot]` suffix, so the author's account type is read
+from GitHub's GraphQL API by the comment's or review's node id, for the
+authors that are not trusted by association. A bot entry matches only an
+author typed `Bot` with the App's slug, and the `gh` user only an author typed
+`User`, so a User account named after the slug is nobody. An author whose type
+cannot be read matches nothing. With the App configured and its slug
+unreadable, no bot is trusted and no marker approves; the next read tries
+again. This applies to the `overdeck-verdict` review marker as well as the
 UAT marker. A marker must stand on its own line (the review marker as the
 comment's first line); a quote-reply (`> <!-- … -->`) or a marker inside prose
 declares nothing.
@@ -317,8 +333,8 @@ declares nothing.
 `gh` credentials, which GitHub reports as `OWNER`, so any agent can post an
 `overdeck-verdict: APPROVED sha=<head>` comment. When the GitHub App is
 configured, an `APPROVED` review marker therefore counts only when the App's
-bot posted it (`getBotIdentity()`, compared without the `[bot]` suffix); a
-marker from any other author, the owner included, is skipped as if it were not
+bot posted it (a `Bot`-typed author with the App's slug, above); a marker
+from any other author, the owner included, is skipped as if it were not
 there. The review agent's verdict is normally a real review under the App's
 token, so this costs the normal path nothing; the one approval it loses is a
 verdict that fell back to a marker because the App token failed, which then

@@ -325,10 +325,25 @@ describe('forgeApprovalAtHead', () => {
     ]), overdeckLogins)).toBe(false);
   });
 
+  // #4066 review (R3-2): the review agent's verdict as PR 3976 carries it live,
+  // an App review by `overdeck-agent` with association CONTRIBUTOR.
+  const botApproval = (__typename?: string): Review => ({
+    state: 'APPROVED',
+    submittedAt: '2026-09-21T00:38:46Z',
+    authorAssociation: 'CONTRIBUTOR',
+    author: { login: 'overdeck-agent', ...(__typename ? { __typename } : {}) },
+    commit: { oid: HEAD },
+  });
+  const liveLogins = async () => ['eltmon', 'overdeck-agent[bot]'];
+
   it('counts an APPROVED review of the head from the identity Overdeck posts as', async () => {
-    expect(await forgeApprovalAtHead(facts, atHead([
-      { state: 'APPROVED', commit: { oid: HEAD }, author: { login: 'overdeck-app[bot]' }, authorAssociation: 'NONE' },
-    ]), async () => ['overdeck-app[bot]'])).toBe(true);
+    expect(await forgeApprovalAtHead(facts, atHead([botApproval('Bot')]), liveLogins)).toBe(true);
+  });
+
+  it("ignores an APPROVED review from a User account named after the App's slug (#4066 review, R3-2)", async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([botApproval('User')]), liveLogins)).toBe(false);
+    // An author whose account type is unknown is no one's identity.
+    expect(await forgeApprovalAtHead(facts, atHead([botApproval()]), liveLogins)).toBe(false);
   });
 
   it('ignores a review with no author login: it cannot be attributed', async () => {
