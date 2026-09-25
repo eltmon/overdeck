@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802_
+_Last sequenced: 2026-09-25T04:33:15.260Z · model: claude-opus-5-5 · open: 801_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -341,7 +341,6 @@ _Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802
 | 392 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 395 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -1117,10 +1116,10 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T02:32:55.628Z",
+  "generatedAt": "2026-09-25T04:33:15.260Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 802,
+  "openCount": 801,
   "nodes": [
     {
       "issue": "PAN-3930",
@@ -5305,19 +5304,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "dependsOn": [],
       "why": "Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard",
       "rationale": "The root-cause fix is on main with a regression test; what is left are two optional hardening follow-ups. Needs a re-scope to those.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3911",
-      "rank": 395,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify",
-      "rationale": "Triage: review-convoy re-dispatch is now one deacon-lite routine (recoverStalledReviews); verify pan pause against it specifically. Still a real token-spend hole; rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11705,13 +11691,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     {
       "from": "PAN-3957",
       "to": "PAN-3940",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3911",
-      "to": "PAN-3668",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
