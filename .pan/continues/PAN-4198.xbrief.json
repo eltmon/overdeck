@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4198",
   "created": "2026-09-25T06:47:47.581Z",
-  "updated": "2026-09-25T07:51:27.127Z",
+  "updated": "2026-09-25T07:55:52.338Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-09-25T07:51:13.236Z"
     },
     "wi-4-restart-dialog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4198",
-      "claimedAt": "2026-09-25T07:51:27.126Z"
+      "claimedAt": "2026-09-25T07:51:27.126Z",
+      "doneAt": "2026-09-25T07:55:52.338Z"
     }
   }
 }
