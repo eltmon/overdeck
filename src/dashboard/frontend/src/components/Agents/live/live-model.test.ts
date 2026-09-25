@@ -77,6 +77,12 @@ describe('classifyEntry — one case per precedence row', () => {
     expect(classifyEntry(subject, facts, NOW)).toMatchObject(expected);
   });
 
+  it('states a stuck idle age in minutes under an hour and days past two days', () => {
+    const stuck = { derived: derived({ attention: 'stuck' }) };
+    expect(classifyEntry(entry({ id: 'a', lastActivityAt: '2026-09-25T11:54:00.000Z' }), stuck, NOW).label).toBe('stuck · idle 6m');
+    expect(classifyEntry(entry({ id: 'a', lastActivityAt: '2026-09-22T12:00:00.000Z' }), stuck, NOW).label).toBe('stuck · idle 3d');
+  });
+
   it('applies derived issue facts only to the issue agent', () => {
     const conversation = entry({ id: 'conv:a', kind: 'conversation', role: null, state: 'idle' });
     expect(classifyEntry(conversation, { derived: derived({ state: 'ready' }) }, NOW).kind).toBe('idle');

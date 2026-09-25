@@ -13,8 +13,6 @@
  */
 import type { DerivedIssueState, DirectoryEntry } from '@overdeck/contracts';
 
-import { hoursSince } from '../directory/directory-state';
-
 export type LiveSection = 'needs-you' | 'live' | 'waiting';
 export type LiveTone = 'live' | 'needs-you' | 'stuck' | 'waiting';
 export type LiveReasonKind =
@@ -69,6 +67,16 @@ function isIssueAgent(entry: DirectoryEntry): boolean {
   return entry.kind === 'agent' && entry.issueId !== null && ISSUE_AGENT_ROLES.has(entry.role ?? '');
 }
 
+/** Compact idle age: minutes under an hour, hours under two days, else days. */
+function idleAge(iso: string | null, now: Date): string | null {
+  const at = iso ? Date.parse(iso) : Number.NaN;
+  if (!Number.isFinite(at)) return null;
+  const minutes = Math.max(0, Math.floor((now.getTime() - at) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+}
+
 function reason(kind: LiveReasonKind, section: LiveSection, tone: LiveTone, label: string, detail: string | null = null): LiveReason {
   return { kind, section, tone, label, detail };
 }
@@ -107,8 +115,8 @@ export function classifyEntry(entry: DirectoryEntry, facts: LiveFacts, now: Date
   if (entry.pause?.by === 'operator') return reason('paused', 'needs-you', 'needs-you', 'paused by you', entry.pause.reason);
   if (derived?.attention === 'api-error') return reason('api-error', 'needs-you', 'stuck', 'API error or usage limit');
   if (derived?.attention === 'stuck' && entry.state === 'idle') {
-    const hours = hoursSince(entry.lastActivityAt, now);
-    return reason('stuck', 'needs-you', 'stuck', hours === undefined ? 'stuck' : `stuck · idle ${hours}h`);
+    const age = idleAge(entry.lastActivityAt, now);
+    return reason('stuck', 'needs-you', 'stuck', age === null ? 'stuck' : `stuck · idle ${age}`);
   }
   if (derived?.state === 'ready') return reason('ready-to-merge', 'needs-you', 'needs-you', 'ready to merge');
   if (entry.state === 'working') return reason('working', 'live', 'live', activityLabel(facts.runtime));
