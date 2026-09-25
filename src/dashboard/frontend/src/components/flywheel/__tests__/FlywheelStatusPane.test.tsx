@@ -46,9 +46,12 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(screen.getByTestId('flywheel-freshness')).toHaveAttribute('data-tone', tone);
   });
 
-  it('idle empty state names pan flywheel start', () => {
+  it('idle empty state points at the conversation pane toolbar, not a button below (PAN-4199 ac1, ac2)', () => {
     render(<FlywheelStatusPane status={flywheelStatus({ run: 'idle', conversation: null, lastTick: null, freshness: null, inFlight: [] })} unreachable={false} nowMs={NOW} />);
-    expect(screen.getByText(/No flywheel running/)).toHaveTextContent('No flywheel running — pan flywheel start or Start below');
+    const title = screen.getByText(/No flywheel running/);
+    expect(title).toHaveTextContent("conversation pane's toolbar");
+    expect(title).toHaveTextContent('pan flywheel start');
+    expect(title).not.toHaveTextContent('Start below');
   });
 
   it('paused empty state points at Resume', () => {

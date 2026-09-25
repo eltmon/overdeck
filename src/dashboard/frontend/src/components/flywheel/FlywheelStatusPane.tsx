@@ -80,7 +80,7 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
 
       {status.run === 'idle' ? (
         <EmptyState
-          title={<>No flywheel running — <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs">pan flywheel start</code> or Start below</>}
+          title={<>No flywheel running — Start it from the conversation pane&apos;s toolbar, or run <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs">pan flywheel start</code></>}
           detail="Nothing is stored between runs: this pane fills in from the loop's tick markers once it starts."
         />
       ) : status.run === 'paused' ? (
