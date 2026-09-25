@@ -1,20 +1,20 @@
 {
   "xBRIEFInfo": {
     "version": "0.8",
-    "created": "2026-08-14T05:25:28.000Z",
+    "created": "2026-09-25T05:54:44Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-1641: Run agents on local GPU models via a managed Ollama sidecar (delta: review-cycle-2 blockers)",
-    "updated": "2026-08-14T05:33:47.021Z"
+    "description": "Plan for PAN-1641: Run agents on local GPU models via a managed Ollama sidecar",
+    "updated": "2026-09-25T06:02:16.606Z"
   },
   "plan": {
     "id": "pan-1641",
-    "title": "Run agents on local GPU models via a managed Ollama sidecar — review-cycle-2 delta",
+    "title": "Run agents on local GPU models via a managed Ollama sidecar",
     "status": "proposed",
-    "uid": "7e583334-8158-4421-b960-576d748c9bbc",
-    "author": "agent:k3[1m]",
-    "sequence": 3,
-    "created": "2026-08-14T05:25:28.000Z",
-    "updated": "2026-08-14T05:33:47.021Z",
+    "uid": "3425768a-212c-4147-8771-2cd9fcfcd871",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-25T05:54:44Z",
+    "updated": "2026-09-25T06:02:16.606Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1641",
@@ -22,153 +22,66 @@
         "type": "issue"
       },
       {
+        "uri": "/home/eltmon/Projects/overdeck/.pan/drafts/pan-1641.md",
+        "label": "PRD draft (.pan/drafts/pan-1641.md)",
+        "type": "prd"
+      },
+      {
         "uri": "https://github.com/eltmon/overdeck/issues/3684",
-        "label": "PAN-3684 acceptance spawn",
+        "label": "PAN-3684 acceptance vehicle",
         "type": "issue"
       }
     ],
     "tags": [
-      "ollama",
-      "pi",
-      "ohmypi",
       "local-models",
-      "review-delta"
+      "ollama",
+      "providers",
+      "claude-code",
+      "install",
+      "doctor"
     ],
-    "metadata": {
-      "sizeJustification": "The async-omp-provisioning item spans 9 generateLauncherScriptSync call sites because the review-prescribed fix (hoist provisioning out of the sync generator) is only safe as one atomic change: a partial hoist leaves some spawns unprovisioned and others double-provisioned. The remaining three items are small and separable but all gate the same review-cycle-2 unblock, so sibling issues would only add pipeline overhead.",
-      "canonicalFilename": "2026-08-14-PAN-1641-run-agents-on-local-gpu-models-via-a-managed-ollama-sidecar-review-cycle-2-delta.xbrief.json",
-      "promotionIntent": "automatic"
-    },
     "narratives": {
-      "Problem": "PAN-1641's implementation completed all 9 original xBRIEF items on 2026-08-13, but review cycle 2 (agent-pan-1641-review-6370a390) returned CHANGES REQUESTED with two blocking findings: (1) performance — provisionOhmypiProviderForModel does synchronous read/parse/rewrite of ~/.omp/agent/models.json inside generateLauncherScriptSync, which runs on the dashboard's long-lived Node event loop; (2) requirements — the E2E verification invoked omp directly instead of spawning a work agent through Overdeck, so AC 28/29 (Overdeck-spawned Pi agent on ollama:gemma4:12b with localhost-only, zero-cloud evidence) remain unproven. Three non-blocking findings ride along: unbounded response.json() in checkOllamaHealth, compounding health-probe retries (~189 s worst case), and a missing AC 19 regression test for the stopped-agent fresh-launch fallback.",
-      "Proposal": "Delta plan of four items. WI-1: replace sync provisioning with provisionOhmypiProviderForModelAsync (node:fs/promises), skip unchanged writes, serialize per registry path via a promise-chain map, hoist the call out of generateLauncherScriptSync into all 9 async call sites. WI-2: bound checkOllamaHealth's body read by the probe timeout, add a knownUnhealthy hint to ensureOllamaServeRunning, and replace the fixed-attempt retry loop with one overall 30 s startup deadline. WI-3: regression test pinning the AC 19 preflight-before-session-recreation ordering in messageAgent's stopped-agent fallback. WI-4: run the acceptance flow through the existing PAN-3684 spawn issue, record agent identity/launch path/result/localhost-only traffic/absent cloud credentials in docs/audits/pan-1641-local-ollama-verification.md, and close PAN-3684.",
-      "NonGoals": "- Re-planning or re-implementing the 9 completed PAN-1641 items (provider routing, lifecycle module, config, Pi env, install, doctor, docs)\n- Extending Ollama to the Claude Code or Codex harnesses (tracked in the follow-up issue named in PAN-1641)\n- A dashboard model picker for local Ollama tags (follow-up issue)\n- Generalizing openai-compatible-proxy.ts as an Anthropic-compatible shim (follow-up issue)\n- Refactoring launcher-generation call sites beyond the provisioning hoist\n- Changing the documented Gemma 4 12B default model or the ollama: model-ref syntax"
+      "Problem": "Overdeck agents can only run on cloud models. Operators with a 24 GB GPU (RTX 3090 Ti, Apple M4) want zero-cost, fully private agents on a local model such as Gemma 4 12B. The original plan targeted the Pi/ohmypi harness, which no longer exists as a runtime on main (pi folds into ohmypi, and ohmypi is being removed by PAN-4003).",
+      "Proposal": "Serve local models through Ollama (>= 0.14, verified 0.19.0 on this host) using its native Anthropic Messages endpoint, and run them on the claude-code harness with the existing ANTHROPIC_BASE_URL provider pattern. Model ids are ollama:<tag>; the prefix routes to a new ollama provider and is stripped at the single launch-arg door (apiLaunchModelId). A preflight in getProviderEnvForModel checks health, version, and model presence, starts ollama serve lazily, warm-loads the model, and pins Claude Code's context window to the server's real num_ctx. pan install detects Ollama and offers the gemma4:12b pull, pan doctor reports it, pan up starts it only when config names an ollama: model, and an Overdeck-spawned agent completes PAN-3684 with zero cloud model calls.",
+      "NonGoals": "- ohmypi / pi harness support or ~/.omp/agent/models.json provisioning (PAN-4003 removes ohmypi)\n- Codex --oss, opencode, kimi-code, acp, or muse on Ollama\n- Generalizing src/lib/openai-compatible-proxy.ts for Ollama\n- Dashboard model picker entries, a Settings provider card/toggle, or adding ollama to CONFIGURABLE_PROVIDERS\n- Remote (non-localhost) Ollama hosts and remote (Fly.io) workspaces with ollama: models\n- Gemma 3 support; DeepSeek V4 (route via OpenRouter)\n- Automatic Ollama installation (curl | sh) on any platform\n- Pricing rows or cost dashboards for local models (they record $0)\n- Hardcoded model fallback to gemma4:12b in model resolution\n- Changing the conversation-search embeddings path or ensureOllama() behavior\n- Merging the PAN-3684 acceptance PR"
     },
     "autoDecisions": [
       {
-        "summary": "Delta plan covering only the review-cycle-2 blocking findings plus the three adjacent non-blocking findings; the 9 completed items are not re-planned.",
-        "rationale": "The record shows every original item completed and inspectStatus passed; re-planning finished work would churn already-reviewed diffs. The two blocking findings are the precise reason the pipeline cannot advance."
+        "summary": "Run Ollama models on the claude-code harness instead of Pi.",
+        "rationale": "pi is not a runtime on main and ohmypi is being removed (PAN-4003). Ollama 0.19.0 here serves POST /v1/messages with streaming tool_use, and claude --print completed a turn against it, so the existing ANTHROPIC_BASE_URL provider pattern works with no shim."
       },
       {
-        "summary": "Provisioning fix follows the reviewer's prescribed shape: async fs/promises, hoisted before sync generation, unchanged-write skip, per-path serialization.",
-        "rationale": "The review gate owns this shape and will re-check it next cycle; a cheaper sync fast-path would also violate the repo's no-sync-I/O-in-server rule."
+        "summary": "Address local models as ollama:<tag> and strip the prefix in apiLaunchModelId.",
+        "rationale": "Matches PAN-3684 and the archived branch; tags can contain '/', so a colon namespace checked first avoids the OpenRouter slash heuristic; apiLaunchModelId is already the single launch-arg door for every --model flag."
       },
       {
-        "summary": "The sync provisionOhmypiProviderForModel is removed rather than kept alongside the async variant.",
-        "rationale": "All 9 generateLauncherScriptSync call sites sit inside async functions, so no caller needs the sync path; one door avoids drift between two provisioning implementations."
+        "summary": "Use a top-level ollama: YAML block (base_url, context_length) instead of models.providers.ollama.",
+        "rationale": "models.providers is keyed by CONFIGURABLE_PROVIDERS, which also drives the dashboard Settings union and tier-fitness warnings; the dashboard is follow-up scope and Ollama needs no key or enable toggle."
       },
       {
-        "summary": "E2E evidence runs through the existing PAN-3684 acceptance issue instead of a new ad-hoc acceptance flow.",
-        "rationale": "PAN-3684 was created on 2026-08-13 with its own xBRIEF for exactly this acceptance spawn; duplicating the vehicle would split the evidence trail."
+        "summary": "Pin Claude Code's context window to the context_length Ollama reports for the warm-loaded model; default server context 65536 when Overdeck starts ollama serve.",
+        "rationale": "Claude Code assumed 200K while the server enforced 32768 in the probe, and Ollama truncates silently; the server's own number is the only reliable source."
       },
       {
-        "summary": "The three non-blocking findings (body-read bound, startup deadline, AC 19 regression test) are included in this delta.",
-        "rationale": "Each is small, precisely specified by the review, and would otherwise resurface as next cycle's blocking findings."
+        "summary": "pan up starts Ollama only when the config names an ollama: model; install gives guidance and an optional pull (default No), never auto-installs.",
+        "rationale": "Avoids starting a GPU server on hosts that never opted in; commit 625bb71f62b blocked curl|sh auto-install on purpose."
+      },
+      {
+        "summary": "Run the E2E through PAN-3684 using the workspace-built CLI and kill the agent right after evidence capture.",
+        "rationale": "pan reload deploys origin/main, so the production dashboard cannot route ollama: ids before merge; the archived review rejected direct-binary evidence."
+      },
+      {
+        "summary": "Keep install/doctor/pan-up in this issue under plan.metadata.sizeJustification instead of splitting a sibling issue.",
+        "rationale": "The issue's acceptance criteria name pan install and pan up explicitly; the file count comes from per-slice tests, ratchet allowlist rows, and docs, not from a sprawling change."
       }
     ],
     "items": [
       {
-        "id": "async-omp-provisioning",
-        "title": "Make omp registry provisioning async, unchanged-skipping, and serialized; hoist it out of generateLauncherScriptSync",
+        "id": "ollama-lifecycle",
+        "title": "Add agent-facing Ollama health, start, and warm-load helpers",
         "status": "pending",
-        "priority": "high",
-        "created": "2026-08-14T05:25:28.000Z",
-        "metadata": {
-          "difficulty": "complex",
-          "kind": "backend",
-          "issueLabel": "pan-1641",
-          "requiresInspection": true,
-          "inspectionDepth": "fast",
-          "foundationFor": [
-            "e2e-overdeck-spawn-evidence"
-          ],
-          "files_scope": [
-            "src/lib/ohmypi-models.ts",
-            "src/lib/launcher-generator.ts",
-            "src/lib/runtimes/ohmypi.ts",
-            "src/lib/agents/messaging.ts",
-            "src/lib/agents/recovery.ts",
-            "src/lib/agents/spawn.ts",
-            "src/lib/cloister/inspect-agent.ts",
-            "src/lib/remote/remote-agents.ts",
-            "src/lib/planning/spawn-planning-session.ts",
-            "src/lib/runtime/claude.ts",
-            "src/lib/__tests__/ohmypi-models-ollama.test.ts",
-            "tests/lib/ohmypi-models.test.ts",
-            "src/lib/__tests__/launcher-generator.test.ts"
-          ],
-          "files_scope_confidence": "high",
-          "verify_commands": [
-            "npx vitest run src/lib/__tests__/ohmypi-models-ollama.test.ts tests/lib/ohmypi-models.test.ts src/lib/__tests__/launcher-generator.test.ts",
-            "npm run typecheck",
-            "grep -n \"provisionOhmypiProviderForModel\" src/lib/launcher-generator.ts || echo PROVISIONING-HOISTED"
-          ],
-          "expected_outputs": [
-            "all three named test files pass",
-            "typecheck completes without errors",
-            "grep prints PROVISIONING-HOISTED (no provisioning call left in the sync generator)"
-          ],
-          "readiness": "ready",
-          "parallelSafeReason": "Touches only the launcher-provisioning path and its call sites; the other wave-0 items edit disjoint files (src/lib/ollama.ts, provider-env.ts, a new test file), so this item runs in its own slot without conflicts.",
-          "traces": [
-            "FR-1",
-            "FR-2",
-            "FR-3",
-            "NFR-1"
-          ]
-        },
-        "narrative": {
-          "Action": "Replace the synchronous provisionOhmypiProviderForModel in src/lib/ohmypi-models.ts with an async version using node:fs/promises (readFile/mkdir/writeFile/rename; existence via readFile catch, not existsSync). Keep the corrupt-registry error text and the agentDir test hook. Skip the write entirely when the existing registry entry is deep-equal (node:util isDeepStrictEqual) to the computed def. Serialize updates per absolute registry path with a module-level Map<string, Promise<void>> promise chain (cleaned up in .finally); different paths run in parallel. Delete the provisioning block and import from src/lib/launcher-generator.ts (lines 6 and 247-253) and update its doc comment to state callers must await provisioning first. Update all 9 generateLauncherScriptSync call sites (src/lib/runtimes/ohmypi.ts:354, src/lib/agents/messaging.ts:360, src/lib/agents/recovery.ts:650, src/lib/agents/spawn.ts:382, src/lib/cloister/inspect-agent.ts:246, src/lib/remote/remote-agents.ts:622, src/lib/planning/spawn-planning-session.ts:697, src/lib/runtime/claude.ts:104, and the Effect wrapper at src/lib/launcher-generator.ts:905 — provisioning becomes an Effect.promise step before Effect.sync generation) to await provisionOhmypiProviderForModel(config.model) under the same harness === 'ohmypi' && model guard immediately before generation. Update src/lib/__tests__/ohmypi-models-ollama.test.ts and tests/lib/ohmypi-models.test.ts to async; add cases: unchanged entry produces no writeFile call; two concurrent calls with different providers both land; corrupt registry throws the same message. Add a launcher-generator test asserting generateLauncherScriptSync with an ohmypi+ollama config performs no registry write. Full step list and before/after snippet: .pan/drafts/PAN-1641.md WI-1."
-        },
-        "items": [
-          {
-            "id": "async-omp-provisioning.ac1",
-            "title": "src/lib/ohmypi-models.ts contains fs imports only from node:fs/promises, and its async provisionOhmypiProviderForModel returns Promise<void>",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "async-omp-provisioning.ac2",
-            "title": "generateLauncherScriptSync contains no provisioning call and no ohmypi-models import; all 9 former call sites await provisioning before generation (verified by grep)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "async-omp-provisioning.ac3",
-            "title": "a unit test proves an unchanged registry entry produces zero writeFile calls (no tmp file, no rename)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "async-omp-provisioning.ac4",
-            "title": "a unit test proves two concurrent provisioning calls for the same registry path both persist their providers (no lost update), and a corrupt existing models.json still throws the manual-fix error",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "async-omp-provisioning.ac5",
-            "title": "npm run typecheck exits without errors and each of the three named test files passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "bound-ollama-health-timeouts",
-        "title": "Bound Ollama health body reads and enforce one overall startup deadline",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-08-14T05:25:28.000Z",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
         "metadata": {
           "difficulty": "medium",
           "kind": "backend",
@@ -177,47 +90,57 @@
           "inspectionDepth": "fast",
           "files_scope": [
             "src/lib/ollama.ts",
-            "src/lib/agents/provider-env.ts",
-            "src/lib/__tests__/ollama.test.ts",
-            "src/lib/__tests__/provider-env-ollama.test.ts"
+            "src/lib/__tests__/ollama.test.ts"
           ],
           "files_scope_confidence": "high",
           "verify_commands": [
-            "npx vitest run src/lib/__tests__/ollama.test.ts src/lib/__tests__/provider-env-ollama.test.ts"
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/ollama.test.ts"
           ],
           "expected_outputs": [
-            "both named test files pass with fake-timer deadline coverage (no real 5s waits)"
+            "typecheck completes without errors",
+            "src/lib/__tests__/ollama.test.ts passes"
           ],
           "readiness": "ready",
           "traces": [
             "FR-4",
-            "FR-5",
-            "NFR-2"
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
           ]
         },
         "narrative": {
-          "Action": "In src/lib/ollama.ts: (1) checkOllamaHealth — keep the AbortController timeout armed through response.json() so the 5s probe budget covers headers AND body; on body timeout cancel the body and return the standard endpointReachable:false result. (2) ensureOllamaServeRunning — add a knownUnhealthy?: boolean option that skips the initial isOllamaHealthy probe; getProviderEnvForModel (src/lib/agents/provider-env.ts:48-49) passes knownUnhealthy:true because it just observed endpointReachable:false. (3) Replace the fixed maxHealthAttempts loop in waitForOllamaHealth with one overall startup deadline (default startupDeadlineMs 30_000): each attempt's probe timeout is min(OLLAMA_PROBE_TIMEOUT_MS, remaining budget), the 1s retry gap stays, connection-refused still retries fast, and expiry throws the same OllamaEnsureError. All new retry/deadline tests MUST use vi.useFakeTimers() + advanceTimersByTime (repo rule — never real waits). Details: .pan/drafts/PAN-1641.md WI-2."
+          "Action": "PRD WI-1. In src/lib/ollama.ts add and export DEFAULT_OLLAMA_AGENT_MODEL='gemma4:12b' (recommended pull target only, never a resolution fallback), MIN_OLLAMA_VERSION='0.14.0', OLLAMA_MODEL_PREFIX='ollama:', export the existing SAFE_OLLAMA_HOST_RE, stripOllamaPrefix(), isOllamaInstalled() (async spawn of `ollama --version`), checkOllamaHealth(tag, baseUrl, {fetchImpl, timeoutMs=5000}) returning {endpointReachable, version, versionSupported, modelPresent, message} with ONE AbortController bounding /api/version + /api/tags headers AND body, ensureOllamaServeRunning({baseUrl, contextLength, knownUnhealthy, deadlineMs=30000, fetchImpl, startServer, now, sleep}) that skips the pre-start probe when knownUnhealthy, starts `ollama serve` detached with OLLAMA_HOST and OLLAMA_CONTEXT_LENGTH env, and polls with per-attempt timeout min(5000, remaining) and 1000ms gaps until one overall deadline, and warmOllamaModel(tag, baseUrl) that POSTs /api/generate {model, prompt:''} (timeout 120000) then reads context_length for the tag from GET /api/ps. Keep ensureOllama() signature and behavior unchanged for the embeddings caller. No execSync, no sync fs. Tests use vi.useFakeTimers() + vi.advanceTimersByTimeAsync(); never real waits. Reference shape: `git show origin/archive/pan-1641-pre-cut:src/lib/ollama.ts`."
         },
         "items": [
           {
-            "id": "bound-ollama-health-timeouts.ac1",
-            "title": "a fake-timer test shows checkOllamaHealth returns endpointReachable:false within the 5s probe budget when the response body never arrives, and cancels the body",
+            "id": "ollama-lifecycle.ac1",
+            "title": "Given /api/tags returns headers but its body never resolves, when checkOllamaHealth runs, then it returns endpointReachable=false after 5000ms of fake time and aborts the request",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "bound-ollama-health-timeouts.ac2",
-            "title": "a test shows getProviderEnvForModel's ensure call skips the duplicate pre-start probe when knownUnhealthy is set",
+            "id": "ollama-lifecycle.ac2",
+            "title": "Given knownUnhealthy=true and a server that never becomes healthy, when ensureOllamaServeRunning runs, then it performs zero probes before calling startServer and rejects with an OllamaEnsureError after 30000ms of fake time",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "bound-ollama-health-timeouts.ac3",
-            "title": "a fake-timer test proves a stalled endpoint fails startup within the 30s overall deadline (not ~189s), while connection-refused retries at 1s cadence and succeeds once the endpoint is up",
+            "id": "ollama-lifecycle.ac3",
+            "title": "Given /api/version reports 0.13.5, when checkOllamaHealth runs, then it returns versionSupported=false and a message that contains 0.14.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-lifecycle.ac4",
+            "title": "Given /api/ps lists gemma4:12b with context_length 65536, when warmOllamaModel('gemma4:12b', baseUrl) runs, then it returns {contextLength: 65536}",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -226,11 +149,244 @@
         ]
       },
       {
-        "id": "preflight-fallback-regression-test",
-        "title": "Pin AC 19: regression test that the stopped-agent fresh-launch fallback preflights Ollama before session recreation",
+        "id": "ollama-config",
+        "title": "Normalize a top-level ollama: YAML block and list configured Ollama models",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-08-14T05:25:28.000Z",
+        "created": "2026-09-25T05:54:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/ollama.ts",
+            "src/lib/ollama-usage.ts",
+            "src/lib/config-yaml/__tests__/merge.test.ts",
+            "src/lib/__tests__/ollama-usage.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/lib/config-yaml/__tests__/merge.test.ts src/lib/__tests__/ollama-usage.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including scripts/lint-file-size.sh",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add YamlConfig.ollama?: {base_url?: string; context_length?: number} (next to terminal?: in schema.ts ~line 541) and NormalizedConfig.ollama: {baseUrl: string; contextLength: number} (next to terminal: ~line 790). DEFAULT_CONFIG.ollama = {baseUrl:'http://localhost:11434', contextLength:65536}. New src/lib/config-yaml/ollama.ts normalizeOllamaConfig(raw, current): strip trailing '/', reject base_url failing SAFE_OLLAMA_HOST_RE (imported from src/lib/ollama.ts) with 'config.yaml: ollama.base_url must be a localhost address (got: <value>)', reject non-integer or <2048 context_length. merge.ts: initialize result.ollama where terminal is initialized (~line 161) and apply per layer where terminal is merged (~line 445). New pure src/lib/ollama-usage.ts configuredOllamaModels(config) returning distinct 'ollama:' ids from workhorses values, roles[*].model (string or array entries' .model), roles[*].autonomousModel, roles[*].sub[*].model; it must not import config-yaml.ts (ESM cycle). schema.ts is over the 1000-line ceiling: add '<new line count> src/lib/config-yaml/schema.ts # PAN-1641' to scripts/file-size-allowlist.txt in the same commit."
+        },
+        "items": [
+          {
+            "id": "ollama-config.ac1",
+            "title": "Given a config.yaml with no ollama block, when the config loads, then config.ollama equals {baseUrl:'http://localhost:11434', contextLength:65536}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-config.ac2",
+            "title": "Given ollama.base_url https://example.com, when the config loads, then loading rejects with a message containing 'ollama.base_url must be a localhost address'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-config.ac3",
+            "title": "Given ollama.context_length 131072 in the user layer, when the config loads, then config.ollama.contextLength returns 131072 and baseUrl keeps the default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-config.ac4",
+            "title": "Given workhorses.mid is ollama:gemma4:12b and no role names another ollama id, when configuredOllamaModels runs, then it returns ['ollama:gemma4:12b']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-provider-routing",
+        "title": "Register the ollama provider and route ollama:<tag> ids to claude-code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1641",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/model-context-windows.ts",
+            "src/lib/harness-policy.ts",
+            "tests/unit/lib/providers.test.ts",
+            "src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/providers.test.ts src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "ollama-spawn-env",
+            "ollama-relaunch-preflight-test",
+            "ollama-e2e-acceptance"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add 'ollama' to ProviderName (providers.ts:15) and a PROVIDERS.ollama entry after quantumllama: displayName 'Ollama (local)', compatibility 'direct', defaultHarness 'claude-code', baseUrl 'http://localhost:11434' (NO /v1 — Claude Code appends /v1/messages), authType 'static', models [], tested true. Make `if (modelId.startsWith('ollama:')) return PROVIDERS.ollama;` the FIRST statement of getProviderForModel (before the Meta check and the includes('/') OpenRouter branch). Add 'ollama' to ModelProvider (model-fallback.ts:16) and make `if (modelId.startsWith('ollama:')) return 'ollama';` the first line of getModelProvider. In apiLaunchModelId (model-context-windows.ts:99) strip the literal 'ollama:' prefix first (do not import ollama.ts there). In canUseHarness (harness-policy.ts) after the Muse block return {allowed:false, reason:'Local Ollama models (ollama:<tag>) run on the claude-code harness in this release. Select claude-code.'} when providerName==='ollama' && harness!=='claude-code'. Do not add an ollama branch to getProviderEnv. Add tests including shellQuoteModelId and a null-pricing case: getPricing on normalizeModelName('gemma4:12b') returns null (local runs record $0)."
+        },
+        "items": [
+          {
+            "id": "ollama-provider-routing.ac1",
+            "title": "Given the id ollama:hf.co/org/model-GGUF:Q4_K_M, when getProviderForModel runs, then it returns the provider named ollama instead of openrouter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-provider-routing.ac2",
+            "title": "Given the id ollama:gemma4:12b, when shellQuoteModelId runs, then it returns the quoted bare tag 'gemma4:12b'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-provider-routing.ac3",
+            "title": "Given an ollama:gemma4:12b model, when canUseHarness is called with codex, then it returns allowed=false with a reason naming claude-code, and with claude-code it returns allowed=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-provider-routing.ac4",
+            "title": "Given the transcript model gemma4:12b, when normalizeModelName and getPricing run, then getPricing returns null so the cost parser records 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-spawn-env",
+        "title": "Run the Ollama preflight and build the claude-code launch env",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1641",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/provider-env.ts",
+            "src/lib/agents/ollama-launch-env.ts",
+            "src/lib/agents/__tests__/ollama-launch-env.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/ollama-launch-env.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "src/lib/agents/__tests__/ollama-launch-env.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "ollama-relaunch-preflight-test",
+            "ollama-e2e-acceptance"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. New src/lib/agents/ollama-launch-env.ts getOllamaLaunchEnv(model, {baseUrl, contextLength}): tag=stripOllamaPrefix(model); checkOllamaHealth; if unreachable call ensureOllamaServeRunning({baseUrl, contextLength, knownUnhealthy:true}) once and re-check; throw health.message when unreachable, version unsupported, or tag missing; warmOllamaModel -> contextLength; return EXACTLY {ANTHROPIC_BASE_URL: baseUrl, ANTHROPIC_AUTH_TOKEN:'ollama', ANTHROPIC_DEFAULT_OPUS_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL, ANTHROPIC_DEFAULT_HAIKU_MODEL, ANTHROPIC_SMALL_FAST_MODEL, CLAUDE_CODE_SUBAGENT_MODEL (all = tag), API_TIMEOUT_MS:'600000', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:'1', CLAUDE_CODE_MAX_CONTEXT_TOKENS and CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(contextLength)}. In provider-env.ts right after `const { config } = loadYamlConfig();` (line 43) return getOllamaLaunchEnv(model, config.ollama) when provider.name==='ollama'. Make getClaudeCodeContextPolicyForModel return {} for the ollama provider (pins come from the env; no duplicate export lines). Do NOT add CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC to PROVIDER_ENV_KEYS (provider-env.ts:100) or src/lib/child-env.ts:24: those lists unset/blank the key for every launch and would re-enable Claude Code telemetry for non-Ollama agents of an operator who sets it globally. It is an Ollama-only export. No execSync, no sync fs."
+        },
+        "items": [
+          {
+            "id": "ollama-spawn-env.ac1",
+            "title": "Given a healthy server with gemma4:12b loaded at context 65536, when getProviderEnvForModel('ollama:gemma4:12b','claude-code') runs, then it returns exactly the eleven D4 keys with ANTHROPIC_BASE_URL http://localhost:11434 and no ANTHROPIC_API_KEY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-spawn-env.ac2",
+            "title": "Given the endpoint is unreachable, when getProviderEnvForModel runs, then ensureOllamaServeRunning is called exactly once with knownUnhealthy true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-spawn-env.ac3",
+            "title": "Given the tag is absent from /api/tags, when getProviderEnvForModel runs, then it rejects with a message containing 'ollama pull gemma4:12b'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-spawn-env.ac4",
+            "title": "Given an ollama model, when getProviderExportsForModel runs, then the export text contains exactly one 'export CLAUDE_CODE_MAX_CONTEXT_TOKENS=' line and one 'export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=\"1\"' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-relaunch-preflight-test",
+        "title": "Pin preflight-before-session ordering in the messageAgent relaunch fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
         "metadata": {
           "difficulty": "simple",
           "kind": "test",
@@ -238,36 +394,36 @@
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "files_scope": [
-            "src/lib/agents/messaging.ts",
-            "tests/unit/lib/agents/messaging-ollama-preflight.test.ts"
+            "tests/unit/lib/agents/messaging-ollama-preflight.test.ts",
+            "src/lib/agents/messaging.ts"
           ],
           "files_scope_confidence": "medium",
           "verify_commands": [
             "npx vitest run tests/unit/lib/agents/messaging-ollama-preflight.test.ts"
           ],
           "expected_outputs": [
-            "the new regression test passes, and fails if the preflight is moved after createSession"
+            "tests/unit/lib/agents/messaging-ollama-preflight.test.ts passes"
           ],
           "readiness": "ready",
           "traces": [
-            "FR-6"
+            "FR-12"
           ]
         },
         "narrative": {
-          "Action": "Add tests/unit/lib/agents/messaging-ollama-preflight.test.ts driving the messageAgent() stopped-agent fresh-launch fallback (src/lib/agents/messaging.ts, block starting ~line 330) with agentState.model = 'ollama:gemma4:12b'. Mock the provider-env module boundary (checkOllamaHealth/ensureOllamaServeRunning via getProviderEnvForModel) and createSession; assert the Ollama preflight resolves before createSession is invoked, and that a failing preflight aborts the fallback without creating a session. Code reading suggests the ordering already holds (getProviderExportsForModel awaited at messaging.ts:331 precedes createSession at ~line 377, and it routes through getProviderEnvForModel's Ollama preflight at provider-env.ts:45-56). Decision rule: if the test exposes wrong ordering, hoist the preflight above the session-recreation block in messaging.ts — fix the ordering, never weaken the test. Details: .pan/drafts/PAN-1641.md WI-3."
+          "Action": "PRD WI-5. Add tests/unit/lib/agents/messaging-ollama-preflight.test.ts for the stopped-agent fresh-launch fallback in messageAgent() (src/lib/agents/messaging.ts; preflight calls at ~lines 403 and 416, launcher at ~438). Reference: `git show origin/archive/pan-1641-pre-cut:tests/unit/lib/agents/messaging-ollama-preflight.test.ts`, adapted to current main mocks. Decision rule: if the test exposes wrong ordering, move the preflight above session recreation in messaging.ts; never weaken the test. messaging.ts is in files_scope only for that case."
         },
         "items": [
           {
-            "id": "preflight-fallback-regression-test.ac1",
-            "title": "the new test proves createSession is called only after the Ollama preflight resolves in the stopped-agent fallback",
+            "id": "ollama-relaunch-preflight-test.ac1",
+            "title": "Given a stopped agent on ollama:gemma4:12b and a preflight that rejects, when messageAgent takes the fresh-launch fallback, then the test observes zero terminal session-create calls and the call rejects with the preflight error",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "preflight-fallback-regression-test.ac2",
-            "title": "the new test proves a failing preflight (endpoint down or model missing) rejects the fallback and createSession is never called",
+            "id": "ollama-relaunch-preflight-test.ac2",
+            "title": "Given a preflight that resolves, when messageAgent takes the fallback, then the recorded call order is preflight, then launcher generation, then session create",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -276,13 +432,286 @@
         ]
       },
       {
-        "id": "e2e-overdeck-spawn-evidence",
-        "title": "Record Overdeck-spawned Pi work-agent E2E evidence (AC 28/29) via PAN-3684 and close it",
+        "id": "ollama-install-step",
+        "title": "Add Ollama detection, guidance, and optional gemma4:12b pull to pan install",
         "status": "pending",
-        "priority": "high",
-        "created": "2026-08-14T05:25:28.000Z",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
         "metadata": {
           "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/install-ollama.ts",
+            "src/cli/commands/install.ts",
+            "src/cli/commands/__tests__/install-ollama.test.ts",
+            "sync-sources/skills/pan-install/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/cli/commands/__tests__/install-ollama.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including scripts/lint-skills.sh",
+            "install-ollama.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New src/cli/commands/install-ollama.ts exporting getOllamaInstallGuidance(platform) (linux/wsl: `curl -fsSL https://ollama.com/install.sh | sh`; darwin: `brew install ollama` or https://ollama.com/download/mac) and setupOllamaForInstall({skip, platform, spinner, isTty, detectInstalled?, confirmPull?, pullModel?}). Skip -> spinner.info only. Missing -> spinner.warn with guidance; never execute an installer. Installed + TTY -> inquirer confirm (default No) to pull DEFAULT_OLLAMA_AGENT_MODEL via execFileSync('ollama',['pull',tag],{stdio:'inherit',timeout:1_800_000}); failed pull = spinner.warn. Installed + non-TTY -> print 'ollama pull gemma4:12b'. install.ts: add .option('--skip-ollama', 'Skip Ollama local-model detection and optional gemma4:12b pull') after --skip-herdr (line 44), skipOllama?: boolean after line 55, one call before '// Step 5d: Build Moonshine' (line 443) passing isTty: Boolean(process.stdin.isTTY). Same commit: document the step and flag in sync-sources/skills/pan-install/SKILL.md and run `npm run generate:slash-commands` to regenerate packages/contracts/src/composer-commands.generated.ts."
+        },
+        "items": [
+          {
+            "id": "ollama-install-step.ac1",
+            "title": "Given skip=true, when setupOllamaForInstall runs, then it emits one info line and never calls detectInstalled or pullModel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-install-step.ac2",
+            "title": "Given Ollama is missing on linux, when setupOllamaForInstall runs, then it emits a warning containing 'https://ollama.com/install.sh' and runs no command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-install-step.ac3",
+            "title": "Given Ollama is installed, stdin is not a TTY, when setupOllamaForInstall runs, then it never prompts and prints 'ollama pull gemma4:12b'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-install-step.ac4",
+            "title": "Given the built CLI, when `pan install --help` runs, then its output lists --skip-ollama and npm run lint exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-doctor-check",
+        "title": "Report Ollama install, health, models, and context length in pan doctor",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-ollama.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-ollama.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/cli/commands/__tests__/doctor-ollama.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including scripts/lint-file-size.sh",
+            "doctor-ollama.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New src/cli/commands/doctor-ollama.ts checkOllama({config, detectInstalled?, checkHealth?, fetchImpl?}): models=configuredOllamaModels(config). No models and not installed -> []. Not installed but models configured -> warn with install guidance. Unreachable -> warn 'start it with `ollama serve`'. Version < 0.14.0 -> fail. Each configured tag missing -> warn '`ollama pull <tag>`'. Healthy -> ok with version and base URL. GET /api/ps lists a configured tag with context_length < 65536 -> warn naming OLLAMA_CONTEXT_LENGTH=65536. Never warm-load. doctor.ts: one call after `for (const c of await checkKimi()) checks.push(c);` (line 770) plus the import; doctor.ts is over 1000 lines, so add '<new line count> src/cli/commands/doctor.ts # PAN-1641' to scripts/file-size-allowlist.txt in the same commit."
+        },
+        "items": [
+          {
+            "id": "ollama-doctor-check.ac1",
+            "title": "Given no ollama: models configured and no ollama binary, when checkOllama runs, then it returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-doctor-check.ac2",
+            "title": "Given ollama:gemma4:12b configured and an unreachable endpoint, when checkOllama runs, then it returns a warn row whose fix contains 'ollama serve'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-doctor-check.ac3",
+            "title": "Given /api/ps reports gemma4:12b loaded with context_length 32768, when checkOllama runs, then it returns a warn row naming OLLAMA_CONTEXT_LENGTH=65536",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-doctor-check.ac4",
+            "title": "Given version 0.13.0 is reported, when checkOllama runs, then it returns a fail row naming 0.14.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-pan-up-ensure",
+        "title": "Start ollama serve during pan up only when the config names an ollama: model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/up-ollama.ts",
+            "src/cli/index.ts",
+            "src/cli/commands/__tests__/up-ollama.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/cli/commands/__tests__/up-ollama.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes including scripts/lint-file-size.sh",
+            "up-ollama.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. New src/cli/commands/up-ollama.ts ensureOllamaForUp(config, deps?) -> 'not-configured'|'running'|'started'|'failed': empty configuredOllamaModels(config) -> 'not-configured' with zero network calls; else checkOllamaHealth and, if unreachable, ensureOllamaServeRunning({baseUrl, contextLength, knownUnhealthy:true}); print a green check line or a yellow warning; never throw. src/cli/index.ts: one line in the pan up action after `console.log(chalk.bold('Starting Overdeck...\\n'));` (line 639) calling it with loadConfigSync().config via dynamic imports; index.ts is over 1000 lines, so add '<new line count> src/cli/index.ts # PAN-1641' to scripts/file-size-allowlist.txt in the same commit."
+        },
+        "items": [
+          {
+            "id": "ollama-pan-up-ensure.ac1",
+            "title": "Given no ollama: models in config, when ensureOllamaForUp runs, then it returns 'not-configured' and the injected fetch is called zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-pan-up-ensure.ac2",
+            "title": "Given a configured ollama model and an unreachable endpoint, when ensureOllamaForUp runs, then ensureOllamaServeRunning is called once with knownUnhealthy true and the result is 'started'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-pan-up-ensure.ac3",
+            "title": "Given ensureOllamaServeRunning rejects, when ensureOllamaForUp runs, then it returns 'failed' and prints a warning instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-docs",
+        "title": "Document local models: install, pull, context length, config, and run",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/local-models.mdx",
+            "docs.json",
+            "configuration/harnesses.mdx",
+            "docs/CONFIGURATION.md",
+            "docs/MODEL_ROUTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const d=JSON.stringify(require('./docs.json'));if(!d.includes('configuration/local-models'))process.exit(1)\"",
+            "grep -c 'OLLAMA_CONTEXT_LENGTH' configuration/local-models.mdx"
+          ],
+          "expected_outputs": [
+            "the docs.json check exits 0",
+            "grep reports at least 1 match"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. New Mintlify page configuration/local-models.mdx 'Local models (Ollama)' with sections: requirements (Ollama >= 0.14.0; RTX 3090 Ti 24 GB CUDA and Apple M4 24 GB Metal notes; gemma4:12b ~8 GB at Q4), install (Linux curl install.sh, macOS brew/app, pan install detection, --skip-ollama), pull (`ollama pull gemma4:12b`), context length (silent truncation; OLLAMA_CONTEXT_LENGTH=65536; systemd `systemctl edit ollama` Environment line; macOS `launchctl setenv OLLAMA_CONTEXT_LENGTH 65536`), configure ~/.overdeck/config.yaml (roles.work.model: ollama:gemma4:12b or a workhorse; optional top-level ollama: {base_url, context_length}), run (`pan start <issue> --model ollama:gemma4:12b`, preflight errors, pan doctor rows, pan up behavior), limits (claude-code only, localhost only, local workspaces only — not --remote/Fly.io, $0 cost, codex/opencode/dashboard picker are future work). docs.json: add 'configuration/local-models' right after 'configuration/harnesses' (line 103). configuration/harnesses.mdx: short 'Local models through Ollama' paragraph under '### Claude Code (default)' linking /configuration/local-models. docs/CONFIGURATION.md: the top-level ollama: block (keys, defaults, localhost rule). docs/MODEL_ROUTING.md: ollama:<tag> -> ollama provider -> claude-code routing."
+        },
+        "items": [
+          {
+            "id": "ollama-docs.ac1",
+            "title": "Given the docs build config, when docs.json is read, then its navigation lists configuration/local-models directly after configuration/harnesses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-docs.ac2",
+            "title": "Given configuration/local-models.mdx, when a reader opens it, then it shows the commands `ollama pull gemma4:12b` and `pan start <issue> --model ollama:gemma4:12b` and the OLLAMA_CONTEXT_LENGTH setup for both systemd and macOS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-docs.ac3",
+            "title": "Given docs/CONFIGURATION.md, when a reader looks up the ollama block, then it shows base_url and context_length with defaults http://localhost:11434 and 65536 and states that non-localhost URLs are rejected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-e2e-acceptance",
+        "title": "Verify an Overdeck-spawned claude-code agent completes PAN-3684 on local gemma4:12b",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:54:44Z",
+        "metadata": {
+          "difficulty": "complex",
           "kind": "test",
           "issueLabel": "pan-1641",
           "requiresInspection": false,
@@ -290,54 +719,54 @@
           "files_scope": [
             "docs/audits/pan-1641-local-ollama-verification.md"
           ],
-          "files_scope_confidence": "high",
+          "files_scope_confidence": "medium",
           "verify_commands": [
-            "gh issue view 3684 --repo eltmon/overdeck --json state --jq .state",
-            "grep -n \"Overdeck-spawned agent verification\" docs/audits/pan-1641-local-ollama-verification.md",
-            "git log --all --oneline -- LOCAL_OLLAMA_OK.txt"
+            "npm run build",
+            "node dist/cli/index.js start PAN-3684 --model ollama:gemma4:12b --harness claude-code",
+            "test -s docs/audits/pan-1641-local-ollama-verification.md"
           ],
           "expected_outputs": [
-            "gh prints CLOSED",
-            "grep finds the new audit section naming the agent id and pushed commit SHA",
-            "git log lists the acceptance commit that created LOCAL_OLLAMA_OK.txt"
+            "build completes",
+            "the PAN-3684 agent pushes LOCAL_OLLAMA_OK.txt containing LOCAL_OK",
+            "the audit file exists and is non-empty"
           ],
-          "readiness": "ready",
+          "readiness": "sequential",
           "traces": [
-            "FR-7",
-            "NFR-3"
+            "FR-10",
+            "NFR-5"
           ]
         },
         "narrative": {
-          "Action": "Implementation checkpoint (live verification): run the acceptance flow through the existing PAN-3684 issue rather than a direct omp invocation. Preconditions: ollama installed, gemma4:12b pulled (ollama list), GPU free — if any fails, stop and report the blocker; never fake or transcribe evidence from a direct-omp run. Steps: (1) pan start 3684 — its xBRIEF spawns a Pi work agent with model ollama:gemma4:12b that creates LOCAL_OLLAMA_OK.txt containing exactly LOCAL_OK, commits, pushes, and runs pan task done. (2) Watch it to completion (pan show 3684, tmux capture); record the agent id, the spawn path (pan start → workspace → launcher), and the pushed commit SHA. (3) Capture on the spawned agent: env shows OPENAI_BASE_URL=http://localhost:11434/v1 and no ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN/ANTHROPIC_API_KEY; localhost-only model traffic via strace-connect summary or /proc socket check for the omp process (loopback :11434, no api.anthropic.com/api.openai.com connections) — the audit's existing direct-run section demonstrates the strace technique. (4) Add an 'Overdeck-spawned agent verification (AC 28/29)' section to docs/audits/pan-1641-local-ollama-verification.md with agent identity, launch path, result, and both evidence captures; keep the direct-omp section as supporting evidence. (5) Close PAN-3684 with a comment linking the audit section. Details: .pan/drafts/PAN-1641.md WI-4."
+          "Action": "PRD WI-10 (implementation checkpoint; follow its decision rules exactly). 1) npm run build in this workspace; confirm ollama >= 0.14.0; `ollama pull gemma4:12b`. 2) `gh issue edit 3684 --repo eltmon/overdeck` to replace 'Pi work agent' with 'claude-code work agent'. 3) From this workspace run `node dist/cli/index.js start PAN-3684 --model ollama:gemma4:12b --harness claude-code` (the production dashboard runs origin/main and cannot route ollama: ids before merge). Planning-time `pan start PAN-3684 --dry-run` found the existing workspace workspaces/feature-pan-3684 and its 1-item plan with no gate; if start refuses on a gate, `pan tell flywheel-orchestrator` with the message and stop — never pass --force. 4) Capture: the agent's launcher.sh exports (localhost ANTHROPIC_BASE_URL, no ANTHROPIC_API_KEY); `strace -f -e trace=connect -p <claude pid> -o <file>` (fallback: poll `ss -tnpH` every 1s for the claude process tree); `ollama ps`. 5) Confirm LOCAL_OLLAMA_OK.txt (LOCAL_OK) is committed and pushed on feature/pan-3684 and pan task done ran. 6) Kill the agent with `node dist/cli/index.js kill PAN-3684` immediately after evidence capture; under Herdr also check `herdr pane list` and `herdr pane close <id>` any leftover PAN-3684 pane (PAN-3966); close its PR unmerged. Never run pan reload/pan restart while the E2E agent's state row exists. This is the first real test of the tool_result round-trip through Ollama's shim (the planning probe only proved tool_use emission). 7) Write docs/audits/pan-1641-local-ollama-verification.md (date, GPU, Ollama version, model, context length, launch command, env excerpt, connection summary attributing every non-loopback connection to its process, LOCAL_OLLAMA_OK.txt commit SHA, first-turn input tokens). 8) Comment on PAN-3684 linking the audit, then close it. Checkpoints: non-loopback connection from the claude process -> add the matching documented Claude Code disable env var (DISABLE_TELEMETRY, DISABLE_ERROR_REPORTING, DISABLE_AUTOUPDATER, CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY) to the ollama-launch-env env and PROVIDER_ENV_KEYS, rebuild, re-run; if none applies, record it and `pan tell flywheel-orchestrator`. Context overflow at 65536 -> set the server's OLLAMA_CONTEXT_LENGTH to 131072, re-run, record both. gemma4:12b fails the tool loop twice -> record the transcript tail and `pan tell`; never switch models silently. Agent git pushes to GitHub are expected and listed."
         },
         "items": [
           {
-            "id": "e2e-overdeck-spawn-evidence.ac1",
-            "title": "the audit doc's new section records the Overdeck agent id, the pan start launch path, and the pushed LOCAL_OLLAMA_OK.txt commit SHA",
+            "id": "ollama-e2e-acceptance.ac1",
+            "title": "Given the workspace-built CLI and a pulled gemma4:12b, when PAN-3684 is started with --model ollama:gemma4:12b, then the claude-code agent commits and pushes LOCAL_OLLAMA_OK.txt containing LOCAL_OK and records pan task done",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "e2e-overdeck-spawn-evidence.ac2",
-            "title": "the section records the spawned agent's env: OPENAI_BASE_URL points at localhost:11434/v1 and no ANTHROPIC_* credentials are present",
+            "id": "ollama-e2e-acceptance.ac2",
+            "title": "Given the running PAN-3684 agent, when its launcher.sh is read, then it exports ANTHROPIC_BASE_URL=http://localhost:11434 and contains no ANTHROPIC_API_KEY export",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "e2e-overdeck-spawn-evidence.ac3",
-            "title": "the section records localhost-only traffic evidence (loopback :11434 connections, no api.anthropic.com or api.openai.com connections) for the Overdeck-spawned process",
+            "id": "ollama-e2e-acceptance.ac3",
+            "title": "Given the connection capture of the claude process tree, when the audit lists every non-loopback connection with its process, then none belongs to the claude process",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "e2e-overdeck-spawn-evidence.ac4",
-            "title": "PAN-3684 closes with a comment linking the audit section",
+            "id": "ollama-e2e-acceptance.ac4",
+            "title": "Given the evidence is recorded in docs/audits/pan-1641-local-ollama-verification.md, when the item completes, then PAN-3684 is closed with a comment linking the audit and its agent is stopped",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -348,26 +777,71 @@
     ],
     "edges": [
       {
-        "from": "async-omp-provisioning",
-        "to": "preflight-fallback-regression-test",
+        "from": "ollama-lifecycle",
+        "to": "ollama-config",
         "type": "blocks"
       },
       {
-        "from": "async-omp-provisioning",
-        "to": "e2e-overdeck-spawn-evidence",
+        "from": "ollama-lifecycle",
+        "to": "ollama-spawn-env",
         "type": "blocks"
       },
       {
-        "from": "bound-ollama-health-timeouts",
-        "to": "e2e-overdeck-spawn-evidence",
+        "from": "ollama-config",
+        "to": "ollama-spawn-env",
         "type": "blocks"
       },
       {
-        "from": "preflight-fallback-regression-test",
-        "to": "e2e-overdeck-spawn-evidence",
-        "type": "informs"
+        "from": "ollama-provider-routing",
+        "to": "ollama-spawn-env",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-spawn-env",
+        "to": "ollama-relaunch-preflight-test",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-lifecycle",
+        "to": "ollama-install-step",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-lifecycle",
+        "to": "ollama-doctor-check",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-config",
+        "to": "ollama-doctor-check",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-lifecycle",
+        "to": "ollama-pan-up-ensure",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-config",
+        "to": "ollama-pan-up-ensure",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-doctor-check",
+        "to": "ollama-pan-up-ensure",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-spawn-env",
+        "to": "ollama-e2e-acceptance",
+        "type": "blocks"
       }
-    ]
+    ],
+    "metadata": {
+      "sizeJustification": "PAN-1641's own acceptance criteria require the provider/preflight, pan install, pan doctor, pan up, docs, and an E2E in one issue, and splitting them would ship an Ollama provider with no setup path. The ~39-file surface is driven by one new test file per slice, one-line call sites in ratcheted files (src/cli/index.ts, doctor.ts, schema.ts) with their allowlist rows, the skills/composer lockstep pair, and five doc files. Logic lives in eight new small modules. The plan is already 10 vertical items with a DAG that lets install, doctor, provider routing, and docs run in parallel slots.",
+      "canonicalFilename": "2026-09-25-PAN-1641-run-agents-on-local-gpu-models-via-a-managed-ollama-sidecar.xbrief.json",
+      "promotionIntent": "automatic"
+    }
   },
   "status": "proposed"
 }
