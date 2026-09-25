@@ -115,13 +115,12 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureBadge_stopped: 'featureBadge_stopped',
     featureBadge_error: 'featureBadge_error',
     featureActivityError: 'featureActivityError',
-    featureState: 'featureState',
-    featureState_done: 'featureState_done',
-    featureState_progress: 'featureState_progress',
-    featureState_review: 'featureState_review',
-    featureState_context: 'featureState_context',
-    featureState_planning: 'featureState_planning',
-    featureState_todo: 'featureState_todo',
+    featureStateBadge: 'featureStateBadge',
+    featureStateBadge_rest: 'featureStateBadge_rest',
+    featureStateBadge_machine: 'featureStateBadge_machine',
+    featureStateBadge_specialist: 'featureStateBadge_specialist',
+    featureStateBadge_human: 'featureStateBadge_human',
+    featureStateBadge_outcome: 'featureStateBadge_outcome',
     featureCost: 'featureCost',
     featureResourceStrip: 'featureResourceStrip',
     featureResourceIcon: 'featureResourceIcon',
@@ -595,40 +594,43 @@ describe('FeatureItem', () => {
     expect(screen.getByText('✕ review')).toHaveAttribute('title', 'Review pipeline has 1 failing session. Affected roles: security.');
   });
 
-  it('applies the colored kanban state pill class', () => {
+  it('renders the derived state badge and never the raw Allocated stateLabel', () => {
     renderFeature(
       <FeatureItem
-        feature={makeFeature({ stateLabel: 'Planning' })}
+        feature={makeFeature({ stateLabel: 'Allocated', state: 'working' })}
         isSelected={false}
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('Planning')).toHaveClass('featureState_planning');
+    expect(screen.getByText('Working')).toBeInTheDocument();
+    expect(screen.queryByText('Allocated')).not.toBeInTheDocument();
   });
 
-  it('uses the review tone for merged work that needs close-out', () => {
-    renderFeature(
-      <FeatureItem
-        feature={makeFeature({ stateLabel: 'Merged — Needs Close-Out' })}
-        isSelected={false}
-        onSelect={() => {}}
-      />,
-    );
-
-    expect(screen.getByText('Merged — Needs Close-Out')).toHaveClass('featureState_review');
-    expect(screen.getByText('Merged — Needs Close-Out')).not.toHaveClass('featureState_planning', 'featureState_todo');
-  });
-
-  it('adds contextual tooltip text to the feature state pill', () => {
+  it('renders the Ready state badge, the merge button, and no separate feature-ready badge', () => {
     markReady();
     renderFeature(
       <FeatureItem
-        feature={makeFeature({ stateLabel: 'In Review' })}
+        feature={makeFeature({ state: 'ready' })}
         isSelected={false}
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('In Review')).toHaveAttribute('title', 'The pull request is approved, green, and mergeable — awaiting your merge.');
+    const badge = screen.getByTestId('feature-state');
+    expect(badge).toHaveAttribute('data-state', 'ready');
+    expect(badge).toHaveTextContent('Ready');
+    expect(screen.getByTitle('Merge')).toBeInTheDocument();
+    expect(screen.queryByTestId('feature-ready')).toBeNull();
+  });
+
+  it('falls back to Merged for a null state with pipelineBucket post_merge_limbo', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({ state: null, pipelineBucket: 'post_merge_limbo' })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-state')).toHaveTextContent('Merged');
   });
 
   it('adds richer progress tooltip text for rally progress pills', () => {

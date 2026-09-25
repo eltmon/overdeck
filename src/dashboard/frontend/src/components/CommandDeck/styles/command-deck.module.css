@@ -576,51 +576,48 @@
   min-width: 0;
 }
 
-.featureState {
-  font-size: 10px;
-  color: var(--muted-foreground);
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--accent);
+.featureStateBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
   white-space: nowrap;
+  flex-shrink: 0;
   border: 1px solid transparent;
+  border-radius: var(--badge-radius, var(--radius-sm));
 }
 
-.featureState_done {
-  background: color-mix(in srgb, var(--success) 14%, transparent);
-  color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 32%, transparent);
-}
-
-.featureState_progress {
-  background: color-mix(in srgb, var(--primary) 16%, transparent);
-  color: var(--primary);
-  border-color: color-mix(in srgb, var(--primary) 36%, transparent);
-}
-
-.featureState_review {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
-  color: var(--warning);
-  border-color: color-mix(in srgb, var(--warning) 36%, transparent);
-}
-
-.featureState_context {
-  background: color-mix(in srgb, #14b8a6 16%, transparent);
-  color: #0f766e;
-  border-color: color-mix(in srgb, #14b8a6 36%, transparent);
-}
-
-.featureState_planning {
-  background: color-mix(in srgb, #8b5cf6 16%, transparent);
-  color: #7c3aed;
-  border-color: color-mix(in srgb, #8b5cf6 36%, transparent);
-}
-
-.featureState_todo {
-  background: var(--accent);
+.featureStateBadge_rest {
   color: var(--muted-foreground);
-  border-color: color-mix(in srgb, var(--muted-foreground) 16%, transparent);
+  background: color-mix(in srgb, var(--muted-foreground) 8%, transparent);
+  border-color: color-mix(in srgb, var(--muted-foreground) 32%, transparent);
+}
+
+.featureStateBadge_machine {
+  color: var(--info-foreground);
+  background: color-mix(in srgb, var(--info) 8%, transparent);
+  border-color: color-mix(in srgb, var(--info) 32%, transparent);
+}
+
+.featureStateBadge_specialist {
+  color: var(--signal-review-foreground);
+  background: color-mix(in srgb, var(--signal-review) 8%, transparent);
+  border-color: color-mix(in srgb, var(--signal-review) 32%, transparent);
+}
+
+.featureStateBadge_human {
+  color: var(--warning-foreground);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+}
+
+.featureStateBadge_outcome {
+  color: var(--success-foreground);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
 }
 
 /* Feature Item Wrapper (expandable) */

@@ -23,6 +23,7 @@ import {
 import { IssuePeek } from '../../issue-detail/IssuePeek';
 import { useConvoDock } from '../../../lib/convoDock';
 import { useDerivedIssueState } from '../../../lib/store';
+import { resolveFeatureStateBadge } from './featureStateBadge';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -503,16 +504,6 @@ function getAggregateBadges(sessions: readonly SessionNodeType[]): AggregateBadg
   return badges;
 }
 
-function getFeatureStateTone(stateLabel: string): 'done' | 'progress' | 'review' | 'context' | 'planning' | 'todo' {
-  const normalized = stateLabel.trim().toLowerCase();
-  if (normalized === 'done') return 'done';
-  if (normalized === 'in progress' || normalized === 'active') return 'progress';
-  if (normalized.includes('close-out') || normalized === 'in review' || normalized === 'review' || normalized === 'verifying' || normalized === 'verifying on main') return 'review';
-  if (normalized === 'has context') return 'context';
-  if (normalized === 'planning') return 'planning';
-  return 'todo';
-}
-
 function getAggregateBadgeTitle(badge: AggregateBadge, sessions: readonly SessionNodeType[]): string {
   if (badge.key === 'input') {
     const waiting = sessions.find((session) => session.awaitingInput === true);
@@ -573,38 +564,6 @@ function getAggregateBadgeTitle(badge: AggregateBadge, sessions: readonly Sessio
     parts.push(`Affected roles: ${formatRoleList(failingRoles)}.`);
   }
   return parts.join(' ');
-}
-
-function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readonly SessionNodeType[], isReady: boolean): string | undefined {
-  const normalized = feature.stateLabel.trim().toLowerCase();
-  const contextParts = [
-    feature.hasPrd ? 'PRD' : null,
-    feature.hasState ? 'continue file' : null,
-    feature.resourceDetails?.hasXbrief ? 'xBRIEF' : null,
-    feature.resourceDetails?.hasTasks ? 'tasks' : null,
-  ].filter((part): part is string => part !== null);
-  const contextSuffix = contextParts.length > 0 ? ` Context present: ${contextParts.join(', ')}.` : '';
-
-  if (normalized === 'planning') {
-    return `Planning context is being prepared for this issue.${contextSuffix}`;
-  }
-  if (normalized === 'has context') {
-    return `Planning artifacts exist for this issue, but active implementation or review has not started yet.${contextSuffix}`;
-  }
-  if (normalized === 'in review' || normalized === 'review') {
-    return isReady
-      ? 'The pull request is approved, green, and mergeable — awaiting your merge.'
-      : 'Implementation has moved into review.';
-  }
-  if (normalized === 'in progress' || normalized === 'active') {
-    return aggregateSessions.length > 0
-      ? `Implementation work is active or resumable for this issue. ${buildActivitySummary(aggregateSessions)}.`
-      : `Implementation work is active for this issue.${contextSuffix}`;
-  }
-  if (normalized === 'done') {
-    return 'Tracker state is done for this issue.';
-  }
-  return `Tracker state: ${feature.stateLabel}.${contextSuffix}`;
 }
 
 const TYPE_PRIORITY: Record<string, number> = {
@@ -958,13 +917,21 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   // PAN-3917: "ready to merge" is derived from the forge (approved, green,
   // mergeable), never a stored isReadyToMerge flag.
-  const isReady = useDerivedIssueState(feature.issueId)?.state === 'ready';
+  const storeDerived = useDerivedIssueState(feature.issueId);
+  const resolvedState = storeDerived?.state ?? feature.state ?? null;
+  const isReady = resolvedState === 'ready';
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
   const activitySummary = buildActivitySummary(aggregateSessions);
   const aggregateBadges = getAggregateBadges(aggregateSessions);
-  const featureStateTone = getFeatureStateTone(feature.stateLabel);
+  const stateBadge = resolveFeatureStateBadge({
+    storeState: storeDerived?.state,
+    restState: feature.state,
+    sessions: feature.sessions,
+    pipelineBucket: feature.pipelineBucket,
+    rawTrackerState: feature.rawTrackerState,
+  });
 
   // Dominant session state for the feature row StatusDot (blocker-7)
   const dominantStatus = feature.sessions && feature.sessions.length > 0
@@ -1103,7 +1070,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             </span>
           )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
-            <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}${progressPct !== null ? ` (${progressPct}% complete)` : ''}`}>
+            <span className={`${styles.featureStateBadge} ${styles.featureStateBadge_rest}`} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}${progressPct !== null ? ` (${progressPct}% complete)` : ''}`}>
               {feature.completedCount || 0}/{feature.childCount}
               {progressPct !== null && (
                 <span style={{
@@ -1126,23 +1093,16 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                 </span>
               )}
             </span>
-          ) : (
+          ) : stateBadge ? (
             <span
-              className={`${styles.featureState} ${styles[`featureState_${featureStateTone}` as keyof typeof styles]}`}
-              title={getFeatureStateTitle(feature, aggregateSessions, isReady)}
+              className={`${styles.featureStateBadge} ${styles[`featureStateBadge_${stateBadge.tone}` as keyof typeof styles]}`}
+              data-testid="feature-state"
+              data-state={stateBadge.key}
+              title={stateBadge.key === 'working' && aggregateSessions.length > 0 ? `${stateBadge.title} ${buildActivitySummary(aggregateSessions)}.` : stateBadge.title}
             >
-              {feature.stateLabel}
+              {stateBadge.label}
             </span>
-          )}
-          {isReady && (
-            <span
-              className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
-              data-testid="feature-ready"
-              title="All gates passed — awaiting your merge"
-            >
-              Ready · awaiting merge
-            </span>
-          )}
+          ) : null}
           {isReady && (
             <span data-section="MergeButton"><MergeButton
               issueId={feature.issueId}
