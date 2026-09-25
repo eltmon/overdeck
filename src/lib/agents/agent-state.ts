@@ -12,7 +12,7 @@
  * Do not add new synchronous callers; server-reachable code uses the async variants.
  */
 
-import { mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { readdir, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -38,6 +38,7 @@ import {
   getAgentState,
   listAgentStatesSync,
   cleanAgentState,
+  isOperatorPause,
 } from './agent-state-read.js';
 
 export type { Role } from './role.js';
@@ -46,7 +47,7 @@ export type { Role } from './role.js';
 // agent-state-read.ts (lint:circular fixup — see that file's header). This
 // keeps every existing `from './agent-state.js'` import working unchanged.
 export type { AgentState, AgentStopCause } from './agent-state-read.js';
-export { getAgentDir, getAgentStateFilePath, getAgentState, listAgentStatesSync } from './agent-state-read.js';
+export { getAgentDir, getAgentStateFilePath, getAgentState, isOperatorPause, listAgentStatesSync } from './agent-state-read.js';
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
@@ -257,13 +258,21 @@ function isGovernorSlotPauseReason(reason: string | undefined): boolean {
 }
 
 /** Sets the persistent manual pause gate used before stopping or suppressing resume. */
-function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = false): void {
+function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = false, byOperator = false): void {
   if (!state.paused) {
     state.pausedAt = new Date().toISOString();
   }
   state.paused = true;
   if (stoppedByPause) {
     state.stoppedByPause = true;
+  }
+  if (byOperator) {
+    // PAN-3911: an operator pause supersedes a scheduler yield. Left in place,
+    // the yield flag would let the scheduler resume the agent the operator
+    // just paused.
+    state.pausedBy = 'operator';
+    delete state.yieldedByScheduler;
+    delete state.yieldedAt;
   }
   if (reason === undefined) {
     delete state.pausedReason;
@@ -280,11 +289,17 @@ function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = f
   }
 }
 
-/** Sets the persistent manual pause gate used before stopping or suppressing resume; resolves the saved state, or null when the agent has no state. */
+/**
+ * Sets the persistent manual pause gate used before stopping or suppressing
+ * resume; resolves the saved state, or null when the agent has no state.
+ * `byOperator` marks an operator pause (`pan pause`, the dashboard Pause
+ * button); only those count as an issue pause (PAN-3911).
+ */
 export const setAgentPaused = (
   agentId: string,
   reason?: string,
   stoppedByPause = false,
+  byOperator = false,
 ): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* Effect.try({
@@ -293,9 +308,47 @@ export const setAgentPaused = (
     });
     if (!state) return null;
 
-    applyAgentPaused(state, reason, stoppedByPause);
+    applyAgentPaused(state, reason, stoppedByPause, byOperator);
     yield* saveAgentState(state);
     return state;
+  });
+
+/**
+ * PAN-3911: record, next to the issue pause, which review and test agents the
+ * pause stopped, so `pan unpause` knows to re-request the review. Only written
+ * while the agent is still paused; resolves false otherwise.
+ */
+export const recordPauseStoppedAgents = (
+  agentId: string,
+  stoppedAgentIds: readonly string[],
+): Effect.Effect<boolean, FsError> =>
+  Effect.gen(function* () {
+    const state = yield* Effect.try({
+      try: () => getAgentState(agentId),
+      catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
+    });
+    if (!state || state.paused !== true) return false;
+    state.pauseStoppedAgents = [...new Set([...(state.pauseStoppedAgents ?? []), ...stoppedAgentIds])];
+    yield* saveAgentState(state);
+    return true;
+  });
+
+/**
+ * PAN-3911: drop the operator-stop gate from an agent row. Unpause runs it on
+ * the review and test agents the issue pause stopped, so none of them is left
+ * behind a per-agent gate that nothing else clears. Resolves true when the
+ * row carried the flag.
+ */
+export const clearAgentStoppedByUser = (agentId: string): Effect.Effect<boolean, FsError> =>
+  Effect.gen(function* () {
+    const state = yield* Effect.try({
+      try: () => getAgentState(agentId),
+      catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
+    });
+    if (!state || state.stoppedByUser !== true) return false;
+    delete state.stoppedByUser;
+    yield* saveAgentState(state);
+    return true;
   });
 
 /**
@@ -340,6 +393,8 @@ function applyAgentUnpaused(state: AgentState): void {
   delete state.paused;
   delete state.pausedReason;
   delete state.pausedAt;
+  delete state.pausedBy;
+  delete state.pauseStoppedAgents;
   // PAN-2507 (FR-5): clearing a pause also clears the scheduler-yield
   // attribution, so an operator `pan unpause` on a yielded agent self-clears
   // the yield. `lastYieldResumeAt` is deliberately preserved — it is a
@@ -350,7 +405,8 @@ function applyAgentUnpaused(state: AgentState): void {
 
 function isAgentPauseClear(state: AgentState): boolean {
   return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined
-    && state.yieldedByScheduler === undefined && state.yieldedAt === undefined;
+    && state.yieldedByScheduler === undefined && state.yieldedAt === undefined
+    && state.pausedBy === undefined && state.pauseStoppedAgents === undefined;
 }
 
 /**
@@ -549,6 +605,60 @@ export function resetAgentFailureCount(agentId: string): boolean {
 /** Reports whether callers should block start, resume, auto-resume, or message delivery on the manual pause gate. */
 export function isAgentPaused(agentId: string): boolean {
   return getAgentState(agentId)?.paused === true;
+}
+
+/**
+ * The agent whose pause is the issue pause (PAN-3911): the issue's work agent,
+ * `agent-<issue>`. A swarm slot (`agent-<issue>-slot-N`) is also role `work`,
+ * but pausing one pauses that slot, not the issue.
+ */
+export function issuePauseAgentId(issueId: string): string {
+  return `agent-${issueId.trim().toLowerCase()}`;
+}
+
+/** What `getIssuePause` found. `unknown`: the work agent's state could not be read. */
+export type IssuePause =
+  | { status: 'unpaused' }
+  | {
+    status: 'paused';
+    agentId: string;
+    pausedAt?: string;
+    pausedReason?: string;
+    /** Review and test agents this pause stopped (`pauseStoppedAgents`). */
+    stoppedAgents: string[];
+  }
+  | { status: 'unknown'; agentId: string; reason: string };
+
+/**
+ * The issue-level pause gate (PAN-3911). An operator pause of the issue's work
+ * agent (`issuePauseAgentId`) holds the issue: stalled-review recovery does not
+ * re-dispatch its reviewers, and a message does not resume a reviewer the
+ * pause stopped. Other dispatchers do not read it. A machine pause (memory
+ * shed, post-merge, migration, escalation) or a scheduler yield is not an
+ * issue pause: only an operator pause (`isOperatorPause`) is.
+ *
+ * Never throws. A state file that exists but cannot be read or parsed (a
+ * crash-truncated write, EACCES) is `unknown`, never `unpaused`, and callers
+ * hold on it.
+ */
+export function getIssuePause(issueId: string): IssuePause {
+  const agentId = issuePauseAgentId(issueId);
+  let state: AgentState | null;
+  try {
+    if (!existsSync(getAgentStateFilePath(agentId))) return { status: 'unpaused' };
+    state = getAgentState(agentId);
+  } catch (err) {
+    return { status: 'unknown', agentId, reason: err instanceof Error ? err.message : String(err) };
+  }
+  if (!state) return { status: 'unknown', agentId, reason: 'state.json is unparsable' };
+  if (!isOperatorPause(state)) return { status: 'unpaused' };
+  return {
+    status: 'paused',
+    agentId,
+    pausedAt: state.pausedAt,
+    pausedReason: state.pausedReason,
+    stoppedAgents: state.pauseStoppedAgents ?? [],
+  };
 }
 
 /** Reports whether callers should block start, resume, auto-resume, or message delivery on the troubled gate. */

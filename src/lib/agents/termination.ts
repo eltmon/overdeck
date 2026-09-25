@@ -34,6 +34,7 @@ import {
   capturePane,
 } from '../tmux.js';
 import { FsError, TmuxError } from '../errors.js';
+import type { CloseAgentPaneResult } from '../terminal-backends/launch.js';
 
 const execAsync = promisify(exec);
 
@@ -210,11 +211,16 @@ export function stopAgentSync(agentId: string, cause: AgentStopCause = 'system')
   });
 }
 
-/** Async twin of `stopAgentSync`. Same `cause` semantics — see `AgentStopCause`. */
+/**
+ * Async twin of `stopAgentSync`. Same `cause` semantics — see `AgentStopCause`.
+ * Resolves what the terminal-backend close did (PAN-3911): a caller that tells
+ * an operator the agent stopped must check for `failed`, because the state is
+ * rewritten to stopped either way.
+ */
 export const stopAgent = (
   agentId: string,
   cause: AgentStopCause = 'system',
-): Effect.Effect<void, FsError | TmuxError> => {
+): Effect.Effect<CloseAgentPaneResult, FsError | TmuxError> => {
   const normalizedId = normalizeAgentId(agentId);
 
   return Effect.gen(function* () {
@@ -242,13 +248,16 @@ export const stopAgent = (
     // in it). Before this, a Herdr stop only rewrote state.json and the pane
     // stayed alive, so liveness readers kept seeing the agent and the next start
     // was refused as "already running".
-    yield* Effect.promise(async () => {
+    const close = yield* Effect.promise(async (): Promise<CloseAgentPaneResult> => {
       try {
-        const { closeAgentPane } = await import('../terminal-backends/launch.js');
-        return await closeAgentPane(normalizedId);
+        const { closeAgentPaneDetailed } = await import('../terminal-backends/launch.js');
+        const result = await closeAgentPaneDetailed(normalizedId);
+        if (result.outcome === 'failed') console.warn(`[agents] Backend close failed for ${normalizedId}: ${result.reason}`);
+        return result;
       } catch (err) {
-        console.warn(`[agents] Backend close failed for ${normalizedId} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-        return false;
+        const reason = err instanceof Error ? err.message : String(err);
+        console.warn(`[agents] Backend close failed for ${normalizedId} (non-fatal): ${reason}`);
+        return { outcome: 'failed', reason };
       }
     });
 
@@ -285,5 +294,6 @@ export const stopAgent = (
       kind: 'activity',
       activity: 'stopped',
     }));
+    return close;
   });
 };

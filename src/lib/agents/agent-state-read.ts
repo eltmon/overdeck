@@ -94,6 +94,20 @@ export interface AgentState {
   pausedReason?: string;
   pausedAt?: string;
   /**
+   * PAN-3911: `'operator'` when the operator set this pause (`pan pause`, the
+   * dashboard Pause button). Machine pauses (memory shed, post-merge, Fly
+   * migration, escalations, scheduler yields) leave it unset, so only an
+   * operator pause of the issue's work agent reads as an issue pause
+   * (`getIssuePause`). Cleared with the pause.
+   */
+  pausedBy?: 'operator';
+  /**
+   * PAN-3911: review and test agents of this issue that the operator's issue
+   * pause stopped. `pan unpause` reads it to re-request the review (or re-run
+   * the tests) through the normal dispatch door. Cleared with the pause.
+   */
+  pauseStoppedAgents?: string[];
+  /**
    * PAN-2507: true when this work agent was paused by the preemptive scheduler
    * (yielded to free capacity for an advancing dispatch), as distinct from an
    * operator pause. Reuses `paused: true` so every existing no-resume gate
@@ -205,6 +219,18 @@ export interface AgentState {
   parentId?: string;
 }
 
+/**
+ * The one answer to "did the operator set this pause?" (PAN-3911): a pause
+ * written by `pan pause` or the dashboard Pause button, which stamp
+ * `pausedBy: 'operator'`. Machine pauses (memory shed, post-merge, Fly
+ * migration, escalations) and scheduler yields never stamp it, and a machine
+ * pause written over an operator pause keeps it. `getIssuePause` and the
+ * feedback ladder's `classifyPause` both read this.
+ */
+export function isOperatorPause(state: Pick<AgentState, 'paused' | 'pausedBy'>): boolean {
+  return state.paused === true && state.pausedBy === 'operator';
+}
+
 export function getAgentDir(agentId: string): string {
   return join(getOverdeckHome(), 'agents', agentId);
 }
@@ -232,6 +258,8 @@ export function cleanAgentState(raw: AgentState): AgentState {
     paused: raw.paused,
     pausedReason: raw.pausedReason,
     pausedAt: raw.pausedAt,
+    pausedBy: raw.pausedBy,
+    pauseStoppedAgents: raw.pauseStoppedAgents,
     yieldedByScheduler: raw.yieldedByScheduler,
     yieldedAt: raw.yieldedAt,
     lastYieldResumeAt: raw.lastYieldResumeAt,

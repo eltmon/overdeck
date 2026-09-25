@@ -60,6 +60,27 @@ const sharedMocks = vi.hoisted(() => ({
   })),
 }));
 
+const issuePauseMocks = vi.hoisted(() => ({
+  haltIssueSpecialistsForPause: vi.fn(),
+  restartIssueAfterUnpause: vi.fn(),
+}));
+
+vi.mock('../../../../lib/agents/issue-pause.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/agents/issue-pause.js')>()),
+  haltIssueSpecialistsForPause: issuePauseMocks.haltIssueSpecialistsForPause,
+  restartIssueAfterUnpause: issuePauseMocks.restartIssueAfterUnpause,
+}));
+
+const reviewPipelineMocks = vi.hoisted(() => ({
+  requestReviewGuarded: vi.fn(),
+}));
+
+// The guarded review request the review route registers (PAN-3911).
+vi.mock('../../../../lib/cloister/request-review-pipeline.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/cloister/request-review-pipeline.js')>()),
+  getGuardedReviewRequester: () => reviewPipelineMocks.requestReviewGuarded,
+}));
+
 vi.mock('../../../../lib/operator-interventions.js', () => ({
   appendOperatorInterventionEvent: operatorInterventionMocks.appendOperatorInterventionEvent,
   operatorInterventionEvent: (input: any) => ({
@@ -333,6 +354,10 @@ describe('operator.intervention dashboard routes', () => {
     // and the request reaches the start-gate (clearGates) logic under test.
     issueServiceMock.getIssues.mockReturnValue([]);
     dashboardAuthMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+    issuePauseMocks.haltIssueSpecialistsForPause.mockReset();
+    issuePauseMocks.haltIssueSpecialistsForPause.mockResolvedValue(null);
+    issuePauseMocks.restartIssueAfterUnpause.mockReset();
+    issuePauseMocks.restartIssueAfterUnpause.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -349,6 +374,71 @@ describe('operator.intervention dashboard routes', () => {
       type: 'operator.intervention',
       payload: { issueId: 'PAN-1', kind: 'pause', source: 'dashboard' },
     }));
+    // PAN-3911: pausing the work agent stops the issue's review/test agents.
+    expect(issuePauseMocks.haltIssueSpecialistsForPause).toHaveBeenCalledWith(
+      'agent-pan-1', expect.objectContaining({ issueId: 'PAN-1' }), 'dashboard',
+    );
+  });
+
+  it('reports review/test agents the pause could not stop in the pause response (PAN-3911)', async () => {
+    issuePauseMocks.haltIssueSpecialistsForPause.mockResolvedValue({
+      stopped: ['agent-pan-1-review'],
+      failed: [{ agentId: 'agent-pan-1-review-security', reason: 'herdr could not close pane p_9' }],
+      unknown: [],
+      closedPanes: [],
+    });
+
+    const { response } = await requestAgents('/api/agents/agent-pan-1/pause', { body: JSON.stringify({}) });
+
+    expect(response.status).toBe(200);
+    const body = await HttpServerResponse.toWeb(response).json() as {
+      specialists?: { stopped: string[] };
+      warnings?: string[];
+    };
+    expect(body.specialists?.stopped).toEqual(['agent-pan-1-review']);
+    expect(body.warnings).toEqual(['could not stop agent-pan-1-review-security: herdr could not close pane p_9']);
+  });
+
+  it('re-requests the review through the guarded review request, as the CLI route does (PAN-3911)', async () => {
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pauseStoppedAgents: ['agent-pan-1-review'] });
+    issuePauseMocks.restartIssueAfterUnpause.mockResolvedValue({ clearedStopGates: [], review: { requested: true } });
+    reviewPipelineMocks.requestReviewGuarded.mockResolvedValue({ kind: 'started', autoRequeueCount: 0 });
+
+    const { response } = await requestAgents('/api/agents/agent-pan-1/unpause', { body: JSON.stringify({}) });
+
+    expect(response.status).toBe(200);
+    const body = await HttpServerResponse.toWeb(response).json() as { restart?: unknown; warnings?: string[] };
+    expect(body.restart).toEqual({ clearedStopGates: [], review: { requested: true } });
+    expect(body.warnings).toBeUndefined();
+    const [stateBefore, deps] = issuePauseMocks.restartIssueAfterUnpause.mock.calls[0] as [
+      { pauseStoppedAgents?: string[] },
+      { requestReview: (issueId: string) => Promise<unknown> },
+    ];
+    expect(stateBefore.pauseStoppedAgents).toEqual(['agent-pan-1-review']);
+    expect(await deps.requestReview('PAN-1')).toEqual({ requested: true });
+    expect(reviewPipelineMocks.requestReviewGuarded).toHaveBeenCalledWith('PAN-1', expect.objectContaining({ source: 'pan-unpause' }));
+
+    // The guard's refusals come back as what they are, never as a request.
+    reviewPipelineMocks.requestReviewGuarded.mockResolvedValue({ kind: 'already-passed' });
+    expect(await deps.requestReview('PAN-1')).toMatchObject({ requested: false, noReviewNeeded: true });
+    reviewPipelineMocks.requestReviewGuarded.mockResolvedValue({ kind: 'already-merged' });
+    expect(await deps.requestReview('PAN-1')).toMatchObject({ requested: false, noReviewNeeded: true });
+    reviewPipelineMocks.requestReviewGuarded.mockResolvedValue({ kind: 'circuit-breaker', autoRequeueCount: 25 });
+    expect(await deps.requestReview('PAN-1')).toMatchObject({ requested: false, reason: expect.stringContaining('re-review limit') });
+  });
+
+  it('reports a review re-request that did not go out in the unpause response (PAN-3911)', async () => {
+    agentMocks.getAgentState.mockReturnValue({ ...agentState, paused: true, pauseStoppedAgents: ['agent-pan-1-review'] });
+    issuePauseMocks.restartIssueAfterUnpause.mockResolvedValue({
+      clearedStopGates: [],
+      review: { requested: false, reason: 'working tree is dirty' },
+    });
+
+    const { response } = await requestAgents('/api/agents/agent-pan-1/unpause', { body: JSON.stringify({}) });
+
+    expect(response.status).toBe(200);
+    const body = await HttpServerResponse.toWeb(response).json() as { warnings?: string[] };
+    expect(body.warnings).toEqual(['review not re-requested: working tree is dirty']);
   });
 
   it('emits restart from the successful dashboard restart route and forwards harness overrides', async () => {

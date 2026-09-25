@@ -16,8 +16,16 @@ import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { stopWorkspaceDocker } from '../../../../lib/workspace-manager.js';
 import { sessionExists } from '../../../../lib/tmux.js';
-import { agentPaneExists, closeAgentPane } from '../../../../lib/terminal-backends/launch.js';
+import { agentPaneExists, closeAgentPane, closeAgentPaneDetailed } from '../../../../lib/terminal-backends/launch.js';
+import {
+  describeSweepProblems,
+  describeUnpauseRestartProblems,
+  haltIssueSpecialistsForPause,
+  restartIssueAfterUnpause,
+  type ReviewRequestOutcome,
+} from '../../../../lib/agents/issue-pause.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
+import { getGuardedReviewRequester } from '../../../../lib/cloister/request-review-pipeline.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -208,14 +216,17 @@ export const postAgentPauseRoute = HttpRouter.add(
     // agent's pane and harness used to stay alive.
     const hasLiveSession = yield* Effect.promise(() => agentPaneExists(id).catch(() => false));
     const stoppedByPause = hasLiveSession || stateBeforePause.status === 'running' || stateBeforePause.status === 'starting';
-    let updatedState = yield* setAgentPaused(id, reason, stoppedByPause);
+    let updatedState = yield* setAgentPaused(id, reason, stoppedByPause, true);
     if (!updatedState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
 
+    // PAN-3911: a failed close is reported in the response, never as a stop.
+    let closeError: string | undefined;
     if (hasLiveSession) {
       yield* Effect.promise(() => captureAgentOutputBeforeKill(id));
-      yield* Effect.promise(() => closeAgentPane(id));
+      const close = yield* Effect.promise(() => closeAgentPaneDetailed(id));
+      if (close.outcome === 'failed') closeError = close.reason;
     }
 
     if (hasLiveSession || updatedState.status === 'running' || updatedState.status === 'starting') {
@@ -226,6 +237,12 @@ export const postAgentPauseRoute = HttpRouter.add(
         lastActivity: new Date().toISOString(),
       }));
     }
+
+    // PAN-3911: pausing the issue's work agent pauses the issue, so its review
+    // and test agents stop too. Never throws.
+    const sweep = yield* Effect.promise(() => haltIssueSpecialistsForPause(id, stateBeforePause, 'dashboard'));
+    const specialistProblems = sweep ? describeSweepProblems(sweep) : [];
+    for (const problem of specialistProblems) console.warn(`[agents] Pause of ${id}: ${problem}`);
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.pause_requested', { reason }));
     yield* eventStore.appendAsync(operatorInterventionEvent({
@@ -245,11 +262,63 @@ export const postAgentPauseRoute = HttpRouter.add(
     });
 
     invalidateAgentsCache();
-    return jsonResponse({ success: true, agent: updatedState });
+    return jsonResponse({
+      success: true,
+      agent: updatedState,
+      ...(closeError ? { closeError } : {}),
+      ...(sweep
+        ? {
+          specialists: {
+            stopped: sweep.stopped,
+            closedPanes: sweep.closedPanes,
+            failed: sweep.failed,
+            unknown: sweep.unknown,
+          },
+        }
+        : {}),
+      ...(closeError || specialistProblems.length > 0
+        ? { warnings: [...(closeError ? [`could not close ${id}: ${closeError}`] : []), ...specialistProblems] }
+        : {}),
+    });
   })),
 );
 
 // ─── Route: POST /api/agents/:id/unpause ──────────────────────────────────────
+
+/**
+ * The review-request door, in this process: the same guarded request
+ * `POST /api/review/:issueId/request` makes for `pan unpause` (merged check,
+ * approved-head check, re-request breaker), never the bare pipeline starter.
+ */
+async function requestReviewInProcess(issueId: string): Promise<ReviewRequestOutcome> {
+  const requestReviewGuarded = getGuardedReviewRequester();
+  if (!requestReviewGuarded) return { requested: false, reason: 'the review pipeline is not loaded in this process' };
+  const outcome = await requestReviewGuarded(issueId, {
+    message: 'review re-requested after pan unpause',
+    source: 'pan-unpause',
+  });
+  switch (outcome.kind) {
+    case 'started':
+      return { requested: true };
+    case 'already-running':
+      // A request already in flight will dispatch the review itself.
+      return { requested: true, message: 'a review request was already running' };
+    case 'already-merged':
+      return { requested: false, noReviewNeeded: true, reason: `${issueId} is already merged` };
+    case 'already-passed':
+      return { requested: false, noReviewNeeded: true, reason: 'the PR is approved at its current head' };
+    case 'tests-requeued':
+      return { requested: false, noReviewNeeded: true, reason: 'the PR is approved; its tests were re-queued' };
+    case 'circuit-breaker':
+      return { requested: false, reason: `the re-review limit is reached (${outcome.autoRequeueCount} requests)` };
+    case 'dirty-workspace':
+      return { requested: false, reason: outcome.error };
+    case 'no-workspace':
+      return { requested: false, reason: 'the workspace does not exist' };
+    case 'no-project':
+      return { requested: false, reason: `no project is configured for ${issueId}` };
+  }
+}
 
 export const postAgentUnpauseRoute = HttpRouter.add(
   'POST',
@@ -302,6 +371,14 @@ export const postAgentUnpauseRoute = HttpRouter.add(
     // updates via the projection as the agent comes up. Only fires when the
     // lifecycle says there is actually a session to resume — a plain stopped
     // agent with no session is left for the Start button, same as before.
+    // PAN-3911: when the issue pause stopped review or test agents, start them
+    // again through the normal doors before the work agent resumes: a fresh
+    // review request (new synthesis parent and convoy for the current head),
+    // never convoy recovery against the stopped parent.
+    const restart = yield* Effect.promise(() => restartIssueAfterUnpause(stateBeforeUnpause, {
+      requestReview: requestReviewInProcess,
+    }));
+
     let resumeTriggered = false;
     const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     // Troubled agents are quarantined from auto-resume (the deacon skips them
@@ -318,6 +395,15 @@ export const postAgentUnpauseRoute = HttpRouter.add(
         .catch((err) => console.warn(`[agents] immediate resume after unpause errored for ${id}:`, err));
     }
 
-    return jsonResponse({ success: true, agent: updatedState, resumeTriggered });
+    // PAN-3911: a re-request that did not go out is reported, never a silent success.
+    const warnings = restart ? describeUnpauseRestartProblems(restart) : [];
+    for (const warning of warnings) console.warn(`[agents] Unpause of ${id}: ${warning}`);
+    return jsonResponse({
+      success: true,
+      agent: updatedState,
+      resumeTriggered,
+      ...(restart ? { restart } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
+    });
   })),
 );

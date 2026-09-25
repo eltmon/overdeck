@@ -17,6 +17,7 @@ import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
+import { pauseOutcomeNotice, toastPauseOutcome, unpauseOutcomeNotice } from '../../lib/pauseOutcome';
 import { selectAgents, selectBackendPanes, selectDerivedIssueState, selectIssues, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
@@ -349,11 +350,14 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
           ? `${issueId}: review requested (${mode} mode)`
           : `${issueId}: review requested`);
       }
+      if (action.key === 'pause') {
+        // PAN-3911: a review/test agent the pause could not stop is reported.
+        const notice = pauseOutcomeNotice(issueId, _data as Parameters<typeof pauseOutcomeNotice>[1]);
+        if (notice.level === 'warning') toastPauseOutcome(notice);
+      }
       if (action.key === 'unpause') {
-        // The route resumes immediately when a session exists — no more
-        // "deacon resumes it on the next patrol" wait.
-        const resuming = (_data as { resumeTriggered?: boolean } | undefined)?.resumeTriggered === true;
-        toast.success(resuming ? `${issueId} unpaused — resuming now` : `${issueId} unpaused`);
+        // PAN-3911: says whether the review the pause stopped was re-requested.
+        toastPauseOutcome(unpauseOutcomeNotice(issueId, _data as Parameters<typeof unpauseOutcomeNotice>[1]));
       }
       if (action.key === 'resumeSession' && agent?.id) {
         // PAN-2975: every resume affordance reports the actual outcome.

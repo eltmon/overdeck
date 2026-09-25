@@ -252,6 +252,30 @@ export class PipelineMembershipUnavailableError extends Error {
   }
 }
 
+/**
+ * Forge failures where the tracker or forge gave no answer: a rate limit, a
+ * 5xx, a timeout, or a network error. A bare 403 or 404 is an answer (no
+ * access, no installation) and stays settled. The patterns match the messages
+ * `githubApi` (`GitHub API <method> <path> failed: <status> <text>`), the
+ * installation-token exchange, fetch, and the gh/glab CLIs produce.
+ */
+const TRANSIENT_FORGE_FAILURE_PATTERNS: readonly RegExp[] = [
+  /\b(?:failed|token): (?:429|5\d\d)\b/,
+  /\bHTTP (?:429|5\d\d)\b/,
+  /rate limit/i,
+  /timed out|\btimeout\b/i,
+  /fetch failed|socket hang up|network error/i,
+  /\b(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EPIPE)\b/,
+];
+
+/** PAN-3527: did this forge failure mean "ask again later" rather than "no"? */
+export function isTransientForgeFailure(error: unknown): boolean {
+  if (error instanceof Error && error.name === 'GitHubRequestTimeoutError') return true;
+  const cause = error instanceof Error && error.cause instanceof Error ? ` ${error.cause.message}` : '';
+  const text = `${error instanceof Error ? error.message : String(error)}${cause}`;
+  return TRANSIENT_FORGE_FAILURE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 async function withUnavailableReason<T>(
   reason: MembershipUnavailableReason,
   operation: () => Promise<T>,
@@ -263,7 +287,7 @@ async function withUnavailableReason<T>(
     if (error instanceof PipelineMembershipUnavailableError) throw error;
     const message = error instanceof Error ? error.message : String(error);
     throw new PipelineMembershipUnavailableError(
-      reason,
+      reason === 'forge_unavailable' && isTransientForgeFailure(error) ? 'forge_transient' : reason,
       context ? `${context}: ${message}` : message,
     );
   }

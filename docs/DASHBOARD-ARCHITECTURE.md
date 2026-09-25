@@ -76,8 +76,13 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - The Command Deck's pipeline-membership banner (`ProjectMembershipBoundary`,
   PAN-3527) tells a temporary outage from a settled answer. While a restarted
   server's snapshot warms, `GET /api/pipeline/membership` returns 503 with
-  `{ status: 'loading', code: 'snapshot_loading' }` and `Retry-After: 5`. That
-  503, a failed or timed-out request, and a proxy 502/503/504 are transient:
+  `{ status: 'loading', code: 'snapshot_loading' }` and `Retry-After: 5`. A
+  cold snapshot whose gather failed because the forge did not answer (rate
+  limit, 429/5xx, timeout, network error: reason `forge_transient`) also
+  returns 503, with `Retry-After: 30`; the 5-minute periodic-convergence
+  refresh re-gathers it. A forge that answered "no" (404, a 403
+  without a rate limit, no App installation) stays `forge_unavailable`. Those
+  503s, a failed or timed-out request, and a proxy 502/503/504 are transient:
   the banner keeps retrying them (backoff capped at 30s, never sooner than
   `Retry-After`), shows "retrying automatically" instead of the error alert, and
   keeps its last good result meanwhile. A typed `status: 'unavailable'` body or

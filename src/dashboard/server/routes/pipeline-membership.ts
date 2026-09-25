@@ -32,6 +32,14 @@ import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
  */
 export const PIPELINE_MEMBERSHIP_LOADING_RETRY_AFTER_SECONDS = 5;
 
+/**
+ * PAN-3527 — seconds a client should wait before re-reading a snapshot whose
+ * gather failed because the forge did not answer (`forge_transient`: rate
+ * limit, 5xx, timeout, network). Resource refreshes keep re-gathering a cold
+ * snapshot, so the next read can succeed without an operator click.
+ */
+export const PIPELINE_MEMBERSHIP_FORGE_TRANSIENT_RETRY_AFTER_SECONDS = 30;
+
 // ─── Route: GET /api/pipeline/membership ──────────────────────────────────────
 
 const getPipelineMembershipRoute = HttpRouter.add(
@@ -56,6 +64,15 @@ const getPipelineMembershipRoute = HttpRouter.add(
         message: snapshot.error instanceof Error ? snapshot.error.message : String(snapshot.error),
         projectKey,
       };
+      // PAN-3527: a forge that did not answer is not an answer about the
+      // project. 503 + Retry-After makes the dashboard retry it instead of
+      // latching the settled banner; `error` is the text the banner shows.
+      if (body.reason === 'forge_transient') {
+        return jsonResponse({ ...body, error: body.message }, {
+          status: 503,
+          headers: { 'Retry-After': String(PIPELINE_MEMBERSHIP_FORGE_TRANSIENT_RETRY_AFTER_SECONDS) },
+        });
+      }
       return jsonResponse(body);
     }
     // PAN-3527: "not gathered yet" is temporary, not an answer about the

@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802_
+_Last sequenced: 2026-09-25T05:11:10.583236Z · model: claude-opus-5-5 · open: 801_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 23 | PAN-4134 | S | critical | ok |  |  | All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
@@ -131,6 +130,7 @@ _Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802
 | 164 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
 | 165 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
 | 166 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 167 | PAN-4191 | S | high | ok |  |  | Tier table pins literal models, so work agents ignore roles.work/workhorse:mid; tiers can't take workhorse: refs; opus-5 pin stale |
 | 168 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
@@ -181,7 +181,6 @@ _Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -208,32 +207,33 @@ _Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802
 | 254 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
-| 257 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
-| 258 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
-| 259 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
-| 260 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 261 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 262 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
-| 263 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 264 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 265 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
-| 266 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 267 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
-| 268 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 269 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 270 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 271 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 272 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 273 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
-| 274 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 275 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 276 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
-| 277 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
-| 278 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
-| 279 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
-| 280 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
-| 281 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 282 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 257 | PAN-4193 | S | medium | ok |  |  | EINTR from @parcel/watcher poll() trips the PAN-3915 breaker, so conversation search stops indexing; resubscribe on EINTR instead |
+| 258 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
+| 259 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
+| 260 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
+| 261 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 262 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 263 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
+| 264 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 266 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
+| 267 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
+| 268 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
+| 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 272 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 273 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 274 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
+| 275 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 277 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
+| 278 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
+| 279 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
+| 280 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
+| 281 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
+| 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 283 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
 | 284 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
 | 285 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
 | 286 | PAN-2754 | S | high | ok |  |  | `always` is inert |
@@ -341,7 +341,6 @@ _Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802
 | 392 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 395 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -810,10 +809,6 @@ _Last sequenced: 2026-09-25T02:32:55.628Z · model: claude-opus-5-5 · open: 802
 
 ## Rationale detail
 
-### PAN-3930 (rank 15)
-
-In pipeline — rank pinned.
-
 ### PAN-3983 (rank 19)
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
@@ -1110,6 +1105,10 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 
 Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
 
+### PAN-4184 (rank 118)
+
+New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1117,24 +1116,11 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T02:32:55.628Z",
+  "generatedAt": "2026-09-25T05:11:10.583236Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 802,
+  "openCount": 801,
   "nodes": [
-    {
-      "issue": "PAN-3930",
-      "rank": 15,
-      "size": "S",
-      "importance": "low",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL",
-      "rationale": "In pipeline — rank pinned.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-3983",
       "rank": 19,
@@ -2166,6 +2152,19 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "planning": "auto"
     },
     {
+      "issue": "PAN-4184",
+      "rank": 118,
+      "size": "S",
+      "importance": "high",
+      "score": 81,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "--no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked",
+      "rationale": "New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified (\"very likely\"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2511",
       "rank": 119,
       "size": "XS",
@@ -2727,6 +2726,19 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "condition": "ok",
       "dependsOn": [],
       "why": "Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4191",
+      "rank": 167,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Tier table pins literal models, so work agents ignore roles.work/workhorse:mid; tiers can't take workhorse: refs; opus-5 pin stale",
+      "rationale": "New issue: the operator re-pointed workhorses.mid expecting work agents to follow, but the enabled tier table silently overrode it with pinned literals (all work agents ran claude-sonnet-5, and complex runs a stale claude-opus-5). That is a model-routing correctness and cost problem with a verified reproduction and two concrete fix options, so it ranks with the other high-importance config and spawn defects rather than with routine feature work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3355,18 +3367,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3527",
-      "rank": 229,
-      "size": "XS",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-3510",
       "rank": 230,
       "size": "S",
@@ -3684,8 +3684,21 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "planning": "auto"
     },
     {
-      "issue": "PAN-3533",
+      "issue": "PAN-4193",
       "rank": 257,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "EINTR from @parcel/watcher poll() trips the PAN-3915 breaker, so conversation search stops indexing; resubscribe on EINTR instead",
+      "rationale": "New issue (2026-09-25). The root cause is traced to upstream @parcel/watcher throwing on EINTR, and the fix is small and scoped to two watcher services with a clear sanity cap. It sits next to PAN-3771 because both leave conversation search silently broken for the operator.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3533",
+      "rank": 258,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -3697,7 +3710,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-3107",
-      "rank": 258,
+      "rank": 259,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -3709,7 +3722,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-3762",
-      "rank": 259,
+      "rank": 260,
       "size": "XL",
       "importance": "high",
       "score": 64,
@@ -3722,7 +3735,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-1666",
-      "rank": 260,
+      "rank": 261,
       "size": "XL",
       "importance": "medium",
       "score": 63,
@@ -3736,7 +3749,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-1556",
-      "rank": 261,
+      "rank": 262,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -3749,7 +3762,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2188",
-      "rank": 262,
+      "rank": 263,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3762,7 +3775,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2190",
-      "rank": 263,
+      "rank": 264,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -3775,7 +3788,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2233",
-      "rank": 264,
+      "rank": 265,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -3788,7 +3801,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2008",
-      "rank": 265,
+      "rank": 266,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3803,7 +3816,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-1325",
-      "rank": 266,
+      "rank": 267,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -3815,7 +3828,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-1728",
-      "rank": 267,
+      "rank": 268,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -3828,7 +3841,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2241",
-      "rank": 268,
+      "rank": 269,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3840,7 +3853,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2242",
-      "rank": 269,
+      "rank": 270,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3852,7 +3865,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2240",
-      "rank": 270,
+      "rank": 271,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3864,7 +3877,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2243",
-      "rank": 271,
+      "rank": 272,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3876,7 +3889,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2202",
-      "rank": 272,
+      "rank": 273,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3888,7 +3901,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2195",
-      "rank": 273,
+      "rank": 274,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3901,7 +3914,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2237",
-      "rank": 274,
+      "rank": 275,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3913,7 +3926,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2487",
-      "rank": 275,
+      "rank": 276,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3925,7 +3938,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2469",
-      "rank": 276,
+      "rank": 277,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3937,7 +3950,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2212",
-      "rank": 277,
+      "rank": 278,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3949,7 +3962,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2213",
-      "rank": 278,
+      "rank": 279,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3961,7 +3974,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2211",
-      "rank": 279,
+      "rank": 280,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3973,7 +3986,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2210",
-      "rank": 280,
+      "rank": 281,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3985,7 +3998,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2201",
-      "rank": 281,
+      "rank": 282,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -3997,7 +4010,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     },
     {
       "issue": "PAN-2646",
-      "rank": 282,
+      "rank": 283,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -5305,19 +5318,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "dependsOn": [],
       "why": "Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard",
       "rationale": "The root-cause fix is on main with a regression test; what is left are two optional hardening follow-ups. Needs a re-scope to those.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3911",
-      "rank": 395,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify",
-      "rationale": "Triage: review-convoy re-dispatch is now one deacon-lite routine (recoverStalledReviews); verify pan pause against it specifically. Still a real token-spend hole; rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11021,19 +11021,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4184",
-      "rank": 118,
-      "size": "S",
-      "importance": "high",
-      "score": 81,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "--no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked",
-      "rationale": "New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified (\"very likely\"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -11710,13 +11697,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "confidence": 1
     },
     {
-      "from": "PAN-3911",
-      "to": "PAN-3668",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3864",
       "to": "PAN-3862",
       "type": "informs",
@@ -11885,13 +11865,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "confidence": 1
     },
     {
-      "from": "PAN-3935",
-      "to": "PAN-3930",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3946",
       "to": "PAN-1560",
       "type": "informs",
@@ -12051,6 +12024,20 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4191",
+      "to": "PAN-1852",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4193",
+      "to": "PAN-3771",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

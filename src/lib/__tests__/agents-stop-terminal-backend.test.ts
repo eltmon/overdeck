@@ -183,7 +183,10 @@ describe('stopAgent terminates through the terminal backend (PAN-3947)', () => {
     backendSelection.name = 'herdr';
     herdr.handler = () => new Error('socket_error');
 
-    await expect(Effect.runPromise(stopAgent(AGENT, 'operator'))).resolves.toBeUndefined();
+    // stopAgent resolves the backend close result (PAN-3911). A down socket
+    // answers no lookup, so the close reads as `absent` (documented on
+    // closeAgentPaneDetailed); the stop itself still completes.
+    await expect(Effect.runPromise(stopAgent(AGENT, 'operator'))).resolves.toEqual({ outcome: 'absent' });
     expect(herdrPaneCloses()).toEqual([]);
   });
 });
