@@ -7,6 +7,10 @@ vi.mock('../../components/flywheel/FlywheelConversationPane', () => ({
 }));
 vi.mock('../../components/flywheel/FlywheelOrderBookCard', () => ({ FlywheelOrderBookCard: () => null }));
 vi.mock('../../components/flywheel/PendingAutoMergesCard', () => ({ PendingAutoMergesCard: () => null }));
+// The card's own test covers its counts; here only its presence in the rail matters.
+vi.mock('../../components/flywheel/FlywheelUatBatchesCard', () => ({
+  FlywheelUatBatchesCard: () => <section aria-label="UAT batches" />,
+}));
 
 import { FlywheelPage } from '../FlywheelPage';
 import { flywheelStatus, renderWithQuery, stubFetch } from '../../components/flywheel/__tests__/fixtures';
@@ -29,6 +33,13 @@ function setup(status: FlywheelDerivedStatus | 'unreachable') {
 
 describe('FlywheelPage (PAN-3964 FR-8)', () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it('mounts the UAT batches card in the left rail even when idle (PAN-4199 ac3)', async () => {
+    setup(flywheelStatus({ run: 'idle', conversation: null, lastTick: null, freshness: null }));
+    renderWithQuery(<FlywheelPage />);
+    await screen.findByTestId('flywheel-run-chip');
+    expect(screen.getByRole('region', { name: 'UAT batches' })).toBeInTheDocument();
+  });
 
   it.each([
     [flywheelStatus(), 'running · tick 3', 'info'],

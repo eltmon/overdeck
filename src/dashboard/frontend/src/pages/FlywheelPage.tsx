@@ -15,6 +15,7 @@ import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookC
 import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
 import { FlywheelStatusPane, FreshnessBadge } from '../components/flywheel/FlywheelStatusPane';
+import { FlywheelUatBatchesCard } from '../components/flywheel/FlywheelUatBatchesCard';
 import { PendingAutoMergesCard } from '../components/flywheel/PendingAutoMergesCard';
 import { RailCard, StatusBadge, ToggleSwitch } from '../components/flywheel/primitives';
 import { useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
@@ -155,6 +156,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
           aria-label="Flywheel control rail"
         >
           <PendingAutoMergesCard onNavigateIssue={onNavigateIssue} />
+          <FlywheelUatBatchesCard onNavigateIssue={onNavigateIssue} />
           <FlywheelOrderBookCard bookId={status?.orderBook?.id ?? null} />
           <RailCard
             label="Flywheel"
