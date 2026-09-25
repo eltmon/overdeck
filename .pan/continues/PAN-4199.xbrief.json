@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4199",
   "created": "2026-09-25T06:46:14.958Z",
-  "updated": "2026-09-25T07:57:50.662Z",
+  "updated": "2026-09-25T07:58:46.454Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,9 +112,10 @@
       "doneAt": "2026-09-25T07:57:49.511Z"
     },
     "wi18-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4199",
-      "claimedAt": "2026-09-25T07:57:50.662Z"
+      "claimedAt": "2026-09-25T07:57:50.662Z",
+      "doneAt": "2026-09-25T07:58:46.454Z"
     }
   }
 }
