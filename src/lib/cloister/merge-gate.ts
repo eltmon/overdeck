@@ -87,7 +87,7 @@ export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps 
  * verdict marker whose `sha=` is the head, or a GitHub review approving that
  * commit. `reviewDecision` alone, a marker without `sha=`, or a marker naming
  * another commit never approves a merge. The reviews are read only when no
- * marker already proves it.
+ * marker already proves it and the PR is otherwise green and mergeable.
  */
 export async function evaluateIssueMergeGate(
   issueId: string,

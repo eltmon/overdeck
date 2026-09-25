@@ -245,6 +245,14 @@ describe('evaluateIssueMergeGate — approval bound to the PR head (#3983)', () 
     await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
   });
 
+  it('reads no reviews for a PR the gate refuses anyway (red checks)', async () => {
+    const { result, readReviews } = gate(pr({
+      statusCheckRollup: [{ name: 'build', status: 'COMPLETED', conclusion: 'FAILURE' }],
+    }));
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
+    expect(readReviews).not.toHaveBeenCalled();
+  });
+
   it('takes a GitLab approval as the forge gives it', async () => {
     const facts = readyFacts('MIN-1', { forge: 'gitlab', approvedAtHead: undefined });
     const result = await evaluateIssueMergeGate('MIN-1', { getFacts: async () => facts, ciTestsRequired: () => false });

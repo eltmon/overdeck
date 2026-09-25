@@ -689,15 +689,21 @@ export async function forgeApprovalAtHead(
 /**
  * #3983: the facts with a GitHub review approving the exact head folded into
  * `approvedAtHead`, for the merge gate. A marker naming the head already set
- * it, so the reviews are read only when it is not proven yet and no rework is
- * owed. `forgeApprovalAtHead` re-reads the head, so a push between the two
- * reads leaves the approval unproven.
+ * it, so the reviews are read only when it is not proven yet, no rework is
+ * owed, and the PR is otherwise mergeable (open, not a draft, green, forge
+ * `mergeable`): the gate refuses every other PR whatever its reviews say, so
+ * the merge-ready walk costs no extra read for them. `forgeApprovalAtHead`
+ * re-reads the head, so a push between the two reads leaves the approval
+ * unproven.
  */
 export async function withForgeApprovalAtHead(
   facts: PrFacts,
   readReviews?: ReadGitHubReviews,
 ): Promise<PrFacts> {
-  if (facts.forge !== 'github' || facts.approvedAtHead === true || facts.changesRequested || !facts.open) {
+  if (
+    facts.forge !== 'github' || facts.approvedAtHead === true || facts.changesRequested
+    || !facts.open || facts.draft || facts.checks !== 'green' || facts.mergeable !== true
+  ) {
     return facts;
   }
   const proven = await forgeApprovalAtHead(facts, readReviews);
