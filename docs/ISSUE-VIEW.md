@@ -66,9 +66,101 @@ The tasks and PRD resource chips follow the same global-mount pattern with their
 
 Every issue-action surface renders from the single executable registry in `src/dashboard/frontend/src/lib/issueActions.ts`. Surfaces declare only their presentation: `grouped-panel` for the cockpit popover, `grouped-context` for right-click menus, `primary-strip` for phase-primary buttons with grouped overflow, `overflow-only` where only the grouped menu is shown, and pinned slots for declared registry actions or React controls such as the drawer merge button. Action identity, availability, grouping, ordering, descriptions, confirmation, and invocation remain registry-owned.
 
+### A menu lists only what the operator can do right now (PAN-4198)
+
+`getMenuActions(state)` is what a menu renders: the entries whose `placement` is
+`'menu'` and whose `enabledWhen(state)` is true, in registry order. Nothing else
+appears. There are no disabled rows with a reason, and no "N available now · M
+gated" count — a row the operator cannot click and cannot interpret is noise, and
+hiding it is what makes the ten-action ceiling mean anything.
+
+`placement` is the second half of that rule. An entry marked `'contextual'` stays
+in the registry because a card or button invokes it by key, but no menu lists it:
+
+| Key | Invoked from |
+| --- | --- |
+| `pause` | the agent-scope menu on a fleet card |
+| `recoverAgent` | `NeedsYouSlot`, `AgentActivityCards`, spotlight |
+| `rebuildAndStart` | `AgentsLane` |
+| `createWorkspace` | `WorkspaceCard`, `AgentsLane` |
+
+The agent-scope menu (`agentScopeOnly`, used by `FleetAgentsView`) is the one
+caller that ignores `placement`: it passes `ignorePlacement` because its own
+`AGENT_SCOPE_ACTION_KEYS` allowlist has already decided what belongs, so Pause
+and Recover still reach the fleet cards. It still shows only enabled entries.
+
+**Four groups, in order:** `communicate` (Communicate), `lifecycle` (Actions),
+`inspect` (Inspect), `danger` (Danger). `recover` folded into `lifecycle` and
+`navigation` into `inspect`. A group section renders only when it has a row.
+
+**Primaries render once.** An enabled phase primary appears under **Next step**
+and is left out of its own group and out of Danger. **Danger** stays a collapsed
+disclosure and is absent entirely when nothing in it is enabled. Session
+utilities (Open State Dir, View JSONL) sit behind a collapsed **Debug**
+disclosure rather than an always-open "This session" section.
+
+`src/dashboard/frontend/src/lib/__tests__/issueActions.menu-by-state.test.ts`
+pins the exact key set for ten derived states and holds every one at or under
+ten actions. It runs in CI through the root `test:frontend-subset`; add new
+must-run frontend tests there or CI will not see them.
+
+### Retired keys (PAN-4198)
+
+Twelve keys left `IssueActionKey`. Every one has a `RETIREMENT_AUDIT` row in
+`issueActions.parity.test.tsx` naming a live successor, an existing file that
+took the behavior over, or why it was dropped. **No server route or CLI verb was
+removed** — `pan wipe`, `pan plan --auto`, `pan start --auto` and every retired
+endpoint still work.
+
+| Retired key | Successor or new home |
+| --- | --- |
+| `autoPlan` | `plan` — the Plan dialog's "Plan automatically" button |
+| `startSkipPlanning` | `plan` — the dialog's "Start work as soon as the plan is ready" checkbox, which finally sends the server's `autoStart` |
+| `restartFromPlan` | `restartAgent` — the dialog's fresh-session option |
+| `completeWorkReset` | `restartAgent` — same |
+| `resetSession` | `restartAgent` — same |
+| `wipe` | `resetIssue`, which runs the same teardown |
+| `inference` | `Stage/panes/DocsPane.tsx` (INFERENCE tab) |
+| `discussions` | `Stage/cockpit/IssueDigTabs.tsx` (Discussions tab) |
+| `transcripts` | the drawer conversation tab, `openIssue(id, 'conversation')` |
+| `upload` | dropped — hard-disabled with no handler |
+| `syncDiscussions` | dropped — automation-only |
+| `copySettings` | dropped — automation-only |
+
+`restartAgent` is a dialog, not a typed-confirm destructive action. It asks one
+question: keep the agent's memory, or start a fresh session? Keep-memory posts
+`/restart {graceful:true}` for a live agent and `/recover` for a stopped one;
+fresh posts `/restart-fresh {spawn:true}`. All three go through
+`submitDialogAction`'s endpoint override, so they share the 409-recovery flow.
+
+"Open planning session" (key `watchPlanning`) navigates — it dispatches
+`openIssue(issueId, 'conversation')` and posts nothing.
+
+**What each state offers.** The authority is the fixture table in
+`issueActions.menu-by-state.test.ts`; screenshots of three of these states in
+both themes are under `docs/images/pan-4198/`.
+
+| Derived state | Menu |
+| --- | --- |
+| backlog / parked | Plan…, Add to order book, Cancel issue |
+| planning (a live plan pane) | Open planning session, Message agent, Stop agent, Reset to Todo, Cancel issue, Open in editor |
+| planned | Accept plan, Start work, Update from main, Reset to Todo, Cancel issue, Open in editor, Add to order book, Show plan and tasks |
+| working | Message agent, Finish work and start review, Stop agent, Restart agent…, Reset to Todo, Cancel issue, Open in editor, Show plan and tasks |
+| in-review | Review again, Update from main, Reset to Todo, Cancel issue, Open in editor, Open pull request, Show plan and tasks |
+| changes-requested | Review again, Resume, Restart agent…, Update from main, Reset to Todo, Cancel issue, Open in editor, Open pull request, Show plan and tasks |
+| ready | Merge to main, Update from main, Reset to Todo, Cancel issue, Open in editor, Open pull request, Show plan and tasks |
+| merged | Close out, Open in editor, Open pull request, Show plan and tasks |
+| closed | Reopen, Delete workspace, Open in editor, Open pull request, Show plan and tasks |
+
+Resume and Restart agent… are offered in `changes-requested` but not in
+`in-review` or `ready`: once the code is out for review or approved, re-running
+review is the next step, not restarting its author. Delete workspace needs a
+closed tracker issue, because `cleanupWorkspaceForIssue` answers 409 otherwise —
+a merged-but-open issue is closed out instead.
+
 Registry actions may expose option submenus through `IssueActionView.submenu`. The `requestReview` action uses that contract for Full, Quick, and None review-mode selection. Choosing a mode requests review, and that mode applies to this review run only: it takes precedence over `roles.review.mode` for the run, and nothing saves it. Later runs, such as a deacon re-dispatch, `pan review request`, or the PR webhook, resolve the mode from config again. Primary-strip buttons render the options in a popover; grouped and context-menu surfaces render the same options as an expandable sub-list. Both presentations remain covered by the cross-surface parity gate below.
 
-The Recover group includes `resyncPipelineState`, the never-gated action backed by `pan review resync <id>` and `POST /api/review/:id/resync`. It re-emits the canonical review status without changing a verdict, so operators can repair stale action gating even when the stale state itself would disable other recovery paths.
+`resyncPipelineState` is the never-gated action backed by `pan review resync <id>` and `POST /api/review/:id/resync`. It re-emits the canonical review status without changing a verdict, so operators can repair stale action gating even when the stale state itself would disable other recovery paths.
 
 `src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx` is the cross-surface parity gate. It compares each rendered surface with an explicit registry-derived oracle, including legitimate rail and Zone B session actions and declared pinned controls, so a surface-local action, gating change, order drift, or missing extra fails the test.
 
@@ -77,6 +169,11 @@ The PAN-2499 inventory records action-renderer relocations separately from each 
 ## Protected issue-row action menu
 
 `FeatureContextMenu (issue-row right-click)` is a protected rail inventory surface. `FeatureItem.tsx` renders it through the shared `GroupedIssueActionMenu`, which derives its semantic sections from the issue-action registry's `GROUP_ORDER`; changes must preserve its matching visible `data-section` marker and no-loss inventory entry.
+
+Since PAN-4198 this menu shows only the enabled, menu-placed actions, so a
+section is absent whenever nothing in it applies — an empty group, an empty
+Danger disclosure and an empty Debug disclosure all render nothing. Assert on the
+sections a given state actually produces, not on the full `GROUP_ORDER`.
 
 ## Recovery start contract
 
