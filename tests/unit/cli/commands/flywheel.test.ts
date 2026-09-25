@@ -150,6 +150,35 @@ describe('pan flywheel verbs (PAN-3964 FR-6)', () => {
     expect(out).toContain('PAN-1');
   });
 
+  it('status names the no-agent row, its title, and the loop in-flight count (PAN-4199 ac1)', async () => {
+    mocks.deriveFlywheelStatus.mockResolvedValue(status);
+    await run('status');
+    const out = log.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(out).toContain('no agent');
+    expect(out).toContain('Fix the thing');
+    expect(out).toContain('in flight (loop) 1');
+  });
+
+  it('status prints (tracker unknown) in place of a missing title (PAN-4199 ac2)', async () => {
+    mocks.deriveFlywheelStatus.mockResolvedValue({
+      ...status,
+      inFlight: [{ ...status.inFlight[0]!, title: null, trackerUnknown: true }],
+    });
+    await run('status');
+    const line = log.mock.calls.map((c) => String(c[0])).join('\n').split('\n').find((l) => l.startsWith('    PAN-1'));
+    expect(line).toContain('(tracker unknown)');
+  });
+
+  it('status counts feature workspaces when the source is the census (PAN-4199 ac3)', async () => {
+    mocks.deriveFlywheelStatus.mockResolvedValue({
+      ...status,
+      inFlightSource: 'census',
+      inFlight: ['PAN-1', 'PAN-2', 'PAN-3'].map((issueId) => ({ ...status.inFlight[0]!, issueId, inTick: false })),
+    });
+    await run('status');
+    expect(log.mock.calls.map((c) => String(c[0])).join('\n')).toContain('feature workspaces 3');
+  });
+
   it('stats passes --window and prints JSON', async () => {
     mocks.resolveFlywheelProjectRoot.mockResolvedValue({ projectRoot: '/repos/overdeck', planHome: '/repos/overdeck' });
     mocks.computeSubstrateStats.mockResolvedValue({ window: { days: 7 } });
