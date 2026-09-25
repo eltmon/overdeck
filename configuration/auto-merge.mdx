@@ -105,9 +105,16 @@ the approved head and to the PR the gate judged:
   `glab mr merge --sha`);
 - a PR that needs a rebase is rebased by the server only, and only when the
   worktree and `origin/feature/<id>` are both at the approved head. The server
-  rebases exactly that commit, pushes the result by sha with a lease on the
-  approved head, and pins the merge to the result. It never hands the rebase
-  to the work agent, whose push would merge unreviewed;
+  rebases exactly that commit in its own detached worktree, created at the
+  approved head under a temporary path the work agent never uses and removed
+  afterwards, so nothing the agent commits in its worktree meanwhile can
+  become the rebased head. It moves the work agent's worktree to the result
+  for local verification (only while that worktree is still at the approved
+  head), pushes the result by sha with a lease on the approved head, and pins
+  the merge to it. It never hands the rebase to the work agent, whose push
+  would merge unreviewed. The pushed head is new, so if verification or the
+  merge then fails, the PR needs a fresh review before it can merge
+  automatically again;
 - polyrepo merge sets and branches that track `.planning/` files are left to
   the operator.
 
