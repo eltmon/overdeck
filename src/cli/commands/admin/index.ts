@@ -9,17 +9,49 @@
 
 import { Command } from 'commander';
 import { collectCommandTree } from '../../command-introspection.js';
+import { CommandGroupLoader, group, resolveGroupDemand, type GroupDemand } from '../../command-group-loader.js';
 import { registerCloisterCommands } from '../cloister/index.js';
 import { registerSpecialistsCommands } from '../specialists/index.js';
 import { registerRemoteCommands } from '../remote/index.js';
-import { registerDbCommands } from '../db.js';
-import { registerConfigCommand } from '../config.js';
 import { lazyAction } from '../../lazy-action.js';
-import { registerMigratePlanHomeCommand } from './migrate-plan-home.js';
-import { registerSeedUatFixturesCommand } from './seed-uat-fixtures.js';
-import { registerAgentsCommands } from './agents-exited.js';
 
-export function registerAdminCommands(program: Command): void {
+/**
+ * Admin subcommands whose modules carry their implementations: registered
+ * only when argv invokes them, so `pan admin specialists done` does not load
+ * the db, config and migration tooling (PAN-4195).
+ */
+export const ADMIN_COMMAND_GROUPS = {
+  seedUatFixtures: group({
+    names: ['seed-uat-fixtures'],
+    load: () => import('./seed-uat-fixtures.js'),
+    register: (mod, admin) => mod.registerSeedUatFixturesCommand(admin),
+  }),
+  migratePlanHome: group({
+    names: ['migrate-plan-home'],
+    load: () => import('./migrate-plan-home.js'),
+    register: (mod, admin) => mod.registerMigratePlanHomeCommand(admin),
+  }),
+  agents: group({
+    names: ['agents'],
+    load: () => import('./agents-exited.js'),
+    register: (mod, admin) => mod.registerAgentsCommands(admin),
+  }),
+  db: group({
+    names: ['db'],
+    load: () => import('../db.js'),
+    register: (mod, admin) => mod.registerDbCommands(admin),
+  }),
+  config: group({
+    names: ['config'],
+    load: () => import('../config.js'),
+    register: (mod, admin) => mod.registerConfigCommand(admin),
+  }),
+};
+
+export async function registerAdminCommands(
+  program: Command,
+  demand: GroupDemand = resolveGroupDemand(process.argv, ['admin']),
+): Promise<void> {
   const admin = program
     .command('admin')
     .description('Plumbing commands: watchdog, specialists, infra, db, config, and more');
@@ -39,9 +71,10 @@ export function registerAdminCommands(program: Command): void {
       }
     });
 
-  registerSeedUatFixturesCommand(admin);
-  registerMigratePlanHomeCommand(admin);
-  registerAgentsCommands(admin);
+  const groups = new CommandGroupLoader(admin, demand, ADMIN_COMMAND_GROUPS);
+  await groups.register('seedUatFixtures');
+  await groups.register('migratePlanHome');
+  await groups.register('agents');
 
   // pan admin cloister — lifecycle watchdog
   registerCloisterCommands(admin);
@@ -53,14 +86,14 @@ export function registerAdminCommands(program: Command): void {
   registerRemoteCommands(admin);
 
   // pan admin db — database seeding
-  registerDbCommands(admin);
+  await groups.register('db');
 
   // pan task — canonical beads mutation door (top level: the work-agent
   // prompts instruct `pan task close|claim|...`; PAN-2564 FR-9/WI-13).
   // Also kept under pan admin beads for the reconcile/migration-gate docs.
 
   // pan admin config — configuration management
-  registerConfigCommand(admin);
+  await groups.register('config');
 
   // pan admin hooks — harness hook management
   const hooks = admin
@@ -144,4 +177,6 @@ export function registerAdminCommands(program: Command): void {
     .option('--no-backup', 'Do not back up settings.json')
     .option('--delete-legacy', 'Delete settings.json after migration')
     .action(lazyAction(() => import('../migrate-config.js'), 'migrateConfigCommand'));
+
+  await groups.finish();
 }

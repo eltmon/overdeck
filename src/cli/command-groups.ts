@@ -13,18 +13,7 @@
  * checks it against the real registration. A missing name is still correct
  * (the unmatched name falls back to registering every group), just slower.
  */
-import type { Command } from 'commander';
-
-export interface CommandGroup<M = unknown> {
-  readonly names: readonly string[];
-  readonly load: () => Promise<M>;
-  readonly register: (mod: M, program: Command) => void;
-}
-
-/** Ties an entry's `register` to the module type its `load` returns. */
-function group<M>(entry: CommandGroup<M>): CommandGroup<M> {
-  return entry;
-}
+import { group } from './command-group-loader.js';
 
 export const COMMAND_GROUPS = {
   review: group({
@@ -123,10 +112,9 @@ export const COMMAND_GROUPS = {
     register: (mod, program) => { program.addCommand(mod.createDocsCommand()); },
   }),
   admin: group({
-    // `pan admin commands` walks the whole tree, so the admin group registers everything.
     names: ['admin'],
     load: () => import('./commands/admin/index.js'),
-    register: (mod, program) => mod.registerAdminCommands(program),
+    register: (mod, program, demand) => mod.registerAdminCommands(program, demand === 'all' ? 'all' : undefined),
   }),
   conversations: group({
     names: ['conversations', 'conv'],
@@ -199,73 +187,3 @@ export const COMMAND_GROUPS = {
 };
 
 export type CommandGroupKey = keyof typeof COMMAND_GROUPS;
-
-/**
- * Which command groups this argv needs: `'all'`, `'none'`, or the invoked
- * top-level command name. Root options other than `-V/--version` and the
- * help flags take no value (`--yolo` is stripped before Commander runs).
- */
-export function resolveGroupDemand(argv: readonly string[]): 'all' | 'none' | { name: string } {
-  const tokens = argv.slice(2);
-  let sawHelpCommand = false;
-  for (const [index, token] of tokens.entries()) {
-    if (token === '-V' || token === '--version') return sawHelpCommand ? 'all' : 'none';
-    if (token.startsWith('-')) return 'all';
-    if (token === 'help' && !sawHelpCommand) {
-      sawHelpCommand = true;
-      continue;
-    }
-    // `pan admin commands` introspects the whole command tree.
-    if (token === 'admin' && tokens[index + 1] === 'commands') return 'all';
-    return { name: token };
-  }
-  return 'all';
-}
-
-/**
- * Registers command groups at their place in the entry's registration order,
- * but only the ones argv needs. When every group is needed, all modules start
- * loading at once and still register in order. `finish()` registers every
- * skipped group when the invoked name matched no command, so Commander
- * reports it exactly as before.
- */
-export class CommandGroupLoader {
-  private readonly skipped: CommandGroupKey[] = [];
-  private readonly prefetched = new Map<CommandGroupKey, Promise<unknown>>();
-
-  constructor(
-    private readonly program: Command,
-    private readonly demand: ReturnType<typeof resolveGroupDemand>,
-  ) {
-    if (demand === 'all') {
-      for (const key of Object.keys(COMMAND_GROUPS) as CommandGroupKey[]) {
-        const pending = COMMAND_GROUPS[key].load();
-        // Surfaced by register(); this only stops an early unhandled rejection.
-        pending.catch(() => {});
-        this.prefetched.set(key, pending);
-      }
-    }
-  }
-
-  async register(key: CommandGroupKey): Promise<void> {
-    const group = COMMAND_GROUPS[key] as CommandGroup;
-    const { demand } = this;
-    if (demand === 'all' || (demand !== 'none' && group.names.includes(demand.name))) {
-      group.register(await (this.prefetched.get(key) ?? group.load()), this.program);
-    } else {
-      this.skipped.push(key);
-    }
-  }
-
-  async finish(): Promise<void> {
-    const { demand } = this;
-    if (typeof demand !== 'object') return;
-    const matched = this.program.commands.some((command) =>
-      command.name() === demand.name || command.aliases().includes(demand.name));
-    if (matched) return;
-    for (const key of this.skipped.splice(0)) {
-      const group = COMMAND_GROUPS[key] as CommandGroup;
-      group.register(await group.load(), this.program);
-    }
-  }
-}

@@ -41,7 +41,8 @@ import { lazyAction } from './lazy-action.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
-import { CommandGroupLoader, resolveGroupDemand } from './command-groups.js';
+import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
+import { COMMAND_GROUPS } from './command-groups.js';
 import { exitCli, runCliWithTelemetry } from './telemetry.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
@@ -86,7 +87,7 @@ if (process.argv.length === 2) {
 const program = new Command();
 program.enablePositionalOptions();
 // Command groups register only when argv needs them (PAN-4195): see command-groups.ts.
-const groups = new CommandGroupLoader(program, resolveGroupDemand(process.argv));
+const groups = new CommandGroupLoader(program, resolveGroupDemand(process.argv), COMMAND_GROUPS);
 
 const ensureDashboardBundle = async (
   bundledServer: string,

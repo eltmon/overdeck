@@ -1,14 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { Command } from 'commander';
 import {
-  COMMAND_GROUPS,
   CommandGroupLoader,
   resolveGroupDemand,
   type CommandGroup,
-  type CommandGroupKey,
-} from '../../../src/cli/command-groups.js';
+  type ErasedCommandGroup,
+} from '../../../src/cli/command-group-loader.js';
+import { COMMAND_GROUPS, type CommandGroupKey } from '../../../src/cli/command-groups.js';
+import { ADMIN_COMMAND_GROUPS } from '../../../src/cli/commands/admin/index.js';
 
 const argv = (...args: string[]) => ['node', 'pan', ...args];
+const topLevelNames = (command: Command) => command.commands.map((child) => child.name());
+
+async function registerAll(groups: Record<string, ErasedCommandGroup>, parent: Command): Promise<void> {
+  for (const entry of Object.values(groups)) {
+    const group = entry as CommandGroup;
+    await group.register(await group.load(), parent, 'all');
+  }
+}
 
 describe('resolveGroupDemand', () => {
   it('needs no group for --version', () => {
@@ -33,15 +42,26 @@ describe('resolveGroupDemand', () => {
     expect(resolveGroupDemand(argv('help', 'task'))).toEqual({ name: 'task' });
     expect(resolveGroupDemand(argv('admin', 'specialists', 'done'))).toEqual({ name: 'admin' });
   });
+
+  it('names the invoked subcommand below a parent path', () => {
+    expect(resolveGroupDemand(argv('admin', 'specialists', 'done'), ['admin'])).toEqual({ name: 'specialists' });
+    expect(resolveGroupDemand(argv('admin', 'help', 'db'), ['admin'])).toEqual({ name: 'db' });
+    expect(resolveGroupDemand(argv('admin'), ['admin'])).toBe('all');
+    expect(resolveGroupDemand(argv('admin', '--help'), ['admin'])).toBe('all');
+    expect(resolveGroupDemand(argv('help', 'admin', 'db'), ['admin'])).toBe('all');
+  });
 });
 
-describe('COMMAND_GROUPS', () => {
-  it('declares exactly the top-level names and aliases each group registers', async () => {
-    for (const [key, entry] of Object.entries(COMMAND_GROUPS)) {
+describe.each([
+  { label: 'COMMAND_GROUPS', groups: COMMAND_GROUPS as Record<string, ErasedCommandGroup> },
+  { label: 'ADMIN_COMMAND_GROUPS', groups: ADMIN_COMMAND_GROUPS as Record<string, ErasedCommandGroup> },
+])('$label', ({ groups }) => {
+  it('declares exactly the names and aliases each group registers', async () => {
+    for (const [key, entry] of Object.entries(groups)) {
       const group = entry as CommandGroup;
-      const program = new Command();
-      group.register(await group.load(), program);
-      const registered = program.commands.flatMap((command) => [command.name(), ...command.aliases()]);
+      const parent = new Command();
+      await group.register(await group.load(), parent, 'all');
+      const registered = parent.commands.flatMap((command) => [command.name(), ...command.aliases()]);
       expect({ key, names: [...registered].sort() }).toEqual({ key, names: [...group.names].sort() });
     }
   }, 60_000);
@@ -49,28 +69,31 @@ describe('COMMAND_GROUPS', () => {
 
 describe('CommandGroupLoader', () => {
   const keys = Object.keys(COMMAND_GROUPS) as CommandGroupKey[];
-  const topLevelNames = (program: Command) => program.commands.map((command) => command.name());
+
+  async function registerWith(demand: ConstructorParameters<typeof CommandGroupLoader>[1]): Promise<{
+    program: Command;
+    loader: CommandGroupLoader<CommandGroupKey>;
+  }> {
+    const program = new Command();
+    const loader = new CommandGroupLoader(program, demand, COMMAND_GROUPS);
+    for (const key of keys) await loader.register(key);
+    return { program, loader };
+  }
 
   it('registers only the group that owns the invoked name', async () => {
-    const program = new Command();
-    const loader = new CommandGroupLoader(program, { name: 'task' });
-    for (const key of keys) await loader.register(key);
+    const { program, loader } = await registerWith({ name: 'task' });
     await loader.finish();
     expect(topLevelNames(program)).toEqual(['task']);
   }, 60_000);
 
   it('registers nothing for --version', async () => {
-    const program = new Command();
-    const loader = new CommandGroupLoader(program, 'none');
-    for (const key of keys) await loader.register(key);
+    const { program, loader } = await registerWith('none');
     await loader.finish();
     expect(program.commands).toEqual([]);
   });
 
   it('registers every group when the invoked name matches no command', async () => {
-    const program = new Command();
-    const loader = new CommandGroupLoader(program, { name: 'no-such-command' });
-    for (const key of keys) await loader.register(key);
+    const { program, loader } = await registerWith({ name: 'no-such-command' });
     expect(program.commands).toEqual([]);
     await loader.finish();
     expect(topLevelNames(program)).toContain('task');
@@ -78,16 +101,18 @@ describe('CommandGroupLoader', () => {
   }, 60_000);
 
   it('keeps registration order when every group is needed', async () => {
+    const { program } = await registerWith('all');
+    const expected = new Command();
+    await registerAll(COMMAND_GROUPS as Record<string, ErasedCommandGroup>, expected);
+    expect(topLevelNames(program)).toEqual(topLevelNames(expected));
+  }, 60_000);
+
+  it('skips unrelated admin subgroups for `pan admin specialists done`', async () => {
+    const { registerAdminCommands } = await import('../../../src/cli/commands/admin/index.js');
     const program = new Command();
-    const loader = new CommandGroupLoader(program, 'all');
-    for (const key of keys) await loader.register(key);
-    const expected: string[] = [];
-    for (const entry of Object.values(COMMAND_GROUPS)) {
-      const group = entry as CommandGroup;
-      const probe = new Command();
-      group.register(await group.load(), probe);
-      expected.push(...topLevelNames(probe));
-    }
-    expect(topLevelNames(program)).toEqual(expected);
+    await registerAdminCommands(program, { name: 'specialists' });
+    const admin = program.commands.find((command) => command.name() === 'admin');
+    expect(admin && topLevelNames(admin)).toContain('specialists');
+    expect(admin && topLevelNames(admin)).not.toContain('db');
   }, 60_000);
 });
