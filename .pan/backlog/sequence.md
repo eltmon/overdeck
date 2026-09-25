@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:56:36.853017Z · model: claude-opus-5-5 · open: 806_
+_Last sequenced: 2026-09-25T06:03:54.529508Z · model: claude-opus-5-5 · open: 807_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -260,6 +260,7 @@ _Last sequenced: 2026-09-25T05:56:36.853017Z · model: claude-opus-5-5 · open: 
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
 | 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 307 | PAN-4203 | L | high | ok |  | PAN-4198 | Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main. |
 | 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
@@ -1121,10 +1122,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:56:36.853017Z",
+  "generatedAt": "2026-09-25T06:03:54.529508Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 806,
+  "openCount": 807,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11091,6 +11092,21 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks medium, just below its sibling dashboard items PAN-4197 through PAN-4200, because it is visual polish on a working view rather than a correctness bug; the only data change is reading the derived issue state instead of a constant chip. It must reuse the shared semantic tokens that PAN-4197 is redefining, so it is advisory-linked to that issue to avoid forking a second palette.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4203",
+      "rank": 307,
+      "size": "L",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4198"
+      ],
+      "why": "Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main.",
+      "rationale": "New issue (2026-09-25), split from PAN-4198 by its planner to meet the plan-size gate. The Cut left several in-flight branches (PAN-3668, PAN-1641) unsyncable, and replanning them is currently a manual, error-prone procedure; this gives one core for CLI and dashboard with a fixture-proven archive-before-delete guarantee. Body is well-specified with verified file:line starting points. The menu entry needs PAN-4198 to land first, so it ranks behind that in-pipeline parent.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12129,6 +12145,13 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4198",
+      "to": "PAN-4203",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
