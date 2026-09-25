@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-09-25T06:57:01.498Z",
+  "updated": "2026-09-25T06:57:09.850Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -364,6 +364,11 @@
       "claimedBy": "agent-pan-1641",
       "claimedAt": "2026-09-25T06:47:44.136Z",
       "doneAt": "2026-09-25T06:57:01.497Z"
+    },
+    "ollama-config": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1641",
+      "claimedAt": "2026-09-25T06:57:09.850Z"
     }
   }
 }
