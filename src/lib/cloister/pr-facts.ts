@@ -129,6 +129,8 @@ export interface PrFactsDeps {
    * whose association alone does not make it trusted.
    */
   overdeckLogins?: () => Promise<readonly string[]>;
+  /** #4066 review: the GitHub App's bot login, null without the App (`markerApproversFor`). */
+  appBotLogin?: () => Promise<string | null>;
 }
 
 export interface PrFactsOptions {
@@ -313,6 +315,9 @@ const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 /** The logins Overdeck posts as, lower-cased with any `[bot]` suffix dropped. */
 export type TrustedAuthors = ReadonlySet<string>;
 
+/** Who may approve by marker: any trusted author (no App), or these normalized logins. */
+type MarkerApprovers = 'any-trusted' | ReadonlySet<string>;
+
 function normalizeLogin(login: string): string {
   return login.trim().toLowerCase().replace(/\[bot\]$/, '');
 }
@@ -330,6 +335,13 @@ function isTrustedComment(comment: PrComment | undefined, trusted: TrustedAuthor
   return Boolean(login) && trusted.has(normalizeLogin(login!));
 }
 
+/** A trusted comment's marker counts, except an `APPROVED` one from outside `approvers`. */
+function markerCounts(comment: PrComment | undefined, verdict: MarkerVerdict, approvers: MarkerApprovers): boolean {
+  if (verdict !== 'APPROVED' || approvers === 'any-trusted') return true;
+  const login = comment?.author?.login;
+  return Boolean(login) && approvers.has(normalizeLogin(login!));
+}
+
 function carriesMarker(comment: PrComment | undefined): boolean {
   return parseVerdictMarker(comment?.body) !== null || parseUatVerdict(comment?.body) !== null;
 }
@@ -341,12 +353,16 @@ function carriesMarker(comment: PrComment | undefined): boolean {
  * approval must never merge commits it never saw. A stale CHANGES_REQUESTED
  * still counts — rework stays owed until a newer verdict says otherwise.
  */
-function markerVerdictFromComments(pr: IssuePullRequestData, trusted: TrustedAuthors): MarkerVerdict | null {
+function markerVerdictFromComments(
+  pr: IssuePullRequestData,
+  trusted: TrustedAuthors,
+  approvers: MarkerApprovers,
+): MarkerVerdict | null {
   const comments = pr.comments ?? [];
   for (let index = comments.length - 1; index >= 0; index -= 1) {
     if (!isTrustedComment(comments[index], trusted)) continue;
     const verdict = parseVerdictMarker(comments[index]?.body);
-    if (!verdict) continue;
+    if (!verdict || !markerCounts(comments[index], verdict, approvers)) continue;
     if (verdict === 'APPROVED') {
       const headAt = headCommitTime(pr);
       const commentAt = Date.parse(comments[index]?.createdAt ?? '');
@@ -399,20 +415,25 @@ function uatVerdictAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): Ua
  * head commit by `sha=`. Only a sha proves it; a marker without one, or one
  * dated by its timestamp, proves nothing.
  */
-function approvalMarkerAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): boolean {
+function approvalMarkerAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors, approvers: MarkerApprovers): boolean {
   const head = pr.headRefOid;
   if (!head) return false;
   const comments = pr.comments ?? [];
   for (let index = comments.length - 1; index >= 0; index -= 1) {
     if (!isTrustedComment(comments[index], trusted)) continue;
     const marker = parseVerdictMarkerWithSha(comments[index]?.body);
-    if (!marker) continue;
+    if (!marker || !markerCounts(comments[index], marker.verdict, approvers)) continue;
     return marker.verdict === 'APPROVED' && marker.sha !== null && sameCommit(marker.sha, head);
   }
   return false;
 }
 
-function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: TrustedAuthors = new Set()): PrFacts {
+function gitHubFacts(
+  issueId: string,
+  pr: IssuePullRequestData,
+  trusted: TrustedAuthors = new Set(),
+  approvers: MarkerApprovers = new Set(),
+): PrFacts {
   const state = normalize(pr.state);
   const merged = state === 'MERGED' || Boolean(pr.mergedAt);
   const mergeable = normalize(pr.mergeable);
@@ -420,7 +441,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
   const forgeDecision = decision === 'APPROVED' || decision === 'CHANGES_REQUESTED' ? decision : null;
   // Only consult the marker when the forge itself reached no decision.
   const effective: PrReviewDecision = forgeDecision
-    ?? markerVerdictFromComments(pr, trusted)
+    ?? markerVerdictFromComments(pr, trusted, approvers)
     ?? (decision === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : null);
   return {
     issueId: issueId.toUpperCase(),
@@ -438,7 +459,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
     approved: effective === 'APPROVED',
     // #3853: proven only by a marker naming the head. A forge approval's
     // review commit is read on the verdict path alone (`forgeApprovalAtHead`).
-    ...(effective === 'APPROVED' && forgeDecision === null && approvalMarkerAtHead(pr, trusted)
+    ...(effective === 'APPROVED' && forgeDecision === null && approvalMarkerAtHead(pr, trusted, approvers)
       ? { approvedAtHead: true }
       : {}),
     changesRequested: effective === 'CHANGES_REQUESTED',
@@ -620,6 +641,37 @@ async function defaultOverdeckLogins(): Promise<readonly string[]> {
   return logins;
 }
 
+let warnedMarkerApprovalTrust = false;
+
+async function defaultAppBotLogin(): Promise<string | null> {
+  const { getBotIdentity, isGitHubAppConfigured } = await import('../github-app.js');
+  return isGitHubAppConfigured() ? getBotIdentity().name : null;
+}
+
+/**
+ * #4066 review: agents hold the operator's `gh` credentials (`OWNER`), so with
+ * the GitHub App configured only its bot approves by marker. Without it, any
+ * trusted author does, logged once as operator-credential trust. A failed read
+ * approves nothing. `CHANGES_REQUESTED` markers are unaffected.
+ */
+async function markerApproversFor(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<MarkerApprovers> {
+  const hasApprovalMarker = (pr.comments ?? []).some((comment) => parseVerdictMarker(comment.body) === 'APPROVED');
+  if (!hasApprovalMarker) return new Set();
+  let bot: string | null;
+  try {
+    bot = await (deps.appBotLogin ?? defaultAppBotLogin)();
+  } catch {
+    return new Set();
+  }
+  if (bot) return new Set([normalizeLogin(bot)]);
+  if (!warnedMarkerApprovalTrust) {
+    warnedMarkerApprovalTrust = true;
+    console.warn('[pr-facts] No GitHub App configured: an APPROVED verdict marker counts from any trusted author, '
+      + 'i.e. from anyone (any agent) holding the operator\'s GitHub credentials. Configure the App to close this.');
+  }
+  return 'any-trusted';
+}
+
 /** Resolve Overdeck's own logins only when some marker's author needs it. */
 async function trustedAuthorsFor(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<TrustedAuthors> {
   const needsIdentity = (pr.comments ?? []).some((comment) => (
@@ -637,7 +689,9 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
   const fetchGitHubPr = deps.fetchGitHubPr ?? fetchIssuePullRequest;
   try {
     const gh = await fetchGitHubPr(issueId, options.preferBranch ? { preferBranch: options.preferBranch } : {});
-    if (gh.pr) return gitHubFacts(issueId, gh.pr, await trustedAuthorsFor(gh.pr, deps));
+    if (gh.pr) {
+      return gitHubFacts(issueId, gh.pr, await trustedAuthorsFor(gh.pr, deps), await markerApproversFor(gh.pr, deps));
+    }
     if (gh.error) return emptyPrFacts(issueId, gh.error);
   } catch (cause) {
     return emptyPrFacts(issueId, `GitHub PR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
@@ -892,7 +946,7 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
     if (!approvalProvenAtHead(facts)) {
       return {
         ready: false,
-        reason: `PR is not approved at PR HEAD ${head} (needs a GitHub approval of that commit or a verdict marker naming it)`,
+        reason: `PR is not approved at PR HEAD ${head} (needs a review approving that commit)`,
       };
     }
   } else if (policy.requireApprovalAtHead ? !approvalProvenAtHead(facts) : !facts.approved) {

@@ -313,6 +313,20 @@ UAT marker. A marker must stand on its own line (the review marker as the
 comment's first line); a quote-reply (`> <!-- … -->`) or a marker inside prose
 declares nothing.
 
+**Who may approve by marker** (#4066 review). Agents run with the operator's
+`gh` credentials, which GitHub reports as `OWNER`, so any agent can post an
+`overdeck-verdict: APPROVED sha=<head>` comment. When the GitHub App is
+configured, an `APPROVED` review marker therefore counts only when the App's
+bot posted it (`getBotIdentity()`, compared without the `[bot]` suffix); a
+marker from any other author, the owner included, is skipped as if it were not
+there. The review agent's verdict is normally a real review under the App's
+token, so this costs the normal path nothing; the one approval it loses is a
+verdict that fell back to a marker because the App token failed, which then
+needs a fresh review. A `CHANGES_REQUESTED` marker still counts from every
+trusted author: it can only hold a merge back. Without the App, any trusted
+author's `APPROVED` marker counts, which is trust in the operator's
+credentials; the server logs that once per process.
+
 **Failed UAT.** The newest trusted UAT marker that applies to the current
 head decides. A marker applies when its commit is the head (an abbreviated SHA
 matches); a marker posted without a commit (the PR head was unreadable) applies
@@ -395,13 +409,14 @@ run with the operator's `gh` credentials, which GitHub reports as `OWNER`. An
 agent that daemonizes out of its harness's process tree and scrubs all three
 variables is read as the operator, and any agent can post an
 `overdeck-verdict: APPROVED sha=<head>` comment with `gh pr comment` without
-going through this command at all; the marker trust rule cannot tell that
+going through this command at all. With the GitHub App configured, that
+comment approves nothing (only the App bot's approval markers count, above),
+and what remains is an agent minting an installation token from the App's
+private key on disk; without the App, the marker trust rule cannot tell that
 comment from the review agent's. The ancestry read fails the other way too: a
 long-lived process started from an agent pane (a tmux or Herdr server, a
 dashboard) passes that agent's id to everything beneath it, so an operator
-conversation under it is read as that agent and its override is refused. Closing that needs verdicts posted under an
-identity agents cannot use (the GitHub App, with markers trusted only from
-it).
+conversation under it is read as that agent and its override is refused.
 
 That review session's `blocked`/`failed` verdict is refused only when it is
 proven that the exact head commit carries an approval: with no new commit

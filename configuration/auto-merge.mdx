@@ -70,7 +70,9 @@ operator merges it (PAN-3973). For each one it checks, in order:
    a trusted reviewer's standing GitHub review approving that exact commit, so
    a repo without branch protection still qualifies. "Trusted" is the marker
    rule: `OWNER`, `MEMBER` or `COLLABORATOR`, or the identity Overdeck posts
-   as. A review from any other account never counts, and each reviewer's
+   as. With the GitHub App configured, an approving marker counts only from
+   the App's bot: agents hold the operator's `gh` credentials and could post
+   one as the owner. A review from any other account never counts, and each reviewer's
    latest review stands: a later "Request changes" or a dismissal withdraws an
    approval. An approval of an older commit, or a marker without `sha=`, never
    counts. A GitLab MR needs a named approver in `approved_by` (what
@@ -175,7 +177,7 @@ only when **all** of these are true:
 - The PR is open (not closed, not a draft, not already merged)
 - The PR is approved on its exact head commit (a trusted reviewer's standing
   GitHub review of that commit, or a trusted verdict marker whose `sha=` names
-  it; on GitLab, a named approver in `approved_by`), and no review or marker
+  it, posted by the GitHub App's bot when the App is configured; on GitLab, a named approver in `approved_by`), and no review or marker
   requests changes
 - The forge reports CI checks on the PR head, and all of them passed. Pending
   checks, failing checks, and no reported checks each make the PR ineligible.

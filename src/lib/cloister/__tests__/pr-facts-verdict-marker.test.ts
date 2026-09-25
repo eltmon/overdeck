@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { getPrFacts, parseVerdictMarker, parseVerdictMarkerWithSha, resetPrFactsCache } from '../pr-facts.js';
+import { evaluateMergeReadiness, getPrFacts, parseVerdictMarker, parseVerdictMarkerWithSha, resetPrFactsCache } from '../pr-facts.js';
 import type { IssuePullRequestData } from '../../overdeck/pull-requests.js';
 
 const HEAD = 'a7b64f7c0000000000000000000000000000abcd';
@@ -187,5 +187,83 @@ describe('getPrFacts — only trusted authors declare a review verdict (#4040 re
   it('ignores a marker that is not its own first line', () => {
     expect(parseVerdictMarker('> <!-- overdeck-verdict: APPROVED -->\n\nquoting the old verdict')).toBeNull();
     expect(parseVerdictMarker('<!-- overdeck-verdict: APPROVED --> and more prose')).toBeNull();
+  });
+});
+
+describe('getPrFacts — with the GitHub App, only its bot approves by marker (#4066 review, B2)', () => {
+  const BOT = 'panopticon-agent[bot]';
+  const approveHead = `<!-- overdeck-verdict: APPROVED sha=${HEAD} -->\n\nreview verdict: passed`;
+
+  async function factsWith(comments: IssuePullRequestData['comments'], appBot: string | null) {
+    resetPrFactsCache();
+    return getPrFacts('PAN-3705', {
+      fetchGitHubPr: async () => ({ issueId: 'PAN-3705', pr: prFixture({ comments }) }),
+      overdeckLogins: async () => ['eltmon', ...(appBot ? [appBot] : [])],
+      appBotLogin: async () => appBot,
+    });
+  }
+
+  const ownerApproval = [{
+    author: { login: 'eltmon' },
+    authorAssociation: 'OWNER',
+    body: approveHead,
+    createdAt: '2026-09-19T10:05:00Z',
+  }];
+
+  it('refuses an owner-authored APPROVED marker when the App is configured (an agent can post one with gh)', async () => {
+    const facts = await factsWith(ownerApproval, BOT);
+    expect(facts.approved).toBe(false);
+    expect(facts.approvedAtHead).toBeUndefined();
+    expect(evaluateMergeReadiness(facts, { requireApprovalAtHead: true }).ready).toBe(false);
+  });
+
+  it('accepts the same owner-authored marker when no App is configured (operator-credential trust)', async () => {
+    const facts = await factsWith(ownerApproval, null);
+    expect(facts.approved).toBe(true);
+    expect(facts.approvedAtHead).toBe(true);
+  });
+
+  it("accepts an APPROVED marker posted by the App's bot", async () => {
+    // GraphQL reports a bot's login without the `[bot]` suffix.
+    for (const login of [BOT, 'panopticon-agent']) {
+      const facts = await factsWith([{
+        author: { login },
+        authorAssociation: 'NONE',
+        body: approveHead,
+        createdAt: '2026-09-19T10:05:00Z',
+      }], BOT);
+      expect(facts.approved).toBe(true);
+      expect(facts.approvedAtHead).toBe(true);
+    }
+  });
+
+  it('still blocks on an owner-authored CHANGES_REQUESTED marker when the App is configured', async () => {
+    const facts = await factsWith([{
+      author: { login: 'eltmon' },
+      authorAssociation: 'OWNER',
+      body: `<!-- overdeck-verdict: CHANGES_REQUESTED sha=${HEAD} -->`,
+      createdAt: '2026-09-19T10:05:00Z',
+    }], BOT);
+    expect(facts.changesRequested).toBe(true);
+    expect(facts.approved).toBe(false);
+  });
+
+  it('a forged owner APPROVED marker does not hide an earlier bot CHANGES_REQUESTED', async () => {
+    const facts = await factsWith([
+      { author: { login: BOT }, authorAssociation: 'NONE', body: '<!-- overdeck-verdict: CHANGES_REQUESTED -->', createdAt: '2026-09-19T10:05:00Z' },
+      ...ownerApproval.map((comment) => ({ ...comment, createdAt: '2026-09-19T10:06:00Z' })),
+    ], BOT);
+    expect(facts.changesRequested).toBe(true);
+    expect(facts.approved).toBe(false);
+  });
+
+  it('approves nothing by marker when the App identity cannot be read', async () => {
+    resetPrFactsCache();
+    const facts = await getPrFacts('PAN-3705', {
+      fetchGitHubPr: async () => ({ issueId: 'PAN-3705', pr: prFixture({ comments: ownerApproval }) }),
+      overdeckLogins: async () => ['eltmon'],
+      appBotLogin: async () => { throw new Error('unreadable'); },
+    });
+    expect(facts.approved).toBe(false);
   });
 });
