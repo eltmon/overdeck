@@ -1,18 +1,16 @@
 import { exitCli } from '../exit.js';
 import { existsSync, mkdirSync, readdirSync, cpSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
-import { INIT_DIRS, CONFIG_FILE, OVERDECK_HOME, SKILLS_DIR, AGENTS_DIR } from '../../lib/paths.js';
+import { INIT_DIRS, CONFIG_FILE, OVERDECK_HOME, SKILLS_DIR, AGENTS_DIR, packageRoot } from '../../lib/paths.js';
 import { getDefaultConfig, saveConfig } from '../../lib/config.js';
 import { detectShell, getShellRcFile, addAlias, getAliasInstructions } from '../../lib/shell.js';
 
-// Get the package root directory (where skills/ and agents/ live)
-// Note: After bundling, code runs from dist/cli/index.js, so go up 2 levels
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const PACKAGE_ROOT = join(__dirname, '..', '..'); // dist/cli -> dist -> package root
+// The package root (where skills/ and agents/ live). Resolved by lib/paths, not
+// from this module's URL: the CLI loads command modules lazily as dist/ chunks
+// (PAN-4195), so a relative walk from import.meta.url is location-dependent.
+const PACKAGE_ROOT = packageRoot;
 const BUNDLED_SKILLS_DIR = join(PACKAGE_ROOT, 'skills');
 const BUNDLED_AGENTS_DIR = join(PACKAGE_ROOT, 'agents');
 
