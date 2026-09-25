@@ -76,9 +76,17 @@ export const DirectoryEntry = Schema.Struct({
 })
 export type DirectoryEntry = typeof DirectoryEntry.Type
 
+/**
+ * `window`: live entries plus finished ones active inside `windowHours`.
+ * `live` (PAN-4197): what is running or waiting now; `windowHours` is 0.
+ */
+export const DirectoryScope = Schema.Literals(["window", "live"])
+export type DirectoryScope = typeof DirectoryScope.Type
+
 export const AgentDirectoryResponse = Schema.Struct({
   generatedAt: Schema.String,
   windowHours: Schema.Number,
+  scope: Schema.optional(DirectoryScope),
   entries: Schema.Array(DirectoryEntry),
 })
 export type AgentDirectoryResponse = typeof AgentDirectoryResponse.Type

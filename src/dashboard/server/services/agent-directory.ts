@@ -18,6 +18,12 @@
  *                        pid and the transcript (D21), see
  *                        agent-directory-external.ts
  *
+ * Live scope (PAN-4197): `buildLiveAgentDirectory` keeps what is running or
+ * waiting now instead of a time window — live entries, paused native agents of
+ * an unfinished issue, and the newest work/strike agent of an issue waiting in
+ * the pipeline (in review, changes requested, ready), read from the derived
+ * issue states. Rules are FR-2 of `.pan/drafts/pan-4197.md`.
+ *
  * Workers (Phase B, role `worker`) and external agents are entries with a
  * parent: their `parentId` names an agent id or a conversation tmux session,
  * which maps to that conversation's `conv:<name>` entry so they nest under it.
@@ -33,10 +39,12 @@ import { join } from 'node:path';
 import type {
   AgentDirectoryResponse,
   BackendPane,
+  DerivedIssueState,
   DirectoryEntry,
   DirectoryEntryState,
   DirectoryPause,
   HarnessName,
+  IssueState,
 } from '@overdeck/contracts';
 import { getHarnessBehavior } from '@overdeck/contracts';
 
@@ -118,6 +126,8 @@ export interface AgentDirectoryDeps {
   /** Issue id (uppercase) → title, from the tracker cache the dashboard already holds. */
   readonly issueTitles?: () => ReadonlyMap<string, string> | Promise<ReadonlyMap<string, string>>;
   readonly projectKeyForPath?: (path: string) => string | null;
+  /** Issue id (uppercase) → derived pipeline state; the live scope reads it (PAN-4197). */
+  readonly derivedIssueStates?: () => ReadonlyMap<string, DerivedIssueState> | Promise<ReadonlyMap<string, DerivedIssueState>>;
 }
 
 /** The `remote-state.json` facts the directory reads. */
@@ -161,6 +171,16 @@ async function defaultIssueTitles(): Promise<ReadonlyMap<string, string>> {
       }
     }
     return titles;
+  } catch {
+    return new Map();
+  }
+}
+
+/** Derived pipeline states from the shared issue service's cache; empty on any error. */
+async function defaultDerivedIssueStates(): Promise<ReadonlyMap<string, DerivedIssueState>> {
+  try {
+    const { getSharedIssueService } = await import('./issue-service-singleton.js');
+    return new Map(getSharedIssueService().listDerivedStates().map((derived) => [derived.issueId.toUpperCase(), derived]));
   } catch {
     return new Map();
   }
@@ -316,6 +336,82 @@ export async function buildAgentDirectory(
   const now = (deps.now ?? Date.now)();
   const hours = clampWindowHours(windowHours);
   const windowMs = hours * HOUR_MS;
+  const all = await buildDirectoryEntries(now, deps);
+
+  // 7. Window (D4).
+  const kept = new Set<string>();
+  for (const entry of all) {
+    const inWindow = entry.lastActivityAt !== null && now - timeOf(entry.lastActivityAt) <= windowMs;
+    if (isLiveDirectoryState(entry.state) || inWindow) kept.add(entry.id);
+  }
+
+  return { generatedAt: new Date(now).toISOString(), windowHours: hours, scope: 'window', entries: keepWithAncestors(all, kept) };
+}
+
+/** Issue states in which an issue's last agent is waiting on the pipeline (FR-2 rule 3). */
+export const LIVE_PIPELINE_ISSUE_STATES: ReadonlySet<IssueState> = new Set<IssueState>(['in-review', 'changes-requested', 'ready']);
+
+const FINISHED_ISSUE_STATES: ReadonlySet<IssueState> = new Set<IssueState>(['merged', 'closed']);
+
+function isIssueAgent(entry: DirectoryEntry): boolean {
+  return entry.kind === 'agent' && (entry.role === 'work' || entry.role === 'strike');
+}
+
+/**
+ * The live scope (PAN-4197 FR-2): what is running or waiting now, with no time
+ * window. An entry is kept when it is live, when it is a paused native agent
+ * of an issue that is not merged or closed (or of no issue), or when it is the
+ * newest work/strike agent of an issue waiting in the pipeline.
+ */
+export async function buildLiveAgentDirectory(deps: AgentDirectoryDeps = {}): Promise<AgentDirectoryResponse> {
+  const now = (deps.now ?? Date.now)();
+  const [all, derived] = await Promise.all([
+    buildDirectoryEntries(now, deps),
+    Promise.resolve((deps.derivedIssueStates ?? defaultDerivedIssueStates)())
+      .catch(() => new Map<string, DerivedIssueState>()),
+  ]);
+  const issueState = (issueId: string | null) => (issueId ? derived.get(issueId)?.state : undefined);
+
+  const kept = new Set<string>();
+  const newestIssueAgent = new Map<string, DirectoryEntry>();
+  for (const entry of all) {
+    if (isLiveDirectoryState(entry.state)) kept.add(entry.id);
+    const state = issueState(entry.issueId);
+    if (entry.pause && entry.source === 'overdeck' && !(state && FINISHED_ISSUE_STATES.has(state))) kept.add(entry.id);
+    if (entry.issueId && isIssueAgent(entry)) {
+      const newest = newestIssueAgent.get(entry.issueId);
+      const newer = !newest
+        || timeOf(entry.startedAt) > timeOf(newest.startedAt)
+        || (timeOf(entry.startedAt) === timeOf(newest.startedAt) && entry.id.localeCompare(newest.id) > 0);
+      if (newer) newestIssueAgent.set(entry.issueId, entry);
+    }
+  }
+  for (const [issueId, entry] of newestIssueAgent) {
+    const state = issueState(issueId);
+    if (state && LIVE_PIPELINE_ISSUE_STATES.has(state)) kept.add(entry.id);
+  }
+
+  return { generatedAt: new Date(now).toISOString(), windowHours: 0, scope: 'live', entries: keepWithAncestors(all, kept) };
+}
+
+/** Re-adds every ancestor of a kept entry, then sorts: live first, last activity descending, then id. */
+function keepWithAncestors(all: readonly DirectoryEntry[], kept: Set<string>): DirectoryEntry[] {
+  const byId = new Map(all.map((entry) => [entry.id, entry]));
+  for (const id of [...kept]) {
+    let parentId = byId.get(id)?.parentId ?? null;
+    while (parentId && byId.has(parentId) && !kept.has(parentId)) {
+      kept.add(parentId);
+      parentId = byId.get(parentId)?.parentId ?? null;
+    }
+  }
+  return all.filter((entry) => kept.has(entry.id)).sort((a, b) =>
+    Number(isLiveDirectoryState(b.state)) - Number(isLiveDirectoryState(a.state))
+    || timeOf(b.lastActivityAt) - timeOf(a.lastActivityAt)
+    || a.id.localeCompare(b.id));
+}
+
+/** Steps 1–6: every entry the directory can show, before any window or scope. */
+async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Promise<DirectoryEntry[]> {
   const readRemoteState = deps.readRemoteState ?? defaultReadRemoteState;
   const projectKeyForIssue = perBuild(deps.projectKeyForIssue ?? defaultProjectKeyForIssue);
   const projectKeyForPath = perBuild(deps.projectKeyForPath ?? defaultProjectKeyForPath);
@@ -478,7 +574,7 @@ export async function buildAgentDirectory(
   // 6. Project keys (D5): issue → the row's own project → cwd → unassigned.
   //    A subagent inherits its parent's key (parents precede their subagents).
   const projectKeys = new Map<string, string>();
-  const all: DirectoryEntry[] = candidates.map(({ entry, cwd, explicitProjectKey }) => {
+  return candidates.map(({ entry, cwd, explicitProjectKey }) => {
     const inherited = entry.kind === 'subagent' && entry.parentId ? projectKeys.get(entry.parentId) : undefined;
     const projectKey = inherited
       ?? (entry.issueId ? projectKeyForIssue(entry.issueId) : null)
@@ -488,29 +584,6 @@ export async function buildAgentDirectory(
     projectKeys.set(entry.id, projectKey);
     return { ...entry, projectKey, issueTitle: entry.issueId ? issueTitles.get(entry.issueId) ?? null : null };
   });
-
-  // 7. Window (D4), then re-add every ancestor of a kept entry.
-  const byId = new Map(all.map((entry) => [entry.id, entry]));
-  const kept = new Set<string>();
-  for (const entry of all) {
-    const inWindow = entry.lastActivityAt !== null && now - timeOf(entry.lastActivityAt) <= windowMs;
-    if (isLiveDirectoryState(entry.state) || inWindow) kept.add(entry.id);
-  }
-  for (const id of [...kept]) {
-    let parentId = byId.get(id)?.parentId ?? null;
-    while (parentId && byId.has(parentId) && !kept.has(parentId)) {
-      kept.add(parentId);
-      parentId = byId.get(parentId)?.parentId ?? null;
-    }
-  }
-
-  // 8. Sort: live first, then last activity descending, then id.
-  const entries = all.filter((entry) => kept.has(entry.id)).sort((a, b) =>
-    Number(isLiveDirectoryState(b.state)) - Number(isLiveDirectoryState(a.state))
-    || timeOf(b.lastActivityAt) - timeOf(a.lastActivityAt)
-    || a.id.localeCompare(b.id));
-
-  return { generatedAt: new Date(now).toISOString(), windowHours: hours, entries };
 }
 
 function subagentCandidates(
@@ -557,6 +630,7 @@ function subagentCandidates(
 // ─── memoized read door ──────────────────────────────────────────────────────
 
 let memo = createSettledTtlPromiseCache<number, AgentDirectoryResponse>(DIRECTORY_MEMO_MS);
+let liveMemo = createSettledTtlPromiseCache<number, AgentDirectoryResponse>(DIRECTORY_MEMO_MS);
 
 /** The directory for a window, memoized for 3 s; concurrent callers share one build. */
 export function getAgentDirectory(windowHours: number, deps?: AgentDirectoryDeps): Promise<AgentDirectoryResponse> {
@@ -564,6 +638,12 @@ export function getAgentDirectory(windowHours: number, deps?: AgentDirectoryDeps
   return memo(hours, () => buildAgentDirectory(hours, deps));
 }
 
+/** The live scope, memoized for 3 s like the window answer (PAN-4197 NFR-3). */
+export function getLiveAgentDirectory(deps?: AgentDirectoryDeps): Promise<AgentDirectoryResponse> {
+  return liveMemo(0, () => buildLiveAgentDirectory(deps));
+}
+
 export function _resetAgentDirectoryForTests(): void {
   memo = createSettledTtlPromiseCache<number, AgentDirectoryResponse>(DIRECTORY_MEMO_MS);
+  liveMemo = createSettledTtlPromiseCache<number, AgentDirectoryResponse>(DIRECTORY_MEMO_MS);
 }
