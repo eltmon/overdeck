@@ -260,7 +260,7 @@ export class PipelineMembershipUnavailableError extends Error {
  * installation-token exchange, fetch, and the gh/glab CLIs produce.
  */
 const TRANSIENT_FORGE_FAILURE_PATTERNS: readonly RegExp[] = [
-  /\bfailed: (?:429|5\d\d)\b/,
+  /\b(?:failed|token): (?:429|5\d\d)\b/,
   /\bHTTP (?:429|5\d\d)\b/,
   /rate limit/i,
   /timed out|\btimeout\b/i,

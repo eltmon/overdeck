@@ -79,7 +79,8 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   `{ status: 'loading', code: 'snapshot_loading' }` and `Retry-After: 5`. A
   cold snapshot whose gather failed because the forge did not answer (rate
   limit, 429/5xx, timeout, network error: reason `forge_transient`) also
-  returns 503, with `Retry-After: 30`. A forge that answered "no" (404, a 403
+  returns 503, with `Retry-After: 30`; the 5-minute periodic-convergence
+  refresh re-gathers it. A forge that answered "no" (404, a 403
   without a rate limit, no App installation) stays `forge_unavailable`. Those
   503s, a failed or timed-out request, and a proxy 502/503/504 are transient:
   the banner keeps retrying them (backoff capped at 30s, never sooner than

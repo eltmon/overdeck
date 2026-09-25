@@ -771,6 +771,7 @@ describe('gatherProjectLensSignals', () => {
       timeout,
       new TypeError('fetch failed', { cause: new Error('connect ECONNRESET 140.82.112.6:443') }),
       new Error('GitHub API GET /repos/o/r/issues failed: 502 Bad Gateway'),
+      new Error('Failed to generate installation token: 503 Service Unavailable'),
       new Error('GitHub API GET /repos/o/r/issues failed: 429 Too Many Requests'),
       new Error('GitHub API GET /repos/o/r/issues failed: 403 You have exceeded a secondary rate limit'),
       new Error('gh api graphql failed (timeout, attempt 2): no stderr'),
