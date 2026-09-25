@@ -15,7 +15,7 @@ import { FlywheelHeadlineStrip } from '../components/flywheel/FlywheelHeadlineSt
 import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookCard';
 import { FlywheelReportPane, FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
-import { FlywheelStatusPane, FreshnessBadge } from '../components/flywheel/FlywheelStatusPane';
+import { FlywheelStatusPane, FreshnessBadge, inFlightCountLabel } from '../components/flywheel/FlywheelStatusPane';
 import { FlywheelUatBatchesCard } from '../components/flywheel/FlywheelUatBatchesCard';
 import { PendingAutoMergesCard } from '../components/flywheel/PendingAutoMergesCard';
 import { RailCard, StatusBadge, ToggleSwitch } from '../components/flywheel/primitives';
@@ -138,7 +138,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
         )}
         {status && (
           <span className="text-[11px] text-muted-foreground" data-testid="flywheel-inflight-count">
-            <span className="font-mono text-foreground">{status.inFlight.length}</span> in flight
+            {inFlightCountLabel(status)}
           </span>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-4">

@@ -67,7 +67,11 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     const chip = await screen.findByTestId('flywheel-run-chip');
     expect(chip).toHaveTextContent(label);
     expect(chip).toHaveAttribute('data-tone', tone);
-    expect(screen.getByTestId('flywheel-inflight-count')).toHaveTextContent(`${status.inFlight.length} in flight`);
+    expect(screen.getByTestId('flywheel-inflight-count')).toHaveTextContent(
+      status.inFlightSource === 'tick'
+        ? `${status.inFlight.filter((row) => row.inTick).length} in flight (loop)`
+        : `${status.inFlight.length} feature workspaces`,
+    );
   });
 
   it('shows the retry copy, never idle, when the status read fails', async () => {
@@ -96,6 +100,30 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     expect(mergeTrain).toHaveTextContent('Merge train: on');
     expect(mergeTrain).toHaveAttribute('href', '/awaiting-merge');
     expect(screen.queryByRole('switch', { name: 'Merge train' })).toBeNull();
+  });
+
+  it('the header counts the loop\'s own in-flight ids when a tick named them (PAN-4199 ac3)', async () => {
+    const base = flywheelStatus();
+    setup(flywheelStatus({
+      inFlightSource: 'tick',
+      inFlight: [
+        { ...base.inFlight[0]!, issueId: 'PAN-1', inTick: true },
+        { ...base.inFlight[0]!, issueId: 'PAN-2', inTick: true },
+        { ...base.inFlight[0]!, issueId: 'PAN-3', inTick: false },
+      ],
+    }));
+    renderWithQuery(<FlywheelPage />);
+    expect(await screen.findByTestId('flywheel-inflight-count')).toHaveTextContent('2 in flight (loop)');
+  });
+
+  it('the header counts feature workspaces when no tick named them (PAN-4199 ac4)', async () => {
+    const base = flywheelStatus();
+    setup(flywheelStatus({
+      inFlightSource: 'census',
+      inFlight: ['PAN-1', 'PAN-2', 'PAN-3'].map((issueId) => ({ ...base.inFlight[0]!, issueId, inTick: false })),
+    }));
+    renderWithQuery(<FlywheelPage />);
+    expect(await screen.findByTestId('flywheel-inflight-count')).toHaveTextContent('3 feature workspaces');
   });
 
   it('a pending reveal selects the Status tab (PAN-4199 ac4)', async () => {

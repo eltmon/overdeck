@@ -61,6 +61,49 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     });
   });
 
+  describe('no-agent and loop markers (PAN-4199 FR-5, FR-6)', () => {
+    function rowsStatus(rows: Array<Partial<FlywheelInFlightRow>>, overrides: Partial<Parameters<typeof flywheelStatus>[0]> = {}) {
+      const base = flywheelStatus().inFlight[1]!;
+      return flywheelStatus({
+        inFlight: rows.map((row, i) => ({ ...base, issueId: `PAN-${i + 1}`, state: 'working', ...row })),
+        ...overrides,
+      });
+    }
+
+    it('marks a working row with no live pane, and only that row (ac1)', () => {
+      render(<FlywheelStatusPane status={rowsStatus([{ liveAgents: 0 }, { liveAgents: 1 }])} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-no-agent-PAN-1')).toHaveTextContent('no agent');
+      expect(screen.queryByTestId('flywheel-no-agent-PAN-2')).toBeNull();
+    });
+
+    it('leaves a non-working row alone however few agents it has', () => {
+      render(<FlywheelStatusPane status={rowsStatus([{ state: 'in-review', liveAgents: 0 }])} unreachable={false} nowMs={NOW} />);
+      expect(screen.queryByTestId('flywheel-no-agent-PAN-1')).toBeNull();
+    });
+
+    it('marks the rows the loop named in its tick (ac2)', () => {
+      render(<FlywheelStatusPane status={rowsStatus([{ inTick: true }, { inTick: false }])} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-in-tick-PAN-1')).toHaveTextContent('flywheel');
+      expect(screen.queryByTestId('flywheel-in-tick-PAN-2')).toBeNull();
+    });
+
+    it('exposes each row\'s attention so the reveal can scroll to it', () => {
+      render(<FlywheelStatusPane status={rowsStatus([{ attention: 'needs-you' }])} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-inflight-PAN-1')).toHaveAttribute('data-attention', 'needs-you');
+    });
+
+    it('heads the section with the loop count or the census count', () => {
+      const { unmount } = render(
+        <FlywheelStatusPane status={rowsStatus([{ inTick: true }, { inTick: false }], { inFlightSource: 'tick' })} unreachable={false} nowMs={NOW} />,
+      );
+      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('1 in flight (loop)');
+      unmount();
+
+      render(<FlywheelStatusPane status={rowsStatus([{}, {}], { inFlightSource: 'census' })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('2 feature workspaces');
+    });
+  });
+
   it.each([
     ['live', '2026-09-23T09:59:40.000Z', 'live', 'info'],
     ['breathing', '2026-09-23T09:50:00.000Z', 'last tick 10m ago', 'neutral'],

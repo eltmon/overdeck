@@ -33,6 +33,17 @@ export function FreshnessBadge({ freshness, at, nowMs }: { freshness: FlywheelFr
 
 const ATTENTION_TONE: Record<string, Tone> = { 'needs-you': 'warning', stuck: 'destructive', 'api-error': 'destructive' };
 
+/**
+ * What the board is counting. A running loop's own tick list is the authority
+ * on what it picked up; with no tick, the rows are just the workspace census
+ * and the heading says so rather than implying the loop chose them.
+ */
+export function inFlightCountLabel(status: FlywheelDerivedStatus): string {
+  return status.inFlightSource === 'tick'
+    ? `${status.inFlight.filter((row) => row.inTick).length} in flight (loop)`
+    : `${status.inFlight.length} feature workspaces`;
+}
+
 interface FlywheelStatusPaneProps {
   status: FlywheelDerivedStatus | undefined;
   unreachable: boolean;
@@ -112,7 +123,7 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
 
       <section aria-label="In-flight issues">
         <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          In flight · {status.inFlight.length}
+          {inFlightCountLabel(status)}
         </h3>
         {status.inFlight.length === 0 ? (
           <p className="text-xs text-muted-foreground">No feature workspaces in this project.</p>
@@ -128,7 +139,12 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
             </thead>
             <tbody>
               {status.inFlight.map((row) => (
-                <tr key={row.issueId} className="border-t border-border/60 align-top" data-testid={`flywheel-inflight-${row.issueId}`}>
+                <tr
+                  key={row.issueId}
+                  className="border-t border-border/60 align-top"
+                  data-testid={`flywheel-inflight-${row.issueId}`}
+                  data-attention={row.attention}
+                >
                   <td className="py-1.5 pr-2">
                     <button
                       type="button"
@@ -156,6 +172,13 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
                     <span className="text-muted-foreground">{row.state}</span>
                     {row.attention && (
                       <span className="ml-1.5"><StatusBadge tone={ATTENTION_TONE[row.attention] ?? 'neutral'}>{row.attention}</StatusBadge></span>
+                    )}
+                    {/* `working` with no live pane is what a stalled issue looks like. */}
+                    {row.state === 'working' && row.liveAgents === 0 && (
+                      <span className="ml-1.5"><StatusBadge tone="neutral" testId={`flywheel-no-agent-${row.issueId}`}>no agent</StatusBadge></span>
+                    )}
+                    {row.inTick && (
+                      <span className="ml-1.5"><StatusBadge tone="info" testId={`flywheel-in-tick-${row.issueId}`}>flywheel</StatusBadge></span>
                     )}
                   </td>
                   <td className="py-1.5 pr-2 text-muted-foreground">
