@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { FlywheelInFlightRow } from '@overdeck/contracts';
 
 import { FlywheelStatusPane, freshnessLabel } from '../FlywheelStatusPane';
 import { NOW, flywheelStatus } from './fixtures';
@@ -32,6 +33,32 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(screen.getByTestId('flywheel-inflight-PAN-3920')).toHaveTextContent('working');
     fireEvent.click(screen.getByRole('button', { name: 'PAN-3964' }));
     expect(onNavigateIssue).toHaveBeenCalledWith('PAN-3964');
+  });
+
+  describe('row title and tracker-unknown marker (PAN-4199 FR-3)', () => {
+    /** One in-flight row, with everything but the fields under test defaulted. */
+    function rowStatus(row: Partial<FlywheelInFlightRow>) {
+      const base = flywheelStatus().inFlight[1]!;
+      return flywheelStatus({ inFlight: [{ ...base, issueId: 'PAN-1', title: null, ...row }] });
+    }
+
+    it('renders the title with the full text as its tooltip (ac1)', () => {
+      render(<FlywheelStatusPane status={rowStatus({ title: 'Fix the thing' })} unreachable={false} nowMs={NOW} />);
+      const title = screen.getByTestId('flywheel-title-PAN-1');
+      expect(title).toHaveTextContent('Fix the thing');
+      expect(title).toHaveAttribute('title', 'Fix the thing');
+    });
+
+    it('marks a row no tracker answered for (ac2)', () => {
+      render(<FlywheelStatusPane status={rowStatus({ trackerUnknown: true })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-tracker-unknown-PAN-1')).toHaveTextContent('tracker unknown');
+    });
+
+    it('renders neither marker for a titleless row the tracker knows (ac3)', () => {
+      render(<FlywheelStatusPane status={rowStatus({})} unreachable={false} nowMs={NOW} />);
+      expect(screen.queryByTestId('flywheel-title-PAN-1')).toBeNull();
+      expect(screen.queryByTestId('flywheel-tracker-unknown-PAN-1')).toBeNull();
+    });
   });
 
   it.each([
