@@ -16,7 +16,7 @@
  */
 import { existsSync } from 'node:fs';
 
-import type { AgentState } from '../agents/agent-state.js';
+import { getIssuePause, type AgentState } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents.js';
 import { isAlive, isConfirmedDead, isIdle } from '../agents/liveness.js';
 import { liveAgentInventory } from '../terminal-backends/inventory.js';
@@ -191,10 +191,13 @@ const STALLED_REVIEW_MIN_AGE_MS = 15 * 60_000;
 const STALLED_REVIEW_COOLDOWN_MS = 60 * 60_000; // one re-dispatch per issue per hour
 
 const lastReviewRedispatchAt = new Map<string, number>();
+/** issueId -> pausedAt of the pause already logged, so a hold logs once, not every tick. */
+const loggedPausedSkip = new Map<string, string>();
 
 /** Test seam: clear the per-issue re-dispatch cooldown between test cases. */
 export function __resetStalledReviewCooldownForTests(): void {
   lastReviewRedispatchAt.clear();
+  loggedPausedSkip.clear();
 }
 
 /**
@@ -210,6 +213,32 @@ function stalledReviewReason(type: string): string | null {
   if (type === 'review.requested') {
     return 'the review was requested but the pipeline never dispatched reviewers';
   }
+  return null;
+}
+
+/**
+ * PAN-3911: a `review.halted` tail is a review an issue pause stopped. While
+ * the issue stays paused (or its pause cannot be read) it holds. Once the pause
+ * is gone, by whatever door (`pan unpause` whose re-request failed, `pan start
+ * --force`, dashboard Start with `clearGates`, an unpause while the dashboard
+ * was down), the review is owed: re-request a fresh one through the guarded
+ * review route. The route journals `review.requested`, which ends the halt;
+ * the cooldown keeps a refused request from repeating every tick.
+ */
+async function rerequestHaltedReview(issueId: string, now: number): Promise<string | null> {
+  if (getIssuePause(issueId).status !== 'unpaused') return null;
+  const lastRedispatch = lastReviewRedispatchAt.get(issueId);
+  if (lastRedispatch !== undefined && now - lastRedispatch < STALLED_REVIEW_COOLDOWN_MS) return null;
+  lastReviewRedispatchAt.set(issueId, now);
+
+  const { requestReviewThroughRoute } = await import('./review-request-route.js');
+  const outcome = await requestReviewThroughRoute(issueId, {
+    message: 'an issue pause halted this review and has since been cleared',
+    source: 'deacon-lite',
+  });
+  if (outcome.requested) return `recoverStalledReviews: re-requested the halted ${issueId} review`;
+  if (outcome.noReviewNeeded) console.log(`[deacon-lite] ${issueId}: halted review not re-requested — ${outcome.reason}`);
+  else console.warn(`[deacon-lite] ${issueId}: could not re-request the halted review — ${outcome.reason}`);
   return null;
 }
 
@@ -235,10 +264,30 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
 
     const last = lastPipelineEntry(workspace.path);
     if (!last) continue;
+    if (last.type === 'review.halted') {
+      const action = await rerequestHaltedReview(issueId, now);
+      if (action) actions.push(action);
+      continue;
+    }
     const reason = stalledReviewReason(last.type);
     if (!reason) continue;
     const at = Date.parse(last.at);
     if (Number.isNaN(at) || now - at < STALLED_REVIEW_MIN_AGE_MS) continue;
+
+    // An operator issue pause holds the whole issue, reviewers included
+    // (PAN-3911). An unreadable pause is a hold too. getIssuePause never throws.
+    const pause = getIssuePause(issueId);
+    if (pause.status !== 'unpaused') {
+      const key = pause.status === 'paused' ? `paused:${pause.pausedAt ?? ''}` : `unknown:${pause.reason}`;
+      if (loggedPausedSkip.get(issueId) !== key) {
+        loggedPausedSkip.set(issueId, key);
+        const why = pause.status === 'paused'
+          ? `is paused (${pause.agentId}${pause.pausedReason ? `: ${pause.pausedReason}` : ''})`
+          : `has an unreadable pause state (${pause.agentId}: ${pause.reason})`;
+        console.log(`[deacon-lite] ${issueId} ${why} — not re-dispatching its stalled review`);
+      }
+      continue;
+    }
 
     // Only SUB-reviewers count as "the convoy is alive". The synthesis parent's
     // id is exactly `agent-<issue>-review`, so a prefix without the trailing

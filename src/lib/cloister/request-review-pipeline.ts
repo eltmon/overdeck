@@ -62,7 +62,7 @@ export type StartRequestReviewOutcome =
   | { started: false; reason: 'dirty-workspace'; error: string };
 
 /** Who asked for the review — journalled as the `review.requested` source. */
-export type RequestReviewSource = 'pan-done' | 'pan-review-request' | 'webhook' | 'deacon-lite' | 'api';
+export type RequestReviewSource = 'pan-done' | 'pan-review-request' | 'pan-unpause' | 'webhook' | 'deacon-lite' | 'api';
 
 export type RequestReviewStarter = (
   issueId: string,
@@ -85,4 +85,37 @@ export function registerRequestReviewStarter(starter: RequestReviewStarter | nul
 
 export function getRequestReviewStarter(): RequestReviewStarter | null {
   return requestReviewStarter;
+}
+
+/** What the guarded review request did (PAN-3911). */
+export type GuardedReviewRequestOutcome =
+  | { kind: 'already-merged' }
+  | { kind: 'already-passed' }
+  | { kind: 'tests-requeued' }
+  | { kind: 'circuit-breaker'; autoRequeueCount: number }
+  | { kind: 'no-workspace' }
+  | { kind: 'dirty-workspace'; error: string }
+  | { kind: 'no-project'; autoRequeueCount: number }
+  | { kind: 'already-running' }
+  | { kind: 'started'; autoRequeueCount: number; remoteVmName?: string };
+
+export type GuardedReviewRequester = (
+  issueId: string,
+  options: { message?: string; source: RequestReviewSource },
+) => Promise<GuardedReviewRequestOutcome>;
+
+let guardedReviewRequester: GuardedReviewRequester | null = null;
+
+/**
+ * The guarded review request (`POST /api/review/:issueId/request` without
+ * `force` or `nudge`: merged check, approved-head check, re-request breaker),
+ * registered by the review route at module load so other dashboard routes
+ * (the Unpause route) reach it without importing a route module.
+ */
+export function registerGuardedReviewRequester(requester: GuardedReviewRequester | null): void {
+  guardedReviewRequester = requester;
+}
+
+export function getGuardedReviewRequester(): GuardedReviewRequester | null {
+  return guardedReviewRequester;
 }

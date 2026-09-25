@@ -16,6 +16,10 @@ interface RequestReviewOptions {
 }
 
 interface RequestReviewResponse {
+  success?: boolean;
+  alreadyMerged?: boolean;
+  alreadyPassed?: boolean;
+  requeued?: boolean;
   message?: string;
   error?: string;
   hint?: string;
@@ -43,7 +47,7 @@ export async function requestReviewViaDashboard(
   message?: string,
   timeoutMs = 120_000,
   /** Who asked — journalled by the server as the `review.requested` source. */
-  source: 'pan-review-request' | 'pan-done' = 'pan-review-request',
+  source: 'pan-review-request' | 'pan-done' | 'pan-unpause' = 'pan-review-request',
 ): Promise<ReviewRequestResult> {
   let response: Response;
   try {

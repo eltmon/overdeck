@@ -152,7 +152,7 @@ describe('pauseCommand agent targeting (PAN-1760)', () => {
   it('pauses a strike session by its full agent ID', async () => {
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('strike-pan-1723', {});
-    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('strike-pan-1723', undefined, false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('strike-pan-1723', undefined, false, true);
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),
     );
@@ -161,7 +161,7 @@ describe('pauseCommand agent targeting (PAN-1760)', () => {
   it('still pauses the canonical work agent for a bare issue ID', async () => {
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('PAN-1723', { reason: 'ram' });
-    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1723', 'ram', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1723', 'ram', false, true);
   });
 });
 

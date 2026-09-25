@@ -43,8 +43,10 @@ import { transitionIssueToInReview } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
 import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-push.js';
 import {
+  registerGuardedReviewRequester,
   registerRequestReviewStarter,
   requestReviewPipeline,
+  type GuardedReviewRequestOutcome,
   type RequestReviewSource,
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
@@ -599,6 +601,116 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     });
   }))
 );
+/**
+ * The guarded review request: what `POST /api/review/:issueId/request` does
+ * without `force` or `nudge`, and what every re-request that is not an
+ * operator override goes through (PAN-3911: the dashboard Unpause). It refuses
+ * a merged issue, never re-reviews an approved head (it re-queues the tests
+ * when the approved PR's checks are not green, and is a no-op otherwise), and
+ * counts review spawns against the per-issue `MAX_AUTO_REQUEUE` breaker
+ * before it starts the review pipeline.
+ */
+export async function requestReviewGuarded(
+  issueId: string,
+  options: { message?: string; source: RequestReviewSource; derived?: DerivedIssueState },
+): Promise<GuardedReviewRequestOutcome> {
+  const canonicalIssueId = issueId.toUpperCase();
+  const derived = options.derived ?? await getDerivedIssueState(canonicalIssueId);
+
+  if (derived.state === 'merged') {
+    console.log(`[request-review] Rejecting ${issueId}: already merged`);
+    return { kind: 'already-merged' };
+  }
+
+  if (derived.pr?.reviewState === 'approved') {
+    if (derived.pr?.checks !== 'green') {
+      console.log(
+        `[request-review] ${issueId}: PR approved but checks ${derived.pr?.checks ?? 'unknown'} — dispatching test role`
+      );
+
+      try {
+        const resolved = resolveProjectFromIssueSync(issueId);
+        if (!resolved) {
+          console.error(
+            `[request-review] No project configured for ${issueId} — cannot spawn test role`
+          );
+        } else {
+          const workspacePath = join(
+            resolved.projectPath,
+            'workspaces',
+            `feature-${issueId.toLowerCase()}`
+          );
+          // PAN-1048 R1: spawn the test role via the role primitive. Reactive
+          // Cloister normally drives this on lifecycle transitions; this path
+          // is a manual re-dispatch for an already-approved PR.
+          const { spawnRun } = await import('../../../../lib/agents.js');
+          try {
+            const testRun = await spawnRun(issueId, 'test', {
+              workspace: workspacePath,
+              startedBy: 'dashboard:review-pipeline',
+            });
+            console.log(
+              `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
+            );
+          } catch (testErr) {
+            const msg = testErr instanceof Error ? testErr.message : String(testErr);
+            console.error(
+              `[request-review] Test role spawn failed for ${issueId}: ${msg}`
+            );
+            completePendingOperation(issueId, `Test dispatch failed: ${msg}`);
+          }
+        }
+      } catch (err: unknown) {
+        console.warn(
+          `[request-review] Failed to queue test role for ${issueId}: ${errorMessage(err)}`
+        );
+      }
+      return { kind: 'tests-requeued' };
+    }
+    console.log(
+      `[request-review] ${issueId}: review already passed — returning success no-op`
+    );
+    return { kind: 'already-passed' };
+  }
+
+  const currentCount = autoRequeueCounts.get(canonicalIssueId) ?? 0;
+
+  if (currentCount >= MAX_AUTO_REQUEUE) {
+    console.log(
+      `[request-review] Circuit breaker: ${issueId} exceeded max auto-requeues (${currentCount}/${MAX_AUTO_REQUEUE})`
+    );
+    return { kind: 'circuit-breaker', autoRequeueCount: currentCount };
+  }
+
+  const newCount = currentCount + 1;
+  const requestNote = options.message
+    ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${options.message}`
+    : `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE})`;
+
+  const outcome = await startRequestReviewPipeline(issueId, {
+    note: requestNote,
+    source: options.source,
+    onReviewSpawned: () => autoRequeueCounts.set(canonicalIssueId, newCount),
+  });
+
+  if (!outcome.started) {
+    if (outcome.reason === 'dirty-workspace') return { kind: 'dirty-workspace', error: outcome.error };
+    if (outcome.reason === 'no-project') return { kind: 'no-project', autoRequeueCount: currentCount };
+    return { kind: outcome.reason };
+  }
+
+  console.log(
+    `[request-review] Verification started for ${issueId}; review will dispatch after the verified branch is pushed${outcome.remoteVmName ? ` (remote: ${outcome.remoteVmName})` : ''}`
+  );
+  return {
+    kind: 'started',
+    autoRequeueCount: currentCount,
+    ...(outcome.remoteVmName ? { remoteVmName: outcome.remoteVmName } : {}),
+  };
+}
+
+registerGuardedReviewRequester(requestReviewGuarded);
+
 // ─── Route: POST /api/review/:issueId/request ─────────────────────
 const postWorkspaceRequestReviewRoute = HttpRouter.add(
   'POST',
@@ -616,7 +728,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const { message } = body as { message?: string };
     const rawSource = (body as { source?: unknown }).source;
     const requestSource: RequestReviewSource =
-      rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'webhook'
+      rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'pan-unpause'
+        || rawSource === 'webhook' || rawSource === 'deacon-lite'
         ? rawSource
         : 'api';
     const eventStore = yield* EventStoreService;
@@ -631,16 +744,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     const derived = yield* Effect.promise(() => getDerivedIssueState(canonicalIssueId));
 
-    if (derived.state === 'merged') {
-      console.log(`[request-review] Rejecting ${issueId}: already merged`);
-      return jsonResponse({
-        success: false,
-        alreadyMerged: true,
-        message: `${issueId} is already merged. Reopen the issue first.`,
-      });
-    }
-
-    if (derived.pr?.reviewState === 'approved') {
+    // The operator overrides of an approved head (`force`, `nudge`); every
+    // other request goes through the guard below.
+    if (derived.state !== 'merged' && derived.pr?.reviewState === 'approved') {
       if (forceReview) {
         console.log(`[request-review] FORCE: full reset requested by operator for ${canonicalIssueId}`);
       } else if (nudgeReview) {
@@ -753,129 +859,73 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           message: `Re-running review & test pipeline for ${issueId}`,
         });
       }
+    }
 
-      if (derived.pr?.checks !== 'green') {
-        console.log(
-          `[request-review] ${issueId}: PR approved but checks ${derived.pr?.checks ?? 'unknown'} — dispatching test role`
-        );
+    const guarded = yield* Effect.promise(() => requestReviewGuarded(issueId, {
+      source: requestSource,
+      derived,
+      ...(message ? { message } : {}),
+    }));
 
-        try {
-          const resolved = resolveProjectFromIssueSync(issueId);
-          if (!resolved) {
-            console.error(
-              `[request-review] No project configured for ${issueId} — cannot spawn test role`
-            );
-          } else {
-            const workspacePath = join(
-              resolved.projectPath,
-              'workspaces',
-              `feature-${issueId.toLowerCase()}`
-            );
-            // PAN-1048 R1: spawn the test role via the role primitive. Reactive
-            // Cloister normally drives this on lifecycle transitions; this path
-            // is a manual re-dispatch for an already-approved PR.
-            const { spawnRun } = yield* Effect.promise(() => import('../../../../lib/agents.js'));
-            try {
-              const testRun = yield* Effect.promise(() => spawnRun(issueId, 'test', {
-                workspace: workspacePath,
-                startedBy: 'dashboard:review-pipeline',
-              }));
-              console.log(
-                `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
-              );
-            } catch (testErr) {
-              const msg = testErr instanceof Error ? testErr.message : String(testErr);
-              console.error(
-                `[request-review] Test role spawn failed for ${issueId}: ${msg}`
-              );
-              completePendingOperation(issueId, `Test dispatch failed: ${msg}`);
-            }
-          }
-        } catch (err: unknown) {
-          console.warn(
-            `[request-review] Failed to queue test role for ${issueId}: ${errorMessage(err)}`
-          );
-        }
+    switch (guarded.kind) {
+      case 'already-merged':
+        return jsonResponse({
+          success: false,
+          alreadyMerged: true,
+          message: `${issueId} is already merged. Reopen the issue first.`,
+        });
+      case 'tests-requeued':
         return jsonResponse({
           success: true,
           requeued: true,
           message: `Tests re-queued for ${issueId} (PR already approved)`,
         });
-      }
-      console.log(
-        `[request-review] ${issueId}: review already passed — returning success no-op`
-      );
-      return jsonResponse({
-        success: true,
-        alreadyPassed: true,
-        message: `Review already passed for ${issueId}`,
-      });
-    }
-
-    const currentCount = autoRequeueCounts.get(canonicalIssueId) ?? 0;
-
-    if (currentCount >= MAX_AUTO_REQUEUE) {
-      console.log(
-        `[request-review] Circuit breaker: ${issueId} exceeded max auto-requeues (${currentCount}/${MAX_AUTO_REQUEUE})`
-      );
-      return jsonResponse(
-        {
-          success: false,
-          error: 'Circuit breaker triggered',
-          message: `Maximum automatic re-review requests (${MAX_AUTO_REQUEUE}) exceeded. Human intervention required.`,
-          autoRequeueCount: currentCount,
-          hint: 'A human must click the Review button to continue.',
-        },
-        { status: 429 }
-      );
-    }
-
-    const newCount = currentCount + 1;
-    const requestNote = message
-      ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}`
-      : `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE})`;
-
-    const outcome = yield* Effect.promise(() => startRequestReviewPipeline(issueId, {
-      note: requestNote,
-      source: requestSource,
-      onReviewSpawned: () => autoRequeueCounts.set(canonicalIssueId, newCount),
-    }));
-
-    if (!outcome.started) {
-      if (outcome.reason === 'no-workspace') {
+      case 'already-passed':
+        return jsonResponse({
+          success: true,
+          alreadyPassed: true,
+          message: `Review already passed for ${issueId}`,
+        });
+      case 'circuit-breaker':
+        return jsonResponse(
+          {
+            success: false,
+            error: 'Circuit breaker triggered',
+            message: `Maximum automatic re-review requests (${MAX_AUTO_REQUEUE}) exceeded. Human intervention required.`,
+            autoRequeueCount: guarded.autoRequeueCount,
+            hint: 'A human must click the Review button to continue.',
+          },
+          { status: 429 }
+        );
+      case 'no-workspace':
         return jsonResponse({ success: false, error: 'Workspace does not exist' }, { status: 400 });
-      }
-      if (outcome.reason === 'dirty-workspace') {
-        return jsonResponse({ success: false, error: outcome.error }, { status: 400 });
-      }
-      if (outcome.reason === 'no-project') {
+      case 'dirty-workspace':
+        return jsonResponse({ success: false, error: guarded.error }, { status: 400 });
+      case 'no-project':
         return jsonResponse(
           {
             success: false,
             error: `No project configured for ${issueId}. Add it to projects.yaml.`,
-            autoRequeueCount: currentCount,
+            autoRequeueCount: guarded.autoRequeueCount,
           },
           { status: 500 }
         );
-      }
-      return jsonResponse({
-        success: true,
-        queued: true,
-        alreadyRunning: true,
-        message: `Verification already running for ${canonicalIssueId}; review will start automatically when it passes`,
-      }, { status: 202 });
+      case 'already-running':
+        return jsonResponse({
+          success: true,
+          queued: true,
+          alreadyRunning: true,
+          message: `Verification already running for ${canonicalIssueId}; review will start automatically when it passes`,
+        }, { status: 202 });
+      case 'started':
+        return jsonResponse({
+          success: true,
+          queued: true,
+          message: `Verification started for ${canonicalIssueId}; review will start automatically when it passes`,
+          autoRequeueCount: guarded.autoRequeueCount,
+          remainingRequeues: MAX_AUTO_REQUEUE - guarded.autoRequeueCount,
+        }, { status: 202 });
     }
-
-    console.log(
-      `[request-review] Verification started for ${issueId}; review will dispatch after the verified branch is pushed${outcome.remoteVmName ? ` (remote: ${outcome.remoteVmName})` : ''}`
-    );
-    return jsonResponse({
-      success: true,
-      queued: true,
-      message: `Verification started for ${canonicalIssueId}; review will start automatically when it passes`,
-      autoRequeueCount: currentCount,
-      remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
-    }, { status: 202 });
   }))
 );
 

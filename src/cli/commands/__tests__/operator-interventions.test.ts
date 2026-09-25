@@ -51,6 +51,10 @@ const interventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(),
 }));
 
+const issuePauseMocks = vi.hoisted(() => ({
+  haltIssueSpecialistsForPause: vi.fn(),
+}));
+
 const unpauseMocks = vi.hoisted(() => ({
   getWorkAgentLifecycleState: vi.fn(),
   resumeAgent: vi.fn(),
@@ -84,6 +88,11 @@ vi.mock('../../../lib/agents.js', () => {
 // the fake mirrors the tmux session mock so each case sets liveness once.
 vi.mock('../../../lib/terminal-backends/launch.js', () => ({
   agentPaneExists: vi.fn(async (id: string) => (tmuxMocks.sessionExistsSync as (name: string) => boolean)(id)),
+}));
+
+vi.mock('../../../lib/agents/issue-pause.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/agents/issue-pause.js')>()),
+  haltIssueSpecialistsForPause: issuePauseMocks.haltIssueSpecialistsForPause,
 }));
 
 vi.mock('../../../lib/tmux.js', () => ({
@@ -157,6 +166,8 @@ describe('operator intervention CLI emission', () => {
     agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed(null));
     agentMocks.stopAgent.mockReset();
     agentMocks.stopAgent.mockReturnValue(Effect.void);
+    issuePauseMocks.haltIssueSpecialistsForPause.mockReset();
+    issuePauseMocks.haltIssueSpecialistsForPause.mockResolvedValue(null);
     tmuxMocks.sessionExistsSync.mockReset();
     remoteMocks.isRemoteAvailable.mockReset();
     remoteMocks.killRemoteAgent.mockReset();
@@ -200,12 +211,44 @@ describe('operator intervention CLI emission', () => {
     const { pauseCommand } = await import('../pause.js');
     await pauseCommand('PAN-1', { reason: 'operator requested' });
 
-    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1', 'operator requested', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1', 'operator requested', false, true);
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-1',
       kind: 'pause',
       source: 'pan pause',
     });
+  });
+
+  it('stops the issue review/test agents when pan pause pauses the work agent (PAN-3911)', async () => {
+    agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-1', role: 'work', status: 'running' });
+    tmuxMocks.sessionExistsSync.mockReturnValue(true);
+    issuePauseMocks.haltIssueSpecialistsForPause.mockResolvedValue({
+      stopped: ['agent-pan-1-review-security', 'agent-pan-1-review'],
+      failed: [{ agentId: 'agent-pan-1-test', reason: 'herdr could not close pane p_3' }],
+      unknown: [],
+      closedPanes: [],
+    });
+
+    const { pauseCommand } = await import('../pause.js');
+    await pauseCommand('PAN-1', {});
+
+    expect(issuePauseMocks.haltIssueSpecialistsForPause).toHaveBeenCalledWith(
+      'agent-pan-1', expect.objectContaining({ issueId: 'PAN-1', role: 'work' }), 'pan-pause',
+    );
+    expect(logSpy.mock.calls.some(([line]) => String(line).includes('agent-pan-1-review-security'))).toBe(true);
+    expect(errorSpy.mock.calls.some(([line]) => String(line).includes('could not stop agent-pan-1-test'))).toBe(true);
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
+  });
+
+  it('marks pan pause as an operator pause for any agent', async () => {
+    agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-1', role: 'review', status: 'running' });
+    tmuxMocks.sessionExistsSync.mockReturnValue(true);
+
+    const { pauseCommand } = await import('../pause.js');
+    await pauseCommand('agent-pan-1-review', {});
+
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-1-review', undefined, true, true);
   });
 
   it('emits a pause intervention when pan kill stops a local agent', async () => {
