@@ -1,0 +1,413 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-25T06:54:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4211: No way to clear a 'troubled' agent after the Cut: errors say 'pan untroubled' but the command no longer exists",
+    "updated": "2026-09-25T06:54:34.519Z"
+  },
+  "plan": {
+    "id": "pan-4211",
+    "title": "No way to clear a 'troubled' agent after the Cut: errors say 'pan untroubled' but the command no longer exists",
+    "status": "proposed",
+    "uid": "1fe8d14a-200c-4e35-b9cb-4e0975a7c332",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-25T06:54:15Z",
+    "updated": "2026-09-25T06:54:34.519Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4211",
+        "label": "PAN-4211",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4211.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cli",
+      "agent-gates",
+      "troubled",
+      "regression",
+      "the-cut"
+    ],
+    "narratives": {
+      "Problem": "The Cut (PAN-3917, commit a1def1f8959) deleted `pan untroubled` believing there was no stored troubled flag, but applyAgentFailure still sets `troubled` after three failures in ten minutes and it still blocks pan start, pan resume, dashboard Start and MERGE. Four operator messages (start.ts:790, agent-state.ts:786/794, routes/agents/shared.ts:572, parked/resolver.ts:186) name the dead verb, and `pan start --force` clears only the paused gate, so operators must hand-edit ~/.overdeck/agents/<agent>/state.json.",
+      "Proposal": "Restore `pan untroubled <id>` as a clear-only verb over clearAgentTroubled that records an `untroubled` operator intervention; make `pan start <id> --force` also clear the troubled gate (parity with dashboard clearGates) and record the intervention; reword the start refusal to name both doors; extend src/lib/__tests__/agent-text-cli-verbs.test.ts so every troubled/paused gate message is checked against the CLI registry; restore the pan-untroubled skill and correct THE-CUT, PIPELINE-GATES, ISSUE-VIEW, SKILLS-CONVENTION and the pan-start skill.",
+      "NonGoals": "- A troubled-gate recovery dialog in the dashboard frontend (StartAgentCta, ResumableSessionDialog, resumeRecovery.ts)\n- Changing when the troubled gate is set (threshold, window, backoff)\n- Removing the troubled flag or the failure tracking fields\n- Making --fresh alone clear the troubled gate\n- Recording an unpause intervention for the pause clear pan start --force already performs\n- Re-adding a dashboard POST /api/agents/:id/untroubled route\n- Rewording the agent-state.ts, shared.ts and parked/resolver.ts messages (they become correct once the verb exists)\n- Un-skipping or regenerating tests/fixtures/pan-help.txt\n- pan untroubled resuming or spawning the agent"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Provide both clearing doors: restored `pan untroubled <id>` and `pan start <id> --force` clearing the troubled gate.",
+        "rationale": "The issue lists both; the dashboard's clearGates already clears paused and troubled together, and --force is the CLI's advertised gate override, so the CLI now matches. The verb gives a clear-without-spawn door the MERGE and parked-row messages need."
+      },
+      {
+        "summary": "`pan untroubled` is clear-only: it never resumes or spawns.",
+        "rationale": "Matches its deleted implementation and the help text still in tests/fixtures/pan-help.txt ('Clear an agent troubled gate without spawning it'); a repeatedly crashing agent should restart only when the operator chooses."
+      },
+      {
+        "summary": "`--fresh` alone does not clear the troubled gate; only `--force` (alone or with --fresh) does.",
+        "rationale": "--fresh replaces a session and is not a gate override; keeping gate overrides on one flag keeps the semantics of each flag single-purpose."
+      },
+      {
+        "summary": "Keep the agent-state.ts, shared.ts and resolver.ts message text unchanged; reword only the start.ts refusal.",
+        "rationale": "Once the verb is registered those messages are correct; the start refusal is the one place both doors apply."
+      },
+      {
+        "summary": "Guard recurrence by extending src/lib/__tests__/agent-text-cli-verbs.test.ts rather than adding a new mechanism.",
+        "rationale": "That test already checks agent-facing text against COMPOSER_COMMAND_MANIFEST, which is drift-gated against the real CLI registry."
+      },
+      {
+        "summary": "Dashboard frontend troubled recovery dialog is out of scope.",
+        "rationale": "The backend already supports clearGates; the UI change is a separate vertical slice and the issue asks for a CLI door plus correct messages."
+      }
+    ],
+    "items": [
+      {
+        "id": "untroubled-verb",
+        "title": "Restore the pan untroubled <id> clear-only verb",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:54:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/untroubled.ts",
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "sync-sources/skills/pan-untroubled/SKILL.md",
+            "tests/fixtures/synced-skills.txt",
+            "src/cli/commands/__tests__/untroubled.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli && npm run generate:slash-commands",
+            "bash scripts/lint-slash-commands.sh",
+            "npx vitest run src/cli/commands/__tests__/untroubled.test.ts tests/fixtures/synced-skills.test.ts src/lib/__tests__/agent-text-cli-verbs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lint-slash-commands prints '✓ composer-command manifest matches the CLI registry'",
+            "untroubled.test.ts, synced-skills.test.ts and agent-text-cli-verbs.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-11",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4211.md WI-1. Create src/cli/commands/untroubled.ts mirroring src/cli/commands/unpause.ts target resolution (resolveAgentTarget, getAgentState), clear through Effect.runPromise(clearAgentTroubled(agentId)), record appendOperatorInterventionEvent({ issueId, kind: 'untroubled', source: 'pan untroubled' }) only when the state was troubled or had consecutiveFailures > 0, print 'Cleared troubled state for agent: <agentId>' then 'Run pan start <issueId> to spawn it.', or 'Agent <agentId> is already untroubled.' when clear. Never spawn or resume. Catch error: unknown (no any). Register 'untroubled <id>' in src/cli/index.ts right after the unpause block with description 'Clear an agent troubled gate without spawning it'. Regenerate the composer manifest (npm run build:cli && npm run generate:slash-commands) and commit it. Restore sync-sources/skills/pan-untroubled/SKILL.md from the pan-unpause template (no Deacon auto-resume claim) and add pan-untroubled to tests/fixtures/synced-skills.txt after pan-unpause. Add src/cli/commands/__tests__/untroubled.test.ts with the four cases in WI-1 step 6."
+        },
+        "items": [
+          {
+            "id": "untroubled-verb.ac1",
+            "title": "Given the CLI is built, when `node dist/cli/index.js untroubled --help` runs, then it prints 'Clear an agent troubled gate without spawning it' and COMPOSER_COMMAND_MANIFEST contains an entry with path ['untroubled']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "untroubled-verb.ac2",
+            "title": "Given a state { issueId: 'PAN-1641', troubled: true, consecutiveFailures: 3 }, when untroubledCommand('PAN-1641') runs, then it calls clearAgentTroubled('agent-pan-1641'), records exactly one intervention { issueId: 'PAN-1641', kind: 'untroubled', source: 'pan untroubled' }, and prints 'Cleared troubled state for agent: agent-pan-1641' and 'pan start PAN-1641'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "untroubled-verb.ac3",
+            "title": "Given an agent with no troubled flag and zero failures, when untroubledCommand runs, then it prints 'is already untroubled', exits 0, and records no intervention",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "untroubled-verb.ac4",
+            "title": "Given getAgentState returns null, when untroubledCommand('PAN-1641') runs, then it exits 1 with 'Agent agent-pan-1641 not found.'; given 'strike-pan-1723', then clearAgentTroubled is called with 'strike-pan-1723'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "untroubled-verb.ac5",
+            "title": "Given sync-sources/skills/pan-untroubled/SKILL.md exists, when tests/fixtures/synced-skills.test.ts and src/lib/__tests__/agent-text-cli-verbs.test.ts run, then both pass with pan-untroubled listed in the fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-force-clears-troubled",
+        "title": "Make pan start --force clear the troubled gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:54:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "src/lib/work-agent-lifecycle.ts",
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "src/cli/commands/__tests__/start-running-noop.test.ts",
+            "tests/lib/work-agent-lifecycle.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli && npm run generate:slash-commands",
+            "bash scripts/lint-slash-commands.sh",
+            "npx vitest run src/cli/commands/__tests__/start-running-noop.test.ts tests/lib/work-agent-lifecycle.test.ts src/cli/commands/__tests__/start-fresh-session.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint-slash-commands prints '✓ composer-command manifest matches the CLI registry'",
+            "start-running-noop.test.ts, work-agent-lifecycle.test.ts and start-fresh-session.test.ts pass",
+            "typecheck and lint complete without errors (including lint:file-size)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/cli/commands/start.ts add shouldClearTroubledBeforeSpawn = existingAgentState?.troubled === true && options.force === true; skip the troubled refusal when --force is set; reword the refusal's last line to 'Investigate the crash cause, then run pan untroubled <id> to clear the gate, or pan start <id> --force to clear it and start now.'; add a local clearTroubledForForce(agentId, issueId) that runs Effect.runPromise(clearAgentTroubled(agentId)) then appendOperatorInterventionEvent({ issueId, kind: 'untroubled', source: 'pan start --force' }); call it next to both existing pause clears (local spawn near line 1189 and inside handleRemoteWorkspace near line 419 via a new clearTroubledBeforeSpawn parameter); pass allowTroubledForce: shouldClearTroubledBeforeSpawn to assertCanStartFresh. In src/lib/work-agent-lifecycle.ts add allowTroubledForce to StartFreshOptions and widen the paused-force override to a gate-force override covering troubled. Change the --force description in src/cli/index.ts to 'Clear paused, troubled, and pending-operator-decision gates and start anyway' and regenerate the manifest. --fresh without --force must still refuse a troubled agent. start.ts is at its 1265-line allowlist cap: if it grows, add '<lines> src/cli/commands/start.ts # PAN-4211' to scripts/file-size-allowlist.txt in the same commit."
+        },
+        "items": [
+          {
+            "id": "start-force-clears-troubled.ac1",
+            "title": "Given a troubled agent state, when issueCommand('PAN-X', {}) runs, then it exits 1 and stderr contains 'pan untroubled PAN-X' and 'pan start PAN-X --force'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-force-clears-troubled.ac2",
+            "title": "Given a troubled agent state, when issueCommand('PAN-X', { force: true }) runs, then stderr does not contain 'will not be started' and getWorkAgentLifecycleState is called (the refusal no longer returns early)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-force-clears-troubled.ac3",
+            "title": "Given pan start --force reaches the spawn step for a troubled agent, then clearAgentTroubled is called with the agent id and appendOperatorInterventionEvent records { kind: 'untroubled', source: 'pan start --force' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-force-clears-troubled.ac4",
+            "title": "Given a stopped troubled agent with a saved session, when assertCanStartFresh is called with { allowTroubledForce: true }, then it resolves; without the option it rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-force-clears-troubled.ac5",
+            "title": "Given the CLI is built, when `node dist/cli/index.js start --help` runs, then the --force line reads 'Clear paused, troubled, and pending-operator-decision gates and start anyway' and bash scripts/lint-slash-commands.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-message-registry-test",
+        "title": "Test that gate messages name only registered pan commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:54:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/__tests__/agent-text-cli-verbs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "agent-text-cli-verbs.test.ts passes, including the PAN-4211 describe block",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Add a describe block 'operator gate messages name only registered pan commands (PAN-4211)' to src/lib/__tests__/agent-text-cli-verbs.test.ts that reuses buildRegistry/commandsIn/unregistered. Collect texts from: decideResumeGate(troubled block, 'merge-preparation'), decideResumeGate(troubled block, 'operator-start'), the same two for a paused block (src/lib/agents/agent-state.ts); evaluateAgentStartGate('agent-pan-1', troubled) and (paused) .hint (src/dashboard/server/routes/agents/shared.ts); classifyParked with a stopped troubled agent and a stopped paused agent → each row's unparkCondition (src/lib/parked/resolver.ts). Assert every collected text is non-empty and every pan command in them resolves in the registry. Copy the vi.mock of '../../agents/queries.js' from src/lib/parked/__tests__/resolver.test.ts only if importing resolver.js requires it. Do not change the existing helpers."
+        },
+        "items": [
+          {
+            "id": "gate-message-registry-test.ac1",
+            "title": "Given the PAN-4211 block, when agent-text-cli-verbs.test.ts runs, then it collects non-empty messages from decideResumeGate (troubled and paused, merge-preparation and operator-start), evaluateAgentStartGate hints, and classifyParked unparkCondition rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-message-registry-test.ac2",
+            "title": "Given every collected message, when each pan command is checked with unregistered(), then the list of unregistered commands equals []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-message-registry-test.ac3",
+            "title": "Given the PAN-4211 block, when it runs, then it asserts unregistered(['untroubled'], registry) returns null, mirroring the existing `pan work done` assertion, so removing the verb fails the test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-troubled-doors",
+        "title": "Document the two troubled-gate clearing doors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:54:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4211",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/THE-CUT.md",
+            "docs/PIPELINE-GATES.md",
+            "docs/ISSUE-VIEW.md",
+            "docs/SKILLS-CONVENTION.md",
+            "sync-sources/skills/pan-start/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'no stored troubled flag' docs/THE-CUT.md; test $? -eq 1",
+            "git grep -n 'pan untroubled <id>' docs/PIPELINE-GATES.md",
+            "npx vitest run src/lib/__tests__/agent-text-cli-verbs.test.ts"
+          ],
+          "expected_outputs": [
+            "the THE-CUT.md grep returns no match",
+            "PIPELINE-GATES.md grep returns at least one line",
+            "agent-text-cli-verbs.test.ts passes (pan-start skill references resolve)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 exactly. (1) docs/THE-CUT.md line 158: the pan untroubled row now says it was restored by PAN-4211 because the troubled flag survived the Cut, naming pan untroubled <id> and pan start <id> --force. (2) docs/PIPELINE-GATES.md 'Agent Auto-Resume Gates': add a Troubled gate bullet after Manual pause (set after three failures in ten minutes; blocks start/resume/dashboard Start/MERGE; pan untroubled <id> clears without spawning; pan start <id> --force and dashboard clearGates clear and start; both record an untroubled operator intervention). (3) docs/ISSUE-VIEW.md line 87: paused opens the recovery dialog posting clearGates: true; troubled Start is refused with a 409 whose hint names pan untroubled <agent-id>. (4) sync-sources/skills/pan-start/SKILL.md after line 76: troubled refusal sentence and --force clears it. (5) docs/SKILLS-CONVENTION.md line 46: pan pause, pan unpause and pan untroubled are intentionally wrapped."
+        },
+        "items": [
+          {
+            "id": "docs-troubled-doors.ac1",
+            "title": "Given the change, when `git grep -n 'no stored troubled flag' docs/THE-CUT.md` runs, then it returns no match and the pan untroubled row names PAN-4211, `pan untroubled <id>` and `pan start <id> --force`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-troubled-doors.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, when a reader opens 'Agent Auto-Resume Gates', then a Troubled gate bullet states the three-failures-in-ten-minutes trigger and names `pan untroubled <id>` and `pan start <id> --force` as the clearing doors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-troubled-doors.ac3",
+            "title": "Given docs/ISSUE-VIEW.md, when a reader checks the start CTA list, then it no longer claims a troubled issue opens a confirmation dialog and instead states the 409 refusal naming `pan untroubled`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-troubled-doors.ac4",
+            "title": "Given sync-sources/skills/pan-start/SKILL.md and docs/SKILLS-CONVENTION.md, when agent-text-cli-verbs.test.ts runs, then it passes and the pan-start skill states that --force clears the troubled gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "untroubled-verb",
+        "to": "start-force-clears-troubled",
+        "type": "blocks"
+      },
+      {
+        "from": "untroubled-verb",
+        "to": "gate-message-registry-test",
+        "type": "blocks"
+      },
+      {
+        "from": "untroubled-verb",
+        "to": "docs-troubled-doors",
+        "type": "blocks"
+      },
+      {
+        "from": "start-force-clears-troubled",
+        "to": "docs-troubled-doors",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "17 files total; the 11-subsystem count comes from the tests, generated composer manifest, skill, fixture and docs that accompany two small CLI changes (one restored verb, one --force branch). Every item is one vertical slice of the same regression fix; splitting into sibling issues would ship the verb without its guard test or docs and leave THE-CUT.md contradicting the code.",
+      "canonicalFilename": "2026-09-25-PAN-4211-no-way-to-clear-a-troubled-agent-after-the-cut-errors-say-pan-untroubled-but-the-command-no-longer-exists.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
