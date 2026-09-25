@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-09-25T07:37:40.529Z",
+  "updated": "2026-09-25T07:41:20.864Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -402,9 +402,10 @@
       "doneAt": "2026-09-25T07:37:36.808Z"
     },
     "ollama-pan-up-ensure": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1641",
-      "claimedAt": "2026-09-25T07:37:40.524Z"
+      "claimedAt": "2026-09-25T07:37:40.524Z",
+      "doneAt": "2026-09-25T07:41:20.863Z"
     }
   }
 }
