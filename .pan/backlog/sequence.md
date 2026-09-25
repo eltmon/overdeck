@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:21:21.320678Z · model: claude-opus-5-5 · open: 801_
+_Last sequenced: 2026-09-25T05:23:31.207963Z · model: claude-opus-5-5 · open: 802_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -38,6 +38,7 @@ _Last sequenced: 2026-09-25T05:21:21.320678Z · model: claude-opus-5-5 · open: 
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 70 | PAN-4196 | M | high | ok |  |  | bun audit: 218 advisories (1 critical tar DoS, 91 high); in-range updates + overrides + node-pty beta.15 with PTY smoke test |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -941,6 +942,10 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
+### PAN-4196 (rank 70)
+
+New issue (2026-09-25). The dependency tree carries a critical tar decompression-DoS advisory and 91 high-severity findings, so it sits beside the PAN-3605 supply-chain fix. Scope is bounded to in-range updates and overrides with mechanical verification (audit counts, build, Node 22 PTY smoke); the node-pty bump touches the dashboard terminal path, which is why the PTY smoke test matters.
+
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1105,10 +1110,6 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 
 Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
 
-### PAN-4184 (rank 118)
-
-New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1116,10 +1117,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:21:21.320678Z",
+  "generatedAt": "2026-09-25T05:23:31.207963Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 801,
+  "openCount": 802,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11019,6 +11020,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "dependsOn": [],
       "why": "Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms",
       "rationale": "New issue (2026-09-25). Agents and hooks invoke pan constantly, so a 0.5 s, 230 MB floor per call adds latency to every agent turn and memory pressure on the host. The fix (lazy action imports, bundle/compile-cache tuning, a startup regression check) is well scoped with a measurable target, so condition is ok; placed in a free slot among score-63 medium work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4196",
+      "rank": 70,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "bun audit: 218 advisories (1 critical tar DoS, 91 high); in-range updates + overrides + node-pty beta.15 with PTY smoke test",
+      "rationale": "New issue (2026-09-25). The dependency tree carries a critical tar decompression-DoS advisory and 91 high-severity findings, so it sits beside the PAN-3605 supply-chain fix. Scope is bounded to in-range updates and overrides with mechanical verification (audit counts, build, Node 22 PTY smoke); the node-pty bump touches the dashboard terminal path, which is why the PTY smoke test matters.",
       "gate": "auto",
       "planning": "auto"
     }
