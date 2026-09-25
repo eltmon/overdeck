@@ -22,7 +22,12 @@ import {
   stopFlywheel,
   type FlywheelStartOptions,
 } from '../../../lib/flywheel/actions.js';
-import { deriveFlywheelStatus, readFlywheelRun, resolveFlywheelProjectRoot } from '../../../lib/flywheel/derive-status.js';
+import {
+  deriveFlywheelStatus,
+  readFlywheelRun,
+  resolveFlywheelProjectRoot,
+  type DeriveFlywheelStatusDeps,
+} from '../../../lib/flywheel/derive-status.js';
 import {
   FlywheelAlreadyRunning,
   FlywheelNotRunning,
@@ -31,7 +36,10 @@ import {
 } from '../../../lib/flywheel/errors.js';
 import { readFlywheelReportFile, readFlywheelStateFile } from '../../../lib/flywheel/files.js';
 import { computeSubstrateStats } from '../../../lib/flywheel/substrate-stats.js';
+import type { TrackerIssueFacts } from '../../../lib/overdeck/derived-issue-state.js';
 import { jsonResponse } from '../http-helpers.js';
+import { loadIssueStatesForProject } from '../services/derived-issue-state.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { hasDashboardInternalToken, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
@@ -82,8 +90,30 @@ async function guarded(action: () => Promise<unknown>): Promise<RouteResult> {
 
 // ─── payloads (exported for tests) ───────────────────────────────────────────
 
-export function getFlywheelStatusPayload(): Promise<RouteResult> {
-  return guarded(() => deriveFlywheelStatus());
+/**
+ * The server's reads for the deriver: the tracker row comes from the shared
+ * `IssueDataService` cache and the derived states from the server adapter, so
+ * a status poll re-reads neither the tracker nor the forge. Without them the
+ * deriver falls back to its own per-issue tracker reads (PAN-4199 FR-4).
+ */
+export function serverFlywheelStatusDeps(): DeriveFlywheelStatusDeps {
+  return {
+    readTrackerIssues: async (issueIds) => Object.fromEntries(issueIds.map((raw) => {
+      const issueId = raw.toUpperCase();
+      let facts: TrackerIssueFacts | null = null;
+      try {
+        facts = getSharedIssueService().getTrackerIssue(issueId);
+      } catch {
+        // No issue service in this process — unknown, never a silent "open".
+      }
+      return [issueId, facts];
+    })),
+    loadStates: (projectPath, issueIds, opts) => loadIssueStatesForProject(projectPath, issueIds, { issues: opts.issues }),
+  };
+}
+
+export function getFlywheelStatusPayload(deps: DeriveFlywheelStatusDeps = serverFlywheelStatusDeps()): Promise<RouteResult> {
+  return guarded(() => deriveFlywheelStatus({ deps }));
 }
 
 export function getFlywheelStatePayload(): Promise<RouteResult> {
