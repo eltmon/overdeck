@@ -8,7 +8,7 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', () => ({
   markBlocked: vi.fn(() => true),
   markFailed: vi.fn(() => true),
   markMerged: vi.fn(() => true),
-  markMergingBlocked: vi.fn(() => true),
+  markMergeRetriesExhausted: vi.fn(() => true),
   requeueToPending: vi.fn(() => true),
   transitionToMerging: vi.fn(() => true),
 }));
@@ -19,8 +19,16 @@ vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', () => ({
   isAutoMergeEligible: vi.fn(async () => ({ eligible: true })),
 }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
+// #3983: the executor reads the tracker live before it merges.
+const tracker = vi.hoisted(() => ({ open: true as boolean | null }));
 vi.mock('../derived-issue-state.js', () => ({
-  getDerivedIssueState: vi.fn(async (issueId: string) => ({ issueId, state: 'ready' })),
+  readIssueFromTracker: vi.fn(async () => (tracker.open === null ? null : { open: tracker.open, labels: [] })),
+}));
+vi.mock('../issue-service-singleton.js', () => ({
+  getSharedIssueService: () => ({ getTrackerIssue: () => null }),
+}));
+vi.mock('../../../../lib/cloister/merge-gate.js', () => ({
+  evaluateIssueMergeGate: vi.fn(async () => ({ ready: true, facts: { headSha: null } })),
 }));
 
 import {
@@ -31,8 +39,32 @@ import {
   stopAutoMergeExecutor,
   tickAutoMergeExecutor,
 } from '../auto-merge-executor.js';
-import type { DerivedIssueState, IssueState } from '@overdeck/contracts';
 import type { PendingAutoMerge } from '../../../../lib/overdeck/merge-types.js';
+import { emptyPrFacts, type PrFacts } from '../../../../lib/cloister/pr-facts.js';
+import type { MergeGateResult } from '../../../../lib/cloister/merge-gate.js';
+
+/** What the real merge gate answers: a verdict plus the PR facts it read. */
+function gate(ready = true, facts: Partial<PrFacts> = {}, reason?: string): MergeGateResult {
+  return {
+    ready,
+    ...(reason ? { reason } : {}),
+    facts: {
+      ...emptyPrFacts('PAN-1486'),
+      forge: 'github',
+      url: 'https://github.com/eltmon/overdeck/pull/1486',
+      number: 1486,
+      exists: true,
+      open: true,
+      headSha: 'aaaaaaaaaaaaaaaa',
+      reviewDecision: 'APPROVED',
+      approved: true,
+      approvedAtHead: true,
+      mergeable: true,
+      checks: 'green',
+      ...facts,
+    },
+  };
+}
 
 const NOW = new Date('2026-05-25T10:00:00.000Z');
 
@@ -43,9 +75,11 @@ function pendingEntry(overrides: Partial<PendingAutoMerge> = {}): PendingAutoMer
     prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
     prNumber: 1486,
     projectKey: 'overdeck',
+    forge: 'github',
     status: 'pending',
     scheduledMergeAt: '2026-05-25T09:59:59.000Z',
     scheduledAt: '2026-05-25T09:54:59.000Z',
+    headSha: 'aaaaaaaaaaaaaaaa',
     ...overrides,
   };
 }
@@ -56,6 +90,7 @@ describe('auto-merge executor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     delete process.env.OVERDECK_DISABLE_AUTO_MERGE;
+    tracker.open = true;
   });
 
   afterEach(() => {
@@ -76,7 +111,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry({ scheduledMergeAt: '2026-05-25T10:00:01.000Z' })],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       transition,
       mergeIssue,
@@ -113,7 +148,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry(), pendingEntry({ id: 2, issueId: 'PAN-1487' })],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => deployQueued,
       isEligible,
       transition,
@@ -145,7 +180,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD abc123' }),
       markBlocked,
@@ -164,7 +199,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => false,
@@ -185,7 +220,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -194,7 +229,7 @@ describe('auto-merge executor', () => {
       markFailed,
     });
 
-    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486');
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
     expect(markMerged).toHaveBeenCalledWith(1);
     expect(markFailed).not.toHaveBeenCalled();
   });
@@ -210,7 +245,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -244,7 +279,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -271,7 +306,7 @@ describe('auto-merge executor', () => {
   });
 
   it('requeues retryable failures below the circuit-breaker ceiling', async () => {
-    const markMergingBlocked = vi.fn();
+    const markMergeRetriesExhausted = vi.fn();
     const markFailed = vi.fn();
     const announceFailure = vi.fn();
     const requeueToPending = vi.fn().mockReturnValue(true);
@@ -281,14 +316,14 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
       getMergeRetryCount: () => 1,
       setMergeRetryCount,
-      markMergingBlocked,
+      markMergeRetriesExhausted,
       markFailed,
       announceFailure,
       requeueToPending,
@@ -296,13 +331,13 @@ describe('auto-merge executor', () => {
 
     expect(setMergeRetryCount).toHaveBeenCalledWith('PAN-1486', 2);
     expect(requeueToPending).toHaveBeenCalledWith(1, new Date(NOW.getTime() + 60_000).toISOString());
-    expect(markMergingBlocked).not.toHaveBeenCalled();
+    expect(markMergeRetriesExhausted).not.toHaveBeenCalled();
     expect(markFailed).not.toHaveBeenCalled();
     expect(announceFailure).not.toHaveBeenCalled();
   });
 
   it('blocks retryable failures at the circuit-breaker ceiling', async () => {
-    const markMergingBlocked = vi.fn().mockReturnValue(true);
+    const markMergeRetriesExhausted = vi.fn().mockReturnValue(true);
     const markFailed = vi.fn();
     const announceFailure = vi.fn();
     const requeueToPending = vi.fn();
@@ -312,21 +347,21 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
       getMergeRetryCount: () => 3,
       setMergeRetryCount,
-      markMergingBlocked,
+      markMergeRetriesExhausted,
       markFailed,
       announceFailure,
       requeueToPending,
     });
 
     const reason = 'Auto-merge for PAN-1486 blocked: agent stopped (retried 3 times — fix the underlying cause and re-schedule)';
-    expect(markMergingBlocked).toHaveBeenCalledWith(1, reason);
+    expect(markMergeRetriesExhausted).toHaveBeenCalledWith(1, reason);
     expect(announceFailure).toHaveBeenCalledWith('PAN-1486', reason);
     expect(setMergeRetryCount).not.toHaveBeenCalled();
     expect(requeueToPending).not.toHaveBeenCalled();
@@ -341,13 +376,13 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
       mergeIssue: async () => ({ success: false, statusCode: 500, error: 'agent stopped', retryable: true }),
       getMergeRetryCount: () => 3,
-      markMergingBlocked: () => false,
+      markMergeRetriesExhausted: () => false,
       announceFailure,
       log,
     });
@@ -367,7 +402,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
+      mergeGate: async () => gate(),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -431,50 +466,157 @@ describe('auto-merge executor', () => {
       isEligible: async () => ({ eligible: true }),
       // A push landed between scheduling and the cooldown expiring, so checks
       // went back to pending — the forge, not a stored row, decides.
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({
-        issueId,
-        state: 'in-review',
-        pr: { url: 'u', number: 1486, reviewState: 'approved', checks: 'pending', mergeable: true },
-      }),
+      mergeGate: async () => gate(false, { checks: 'pending' }, 'CI checks still pending on PR HEAD abc123'),
       markBlocked,
       transition,
       mergeIssue,
     });
 
-    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is in-review, not ready to merge');
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is not ready to merge: CI checks still pending on PR HEAD abc123');
     expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('blocks a scheduled merge whose PR head moved since scheduling, even when the gate passes (#3983)', async () => {
+    const markBlocked = vi.fn(() => true);
+    const transition = vi.fn(() => true);
+    const mergeIssue = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      mergeGate: async () => gate(true, { headSha: 'bbbbbbbbbbbbbbbb' }),
+      markBlocked,
+      transition,
+      mergeIssue,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 PR head moved from aaaaaaaaaaaa to bbbbbbbbbbbb since the auto-merge was scheduled');
+    expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('blocks a scheduled merge whose tracker issue was closed, read live (#3983)', async () => {
+    tracker.open = false;
+    const markBlocked = vi.fn(() => true);
+    const transition = vi.fn(() => true);
+    const mergeIssue = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      mergeGate: async () => gate(),
+      markBlocked,
+      transition,
+      mergeIssue,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is closed in the tracker');
+    expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the cached tracker row when the live read gets no answer (#3983)', async () => {
+    tracker.open = null;
+    const markBlocked = vi.fn(() => true);
+    const mergeIssue = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      mergeGate: async () => gate(),
+      cachedTrackerIssue: () => ({ open: false }),
+      markBlocked,
+      transition: () => true,
+      mergeIssue,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is closed in the tracker');
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('merges when the gate passes on the scheduled head, pinned to it (#3983)', async () => {
+    const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
+    const markMerged = vi.fn(() => true);
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: 'aaaaaaaaaaaaaaaa' })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      mergeGate: async () => gate(true, { headSha: 'aaaaaaaaaaaaaaaa' }),
+      transition: () => true,
+      mergeIssue,
+      markMerged,
+    });
+
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
+    expect(markMerged).toHaveBeenCalledWith(1);
+  });
+
+  // #4066 review: an automatic merge is pinned to its scheduled head; a row
+  // without one cannot be, so it never reaches triggerMerge unpinned.
+  it('blocks a row with no scheduled head instead of merging it unpinned', async () => {
+    const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
+    const markBlocked = vi.fn(() => true);
+    const isEligible = vi.fn(async () => ({ eligible: true as const }));
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: undefined })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible,
+      mergeGate: async () => gate(),
+      transition: () => true,
+      mergeIssue,
+      markBlocked,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 auto-merge has no scheduled PR head to pin; re-schedule it');
+    expect(isEligible).not.toHaveBeenCalled();
     expect(mergeIssue).not.toHaveBeenCalled();
   });
 
   it('starts the retry budget over per process rather than persisting it', async () => {
     const requeueToPending = vi.fn(() => true);
-    const markMergingBlocked = vi.fn(() => true);
+    const markMergeRetriesExhausted = vi.fn(() => true);
     const base = {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true as const }),
-      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' as IssueState }),
+      mergeGate: async () => gate(),
       transition: () => true,
       mergeIssue: async () => ({ success: false, retryable: true, error: 'transient' }),
       requeueToPending,
-      markMergingBlocked,
+      markMergeRetriesExhausted,
     };
 
     _resetMergeRetryCountsForTests();
     for (let i = 0; i < FAILED_MERGE_MAX_RETRIES; i += 1) await tickAutoMergeExecutor(base);
     expect(requeueToPending).toHaveBeenCalledTimes(FAILED_MERGE_MAX_RETRIES);
-    expect(markMergingBlocked).not.toHaveBeenCalled();
+    expect(markMergeRetriesExhausted).not.toHaveBeenCalled();
 
     await tickAutoMergeExecutor(base);
-    expect(markMergingBlocked).toHaveBeenCalledOnce();
+    expect(markMergeRetriesExhausted).toHaveBeenCalledOnce();
 
     // A restart forgets the budget: the circuit breaker exists to stop a hot
     // loop in THIS process, not to permanently condemn the issue.
-    markMergingBlocked.mockClear();
+    markMergeRetriesExhausted.mockClear();
     _resetMergeRetryCountsForTests();
     await tickAutoMergeExecutor(base);
-    expect(markMergingBlocked).not.toHaveBeenCalled();
+    expect(markMergeRetriesExhausted).not.toHaveBeenCalled();
   });
 });

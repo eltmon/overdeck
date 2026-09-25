@@ -579,6 +579,16 @@ async function specialistLifecycles(
   return lifecycles;
 }
 
+/**
+ * An Overdeck-launched agent pane: one carrying an agent id. A plain Herdr
+ * shell (a workspace's first pane, an operator's terminal) has no Overdeck
+ * tokens, and `paneFromBackendSnapshot` defaults its role to `work` — counting
+ * it would hold every spawn at the work-agent ceiling.
+ */
+export function isOverdeckAgentPane(pane: Pick<BackendPane, 'agentId'>): boolean {
+  return Boolean(pane.agentId);
+}
+
 /** The live inventory, in the shape this service's helpers read. */
 function paneAsAgent(pane: BackendPane) {
   const since = pane.stateSince === undefined ? undefined : new Date(pane.stateSince).toISOString();
@@ -594,15 +604,20 @@ function paneAsAgent(pane: BackendPane) {
   };
 }
 
+/** The work-agent ceiling's count over the live inventory: Overdeck agent panes only. */
+export function countAdmittedWorkAgentPanes(panes: readonly BackendPane[], nowMs = Date.now()): number {
+  return countAdmittedWorkAgents(panes.filter(isOverdeckAgentPane).map(paneAsAgent), nowMs);
+}
+
 async function collectAgentProcesses(): Promise<{
   agents: HealthAgentProcess[];
   healthAgents: AgentHealthSnapshot[];
   admittedWorkAgentCount: number;
 }> {
-  const panes = await getBackendPanes();
+  const panes = (await getBackendPanes()).filter(isOverdeckAgentPane);
   const registeredAgents = panes.map(paneAsAgent);
   const nowMs = Date.now();
-  const admittedWorkAgentCount = countAdmittedWorkAgents(registeredAgents, nowMs);
+  const admittedWorkAgentCount = countAdmittedWorkAgentPanes(panes, nowMs);
   const activeAgents = registeredAgents.filter((agent) => agent.status !== 'exited');
   const liveSessions = new Set(
     registeredAgents.filter((agent) => agent.tmuxActive).map((agent) => agent.id),

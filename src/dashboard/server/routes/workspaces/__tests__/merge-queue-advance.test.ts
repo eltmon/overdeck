@@ -25,7 +25,16 @@ vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleState: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
 }));
 
-const { advanceMergeQueue, mergeGateRefusal } = await import('../merge-strike.js');
+const {
+  advanceMergeQueue,
+  automaticMergePin,
+  manualMergeHeadMoved,
+  mergeHeadPin,
+  automaticMergeStartRefusal,
+  forgeMergeGateRefusal,
+  mergeGateRefusal,
+  mergeTargetRefusal,
+} = await import('../merge-strike.js');
 type MergeQueueAdvanceDeps = Parameters<typeof advanceMergeQueue>[0];
 type MergeGateVerdict = Awaited<ReturnType<MergeQueueAdvanceDeps['checkMergeGate']>>;
 
@@ -35,8 +44,9 @@ type MergeGateVerdict = Awaited<ReturnType<MergeQueueAdvanceDeps['checkMergeGate
  * drain: unstartable heads are removed, the first startable entry is triggered,
  * and the walk always terminates.
  *
- * PAN-3917: startability is now the forge's answer — `DerivedIssueState.state`
- * is `ready` only when the PR is approved, green, and mergeable.
+ * PAN-3917: startability is now the forge's answer. #3983: the merge gate
+ * judges approval, checks and mergeability; the derived state refuses only a
+ * merged issue. The harness's default gate is ready exactly for `ready` rows.
  *
  * #4016/#4021/#4036: every entry, whatever branches the issue has, also passes
  * the forge-facts merge gate (CI test job, failed required UAT).
@@ -65,7 +75,8 @@ function harness(
       return queue[0] ?? null;
     },
     getDerivedState: async (issueId) => derived(issueId, states[issueId] ?? 'backlog'),
-    checkMergeGate: async (issueId) => gates[issueId] ?? { ready: true },
+    checkMergeGate: async (issueId) => gates[issueId]
+      ?? (states[issueId] === 'ready' ? { ready: true } : { ready: false, reason: 'no pull request for this issue' }),
     triggerMerge: async (issueId, ...rest: unknown[]) => {
       triggered.push([issueId, rest[0]]);
       return { success: true };
@@ -100,7 +111,7 @@ describe('advanceMergeQueue', () => {
   it('names the missing forge condition when it drops a head', async () => {
     const { deps, warnings } = harness(['PAN-100'], { 'PAN-100': 'in-review' });
     await advanceMergeQueue(deps, 'pan');
-    expect(warnings.join('\n')).toContain('no open pull request for this issue');
+    expect(warnings.join('\n')).toContain('Cannot merge: no pull request for this issue');
   });
 
   it('removes the completed issue before choosing the next entry', async () => {
@@ -171,7 +182,7 @@ describe('advanceMergeQueue', () => {
       {
         dequeue,
         getDerivedState: async (issueId) => derived(issueId, 'planned'),
-        checkMergeGate: async () => ({ ready: true }),
+        checkMergeGate: async () => ({ ready: false, reason: 'no pull request for this issue' }),
         triggerMerge: async () => ({}),
         log: () => {},
         warn: () => {},
@@ -207,5 +218,120 @@ describe('mergeGateRefusal', () => {
       'strike/pan-400',
     );
     expect(refusal?.error).toBe('Cannot merge: CI checks failing on PR HEAD def5678');
+  });
+
+  it('refuses an automatic merge whose PR head moved off the scheduled one (#3983)', () => {
+    const verdict = { ready: true, facts: { headBranch: 'feature/pan-1', headSha: 'bbbbbbbbbbbbbbbb' } };
+    expect(mergeGateRefusal(verdict, undefined, 'aaaaaaaaaaaaaaaa')).toEqual({
+      success: false,
+      statusCode: 409,
+      error: 'Cannot merge: the PR head is bbbbbbbbbbbb, not aaaaaaaaaaaa as scheduled',
+    });
+    expect(mergeGateRefusal(verdict, undefined, 'bbbbbbbbbbbbbbbb')).toBeNull();
+  });
+});
+
+describe('forgeMergeGateRefusal (#3983)', () => {
+  it('asks the one gate, and holds an automatic merge to its scheduled head', async () => {
+    const gate = vi.fn(async () => ({ ready: true, facts: { headBranch: 'feature/pan-1', headSha: 'aaaaaaaa' } }));
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal', expectedHeadSha: 'aaaaaaaa' }, gate)).resolves.toBeNull();
+    // #4066 review: bound to the feature PR, which also skips the facts cache.
+    expect(gate).toHaveBeenCalledWith('PAN-1', { preferBranch: 'feature/pan-1' });
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal', expectedHeadSha: 'bbbbbbbb' }, gate))
+      .resolves.toEqual(expect.objectContaining({ statusCode: 409 }));
+  });
+
+  it('judges the manual Merge button by the same gate', async () => {
+    const gate = vi.fn(async () => ({ ready: false, reason: 'PR is not approved at PR HEAD aaaaaaaa', facts: { headBranch: 'feature/pan-1' } }));
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal' }, gate))
+      .resolves.toEqual(expect.objectContaining({ error: 'Cannot merge: PR is not approved at PR HEAD aaaaaaaa' }));
+    expect(gate).toHaveBeenCalledWith('PAN-1', { preferBranch: 'feature/pan-1' });
+  });
+
+  // #4066 review: an approved strike PR must not stand in for the feature PR
+  // a normal merge lands.
+  it('refuses a normal merge whose gate passed a strike PR', async () => {
+    const gate = vi.fn(async () => ({ ready: true, facts: { headBranch: 'strike/pan-1', headSha: 'aaaaaaaa' } }));
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal' }, gate))
+      .resolves.toEqual(expect.objectContaining({ error: 'Cannot merge: the open pull request is on strike/pan-1, not feature/pan-1' }));
+  });
+});
+
+describe('mergeTargetRefusal (#4066 review)', () => {
+  const url = 'https://github.com/eltmon/overdeck/pull/1';
+  it('lets through the PR the gate passed', () => {
+    expect(mergeTargetRefusal({ headBranch: 'feature/pan-1', url }, `${url}/`)).toBeNull();
+  });
+
+  it('refuses any other PR, or none', () => {
+    expect(mergeTargetRefusal({ headBranch: 'feature/pan-1', url }, 'https://github.com/eltmon/overdeck/pull/2'))
+      .toEqual(expect.objectContaining({ statusCode: 409 }));
+    expect(mergeTargetRefusal({ headBranch: 'feature/pan-1', url: null }, url))
+      .toEqual(expect.objectContaining({ statusCode: 409 }));
+  });
+});
+
+describe('mergeHeadPin and manualMergeHeadMoved (#4066 review)', () => {
+  it('pins a manual merge to the head it lands, an automatic one as before, and never a strike', () => {
+    expect(mergeHeadPin({ kind: 'normal' }, 'abc1234')).toEqual({ matchHeadCommit: 'abc1234' });
+    expect(mergeHeadPin({ kind: 'normal' }, null)).toEqual({});
+    expect(mergeHeadPin({ kind: 'normal', expectedHeadSha: 'abc1234' }, 'def5678')).toEqual({ matchHeadCommit: 'def5678' });
+    expect(mergeHeadPin({ kind: 'normal', expectedHeadSha: 'abc1234' })).toEqual({ matchHeadCommit: 'abc1234' });
+    expect(mergeHeadPin({
+      kind: 'strike', markerHead: 'abc1234', workspacePath: '/w', branchName: 'strike/pan-1', recoveryTarget: 'agent-pan-1',
+    }, 'abc1234')).toEqual({});
+  });
+
+  it('refuses a manual merge only when the head it would land is not the gated head', () => {
+    expect(manualMergeHeadMoved({ kind: 'normal' }, 'abc1234', 'abc1234ffff')).toBeNull();
+    expect(manualMergeHeadMoved({ kind: 'normal' }, 'abc1234', 'def5678')).toContain('the PR head moved to def5678');
+    expect(manualMergeHeadMoved({ kind: 'normal' }, null, 'def5678')).toBeNull();
+    expect(manualMergeHeadMoved({ kind: 'normal', expectedHeadSha: 'abc1234' }, 'abc1234', 'def5678')).toBeNull();
+  });
+});
+
+describe('automaticMergePin (#3983)', () => {
+  it('pins nothing for a manual merge', () => {
+    expect(automaticMergePin({ kind: 'normal' }, 'abc1234')).toEqual({});
+  });
+
+  it('pins a remote merge to the scheduled head', () => {
+    expect(automaticMergePin({ kind: 'normal', expectedHeadSha: 'abc1234' })).toEqual({ matchHeadCommit: 'abc1234' });
+  });
+
+  it("pins a local merge to the commit the server verified (its rebase of the approved head)", () => {
+    expect(automaticMergePin({ kind: 'normal', expectedHeadSha: 'abc1234' }, 'def5678')).toEqual({ matchHeadCommit: 'def5678' });
+  });
+});
+
+describe('automaticMergeStartRefusal (#4066 review)', () => {
+  const approved = 'a'.repeat(40);
+  const git = (heads: Record<string, string>) => vi.fn(async (args: string[]) => {
+    if (args[0] === 'fetch') return '';
+    return heads[args[1] ?? ''] ?? '';
+  });
+
+  it('on the direct path, starts only from the approved PR head', async () => {
+    await expect(automaticMergeStartRefusal(approved, approved, '/ws', 'feature/pan-1')).resolves.toBeNull();
+    await expect(automaticMergeStartRefusal(approved, 'b'.repeat(40), '/ws', 'feature/pan-1'))
+      .resolves.toEqual({ reason: expect.stringContaining('not the approved head') });
+  });
+
+  it('before a rebase, needs the worktree and the PR branch both at the approved head', async () => {
+    await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
+      git({ HEAD: approved, 'origin/feature/pan-1': approved }))).resolves.toBeNull();
+    await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
+      git({ HEAD: 'c'.repeat(40), 'origin/feature/pan-1': approved }))).resolves.toEqual({ reason: expect.stringContaining('worktree HEAD') });
+    await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
+      git({ HEAD: approved, 'origin/feature/pan-1': 'd'.repeat(40) }))).resolves.toEqual({ reason: expect.stringContaining('PR branch is at') });
+  });
+
+  it('marks a failed git read retryable, so a transient failure never fails the head for good', async () => {
+    const flaky = vi.fn(async (args: string[]) => {
+      if (args[0] === 'fetch') throw new Error('Could not resolve host: github.com');
+      return approved;
+    });
+    await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1', flaky))
+      .resolves.toEqual({ reason: expect.stringContaining('Could not resolve host'), retryable: true });
   });
 });

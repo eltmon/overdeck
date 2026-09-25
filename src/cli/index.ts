@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -38,87 +37,13 @@ if (existsSync(OVERDECK_ENV_FILE)) {
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { initCommand } from './commands/init.js';
-import { syncCommand } from './commands/sync.js';
-import {
-  contextListCommand,
-  contextEditCommand,
-  contextSyncCommand,
-  contextDiffCommand,
-  contextValidateCommand,
-  contextMigrateCommand,
-  contextDetachCommand,
-  contextLayersHelp,
-} from './commands/context-layers.js';
-import { restoreCommand } from './commands/restore.js';
-import { backupListCommand, backupCleanCommand } from './commands/backup.js';
-import { skillsCommand } from './commands/skills.js';
-import { statusCommand } from './commands/status.js';
-import { issueCommand as startCommand } from './commands/start.js';
+import { lazyAction } from './lazy-action.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
-import { tellCommand } from './commands/tell.js';
-import { answerCommand } from './commands/answer.js';
-import { registerMonitorCommands } from './commands/monitor.js';
-import { killCommand } from './commands/kill.js';
-import { registerResetSessionCommand } from './commands/reset-session.js';
-import { pauseCommand } from './commands/pause.js';
-import { unpauseCommand } from './commands/unpause.js';
-import { forkCommand } from './commands/fork.js';
-import { handoffCommand } from './commands/handoff.js';
-import { unarchiveConversationCommand } from './commands/unarchive-conversation.js';
-import { resumeCommand } from './commands/resume.js';
-import { recoverCommand } from './commands/recover.js';
-import { syncMainCommand } from './commands/sync-main.js';
-import { doneCommand } from './commands/done.js';
-import { reopenCommand } from './commands/reopen.js';
-import { wipeCommand } from './commands/wipe.js';
-import { registerCloseCommand } from './commands/close.js';
-import { showCommand } from './commands/show.js';
-import { listCommand as issuesCommand } from './commands/issues.js';
-import { triageCommand } from './commands/triage.js';
-import { registerReviewCommands } from './commands/review-subcommands.js';
-import { staffingCommand } from './commands/staffing.js';
-import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
-import { registerTestCommands } from './commands/test.js';
-import { registerTtsCommands } from './commands/tts.js';
-import { registerInstallCommand } from './commands/install.js';
-import { registerAdminCommands } from './commands/admin/index.js';
-import { registerConversationsCommands } from './commands/conversations/index.js';
-import { registerOhmypiAuthCommands } from './commands/ohmypi-auth.js';
-import { registerProjectCommands } from './commands/project.js';
-import { doctorCommand } from './commands/doctor.js';
-import { systemHealthCommand } from './commands/system-health.js';
-import { updateCommand } from './commands/update.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
-import { createCostCommand } from './commands/cost.js';
-import { createMemoryCommand } from './commands/memory.js';
-import { createBriefingCommand } from './commands/briefing.js';
-import { createComplianceCommand } from './commands/compliance.js';
-import { createRegistryCommand } from './commands/registry.js'; import { createOrdersCommand } from './commands/orders.js';
-import { createParkedCommand } from './commands/parked.js';
-import { createDocsCommand } from './commands/docs.js';
-import { planCommand } from './commands/plan.js';
-import { strikeCommand } from './commands/strike.js';
-import { configureKnowledgeCommand } from './commands/knowledge.js';
-import { planFinalizeCommand } from './commands/plan-finalize.js';
-import { planDoneCommand } from './commands/plan-done.js';
-import { registerCavemanCommands } from './commands/caveman.js';
-import { registerReleaseCommands } from './commands/release.js';
-import { registerRolloutCommands } from './commands/rollout.js';
-import { isNoResumeCliOptionEnabled } from '../lib/boot-no-resume.js';
-import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
-import { getManagedTmuxSocketName } from '../lib/tmux.js';
-import { registerResourceCommands } from './commands/resources.js';
-import { devCommand } from './commands/dev.js';
-import { registerScopeCommands } from './commands/scope.js';
-import { registerSpawnCommand } from './commands/spawn.js';
-import { registerWorkerCommands } from './commands/worker.js';
-import { openCommand } from './commands/open.js';
-import { registerFlywheelCommands } from './commands/flywheel.js';
-import { registerMergeCommands } from './commands/merge.js';
-import { registerArtifactCommands } from './commands/artifacts.js';
-import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js'; import { exitCli, runCliWithTelemetry } from './telemetry.js';
+import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
+import { COMMAND_GROUPS } from './command-groups.js';
+import { exitCli, runCliWithTelemetry } from './telemetry.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -153,8 +78,16 @@ import { registerSwarmCommands } from './commands/swarm.js'; import { registerTa
   }
 })();
 
+// Default action: no args → serve (npx overdeck). Decided before group
+// registration so the loader sees the command that will actually run.
+if (process.argv.length === 2) {
+  process.argv.push('serve');
+}
+
 const program = new Command();
 program.enablePositionalOptions();
+// Command groups register only when argv needs them (PAN-4195): see command-groups.ts.
+const groups = new CommandGroupLoader(program, resolveGroupDemand(process.argv), COMMAND_GROUPS);
 
 const ensureDashboardBundle = async (
   bundledServer: string,
@@ -205,7 +138,7 @@ program
 program
   .command('init')
   .description('Initialize Overdeck (~/.overdeck/)')
-  .action(initCommand);
+  .action(lazyAction(() => import('./commands/init.js'), 'initCommand'));
 
 program
   .command('sync')
@@ -215,7 +148,7 @@ program
   .option('--diff', 'Show diff for modified files')
   .option('--backup-only', 'Only create backup')
   .option('--if-changed', 'Skip the sync when inputs are unchanged (used by startup)')
-  .action(syncCommand);
+  .action(lazyAction(() => import('./commands/sync.js'), 'syncCommand'));
 
 // pan context — layered context distribution (PAN-1201)
 const context = program
@@ -227,49 +160,49 @@ context
   .description("Show all three layers' files")
   .option('--layer <layer>', 'Limit to one layer: global, project, or workspace')
   .option('--json', 'Output as JSON')
-  .action(contextListCommand);
+  .action(lazyAction(() => import('./commands/context-layers.js'), 'contextListCommand'));
 
 context
   .command('edit')
   .description('Open a context layer in $EDITOR')
   .option('--layer <layer>', 'Layer to edit: global (default), project, or workspace')
-  .action(contextEditCommand);
+  .action(lazyAction(() => import('./commands/context-layers.js'), 'contextEditCommand'));
 
 context
   .command('sync')
   .description('Refresh Overdeck-managed session context artifacts')
-  .action(contextSyncCommand);
+  .action(lazyAction(() => import('./commands/context-layers.js'), 'contextSyncCommand'));
 
 context
   .command('diff')
   .description('Show what each harness would receive after templating')
   .option('--harness <harness>', 'Limit to one harness: claude or pi')
-  .action(contextDiffCommand);
+  .action(lazyAction(() => import('./commands/context-layers.js'), 'contextDiffCommand'));
 
 context
   .command('validate')
   .description('Lint layer templates for unclosed or unknown harness blocks')
-  .action(contextValidateCommand);
+  .action(lazyAction(() => import('./commands/context-layers.js'), 'contextValidateCommand'));
 
 context
   .command('migrate')
   .description('One-shot migration from the deprecated sync.devroot model')
   .option('--yes', 'Register every discovered project without prompting')
-  .action(contextMigrateCommand);
+  .action(lazyAction(() => import('./commands/context-layers.js'), 'contextMigrateCommand'));
 
 context
   .command('detach')
   .description('Explicitly remove historical Overdeck managed regions from native instruction files')
   .option('--dry-run', 'Preview exact files and managed blocks without changing anything')
   .option('--apply', 'Back up each file and remove only an unambiguous managed block')
-  .action(contextDetachCommand);
+  .action(lazyAction(() => import('./commands/context-layers.js'), 'contextDetachCommand'));
 
-context.action(contextLayersHelp);
+context.action(lazyAction(() => import('./commands/context-layers.js'), 'contextLayersHelp'));
 
 program
   .command('restore [timestamp]')
   .description('Restore from backup')
-  .action(restoreCommand);
+  .action(lazyAction(() => import('./commands/restore.js'), 'restoreCommand'));
 
 // Backup management
 const backup = program.command('backup').description('Manage backups');
@@ -278,19 +211,19 @@ backup
   .command('list')
   .description('List all backups')
   .option('--json', 'Output as JSON')
-  .action(backupListCommand);
+  .action(lazyAction(() => import('./commands/backup.js'), 'backupListCommand'));
 
 backup
   .command('clean')
   .description('Remove old backups')
   .option('--keep <count>', 'Number of backups to keep', '10')
-  .action(backupCleanCommand);
+  .action(lazyAction(() => import('./commands/backup.js'), 'backupCleanCommand'));
 
 program
   .command('skills')
   .description('List and manage skills')
   .option('--json', 'Output as JSON')
-  .action(skillsCommand);
+  .action(lazyAction(() => import('./commands/skills.js'), 'skillsCommand'));
 
 // pan issues — list and triage work
 program
@@ -302,10 +235,12 @@ program
   .option('--tracker <type>', 'Query specific tracker (linear/github/gitlab)')
   .option('--all-trackers', 'Query all configured trackers')
   .option('--triage', 'Show triage queue')
-  .action((options) => {
+  .action(async (options) => {
     if (options.triage) {
+      const { triageCommand } = await import('./commands/triage.js');
       triageCommand(undefined, options);
     } else {
+      const { listCommand: issuesCommand } = await import('./commands/issues.js');
       issuesCommand(options);
     }
   });
@@ -318,18 +253,18 @@ program
   .option('--context', 'Context engineering state only')
   .option('--health', 'Health + heartbeat only')
   .option('--json', 'Output as JSON')
-  .action(showCommand);
+  .action(lazyAction(() => import('./commands/show.js'), 'showCommand'));
 
 // pan open <id> — open workspace in editor
 program
   .command('open <id>')
   .description('Open an issue workspace in your preferred editor')
   .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
-  .action(openCommand);
+  .action(lazyAction(() => import('./commands/open.js'), 'openCommand'));
 
-registerReviewCommands(program);
+await groups.register('review');
 
-program.command('staffing <id>').description('Show the work model and swarm policy in effect for an issue').action(staffingCommand);
+program.command('staffing <id>').description('Show the work model and swarm policy in effect for an issue').action(lazyAction(() => import('./commands/staffing.js'), 'staffingCommand'));
 
 // pan backlog — sequence writer surface
 const backlog = program
@@ -385,7 +320,7 @@ const planCmd = program
   .option('--effort <level>', 'Planning effort: low | medium | high')
   .option('--remote', 'Use remote planning workspace (Fly.io)')
   .option('--local', 'Use local planning workspace')
-  .action(planCommand);
+  .action(lazyAction(() => import('./commands/plan.js'), 'planCommand'));
 
 planCmd
   .command('finalize')
@@ -395,40 +330,40 @@ planCmd
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
   .option('--no-quality-lint', 'Emergency bypass for xBRIEF quality lint during finalize')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
-  .action(planFinalizeCommand);
+  .action(lazyAction(() => import('./commands/plan-finalize.js'), 'planFinalizeCommand'));
 
 planCmd
   .command('done <id>')
   .description('Complete planning — promote the xBRIEF and transition the issue to Planned')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
-  .action(planDoneCommand);
+  .action(lazyAction(() => import('./commands/plan-done.js'), 'planDoneCommand'));
 
 program
   .command('tell <id> <message>')
   .description('Send message to running agent')
-  .action(tellCommand);
+  .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
 program
   .command('answer <id> [option]')
   .description('Show a pending pane choice, or answer its numbered option')
-  .action(answerCommand);
-registerMonitorCommands(program);
+  .action(lazyAction(() => import('./commands/answer.js'), 'answerCommand'));
+await groups.register('monitor');
 program
   .command('kill <id>')
   .alias('stop')
   .description('Stop one qualified agent, or all agents when given an issue ID (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
-  .action(killCommand);
-registerResetSessionCommand(program);
+  .action(lazyAction(() => import('./commands/kill.js'), 'killCommand'));
+await groups.register('resetSession');
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')
   .option('--reason <reason>', 'Reason to store with the pause gate')
-  .action(pauseCommand);
+  .action(lazyAction(() => import('./commands/pause.js'), 'pauseCommand'));
 
 program
   .command('unpause <id>')
   .description('Clear an agent pause gate without spawning it')
-  .action(unpauseCommand);
+  .action(lazyAction(() => import('./commands/unpause.js'), 'unpauseCommand'));
 
 program
   .command('fork [conv]')
@@ -437,7 +372,7 @@ program
   .option('--cwd <path>', 'Working directory for the summary-forked session')
   .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--plain', 'Skip summary generation and copy raw conversation history')
-  .action(forkCommand);
+  .action(lazyAction(() => import('./commands/fork.js'), 'forkCommand'));
 
 program
   .command('handoff [conv] [focus...]')
@@ -452,12 +387,12 @@ program
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
   .option('--author-harness <harness>', 'Ignored: author harness is provider-default-only (PAN-1984)')
-  .action(handoffCommand);
+  .action(lazyAction(() => import('./commands/handoff.js'), 'handoffCommand'));
 
 program
   .command('unarchive-conversation <query>')
   .description('Restore an archived conversation by exact name or matching title')
-  .action(unarchiveConversationCommand);
+  .action(lazyAction(() => import('./commands/unarchive-conversation.js'), 'unarchiveConversationCommand'));
 
 program
   .command('resume <id>')
@@ -465,7 +400,7 @@ program
   .option('--host', 'Bypass workspace docker stack-health gate and resume on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
   .option('--compact', 'Summarize the saved session out-of-band and respawn a fresh session seeded with the summary (recovers a context-wedged agent without the harness /compact deadlock)')
-  .action(resumeCommand);
+  .action(lazyAction(() => import('./commands/resume.js'), 'resumeCommand'));
 
 program
   .command('recover [id]')
@@ -474,11 +409,11 @@ program
   .option('--compact', 'Compact-respawn a context-wedged agent, including troubled/user-stopped work agents that automatic recovery will not resume')
   .option('--json', 'Output as JSON')
   .option('--model <model>', 'Override model on recovery (e.g. switch off Kimi when quota is exhausted)')
-  .action(recoverCommand);
+  .action(lazyAction(() => import('./commands/recover.js'), 'recoverCommand'));
 program
   .command('sync-main <id>')
   .description('Merge latest main into workspace feature branch')
-  .action(syncMainCommand);
+  .action(lazyAction(() => import('./commands/sync-main.js'), 'syncMainCommand'));
 
 program
   .command('done <id>')
@@ -487,21 +422,21 @@ program
   .option('--force', 'Skip pre-flight completion checks')
   .option('--test-waived <reason>', 'Skip the test-requirement gate; reason must include rationale and SHA of an existing test that covers the requirement')
   .option('--strike', 'Strike shape: verify the strike branch is contained in origin/main; no PR is opened')
-  .action(doneCommand);
+  .action(lazyAction(() => import('./commands/done.js'), 'doneCommand'));
 
 program
   .command('reopen <id>')
   .description('Re-enter the pipeline for a closed/completed/cancelled issue (resets specialist state). For issues already in progress, use `pan review restart`.')
   .option('--reason <reason>', 'Reason for reopening')
   .option('--force', 'Skip the in-progress guard and confirmation prompt')
-  .action(reopenCommand);
+  .action(lazyAction(() => import('./commands/reopen.js'), 'reopenCommand'));
 
 program
   .command('wipe <id>')
   .description('Destructive: removes workspace files, kills processes, deletes branches, clears review state, and resets tracker status')
   .option('--force', 'Skip confirmation')
   .option('-y, --yes', 'Skip confirmation')
-  .action(wipeCommand);
+  .action(lazyAction(() => import('./commands/wipe.js'), 'wipeCommand'));
 
 program
   .command('destroy <id>')
@@ -509,9 +444,9 @@ program
   .option('--force', 'Force removal even with uncommitted changes')
   .option('--project <path>', 'Explicit project path (overrides registry)')
   .option('--shape <shape>', 'Limit to one shape: base|strike|slot|all (default: all)')
-  .action(destroyWorkspaceCommand);
+  .action(lazyAction(() => import('./commands/workspace.js'), 'destroyCommand'));
 
-registerCloseCommand(program);
+await groups.register('close');
 
 program
   .command('start <id>')
@@ -531,7 +466,7 @@ program
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
   .option('--skip-freshness', 'Bypass the plan-freshness preflight and spawn even if the plan names files that no longer exist')
-  .action(startCommand);
+  .action(lazyAction(() => import('./commands/start.js'), 'issueCommand'));
 
 program
   .command('strike <ids...>')
@@ -540,44 +475,44 @@ program
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')
   .option('--dry-run', 'Print what would happen without spawning')
-  .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
-configureKnowledgeCommand(program);
-registerSwarmCommands(program); registerTaskCommands(program);
-registerWorkspaceCommands(program);
-registerTestCommands(program);
-registerTtsCommands(program);
+  .action(async (ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => (await import('./commands/strike.js')).strikeCommand(ids, options));
+await groups.register('knowledge');
+await groups.register('swarm'); await groups.register('task');
+await groups.register('workspace');
+await groups.register('test');
+await groups.register('tts');
 
 // Register release commands (pan release check/stable/canary/notes)
-registerReleaseCommands(program);
-registerRolloutCommands(program);
+await groups.register('release');
+await groups.register('rollout');
 
-program.addCommand(createMemoryCommand());
-program.addCommand(createBriefingCommand());
-program.addCommand(createComplianceCommand());
-program.addCommand(createRegistryCommand()); program.addCommand(createOrdersCommand());
-program.addCommand(createParkedCommand());
-program.addCommand(createDocsCommand());
+await groups.register('memory');
+await groups.register('briefing');
+await groups.register('compliance');
+await groups.register('registry'); await groups.register('orders');
+await groups.register('parked');
+await groups.register('docs');
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
-registerAdminCommands(program);
+await groups.register('admin');
 
 // Register conversations commands (pan conversations scan, search, list, show, cost, enrich)
-registerConversationsCommands(program);
+await groups.register('conversations');
 
 // Register ohmypi-auth commands (pan ohmypi-auth status|login; pan pi-auth is a deprecated alias)
-registerOhmypiAuthCommands(program);
+await groups.register('ohmypiAuth');
 
 // Register install command
-registerInstallCommand(program);
+await groups.register('install');
 
 // Register caveman commands (pan caveman-compress)
-registerCavemanCommands(program);
-registerScopeCommands(program);
-registerSpawnCommand(program);
-registerWorkerCommands(program);
-registerFlywheelCommands(program);
-registerMergeCommands(program);
-registerArtifactCommands(program);
+await groups.register('caveman');
+await groups.register('scope');
+await groups.register('spawn');
+await groups.register('worker');
+await groups.register('flywheel');
+await groups.register('merge');
+await groups.register('artifacts');
 
 // Shorthand: pan status = pan status
 program
@@ -586,7 +521,7 @@ program
   .option('--json', 'Output as JSON')
   .option('--tldr', 'Show TLDR index health across all workspaces')
   .option('--context', 'Show context window usage % for each agent')
-  .action(statusCommand);
+  .action(lazyAction(() => import('./commands/status.js'), 'statusCommand'));
 
 // Dashboard commands
 program
@@ -595,10 +530,14 @@ program
   .option('--skip-traefik', 'Skip Traefik startup')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--no-resume', 'Disable agent auto-resume (opt out of the default-on auto-resume)')
-  .action(devCommand);
+  .action(lazyAction(() => import('./commands/dev.js'), 'devCommand'));
 
 defineUpCommand(program)
   .action(async (options) => { const restartModule = await import('./commands/restart.js'); if (restartModule.refuseNonPrimaryDashboardCwd(process.cwd(), 'start')) return;
+    const { isNoResumeCliOptionEnabled } = await import('../lib/boot-no-resume.js');
+    const { applyBootGateEnv, formatBootGateState, resolveBootGates } = await import('../lib/boot-gates.js');
+    const { getManagedTmuxSocketName } = await import('../lib/tmux.js');
+    const { Effect } = await import('effect');
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
     const { spawn, execSync, exec } = await import('child_process');
@@ -1223,26 +1162,22 @@ program
 registerReloadAndRestartCommands(program);
 
 // Project management commands
-const project = program.command('project').description('Project registry for multi-project workspace support');
-registerProjectCommands(project);
-
-const projects = program.command('projects').description('Project registry for multi-project workspace support');
-registerProjectCommands(projects);
+await groups.register('project');
 
 // Health command
 program
   .command('health')
   .description('Show runtime health of Overdeck services')
-  .action(systemHealthCommand);
+  .action(lazyAction(() => import('./commands/system-health.js'), 'systemHealthCommand'));
 
 // Doctor command
 program
   .command('doctor')
   .description('Check system health and dependencies')
   .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
-  .action((options) => doctorCommand(options));
+  .action(lazyAction(() => import('./commands/doctor.js'), 'doctorCommand'));
 
-registerResourceCommands(program);
+await groups.register('resources');
 
 // Update command
 program
@@ -1250,10 +1185,10 @@ program
   .description('Update Overdeck to latest version')
   .option('--check', 'Only check for updates, don\'t install')
   .option('--force', 'Force update even if on latest')
-  .action(updateCommand);
+  .action(lazyAction(() => import('./commands/update.js'), 'updateCommand'));
 
 // Cost tracking commands (pan cost today, pan cost sync, etc.)
-program.addCommand(createCostCommand());
+await groups.register('cost');
 
 // ─── npx overdeck — server + browser launcher ───────────────────────────────
 // Low-friction entry point: no Electron required.
@@ -1319,11 +1254,7 @@ program
     }, 1_500);
   });
 
-// Default action: show help (Commander default) unless no args → serve
-if (process.argv.length === 2) {
-  // npx overdeck with no args → act as serve
-  process.argv.push('serve');
-}
+await groups.finish();
 
 // Short-lived commands must drain durable state writes before exit (PAN-2692).
 // PAN-3917: durable-write-drain.ts (journal writes plus the state worktree's

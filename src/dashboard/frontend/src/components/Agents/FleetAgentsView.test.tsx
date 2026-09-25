@@ -1,510 +1,133 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+/** PAN-4197 WI-6 — the Agents page shell: Live by default, History behind one link. */
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useEffect } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useDashboardStore } from '../../lib/store';
-import type { Agent, Issue } from '../../types';
-import { FleetAgentsView } from './FleetAgentsView';
-import { IssueDrawer } from '../drawer/IssueDrawer';
-import { DialogProvider } from '../DialogProvider';
+import type { LiveCounts } from './live/LiveAgentsView';
 
 vi.mock('./directory/AgentsDirectory', () => ({
   AgentsDirectory: () => <div data-component="agents-directory">Agents Directory</div>,
 }));
 
-function agent(overrides: Partial<Agent>): Agent {
-  return {
-    id: overrides.id ?? 'agent-pan-1',
-    issueId: overrides.issueId ?? 'PAN-1',
-    role: overrides.role ?? 'work',
-    runtime: overrides.runtime ?? 'claude-code',
-    model: overrides.model ?? 'claude-opus-4-7',
-    status: overrides.status ?? 'running',
-    startedAt: overrides.startedAt ?? '2026-05-18T00:00:00.000Z',
-    consecutiveFailures: 0,
-    killCount: 0,
-    ...overrides,
-  };
+let liveCounts: LiveCounts = { live: 2, needsYou: 1, waiting: 0, idle: 14 };
+vi.mock('./live/LiveAgentsView', () => ({
+  LiveAgentsView: ({ onCountsChange, previewHidden }: { onCountsChange?: (counts: LiveCounts) => void; previewHidden?: boolean }) => {
+    useEffect(() => onCountsChange?.(liveCounts), [onCountsChange]);
+    return <div data-component="agents-live" data-preview-hidden={String(previewHidden)}>Live</div>;
+  },
+}));
+
+import { FleetAgentsView } from './FleetAgentsView';
+
+const view = () => new URLSearchParams(window.location.search).get('view');
+
+function renderAt(path: string, props: Parameters<typeof FleetAgentsView>[0] = {}) {
+  window.history.replaceState(null, '', path);
+  return render(<FleetAgentsView {...props} />);
 }
 
-function issue(overrides: Partial<Issue>): Issue {
-  return {
-    id: overrides.identifier ?? 'PAN-1',
-    identifier: overrides.identifier ?? 'PAN-1',
-    title: overrides.title ?? 'Fleet issue',
-    status: overrides.status ?? 'Todo',
-    priority: overrides.priority ?? 3,
-    labels: overrides.labels ?? [],
-    url: `https://example.com/${overrides.identifier ?? 'PAN-1'}`,
-    createdAt: '2026-05-18T00:00:00.000Z',
-    updatedAt: '2026-05-18T00:00:00.000Z',
-    ...overrides,
-  };
+function expectNoRemovedViews() {
+  for (const component of ['agent-card', 'agents-coming-soon', 'agents-filter-row']) {
+    expect(document.querySelector(`[data-component="${component}"]`)).toBeNull();
+  }
 }
 
-function renderFleetView(props: { onNavigateToIssues?: () => void } = {}) {
-  const client = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, staleTime: Infinity },
-      mutations: { retry: false },
-    },
-  });
-  client.setQueryData(['agents-fleet-cost-summary'], {
-    today: {
-      totalCost: 12.34,
-      totalTokens: 456_000,
-    },
-  });
+beforeEach(() => {
+  window.history.replaceState(null, '', '/agents');
+  liveCounts = { live: 2, needsYou: 1, waiting: 0, idle: 14 };
+});
 
-  return render(
-    <QueryClientProvider client={client}>
-      <DialogProvider>
-        <FleetAgentsView {...props} />
-      </DialogProvider>
-    </QueryClientProvider>,
-  );
-}
+const metaPart = (key: string) => document.querySelector(`[data-component="agents-meta"] [data-meta-part="${key}"]`) as HTMLElement;
 
 describe('FleetAgentsView', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-18T03:00:00.000Z'));
-    // Grid-view tests pin ?view=grid; the directory is the default (PAN-3920 D11).
-    window.history.replaceState(null, '', '/agents?view=grid');
-    useDashboardStore.setState({
-      drawer: { issueId: null, tab: 'overview' },
-      issuesRaw: [issue({ identifier: 'PAN-1', title: 'Fleet drawer issue' })],
-      agentsById: {
-        'agent-running': agent({ id: 'agent-running', issueId: 'PAN-1', status: 'running', role: 'work' }),
-        'agent-stuck': agent({
-          id: 'agent-stuck',
-          issueId: 'PAN-2',
-          status: 'stuck',
-          role: 'review',
-          firstFailureInRunAt: '2026-05-18T01:00:00.000Z',
-          lastFailureReason: 'No response from agent',
-        }),
-        'agent-idle': agent({ id: 'agent-idle', issueId: 'PAN-3', status: 'stopped', role: 'ship' }),
-        'agent-dead': agent({ id: 'agent-dead', issueId: 'PAN-4', status: 'dead', role: 'work' }),
-      },
-      agentOutputById: {
-        'agent-running': ['boot', 'working on PAN-1'],
-        'agent-stuck': ['review started', 'waiting for output'],
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.startsWith('/api/costs/stream')) {
-        return new Response(JSON.stringify({
-          events: [],
-          byIssue: {
-            'pan-1': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 12.34, tokens: 456_000 }],
-          },
-          count: 1,
-        }), { status: 200 });
-      }
-      if (url.startsWith('/api/costs/summary')) {
-        return new Response(JSON.stringify({
-          today: {
-            totalCost: 12.34,
-            totalTokens: 456_000,
-          },
-        }), { status: 200 });
-      }
-      return new Response(JSON.stringify({}), { status: 200 });
-    }));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('renders running and stuck AgentCard primitives in the fleet grid', () => {
-    renderFleetView();
-
-    expect(screen.getByText('agent-running')).toBeInTheDocument();
-    expect(screen.getByText('agent-stuck')).toBeInTheDocument();
-    expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
-    expect(screen.queryByText('agent-dead')).not.toBeInTheDocument();
-    expect(screen.getByText('working on PAN-1')).toBeInTheDocument();
-  });
-
-  it('renders the six Agents metric tiles in order with live cost totals', () => {
-    renderFleetView();
-
-    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
-
-    expect(tiles).toHaveLength(6);
-    expect(tiles.map((tile) => within(tile as HTMLElement).getByText(/Running|Stuck|Cost 24h|Tokens 24h|Avg runtime|Queue/).textContent)).toEqual([
-      'Running',
-      'Stuck',
-      'Cost 24h',
-      'Tokens 24h',
-      'Avg runtime',
-      'Queue',
-    ]);
-    expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'destructive', 'cost', 'muted', 'review', 'warning']);
-    expect(within(tiles[0] as HTMLElement).getByText('1')).toBeInTheDocument();
-    expect(within(tiles[1] as HTMLElement).getByText('1')).toBeInTheDocument();
-    expect(within(tiles[2] as HTMLElement).getByText('$12.3')).toBeInTheDocument();
-    expect(within(tiles[3] as HTMLElement).getByText('456K')).toBeInTheDocument();
-    expect(within(tiles[4] as HTMLElement).getByText('3h 0m')).toBeInTheDocument();
-    expect(tiles[2]).toHaveAttribute('title', 'Open /costs for canonical 24h spend numbers');
-  });
-
-  it('uses canonical cost summary totals instead of issue-attributed stream buckets', () => {
-    const client = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, staleTime: Infinity },
-        mutations: { retry: false },
-      },
-    });
-    client.setQueryData(['agents-fleet-cost-summary'], {
-      today: {
-        totalCost: 27.89,
-        totalTokens: 789_000,
-      },
-    });
-    client.setQueryData(['cost-stream', undefined, 500], {
-      events: [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 0, tokens: 0 }],
-      byIssue: {},
-      count: 1,
-    });
-
-    render(
-      <QueryClientProvider client={client}>
-        <DialogProvider>
-          <FleetAgentsView />
-        </DialogProvider>
-      </QueryClientProvider>,
-    );
-
-    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
-    expect(within(tiles[2] as HTMLElement).getByText('$27.9')).toBeInTheDocument();
-    expect(within(tiles[3] as HTMLElement).getByText('789K')).toBeInTheDocument();
-  });
-
-  it('renders stuck agents with the destructive override and stuck verb badge', () => {
-    renderFleetView();
-
-    expect(screen.getByText('STUCK · 2h')).toBeInTheDocument();
-    expect(screen.getByText('No response from agent')).toBeInTheDocument();
-    expect(screen.getByText('agent-stuck').closest('[data-component="agent-card"]')).toHaveAttribute('data-stuck', 'true');
-  });
-
-  it('treats error and unknown contract statuses as non-running stuck fleet agents', () => {
-    useDashboardStore.setState({
-      agentsById: {
-        'agent-error': agent({ id: 'agent-error', issueId: 'PAN-1', status: 'error', role: 'work', lastFailureReason: 'Process exited' }),
-        'agent-unknown': agent({ id: 'agent-unknown', issueId: 'PAN-2', status: 'unknown', role: 'review' }),
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    renderFleetView();
-
-    expect(screen.getByText('agent-error')).toBeInTheDocument();
-    expect(screen.getByText('agent-unknown')).toBeInTheDocument();
-    expect(screen.getAllByText(/STUCK ·/)).toHaveLength(2);
-    expect(screen.queryByText('WORK RUNNING')).not.toBeInTheDocument();
-    expect(screen.queryByText('REVIEW RUNNING')).not.toBeInTheDocument();
-    expect(within(screen.getByText('Running').closest('[data-component="metric-tile"]') as HTMLElement).getByText('0')).toBeInTheDocument();
-    expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('2')).toBeInTheDocument();
-  });
-
-  it('renders a local strike with no live tmux session as unreachable instead of running', () => {
-    useDashboardStore.setState({
-      agentsById: {
-        'strike-pan-1996': agent({
-          id: 'strike-pan-1996',
-          issueId: 'PAN-1996',
-          status: 'unknown',
-          role: 'strike',
-          startedAt: '2026-05-01T00:00:00.000Z',
-          hasLivePane: false,
-          lastFailureReason: 'No live tmux session found for registered agent',
-        }),
-      },
-      agentOutputById: {
-        'strike-pan-1996': [],
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    renderFleetView();
-
-    expect(screen.getByText('UNREACHABLE')).toBeInTheDocument();
-    expect(screen.queryByText('STRIKE RUNNING')).not.toBeInTheDocument();
-    expect(screen.getByText('No live tmux session found for registered agent')).toBeInTheDocument();
-    expect(within(screen.getByText('Running').closest('[data-component="metric-tile"]') as HTMLElement).getByText('0')).toBeInTheDocument();
-    expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('1')).toBeInTheDocument();
-  });
-
-  it('opens an agent-scoped action menu from the fleet card overflow trigger', () => {
-    renderFleetView();
-
-    fireEvent.click(screen.getAllByTestId('issue-action-overflow-button')[0]);
-
-    const menu = screen.getByTestId('issue-action-overflow-menu');
-    // PAN-4198 (D5 + FR-1): the fleet card's menu is the agent-scope allowlist
-    // narrowed to what is enabled for this agent, so assert the set rather than
-    // naming rows that come and go with the agent's state. `pause` and
-    // `recoverAgent` are `placement: 'contextual'` and still reach this menu.
-    const AGENT_SCOPE_KEYS = ['tell', 'stopAgent', 'pause', 'unpause', 'recoverAgent', 'resumeSession'];
-    const rendered = Array.from(menu.querySelectorAll<HTMLElement>('[data-testid^="issue-action-"]'))
-      .map((element) => element.dataset.testid!.replace('issue-action-', ''))
-      .filter((key) => !['overflow-menu', 'overflow-button', 'explain-toggle', 'debug-toggle', 'menu'].includes(key));
-    expect(rendered.length).toBeGreaterThan(0);
-    for (const key of rendered) expect(AGENT_SCOPE_KEYS, key).toContain(key);
-    for (const key of ['plan', 'startAgent', 'closeOut', 'destroyWorkspace', 'reopen', 'syncMain', 'resetIssue', 'cancel', 'switchModel', 'untroubled', 'inspectTask']) {
-      expect(within(menu).queryByTestId(`issue-action-${key}`), key).not.toBeInTheDocument();
-    }
-    expect(within(menu).queryByTestId('issue-action-open')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
-  });
-
-  it('disables the fleet card overflow trigger for orphan agents without an issue id', () => {
-    useDashboardStore.setState({
-      issuesRaw: [],
-      agentsById: {
-        'agent-orphan': agent({ id: 'agent-orphan', issueId: null, status: 'running', role: 'work' }),
-      },
-      agentOutputById: {},
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    renderFleetView();
-
-    const trigger = screen.getByRole('button', { name: 'Open agent-orphan menu' });
-    expect(trigger).toBeDisabled();
-    expect(trigger).toHaveAttribute('title', 'No issue ID available for this agent');
-  });
-
-  it('opens the drawer from a fleet card and scrolls to the active-agent element', () => {
-    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView');
-    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      cb(0);
-      return 0;
-    });
-    const cafSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
-
-    const client = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false, staleTime: Infinity },
-        mutations: { retry: false },
-      },
-    });
-    client.setQueryData(['cost-stream', undefined, 500], {
-      events: [],
-      byIssue: {},
-      count: 0,
-    });
-    client.setQueryData(['agents-fleet-cost-summary'], {
-      today: {
-        totalCost: 12.34,
-        totalTokens: 456_000,
-      },
-    });
-
-    render(
-      <QueryClientProvider client={client}>
-        <DialogProvider>
-          <FleetAgentsView />
-          <IssueDrawer />
-        </DialogProvider>
-      </QueryClientProvider>,
-    );
-
-    // Address the card by its agent rather than by grid position: card order
-    // follows the fleet's phase sort, which is not what this test is about.
-    const runningCard = document.querySelector('[data-component="agent-card"][data-agent-id="agent-running"]');
-    expect(runningCard).toBeTruthy();
-    fireEvent.click(within(runningCard as HTMLElement).getByText('Open issue'));
-
-    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
-    expect(window.location.search).toBe('?view=grid&issue=PAN-1&tab=overview');
-    expect(window.location.hash).toBe('#active-agent');
-
-    const activeAgent = document.getElementById('active-agent');
-    expect(activeAgent).toBeTruthy();
-    expect(scrollSpy).toHaveBeenCalledTimes(1);
-    expect(scrollSpy).toHaveBeenLastCalledWith({ block: 'start' });
-
-    scrollSpy.mockRestore();
-    rafSpy.mockRestore();
-    cafSpy.mockRestore();
-  });
-
-  it('filters the fleet grid with multi-select phase pills and syncs the URL', () => {
-    renderFleetView();
-
-    fireEvent.click(screen.getByRole('button', { name: 'work' }));
-    expect(window.location.search).toBe('?view=grid&phase=work');
-    expect(screen.getByText('agent-running')).toBeInTheDocument();
-    expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
-    expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'ship' }));
-    expect(new URLSearchParams(window.location.search).get('phase')).toBe('work,ship');
-    expect(screen.getByText('agent-running')).toBeInTheDocument();
-    expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
-    expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
-  });
-
-  it('filters additively by project and model dropdowns and syncs the URL', () => {
-    useDashboardStore.setState({
-      issuesRaw: [
-        issue({ identifier: 'PAN-1', title: 'Fleet drawer issue', project: { id: 'pan', name: 'Overdeck', color: '#333' } }),
-        issue({ identifier: 'PAN-2', title: 'Stuck issue', project: { id: 'ops', name: 'Ops', color: '#444' } }),
-        issue({ identifier: 'PAN-3', title: 'Ship issue', project: { id: 'pan', name: 'Overdeck', color: '#333' } }),
-      ],
-      agentsById: {
-        'agent-running': agent({ id: 'agent-running', issueId: 'PAN-1', status: 'running', role: 'work', model: 'claude-opus-4-7' }),
-        'agent-stuck': agent({ id: 'agent-stuck', issueId: 'PAN-2', status: 'stuck', role: 'review', model: 'claude-sonnet-4-6' }),
-        'agent-idle': agent({ id: 'agent-idle', issueId: 'PAN-3', status: 'stopped', role: 'ship', model: 'claude-haiku-4-5-20251001' }),
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    renderFleetView();
-
-    fireEvent.click(screen.getByLabelText('Overdeck'));
-    expect(window.location.search).toBe('?view=grid&projects=pan');
-    expect(screen.getByText('agent-running')).toBeInTheDocument();
-    expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
-    expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
-
-    expect(screen.queryByLabelText('haiku-4-5')).not.toBeInTheDocument();
-  });
-
-  it('avg runtime tile uses only finite startedAt values (all valid)', () => {
-    useDashboardStore.setState({
-      agentsById: {
-        'agent-a': agent({ id: 'agent-a', issueId: 'PAN-1', status: 'running', startedAt: '2026-05-18T00:00:00.000Z' }),
-        'agent-b': agent({ id: 'agent-b', issueId: 'PAN-2', status: 'running', startedAt: '2026-05-18T01:00:00.000Z' }),
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    renderFleetView();
-
-    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
-    expect(within(tiles[4] as HTMLElement).getByText('2h 30m')).toBeInTheDocument();
-  });
-
-  it('avg runtime tile skips invalid startedAt and averages only valid entries (mixed)', () => {
-    useDashboardStore.setState({
-      agentsById: {
-        'agent-valid': agent({ id: 'agent-valid', issueId: 'PAN-1', status: 'running', startedAt: '2026-05-18T00:00:00.000Z' }),
-        'agent-invalid': agent({ id: 'agent-invalid', issueId: 'PAN-2', status: 'running', startedAt: undefined as any }),
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    renderFleetView();
-
-    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
-    expect(within(tiles[4] as HTMLElement).getByText('3h 0m')).toBeInTheDocument();
-  });
-
-  it('avg runtime tile renders 0m when all running agents have invalid startedAt', () => {
-    useDashboardStore.setState({
-      agentsById: {
-        'agent-bad-1': agent({ id: 'agent-bad-1', issueId: 'PAN-1', status: 'running', startedAt: undefined as any }),
-        'agent-bad-2': agent({ id: 'agent-bad-2', issueId: 'PAN-2', status: 'running', startedAt: '' as any }),
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    renderFleetView();
-
-    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
-    expect(within(tiles[4] as HTMLElement).getByText('0m')).toBeInTheDocument();
-  });
-
-  it('renders TopBar with breadcrumb, meta, search placeholder, segmented control, and Start agent button', () => {
-    renderFleetView({ onNavigateToIssues: vi.fn() });
-
-    expect(screen.getByText('Eltmon / Agents')).toBeInTheDocument();
-    const meta = document.querySelector('[data-component="agents-meta"]') as HTMLElement;
-    expect(meta).toHaveTextContent('1 active · 1 stuck · 3h 0m cumulative runtime');
-    expect(meta).toHaveAttribute('title', '1 active · 1 stuck · 3h 0m cumulative runtime');
-    // Lower-priority parts hide first as the bar narrows (container queries).
-    expect(meta.querySelector('[data-meta-part="runtime"]')?.className).toContain('@[1200px]/topbar:inline');
-    expect(screen.getByText('Search agents by name, issue, model…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start agent' })).toBeInTheDocument();
-  });
-
-  it('defaults to the directory view', () => {
-    window.history.replaceState(null, '', '/agents');
-    renderFleetView();
-
-    expect(screen.getByRole('button', { name: 'directory', pressed: true })).toBeInTheDocument();
-    expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
-    expect(document.querySelector('[data-component="agent-card"]')).toBeNull();
-    expect(document.querySelector('[data-component="metric-tile"]')).toBeNull();
-    // No tiles in the directory, so the header carries the 24h cost the tiles showed.
-    const meta = document.querySelector('[data-component="agents-meta"]') as HTMLElement;
-    expect(meta).toHaveTextContent('cumulative runtime · $12.3 24h · 456K tokens');
-    expect(meta.querySelector('[data-meta-part="tokens"]')?.className).toContain('@[900px]/topbar:inline');
-  });
-
-  it('?view=grid still renders the card grid, MetricStrip and filters', () => {
-    renderFleetView();
-
-    expect(screen.getByRole('button', { name: 'grid', pressed: true })).toBeInTheDocument();
-    expect(screen.getByText('agent-running')).toBeInTheDocument();
-    expect(document.querySelectorAll('[data-component="metric-tile"]')).toHaveLength(6);
-    expect(document.querySelector('[data-component="agents-filter-row"]')).not.toBeNull();
+  it('renders the Live view by default with the section counts in the header', () => {
+    renderAt('/agents');
+    expect(document.querySelector('[data-component="agents-live"]')).not.toBeNull();
     expect(document.querySelector('[data-component="agents-directory"]')).toBeNull();
+    expect(screen.getByText('Eltmon / Agents')).toBeInTheDocument();
+    expect(metaPart('live')).toHaveTextContent('●2 live');
+    expect(metaPart('needs-you')).toHaveTextContent('◐1 need you');
+    expect(metaPart('waiting')).toHaveTextContent('○0 waiting');
+    expect(document.querySelector('[data-component="agents-meta"]')).not.toHaveTextContent('idle');
+    expectNoRemovedViews();
   });
 
-  it('switching to directory drops ?view= and switching back to grid sets it', () => {
-    renderFleetView();
+  it('dims zero counts and makes a nonzero need-you the loud, clickable count', () => {
+    renderAt('/agents');
+    expect(metaPart('waiting')).toHaveClass('opacity-50');
+    expect(metaPart('live')).not.toHaveClass('opacity-50');
+    const needsYou = metaPart('needs-you');
+    expect(needsYou.tagName).toBe('BUTTON');
+    expect(needsYou).toHaveClass('text-state-needs-you', 'font-medium');
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'directory' }));
-    expect(new URLSearchParams(window.location.search).has('view')).toBe(false);
+  it('shows a quiet need-you count when nothing needs the operator', () => {
+    liveCounts = { live: 1, needsYou: 0, waiting: 0, idle: 0 };
+    renderAt('/agents');
+    expect(metaPart('needs-you').tagName).toBe('SPAN');
+    expect(metaPart('needs-you')).toHaveClass('opacity-50');
+  });
+
+  it('the header preview toggle collapses and restores the Live preview', () => {
+    renderAt('/agents');
+    const toggle = screen.getByTestId('agents-live-preview-toggle');
+    expect(toggle).toHaveAttribute('aria-label', 'Hide preview');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-label', 'Show preview');
+    expect(document.querySelector('[data-component="agents-live"]')).toHaveAttribute('data-preview-hidden', 'true');
+    fireEvent.click(toggle);
+    expect(document.querySelector('[data-component="agents-live"]')).toHaveAttribute('data-preview-hidden', 'false');
+  });
+
+  it.each(['/agents?view=history', '/agents?view=directory'])('renders History at %s', (path) => {
+    renderAt(path);
+    expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
+    expect(document.querySelector('[data-component="agents-live"]')).toBeNull();
+    expect(document.querySelector('[data-component="agents-meta"]')).toBeNull();
+    expect(screen.queryByTestId('agents-live-preview-toggle')).toBeNull();
+    expectNoRemovedViews();
+  });
+
+  it.each(['/agents?view=grid', '/agents?view=table', '/agents?view=timeline', '/agents?view=junk'])('renders Live at %s', (path) => {
+    renderAt(path);
+    expect(document.querySelector('[data-component="agents-live"]')).not.toBeNull();
+    expectNoRemovedViews();
+  });
+
+  it('the History link sets view=history and the Live link removes it', () => {
+    renderAt('/agents?entry=agent-pan-1');
+    const link = screen.getByTestId('agents-view-link');
+    expect(link).toHaveTextContent('History');
+    expect(link).toHaveAttribute('href', '/agents?entry=agent-pan-1&view=history');
+    fireEvent.click(link);
+    expect(view()).toBe('history');
     expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'grid' }));
-    expect(new URLSearchParams(window.location.search).get('view')).toBe('grid');
-    expect(screen.getByText('agent-running')).toBeInTheDocument();
+    const back = screen.getByTestId('agents-view-link');
+    expect(back).toHaveTextContent('Live');
+    fireEvent.click(back);
+    expect(view()).toBeNull();
+    expect(document.querySelector('[data-component="agents-live"]')).not.toBeNull();
   });
 
-  it('switches to table view with Coming soon placeholder and updates URL', () => {
-    renderFleetView();
-
-    fireEvent.click(screen.getByRole('button', { name: 'table' }));
-    expect(screen.getByRole('button', { name: 'table', pressed: true })).toBeInTheDocument();
-    expect(screen.getByText('Coming soon')).toBeInTheDocument();
-    expect(new URLSearchParams(window.location.search).get('view')).toBe('table');
-    expect(screen.queryByText('agent-running')).not.toBeInTheDocument();
-  });
-
-  it('switches to timeline view with Coming soon placeholder and updates URL', () => {
-    renderFleetView();
-
-    fireEvent.click(screen.getByRole('button', { name: 'timeline' }));
-    expect(screen.getByRole('button', { name: 'timeline', pressed: true })).toBeInTheDocument();
-    expect(screen.getByText('Coming soon')).toBeInTheDocument();
-    expect(new URLSearchParams(window.location.search).get('view')).toBe('timeline');
-  });
-
-  it('preserves existing filters when switching view mode', () => {
-    renderFleetView();
-
-    fireEvent.click(screen.getByRole('button', { name: 'work' }));
-    expect(window.location.search).toBe('?view=grid&phase=work');
-
-    fireEvent.click(screen.getByRole('button', { name: 'table' }));
-    expect(new URLSearchParams(window.location.search).get('phase')).toBe('work');
-    expect(new URLSearchParams(window.location.search).get('view')).toBe('table');
+  it('follows browser back and forward between the views', () => {
+    renderAt('/agents');
+    act(() => {
+      window.history.pushState(null, '', '/agents?view=history');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
   });
 
   it('calls onNavigateToIssues when Start agent is clicked', () => {
     const onNavigateToIssues = vi.fn();
-    renderFleetView({ onNavigateToIssues });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Start agent' }));
+    renderAt('/agents', { onNavigateToIssues });
+    fireEvent.click(screen.getByRole('button', { name: /Start agent/ }));
     expect(onNavigateToIssues).toHaveBeenCalledTimes(1);
   });
 
-  it('does not render Start agent button when onNavigateToIssues is omitted', () => {
-    renderFleetView();
-
-    expect(screen.queryByRole('button', { name: 'Start agent' })).not.toBeInTheDocument();
+  it('does not render Start agent when onNavigateToIssues is omitted', () => {
+    renderAt('/agents');
+    expect(screen.queryByRole('button', { name: /Start agent/ })).toBeNull();
   });
 });

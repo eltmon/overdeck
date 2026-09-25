@@ -74,6 +74,20 @@ export interface MergeReviewArtifactInput extends ReviewArtifactRef {
   method?: 'merge' | 'squash' | 'rebase';
   cwd?: string;
   repository?: string;
+  /**
+   * #3983: merge only if the PR head is still this commit. A push after the
+   * caller's last read then fails the merge instead of landing unseen code.
+   */
+  matchHeadCommit?: string;
+}
+
+/** The pinned head as a CLI-safe SHA, or null when none was asked for. */
+function pinnedHeadSha(input: MergeReviewArtifactInput): string | null {
+  if (!input.matchHeadCommit) return null;
+  if (!/^[0-9a-f]{7,40}$/i.test(input.matchHeadCommit)) {
+    throw new Error(`Refusing to merge: ${input.matchHeadCommit} is not a commit SHA`);
+  }
+  return input.matchHeadCommit.toLowerCase();
 }
 
 export interface CommentOnArtifactInput extends ReviewArtifactRef {
@@ -362,12 +376,13 @@ const githubForgeAdapter: ForgeAdapter = {
   async mergeReviewArtifact(input) {
     const target = buildGitHubReviewTarget(input);
     const method = input.method || 'squash';
-    console.log(`[forge] mergeReviewArtifact: ${input.forge} ${target} method=${method} repo=${input.repository ?? 'default'}`);
+    const pin = pinnedHeadSha(input);
+    console.log(`[forge] mergeReviewArtifact: ${input.forge} ${target} method=${method} repo=${input.repository ?? 'default'}${pin ? ` head=${pin.slice(0, 12)}` : ''}`);
     if (!isGitHubAppConfigured()) {
       try {
         console.log(`[forge] gh pr merge: executing ${method} merge for ${target}`);
         await execAsync(
-          `gh pr merge ${target}${buildRepositoryFlag(input.repository)} --${method}`,
+          `gh pr merge ${target}${buildRepositoryFlag(input.repository)} --${method}${pin ? ` --match-head-commit ${pin}` : ''}`,
           { cwd: input.cwd, encoding: 'utf-8' }
         );
         console.log(`[forge] gh pr merge: completed successfully for ${target}`);
@@ -397,6 +412,10 @@ const githubForgeAdapter: ForgeAdapter = {
         throw new Error(`GitHub PR #${ref.number} has failing required checks`);
       }
 
+      if (pin && state.headSha && !state.headSha.toLowerCase().startsWith(pin) && !pin.startsWith(state.headSha.toLowerCase())) {
+        throw new Error(`GitHub PR #${ref.number} head is ${state.headSha.slice(0, 12)}, not the pinned ${pin.slice(0, 12)}`);
+      }
+
       if (isTransientGitHubMergeState(state)) {
         await delay(GITHUB_MERGE_POLL_INTERVAL_MS);
         continue;
@@ -408,7 +427,7 @@ const githubForgeAdapter: ForgeAdapter = {
           ref.repo,
           ref.number,
           method,
-          state.headSha || undefined,
+          pin ?? (state.headSha || undefined),
         );
         console.log(`[forge] mergePullRequestWithApp: result merged=${mergeResult.merged} for ${ref.owner}/${ref.repo}#${ref.number}`);
         if (mergeResult.merged) return;
@@ -502,8 +521,9 @@ const gitlabForgeAdapter: ForgeAdapter = {
   async mergeReviewArtifact(input) {
     const target = buildGitLabReviewTarget(input);
     const squashFlag = input.method === 'squash' || !input.method ? ' --squash' : '';
+    const pin = pinnedHeadSha(input);
     await execAsync(
-      `glab mr merge ${target}${buildRepositoryFlag(input.repository)}${squashFlag}`,
+      `glab mr merge ${target}${buildRepositoryFlag(input.repository)}${squashFlag}${pin ? ` --sha ${pin}` : ''}`,
       { cwd: input.cwd, encoding: 'utf-8' }
     );
   },

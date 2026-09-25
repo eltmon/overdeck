@@ -20,8 +20,10 @@ import {
   markFailed,
   markBlocked,
   markMerged,
-  markMergingBlocked,
+  markMergeRetriesExhausted,
   requeueToPending,
+  scheduleAutoMergeWithResult,
+  getLatestAutoMerge,
 } from '../../../../src/lib/overdeck/merge-sync.js';
 
 let odb: OverdeckTestDb;
@@ -168,15 +170,15 @@ describe('markBlocked', () => {
   });
 });
 
-describe('markMergingBlocked', () => {
-  it('marks merging → blocked and stores failure_reason', () => {
+describe('markMergeRetriesExhausted', () => {
+  it('marks merging → failed and stores failure_reason', () => {
     const db = odb.raw();
     seedIssue(db, 'PAN-1');
     const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'merging' });
 
-    expect(markMergingBlocked(id, 'retry ceiling reached')).toBe(true);
+    expect(markMergeRetriesExhausted(id, 'retry ceiling reached')).toBe(true);
     const row = db.prepare('SELECT status, failure_reason FROM pending_auto_merges WHERE id = ?').get(id) as any;
-    expect(row.status).toBe('blocked');
+    expect(row.status).toBe('failed');
     expect(row.failure_reason).toBe('retry ceiling reached');
   });
 
@@ -185,7 +187,7 @@ describe('markMergingBlocked', () => {
     seedIssue(db, 'PAN-1');
     const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'pending' });
 
-    expect(markMergingBlocked(id, 'retry ceiling reached')).toBe(false);
+    expect(markMergeRetriesExhausted(id, 'retry ceiling reached')).toBe(false);
   });
 });
 
@@ -244,5 +246,47 @@ describe('requeueToPending', () => {
     seedIssue(db, 'PAN-1');
     const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'pending' });
     expect(requeueToPending(id, '2026-06-11T08:00:00.000Z')).toBe(false);
+  });
+});
+
+describe('scheduleAutoMergeWithResult (#3983)', () => {
+  const input = {
+    issueId: 'PAN-1',
+    prUrl: 'https://github.com/org/repo/pull/99',
+    projectKey: 'pan',
+    scheduledMergeAt: '2026-06-10T00:05:00.000Z',
+    scheduledAt: '2026-06-10T00:00:00.000Z',
+    headSha: 'abc123',
+  };
+
+  it('stores the PR head and reads it back as the latest row', () => {
+    seedIssue(odb.raw(), 'PAN-1');
+    const result = scheduleAutoMergeWithResult(input);
+    expect(result.created).toBe(true);
+    expect(result.entry.headSha).toBe('abc123');
+    expect(getLatestAutoMerge('PAN-1')).toMatchObject({ id: result.entry.id, status: 'pending', headSha: 'abc123' });
+  });
+
+  it('re-checks the latest row inside the insert, so a cancel that landed mid-pass sticks', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'blocked' });
+    // The scheduler read a re-armable `blocked` row; the operator cancelled it
+    // before the insert ran.
+    db.prepare("UPDATE pending_auto_merges SET status = 'cancelled' WHERE id = ?").run(id);
+
+    const result = scheduleAutoMergeWithResult({ ...input, canSchedule: (latest) => latest.status !== 'cancelled' });
+    expect(result.created).toBe(false);
+    expect(result.entry).toMatchObject({ id, status: 'cancelled' });
+    expect(countActionableAutoMerges('PAN-1')).toBe(0);
+  });
+
+  it('inserts when the latest row still allows it', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'blocked' });
+    const result = scheduleAutoMergeWithResult({ ...input, canSchedule: (latest) => latest.status === 'blocked' });
+    expect(result.created).toBe(true);
+    expect(getLatestAutoMerge('PAN-1')).toMatchObject({ id: result.entry.id, status: 'pending' });
   });
 });

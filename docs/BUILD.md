@@ -83,6 +83,7 @@ All TypeScript bundling uses [tsdown](https://tsdown.dev/) (powered by Rolldown,
 - **`shims: true`**: Auto-injects `createRequire`, `__filename`, `__dirname` for ESM→CJS interop
 - **`deps.alwaysBundle`**: Workspace packages (`@overdeck/*`) are bundled into the output
 - **`clean: true`**: Wipes `dist/` before building (dashboard build runs after)
+- **Lazy command loading (PAN-4195)**: `dist/cli/index.js` statically imports only Commander, chalk and the telemetry lifecycle. Command implementations load when their command runs: commands defined in `src/cli/index.ts` use `lazyAction(() => import('./commands/x.js'), 'xCommand')` (`src/cli/lazy-action.ts`), and group modules (`registerXCommands`/`createXCommand`) are listed in `src/cli/command-groups.ts` and registered only when argv invokes one of their names (`src/cli/command-group-loader.ts`; `pan admin` nests its own table). Root `--help`, `help` and unknown names register every group, so help output is unchanged. Don't add a static import of a command module to the entry: `tests/unit/cli/startup-lazy-load.test.ts` traces `pan --version` with `tests/helpers/module-trace.mjs` and fails on command-only packages or a module count over budget. Lazily loaded modules land in `dist/` chunks, not `dist/cli/`, so resolve package files with `packageRoot` from `src/lib/paths.ts`, never a relative walk from `import.meta.url`.
 
 **Dashboard Server** — `src/dashboard/server/tsdown.config.ts`
 - **Entry point**: `main.ts` → `dist/dashboard/server.js`

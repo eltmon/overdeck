@@ -22,8 +22,8 @@
     "dist"
   ],
   "devDependencies": {
-    "tsdown": "^0.21.7",
+    "tsdown": "^0.21.10",
     "typescript": "catalog:",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.11"
   }
 }

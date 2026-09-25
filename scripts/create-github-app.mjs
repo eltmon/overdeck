@@ -129,7 +129,9 @@ async function main() {
         writeFileSync(join(APP_DIR, 'webhook-secret'), data.webhook_secret, { mode: 0o600 });
         writeFileSync(join(APP_DIR, 'client-id'), data.client_id || '');
         writeFileSync(join(APP_DIR, 'client-secret'), data.client_secret || '', { mode: 0o600 });
-        writeFileSync(join(APP_DIR, 'app-slug'), data.slug || 'panopticon-agent');
+        // The slug names the bot whose reviews approve a merge (#4066 review):
+        // never guess it. Without the file, Overdeck asks GitHub (GET /app).
+        if (data.slug) writeFileSync(join(APP_DIR, 'app-slug'), data.slug);
         writeFileSync(join(APP_DIR, 'owner'), data.owner?.login || '');
 
         console.log('\n✅ GitHub App created successfully!');

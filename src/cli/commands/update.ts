@@ -6,9 +6,9 @@ import { exitCli } from '../exit.js';
 import { execFile } from 'child_process';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { join } from 'path';
 import { loadConfigSync } from '../../lib/config.js';
+import { packageRoot } from '../../lib/paths.js';
 import { syncCommand } from './sync.js';
 import { promisify } from 'util';
 import { UpdateManager } from '../../lib/update-manager.js';
@@ -18,10 +18,7 @@ const execFileAsync = promisify(execFile);
 // Get current installed version
 function getCurrentVersion(): string {
   try {
-    // Navigate from this file to package.json
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const pkgPath = join(__dirname, '..', '..', '..', 'package.json');
+    const pkgPath = join(packageRoot, 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
     return pkg.version;
   } catch {

@@ -7,11 +7,7 @@
  */
 
 import { Command } from 'commander';
-import { statusCommand } from './status.js';
-import { initCommand } from './init.js';
-import { resourcesCommand } from './resources.js';
-import { setupCommand } from './setup.js';
-import { reapCommand } from './reap.js';
+import { lazyAction } from '../../lazy-action.js';
 
 export function registerRemoteCommands(program: Command): void {
   const remote = program
@@ -23,7 +19,7 @@ export function registerRemoteCommands(program: Command): void {
     .command('status')
     .description('Show Fly.io connection and machine status')
     .option('--json', 'Output in JSON format')
-    .action(statusCommand);
+    .action(lazyAction(() => import('./status.js'), 'statusCommand'));
 
   // pan remote init
   remote
@@ -32,20 +28,20 @@ export function registerRemoteCommands(program: Command): void {
     .option('--app <app>', 'Fly app name', 'pan-workspaces')
     .option('--org <org>', 'Fly org slug', 'personal')
     .option('--region <region>', 'Default region', 'iad')
-    .action(initCommand);
+    .action(lazyAction(() => import('./init.js'), 'initCommand'));
 
   // pan remote resources
   remote
     .command('resources')
     .description('Show RAM/disk usage across VMs')
     .option('--json', 'Output in JSON format')
-    .action(resourcesCommand);
+    .action(lazyAction(() => import('./resources.js'), 'resourcesCommand'));
 
   // pan remote setup
   remote
     .command('setup')
     .description('Setup Fly.io integration (install flyctl, configure auth)')
-    .action(setupCommand);
+    .action(lazyAction(() => import('./setup.js'), 'setupCommand'));
 
   // pan remote reap
   remote
@@ -53,5 +49,5 @@ export function registerRemoteCommands(program: Command): void {
     .description('Hand completed remote agents (PAN_REMOTE_DONE) to the review pipeline and stop their machines')
     .option('--issue <id>', 'Target a single issue instead of scanning all remote agents')
     .option('--dry-run', 'Report what would be reaped without acting')
-    .action(reapCommand);
+    .action(lazyAction(() => import('./reap.js'), 'reapCommand'));
 }
