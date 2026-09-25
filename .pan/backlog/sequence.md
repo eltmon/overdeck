@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:44:20.749904Z · model: claude-opus-5-5 · open: 803_
+_Last sequenced: 2026-09-25T05:47:19.671288Z · model: claude-opus-5-5 · open: 805_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -181,6 +181,8 @@ _Last sequenced: 2026-09-25T05:44:20.749904Z · model: claude-opus-5-5 · open: 
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
+| 228 | PAN-4200 | S | high | ok |  |  | bun audit critical: tar 6.2.1 via electron-builder 25; bump to builder 26 + notarize 3 + electron 40.10.6 to clear it. |
+| 229 | PAN-4199 | L | high | ok |  |  | Restored Flywheel page shows closed issues as working, drops titles, and lost ~12 old affordances; derive each on read. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -1118,10 +1120,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:44:20.749904Z",
+  "generatedAt": "2026-09-25T05:47:19.671288Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 803,
+  "openCount": 805,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11047,6 +11049,32 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "dependsOn": [],
       "why": "Right-click menu has 39 overlapping, jargon actions; trim per state, add Replan (archive branch, fresh plan) + pan replan CLI.",
       "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high rather than medium because the Replan action turns a manual recovery procedure (archive a stale branch, wipe, re-plan from main) into one door, which the post-cut conflict wave on PAN-3668 and PAN-1641 showed is needed. The menu trim is a large but self-contained UX change with mechanical, per-state acceptance tests.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4199",
+      "rank": 229,
+      "size": "L",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Restored Flywheel page shows closed issues as working, drops titles, and lost ~12 old affordances; derive each on read.",
+      "rationale": "New operator report, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high because the Flywheel page is the operator view of the pickup loop, and the default server path misreports closed issues as in flight, which is a correctness bug rather than polish. The remaining work restores lost affordances (merge-train rail, headline stats, report viewer, needs-you indicator) from sources that already exist, with mechanical per-item acceptance tests.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4200",
+      "rank": 228,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "bun audit critical: tar 6.2.1 via electron-builder 25; bump to builder 26 + notarize 3 + electron 40.10.6 to clear it.",
+      "rationale": "New dependency-triage issue, already in the pipeline, so it takes a free slot by merit. It ranks high because it clears the only critical advisory in bun audit plus the high-severity AppImage advisory on an artifact we ship. The change is small, but the notarize 3 ESM-only hook and the desktop packaging invariants (ABI-143 rebuild, hardlink-free tarball) need a real packaging build to verify.",
       "gate": "auto",
       "planning": "auto"
     }
