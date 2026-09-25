@@ -102,12 +102,14 @@ describe('AgentsDirectory', () => {
     expect(new URLSearchParams(window.location.search).get('window')).toBe('168');
   });
 
-  it('renders a working agent with the info badge and a stopped one with the muted badge', () => {
+  it('renders a working agent with the live state badge and a stopped one with the muted badge', () => {
     render(<AgentsDirectory />);
     const badge = (id: string) => within(document.querySelector(`[data-entry-id="${id}"]`) as HTMLElement)
       .getByText((_, node) => node?.getAttribute('data-component') === 'directory-state-badge');
     expect(badge('agent-pan-2')).toHaveTextContent('working');
-    expect(badge('agent-pan-2').className).toContain('badge-bg-info');
+    expect(badge('agent-pan-2').className).toContain('badge-bg-state-live');
+    expect(badge('agent-pan-2').className).toContain('text-state-live');
+    expect(badge('agent-pan-2').className).not.toContain('badge-bg-info');
     expect(badge('agent-pan-1')).toHaveTextContent('stopped');
     expect(badge('agent-pan-1').className).toContain('text-muted-foreground');
   });
@@ -126,7 +128,7 @@ describe('AgentsDirectory', () => {
     expect(row).toHaveAttribute('data-state', 'stuck');
     const badge = row.querySelector('[data-component="directory-state-badge"]') as HTMLElement;
     expect(badge).toHaveTextContent(/^stuck · \d+h$/);
-    expect(badge.className).toContain('badge-bg-destructive');
+    expect(badge.className).toContain('badge-bg-state-stuck');
   });
 
   it("shows an agent's issue title after its label and never the word unknown", () => {
