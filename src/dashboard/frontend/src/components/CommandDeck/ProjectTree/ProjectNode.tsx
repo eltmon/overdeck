@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, MessageSquarePlus } from 'lucide-react';
-import type { PipelineBucket, SessionNode } from '@overdeck/contracts';
+import type { IssueState, PipelineBucket, SessionNode } from '@overdeck/contracts';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import type { Harness } from '../../shared/ModelPicker';
@@ -61,6 +61,8 @@ export interface ProjectFeature {
   branch: string;
   status: string;
   stateLabel: string;
+  /** Derived issue state (PAN-3917 FR-6) from /api/issues/resource-allocated; null when not derived. */
+  state?: IssueState | null;
   agentStatus: string | null;
   hasPlanning: boolean;
   hasPrd: boolean;
