@@ -1,0 +1,782 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-25T06:03:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4201: Command Deck issue tree: real state badge instead of 'Allocated', de-duplicate resource chips, clearer hierarchy and colors",
+    "updated": "2026-09-25T06:07:50.200Z"
+  },
+  "plan": {
+    "id": "pan-4201",
+    "title": "Command Deck issue tree: real state badge instead of 'Allocated', de-duplicate resource chips, clearer hierarchy and colors",
+    "status": "proposed",
+    "uid": "c1b1ca3f-e038-4574-b3c2-17c40cf14b2f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-25T06:03:04Z",
+    "updated": "2026-09-25T06:07:50.200Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4201",
+        "label": "PAN-4201",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4201.md",
+        "label": "PRD draft (.pan/drafts/pan-4201.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "command-deck",
+      "ux",
+      "style-guide"
+    ],
+    "narratives": {
+      "Problem": "The Command Deck issue tree shows an 'Allocated' pill on every row (the server stateLabel fallback for any issue with a workspace or branch), repeats resource facts as text chips under every row and again in the expanded Resources group, has an unexplained five-segment progress strip, a mis-aligned caret, a lavender selected block with no nesting hierarchy, wrapped two-line titles, and state pills that break the style guide (pill radius, hardcoded hex).",
+      "Proposal": "Render a state badge from the derived issue state through a new pure resolver (resolveFeatureStateBadge) with style-guide tones on existing tokens; add a StatusDot for live agents and keep one colored signal per row; label the pipeline pips with the current step; collapse resources into one icon-only ResourceCluster and make the expanded ResourcesGroup containers-only (deleting BranchNode/PrNode); align the caret, make ID+title one truncated line, and neutralize selection with visible child nesting. Verify with a mocked Playwright spec that commits light/dark screenshots, and document the row anatomy in docs/ISSUE-VIEW.md. Full detail: .pan/drafts/pan-4201.md.",
+      "NonGoals": "- Changing the server deriveStateLabel or removing stateLabel from /api/issues/resource-allocated\n- Changing other stateLabel readers in FeatureItem.tsx (defaultExpandedFromState, isOrphanedFeature, derivePipeline done check, Rally StatusIcon)\n- Redesigning the palette or adding new color tokens (PAN-4197 owns the palette)\n- Changing AgentStepRow, the cockpit, kanban, pipeline page or other surfaces' state vocabulary, or the base .sessionNode rule\n- Adding container actions to the tree ResourcesGroup\n- Changing ProjectNode headers, CI/deploy chips or the conversation list\n- Removing any issue-view inventory section (Pipeline pips, ResourceStrip, ResourcesGroup stay)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "State badge source precedence: store derived state, then REST feature.state, then pipeline-bucket/tracker fallback, then no badge; never stateLabel.",
+        "rationale": "Both sources are the same FR-6 derivation; the store is live and already drives isReady, so one resolved value feeds the badge and the Merge button and they cannot disagree. REST state is null for rows without live resources, so a fallback is needed to avoid blank badges on merged/closed rows."
+      },
+      {
+        "summary": "Tones follow the style guide literally: In review, Changes requested and Ready amber; Working blue; Planning purple; Merged emerald; Backlog, Parked, Planned and Closed neutral. No new tokens.",
+        "rationale": "The style guide assigns amber to the In Review phase and human gates, blue to machine work, purple to specialist verbs including planning, emerald to outcomes. Existing tokens cover every tone, so PAN-4197 can retune them in one place without a forked palette."
+      },
+      {
+        "summary": "Pipeline pips are labelled (step n of 5, named current step, per-segment titles), not removed.",
+        "rationale": "The issue allows either; labelling keeps a no-loss inventory section and at-a-glance progress with the smallest diff."
+      },
+      {
+        "summary": "Resources appear once as an icon-only cluster on the meta line in both states; the expanded ResourcesGroup lists containers only; BranchNode and PrNode are deleted.",
+        "rationale": "The cluster already hosts the xBRIEF/tasks/PRD viewer clicks and orphan cleanup, so keeping it as the single home is lower risk than relocating those affordances; the group keeps only live container stats the cluster lacks."
+      },
+      {
+        "summary": "Feature titles become one line with an ellipsis and a full-title tooltip, superseding the v1.2 two-line clamp.",
+        "rationale": "The operator's 2026-09-25 request is the newer authority and asks for exactly this."
+      },
+      {
+        "summary": "One colored status signal per row: the state badge. A StatusDot marks live agents; the edge bar keeps only red error; running aggregate badges go neutral; '! INPUT' and '✕ review' keep color.",
+        "rationale": "Style-guide color restraint allows one colored signal plus actionable exceptions; the removed edge variants repeated the badge color."
+      },
+      {
+        "summary": "OKF command-deck concept is updated in the sibling eltmon/overdeck-knowledge repo after merge; in-repo docs go in docs/ISSUE-VIEW.md.",
+        "rationale": "The OKF bundle is a separate repository and cannot ship in this PR."
+      }
+    ],
+    "items": [
+      {
+        "id": "state-badge-helper",
+        "title": "Add the pure resolveFeatureStateBadge resolver and the ProjectFeature.state field",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/featureStateBadge.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "featureStateBadge.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-4201.md §5.1 and WI-1. Create featureStateBadge.ts exporting FeatureStateTone, FeatureStateBadge, FeatureStateBadgeInput and resolveFeatureStateBadge(input) with the exact nine-state label/tone/title table, the planning override (planned|backlog|null + a planning session with presence active|idle => 'Planning'/specialist), the null fallbacks (post_merge_limbo => 'Merged'/outcome; rawTrackerState containing closed|done|canceled => 'Closed'/rest) and null otherwise. Precedence: storeState ?? restState. Add `state?: IssueState | null` to ProjectFeature in ProjectNode.tsx with the doc comment from the PRD. Write featureStateBadge.test.ts with the seven test groups listed in WI-1."
+        },
+        "items": [
+          {
+            "id": "state-badge-helper.ac1",
+            "title": "Given each of the nine IssueState values as restState, when resolveFeatureStateBadge runs, then it returns the label and tone from PRD §5.1 (e.g. 'changes-requested' returns 'Changes requested' with tone 'human')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-badge-helper.ac2",
+            "title": "Given storeState 'ready' and restState 'working', when resolved, then the badge label is 'Ready'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-badge-helper.ac3",
+            "title": "Given state 'planned' and a planning session with presence 'active', when resolved, then the badge is 'Planning' with tone 'specialist'; with presence 'ended' it returns 'Planned'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-badge-helper.ac4",
+            "title": "Given a null state with pipelineBucket 'post_merge_limbo' it returns 'Merged'; with rawTrackerState 'Done' it returns 'Closed'; with no bucket, tracker state or sessions it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-badge-helper.ac5",
+            "title": "Given every test input above, when resolved, then no returned label equals 'Allocated'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row-layout-foundation",
+        "title": "Align the caret, make ID and title one truncated line, and neutralize selection and child nesting styles",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4201",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "FeatureItem.test.tsx passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "wire-state-badge",
+            "live-activity-signal",
+            "pipeline-pips-label",
+            "resource-cluster"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §5.6 and WI-2. In command-deck.module.css: .featureItemRow align-items flex-start; .featureItemCaret height 22px padding 0; .featureTitleLine nowrap baseline; .featureId_sidebar 11px, drop the 56px min-width; .featureLabel single line with white-space nowrap + text-overflow ellipsis (replace the 2-line clamp and its v1.2 comment with the PAN-4201 comment), 12.5px, weight 500; .featureMetaLine gap 6px min-height 18px; .featureItemSelected transparent; .featureItemWrapperSelected background var(--muted) + inset 1px foreground-14% ring; .sessionNodeSelected background var(--muted); .sessionList margin 2px 0 4px 20px + border-left 1px var(--border); new `.sessionList .sessionNode` padding-left 12px, 11.5px, color var(--body-foreground, var(--muted-foreground)); .featureBadge radius var(--badge-radius, var(--radius-sm)). Never edit the base .sessionNode rule (other surfaces use it). Keep title={displayTitle} on the label. Add the 120-character title test."
+        },
+        "items": [
+          {
+            "id": "row-layout-foundation.ac1",
+            "title": "Given a feature whose title is 120 characters, when FeatureItem renders, then the title element carries a title attribute equal to the full title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-layout-foundation.ac2",
+            "title": "Given the updated stylesheet, when .featureLabel is read, then it declares white-space: nowrap and text-overflow: ellipsis and no -webkit-line-clamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-layout-foundation.ac3",
+            "title": "Given the updated stylesheet, when .featureItemSelected, .featureItemWrapperSelected and .sessionNodeSelected are read, then none of them references var(--primary)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row-layout-foundation.ac4",
+            "title": "Given the updated stylesheet, when .sessionList is read, then it applies a left margin and a border-left hairline, and the base .sessionNode rule is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-state-badge",
+        "title": "Render the derived state badge on the feature row in place of the stateLabel pill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "FeatureItem.test.tsx passes including the new Allocated/ready/post_merge_limbo cases",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §5.1, §5.3, §5.6 and WI-3. In FeatureItem.tsx compute storeDerived = useDerivedIssueState(id); resolvedState = storeDerived?.state ?? feature.state ?? null; isReady = resolvedState === 'ready'; stateBadge = resolveFeatureStateBadge({...}). Replace the featureState pill with the featureStateBadge span (data-testid='feature-state', data-state=key, working title appends buildActivitySummary). Delete the 'Ready · awaiting merge' span (data-testid feature-ready) but keep MergeButton. Delete getFeatureStateTone, getFeatureStateTitle and featureStateTone. Rally progress span switches to featureStateBadge featureStateBadge_rest. CSS: add .featureStateBadge and the five tone modifiers exactly as in PRD §5.6 (8%/32% formula, badge radius, tokens only); delete .featureState and all .featureState_* rules (removes the hardcoded #14b8a6/#8b5cf6 hex). Update FeatureItem.test.tsx class-name mock and replace the three featureState_* tests with the WI-3 cases."
+        },
+        "items": [
+          {
+            "id": "wire-state-badge.ac1",
+            "title": "Given a feature with stateLabel 'Allocated' and state 'working', when FeatureItem renders, then the row shows 'Working' and no text 'Allocated'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-state-badge.ac2",
+            "title": "Given a feature with state 'ready', when FeatureItem renders, then [data-testid=feature-state] has data-state 'ready' and text 'Ready', the merge button renders, and no [data-testid=feature-ready] element exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-state-badge.ac3",
+            "title": "Given a feature with state null and pipelineBucket 'post_merge_limbo', when FeatureItem renders, then the badge text is 'Merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-state-badge.ac4",
+            "title": "Given the updated stylesheet, when searched, then no .featureState_ rule and no hardcoded hex color remain in the feature-row block, and every .featureStateBadge_* rule resolves its color from a var(--…) token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-activity-signal",
+        "title": "Show a StatusDot for live agents and reduce the row to one colored status signal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "FeatureItem.test.tsx passes including status-dot cases",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §5.3 and WI-4. Import StatusDot from ../StatusDot and render it (title=activitySummary) right after StartAgentCta when dominantStatus is active, thinking or waiting. Render aggregate badges whose tone is 'running' with the featureBadge_stopped class (keep waiting/error classes and all title text). Reduce edgeClass to the error variant only; delete .featureItemWrapperWorking/Merged/Ready/Paused CSS (keep Error and NeedsAttention); remove now-unused locals. Update the 'shows work and review badges' test and add dot tests."
+        },
+        "items": [
+          {
+            "id": "live-activity-signal.ac1",
+            "title": "Given a feature with an active work session, when FeatureItem renders, then exactly one [data-testid=status-dot] renders with data-status 'active'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-activity-signal.ac2",
+            "title": "Given a feature whose sessions are all ended, when FeatureItem renders, then no [data-testid=status-dot] renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-activity-signal.ac3",
+            "title": "Given a running work session, when FeatureItem renders, then the '▸ work' badge does not carry the featureBadge_running class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-activity-signal.ac4",
+            "title": "Given the updated stylesheet, when searched, then .featureItemWrapperWorking, .featureItemWrapperReady and .featureItemWrapperMerged no longer exist and .featureItemWrapperError still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-pips-label",
+        "title": "Move the pipeline strip helpers into pipelineStrip.ts and label the current step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/pipelineStrip.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/pipelineStrip.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/pipelineStrip.test.ts src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pipelineStrip.test.ts and FeatureItem.test.tsx pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §5.4 and WI-5. Create pipelineStrip.ts holding PipeSegState, PIPE_ORDER, PIPE_STEP_LABELS (plan, work, review, test, merge), derivePipeline (moved verbatim from FeatureItem.tsx), PIPE_CLASS, describePipeSegment and describePipeline with the exact output format in §5.4. FeatureItem imports them; the pips span gets role='img', title and aria-label = describePipeline(pipeline), and each <i> segment gets title '<step>: <status>'. Keep data-section='Pipeline pips' and data-testid='feature-pipe'. Do not re-export derivePipeline from FeatureItem.tsx."
+        },
+        "items": [
+          {
+            "id": "pipeline-pips-label.ac1",
+            "title": "Given segments ['done','done','working','none','none'], when describePipeline runs, then it returns exactly 'Step 3 of 5: review (running) — plan done · work done · review running · test pending · merge pending'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-pips-label.ac2",
+            "title": "Given all segments 'none', when describePipeline runs, then it returns a string starting 'Not started'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-pips-label.ac3",
+            "title": "Given segments ['done','done','done','done','merged'], when describePipeline runs, then it returns a string starting 'Step 5 of 5: merge (merged)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-pips-label.ac4",
+            "title": "Given a feature with a running work session, when FeatureItem renders, then [data-testid=feature-pipe] has an aria-label starting with 'Step '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resource-cluster",
+        "title": "Extract ResourceCluster and render resources once as an icon-only cluster on the meta line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ResourceCluster.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/tests/command-deck-resource-strip.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "npm run typecheck",
+            "npm run lint",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "FeatureItem.test.tsx passes",
+            "typecheck, lint and the file-size ratchet complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §5.5 and WI-6. Move resourceColor, formatPrState, resourceSummary, isOrphanedFeature, ResourceIcon, ResourceStrip and RESOURCE_ICON_ORDER into ResourceCluster.tsx, exported as ResourceCluster. Icons render without visible text labels (title/aria-label carry the facts), except tasks shows 'closed/total' from feature.taskTotals and pr shows '#<number>'. Clickable icons and cleanup buttons become span role='button' tabIndex=0 with Enter/Space activation and stopPropagation (no <button> nested in the row <button>). Render <span data-section='ResourceStrip'><ResourceCluster …/></span> inside .featureMetaLine before the pips; delete the old ResourceStrip div and the 'Tasks summary' button. CSS: .featureResourceChip becomes a borderless 16px icon; delete .featureResourceLine. Update FeatureItem.test.tsx resource tests to find chips by aria-label/title and update command-deck-resource-strip.spec.ts selectors."
+        },
+        "items": [
+          {
+            "id": "resource-cluster.ac1",
+            "title": "Given a feature with a workspace and one local branch, when FeatureItem renders, then no text 'workspace' or 'branch local 1' is visible and both facts are exposed through title or aria-label on cluster icons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resource-cluster.ac2",
+            "title": "Given the xBRIEF, tasks and PRD cluster icons, when each is activated by click or Enter, then its viewer opens and onSelect is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resource-cluster.ac3",
+            "title": "Given an orphaned feature (tracker Closed) with resources, when the cluster popover opens, then the Cleanup affordance renders and calls onCleanupOrphanedResources with the issue id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resource-cluster.ac4",
+            "title": "Given the rendered row, when the DOM is queried, then no button element is a descendant of the .featureItem row button's resource cluster, and FeatureItem.tsx has no more lines than on origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resources-group-containers-only",
+        "title": "Make the expanded ResourcesGroup list containers only and delete BranchNode and PrNode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ResourcesGroup.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ResourcesGroup.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ResourceCluster.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/BranchNode.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/PrNode.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ResourcesGroup.test.tsx src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ResourcesGroup.test.tsx and FeatureItem.test.tsx pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD §5.5 and WI-7. First run git grep -n \"BranchNode\\|PrNode\\|branchNode\\|prNode\\|branchBadge\" to confirm ResourcesGroup is the only importer. Remove the branches and prs props, imports and render blocks from ResourcesGroup; header text 'Containers', summary 'N container(s)', render only when containers.length > 0. FeatureItem renders ResourcesGroup when expanded && detailIdentifiers && dockerContainerNames.length > 0 and stops passing branches/prs; drop hasResources if unused. Delete BranchNode.tsx, PrNode.tsx and their CSS rules. Keep data-section='ResourcesGroup'. Add ResourcesGroup.test.tsx. Add `omit?: readonly ResourceSource[]` to ResourceCluster and pass omit={['docker']} from FeatureItem exactly when the Containers group renders, so docker is shown once per render."
+        },
+        "items": [
+          {
+            "id": "resources-group-containers-only.ac1",
+            "title": "Given two containers, when ResourcesGroup renders expanded, then the header reads 'Containers' and one row renders per container",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resources-group-containers-only.ac2",
+            "title": "Given zero containers, when ResourcesGroup renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resources-group-containers-only.ac3",
+            "title": "Given an expanded feature with a local branch and a PR but no containers, when FeatureItem renders, then no Resources or Containers header and no '(local)' text renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resources-group-containers-only.ac4",
+            "title": "Given the repository after this item, when git ls-files runs, then BranchNode.tsx and PrNode.tsx no longer exist and no .branchNode or .prNode rule remains in command-deck.module.css",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resources-group-containers-only.ac5",
+            "title": "Given an expanded feature with two docker containers, when FeatureItem renders, then the Containers group renders and the resource cluster renders no docker icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "screenshots-spec",
+        "title": "Add the PAN-4201 Playwright spec and commit light/dark screenshots of the issue tree",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4201-issue-tree.spec.ts",
+            "docs/screenshots/pan-4201/light-collapsed.png",
+            "docs/screenshots/pan-4201/light-expanded.png",
+            "docs/screenshots/pan-4201/light-live-agent.png",
+            "docs/screenshots/pan-4201/dark-collapsed.png",
+            "docs/screenshots/pan-4201/dark-expanded.png",
+            "docs/screenshots/pan-4201/dark-live-agent.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vite --port 3450 --strictPort",
+            "cd src/dashboard/frontend && DASHBOARD_URL=http://localhost:3450 npx playwright test tests/pan-4201-issue-tree.spec.ts"
+          ],
+          "expected_outputs": [
+            "vite prints a Local: http://localhost:3450/ line and keeps running in the background",
+            "the spec passes and writes six PNGs under docs/screenshots/pan-4201/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Model the spec on command-deck-resource-strip.spec.ts (route mocks) and pan2450-pipeline-overview.spec.ts (theme via localStorage 'overdeck.ui.theme' + reload). Use issue IDs PAN-99001..PAN-99007 that cannot exist in the live read model (unmocked /ws/rpc proxies to the operator's :3011 and store state beats REST state). Mock resource-allocated with seven overdeck issues (planned+active planning session, working+active work session, in-review, changes-requested, ready, merged via state null + post_merge_limbo, backlog), each with stateLabel 'Allocated', a workspace and one local branch; mock registered-projects, pipeline membership, per-issue resource-details and every other route the resource-strip spec mocks. Use the spec's own isolated page context at 1440x900. Write light/dark × collapsed/expanded/live-agent PNGs to docs/screenshots/pan-4201/ and commit them; embed them in the PR body with absolute https://github.com/eltmon/overdeck/blob/feature/pan-4201/docs/screenshots/pan-4201/<file>.png?raw=true URLs (relative paths do not render) plus the §5.2 token note. Run against this workspace's Vite dev server on a free port (cd src/dashboard/frontend && npx vite --port 3450 --strictPort; routes are mocked so no backend is needed) with DASHBOARD_URL=http://localhost:3450; fallback npx vite preview of the built frontend; if neither runs, record the blocker in the PR body and pan tell the orchestrator."
+        },
+        "items": [
+          {
+            "id": "screenshots-spec.ac1",
+            "title": "Given the mocked tree in light and dark themes, when the spec runs, then page.getByText('Allocated') has count 0 and each row's [data-testid=feature-state] shows the expected label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "screenshots-spec.ac2",
+            "title": "Given the working fixture with an active session, when the spec runs, then that row renders exactly one status-dot and no row shows the text 'branch local 1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "screenshots-spec.ac3",
+            "title": "Given a passing run, when docs/screenshots/pan-4201/ is listed, then it contains light-collapsed, dark-collapsed, light-expanded, dark-expanded, light-live-agent and dark-live-agent PNGs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the rail row anatomy in docs/ISSUE-VIEW.md and queue the OKF command-deck update",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:03:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4201",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "design/style-guide/STYLE-GUIDE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n \"Project-tree rail row\" docs/ISSUE-VIEW.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new subsection heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add a 'Project-tree rail row' subsection to docs/ISSUE-VIEW.md after the density paragraph (~line 31) stating: the state badge shows the derived issue state via resolveFeatureStateBadge with precedence store → REST state → bucket/tracker fallback and never stateLabel; the tone-to-token table; the StatusDot means a live agent session; resources appear once in the ResourceCluster and the expanded ResourcesGroup lists containers only; the pips are labelled by describePipeline. Run git grep -n \"two lines\\|line-clamp\\|wrap to two\" design/style-guide/STYLE-GUIDE.md and, only if it matches a rail-title rule, change it to one line with ellipsis and tooltip (PAN-4201). Do not edit .claude/skills. Add a PR-body note that the OKF command-deck concept (../overdeck-knowledge frontend/command-deck.md) is updated via /okf author and pushed to eltmon/overdeck-knowledge after merge."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given the updated docs/ISSUE-VIEW.md, when read, then a 'Project-tree rail row' subsection names resolveFeatureStateBadge, ResourceCluster and describePipeline and states that the badge never renders stateLabel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given the same subsection, when read, then it contains the tone-to-token table mapping Working to --info, In review/Changes requested/Ready to --warning, Planning to --signal-review and Merged to --success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given the PR body, when read, then it lists the OKF command-deck follow-up for eltmon/overdeck-knowledge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "state-badge-helper",
+        "to": "wire-state-badge",
+        "type": "blocks"
+      },
+      {
+        "from": "row-layout-foundation",
+        "to": "wire-state-badge",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-state-badge",
+        "to": "live-activity-signal",
+        "type": "blocks"
+      },
+      {
+        "from": "live-activity-signal",
+        "to": "pipeline-pips-label",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-pips-label",
+        "to": "resource-cluster",
+        "type": "blocks"
+      },
+      {
+        "from": "resource-cluster",
+        "to": "resources-group-containers-only",
+        "type": "blocks"
+      },
+      {
+        "from": "resources-group-containers-only",
+        "to": "screenshots-spec",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Single subsystem (Command Deck ProjectTree + its stylesheet); items are serialized only by shared mutation of FeatureItem.tsx, FeatureItem.test.tsx and command-deck.module.css.",
+      "canonicalFilename": "2026-09-25-PAN-4201-command-deck-issue-tree-real-state-badge-instead-of-allocated-de-duplicate-resource-chips-clearer-hierarchy-and-colors.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
