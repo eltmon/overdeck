@@ -523,3 +523,54 @@ export function validateTieredExecutionConfig(
     difficultyToTier,
   };
 }
+
+/** PAN-4191: one tier (or distribution entry) with its declared ref and the model it launches. */
+export interface EffectiveTierRow {
+  tierName: string;
+  /** What config.yaml declares: a `workhorse:<slot>` ref or a literal model id. */
+  ref: string;
+  /** The concrete model the tier launches. */
+  model: string;
+  harness: RuntimeName;
+  difficulties: XBriefDifficulty[];
+  /** Distribution weight, when the row is one entry of a distribution tier. */
+  weight?: number;
+  /** True when tiered execution is on and this row launches a different model than roles.work. */
+  overridesWork: boolean;
+}
+
+export interface EffectiveTierTable {
+  enabled: boolean;
+  /** roles.work's effective model (representative pick of a distribution). */
+  workModel: string;
+  rows: EffectiveTierRow[];
+}
+
+/**
+ * PAN-4191: the effective model per tier, and whether the tier table shadows
+ * roles.work. While tiered execution is on, a planned issue's work agent takes
+ * its tier's model, not roles.work; `pan admin config tiers` prints this so
+ * that precedence is visible.
+ */
+export function effectiveTierTable(
+  tiered: Pick<TieredExecutionConfig, 'enabled' | 'tiers'>,
+  workModel: string,
+): EffectiveTierTable {
+  const rows: EffectiveTierRow[] = [];
+  for (const [tierName, tier] of Object.entries(tiered.tiers)) {
+    const entries: Array<{ model: string; modelRef?: string; harness: RuntimeName; weight?: number }> =
+      tier.distribution ?? [{ model: tier.model, modelRef: tier.modelRef, harness: tier.harness }];
+    for (const entry of entries) {
+      rows.push({
+        tierName,
+        ref: entry.modelRef ?? entry.model,
+        model: entry.model,
+        harness: entry.harness,
+        difficulties: tier.difficulties,
+        ...(entry.weight !== undefined ? { weight: entry.weight } : {}),
+        overridesWork: tiered.enabled && entry.model !== workModel,
+      });
+    }
+  }
+  return { enabled: tiered.enabled, workModel, rows };
+}

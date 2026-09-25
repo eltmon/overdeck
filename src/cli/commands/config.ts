@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import { loadConfigSync, saveConfig, OverdeckConfig } from '../../lib/config.js';
 import { getShadowModeFromEnv } from '../../lib/env-loader.js';
 import { listShadowedIssues, getPendingSyncCount } from '../../lib/shadow-state.js';
+import { configTiersCommand } from './config-tiers.js';
 
 export function registerConfigCommand(program: Command): void {
   const config = program
@@ -19,6 +20,11 @@ export function registerConfigCommand(program: Command): void {
     .option('--status', 'Show current shadow mode configuration')
     .option('--tracker <type>', 'Configure specific tracker (linear/github/gitlab/rally)')
     .action(configShadowCommand);
+
+  config
+    .command('tiers')
+    .description('Show the effective model per tiered_execution tier and whether it overrides roles.work')
+    .action(configTiersCommand);
 }
 
 interface ShadowOptions {
