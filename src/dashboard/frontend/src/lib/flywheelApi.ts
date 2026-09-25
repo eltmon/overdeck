@@ -42,15 +42,36 @@ export function useFlywheelRunning(): boolean {
   return data?.run === 'running';
 }
 
+/**
+ * A failed flywheel action, carrying the route's status and its typed `code`
+ * (`FlywheelOrphanSession`, `FlywheelAlreadyRunning`, …). The code is what
+ * lets a caller offer the right recovery instead of just showing the message.
+ */
+export class FlywheelActionHttpError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+
+  constructor(message: string, status: number, code: string | null) {
+    super(message);
+    this.name = 'FlywheelActionHttpError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export async function postFlywheelAction<T = unknown>(action: FlywheelAction, body: unknown = {}): Promise<T> {
   const res = await fetch(`/api/flywheel/${action}`, {
     method: 'POST',
     headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify(body),
   });
-  const payload = (await res.json().catch(() => ({}))) as { error?: unknown };
+  const payload = (await res.json().catch(() => ({}))) as { error?: unknown; code?: unknown };
   if (!res.ok) {
-    throw new Error(typeof payload.error === 'string' ? payload.error : `POST /api/flywheel/${action} → ${res.status}`);
+    throw new FlywheelActionHttpError(
+      typeof payload.error === 'string' ? payload.error : `POST /api/flywheel/${action} → ${res.status}`,
+      res.status,
+      typeof payload.code === 'string' ? payload.code : null,
+    );
   }
   return payload as T;
 }

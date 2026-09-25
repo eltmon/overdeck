@@ -5,7 +5,7 @@
  * `GET /api/flywheel/status`; every control POSTs to the route that wraps the
  * same action the CLI verb calls.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Loader2, Maximize2, Pause, Play, RotateCcw, Square, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import {
   FLYWHEEL_CONVERSATION_NAME,
   FLYWHEEL_CONVERSATION_QUERY_KEY,
+  FlywheelActionHttpError,
   useFlywheelAction,
   useFlywheelStatus,
   type FlywheelAction,
@@ -60,16 +61,22 @@ const BUTTON = 'inline-flex items-center gap-1 rounded-md border border-border b
 const PRIMARY_BUTTON = 'inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/15 disabled:opacity-50';
 const DESTRUCTIVE_BUTTON = 'inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50';
 
-function useRunAction(action: FlywheelAction) {
+function useRunAction(action: FlywheelAction, onError?: (error: Error) => void) {
   const mutation = useFlywheelAction(action);
   return {
     pending: mutation.isPending,
     run: (body?: unknown) => mutation.mutate(body, {
       onSuccess: () => toast.success(ACTION_TOAST[action]),
-      onError: (error: Error) => toast.error(`Flywheel ${action} failed: ${error.message}`),
+      onError: (error: Error) => {
+        toast.error(`Flywheel ${action} failed: ${error.message}`);
+        onError?.(error);
+      },
     }),
   };
 }
+
+/** The route's 409 for a leftover `conv-flywheel` session with no row (D9). */
+const ORPHAN_CODE = 'FlywheelOrphanSession';
 
 export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const [viewMode, setViewMode] = useState<'conversation' | 'terminal'>('conversation');
@@ -80,7 +87,12 @@ export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: 
   const conversationQuery = useQuery({ queryKey: FLYWHEEL_CONVERSATION_QUERY_KEY, queryFn: fetchConversation, refetchInterval: 5_000 });
   const configQuery = useQuery({ queryKey: ['settings', 'roles', 'flywheel'], queryFn: fetchRoleConfig, staleTime: 30_000 });
 
-  const start = useRunAction('start');
+  // A start that trips the orphan guard is the one failure the operator can
+  // clear from here: `Start fresh` replaces the leftover session.
+  const [orphanDetected, setOrphanDetected] = useState(false);
+  const start = useRunAction('start', (error) => {
+    if (error instanceof FlywheelActionHttpError && error.code === ORPHAN_CODE) setOrphanDetected(true);
+  });
   const pause = useRunAction('pause');
   const resume = useRunAction('resume');
   const report = useRunAction('report');
@@ -89,6 +101,11 @@ export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: 
   const busy = start.pending || pause.pending || resume.pending || report.pending || stop.pending || abort.pending;
 
   const run = statusQuery.data?.run;
+
+  // Once the flywheel is running or paused there is nothing orphaned to clear.
+  useEffect(() => {
+    if (run && run !== 'idle') setOrphanDetected(false);
+  }, [run]);
   const conversation = conversationQuery.data ?? null;
   const config = configQuery.data ?? {};
 
@@ -114,7 +131,9 @@ export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: 
   const handleStartFresh = async () => {
     const ok = await confirm({
       title: 'Start a fresh flywheel',
-      message: 'The paused flywheel conversation is replaced by a new one. The old transcript stays on disk. Continue?',
+      message: orphanDetected
+        ? `A leftover ${FLYWHEEL_CONVERSATION_NAME} session is still running with no conversation row. Start fresh replaces it with a new one; the old transcript stays on disk. Continue?`
+        : 'The paused flywheel conversation is replaced by a new one. The old transcript stays on disk. Continue?',
       confirmLabel: 'Start fresh',
       variant: 'destructive',
     });
@@ -141,9 +160,16 @@ export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: 
         {(statusQuery.isLoading || busy) && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-label="Working" />}
         <div className="ml-auto flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Flywheel controls">
           {run === 'idle' && (
-            <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => start.run()}>
-              <Play className="h-3.5 w-3.5" />Start
-            </button>
+            <>
+              <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => start.run()}>
+                <Play className="h-3.5 w-3.5" />Start
+              </button>
+              {orphanDetected && (
+                <button type="button" className={BUTTON} disabled={busy} onClick={() => void handleStartFresh()}>
+                  <Play className="h-3.5 w-3.5" />Start fresh
+                </button>
+              )}
+            </>
           )}
           {run === 'paused' && (
             <>

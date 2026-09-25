@@ -7,8 +7,13 @@
  * real adapter: only the issue cache, the backend inventory, and the forge
  * listing are stubbed. Nothing here stubs `loadStates` — if the route stopped
  * injecting it, a closed issue would derive `working` again.
+ *
+ * The other half of that seam — the deriver holding no `dashboard/server`
+ * import — is proven at runtime by `tests/unit/lib/flywheel/derive-status.ts`,
+ * which runs the whole deriver with no dashboard module mocked at all. A
+ * source grep would trip `lint:source-introspection`.
  */
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -79,11 +84,6 @@ describe('GET /api/flywheel/status reads the server caches (PAN-4199 FR-4)', () 
     const { body } = await statusFor(['PAN-7', 'PAN-8']);
     expect(body.inFlight[0]?.title).toBe('Open thing');
     expect(body.inFlight[0]).not.toHaveProperty('trackerUnknown');
-  });
-
-  it('keeps the deriver free of any dashboard/server import (ac3)', () => {
-    const deriver = readFileSync(join(__dirname, '../../../../../src/lib/flywheel/derive-status.ts'), 'utf-8');
-    expect(deriver).not.toContain('dashboard/server');
   });
 
   it('reports an issue no tracker has as unknown rather than open', async () => {
