@@ -40,38 +40,9 @@ import chalk from 'chalk';
 import { lazyAction } from './lazy-action.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
-import { registerMonitorCommands } from './commands/monitor.js';
-import { registerResetSessionCommand } from './commands/reset-session.js';
-import { registerCloseCommand } from './commands/close.js';
-import { registerReviewCommands } from './commands/review-subcommands.js';
-import { registerWorkspaceCommands } from './commands/workspace.js';
-import { registerTestCommands } from './commands/test.js';
-import { registerTtsCommands } from './commands/tts.js';
-import { registerInstallCommand } from './commands/install.js';
-import { registerAdminCommands } from './commands/admin/index.js';
-import { registerConversationsCommands } from './commands/conversations/index.js';
-import { registerOhmypiAuthCommands } from './commands/ohmypi-auth.js';
-import { registerProjectCommands } from './commands/project.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
-import { createCostCommand } from './commands/cost.js';
-import { createMemoryCommand } from './commands/memory.js';
-import { createBriefingCommand } from './commands/briefing.js';
-import { createComplianceCommand } from './commands/compliance.js';
-import { createRegistryCommand } from './commands/registry.js'; import { createOrdersCommand } from './commands/orders.js';
-import { createParkedCommand } from './commands/parked.js';
-import { createDocsCommand } from './commands/docs.js';
-import { configureKnowledgeCommand } from './commands/knowledge.js';
-import { registerCavemanCommands } from './commands/caveman.js';
-import { registerReleaseCommands } from './commands/release.js';
-import { registerRolloutCommands } from './commands/rollout.js';
-import { registerResourceCommands } from './commands/resources.js';
-import { registerScopeCommands } from './commands/scope.js';
-import { registerSpawnCommand } from './commands/spawn.js';
-import { registerWorkerCommands } from './commands/worker.js';
-import { registerFlywheelCommands } from './commands/flywheel.js';
-import { registerMergeCommands } from './commands/merge.js';
-import { registerArtifactCommands } from './commands/artifacts.js';
-import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js'; import { exitCli, runCliWithTelemetry } from './telemetry.js';
+import { CommandGroupLoader, resolveGroupDemand } from './command-groups.js';
+import { exitCli, runCliWithTelemetry } from './telemetry.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -106,8 +77,16 @@ import { registerSwarmCommands } from './commands/swarm.js'; import { registerTa
   }
 })();
 
+// Default action: no args → serve (npx overdeck). Decided before group
+// registration so the loader sees the command that will actually run.
+if (process.argv.length === 2) {
+  process.argv.push('serve');
+}
+
 const program = new Command();
 program.enablePositionalOptions();
+// Command groups register only when argv needs them (PAN-4195): see command-groups.ts.
+const groups = new CommandGroupLoader(program, resolveGroupDemand(process.argv));
 
 const ensureDashboardBundle = async (
   bundledServer: string,
@@ -282,7 +261,7 @@ program
   .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
   .action(lazyAction(() => import('./commands/open.js'), 'openCommand'));
 
-registerReviewCommands(program);
+await groups.register('review');
 
 program.command('staffing <id>').description('Show the work model and swarm policy in effect for an issue').action(lazyAction(() => import('./commands/staffing.js'), 'staffingCommand'));
 
@@ -366,14 +345,14 @@ program
   .command('answer <id> [option]')
   .description('Show a pending pane choice, or answer its numbered option')
   .action(lazyAction(() => import('./commands/answer.js'), 'answerCommand'));
-registerMonitorCommands(program);
+await groups.register('monitor');
 program
   .command('kill <id>')
   .alias('stop')
   .description('Stop one qualified agent, or all agents when given an issue ID (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(lazyAction(() => import('./commands/kill.js'), 'killCommand'));
-registerResetSessionCommand(program);
+await groups.register('resetSession');
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')
@@ -466,7 +445,7 @@ program
   .option('--shape <shape>', 'Limit to one shape: base|strike|slot|all (default: all)')
   .action(lazyAction(() => import('./commands/workspace.js'), 'destroyCommand'));
 
-registerCloseCommand(program);
+await groups.register('close');
 
 program
   .command('start <id>')
@@ -496,43 +475,43 @@ program
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')
   .option('--dry-run', 'Print what would happen without spawning')
   .action(async (ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => (await import('./commands/strike.js')).strikeCommand(ids, options));
-configureKnowledgeCommand(program);
-registerSwarmCommands(program); registerTaskCommands(program);
-registerWorkspaceCommands(program);
-registerTestCommands(program);
-registerTtsCommands(program);
+await groups.register('knowledge');
+await groups.register('swarm'); await groups.register('task');
+await groups.register('workspace');
+await groups.register('test');
+await groups.register('tts');
 
 // Register release commands (pan release check/stable/canary/notes)
-registerReleaseCommands(program);
-registerRolloutCommands(program);
+await groups.register('release');
+await groups.register('rollout');
 
-program.addCommand(createMemoryCommand());
-program.addCommand(createBriefingCommand());
-program.addCommand(createComplianceCommand());
-program.addCommand(createRegistryCommand()); program.addCommand(createOrdersCommand());
-program.addCommand(createParkedCommand());
-program.addCommand(createDocsCommand());
+await groups.register('memory');
+await groups.register('briefing');
+await groups.register('compliance');
+await groups.register('registry'); await groups.register('orders');
+await groups.register('parked');
+await groups.register('docs');
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
-registerAdminCommands(program);
+await groups.register('admin');
 
 // Register conversations commands (pan conversations scan, search, list, show, cost, enrich)
-registerConversationsCommands(program);
+await groups.register('conversations');
 
 // Register ohmypi-auth commands (pan ohmypi-auth status|login; pan pi-auth is a deprecated alias)
-registerOhmypiAuthCommands(program);
+await groups.register('ohmypiAuth');
 
 // Register install command
-registerInstallCommand(program);
+await groups.register('install');
 
 // Register caveman commands (pan caveman-compress)
-registerCavemanCommands(program);
-registerScopeCommands(program);
-registerSpawnCommand(program);
-registerWorkerCommands(program);
-registerFlywheelCommands(program);
-registerMergeCommands(program);
-registerArtifactCommands(program);
+await groups.register('caveman');
+await groups.register('scope');
+await groups.register('spawn');
+await groups.register('worker');
+await groups.register('flywheel');
+await groups.register('merge');
+await groups.register('artifacts');
 
 // Shorthand: pan status = pan status
 program
@@ -1182,11 +1161,7 @@ program
 registerReloadAndRestartCommands(program);
 
 // Project management commands
-const project = program.command('project').description('Project registry for multi-project workspace support');
-registerProjectCommands(project);
-
-const projects = program.command('projects').description('Project registry for multi-project workspace support');
-registerProjectCommands(projects);
+await groups.register('project');
 
 // Health command
 program
@@ -1201,7 +1176,7 @@ program
   .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
   .action(lazyAction(() => import('./commands/doctor.js'), 'doctorCommand'));
 
-registerResourceCommands(program);
+await groups.register('resources');
 
 // Update command
 program
@@ -1212,7 +1187,7 @@ program
   .action(lazyAction(() => import('./commands/update.js'), 'updateCommand'));
 
 // Cost tracking commands (pan cost today, pan cost sync, etc.)
-program.addCommand(createCostCommand());
+await groups.register('cost');
 
 // ─── npx overdeck — server + browser launcher ───────────────────────────────
 // Low-friction entry point: no Electron required.
@@ -1278,11 +1253,7 @@ program
     }, 1_500);
   });
 
-// Default action: show help (Commander default) unless no args → serve
-if (process.argv.length === 2) {
-  // npx overdeck with no args → act as serve
-  process.argv.push('serve');
-}
+await groups.finish();
 
 // Short-lived commands must drain durable state writes before exit (PAN-2692).
 // PAN-3917: durable-write-drain.ts (journal writes plus the state worktree's
