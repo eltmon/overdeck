@@ -177,8 +177,10 @@ function OverflowMenu({
   actions,
   onClose,
   returnFocusRef,
+  ignorePlacement,
 }: {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
+  ignorePlacement?: boolean;
   onClose: () => void;
   returnFocusRef?: RefObject<HTMLButtonElement>;
 }) {
@@ -192,7 +194,7 @@ function OverflowMenu({
         data-testid="issue-action-overflow-menu"
         className="absolute right-0 top-full z-[1000] mt-1 w-[320px]"
       >
-        <IssueActionGroupedBody actions={actions} primitives={popoverMenuPrimitives(onClose)} />
+        <IssueActionGroupedBody actions={actions} primitives={popoverMenuPrimitives(onClose)} ignorePlacement={ignorePlacement} />
       </MenuSurface>
     </>
   );
@@ -272,8 +274,10 @@ function OverflowButton({
   openSignal,
   count,
   menuKey,
+  ignorePlacement,
 }: {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
+  ignorePlacement?: boolean;
   triggerRef?: RefObject<HTMLButtonElement>;
   openSignal?: number;
   count?: number;
@@ -305,7 +309,7 @@ function OverflowButton({
         <MoreHorizontal className="h-4 w-4" />
         <span>{more} more</span>
       </button>
-      {open ? <OverflowMenu actions={actions} onClose={() => setOpenMenu(null)} returnFocusRef={triggerRef} /> : null}
+      {open ? <OverflowMenu actions={actions} onClose={() => setOpenMenu(null)} returnFocusRef={triggerRef} ignorePlacement={ignorePlacement} /> : null}
     </div>
   );
 }
@@ -451,7 +455,11 @@ export function IssueActionMenu({
     () => new Set<string>([...pinRight, ...componentPinSet]),
     [pinRight, componentPinSet],
   );
-  const inScope = (view: IssueActionView) => !agentScopeOnly || AGENT_SCOPE_ACTION_KEYS.has(view.action.key);
+  // PAN-4198 (D5): the agent-scope menu is its own allowlist and ignores
+  // placement, so Pause and Recover still reach the fleet cards.
+  const inScope = (view: IssueActionView) => (
+    agentScopeOnly ? AGENT_SCOPE_ACTION_KEYS.has(view.action.key) && view.enabled : true
+  );
   const scopedAll = actions.all.filter(inScope);
   const scopedPrimary = actions.primary.filter(inScope);
   const scopedSecondary = actions.secondary.filter(inScope);
@@ -485,7 +493,7 @@ export function IssueActionMenu({
         <ActionButton key={view.action.key} view={view} inline />
       )) : null}
       {mode === 'overflow-only' || (mode === 'primary-strip' && menuAll.length > 0) ? (
-        <OverflowButton actions={overflowActions} count={overflowCount} triggerRef={overflowTriggerRef} openSignal={openSignal} menuKey={`issue-action:${issueId}`} />
+        <OverflowButton actions={overflowActions} count={overflowCount} triggerRef={overflowTriggerRef} openSignal={openSignal} menuKey={`issue-action:${issueId}`} ignorePlacement={agentScopeOnly} />
       ) : null}
       {hasPins ? <div data-testid="issue-action-pin-spacer" className="flex-1" /> : null}
       {registryPins.map((view) => (

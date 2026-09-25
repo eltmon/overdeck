@@ -44,6 +44,12 @@ export type IssueActionGroupedBodyProps = {
   primitives: IssueActionMenuPrimitives;
   nonIssueActions?: NonIssueActionInvocation[];
   defaultExplain?: boolean;
+  /**
+   * PAN-4198 (D5): set by the agent-scope menu, whose own allowlist already
+   * decided what belongs. Everywhere else the body drops contextual entries,
+   * because their card owns them.
+   */
+  ignorePlacement?: boolean;
 };
 
 function phaseLabel(phase: PipelinePhase) {
@@ -177,19 +183,27 @@ export function IssueActionGroupedBody({
   primitives,
   nonIssueActions = [],
   defaultExplain = false,
+  ignorePlacement = false,
 }: IssueActionGroupedBodyProps) {
   const { Item, Label, Separator } = primitives;
   const [dangerOpen, setDangerOpen] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
   const [explain, setExplain] = useState(() => {
     const stored = localStorage.getItem(EXPLAIN_PREFERENCE_KEY);
     return stored === null ? defaultExplain : stored === 'true';
   });
-  const availableCount = actions.all.filter((view) => view.enabled).length;
+  // PAN-4198 (FR-1): a menu lists only the enabled, menu-placed actions.
+  // Contextual entries belong to their cards, and a gated action is noise —
+  // the operator cannot act on it and cannot tell what it would have done.
+  const menuActions = actions.all.filter((view) => view.enabled && (ignorePlacement || view.action.placement === 'menu'));
   const phasePrimary = actions.primary.filter((view) => view.enabled);
-  const dangerActions = actions.all.filter((view) => view.action.group === 'danger');
-  const availableDangerCount = dangerActions.filter((view) => view.enabled).length;
+  // FR-3: a primary renders once, under "Next step", never again in its group.
+  const primaryKeys = new Set(phasePrimary.map((view) => view.action.key));
+  const groupedActions = menuActions.filter((view) => !primaryKeys.has(view.action.key));
+  const dangerActions = groupedActions.filter((view) => view.action.group === 'danger');
 
   const toggleDanger = () => setDangerOpen((open) => !open);
+  const toggleDebug = () => setDebugOpen((open) => !open);
   const toggleExplain = () => {
     const next = !explain;
     localStorage.setItem(EXPLAIN_PREFERENCE_KEY, String(next));
@@ -206,14 +220,10 @@ export function IssueActionGroupedBody({
           </span>
         </span>
       </Label>
-      <div className="px-3 pb-1.5 pt-1 text-[11px] text-muted-foreground">
-        {availableCount} available now · {actions.all.length - availableCount} gated
-      </div>
-
       {phasePrimary.length > 0 ? (
         <>
           <div data-issue-action-section="phase">
-            <Label>For this phase</Label>
+            <Label>Next step</Label>
             {phasePrimary.map((view) => (
               <ActionRow key={`phase-${view.action.key}`} view={view} explain={explain} primitives={primitives} />
             ))}
@@ -223,48 +233,69 @@ export function IssueActionGroupedBody({
       ) : null}
 
       {GROUP_ORDER.filter((group) => group !== 'danger').map((group) => {
-        const groupActions = actions.all.filter((view) => view.action.group === group);
-        if (groupActions.length === 0) return null;
+        const rows = groupedActions.filter((view) => view.action.group === group);
+        if (rows.length === 0) return null;
         return (
           <div key={group} data-issue-action-section={group}>
             <Label>{GROUP_LABELS[group]}</Label>
-            {groupActions.map((view) => (
+            {rows.map((view) => (
               <ActionRow key={view.action.key} view={view} explain={explain} primitives={primitives} />
             ))}
           </div>
         );
       })}
 
+      {/* PAN-4198 (D13): session utilities are debugging aids, not issue
+          actions, so they sit behind the same disclosure pattern as Danger. */}
       {nonIssueActions.length > 0 ? (
-        <div data-issue-action-section="session">
-          <Label>This session</Label>
-          {nonIssueActions.map((invocation) => (
-            <NonIssueActionRow
-              key={invocation.action.key}
-              invocation={invocation}
-              primitives={primitives}
-            />
-          ))}
-        </div>
+        <>
+          <Separator />
+          <Item
+            className="justify-between text-muted-foreground"
+            aria-expanded={debugOpen}
+            aria-controls="issue-action-debug-items"
+            data-testid="issue-action-debug-toggle"
+            onActivate={toggleDebug}
+            preventClose
+          >
+            <span>Debug</span>
+            <ChevronRight className={`h-3 w-3 transition-transform ${debugOpen ? 'rotate-90' : ''}`} />
+          </Item>
+          {debugOpen ? (
+            <div id="issue-action-debug-items" data-issue-action-section="session">
+              {nonIssueActions.map((invocation) => (
+                <NonIssueActionRow
+                  key={invocation.action.key}
+                  invocation={invocation}
+                  primitives={primitives}
+                />
+              ))}
+            </div>
+          ) : null}
+        </>
       ) : null}
 
-      <Separator />
-      <Item
-        className="justify-between text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
-        aria-expanded={dangerOpen}
-        aria-controls="issue-action-danger-items"
-        onActivate={toggleDanger}
-        preventClose
-      >
-        <span>Danger ({availableDangerCount} available)</span>
-        <ChevronRight className={`h-3 w-3 transition-transform ${dangerOpen ? 'rotate-90' : ''}`} />
-      </Item>
-      {dangerOpen ? (
-        <div id="issue-action-danger-items" data-issue-action-section="danger">
-          {dangerActions.map((view) => (
-            <ActionRow key={view.action.key} view={view} explain={explain} primitives={primitives} />
-          ))}
-        </div>
+      {dangerActions.length > 0 ? (
+        <>
+          <Separator />
+          <Item
+            className="justify-between text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
+            aria-expanded={dangerOpen}
+            aria-controls="issue-action-danger-items"
+            onActivate={toggleDanger}
+            preventClose
+          >
+            <span>Danger</span>
+            <ChevronRight className={`h-3 w-3 transition-transform ${dangerOpen ? 'rotate-90' : ''}`} />
+          </Item>
+          {dangerOpen ? (
+            <div id="issue-action-danger-items" data-issue-action-section="danger">
+              {dangerActions.map((view) => (
+                <ActionRow key={view.action.key} view={view} explain={explain} primitives={primitives} />
+              ))}
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       <Separator />

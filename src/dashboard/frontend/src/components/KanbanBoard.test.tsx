@@ -933,7 +933,7 @@ describe('IssueCard', () => {
     expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
+    // PAN-4198: Let agent continue sits in Actions, not behind Danger.
     fireEvent.click(await screen.findByTestId('issue-action-unpause'));
 
     await waitFor(() => {

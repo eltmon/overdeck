@@ -487,8 +487,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       .map((action) => byKey.get(action.key))
       .filter((view): view is IssueActionView => !!view);
     const primaryKeys = new Set(primary.map((view) => view.action.key));
-    const rest = all.filter((view) => !primaryKeys.has(view.action.key));
-    const secondary = rest.filter((view) => view.enabled && view.action.kind !== 'destructive' && view.action.group !== 'danger').slice(0, 4);
+    // PAN-4198 (FR-1): the strip and its overflow offer only what the operator
+    // can act on right now, and only actions that belong in a menu.
+    const rest = all.filter((view) => !primaryKeys.has(view.action.key) && view.enabled && view.action.placement === 'menu');
+    const secondary = rest.filter((view) => view.action.kind !== 'destructive' && view.action.group !== 'danger').slice(0, 4);
     const secondaryKeys = new Set(secondary.map((view) => view.action.key));
     const overflow = rest.filter((view) => !secondaryKeys.has(view.action.key));
     return { all, primary, secondary, overflow };

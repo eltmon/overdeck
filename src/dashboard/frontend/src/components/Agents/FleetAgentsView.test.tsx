@@ -244,22 +244,19 @@ describe('FleetAgentsView', () => {
     fireEvent.click(screen.getAllByTestId('issue-action-overflow-button')[0]);
 
     const menu = screen.getByTestId('issue-action-overflow-menu');
-    expect(within(menu).getAllByTestId('issue-action-tell').length).toBeGreaterThan(0);
-    // PAN-4198: Stop/Pause/Unpause are Actions now, not Danger.
-    expect(within(menu).getByTestId('issue-action-stopAgent')).toHaveTextContent('Stop agent');
-    expect(within(menu).getByTestId('issue-action-pause')).toHaveTextContent('Pause agent');
-    expect(within(menu).getByTestId('issue-action-unpause')).toHaveTextContent('Let agent continue');
-    expect(within(menu).queryByTestId('issue-action-untroubled')).not.toBeInTheDocument();
-    expect(within(menu).getAllByTestId('issue-action-recoverAgent')[0]).toHaveTextContent('Recover agent');
-    expect(within(menu).getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume');
-    expect(within(menu).queryByTestId('issue-action-switchModel')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-destroyWorkspace')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-reopen')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-syncMain')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-inspectTask')).not.toBeInTheDocument();
+    // PAN-4198 (D5 + FR-1): the fleet card's menu is the agent-scope allowlist
+    // narrowed to what is enabled for this agent, so assert the set rather than
+    // naming rows that come and go with the agent's state. `pause` and
+    // `recoverAgent` are `placement: 'contextual'` and still reach this menu.
+    const AGENT_SCOPE_KEYS = ['tell', 'stopAgent', 'pause', 'unpause', 'recoverAgent', 'resumeSession'];
+    const rendered = Array.from(menu.querySelectorAll<HTMLElement>('[data-testid^="issue-action-"]'))
+      .map((element) => element.dataset.testid!.replace('issue-action-', ''))
+      .filter((key) => !['overflow-menu', 'overflow-button', 'explain-toggle', 'debug-toggle', 'menu'].includes(key));
+    expect(rendered.length).toBeGreaterThan(0);
+    for (const key of rendered) expect(AGENT_SCOPE_KEYS, key).toContain(key);
+    for (const key of ['plan', 'startAgent', 'closeOut', 'destroyWorkspace', 'reopen', 'syncMain', 'resetIssue', 'cancel', 'switchModel', 'untroubled', 'inspectTask']) {
+      expect(within(menu).queryByTestId(`issue-action-${key}`), key).not.toBeInTheDocument();
+    }
     expect(within(menu).queryByTestId('issue-action-open')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
   });

@@ -762,7 +762,7 @@ describe('IssueDrawer', () => {
 
     const first = renderDrawer();
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
     const actionSets: Record<string, (string | null)[]> = {
       WORK_RUNNING: drawerIssueActionIds(),
     };
@@ -791,7 +791,7 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
     actionSets.READY_TO_MERGE = drawerIssueActionIds();
 
     expect(actionSets).toMatchInlineSnapshot(`
@@ -809,7 +809,6 @@ describe('IssueDrawer', () => {
           "issue-action-tell",
           "issue-action-doneWork",
           "issue-action-stopAgent",
-          "issue-action-pause",
           "issue-action-restartAgent",
           "issue-action-open",
           "issue-action-tasks",
@@ -852,7 +851,7 @@ describe('IssueDrawer', () => {
     renderDrawer();
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
     fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
     const resetDialog = await screen.findByRole('alertdialog');
     fireEvent.change(within(resetDialog).getByLabelText('Confirmation text'), { target: { value: 'Reset to Todo' } });
@@ -867,7 +866,7 @@ describe('IssueDrawer', () => {
     });
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
+    // PAN-4198: Stop agent is an Actions row now, not a Danger one.
     fireEvent.click(screen.getByTestId('issue-action-stopAgent'));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-PAN-1/stop', expect.objectContaining({ method: 'POST' }));
