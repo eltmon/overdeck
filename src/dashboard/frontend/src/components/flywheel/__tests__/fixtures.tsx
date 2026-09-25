@@ -18,12 +18,13 @@ export function flywheelStatus(overrides: Partial<FlywheelDerivedStatus> = {}): 
     inFlight: [
       {
         issueId: 'PAN-3964',
+        title: 'Restore the Flywheel page',
         state: 'in-review',
         attention: 'needs-you',
         pr: { url: 'https://github.com/eltmon/overdeck/pull/4001', number: 4001, reviewState: 'review-requested', checks: 'pending', mergeable: null },
         lastJournal: { at: '2026-09-23T09:55:00.000Z', type: 'review.dispatched', source: 'pan-done' },
       },
-      { issueId: 'PAN-3920', state: 'working', lastJournal: null },
+      { issueId: 'PAN-3920', title: 'Register external agents', state: 'working', lastJournal: null },
     ],
     orderBook: null,
     projectRoot: '/repos/overdeck',

@@ -82,9 +82,13 @@ export type FlywheelJournalSummary = typeof FlywheelJournalSummary.Type
 
 export const FlywheelInFlightRow = Schema.Struct({
   issueId: Schema.String,
+  /** The tracker's title, or `null` when no tracker answered for this issue. */
+  title: Schema.NullOr(Schema.String),
   state: IssueState,
   attention: Schema.optional(IssueAttention),
   pr: Schema.optional(DerivedPrState),
+  /** Set when no configured tracker answered: the state is a guess, not a fact. */
+  trackerUnknown: Schema.optional(Schema.Literal(true)),
   lastJournal: Schema.NullOr(FlywheelJournalSummary),
 })
 export type FlywheelInFlightRow = typeof FlywheelInFlightRow.Type

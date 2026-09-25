@@ -243,6 +243,8 @@ export interface IssueStateLoaderDeps {
 export interface TrackerIssueFacts {
   readonly open: boolean;
   readonly labels: readonly string[];
+  /** The tracker's title, when the read carried one. */
+  readonly title?: string;
 }
 
 /** What a forge read returns: the PR facts plus whether it merged. */
@@ -675,7 +677,7 @@ export async function readIssueFromTracker(issueId: string): Promise<TrackerIssu
         ? createTracker({ ...trackers.github, type: 'github', owner: gh.owner, repo: gh.repo })
         : createTrackerFromConfig(trackers, type);
       const issue = await Effect.runPromise(tracker.getIssue(issueId));
-      return { open: issue.state !== 'closed', labels: issue.labels ?? [] };
+      return { open: issue.state !== 'closed', labels: issue.labels ?? [], ...(issue.title ? { title: issue.title } : {}) };
     } catch {
       // This tracker does not know the issue (or could not be reached); the
       // next one may.

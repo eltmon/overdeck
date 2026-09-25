@@ -32,6 +32,7 @@ import type {
 } from '@overdeck/contracts';
 
 import type { LegacyConversation } from '../overdeck/conversations.js';
+import type { TrackerIssueFacts } from '../overdeck/derived-issue-state.js';
 import type { PipelineJournalEntry } from '../cloister/pipeline-journal.js';
 import {
   FLYWHEEL_CONVERSATION_SESSION,
@@ -53,7 +54,16 @@ export interface DeriveFlywheelStatusDeps {
   resolveProjectPath?: (dir: string) => string | null | Promise<string | null>;
   resolvePlanHome?: (projectRoot: string) => string | Promise<string>;
   listWorkspaces?: (projectPath: string) => readonly FlywheelWorkspace[] | Promise<readonly FlywheelWorkspace[]>;
-  loadStates?: (projectPath: string, issueIds: readonly string[]) => Promise<Map<string, DerivedIssueState>>;
+  /**
+   * The tracker rows for the in-flight ids, by upper-cased id. A `null` entry
+   * is unknown — no configured tracker answered — and never a silent "open".
+   */
+  readTrackerIssues?: (issueIds: readonly string[]) => Promise<Readonly<Record<string, TrackerIssueFacts | null>>>;
+  loadStates?: (
+    projectPath: string,
+    issueIds: readonly string[],
+    opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>> },
+  ) => Promise<Map<string, DerivedIssueState>>;
   lastJournal?: (workspacePath: string) => PipelineJournalEntry | null | Promise<PipelineJournalEntry | null>;
   policies?: () => FlywheelPolicies | Promise<FlywheelPolicies>;
   runningBook?: (panDir: string) => FlywheelOrderBookSummary | null | Promise<FlywheelOrderBookSummary | null>;
@@ -115,9 +125,28 @@ async function defaultListWorkspaces(projectPath: string): Promise<readonly Flyw
     .map(({ issueId, workspacePath }) => ({ issueId, workspacePath }));
 }
 
-async function defaultLoadStates(projectPath: string, issueIds: readonly string[]): Promise<Map<string, DerivedIssueState>> {
+/**
+ * Without this read the deriver has no tracker state at all, so a closed issue
+ * whose feature branch lingers derives `working` and never leaves the board
+ * (PAN-4199). Four at a time keeps a wide board off the tracker's rate limit.
+ */
+async function defaultReadTrackerIssues(
+  issueIds: readonly string[],
+): Promise<Readonly<Record<string, TrackerIssueFacts | null>>> {
+  const { readIssueFromTracker } = await import('../overdeck/derived-issue-state.js');
+  const { withConcurrencyLimit } = await import('../concurrency.js');
+  const ids = issueIds.map((id) => id.toUpperCase());
+  const facts = await withConcurrencyLimit(ids.map((id) => () => readIssueFromTracker(id)), 4);
+  return Object.fromEntries(ids.map((id, i) => [id, facts[i] ?? null]));
+}
+
+async function defaultLoadStates(
+  projectPath: string,
+  issueIds: readonly string[],
+  opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>> },
+): Promise<Map<string, DerivedIssueState>> {
   const { loadIssueStatesForProject } = await import('../overdeck/derived-issue-state.js');
-  return loadIssueStatesForProject(projectPath, issueIds);
+  return loadIssueStatesForProject(projectPath, issueIds, { issues: opts.issues });
 }
 
 async function defaultLastJournal(workspacePath: string): Promise<PipelineJournalEntry | null> {
@@ -216,18 +245,28 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
   const panDir = join(planHome, '.pan');
 
   const workspaces = await (deps.listWorkspaces ?? defaultListWorkspaces)(projectRoot);
+  const issueIds = workspaces.map((ws) => ws.issueId);
+  // The tracker read comes first: `loadIssueStatesForProject` treats a missing
+  // entry as unknown, so passing it through is what makes `closed` reachable.
+  const issues = workspaces.length
+    ? await (deps.readTrackerIssues ?? defaultReadTrackerIssues)(issueIds)
+    : {};
   const states = workspaces.length
-    ? await (deps.loadStates ?? defaultLoadStates)(projectRoot, workspaces.map((ws) => ws.issueId))
+    ? await (deps.loadStates ?? defaultLoadStates)(projectRoot, issueIds, { issues })
     : new Map<string, DerivedIssueState>();
   const lastJournal = deps.lastJournal ?? defaultLastJournal;
   const rows: FlywheelInFlightRow[] = await Promise.all(workspaces.map(async (ws) => {
-    const derived = states.get(ws.issueId.toUpperCase());
+    const id = ws.issueId.toUpperCase();
+    const derived = states.get(id);
+    const issue = issues[id] ?? null;
     const entry = await lastJournal(ws.workspacePath);
     return {
       issueId: ws.issueId,
+      title: issue?.title ?? null,
       state: derived?.state ?? 'backlog',
       ...(derived?.attention ? { attention: derived.attention } : {}),
       ...(derived?.pr ? { pr: derived.pr } : {}),
+      ...(issue ? {} : { trackerUnknown: true as const }),
       lastJournal: entry ? { at: entry.at, type: entry.type, ...(entry.source ? { source: entry.source } : {}) } : null,
     };
   }));

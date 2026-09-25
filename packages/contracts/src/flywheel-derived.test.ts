@@ -26,11 +26,12 @@ const running = {
   inFlight: [
     {
       issueId: "PAN-3964",
+      title: "The flywheel page",
       state: "in-review",
       pr: { url: "https://github.com/eltmon/overdeck/pull/1", number: 1, reviewState: "review-requested", checks: "pending", mergeable: null },
       lastJournal: { at: "2026-09-23T09:59:00.000Z", type: "review.dispatched", source: "pan-done" },
     },
-    { issueId: "PAN-3920", state: "working", lastJournal: null },
+    { issueId: "PAN-3920", title: null, trackerUnknown: true, state: "working", lastJournal: null },
   ],
   orderBook: { id: "book-1", name: "September", status: "running", landed: 2, total: 5 },
   projectRoot: "/repos/overdeck",

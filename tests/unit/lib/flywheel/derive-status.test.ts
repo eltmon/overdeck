@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DerivedIssueState } from '@overdeck/contracts';
 
 import { deriveFlywheelStatus, freshnessFor, type DeriveFlywheelStatusDeps } from '../../../../src/lib/flywheel/derive-status.js';
 import type { LegacyConversation } from '../../../../src/lib/overdeck/conversations.js';
+import { loadIssueStatesForProject, readIssueFromTracker } from '../../../../src/lib/overdeck/derived-issue-state.js';
+
+// The deriver's defaults import this module lazily; the two names below are
+// everything it takes from it, so replacing the module wholesale is safe and
+// keeps the default `loadStates` / `readTrackerIssues` paths offline.
+vi.mock('../../../../src/lib/overdeck/derived-issue-state.js', () => ({
+  loadIssueStatesForProject: vi.fn(async () => new Map()),
+  readIssueFromTracker: vi.fn(async () => null),
+}));
 
 const NOW = Date.parse('2026-09-23T10:00:00.000Z');
 
@@ -33,6 +42,7 @@ function baseDeps(overrides: DeriveFlywheelStatusDeps = {}): DeriveFlywheelStatu
     resolveProjectPath: (dir) => dir,
     resolvePlanHome: (root) => root,
     listWorkspaces: () => [],
+    readTrackerIssues: async () => ({}),
     loadStates: async () => new Map(),
     lastJournal: () => null,
     policies: () => ({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false }),
@@ -135,16 +145,18 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
           : null),
       }),
     });
-    expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1', 'PAN-2']);
+    expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1', 'PAN-2'], { issues: {} });
     expect(status.inFlight).toEqual([
       {
         issueId: 'PAN-1',
+        title: null,
         state: 'in-review',
         attention: 'needs-you',
         pr: derived.pr,
+        trackerUnknown: true,
         lastJournal: { at: '2026-09-23T09:58:00.000Z', type: 'review.dispatched', source: 'pan-done' },
       },
-      { issueId: 'PAN-2', state: 'backlog', lastJournal: null },
+      { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, lastJournal: null },
     ]);
   });
 
@@ -183,6 +195,96 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     expect(status.orderBook).toEqual({ id: 'book-1', name: 'Sept', status: 'running', landed: 1, total: 4 });
     expect(status.policies).toEqual({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false });
     expect(status.generatedAt).toBe('2026-09-23T10:00:00.000Z');
+  });
+
+  describe('tracker facts (PAN-4199 FR-2, FR-3)', () => {
+    const loadStatesMock = vi.mocked(loadIssueStatesForProject);
+    const readIssueMock = vi.mocked(readIssueFromTracker);
+
+    function workspaces(...ids: readonly string[]) {
+      return ids.map((issueId) => ({ issueId, workspacePath: `/ws/feature-${issueId.toLowerCase()}` }));
+    }
+
+    beforeEach(() => {
+      loadStatesMock.mockReset();
+      loadStatesMock.mockResolvedValue(new Map());
+      readIssueMock.mockReset();
+      readIssueMock.mockResolvedValue(null);
+    });
+
+    it('passes the tracker rows to the lib loader so a closed issue drops out (ac1)', async () => {
+      loadStatesMock.mockResolvedValue(new Map<string, DerivedIssueState>([
+        ['PAN-1', { issueId: 'PAN-1', state: 'closed' }],
+      ]));
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => workspaces('PAN-1'),
+          readTrackerIssues: async () => ({ 'PAN-1': { open: false, labels: [] } }),
+          // Left at the default so the real lazy `loadIssueStatesForProject` runs.
+          loadStates: undefined,
+        }),
+      });
+      expect(loadStatesMock).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1'], {
+        issues: { 'PAN-1': { open: false, labels: [] } },
+      });
+      expect(status.inFlight).toEqual([]);
+    });
+
+    it('marks a row whose tracker did not answer as unknown with a null title (ac2)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => workspaces('PAN-2'),
+          readTrackerIssues: async () => ({ 'PAN-2': null }),
+        }),
+      });
+      expect(status.inFlight).toEqual([
+        { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, lastJournal: null },
+      ]);
+    });
+
+    it('copies the tracker title onto the row (ac3)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => workspaces('PAN-3'),
+          readTrackerIssues: async () => ({ 'PAN-3': { open: true, labels: [], title: 'Fix the thing' } }),
+        }),
+      });
+      expect(status.inFlight[0]).toMatchObject({ issueId: 'PAN-3', title: 'Fix the thing' });
+      expect(status.inFlight[0]).not.toHaveProperty('trackerUnknown');
+    });
+
+    it('reads every id once through the tracker, at most four at a time (ac4)', async () => {
+      const ids = Array.from({ length: 10 }, (_, i) => `PAN-${i + 1}`);
+      let inFlightReads = 0;
+      let peak = 0;
+      readIssueMock.mockImplementation(async (id: string) => {
+        inFlightReads++;
+        peak = Math.max(peak, inFlightReads);
+        // Two microtask turns, so the limiter has to refill the window.
+        await Promise.resolve();
+        await Promise.resolve();
+        inFlightReads--;
+        return { open: true, labels: [], title: `title ${id}` };
+      });
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => workspaces(...ids),
+          // Left at the default so the real lazy `readIssueFromTracker` fan-out runs.
+          readTrackerIssues: undefined,
+        }),
+      });
+      expect(readIssueMock).toHaveBeenCalledTimes(10);
+      expect(new Set(readIssueMock.mock.calls.map(([id]) => id))).toEqual(new Set(ids));
+      expect(peak).toBeLessThanOrEqual(4);
+      expect(status.inFlight.map((row) => row.title)).toEqual(ids.map((id) => `title ${id}`));
+    });
+
+    it('upper-cases the ids it hands the tracker', async () => {
+      await deriveFlywheelStatus({
+        deps: baseDeps({ listWorkspaces: () => workspaces('pan-9'), readTrackerIssues: undefined }),
+      });
+      expect(readIssueMock).toHaveBeenCalledWith('PAN-9');
+    });
   });
 
   it('never writes: every dependency it calls is a read', async () => {
