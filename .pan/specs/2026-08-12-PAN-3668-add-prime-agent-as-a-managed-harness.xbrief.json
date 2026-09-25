@@ -9,7 +9,7 @@
   "plan": {
     "id": "pan-3668",
     "title": "Add Prime Agent as a managed harness",
-    "status": "running",
+    "status": "proposed",
     "uid": "218466dd-dd16-459a-be27-a9b263aa30c6",
     "author": "agent:k3[1m]",
     "sequence": 3,
@@ -1784,5 +1784,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "proposed"
 }
