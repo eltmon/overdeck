@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4201",
   "created": "2026-09-25T06:42:41.599Z",
-  "updated": "2026-09-25T07:21:44.207Z",
+  "updated": "2026-09-25T07:38:52.521Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-25T07:21:39.165Z"
     },
     "pipeline-pips-label": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4201",
-      "claimedAt": "2026-09-25T07:21:44.207Z"
+      "claimedAt": "2026-09-25T07:21:44.207Z",
+      "doneAt": "2026-09-25T07:38:52.520Z"
     }
   }
 }
