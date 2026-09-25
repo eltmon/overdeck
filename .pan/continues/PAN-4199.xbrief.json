@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4199",
   "created": "2026-09-25T06:46:14.958Z",
-  "updated": "2026-09-25T07:58:46.454Z",
+  "updated": "2026-09-25T08:32:27.965Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,174 @@
       "claimedBy": "agent-pan-4199",
       "claimedAt": "2026-09-25T07:57:50.662Z",
       "doneAt": "2026-09-25T07:58:46.454Z"
+    },
+    "wi1-tracker-facts.ac1": {
+      "status": "completed"
+    },
+    "wi1-tracker-facts.ac2": {
+      "status": "completed"
+    },
+    "wi1-tracker-facts.ac3": {
+      "status": "completed"
+    },
+    "wi1-tracker-facts.ac4": {
+      "status": "completed"
+    },
+    "wi2-server-cache.ac1": {
+      "status": "completed"
+    },
+    "wi2-server-cache.ac2": {
+      "status": "completed"
+    },
+    "wi2-server-cache.ac3": {
+      "status": "completed"
+    },
+    "wi3-panes-agents.ac1": {
+      "status": "completed"
+    },
+    "wi3-panes-agents.ac2": {
+      "status": "completed"
+    },
+    "wi3-panes-agents.ac3": {
+      "status": "completed"
+    },
+    "wi4-tick-inflight.ac1": {
+      "status": "completed"
+    },
+    "wi4-tick-inflight.ac2": {
+      "status": "completed"
+    },
+    "wi4-tick-inflight.ac3": {
+      "status": "completed"
+    },
+    "wi4-tick-inflight.ac4": {
+      "status": "completed"
+    },
+    "wi5-conv-created.ac1": {
+      "status": "completed"
+    },
+    "wi5-conv-created.ac2": {
+      "status": "completed"
+    },
+    "wi6-cli-format.ac1": {
+      "status": "completed"
+    },
+    "wi6-cli-format.ac2": {
+      "status": "completed"
+    },
+    "wi6-cli-format.ac3": {
+      "status": "completed"
+    },
+    "wi9-ui-idle-copy.ac1": {
+      "status": "completed"
+    },
+    "wi9-ui-idle-copy.ac2": {
+      "status": "completed"
+    },
+    "wi7-ui-title.ac1": {
+      "status": "completed"
+    },
+    "wi7-ui-title.ac2": {
+      "status": "completed"
+    },
+    "wi7-ui-title.ac3": {
+      "status": "completed"
+    },
+    "wi8-ui-noagent-tick.ac1": {
+      "status": "completed"
+    },
+    "wi8-ui-noagent-tick.ac2": {
+      "status": "completed"
+    },
+    "wi8-ui-noagent-tick.ac3": {
+      "status": "completed"
+    },
+    "wi8-ui-noagent-tick.ac4": {
+      "status": "completed"
+    },
+    "wi14-ui-agents.ac1": {
+      "status": "completed"
+    },
+    "wi14-ui-agents.ac2": {
+      "status": "completed"
+    },
+    "wi14-ui-agents.ac3": {
+      "status": "completed"
+    },
+    "wi10-ui-orphan-start-fresh.ac1": {
+      "status": "completed"
+    },
+    "wi10-ui-orphan-start-fresh.ac2": {
+      "status": "completed"
+    },
+    "wi10-ui-orphan-start-fresh.ac3": {
+      "status": "completed"
+    },
+    "wi11-ui-live-conv-elapsed.ac1": {
+      "status": "completed"
+    },
+    "wi11-ui-live-conv-elapsed.ac2": {
+      "status": "completed"
+    },
+    "wi11-ui-live-conv-elapsed.ac3": {
+      "status": "completed"
+    },
+    "wi12-ui-uat-batches.ac1": {
+      "status": "completed"
+    },
+    "wi12-ui-uat-batches.ac2": {
+      "status": "completed"
+    },
+    "wi12-ui-uat-batches.ac3": {
+      "status": "completed"
+    },
+    "wi13-ui-headline.ac1": {
+      "status": "completed"
+    },
+    "wi13-ui-headline.ac2": {
+      "status": "completed"
+    },
+    "wi13-ui-headline.ac3": {
+      "status": "completed"
+    },
+    "wi13-ui-headline.ac4": {
+      "status": "completed"
+    },
+    "wi15-ui-report-tab.ac1": {
+      "status": "completed"
+    },
+    "wi15-ui-report-tab.ac2": {
+      "status": "completed"
+    },
+    "wi15-ui-report-tab.ac3": {
+      "status": "completed"
+    },
+    "wi16-ui-needs-you.ac1": {
+      "status": "completed"
+    },
+    "wi16-ui-needs-you.ac2": {
+      "status": "completed"
+    },
+    "wi16-ui-needs-you.ac3": {
+      "status": "completed"
+    },
+    "wi16-ui-needs-you.ac4": {
+      "status": "completed"
+    },
+    "wi17-no-loss.ac1": {
+      "status": "completed"
+    },
+    "wi17-no-loss.ac2": {
+      "status": "completed"
+    },
+    "wi18-docs.ac1": {
+      "status": "completed"
+    },
+    "wi18-docs.ac2": {
+      "status": "completed"
+    },
+    "wi18-docs.ac3": {
+      "status": "completed"
     }
   }
 }
