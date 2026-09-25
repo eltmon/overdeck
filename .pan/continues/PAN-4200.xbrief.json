@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4200",
   "created": "2026-09-25T06:42:27.234Z",
-  "updated": "2026-09-25T07:52:48.435Z",
+  "updated": "2026-09-25T07:53:02.764Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "wi5-docs-build.ac3": {
       "status": "completed",
       "doneAt": "2026-09-25T07:52:48.435Z"
+    },
+    "wi6-linux-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:53:02.764Z"
     }
   }
 }
