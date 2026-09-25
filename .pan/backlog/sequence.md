@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:43:00.488973Z · model: claude-opus-5-5 · open: 802_
+_Last sequenced: 2026-09-25T05:44:20.749904Z · model: claude-opus-5-5 · open: 803_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -197,6 +197,7 @@ _Last sequenced: 2026-09-25T05:43:00.488973Z · model: claude-opus-5-5 · open: 
 | 243 | PAN-3308 | XS | high | ok |  |  | The file-size guard prints a paste-ready ratchet-up line, so 2 of 3 agents raised the ceiling instead of shrinking the file. |
 | 244 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
 | 245 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
+| 246 | PAN-4198 | L | high | ok |  |  | Right-click menu has 39 overlapping, jargon actions; trim per state, add Replan (archive branch, fresh plan) + pan replan CLI. |
 | 247 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
 | 248 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
 | 249 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
@@ -1117,10 +1118,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:43:00.488973Z",
+  "generatedAt": "2026-09-25T05:44:20.749904Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 802,
+  "openCount": 803,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11035,6 +11036,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "rationale": "New operator request. It ranks high rather than medium because problem 1 is a correctness bug: agent cards read stale stored status instead of the liveness door in src/lib/agents/liveness.ts, so the page misreports 119 finished strikes as running. The rest is a large UX redesign (live-first default, resizable panes, explained windows and counts, new state color tokens) that needs an interactive mockup first, so it sits with the other high-value dashboard UX items rather than in the substrate tier.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4198",
+      "rank": 246,
+      "size": "L",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Right-click menu has 39 overlapping, jargon actions; trim per state, add Replan (archive branch, fresh plan) + pan replan CLI.",
+      "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high rather than medium because the Replan action turns a manual recovery procedure (archive a stale branch, wipe, re-plan from main) into one door, which the post-cut conflict wave on PAN-3668 and PAN-1641 showed is needed. The menu trim is a large but self-contained UX change with mechanical, per-state acceptance tests.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12056,6 +12070,13 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     {
       "from": "PAN-3862",
       "to": "PAN-4197",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4198",
+      "to": "PAN-1668",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
