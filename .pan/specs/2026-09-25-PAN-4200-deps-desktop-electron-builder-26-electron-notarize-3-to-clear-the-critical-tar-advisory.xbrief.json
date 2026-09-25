@@ -4,17 +4,17 @@
     "created": "2026-09-25T06:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4200: deps(desktop): electron-builder 26 + @electron/notarize 3 to clear the critical tar advisory",
-    "updated": "2026-09-25T05:54:08.757Z"
+    "updated": "2026-09-25T06:41:29.141Z"
   },
   "plan": {
     "id": "pan-4200",
     "title": "deps(desktop): electron-builder 26 + @electron/notarize 3 to clear the critical tar advisory",
-    "status": "proposed",
+    "status": "running",
     "uid": "0b202478-9920-47de-bcc6-0a9307173a58",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-25T06:30:00Z",
-    "updated": "2026-09-25T05:54:08.757Z",
+    "updated": "2026-09-25T06:41:29.141Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4200",
