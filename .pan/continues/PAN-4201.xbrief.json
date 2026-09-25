@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4201",
+  "created": "2026-09-25T06:42:41.599Z",
+  "updated": "2026-09-25T06:42:41.599Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "state-badge-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4201",
+      "claimedAt": "2026-09-25T06:42:41.599Z"
+    }
+  }
+}
