@@ -12,6 +12,7 @@ import {
 } from '../agents/shared.js';
 import { resolveSpawnGuardrailRefusal } from '../agents/spawn.js';
 import {
+  countAdmittedWorkAgentPanes,
   countAdmittedWorkAgents,
   readGlobalResourceConfig,
 } from '../../services/system-health-service.js';
@@ -211,6 +212,27 @@ describe('countAdmittedWorkAgents', () => {
       { role: 'uat', status: 'working', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
       { role: 'strike', status: 'working', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
     ], now)).toBe(3);
+  });
+});
+
+describe('countAdmittedWorkAgentPanes', () => {
+  const now = Date.parse('2026-09-25T06:00:00.000Z');
+  const pane = (id: string, extra: Record<string, unknown> = {}) => ({
+    id, role: 'work' as const, harness: 'unknown', model: 'unknown',
+    state: 'idle' as const, stateSince: now - 60_000, terminalId: id, ...extra,
+  });
+
+  // A plain Herdr shell carries no Overdeck tokens, so the snapshot mapper
+  // defaults its role to `work`; 13 such shells held every spawn at 14/10.
+  it('counts only panes carrying an Overdeck agent id', () => {
+    expect(countAdmittedWorkAgentPanes([
+      pane('wA:p1'),
+      pane('wB:p1'),
+      pane('w2V:p1', { workspace: '/home/u/overdeck/workspaces/feature-pan-4201' }),
+      pane('w2T:p2', { agentId: 'sequencer-runner', state: 'working' }),
+      pane('w3G:p1', { agentId: 'agent-pan-4201', issue: 'PAN-4201' }),
+      pane('w2Z:p2', { agentId: 'planning-pan-4198', role: 'plan' }),
+    ], now)).toBe(2);
   });
 });
 
