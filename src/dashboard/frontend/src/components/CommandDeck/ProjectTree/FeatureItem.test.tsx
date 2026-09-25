@@ -614,6 +614,19 @@ describe('FeatureItem', () => {
     expect(screen.queryByTestId('status-dot')).toBeNull();
   });
 
+  it('labels the pipeline pips with the current step', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ sessionId: 'work-1', type: 'work', status: 'running', presence: 'active' })],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-pipe').getAttribute('aria-label')).toMatch(/^Step /);
+  });
+
   it('shows a review error badge when a review session failed', () => {
     renderFeature(
       <FeatureItem

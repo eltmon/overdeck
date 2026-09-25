@@ -25,6 +25,7 @@ import { useConvoDock } from '../../../lib/convoDock';
 import { useDerivedIssueState } from '../../../lib/store';
 import { resolveFeatureStateBadge } from './featureStateBadge';
 import { StatusDot } from '../StatusDot';
+import { PIPE_ORDER, PIPE_CLASS, PIPE_STEP_LABELS, derivePipeline, describePipeline, describePipeSegment } from './pipelineStrip';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -803,49 +804,6 @@ function useUatTrainMembership(): Map<string, UatTrainBadgeInfo> {
   }, [data]);
 }
 
-type PipeSegState = 'none' | 'done' | 'working' | 'paused' | 'error' | 'merged';
-const PIPE_ORDER = ['planning', 'work', 'review', 'test', 'ship'] as const;
-
-/** Per-issue plan→work→review→test→ship strip. Earlier phases read done;
- *  only the live phase carries a signal color (v1.2 color restraint). */
-export function derivePipeline(feature: ProjectFeature, sessions: readonly SessionNodeType[], isReady = false): PipeSegState[] {
-  const isDone = feature.stateLabel.toLowerCase().includes('done');
-  if (isDone) return ['done', 'done', 'done', 'done', 'merged'];
-
-  const byPhase = PIPE_ORDER.map((phase) =>
-    sessions.filter((s) => s.type === phase || (phase === 'planning' && s.type === 'legacy') || (phase === 'review' && s.type === 'reviewer')),
-  );
-  if (feature.hasPlanning && byPhase[0].length === 0) {
-    byPhase[0] = [{ status: 'stopped' } as SessionNodeType];
-  }
-  let lastIdx = -1;
-  for (let i = 0; i < byPhase.length; i++) {
-    if (byPhase[i].length > 0) lastIdx = i;
-  }
-  if (isReady) lastIdx = 4;
-
-  return PIPE_ORDER.map((_, i) => {
-    if (lastIdx === -1) return 'none';
-    if (i < lastIdx) return 'done';
-    if (i > lastIdx) return 'none';
-    if (isReady && i === 4) return 'done';
-    const phaseSessions = byPhase[i];
-    if (phaseSessions.length === 0) return 'done';
-    if (phaseSessions.some((s) => s.status === 'error')) return 'error';
-    if (phaseSessions.some((s) => s.status === 'running' || s.status === 'starting')) return 'working';
-    return 'done';
-  });
-}
-
-const PIPE_CLASS: Record<PipeSegState, string> = {
-  none: '',
-  done: 'pipeDone',
-  working: 'pipeWorking',
-  paused: 'pipePaused',
-  error: 'pipeError',
-  merged: 'pipeMerged',
-};
-
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const queryClient = useQueryClient();
   const openIssue = useDashboardStore((state) => state.openIssue);
@@ -948,6 +906,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     () => derivePipeline(feature, feature.sessions ?? [], isReady),
     [feature, isReady],
   );
+  const pipelineLabel = useMemo(() => describePipeline(pipeline), [pipeline]);
   const trainInfo = useUatTrainMembership().get(feature.issueId.toUpperCase());
   const shouldShowUatStack = expanded && isReady && Boolean(feature.resourceDetails?.hasWorkspace);
   // Any expanded row with a workspace queries (not just merge-ready), so
@@ -1115,9 +1074,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           <FeatureAppLink frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} />
           {/* Merge-ready only — earlier phases have no stack, and a cached workspace query rendered a bogus chip for planning-phase issues (PAN-2996). */}
           {isReady && <FeatureUatChip summary={uatStackSummary} />}
-          <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
+          <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe"
+            role="img" title={pipelineLabel} aria-label={pipelineLabel}>
             {pipeline.map((seg, i) => (
-              <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />
+              <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} title={`${PIPE_STEP_LABELS[i]}: ${describePipeSegment(seg)}`} />
             ))}
           </span>
           </span>
