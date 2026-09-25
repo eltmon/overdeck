@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-09-25T07:18:37.939Z",
+  "updated": "2026-09-25T07:18:42.577Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -376,6 +376,11 @@
       "claimedBy": "agent-pan-1641",
       "claimedAt": "2026-09-25T07:09:07.071Z",
       "doneAt": "2026-09-25T07:18:37.938Z"
+    },
+    "ollama-spawn-env": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1641",
+      "claimedAt": "2026-09-25T07:18:42.577Z"
     }
   }
 }
