@@ -633,10 +633,19 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
   }
 }
 
+/** One GitHub review as `gh pr view --json reviews` reports it. */
+export interface GitHubReviewRecord {
+  state?: string;
+  submittedAt?: string | null;
+  authorAssociation?: string | null;
+  author?: { login?: string | null } | null;
+  commit?: { oid?: string } | null;
+}
+
 /** A PR's head and its reviews, each with the commit it judged, from one read. */
 export interface GitHubReviewsAtHead {
   headRefOid?: string | null;
-  reviews?: ReadonlyArray<{ state?: string; commit?: { oid?: string } | null }> | null;
+  reviews?: ReadonlyArray<GitHubReviewRecord> | null;
 }
 
 export type ReadGitHubReviews = (repo: string, number: number) => Promise<GitHubReviewsAtHead>;
@@ -646,18 +655,67 @@ async function defaultReadGitHubReviews(repo: string, number: number): Promise<G
     'gh',
     [
       'pr', 'view', String(number), '--repo', repo, '--json', 'headRefOid,reviews',
-      '--jq', '{headRefOid, reviews: [.reviews[] | {state, commit: {oid: .commit.oid}}]}',
+      '--jq',
+      '{headRefOid, reviews: [.reviews[] | {state, submittedAt, authorAssociation, author: {login: .author.login}, commit: {oid: .commit.oid}}]}',
     ],
     { encoding: 'utf-8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 },
   );
   return JSON.parse(stdout) as GitHubReviewsAtHead;
 }
 
+/** Review states that are a verdict; `COMMENTED` and `PENDING` do not replace one. */
+const VERDICT_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED']);
+
+/**
+ * Whether a review may count toward a merge: the same rule verdict markers
+ * follow (`isTrustedComment`). The repository is public, so any GitHub account
+ * can submit an APPROVED review; only `OWNER` / `MEMBER` / `COLLABORATOR` or
+ * the identity Overdeck posts as counts.
+ */
+function isTrustedReview(review: GitHubReviewRecord, trusted: TrustedAuthors): boolean {
+  if (TRUSTED_ASSOCIATIONS.has(normalize(review.authorAssociation))) return true;
+  const login = review.author?.login;
+  return Boolean(login) && trusted.has(normalizeLogin(login!));
+}
+
+/**
+ * #4066 review: each trusted author's latest verdict review, by login. A
+ * later `CHANGES_REQUESTED` or a dismissal replaces an earlier approval, the
+ * way GitHub itself reads a reviewer's standing verdict; a `COMMENTED` review
+ * does not. A review with no author login cannot be attributed, so it is
+ * ignored.
+ */
+function latestTrustedVerdicts(
+  reviews: ReadonlyArray<GitHubReviewRecord>,
+  trusted: TrustedAuthors,
+): GitHubReviewRecord[] {
+  const latest = new Map<string, { review: GitHubReviewRecord; at: number; index: number }>();
+  reviews.forEach((review, index) => {
+    if (!VERDICT_REVIEW_STATES.has(normalize(review.state))) return;
+    const login = review.author?.login;
+    if (!login || !isTrustedReview(review, trusted)) return;
+    const key = normalizeLogin(login);
+    const parsed = Date.parse(review.submittedAt ?? '');
+    const at = Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+    const current = latest.get(key);
+    // `gh` lists reviews oldest first; the index breaks a tie or a missing date.
+    if (!current || at > current.at || (at === current.at && index > current.index)) {
+      latest.set(key, { review, at, index });
+    }
+  });
+  return [...latest.values()].map((entry) => entry.review);
+}
+
 /**
  * #3853: whether a GitHub review approved the exact head commit, by the
  * review's `commit.oid` (`latestReviews` reports that oid empty; `reviews`
- * does not). Only the verdict guard asks, and only for an agent's rejection,
- * so the shared `gh pr view` field list every PR read uses stays as it is.
+ * does not). The verdict guard asks it for an agent's rejection, and the
+ * merge gate asks it through {@link withForgeApprovalAtHead}.
+ *
+ * #4066 review: only a trusted author's review counts (the marker rule), and
+ * only each author's latest verdict: an author whose newest review is
+ * `CHANGES_REQUESTED` or dismissed has withdrawn the approval. Any trusted
+ * author's standing `CHANGES_REQUESTED` leaves the head unapproved.
  *
  * The head is re-read in the same call: a push between the PR read and this
  * one leaves the approval unproven rather than proven against a stale head.
@@ -670,6 +728,7 @@ async function defaultReadGitHubReviews(repo: string, number: number): Promise<G
 export async function forgeApprovalAtHead(
   facts: Pick<PrFacts, 'forge' | 'url' | 'number' | 'headSha'>,
   readReviews: ReadGitHubReviews = defaultReadGitHubReviews,
+  overdeckLogins: () => Promise<readonly string[]> = defaultOverdeckLogins,
 ): Promise<boolean | undefined> {
   if (facts.forge !== 'github' || !facts.headSha || !facts.number) return undefined;
   const repo = facts.url?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
@@ -678,7 +737,24 @@ export async function forgeApprovalAtHead(
   try {
     const read = await readReviews(`${repo[1]}/${repo[2]}`, facts.number);
     if (read.headRefOid?.toLowerCase() !== head) return undefined;
-    return (read.reviews ?? []).some((review) => (
+    const reviews = read.reviews ?? [];
+    // Overdeck's own logins are resolved only when some review's author is
+    // not trusted by association alone.
+    const needsIdentity = reviews.some((review) => (
+      VERDICT_REVIEW_STATES.has(normalize(review.state))
+      && !TRUSTED_ASSOCIATIONS.has(normalize(review.authorAssociation))
+    ));
+    let trusted: TrustedAuthors = new Set();
+    if (needsIdentity) {
+      try {
+        trusted = new Set((await overdeckLogins()).map(normalizeLogin));
+      } catch {
+        trusted = new Set();
+      }
+    }
+    const standing = latestTrustedVerdicts(reviews, trusted);
+    if (standing.some((review) => normalize(review.state) === 'CHANGES_REQUESTED')) return false;
+    return standing.some((review) => (
       normalize(review.state) === 'APPROVED' && review.commit?.oid?.toLowerCase() === head
     ));
   } catch {
@@ -699,6 +775,7 @@ export async function forgeApprovalAtHead(
 export async function withForgeApprovalAtHead(
   facts: PrFacts,
   readReviews?: ReadGitHubReviews,
+  overdeckLogins?: () => Promise<readonly string[]>,
 ): Promise<PrFacts> {
   if (
     facts.forge !== 'github' || facts.approvedAtHead === true || facts.changesRequested
@@ -706,7 +783,7 @@ export async function withForgeApprovalAtHead(
   ) {
     return facts;
   }
-  const proven = await forgeApprovalAtHead(facts, readReviews);
+  const proven = await forgeApprovalAtHead(facts, readReviews, overdeckLogins);
   return proven === true ? { ...facts, approvedAtHead: true } : facts;
 }
 

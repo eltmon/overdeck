@@ -45,6 +45,8 @@ export interface AutoMergeEligibilityDeps {
   ciTestsRequired?: (issueId: string) => boolean;
   /** #3983: the GitHub reviews read that proves an approval of the head. */
   readReviews?: ReadGitHubReviews;
+  /** The logins Overdeck posts as, for a review whose association alone is not trusted. */
+  overdeckLogins?: () => Promise<readonly string[]>;
 }
 
 /** The per-issue auto-merge decision as the tracker's labels express it. */
@@ -136,7 +138,7 @@ export async function isAutoMergeEligible(
   issueId: string,
   deps: AutoMergeEligibilityDeps = {},
 ): Promise<AutoMergeEligibility> {
-  const facts = await withForgeApprovalAtHead(await (deps.getFacts ?? getPrFacts)(issueId), deps.readReviews);
+  const facts = await withForgeApprovalAtHead(await (deps.getFacts ?? getPrFacts)(issueId), deps.readReviews, deps.overdeckLogins);
   // The UAT policy is applied below as the hold itself: an issue that requires
   // UAT is never auto-merged, so a failed UAT verdict (#4036) cannot reach here.
   const readiness = evaluateMergeReadiness(facts, {

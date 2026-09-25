@@ -13,6 +13,7 @@ import {
   forgeApprovalAtHead,
   getPrFacts,
   resetPrFactsCache,
+  type GitHubReviewRecord,
   type GitLabMrView,
   type PrFactsDeps,
 } from '../pr-facts.js';
@@ -245,8 +246,14 @@ describe('forgeApprovalAtHead', () => {
     number: 3979,
     headSha: HEAD,
   };
-  const atHead = (reviews: Array<{ state: string; commit: { oid: string } }>) =>
-    async () => ({ headRefOid: HEAD, reviews });
+  // A trusted reviewer unless the fixture says otherwise (#4066 review).
+  type Review = GitHubReviewRecord & { state: string; commit: { oid: string } };
+  const atHead = (reviews: Review[]) =>
+    async () => ({
+      headRefOid: HEAD,
+      reviews: reviews.map((review) => ({ author: { login: 'eltmon' }, authorAssociation: 'OWNER', ...review })),
+    });
+  const noLogins = async () => [] as string[];
 
   it('is true only for an APPROVED review whose commit is the head', async () => {
     const read = vi.fn(atHead([
@@ -268,6 +275,58 @@ describe('forgeApprovalAtHead', () => {
     expect(await forgeApprovalAtHead(facts, atHead([]))).toBe(false);
     expect(await forgeApprovalAtHead(facts, async () => ({ headRefOid: HEAD, reviews: null }))).toBe(false);
     expect(await forgeApprovalAtHead(facts, atHead([{ state: 'APPROVED', commit: { oid: '' } }]))).toBe(false);
+  });
+
+  // #4066 review: the repo is public; any GitHub account can submit a review.
+  it('ignores an APPROVED review of the head from an untrusted author', async () => {
+    const overdeckLogins = vi.fn(async () => ['eltmon', 'overdeck-app[bot]']);
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, author: { login: 'drive-by' }, authorAssociation: 'NONE' },
+    ]), overdeckLogins)).toBe(false);
+    expect(overdeckLogins).toHaveBeenCalled();
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, author: { login: 'coderabbitai' }, authorAssociation: 'CONTRIBUTOR' },
+    ]), overdeckLogins)).toBe(false);
+  });
+
+  it('counts an APPROVED review of the head from the identity Overdeck posts as', async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, author: { login: 'overdeck-app[bot]' }, authorAssociation: 'NONE' },
+    ]), async () => ['overdeck-app[bot]'])).toBe(true);
+  });
+
+  it('ignores a review with no author login: it cannot be attributed', async () => {
+    expect(await forgeApprovalAtHead(facts, async () => ({
+      headRefOid: HEAD,
+      reviews: [{ state: 'APPROVED', authorAssociation: 'OWNER', commit: { oid: HEAD } }],
+    }), noLogins)).toBe(false);
+  });
+
+  it("takes each author's latest verdict: a later CHANGES_REQUESTED on the head withdraws the approval", async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },
+      { state: 'CHANGES_REQUESTED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:05:00Z' },
+    ]), noLogins)).toBe(false);
+  });
+
+  it('a later dismissal withdraws the approval; a later COMMENTED review does not', async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'DISMISSED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },
+    ]), noLogins)).toBe(false);
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },
+      { state: 'COMMENTED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:05:00Z' },
+    ]), noLogins)).toBe(true);
+  });
+
+  it("another trusted author's standing CHANGES_REQUESTED leaves the head unapproved", async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:05:00Z' },
+      {
+        state: 'CHANGES_REQUESTED', commit: { oid: OLDER }, submittedAt: '2026-09-24T09:00:00Z',
+        author: { login: 'teammate' }, authorAssociation: 'MEMBER',
+      },
+    ]), noLogins)).toBe(false);
   });
 
   it('is undefined when the head moved between the PR read and the review read', async () => {

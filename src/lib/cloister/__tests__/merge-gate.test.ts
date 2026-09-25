@@ -226,22 +226,53 @@ describe('evaluateIssueMergeGate — approval bound to the PR head (#3983)', () 
   it('merges on a GitHub review approving the exact head', async () => {
     const { result, readReviews } = gate(pr(), {
       headRefOid: HEAD,
-      reviews: [{ state: 'APPROVED', commit: { oid: HEAD } }],
+      reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: HEAD } }],
     });
     await expect(result).resolves.toEqual(expect.objectContaining({ ready: true }));
     expect(readReviews).toHaveBeenCalledWith('eltmon/overdeck', 4066);
   });
 
+  // #4066 review: the repo is public and has no branch protection, so anyone
+  // can submit an APPROVED review. Only a trusted reviewer's review counts.
+  it("refuses an untrusted account's APPROVED review of the exact head", async () => {
+    const readReviews = vi.fn(async () => ({
+      headRefOid: HEAD,
+      reviews: [{ state: 'APPROVED', author: { login: 'drive-by' }, authorAssociation: 'NONE', commit: { oid: HEAD } }],
+    }));
+    const result = await evaluateIssueMergeGate('PAN-3983', {
+      getFacts: (issueId, options) => {
+        resetPrFactsCache();
+        return getPrFacts(issueId, { fetchGitHubPr: async () => ({ issueId, pr: pr() }) }, options);
+      },
+      ciTestsRequired: () => false,
+      readReviews,
+      overdeckLogins: async () => ['eltmon'],
+    });
+    expect(result.ready).toBe(false);
+    expect(readReviews).toHaveBeenCalled();
+  });
+
+  it("refuses when the approving reviewer's latest review of the head requests changes", async () => {
+    const { result } = gate(pr(), {
+      headRefOid: HEAD,
+      reviews: [
+        { state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },
+        { state: 'CHANGES_REQUESTED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:05:00Z' },
+      ],
+    });
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
+  });
+
   it('refuses a GitHub review that approved an older commit, even with reviewDecision APPROVED', async () => {
     const { result } = gate(pr({ reviewDecision: 'APPROVED' }), {
       headRefOid: HEAD,
-      reviews: [{ state: 'APPROVED', commit: { oid: OLD } }],
+      reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: OLD } }],
     });
     await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
   });
 
   it('refuses a GitHub head approval when the head moved between the two reads', async () => {
-    const { result } = gate(pr(), { headRefOid: OLD, reviews: [{ state: 'APPROVED', commit: { oid: OLD } }] });
+    const { result } = gate(pr(), { headRefOid: OLD, reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: OLD } }] });
     await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
   });
 

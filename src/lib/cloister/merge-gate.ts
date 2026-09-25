@@ -37,6 +37,8 @@ export interface MergeGateDeps {
   uatRequired?: (issueId: string) => Promise<boolean>;
   /** The GitHub reviews read that proves an approval of the head (`forgeApprovalAtHead`). */
   readReviews?: ReadGitHubReviews;
+  /** The logins Overdeck posts as, for a review whose association alone is not trusted. */
+  overdeckLogins?: () => Promise<readonly string[]>;
 }
 
 export interface MergeGateResult extends MergeReadiness {
@@ -97,7 +99,7 @@ export async function evaluateIssueMergeGate(
   const read = deps.getFacts
     ? await deps.getFacts(issueId, options)
     : await getPrFacts(issueId, {}, options);
-  const facts = await withForgeApprovalAtHead(read, deps.readReviews);
+  const facts = await withForgeApprovalAtHead(read, deps.readReviews, deps.overdeckLogins);
   const ciTestsRequired = facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId);
   let uatRequired = false;
   if (facts.uatVerdict?.status === 'failed') {

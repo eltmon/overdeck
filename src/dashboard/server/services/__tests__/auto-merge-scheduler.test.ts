@@ -263,7 +263,7 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
       getFacts: (issueId) => getPrFacts(issueId, {
         fetchGitHubPr: async () => ({ issueId, pr: { ...markerApprovedPr(), comments: [] } }),
       }),
-      readReviews: async () => ({ headRefOid: MARKER_HEAD, reviews: [{ state: 'APPROVED', commit: { oid: MARKER_HEAD } }] }),
+      readReviews: async () => ({ headRefOid: MARKER_HEAD, reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: MARKER_HEAD } }] }),
     });
     const outcomes = await scheduleReadyAutoMerges(deps);
     expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);

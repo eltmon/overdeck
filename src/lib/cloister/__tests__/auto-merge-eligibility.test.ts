@@ -85,7 +85,7 @@ describe('auto-merge eligibility', () => {
 
   it('accepts a GitHub review approving the exact head (#3983)', async () => {
     const d = { ...deps(readyFacts({ approved: false, approvedAtHead: undefined, reviewDecision: null })),
-      readReviews: vi.fn(async () => ({ headRefOid: 'abc1234', reviews: [{ state: 'APPROVED', commit: { oid: 'abc1234' } }] })) };
+      readReviews: vi.fn(async () => ({ headRefOid: 'abc1234', reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: 'abc1234' } }] })) };
     await expect(isAutoMergeEligible('PAN-1486', d)).resolves.toEqual(expect.objectContaining({ eligible: true }));
     expect(d.readReviews).toHaveBeenCalledWith('eltmon/overdeck', 1486);
   });
