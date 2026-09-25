@@ -14,12 +14,7 @@ import { registerSpecialistsCommands } from '../specialists/index.js';
 import { registerRemoteCommands } from '../remote/index.js';
 import { registerDbCommands } from '../db.js';
 import { registerConfigCommand } from '../config.js';
-import { hooksStatusCommand, parseHookHarness, setupHooksCommand } from '../setup/hooks.js';
-import { tldrCommand } from './tldr-handler.js';
-import { hookCommand } from './fpp-handler.js';
-import { backfillTitlesCommand } from './conversations-handler.js';
-import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
-import { migrateConfigCommand } from '../migrate-config.js';
+import { lazyAction } from '../../lazy-action.js';
 import { registerMigratePlanHomeCommand } from './migrate-plan-home.js';
 import { registerSeedUatFixturesCommand } from './seed-uat-fixtures.js';
 import { registerAgentsCommands } from './agents-exited.js';
@@ -77,23 +72,26 @@ export function registerAdminCommands(program: Command): void {
     .description('Configure heartbeat hooks for Claude Code and/or Pi')
     .option('--dry-run', 'Preview the proposed settings.json diff without writing')
     .option('--harness <harness>', 'Target harness: claude-code, pi, or both')
-    .action((opts: { dryRun?: boolean; harness?: string }) => setupHooksCommand({
-      dryRun: opts.dryRun,
-      harness: parseHookHarness(opts.harness),
-    }));
+    .action(async (opts: { dryRun?: boolean; harness?: string }) => {
+      const { parseHookHarness, setupHooksCommand } = await import('../setup/hooks.js');
+      return setupHooksCommand({
+        dryRun: opts.dryRun,
+        harness: parseHookHarness(opts.harness),
+      });
+    });
 
   hooks
     .command('status')
     .description('Show installed hook harness support')
-    .action(() => hooksStatusCommand());
+    .action(async () => (await import('../setup/hooks.js')).hooksStatusCommand());
 
   // pan admin tldr — TLDR daemon management
   admin
     .command('tldr [action] [workspace]')
     .description('TLDR daemon: status, start, stop, warm')
     .option('--json', 'Output as JSON')
-    .action((action, workspace, options) => {
-      tldrCommand(action || 'status', workspace, options);
+    .action(async (action, workspace, options) => {
+      (await import('./tldr-handler.js')).tldrCommand(action || 'status', workspace, options);
     });
 
   // pan admin fpp — first-person-plural hooks
@@ -101,8 +99,8 @@ export function registerAdminCommands(program: Command): void {
     .command('fpp [action] [idOrMessage...]')
     .description('FPP hooks: check, push, pop, clear, mail')
     .option('--json', 'Output as JSON')
-    .action((action, idOrMessage, options) => {
-      hookCommand(action || 'help', idOrMessage?.join(' '), options);
+    .action(async (action, idOrMessage, options) => {
+      (await import('./fpp-handler.js')).hookCommand(action || 'help', idOrMessage?.join(' '), options);
     });
 
   // pan admin conversations — conversation maintenance
@@ -115,7 +113,7 @@ export function registerAdminCommands(program: Command): void {
     .description('Backfill titles for conversations stuck on "New conversation"')
     .option('--dry-run', 'Preview changes without writing to the database')
     .action(async (options: { dryRun?: boolean }) => {
-      await backfillTitlesCommand(options);
+      await (await import('./conversations-handler.js')).backfillTitlesCommand(options);
     });
 
   // pan admin tracker — tracker-specific operations
@@ -127,7 +125,7 @@ export function registerAdminCommands(program: Command): void {
     .command('linear-states')
     .description('Manage Linear workflow states')
     .option('-t, --team <team>', 'Team key (default: MIN)')
-    .action((options) => listStatesCommand(options));
+    .action(async (options) => (await import('./tracker-handler.js')).listStatesCommand(options));
 
   tracker
     .command('linear-cleanup')
@@ -135,7 +133,7 @@ export function registerAdminCommands(program: Command): void {
     .option('-t, --team <team>', 'Team key (default: MIN)')
     .option('-s, --state <state>', 'State name to archive (default: Planning)')
     .option('--dry-run', 'Show what would be archived without making changes')
-    .action((options) => cleanupStatesCommand(options));
+    .action(async (options) => (await import('./tracker-handler.js')).cleanupStatesCommand(options));
 
   // pan admin migrate-config — one-time settings.json → config.yaml migration
   admin
@@ -145,5 +143,5 @@ export function registerAdminCommands(program: Command): void {
     .option('--preview', 'Preview migration without applying changes')
     .option('--no-backup', 'Do not back up settings.json')
     .option('--delete-legacy', 'Delete settings.json after migration')
-    .action(migrateConfigCommand);
+    .action(lazyAction(() => import('../migrate-config.js'), 'migrateConfigCommand'));
 }
