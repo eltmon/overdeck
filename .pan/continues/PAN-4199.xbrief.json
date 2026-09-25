@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4199",
   "created": "2026-09-25T06:46:14.958Z",
-  "updated": "2026-09-25T07:14:53.331Z",
+  "updated": "2026-09-25T07:18:28.685Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-25T07:14:52.211Z"
     },
     "wi5-conv-created": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4199",
-      "claimedAt": "2026-09-25T07:14:53.331Z"
+      "claimedAt": "2026-09-25T07:14:53.331Z",
+      "doneAt": "2026-09-25T07:18:28.685Z"
     }
   }
 }
