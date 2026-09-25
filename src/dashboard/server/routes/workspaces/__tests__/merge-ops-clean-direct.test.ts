@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   runVerificationForIssue: vi.fn(),
   setMergeRun: vi.fn(),
   mergeRun: null as { phase: string } | null,
+  mergeGate: vi.fn(),
 }));
 
 vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
@@ -138,7 +139,25 @@ vi.mock('../../workspaces.js', () => ({
   setPendingOperation: vi.fn(),
 }));
 
-vi.mock('../merge-strike.js', () => ({
+// #3983: the Merge button's readiness is the real merge door — the real
+// `normalMergeEligibility` and `forgeMergeGateRefusal` — over a stubbed gate.
+vi.mock('../../../../../lib/cloister/merge-gate.js', () => ({
+  evaluateIssueMergeGate: (...args: unknown[]) => mocks.mergeGate(...args),
+}));
+vi.mock('../../../../../lib/agents/agent-state.js', () => ({
+  clearYieldForResume: vi.fn(),
+  decideResumeGate: vi.fn(() => ({ decision: 'proceed' })),
+  getAgentResumeGateBlockReason: vi.fn(() => null),
+  getAgentState: vi.fn(() => null),
+  saveAgentStateSync: vi.fn(),
+}));
+vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
+  getWorkAgentLifecycleState: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
+}));
+
+vi.mock('../merge-strike.js', async (importOriginal) => ({
+  normalMergeEligibility: (await importOriginal<typeof import('../merge-strike.js')>()).normalMergeEligibility,
+  forgeMergeGateRefusal: (await importOriginal<typeof import('../merge-strike.js')>()).forgeMergeGateRefusal,
   activeStrikeMerge: vi.fn(() => false),
   advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: mocks.ensureAgentReadyForMerge,
@@ -146,9 +165,7 @@ vi.mock('../merge-strike.js', () => ({
   automaticMergePin: vi.fn(async (request: { kind: string; expectedHeadSha?: string }) => (
     request.kind === 'normal' && request.expectedHeadSha ? { matchHeadCommit: request.expectedHeadSha } : {}
   )),
-  forgeMergeGateRefusal: vi.fn(async () => null),
   mergeVerificationOptions: vi.fn(() => ({})),
-  normalMergeEligibility: vi.fn(() => null),
   rebaseWithAgentFallback: vi.fn(async () => {
     try {
       await mocks.ensureAgentReadyForMerge();
@@ -194,6 +211,7 @@ describe('triggerMerge clean PR direct merge', () => {
     vi.clearAllMocks();
     mocks.derivedState = 'ready';
     mocks.mergeRun = null;
+    mocks.mergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110', headSha: HEAD_SHA } });
     mocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
     mocks.getPullRequestState.mockResolvedValue(pullRequestState());
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
@@ -267,5 +285,46 @@ describe('triggerMerge clean PR direct merge', () => {
     expect(result).toEqual(expect.objectContaining({ success: false, error: 'rebase flow reached' }));
     expect(mocks.ensureAgentReadyForMerge).toHaveBeenCalledOnce();
     expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+  });
+
+  // #3983: the derived state reads approval only from GitHub's reviewDecision,
+  // which is empty without branch protection, so a PR approved by a verdict
+  // marker naming its head derives `in-review`. The Merge button merges it on
+  // the gate's word.
+  it('merges from the Merge button when the gate proves a head approval the derived state cannot see', async () => {
+    mocks.derivedState = 'in-review';
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+    expect(mocks.mergeGate).toHaveBeenCalledWith('PAN-3110', {}, undefined);
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledOnce();
+  });
+
+  it('refuses from the Merge button when the approval does not name the head', async () => {
+    mocks.derivedState = 'in-review';
+    mocks.mergeGate.mockResolvedValue({
+      ready: false,
+      reason: `PR is not approved at PR HEAD ${HEAD_SHA}`,
+      facts: { headBranch: 'feature/pan-3110', headSha: HEAD_SHA },
+    });
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({
+      success: false,
+      statusCode: 400,
+      error: `Cannot merge: PR is not approved at PR HEAD ${HEAD_SHA}`,
+    }));
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+  });
+
+  it('still refuses an already merged issue from the derived state', async () => {
+    mocks.derivedState = 'merged';
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: false, error: 'Already merged' }));
+    expect(mocks.mergeGate).not.toHaveBeenCalled();
   });
 });

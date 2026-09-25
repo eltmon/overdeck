@@ -37,6 +37,7 @@ function deps(facts: PrFacts, labels: string[] = [], globalUat = false) {
     getProjectDefault: vi.fn(() => undefined),
     isGlobalUatRequired: () => globalUat,
     ciTestsRequired: () => false,
+    readReviews: vi.fn(async () => ({ headRefOid: facts.headSha, reviews: [] })),
   };
 }
 
@@ -71,15 +72,22 @@ describe('auto-merge eligibility', () => {
   });
 
   it('rejects an unapproved PR without looking at labels', async () => {
-    const d = deps(readyFacts({ approved: false, reviewDecision: 'REVIEW_REQUIRED' }));
+    const d = deps(readyFacts({ approved: false, approvedAtHead: undefined, reviewDecision: 'REVIEW_REQUIRED' }));
     await expect(isAutoMergeEligible('PAN-1486', d))
-      .resolves.toEqual({ eligible: false, reason: 'PR is not approved' });
+      .resolves.toEqual({ eligible: false, reason: expect.stringContaining('PR is not approved at PR HEAD abc1234') });
     expect(d.getIssueLabels).not.toHaveBeenCalled();
   });
 
   it('rejects an approval that does not name the PR head (#3983)', async () => {
     await expect(isAutoMergeEligible('PAN-1486', deps(readyFacts({ approvedAtHead: false }))))
-      .resolves.toEqual({ eligible: false, reason: 'PR approval does not name PR HEAD abc1234' });
+      .resolves.toEqual({ eligible: false, reason: expect.stringContaining('PR is not approved at PR HEAD abc1234') });
+  });
+
+  it('accepts a GitHub review approving the exact head (#3983)', async () => {
+    const d = { ...deps(readyFacts({ approved: false, approvedAtHead: undefined, reviewDecision: null })),
+      readReviews: vi.fn(async () => ({ headRefOid: 'abc1234', reviews: [{ state: 'APPROVED', commit: { oid: 'abc1234' } }] })) };
+    await expect(isAutoMergeEligible('PAN-1486', d)).resolves.toEqual(expect.objectContaining({ eligible: true }));
+    expect(d.readReviews).toHaveBeenCalledWith('eltmon/overdeck', 1486);
   });
 
   it('rejects a PR whose latest review requested changes', async () => {

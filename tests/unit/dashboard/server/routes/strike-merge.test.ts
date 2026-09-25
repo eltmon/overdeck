@@ -27,6 +27,8 @@ const {
   normalMergeEligibility,
   validateStrikeMergeRequest,
 } = await import('../../../../../src/dashboard/server/routes/workspaces/merge-strike.js');
+const { emptyPrFacts, evaluateMergeReadiness } = await import('../../../../../src/lib/cloister/pr-facts.js');
+type PrFacts = import('../../../../../src/lib/cloister/pr-facts.js').PrFacts;
 type StrikeMergeRequest = Parameters<typeof validateStrikeMergeRequest>[1];
 
 const markerHead = 'a'.repeat(40);
@@ -138,18 +140,42 @@ describe('strike readiness is its own PR through the merge gate (#4016)', () => 
   });
 });
 
+// #3983: approval, checks and mergeability are the merge gate's, over the
+// forge's PR facts; the derived state refuses only a merged issue or a merge
+// already running. Every reason the derived state used to give still reaches
+// the operator, now from the gate (`evaluateMergeReadiness`).
 describe('normal merge-door no-loss matrix', () => {
+  const HEAD = 'c'.repeat(40);
+  const facts = (overrides: Partial<PrFacts> = {}): PrFacts => ({
+    ...emptyPrFacts('PAN-2702'),
+    forge: 'github', exists: true, open: true, headSha: HEAD, headBranch: 'feature/pan-2702',
+    reviewDecision: null, approved: true, approvedAtHead: true, mergeable: true, checks: 'green',
+    ...overrides,
+  });
+
   it.each([
-    ['no derived state at all', null, false, 'Cannot merge: no open pull request for this issue'],
-    ['no pull request', derived('planned'), false, 'Cannot merge: no open pull request for this issue'],
-    ['changes requested', derived('changes-requested', { reviewState: 'changes-requested', checks: 'green', mergeable: true }), false, 'Cannot merge: the latest review requested changes'],
-    ['not approved', derived('in-review', { reviewState: 'review-requested', checks: 'green', mergeable: true }), false, 'Cannot merge: the pull request is not approved yet'],
-    ['checks failing', derived('in-review', { reviewState: 'approved', checks: 'red', mergeable: true }), false, 'Cannot merge: checks are failing'],
-    ['checks pending', derived('in-review', { reviewState: 'approved', checks: 'pending', mergeable: true }), false, 'Cannot merge: checks have not finished'],
-    ['conflicting', derived('in-review', { reviewState: 'approved', checks: 'green', mergeable: false }), false, 'Cannot merge: the forge reports the pull request as conflicting'],
-    ['already merged', derived('merged'), false, 'Already merged'],
-  ])('preserves %s rejection', (_label, state, activelyMerging, error) => {
-    expect(normalMergeEligibility(state, activelyMerging)).toMatchObject({ success: false, statusCode: 400, error });
+    ['no pull request', emptyPrFacts('PAN-2702'), 'Cannot merge: no pull request for this issue'],
+    ['changes requested', facts({ approved: false, approvedAtHead: false, changesRequested: true }), 'Cannot merge: latest review requested changes'],
+    ['not approved at the head', facts({ approvedAtHead: false }), expect.stringContaining(`Cannot merge: PR is not approved at PR HEAD ${HEAD}`)],
+    ['checks failing', facts({ checks: 'red' }), `Cannot merge: CI checks failing on PR HEAD ${HEAD}`],
+    ['checks pending', facts({ checks: 'pending' }), `Cannot merge: CI checks still pending on PR HEAD ${HEAD}`],
+    ['conflicting', facts({ mergeable: false }), 'Cannot merge: PR is not mergeable'],
+  ])('preserves %s rejection through the gate', async (_label, prFacts, error) => {
+    const gate = async () => ({ ...evaluateMergeReadiness(prFacts, { requireApprovalAtHead: true }), facts: prFacts });
+    await expect(forgeMergeGateRefusal('PAN-2702', { kind: 'normal' }, gate))
+      .resolves.toMatchObject({ success: false, statusCode: 400, error });
+  });
+
+  it('refuses an already merged issue from the derived state', () => {
+    expect(normalMergeEligibility(derived('merged'), false)).toMatchObject({ success: false, statusCode: 400, error: 'Already merged' });
+  });
+
+  it.each([
+    ['no derived state at all', null],
+    ['no pull request', derived('planned')],
+    ['an approval the derived state cannot see', derived('in-review', { reviewState: 'review-requested', checks: 'green', mergeable: true })],
+  ])('leaves readiness to the merge gate for %s (#3983)', (_label, state) => {
+    expect(normalMergeEligibility(state, false)).toBeNull();
   });
 
   it('rejects a merge that is already running', () => {

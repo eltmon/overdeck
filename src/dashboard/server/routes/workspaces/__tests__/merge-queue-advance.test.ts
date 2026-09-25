@@ -35,8 +35,9 @@ type MergeGateVerdict = Awaited<ReturnType<MergeQueueAdvanceDeps['checkMergeGate
  * drain: unstartable heads are removed, the first startable entry is triggered,
  * and the walk always terminates.
  *
- * PAN-3917: startability is now the forge's answer — `DerivedIssueState.state`
- * is `ready` only when the PR is approved, green, and mergeable.
+ * PAN-3917: startability is now the forge's answer. #3983: the merge gate
+ * judges approval, checks and mergeability; the derived state refuses only a
+ * merged issue. The harness's default gate is ready exactly for `ready` rows.
  *
  * #4016/#4021/#4036: every entry, whatever branches the issue has, also passes
  * the forge-facts merge gate (CI test job, failed required UAT).
@@ -65,7 +66,8 @@ function harness(
       return queue[0] ?? null;
     },
     getDerivedState: async (issueId) => derived(issueId, states[issueId] ?? 'backlog'),
-    checkMergeGate: async (issueId) => gates[issueId] ?? { ready: true },
+    checkMergeGate: async (issueId) => gates[issueId]
+      ?? (states[issueId] === 'ready' ? { ready: true } : { ready: false, reason: 'no pull request for this issue' }),
     triggerMerge: async (issueId, ...rest: unknown[]) => {
       triggered.push([issueId, rest[0]]);
       return { success: true };
@@ -100,7 +102,7 @@ describe('advanceMergeQueue', () => {
   it('names the missing forge condition when it drops a head', async () => {
     const { deps, warnings } = harness(['PAN-100'], { 'PAN-100': 'in-review' });
     await advanceMergeQueue(deps, 'pan');
-    expect(warnings.join('\n')).toContain('no open pull request for this issue');
+    expect(warnings.join('\n')).toContain('Cannot merge: no pull request for this issue');
   });
 
   it('removes the completed issue before choosing the next entry', async () => {
@@ -171,7 +173,7 @@ describe('advanceMergeQueue', () => {
       {
         dequeue,
         getDerivedState: async (issueId) => derived(issueId, 'planned'),
-        checkMergeGate: async () => ({ ready: true }),
+        checkMergeGate: async () => ({ ready: false, reason: 'no pull request for this issue' }),
         triggerMerge: async () => ({}),
         log: () => {},
         warn: () => {},
@@ -221,15 +223,18 @@ describe('mergeGateRefusal', () => {
 });
 
 describe('forgeMergeGateRefusal (#3983)', () => {
-  it('asks the gate for a head-bound approval when a head is expected', async () => {
+  it('asks the one gate, and holds an automatic merge to its scheduled head', async () => {
     const gate = vi.fn(async () => ({ ready: true, facts: { headBranch: 'feature/pan-1', headSha: 'aaaaaaaa' } }));
     await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal', expectedHeadSha: 'aaaaaaaa' }, gate)).resolves.toBeNull();
-    expect(gate).toHaveBeenCalledWith('PAN-1', { requireApprovalAtHead: true });
+    expect(gate).toHaveBeenCalledWith('PAN-1');
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal', expectedHeadSha: 'bbbbbbbb' }, gate))
+      .resolves.toEqual(expect.objectContaining({ statusCode: 409 }));
   });
 
-  it('leaves the manual merge gate as it was', async () => {
-    const gate = vi.fn(async () => ({ ready: true, facts: { headBranch: 'feature/pan-1' } }));
-    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal' }, gate)).resolves.toBeNull();
+  it('judges the manual Merge button by the same gate', async () => {
+    const gate = vi.fn(async () => ({ ready: false, reason: 'PR is not approved at PR HEAD aaaaaaaa', facts: { headBranch: 'feature/pan-1' } }));
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal' }, gate))
+      .resolves.toEqual(expect.objectContaining({ error: 'Cannot merge: PR is not approved at PR HEAD aaaaaaaa' }));
     expect(gate).toHaveBeenCalledWith('PAN-1');
   });
 });

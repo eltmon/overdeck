@@ -14,7 +14,7 @@ import type {
   ScheduleAutoMergeInput,
   ScheduleAutoMergeResult,
 } from '../../../../lib/overdeck/merge-sync.js';
-import type { PrFacts } from '../../../../lib/cloister/pr-facts.js';
+import type { GitHubReviewsAtHead, PrFacts } from '../../../../lib/cloister/pr-facts.js';
 import type { IssuePullRequestData } from '../../../../lib/overdeck/pull-requests.js';
 import type { listRepoPullRequests } from '../derived-issue-state.js';
 
@@ -84,6 +84,8 @@ interface WorldOptions {
   latestAtInsert?: PendingAutoMerge | null;
   /** The cached tracker row says the issue is closed. */
   closed?: boolean;
+  /** GitHub's reviews of the PR (`forgeApprovalAtHead`); none by default. */
+  readReviews?: (repo: string, number: number) => Promise<GitHubReviewsAtHead>;
 }
 
 /**
@@ -114,11 +116,13 @@ function world(options: WorldOptions = {}) {
     isMergeTrainEnabled: () => trainEnabled,
     isIssueClosed: () => options.closed ?? false,
   };
-  // As in production: the automatic path needs an approval bound to the head.
+  // As in production: every merge door needs an approval bound to the head.
+  // GitHub's reviews are read only when no marker proves it; none approve here
+  // unless a test says so.
+  const readReviews = vi.fn(options.readReviews ?? (async () => ({ headRefOid: null, reviews: [] })));
   const mergeGate = (issueId: string) => evaluateIssueMergeGate(
     issueId,
-    { getFacts: factsReads, ciTestsRequired: () => false },
-    { requireApprovalAtHead: true },
+    { getFacts: factsReads, ciTestsRequired: () => false, readReviews },
   );
 
   const deps = {
@@ -139,6 +143,7 @@ function world(options: WorldOptions = {}) {
         getProjectDefault: projectDefault,
         isGlobalUatRequired: () => globalRequireUat,
         ciTestsRequired: () => false,
+        readReviews,
       }),
       resolveProject: () => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/repos/overdeck' }),
       schedule: (input) => insert({ ...input, canSchedule }),
@@ -252,6 +257,37 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     expect(insert).toHaveBeenCalledTimes(1);
   });
 
+  it('schedules a PR approved by a GitHub review of its exact head, with no marker', async () => {
+    const { deps, insert } = world({
+      labels: ['auto-merge'],
+      getFacts: (issueId) => getPrFacts(issueId, {
+        fetchGitHubPr: async () => ({ issueId, pr: { ...markerApprovedPr(), comments: [] } }),
+      }),
+      readReviews: async () => ({ headRefOid: MARKER_HEAD, reviews: [{ state: 'APPROVED', commit: { oid: MARKER_HEAD } }] }),
+    });
+    const outcomes = await scheduleReadyAutoMerges(deps);
+    expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ headSha: MARKER_HEAD }));
+  });
+
+  it('schedules on the first tick after the PR turns ready, with no operator action', async () => {
+    // Tick 1: green and mergeable, but no approval yet. Tick 2: the reviewer
+    // has posted a marker naming the head, so the PR is ready.
+    let pr: IssuePullRequestData = { ...markerApprovedPr(), comments: [] };
+    const { deps, insert } = world({
+      labels: ['auto-merge'],
+      getFacts: (issueId) => getPrFacts(issueId, { fetchGitHubPr: async () => ({ issueId, pr }) }),
+    });
+    const before = await scheduleReadyAutoMerges(deps);
+    expect(before[0]).toMatchObject({ scheduled: false });
+    expect(insert).not.toHaveBeenCalled();
+
+    pr = markerApprovedPr();
+    const after = await scheduleReadyAutoMerges(deps);
+    expect(after).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
+    expect(insert).toHaveBeenCalledTimes(1);
+  });
+
   it('does not schedule a PR whose marker approval names no head (#3983)', async () => {
     const { deps, insert } = world({
       labels: ['auto-merge'],
@@ -261,7 +297,7 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
     });
     const outcomes = await scheduleReadyAutoMerges(deps);
     expect(insert).not.toHaveBeenCalled();
-    expect(outcomes[0]).toMatchObject({ scheduled: false, reason: `PR approval does not name PR HEAD ${MARKER_HEAD}` });
+    expect(outcomes[0]).toMatchObject({ scheduled: false, reason: expect.stringContaining(`PR is not approved at PR HEAD ${MARKER_HEAD}`) });
   });
 
   it('does not schedule a PR whose marker approves an older head (#3983)', async () => {
