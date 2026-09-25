@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4200",
   "created": "2026-09-25T06:42:27.234Z",
-  "updated": "2026-09-25T07:51:15.336Z",
+  "updated": "2026-09-25T07:51:28.070Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "wi3-notarize-hook.ac2": {
       "status": "completed",
       "doneAt": "2026-09-25T07:51:15.335Z"
+    },
+    "wi3-notarize-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:51:28.070Z"
     }
   }
 }
