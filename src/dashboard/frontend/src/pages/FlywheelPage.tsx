@@ -20,6 +20,7 @@ import { FlywheelUatBatchesCard } from '../components/flywheel/FlywheelUatBatche
 import { PendingAutoMergesCard } from '../components/flywheel/PendingAutoMergesCard';
 import { RailCard, StatusBadge, ToggleSwitch } from '../components/flywheel/primitives';
 import { useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
+import { consumePendingReveal, subscribeRevealNeedsYou } from '../lib/flywheelReveal';
 
 type RailTab = 'status' | 'state' | 'report' | 'stats';
 const RAIL_TABS = ['status', 'state', 'report', 'stats'] as const;
@@ -63,6 +64,24 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 5_000);
     return () => window.clearInterval(interval);
+  }, []);
+
+  // The header's needs-you indicator navigates here and asks for the block.
+  // Consume on mount too: the indicator's request usually lands before this
+  // page exists, so the subscription alone would miss it.
+  useEffect(() => {
+    const reveal = () => {
+      if (!consumePendingReveal()) return;
+      setTab('status');
+      // The tab's content mounts on the next paint, so the scroll waits for it.
+      window.requestAnimationFrame(() => {
+        const target = document.querySelector('[data-testid="flywheel-needs-you"]')
+          ?? document.querySelector('[data-attention="needs-you"]');
+        target?.scrollIntoView({ block: 'center' });
+      });
+    };
+    reveal();
+    return subscribeRevealNeedsYou(reveal);
   }, []);
 
   const setLeftWidthClamped = useCallback((next: number) => {

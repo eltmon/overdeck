@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelDerivedStatus } from '@overdeck/contracts';
 
 vi.mock('../../components/flywheel/FlywheelConversationPane', () => ({
@@ -14,6 +14,7 @@ vi.mock('../../components/flywheel/FlywheelUatBatchesCard', () => ({
 
 import { FlywheelPage } from '../FlywheelPage';
 import { flywheelStatus, renderWithQuery, stubFetch } from '../../components/flywheel/__tests__/fixtures';
+import { consumePendingReveal, requestRevealNeedsYou } from '../../lib/flywheelReveal';
 
 const config = { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true };
 
@@ -45,7 +46,9 @@ function setup(status: FlywheelDerivedStatus | 'unreachable') {
 }
 
 describe('FlywheelPage (PAN-3964 FR-8)', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  // The reveal flag is module state: clear it so one test cannot steer the next.
+  beforeEach(() => { consumePendingReveal(); });
+  afterEach(() => { vi.unstubAllGlobals(); consumePendingReveal(); });
 
   it('mounts the UAT batches card in the left rail even when idle (PAN-4199 ac3)', async () => {
     setup(flywheelStatus({ run: 'idle', conversation: null, lastTick: null, freshness: null }));
@@ -93,6 +96,17 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     expect(mergeTrain).toHaveTextContent('Merge train: on');
     expect(mergeTrain).toHaveAttribute('href', '/awaiting-merge');
     expect(screen.queryByRole('switch', { name: 'Merge train' })).toBeNull();
+  });
+
+  it('a pending reveal selects the Status tab (PAN-4199 ac4)', async () => {
+    setup(flywheelStatus());
+    renderWithQuery(<FlywheelPage />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'state' }));
+    expect(await screen.findByText('No flywheel state yet.')).toBeInTheDocument();
+
+    requestRevealNeedsYou();
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'status' })).toHaveAttribute('aria-selected', 'true'));
+    expect(screen.getByTestId('flywheel-status-pane')).toBeInTheDocument();
   });
 
   it('tabs switch between Status, State, Report, and Stats (PAN-4199 ac3)', async () => {
