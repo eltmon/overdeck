@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4197",
   "created": "2026-09-25T06:40:33.339Z",
-  "updated": "2026-09-25T08:13:07.768Z",
+  "updated": "2026-09-25T08:13:20.086Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -117,6 +117,10 @@
     "directory-live-scope.ac5": {
       "status": "completed",
       "doneAt": "2026-09-25T08:13:07.768Z"
+    },
+    "live-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T08:13:20.086Z"
     }
   }
 }
