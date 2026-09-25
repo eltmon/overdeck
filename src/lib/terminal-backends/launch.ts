@@ -10,10 +10,11 @@
  * previous pane used. This module is the one place
  * that resolves the backend (D10 selection), finds or creates the workspace,
  * and starts the pane — so a launcher is three lines and cannot forget the
- * tokens. `pan handoff --issue` does not route through here yet — the forked
- * conversation still inherits its parent's cwd (or an explicit `--cwd`), not
- * the issue's workspace; giving it the same pane placement is a post-release
- * follow-up (docs/THE-CUT.md).
+ * tokens. Conversations, forks and handoffs, and `pan flywheel start` route
+ * through `launchAgentPane` too (PAN-3921): the pane is named `conv-<name>`
+ * and stamped with role `conversation` unless `pan handoff --role` says
+ * otherwise, so a handoff started with `--issue X --role review` is X's
+ * Review row.
  *
  * Importing it registers both adapters.
  */
@@ -113,8 +114,29 @@ export interface LaunchPaneRequest {
 }
 
 /**
+ * Mark an issue pane's cwd trusted in Claude Code before the launch (PAN-3905).
+ * Only workspace creation used to do this, so an agent launched into a
+ * workspace some other path made (the planner, a slot or item worktree, a
+ * resume into an older workspace) stopped at Claude Code's trust dialog and
+ * died with `ready-signal-timeout`. Idempotent; a failure is non-fatal, as it
+ * is in `createWorkspace`: the agent still starts and the prompt is visible.
+ */
+async function preTrustClaudeCodeCwd(request: LaunchPaneRequest): Promise<void> {
+  if (!request.issueId || request.tokens.harness !== 'claude-code') return;
+  try {
+    // Lazy: this module is imported almost everywhere; keep workspace-manager
+    // out of its static import graph.
+    const { preTrustDirectory } = await import('../workspace-manager/worktree-ops.js');
+    await preTrustDirectory(request.cwd);
+  } catch {
+    // Non-fatal.
+  }
+}
+
+/**
  * Place a pane in the issue workspace, run the launcher in it, and stamp its
- * tokens. Behaves exactly as `createSession` did on tmux.
+ * tokens. Behaves exactly as `createSession` did on tmux. A Claude Code pane's
+ * cwd is pre-trusted first (PAN-3905).
  */
 export async function launchAgentPane(
   request: LaunchPaneRequest,
@@ -127,6 +149,7 @@ export async function launchAgentPane(
   if (isUnsupported(workspace)) {
     throw new Error(`${resolved.name} cannot host an issue workspace: ${workspace.reason}`);
   }
+  await preTrustClaudeCodeCwd(request);
   const pane = await Effect.runPromise(
     resolved.startAgent(workspace, {
       kind: request.tokens.harness,

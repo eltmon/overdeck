@@ -32,8 +32,8 @@ import { notifyPipeline } from '../pipeline-notifier.js';
 
 export type PipelineJournalEntryType =
   | 'verification.started' | 'verification.passed' | 'verification.failed'
-  | 'review.requested' | 'review.dispatched' | 'review.redispatched' | 'review.verdict'
-  | 'review.aborted' | 'review.synthesis-gave-up'
+  | 'review.requested' | 'review.dispatched' | 'review.redispatched' | 'review.halted' | 'review.verdict'
+  | 'review.verdict-refused' | 'review.aborted' | 'review.synthesis-gave-up'
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed'
@@ -139,6 +139,15 @@ export function readPipelineJournal(
     }
   }
   return opts.limit !== undefined && opts.limit >= 0 ? entries.slice(-opts.limit) : entries;
+}
+
+/**
+ * PAN-3911: a review run that has not posted its verdict. Only the LAST entry
+ * overall decides, the same rule stalled-review recovery uses: a verdict,
+ * delivered feedback or a failed verification after the request ends the run.
+ */
+export function isReviewInFlightEntry(entry: Pick<PipelineJournalEntry, 'type'> | null): boolean {
+  return entry?.type === 'review.requested' || entry?.type === 'review.dispatched' || entry?.type === 'review.redispatched';
 }
 
 /** The last entry, or the last whose type starts with `prefix`. */

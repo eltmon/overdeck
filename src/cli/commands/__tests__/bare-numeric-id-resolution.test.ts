@@ -293,7 +293,7 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
     await pauseCommand('9999', { reason: 'operator' });
 
     expect(issueIdMocks.resolveBareNumericId).toHaveBeenCalledWith('9999');
-    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-9999', 'operator', false);
+    expect(agentMocks.setAgentPaused).toHaveBeenCalledWith('agent-pan-9999', 'operator', false, true);
   });
 
   it('resolves bare numeric input before pan unpause clears the pause gate', async () => {
@@ -356,6 +356,24 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
       'http://dashboard.test/api/specialists/overdeck/PAN-9999/reviewer/correctness/restart',
       expect.any(Object),
     );
+  });
+
+  // #3853: the route grants operator standing unless the caller is an agent.
+  it('tells the restart route whether an agent or the operator is calling', async () => {
+    const { reviewRestartCommand } = await import('../review-restart.js');
+    const postedBody = (call: number) =>
+      JSON.parse((vi.mocked(fetch).mock.calls[call][1] as RequestInit).body as string) as { callerKind?: string };
+
+    process.env.OVERDECK_AGENT_ID = 'flywheel-overdeck';
+    try {
+      await reviewRestartCommand('9999');
+    } finally {
+      delete process.env.OVERDECK_AGENT_ID;
+    }
+    await reviewRestartCommand('9999');
+
+    expect(postedBody(0).callerKind).toBe('agent');
+    expect(postedBody(1).callerKind).toBe('operator');
   });
 
   it('does not fail pan review restart when an accepted response is not JSON', async () => {

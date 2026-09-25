@@ -150,4 +150,36 @@ describe('session-start-hook compaction repair (PAN-2884)', () => {
     expect(code).toBe(0)
     expect(stdout.trim()).toBe('')
   })
+
+  it('injects nothing in a bare conversation but still observes the session (PAN-4185)', async () => {
+    const { stdout, code } = await runHook(tempDir, JSON.stringify({
+      session_id: 'session-4185',
+      model: 'claude-opus-5-5',
+      source: 'compact',
+      transcript_path: '/fixture/transcripts/session-4185.jsonl',
+    }), {
+      OVERDECK_AGENT_ID: 'conv-4185',
+      OVERDECK_HOME: overdeckHome,
+      PAN_DASHBOARD_URL: 'http://dashboard.test',
+      CURL_LOG: curlLog,
+      OVERDECK_BARE_CONTEXT: '1',
+    })
+
+    expect(code).toBe(0)
+    // No compaction note, no memory briefing: nothing reaches the model.
+    expect(stdout.trim()).toBe('')
+    // No memory retrieval round-trip either.
+    let curlArgs = ''
+    try { curlArgs = readFileSync(curlLog, 'utf-8') } catch { /* curl never ran */ }
+    expect(curlArgs).not.toContain('/api/memory/session/start')
+
+    // The observing half still runs: activity, model, ready signal, session index.
+    const events = readFileSync(eventLog, 'utf-8')
+    expect(events).toContain('"kind":"activity","activity":"idle"')
+    expect(events).toContain('"model": "claude-opus-5-5"')
+    const ready = JSON.parse(readFileSync(join(overdeckHome, 'agents', 'conv-4185', 'ready.json'), 'utf-8'))
+    expect(ready).toMatchObject({ ready: true, agentId: 'conv-4185', sessionId: 'session-4185' })
+    const indexEntry = JSON.parse(readFileSync(join(overdeckHome, 'agents', 'conv-4185', 'sessions.json'), 'utf-8'))
+    expect(indexEntry).toMatchObject({ sessionId: 'session-4185', path: '/fixture/transcripts/session-4185.jsonl' })
+  })
 })

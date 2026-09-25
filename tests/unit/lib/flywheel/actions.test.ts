@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const deliverAgentMessage = vi.hoisted(() => vi.fn());
+vi.mock('../../../../src/lib/agents.js', () => ({ deliverAgentMessage }));
+
 import {
   FLYWHEEL_REPORT_REQUEST,
   FLYWHEEL_STOP_REQUEST,
@@ -30,7 +33,6 @@ type State = 'idle' | 'paused' | 'running';
 
 function depsFor(state: State, overrides: FlywheelActionDeps = {}) {
   const calls = {
-    sendKeys: vi.fn(async () => {}),
     sendMessage: vi.fn(async () => {}),
     createConversation: vi.fn(),
     spawnSession: vi.fn(async () => {}),
@@ -62,7 +64,7 @@ describe('startFlywheel (PAN-3964 FR-5, D5)', () => {
     expect(calls.createConversation).toHaveBeenCalledWith(expect.objectContaining({ name: 'conv-flywheel', cwd: '/repos/overdeck', model: 'resolved-model', harness: 'claude-code' }));
     expect(calls.spawnSession).toHaveBeenCalled();
     expect(calls.waitReady).toHaveBeenCalledWith('conv-flywheel', 'claude-code', 'spawn');
-    expect(calls.sendKeys.mock.calls.map((c) => c[1])).toEqual(['/pan-flywheel book-1', 'Enter']);
+    expect(calls.sendMessage.mock.calls).toEqual([['conv-flywheel', '/pan-flywheel book-1', 'pan flywheel start']]);
   });
 
   it('refuses a running flywheel', async () => {
@@ -93,7 +95,7 @@ describe('startFlywheel (PAN-3964 FR-5, D5)', () => {
     await expect(startFlywheel({ cwd: '/repos/overdeck' }, deps)).rejects.toThrow('spawn failed');
     expect(calls.createConversation).toHaveBeenCalledOnce();
     expect(calls.rollbackStart).toHaveBeenCalledWith('conv-flywheel');
-    expect(calls.sendKeys).not.toHaveBeenCalled();
+    expect(calls.sendMessage).not.toHaveBeenCalled();
   });
 
   it('treats an archived row (a rolled-back start) as idle, so the next start needs no --fresh', async () => {
@@ -133,13 +135,13 @@ describe('pause / abort / resume (D4)', () => {
     const { deps, calls } = depsFor('paused');
     await resumeFlywheel(deps);
     expect(calls.resumeConversation).toHaveBeenCalledWith('conv-flywheel');
-    expect(calls.sendKeys.mock.calls.map((c) => c[1])).toEqual(['/pan-flywheel', 'Enter']);
+    expect(calls.sendMessage.mock.calls).toEqual([['conv-flywheel', '/pan-flywheel', 'pan flywheel resume']]);
   });
 
   it('resume does not re-send the skill when the harness was already alive (reattached)', async () => {
     const { deps, calls } = depsFor('paused', { resumeConversation: async () => ({ status: 200, reattached: true }) });
     await resumeFlywheel(deps);
-    expect(calls.sendKeys).not.toHaveBeenCalled();
+    expect(calls.sendMessage).not.toHaveBeenCalled();
   });
 
   it('resume refuses idle and running', async () => {
@@ -150,7 +152,7 @@ describe('pause / abort / resume (D4)', () => {
   it('resume surfaces a respawn failure', async () => {
     const { deps, calls } = depsFor('paused', { resumeConversation: async () => ({ status: 500, error: 'spawn failed' }) });
     await expect(resumeFlywheel(deps)).rejects.toThrow('spawn failed');
-    expect(calls.sendKeys).not.toHaveBeenCalled();
+    expect(calls.sendMessage).not.toHaveBeenCalled();
   });
 });
 
@@ -252,5 +254,21 @@ describe('report / stop', () => {
 
   it('stop refuses when the flywheel is not running', async () => {
     await expect(stopFlywheel({}, depsFor('idle').deps)).rejects.toBeInstanceOf(FlywheelNotRunning);
+  });
+});
+
+describe('kickoff delivery through the delivery door (PAN-3921)', () => {
+  it('delivers the skill through deliverAgentMessage, not tmux keys', async () => {
+    deliverAgentMessage.mockResolvedValueOnce({ ok: true, path: 'herdr' });
+    const { deps } = depsFor('idle', { sendMessage: undefined });
+    await startFlywheel({ cwd: '/repos/overdeck' }, deps);
+    expect(deliverAgentMessage).toHaveBeenCalledWith('conv-flywheel', '/pan-flywheel', 'pan flywheel start');
+  });
+
+  it('fails the start, and rolls it back, when the kickoff is not delivered', async () => {
+    deliverAgentMessage.mockResolvedValueOnce({ ok: false, path: 'herdr', failure: 'refused: guard' });
+    const { deps, calls } = depsFor('idle', { sendMessage: undefined });
+    await expect(startFlywheel({ cwd: '/repos/overdeck' }, deps)).rejects.toThrow('Flywheel message not delivered (pan flywheel start): refused: guard');
+    expect(calls.rollbackStart).toHaveBeenCalledWith('conv-flywheel');
   });
 });

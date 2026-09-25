@@ -330,6 +330,49 @@ requires checking prior fixes first and explaining newly discovered
 blockers. It never suppresses a confirmed blocker solely because a previous
 round missed it.
 
+## The override door is the operator's (#3853)
+
+`pan admin specialists done review` is both the review agent's verdict and
+the operator's override, so the command checks who is calling. The caller is
+read from `OVERDECK_AGENT_ID`, which every managed pane carries on Herdr and
+tmux alike (`cloister/verdict-caller.ts`): no id is an operator shell, a
+`conv-*` id is an operator conversation, and anything else is an agent
+session. An operator may record any review verdict. An agent session may
+record one only as the issue's own review session (`agent-<issue>-review` or
+its convoy).
+
+That review session's `blocked`/`failed` verdict is refused only when it is
+proven that the exact head commit carries an approval: with no new commit
+there is nothing new to review. Proof is a commit sha, never a date. It is
+either a GitHub review whose `commit.oid` is the PR's `headRefOid`, or a
+trusted `overdeck-verdict: APPROVED` marker whose `sha=` names the head. A
+marker's `sha=` is the commit the review run reviewed, taken from its run id
+(`agent-<issue>-review-<head8>`, or the review parent's current run when
+`--run-id` is absent), and it is written only when the PR head is still that
+commit. A head that moved during the review gets a marker without `sha=`, so a
+later cycle can block the new head. A forge review posted with `gh pr review`
+still attaches to the head at submit time (follow-up: post it through the
+reviews API with `commit_id`). The
+reviews are read only on this path (`forgeApprovalAtHead` in `pr-facts`), for
+an agent's rejection of an approved PR, so the shared PR read stays small.
+Anything short of proof lets the verdict through: a GitLab MR (GitLab ties no
+approval to a sha, and `mergeable` is not an approval), an approval of an
+older commit, an empty review list, a marker without `sha=`, or a failed
+read. Turning a real blocker into a pass is the worse failure.
+
+A run the operator asked for may always block. The dashboard's Request review
+and Re-run review (`/api/review/:id/trigger`, including the Full/Quick/None
+choice), a forced re-review of an approved PR, and the dashboard's review
+restart mark the review parent's state `reviewOperatorRequested`. `pan review
+restart` sends its caller kind; run from an agent pane (the flywheel, stall
+recovery) it grants nothing. Every dispatch rewrites that flag, so an automatic
+re-review (the PAN-3836 redundant cycle, `pan done`'s request) runs without it
+and is still refused. A refused verdict posts nothing and delivers no rework.
+It is journaled as `review.verdict-refused` (with the reason, caller, run id
+and notes) and raised as a warning in the activity feed. The agent is told to
+record no verdict, post its findings as a plain PR comment for the operator,
+and exit.
+
 ## Agent Auto-Resume Gates
 
 Auto-resume is intentionally suppressible:
@@ -341,6 +384,52 @@ Auto-resume is intentionally suppressible:
   fields in `~/.overdeck/agents/<agent-id>/state.json` and stops the agent
   if it is running. `pan unpause <id>` clears the gate without spawning.
   `pan start <id>` refuses paused agents unless `--force` is passed.
+  **Issue pause (PAN-3911).** An operator pause (`pan pause`, the dashboard
+  Pause button) stamps `pausedBy: 'operator'`. An operator pause of the
+  issue's work agent `agent-<issue>` pauses the issue. Pausing a swarm slot
+  pauses only that slot. Machine pauses do not count: the memory governor's
+  shed, post-merge close-out, escalations and the Fly migration all leave
+  `pausedBy` unset, and neither does a scheduler yield. An operator pause
+  also clears the yield flags, so the scheduler cannot resume the agent.
+  `isOperatorPause` is the one test for "operator pause": `getIssuePause`
+  and the feedback ladder both read it, so a machine reason written over an
+  operator pause does not let feedback delivery lift it.
+  The issue pause:
+  - Stops the issue's running test agent and, only while a review is in
+    flight (the journal's last entry is `review.requested`,
+    `review.dispatched` or `review.redispatched`: no verdict yet), its review
+    convoy (lanes first, the synthesis parent last). Reviewers that already
+    posted their verdict stay warm at their prompt and are left alone, so
+    unpause never re-reviews a head that was already reviewed. "Running" is
+    `isAlive`'s answer. An
+    agent whose liveness is indeterminate is left alone and reported. On
+    Herdr, a second pass (`closeIssuePanes`) closes review/test panes that no
+    agent row lists. A close that fails is reported by `pan pause` (exit 1)
+    and in the dashboard response (`warnings`), never as a stop.
+  - Stops them with cause `'system'`. `'operator'` would set `stoppedByUser`
+    on each one, and `messageAgent` answers that gate by queueing mail that
+    nothing drains. The hold is the issue gate (`getIssuePause`) instead.
+    `messageAgent` reads it and queues, rather than resumes, a message to a
+    reviewer the pause stopped (listed in `pauseStoppedAgents`) while the
+    issue is paused. Other roles, other reviewers, and an issue whose pause
+    state cannot be read are not held.
+  - Records the stopped ids next to the pause (`pauseStoppedAgents`) and,
+    when reviewers were stopped, journals `review.halted`.
+  - `pan unpause` (and the dashboard Unpause) clears `stoppedByUser` on those
+    rows. It then re-requests the review through the guarded review request
+    (`requestReviewGuarded`, the logic of `POST /api/review/:id/request`:
+    merged check, approved-head check, re-request breaker; source
+    `pan-unpause`), before the work agent resumes. That dispatches a fresh
+    synthesis parent and convoy for the current head. A merged issue or an
+    approved head is reported as "no review re-requested", not as a request.
+    When only the test agent was stopped, unpause re-dispatches the test role
+    instead. A request that fails is printed with `pan review request <id>`
+    as the fix, and the dashboard shows it (and the pause `warnings`) in a
+    toast.
+  - A `review.halted` tail on an issue that is no longer paused is a review
+    owed. Stalled-review recovery re-requests it (see below), which covers an
+    unpause whose re-request failed, an unpause while the dashboard was down,
+    `pan start --force`, and dashboard Start with `clearGates`.
 - **Operator-stop gate:** `stoppedByUser` blocks autonomous re-drive when no
   completed handoff exists and emits one durable needs-you trip. Only an
   operator-initiated stop sets the flag (PAN-3324) — `pan kill`, `pan
@@ -450,8 +539,18 @@ observe and nudge — none reconciles a stored copy of anything:
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
 
-`recoverStalledReviews` reads the journal and nothing else — no GitHub call, no
-tracker call. It acts only when an issue's **last** entry is `review.dispatched`,
+`recoverStalledReviews` reads the journal and the issue pause gate
+(`getIssuePause`, see "Manual pause" above), with no GitHub call and no tracker
+call. It skips an issue that is paused, or whose pause state cannot be read,
+and logs the hold once. A `review.halted` last entry (the pause stopped the
+convoy) is never convoy recovery: the pause stopped the synthesis parent, so
+relaunching lanes against it would only strand them. While the issue is
+paused, or its pause state cannot be read, it holds. Once the pause is clear it
+re-requests a fresh review through the guarded review route
+(`POST /api/review/:id/request` over the internal token, source
+`deacon-lite`, since deacon-lite runs in the deacon child where the route
+module is not loaded), at most once per issue per hour. The route journals
+`review.requested` on success, which ends the halt. Otherwise it acts only when an issue's **last** entry is `review.dispatched`,
 `review.redispatched`, or `review.requested`, is at least 15 minutes old, and no
 pane whose id starts with `agent-<issue>-review-` is live. The last-entry rule is
 load-bearing: a `verification.failed` written *after* `review.requested` means
@@ -480,7 +579,9 @@ hold: no `review.verdict` is journaled for the run, the run has had fewer than
 three synthesis re-dispatches, the liveness oracle (`isAlive` +
 `isConfirmedDead`) confirms the parent `agent-<issue>-review` dead, and the
 cooldown above has passed. The cooldown starts before the relaunch, and an
-in-flight guard makes an overlapping patrol tick do nothing.
+in-flight guard makes an overlapping patrol tick do nothing. The issue pause
+hold comes first: a paused issue, or one whose pause cannot be read, never
+reaches lane or synthesis recovery (PAN-3911).
 
 Under the per-issue review lifecycle lock, the relaunch re-checks everything
 that can change under it and does nothing unless all of it still holds:

@@ -25,11 +25,13 @@ import {
   decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
+  getIssuePause,
   getAgentState,
   markAgentRunning,
   saveAgentStateSync,
   type AgentState,
   type MessageAgentRedriveOptions,
+  type ResumeGateDecision,
   type Role,
 } from './agent-state.js';
 import { getLatestSessionId } from './activity.js';
@@ -253,7 +255,18 @@ export async function messageAgent(
   // is a re-drive, not a casual message. Consult the intent policy so the
   // documented completed-handoff exception can clear stoppedByUser and deliver,
   // instead of silently mailing feedback to a queue nothing drains.
-  const decideMessageGate = () => {
+  const decideMessageGate = (): ResumeGateDecision => {
+    // PAN-3911: an issue pause stops the issue's in-flight review with no
+    // per-agent gate; the issue gate is the hold. A message must not resume a
+    // reviewer that pause stopped while the issue is still paused. Only that:
+    // other roles, reviewers the pause did not stop, and an issue whose pause
+    // cannot be read (`unknown`) all fall through to the per-agent gate.
+    if (agentState?.role === 'review' && agentState.issueId) {
+      const issuePause = getIssuePause(agentState.issueId);
+      if (issuePause.status === 'paused' && issuePause.stoppedAgents.includes(normalizedId)) {
+        return { decision: 'queue-message', reason: `issue ${agentState.issueId.toUpperCase()} is paused` };
+      }
+    }
     const block = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
     const agentDir = getAgentDir(normalizedId);
     const hasCompletedHandoff = existsSync(join(agentDir, 'completed'))
@@ -656,7 +669,8 @@ export async function messageAgent(
   // Codex's notify hook writes turn-completed at every idle boundary. Claiming
   // that marker makes the idle signal one-shot: the next message starts a turn,
   // and further messages queue until the hook reports the next completion.
-  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594).
+  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594);
+  // on Herdr the pane's agent_status answers as well (PAN-4186).
   const promptReady = await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);

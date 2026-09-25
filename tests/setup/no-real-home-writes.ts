@@ -3,10 +3,17 @@ import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
 
-const realOverdeckHome = resolve(homedir(), '.overdeck');
+// tests/setup/overdeck-home.ts points HOME at a temp dir and records the
+// real one here first, so the guard still knows which home to protect.
+const realHome = process.env.OVERDECK_TEST_REAL_HOME ?? homedir();
+const realOverdeckHome = resolve(realHome, '.overdeck');
 // Claude Code transcripts are irreplaceable conversation history (PAN-3915).
-const realClaudeProjects = resolve(homedir(), '.claude', 'projects');
+const realClaudeProjects = resolve(realHome, '.claude', 'projects');
 const blockedRealHomeRoots = [realOverdeckHome, realClaudeProjects];
+// Claude Code's own config: spawn paths pre-trust workspace dirs in it
+// (PAN-3905). The prefix also covers its temp file (`.claude.json.tmp-<pid>`)
+// and lock dir (`.claude.json.lock`), so a blocked write leaves no litter.
+const realClaudeJson = resolve(realHome, '.claude.json');
 const allowedRealHomeWrites = new Set<string>();
 
 function pathString(value: unknown): string | null {
@@ -21,6 +28,7 @@ function blockedRealHomeTarget(value: unknown): string | null {
   if (!rawPath) return null;
   const resolved = resolve(rawPath);
   if (allowedRealHomeWrites.has(resolved)) return null;
+  if (resolved === realClaudeJson || resolved.startsWith(`${realClaudeJson}.`)) return resolved;
   return blockedRealHomeRoots.some(root => resolved === root || resolved.startsWith(`${root}${sep}`))
     ? resolved
     : null;

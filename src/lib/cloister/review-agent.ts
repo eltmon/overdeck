@@ -33,7 +33,7 @@
  *                                     for one issue (merge-agent +
  *                                     dashboard cancel/abort routes)
  *   - killAllReviewSessions         — kill ALL review sessions on shutdown
- *                                     (pan down)
+ *                                     (pan down), on tmux and Herdr
  */
 
 import { exec } from 'child_process';
@@ -43,7 +43,7 @@ import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { killSession, listSessionNames } from '../tmux.js';
+import { listSessionNames } from '../tmux.js';
 import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
@@ -272,7 +272,7 @@ function buildSelfReviewPrompt(opts: {
   return prompt;
 }
 async function spawnReviewRoleForIssueBody(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode; operatorRequested?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const dispatchStartedAtMs = Date.now();
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
@@ -551,6 +551,9 @@ async function spawnReviewRoleForIssueBody(
             resumed.reviewRunId = runId;
             // PAN-2584: arm the parent's liveness deadline for this cycle.
             resumed.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+            // #3853: rewritten on every dispatch so a later automatic cycle
+            // never inherits an operator's request.
+            resumed.reviewOperatorRequested = opts.operatorRequested === true ? true : undefined;
             await Effect.runPromise(saveAgentState(resumed));
           }
         } catch { /* non-fatal */ }
@@ -601,6 +604,8 @@ async function spawnReviewRoleForIssueBody(
     run.reviewRunId = runId;
     // PAN-2584: arm the parent's liveness deadline for this cycle.
     run.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+    // #3853: the verdict guard lets an operator-requested run block an approved head.
+    run.reviewOperatorRequested = opts.operatorRequested === true ? true : undefined;
     try {
       await Effect.runPromise(saveAgentState(run));
     } catch (saveErr) {
@@ -632,26 +637,56 @@ async function spawnReviewRoleForIssueBody(
     // state row still said 'starting'). Only tear down what THIS dispatch
     // created: an older startedAt means a pre-existing session that must not
     // be killed here.
-    try {
-      const orphan = getAgentState(reviewSessionName);
-      const orphanStartedMs = orphan?.startedAt ? Date.parse(orphan.startedAt) : Number.NaN;
-      const createdByThisDispatch = orphan !== null && orphan !== undefined
-        && Number.isFinite(orphanStartedMs) && orphanStartedMs >= dispatchStartedAtMs - 5_000;
-      if (createdByThisDispatch) {
-        const sessions = await Effect.runPromise(listSessionNames()).catch(() => [] as string[]);
-        if (sessions.includes(reviewSessionName)) {
-          await Effect.runPromise(killSession(reviewSessionName)).catch(() => {});
-        }
-        orphan.status = 'error';
-        const { saveAgentState } = await import('../agents.js');
-        await Effect.runPromise(saveAgentState(orphan)).catch(() => {});
-      }
-    } catch { /* teardown is best-effort; the status write below still lands */ }
+    const teardownError = await teardownFailedReviewSpawn(reviewSessionName, dispatchStartedAtMs);
+    const spawnError = err instanceof Error ? err.message : String(err);
     return {
       success: false,
       message: 'Failed to spawn review role',
-      error: err instanceof Error ? err.message : String(err),
+      error: teardownError ? `${spawnError}; ${teardownError}` : spawnError,
     };
+  }
+}
+
+/**
+ * Tear down the reviewer a failed dispatch left behind (PAN-3674), through the
+ * host's terminal backend: `closeAgentPaneDetailed` closes the tmux session or
+ * the Herdr pane, then `stopAgent` writes the `stopped` row. The tmux-only kill
+ * this replaced found nothing on Herdr, so the half-started reviewer's pane
+ * stayed up behind a dead row.
+ *
+ * Only a reviewer THIS dispatch created is touched: an older `startedAt` is a
+ * pre-existing session that must not be killed here. A close that fails leaves
+ * the row alone (the reviewer may still be running) and comes back as the
+ * reason; every other outcome returns null. Never throws.
+ *
+ * @internal exported for tests.
+ */
+export async function teardownFailedReviewSpawn(
+  reviewSessionName: string,
+  dispatchStartedAtMs: number,
+): Promise<string | null> {
+  try {
+    const orphan = getAgentState(reviewSessionName);
+    const orphanStartedMs = orphan?.startedAt ? Date.parse(orphan.startedAt) : Number.NaN;
+    const createdByThisDispatch = orphan !== null && orphan !== undefined
+      && Number.isFinite(orphanStartedMs) && orphanStartedMs >= dispatchStartedAtMs - 5_000;
+    if (!createdByThisDispatch) return null;
+    const { closeAgentPaneDetailed } = await import('../terminal-backends/launch.js');
+    const result = await closeAgentPaneDetailed(reviewSessionName);
+    if (result.outcome === 'failed') {
+      const reason = `could not stop half-started reviewer ${reviewSessionName}: ${result.reason}`;
+      console.warn(`[review-agent] ${reason}`);
+      return reason;
+    }
+    const { stopAgent } = await import('../agents.js');
+    await Effect.runPromise(stopAgent(reviewSessionName)).catch((stopErr: unknown) => {
+      console.warn(`[review-agent] Could not write stopped state for ${reviewSessionName}: ${stopErr instanceof Error ? stopErr.message : String(stopErr)}`);
+    });
+    return null;
+  } catch (teardownErr) {
+    // Teardown is best-effort; the dispatch failure is still reported.
+    console.warn(`[review-agent] Failed-spawn teardown for ${reviewSessionName} errored: ${teardownErr instanceof Error ? teardownErr.message : String(teardownErr)}`);
+    return null;
   }
 }
 
@@ -727,48 +762,105 @@ export async function killAllReviewerSessions(
   return { killed, failed };
 }
 
+/** Canonical reviewer agent ids: the synthesis parent and its convoy lanes. */
+const REVIEW_AGENT_ID_PATTERN = /^agent-[a-z0-9-]+-review(?:-(?:security|correctness|performance|requirements))?$/i;
+
+/** Reviewer tmux session names, legacy ones included (they carry no agent row). */
+const REVIEW_SESSION_PATTERNS = [
+  REVIEW_AGENT_ID_PATTERN,
+  /^review-coordinator-/,
+  /^specialist-.+-review-/,
+  /^review-[A-Z0-9]+-\d+-\d+/, // legacy: review-PAN-999-1713456789000-correctness
+];
+
 /**
- * Kill every review session (any issue) during shutdown. Session-kill failures
- * are aggregated into `failed`; this never rejects.
+ * Herdr panes a shutdown sweep closes: an `agentId` that names a reviewer and a
+ * `review` role token. An untagged pane is left alone: nothing says it is a
+ * reviewer. Empty on tmux, where the session list already covers every pane.
+ */
+async function liveHerdrReviewerIds(): Promise<string[]> {
+  const { resolveLaunchBackend } = await import('../terminal-backends/launch.js');
+  const { isUnsupported } = await import('../terminal-backends/types.js');
+  const backend = await resolveLaunchBackend();
+  if (backend.name !== 'herdr') return [];
+  const result = await Effect.runPromise(backend.list());
+  if (isUnsupported(result)) return [];
+  return result.flatMap((pane) => {
+    const agentId = pane.agentId;
+    return agentId && pane.tokens.role === 'review' && REVIEW_AGENT_ID_PATTERN.test(agentId) ? [agentId] : [];
+  });
+}
+
+/**
+ * Kill every review session (any issue) during shutdown (`pan down`).
+ *
+ * Every close goes through the host's terminal backend
+ * (`closeAgentPaneDetailed`), so on Herdr the reviewer panes close too: the
+ * tmux-only sweep found no sessions there and closed nothing. Candidates, all
+ * of them reviewers and never a work agent or a `conv-*` pane:
+ *   - tmux sessions with a reviewer name (legacy names carry no row);
+ *   - `agent-<issue>-review[-<lane>]` rows that still claim `running` or
+ *     `starting` (a stopped row is not probed: a host keeps hundreds);
+ *   - on Herdr, live panes stamped with a reviewer `agentId` and role `review`.
+ * A candidate whose row names a role other than `review` is skipped. A
+ * reviewer whose close succeeded, or whose row claims it is live, gets a
+ * `stopped` row through `stopAgent`. A failed close lands in `failed` and its
+ * row is left alone. This never rejects.
  */
 export async function killAllReviewSessions(): Promise<{ killed: string[]; failed: string[] }> {
   const killed: string[] = [];
   const failed: string[] = [];
 
-  let allSessions: readonly string[];
-  try {
-    allSessions = await Effect.runPromise(listSessionNames());
-  } catch (err) {
+  const tmuxSessions = await Effect.runPromise(listSessionNames()).catch((err: unknown) => {
     console.warn('[review-agent] Failed to list tmux sessions during review cleanup:', err instanceof Error ? err.message : String(err));
+    return [] as readonly string[];
+  });
+  const herdrReviewers = await liveHerdrReviewerIds().catch((err: unknown) => {
+    console.warn('[review-agent] Failed to list Herdr panes during review cleanup:', err instanceof Error ? err.message : String(err));
+    return [] as string[];
+  });
+  const liveRows = listAgentIdsByPrefix('agent-').filter((id) => {
+    if (!REVIEW_AGENT_ID_PATTERN.test(id)) return false;
+    const status = getAgentState(id)?.status;
+    return status === 'running' || status === 'starting';
+  });
+
+  const candidates = [...new Set([
+    ...tmuxSessions.filter((s) => REVIEW_SESSION_PATTERNS.some((p) => p.test(s))),
+    ...herdrReviewers,
+    ...liveRows,
+  ])].filter((id) => {
+    if (id.toLowerCase().startsWith('conv-')) return false;
+    const role = getAgentState(id)?.role;
+    return role === undefined || role === 'review';
+  });
+  if (candidates.length === 0) {
     return { killed, failed };
   }
 
-  const reviewPatterns = [
-    /^agent-[a-z0-9-]+-review(?:-(?:security|correctness|performance|requirements))?$/i,
-    /^review-coordinator-/,
-    /^specialist-.+-review-/,
-    /^review-[A-Z0-9]+-\d+-\d+/, // legacy: review-PAN-999-1713456789000-correctness
-  ];
+  console.log(`[review-agent] Stopping ${candidates.length} review session(s) during shutdown`);
 
-  const sessionsToKill = allSessions.filter(s => reviewPatterns.some(p => p.test(s)));
-  if (sessionsToKill.length === 0) {
-    return { killed, failed };
+  const { closeAgentPaneDetailed } = await import('../terminal-backends/launch.js');
+  const { stopAgent } = await import('../agents.js');
+  // One reviewer at a time: each close is a handful of backend round trips.
+  for (const sessionName of candidates) {
+    const result = await closeAgentPaneDetailed(sessionName);
+    if (result.outcome === 'failed') {
+      console.warn(`[review-agent] Could not stop review session ${sessionName}: ${result.reason}`);
+      failed.push(sessionName);
+      continue;
+    }
+    if (result.outcome === 'closed') {
+      console.log(`[review-agent] Killed review session ${sessionName}`);
+      killed.push(sessionName);
+    }
+    const status = getAgentState(sessionName)?.status;
+    if (result.outcome === 'closed' || status === 'running' || status === 'starting') {
+      await Effect.runPromise(stopAgent(sessionName)).catch((err: unknown) => {
+        console.warn(`[review-agent] Could not write stopped state for ${sessionName}: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
   }
-
-  console.log(`[review-agent] Killing ${sessionsToKill.length} review session(s) during shutdown`);
-
-  await Promise.all(
-    sessionsToKill.map(async (sessionName) => {
-      try {
-        await Effect.runPromise(killSession(sessionName));
-        console.log(`[review-agent] Killed review session ${sessionName}`);
-        killed.push(sessionName);
-      } catch (err) {
-        console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
-        failed.push(sessionName);
-      }
-    }),
-  );
 
   return { killed, failed };
 }
@@ -784,7 +876,7 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
 const reviewDispatchCoalescer = createPromiseCoalescer<{ success: boolean; message: string; error?: string; gated?: boolean }>();
 
 export const spawnReviewRoleForIssue = (
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean; reviewMode?: ReviewMode; operatorRequested?: boolean },
 ): Effect.Effect<{ success: boolean; message: string; error?: string; gated?: boolean }> =>
   Effect.promise(() => {
     const key = opts.issueId.toUpperCase();

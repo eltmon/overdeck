@@ -1,6 +1,8 @@
 /**
  * PAN-3939: the review synthesis dispatch guard and `killAllReviewerSessions`
- * (`pan review abort`) ask the host's terminal backend, on tmux and on Herdr.
+ * (`pan review abort`) ask the host's terminal backend, on tmux and on Herdr;
+ * so do the `pan down` sweep (`killAllReviewSessions`) and the failed-spawn
+ * teardown (#4182).
  *
  * Before: the guard read `listSessionNames()` + `isPaneDead`, so on tmux a bare
  * shell left after the harness exited blocked every later dispatch, and on
@@ -13,7 +15,7 @@
  * `stopAgent` are the real code.
  */
 import { Effect } from 'effect';
-import { rmSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -120,11 +122,21 @@ import { saveAgentStateSync } from '../../agents.js';
 import { getAgentState } from '../../agents/agent-state-read.js';
 import { HerdrApiError } from '../../terminal-backends/herdr-api.js';
 import { getOverdeckHome } from '../../paths.js';
-import { killAllReviewerSessions, spawnReviewRoleForIssue } from '../review-agent.js';
+import {
+  killAllReviewerSessions,
+  killAllReviewSessions,
+  spawnReviewRoleForIssue,
+  teardownFailedReviewSpawn,
+} from '../review-agent.js';
 
 const ISSUE = 'PAN-3939';
 const PARENT = 'agent-pan-3939-review';
 const LANE = 'agent-pan-3939-review-security';
+/** Another issue's reviewer: the shutdown sweep covers every issue. */
+const OTHER = 'agent-pan-4182-review';
+const WORK = 'agent-pan-3939';
+const CONV = 'conv-20260924-0001';
+const ROW_IDS = [PARENT, LANE, OTHER, WORK];
 
 function saveRow(id: string, extra: Record<string, unknown> = {}): void {
   saveAgentStateSync({
@@ -167,7 +179,7 @@ const dispatch = () => Effect.runPromise(spawnReviewRoleForIssue({
 }));
 
 beforeEach(() => {
-  for (const id of [PARENT, LANE]) rmSync(join(getOverdeckHome(), 'agents', id), { recursive: true, force: true });
+  for (const id of ROW_IDS) rmSync(join(getOverdeckHome(), 'agents', id), { recursive: true, force: true });
   herdr.calls.length = 0;
   herdr.handler = () => ({});
   tmux.live.clear();
@@ -294,5 +306,182 @@ describe('killAllReviewerSessions closes through the terminal backend (PAN-3939)
 
     expect(result).toEqual({ killed: [], failed: [] });
     expect(getAgentState(LANE)?.status).toBe('stopped');
+  });
+});
+
+/**
+ * A Herdr session whose panes carry `agentId` and `role` tokens, as launched
+ * panes do. No Herdr agent record: each pane is residue. A closed pane leaves
+ * the snapshot, so `stopAgent`'s own close after the sweep's finds nothing.
+ */
+function herdrPanes(initial: { agentId: string; paneId: string; role?: string }[], opts: { closeFails?: string } = {}): void {
+  let panes = [...initial];
+  herdr.handler = (method, params) => {
+    if (method === 'pane.close' && params['pane_id'] !== opts.closeFails) {
+      panes = panes.filter((pane) => pane.paneId !== params['pane_id']);
+    }
+    if (method === 'agent.get') return new HerdrApiError({ method, code: 'agent_not_found', message: 'no such agent' });
+    if (method === 'session.snapshot') {
+      return {
+        snapshot: {
+          panes: panes.map(({ agentId, paneId, role }) => ({
+            pane_id: paneId, terminal_id: `t-${paneId}`, workspace_id: 'w1', tokens: { agentId, ...(role ? { role } : {}) },
+          })),
+        },
+      };
+    }
+    if (method === 'pane.process_info') return { process_info: { shell_pid: 10, foreground_processes: [{ pid: 10 }] } };
+    if (method === 'pane.close' && params['pane_id'] === opts.closeFails) {
+      return new HerdrApiError({ method, code: 'internal', message: 'close refused' });
+    }
+    return {};
+  };
+}
+
+function lookedUp(agentId: string): boolean {
+  return herdr.calls.some((call) => call.method === 'agent.get' && call.params['target'] === agentId);
+}
+
+describe('killAllReviewSessions (pan down) closes through the terminal backend (#4182)', () => {
+  // The sweep reads every row in this worker's test home; another file's
+  // leftover reviewer row must not leak into the exact assertions below.
+  beforeEach(() => {
+    const agentsDir = join(getOverdeckHome(), 'agents');
+    const ids = existsSync(agentsDir) ? readdirSync(agentsDir) : [];
+    for (const id of ids.filter((name) => name.includes('-review'))) {
+      rmSync(join(agentsDir, id), { recursive: true, force: true });
+    }
+  });
+
+  it('herdr: closes every issue\'s reviewer panes and writes stopped rows, never a work or conversation pane', async () => {
+    backendSelection.name = 'herdr';
+    herdrPanes([
+      { agentId: PARENT, paneId: 'w1:p2', role: 'review' },
+      { agentId: LANE, paneId: 'w1:p3', role: 'review' },
+      // Its row already says stopped: only the live inventory finds it.
+      { agentId: OTHER, paneId: 'w1:p4', role: 'review' },
+      { agentId: WORK, paneId: 'w1:p1', role: 'work' },
+      { agentId: CONV, paneId: 'w1:p9' },
+    ]);
+    saveRow(PARENT, { backend: 'herdr', paneId: 'w1:p2' });
+    saveRow(LANE, { backend: 'herdr', paneId: 'w1:p3', reviewSubRole: 'security' });
+    saveRow(OTHER, { backend: 'herdr', paneId: 'w1:p4', issueId: 'PAN-4182', status: 'stopped' });
+    saveRow(WORK, { backend: 'herdr', paneId: 'w1:p1', role: 'work' });
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed.sort()).toEqual([PARENT, LANE, OTHER].sort());
+    expect(result.failed).toEqual([]);
+    expect(paneCloses().sort()).toEqual(['w1:p2', 'w1:p3', 'w1:p4']);
+    expect(getAgentState(PARENT)?.status).toBe('stopped');
+    expect(getAgentState(LANE)?.status).toBe('stopped');
+    expect(getAgentState(WORK)?.status).toBe('running');
+  });
+
+  it('herdr: reports a failed close and leaves that reviewer\'s row alone', async () => {
+    backendSelection.name = 'herdr';
+    herdrPanes([
+      { agentId: PARENT, paneId: 'w1:p2', role: 'review' },
+      { agentId: LANE, paneId: 'w1:p3', role: 'review' },
+    ], { closeFails: 'w1:p3' });
+    saveRow(PARENT, { backend: 'herdr', paneId: 'w1:p2' });
+    saveRow(LANE, { backend: 'herdr', paneId: 'w1:p3', reviewSubRole: 'security' });
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toEqual([PARENT]);
+    expect(result.failed).toEqual([LANE]);
+    expect(getAgentState(PARENT)?.status).toBe('stopped');
+    expect(getAgentState(LANE)?.status).toBe('running');
+  });
+
+  it('herdr: a stopped reviewer row with no pane is not probed', async () => {
+    backendSelection.name = 'herdr';
+    herdrPanes([]);
+    saveRow(OTHER, { issueId: 'PAN-4182', status: 'stopped' });
+
+    const result = await killAllReviewSessions();
+
+    expect(result).toEqual({ killed: [], failed: [] });
+    expect(lookedUp(OTHER)).toBe(false);
+  });
+
+  it('tmux: kills reviewer sessions, legacy names included, and leaves work and conversation sessions', async () => {
+    backendSelection.name = 'tmux';
+    for (const name of [PARENT, LANE, 'review-coordinator-pan-4182-1234567890', WORK, CONV]) tmux.live.add(name);
+    saveRow(PARENT);
+    saveRow(LANE, { reviewSubRole: 'security' });
+    saveRow(WORK, { role: 'work' });
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed.sort()).toEqual([PARENT, LANE, 'review-coordinator-pan-4182-1234567890'].sort());
+    expect(result.failed).toEqual([]);
+    expect(tmux.killed).not.toContain(WORK);
+    expect(tmux.killed).not.toContain(CONV);
+    expect(getAgentState(PARENT)?.status).toBe('stopped');
+    expect(getAgentState(LANE)?.status).toBe('stopped');
+    expect(getAgentState(WORK)?.status).toBe('running');
+  });
+
+  it('tmux: a row that claims a reviewer is running is stopped even when no session is left', async () => {
+    backendSelection.name = 'tmux';
+    saveRow(OTHER, { issueId: 'PAN-4182' });
+
+    const result = await killAllReviewSessions();
+
+    expect(result).toEqual({ killed: [], failed: [] });
+    expect(getAgentState(OTHER)?.status).toBe('stopped');
+  });
+});
+
+describe('failed review spawn teardown closes through the terminal backend (#4182)', () => {
+  const dispatchStartedAtMs = Date.parse('2026-09-24T00:00:00.000Z');
+
+  it('herdr: closes the half-started reviewer\'s pane and writes a stopped row', async () => {
+    backendSelection.name = 'herdr';
+    herdrPanes([{ agentId: PARENT, paneId: 'w1:p2', role: 'review' }]);
+    saveRow(PARENT, { backend: 'herdr', paneId: 'w1:p2', status: 'starting' });
+
+    const failure = await teardownFailedReviewSpawn(PARENT, dispatchStartedAtMs);
+
+    expect(failure).toBeNull();
+    expect(paneCloses()).toEqual(['w1:p2']);
+    expect(getAgentState(PARENT)?.status).toBe('stopped');
+  });
+
+  it('herdr: a failed close is reported and the row left alone', async () => {
+    backendSelection.name = 'herdr';
+    herdrPanes([{ agentId: PARENT, paneId: 'w1:p2', role: 'review' }], { closeFails: 'w1:p2' });
+    saveRow(PARENT, { backend: 'herdr', paneId: 'w1:p2', status: 'starting' });
+
+    const failure = await teardownFailedReviewSpawn(PARENT, dispatchStartedAtMs);
+
+    expect(failure).toContain(PARENT);
+    expect(getAgentState(PARENT)?.status).toBe('starting');
+  });
+
+  it('tmux: kills the half-started reviewer\'s session and writes a stopped row', async () => {
+    backendSelection.name = 'tmux';
+    tmux.live.add(PARENT);
+    saveRow(PARENT, { status: 'starting' });
+
+    const failure = await teardownFailedReviewSpawn(PARENT, dispatchStartedAtMs);
+
+    expect(failure).toBeNull();
+    expect(tmux.killed).toEqual([PARENT]);
+    expect(getAgentState(PARENT)?.status).toBe('stopped');
+  });
+
+  it('tmux: a reviewer an earlier dispatch started is not touched', async () => {
+    backendSelection.name = 'tmux';
+    tmux.live.add(PARENT);
+    saveRow(PARENT, { startedAt: '2026-09-23T00:00:00.000Z' });
+
+    const failure = await teardownFailedReviewSpawn(PARENT, dispatchStartedAtMs);
+
+    expect(failure).toBeNull();
+    expect(tmux.killed).toEqual([]);
+    expect(getAgentState(PARENT)?.status).toBe('running');
   });
 });

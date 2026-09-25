@@ -45,4 +45,26 @@ describe('dashboard health identity', () => {
       deploymentCoherent: true,
     });
   });
+
+  it('reports the boot gates this process resolved, even when incoherent (PAN-3899)', async () => {
+    const bootGates = {
+      deacon: { enabled: false, source: 'flag' as const },
+      resume: { enabled: false, source: 'flag' as const },
+    };
+    const healthy = await buildDashboardHealthResponse({
+      processStartedAtMs: 1_000,
+      serverPath: '/deploy/generation-b/dist/dashboard/server.js',
+      statEntrypoint: async () => ({ mtimeMs: 999 }),
+      bootGates,
+    });
+    const incoherent = await buildDashboardHealthResponse({
+      processStartedAtMs: 1_000,
+      serverPath: '/deploy/generation-b/dist/dashboard/server.js',
+      statEntrypoint: async () => ({ mtimeMs: 1_001 }),
+      bootGates,
+    });
+
+    expect(healthy.body.bootGates).toEqual(bootGates);
+    expect(incoherent.body.bootGates).toEqual(bootGates);
+  });
 });

@@ -43,6 +43,26 @@ async function moveConversation(name: string, projectKey: string): Promise<{ pro
   return data as { projectKey: string | null };
 }
 
+// PAN-3822: explicit PR links. `ref` is a PR/MR URL, #42, or owner/repo#42.
+async function linkConversationPullRequest(name: string, ref: string): Promise<{ repository: string; number: number }> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/pull-requests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Failed to link pull request');
+  return data as { repository: string; number: number };
+}
+
+async function unlinkConversationPullRequest(name: string, ref: string): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/pull-requests?ref=${encodeURIComponent(ref)}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Failed to unlink pull request');
+}
+
 type ApiForkMode = 'summary' | 'plain' | 'handoff';
 type ForkModeOption = ApiForkMode | 'fast-summary';
 type HandoffAuthor = 'source' | 'external';
@@ -82,6 +102,8 @@ export interface ConversationMutations {
   isRetitlePending: (name: string) => boolean;
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
   move: (opts: { name: string; projectKey: string; projectName: string }) => void;
+  linkPullRequest: (opts: { name: string; ref: string }) => void;
+  unlinkPullRequest: (opts: { name: string; ref: string }) => void;
   openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => void;
   submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse', projectKey?: string) => void;
   forkTarget: Conversation | null;
@@ -208,6 +230,27 @@ export function useConversationMutations(
     },
   });
 
+  const invalidatePullRequests = (name: string) => {
+    void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    void queryClient.invalidateQueries({ queryKey: ['conversation-pull-requests', name] });
+  };
+  const linkPullRequestMutation = useMutation({
+    mutationFn: (vars: { name: string; ref: string }) => linkConversationPullRequest(vars.name, vars.ref),
+    onSuccess: (link, vars) => {
+      invalidatePullRequests(vars.name);
+      toast.success(`Linked ${link.repository}#${link.number}`, { duration: 4000 });
+    },
+    onError: (err: Error) => { toast.error(err.message, { duration: 6000 }); },
+  });
+  const unlinkPullRequestMutation = useMutation({
+    mutationFn: (vars: { name: string; ref: string }) => unlinkConversationPullRequest(vars.name, vars.ref),
+    onSuccess: (_data, vars) => {
+      invalidatePullRequests(vars.name);
+      toast.success('Pull request unlinked', { duration: 4000 });
+    },
+    onError: (err: Error) => { toast.error(err.message, { duration: 6000 }); },
+  });
+
   const summaryForkMutation = useMutation({
     mutationFn: summaryForkConversation,
     onSuccess: (_data, variables) => {
@@ -272,6 +315,8 @@ export function useConversationMutations(
       favoriteMutation.mutate(opts);
     },
     move: (opts) => moveMutation.mutate(opts),
+    linkPullRequest: (opts) => linkPullRequestMutation.mutate(opts),
+    unlinkPullRequest: (opts) => unlinkPullRequestMutation.mutate(opts),
     openForkModal,
     submitFork,
     forkTarget,

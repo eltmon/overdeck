@@ -19,9 +19,11 @@ const mocks = vi.hoisted(() => ({
   recoverMissingConvoyReviewers: vi.fn(),
   getRequestReviewStarter: vi.fn(),
   notifyPipeline: vi.fn(),
+  getIssuePause: vi.fn(),
   isAlive: vi.fn(),
   redispatchReviewSynthesis: vi.fn(),
   emitActivityEntry: vi.fn(),
+  requestReviewThroughRoute: vi.fn(),
 }));
 
 vi.mock('../../terminal-backends/inventory.js', () => ({ liveAgentInventory: mocks.liveAgentInventory }));
@@ -29,6 +31,11 @@ vi.mock('../../workspaces/resolver.js', () => ({ listWorkspaces: mocks.listWorks
 vi.mock('../review-convoy.js', () => ({ recoverMissingConvoyReviewers: mocks.recoverMissingConvoyReviewers }));
 vi.mock('../request-review-pipeline.js', () => ({ getRequestReviewStarter: mocks.getRequestReviewStarter }));
 vi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: mocks.notifyPipeline }));
+vi.mock('../review-request-route.js', () => ({ requestReviewThroughRoute: mocks.requestReviewThroughRoute }));
+vi.mock('../../agents/agent-state.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agents/agent-state.js')>()),
+  getIssuePause: mocks.getIssuePause,
+}));
 vi.mock('../../agents/liveness.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../agents/liveness.js')>()),
   isAlive: mocks.isAlive,
@@ -68,10 +75,12 @@ beforeEach(() => {
   mocks.recoverMissingConvoyReviewers.mockResolvedValue({
     success: true, message: 'Convoy recovery for PAN-3705 (deacon-lite): launched 4/4 missing reviewer(s)', launched: 4,
   });
+  mocks.getIssuePause.mockReturnValue({ status: 'unpaused' });
   mocks.isAlive.mockResolvedValue({ alive: true, paneAlive: true });
   mocks.redispatchReviewSynthesis.mockResolvedValue({
     success: true, message: 'Synthesis recovery for PAN-3705 (deacon-lite): resumed agent-pan-3705-review for run r1',
   });
+  mocks.requestReviewThroughRoute.mockResolvedValue({ requested: true });
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -278,6 +287,57 @@ describe('recoverStalledReviews', () => {
     expect(readPipelineJournal(workspace).at(-1)?.data).toMatchObject({ via: 'request-review' });
   });
 
+  it('does not re-dispatch a paused issue, and logs the pause once (PAN-3911)', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    mocks.getIssuePause.mockReturnValue({
+      status: 'paused', agentId: 'agent-pan-3705', pausedAt: '2026-09-19T11:00:00.000Z', pausedReason: 'cut token spend',
+    });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(await recoverStalledReviews(NOW + 2 * MINUTE)).toEqual([]);
+
+    expect(mocks.getIssuePause).toHaveBeenCalledWith('PAN-3705');
+    expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+    expect(mocks.getRequestReviewStarter).not.toHaveBeenCalled();
+    expect(readPipelineJournal(workspace).at(-1)?.type).toBe('review.dispatched');
+    const pauseLines = log.mock.calls.filter(([line]) => String(line).includes('PAN-3705 is paused'));
+    expect(pauseLines).toHaveLength(1);
+    expect(String(pauseLines[0]?.[0])).toContain('cut token spend');
+  });
+
+  it('holds an issue whose pause state cannot be read, and logs it once (PAN-3911)', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    mocks.getIssuePause.mockReturnValue({ status: 'unknown', agentId: 'agent-pan-3705', reason: 'state.json is unparsable' });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(await recoverStalledReviews(NOW + MINUTE)).toEqual([]);
+
+    expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+    expect(log.mock.calls.filter(([line]) => String(line).includes('unreadable pause state'))).toHaveLength(1);
+  });
+
+  it('re-requests a review the issue pause halted once the issue is unpaused, never convoy recovery (PAN-3911)', async () => {
+    // The pause stopped the synthesis parent; convoy recovery would relaunch
+    // lanes that report to it. A fresh request through the guarded route instead.
+    journal([{ type: 'review.dispatched', minutesAgo: 60 }, { type: 'review.halted', minutesAgo: 30 }]);
+
+    expect(await recoverStalledReviews(NOW)).toEqual(['recoverStalledReviews: re-requested the halted PAN-3705 review']);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-3705', expect.objectContaining({ source: 'deacon-lite' }));
+    expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+    expect(mocks.getRequestReviewStarter).not.toHaveBeenCalled();
+  });
+
+  it('holds a halted review while the issue is paused or its pause is unreadable (PAN-3911)', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 60 }, { type: 'review.halted', minutesAgo: 30 }]);
+    mocks.getIssuePause.mockReturnValue({ status: 'paused', agentId: 'agent-pan-3705', stoppedAgents: [] });
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    mocks.getIssuePause.mockReturnValue({ status: 'unknown', agentId: 'agent-pan-3705', reason: 'EACCES' });
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
+  });
+
   it('does nothing when the backend inventory cannot be read', async () => {
     journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
     mocks.liveAgentInventory.mockResolvedValue(null);
@@ -433,6 +493,21 @@ describe('recoverStalledReviews — synthesis recovery', () => {
     expect(await recoverStalledReviews(NOW)).toEqual([]);
     expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
     expect(mocks.redispatchReviewSynthesis).not.toHaveBeenCalled();
+  });
+
+  it('holds a paused issue above synthesis recovery: a dead parent with every lane reported is not re-synthesized (PAN-3911)', async () => {
+    journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
+    allLanesReported();
+    mocks.getIssuePause.mockReturnValue({
+      status: 'paused', agentId: 'agent-pan-3705', pausedAt: '2026-09-19T11:00:00.000Z',
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+    expect(mocks.isAlive).not.toHaveBeenCalled();
+    expect(mocks.redispatchReviewSynthesis).not.toHaveBeenCalled();
+    expect(readPipelineJournal(workspace).at(-1)?.type).toBe('review.dispatched');
   });
 
   it('does not warn a second time about a hold the redispatch already logged', async () => {

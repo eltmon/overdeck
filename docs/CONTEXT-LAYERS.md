@@ -112,6 +112,53 @@ injecting it again. This transport does not create or edit `AGENTS.md`,
   matches the installed package;
 - folds bundled engineering rules into harness-specific launch artifacts.
 
+## Bare conversations (no Overdeck context)
+
+The Command Deck header has a **No context** checkbox under the `+`
+new-conversation button (PAN-4185). The choice is stored on the conversation
+row (`conversations.bare_context`), so resume, restart and fork launch it bare
+again. A bare conversation skips every layer that adds Overdeck text to the
+model's context:
+
+| Layer | Normal conversation | Bare |
+| --- | --- | --- |
+| Launch bundle: machine + bundled rules + project + workspace layers (`claudeSystemPromptFiles` → `--append-system-prompt-file`; Codex `developer_instructions`; Pi system context; Kimi launcher context) | composed and delivered | not composed; no compose or receipt step in the launcher |
+| Session briefing (`~/.overdeck/session-context.md`) | part of the bundle | skipped |
+| ACP `--context-file`, Muse developer-prompt file, Kimi first-message context envelope | delivered | skipped |
+| `session-start-hook`: memory briefing from `/api/memory/session/start`, post-compaction note | injected as `additionalContext` | hook stops after its observing half |
+| `user-prompt-submit-hook`: `/api/memory/inject` (`overdeck-memory-context`, `overdeck-briefing-update`) | printed into every prompt | skipped |
+| `tldr-read-enforcer`: file summaries in place of large reads | active | native reads |
+| Resume contract (`CONVERSATION RESUME: …`) and Kimi resume context | typed on resume | not sent |
+
+The launcher exports `OVERDECK_BARE_CONTEXT=1`; the injecting hooks check it and
+exit early, so the hooks need no per-conversation config. What still runs: the
+harness, model, effort, cwd and permission flags; the channels bridge (message
+delivery); and the observing hooks: activity/liveness events, the session
+index and `ready.json` in `session-start-hook`, title capture and activity
+events in `user-prompt-submit-hook`, `pre-tool-hook`, `heartbeat-hook`,
+`stop-hook`, `notification-hook`, `permission-event-hook`, the compaction
+hooks, and `ask-user-question-hook` (its deny message is what lets the
+dashboard surface AskUserQuestion). The guard hooks (`auto-approve-hook`,
+`gh-issue-trailer-hook`, `tmux-send-keys-guard`) also stay on.
+
+Two consequences to know. A managed Codex session runs in a private
+`CODEX_HOME`, so Overdeck normally re-delivers the user's `~/.codex/AGENTS.md`
+inside the launch bundle; a bare Codex conversation drops the bundle and with it
+that file (Codex project `AGENTS.md` discovery still works). The resume bar's
+**Send resume message** checkbox has no effect on a bare conversation, which
+never gets a resume message. A bare session also skips the memory
+session-start call, so it is not registered for memory observation until the
+memory-reconciliation sweep picks up its transcript.
+
+**Native memory.** Claude Code still loads its own `CLAUDE.md` files and auto
+memory in a bare conversation; those are not Overdeck layers. The separate
+**Skip CLAUDE.md** checkbox (Claude Code only, stored as
+`conversations.skip_claude_md`) sets the documented
+`CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` and `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`
+([env vars](https://code.claude.com/docs/en/env-vars)). Overdeck does not use
+`claude --bare` or `--safe-mode`: both skip the settings hooks, which would drop
+the observing hooks and the ready signal. `--bare` also refuses OAuth login.
+
 ## Respecting your existing context
 
 Native instruction files are a strict no-touch boundary. Overdeck may let a

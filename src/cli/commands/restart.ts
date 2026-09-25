@@ -38,7 +38,14 @@ import {
   RESTART_GATE_CLAIMED_ENV,
 } from '../../lib/restart-gate-client.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
-import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
+import {
+  applyBootGateEnv,
+  formatBootGateState,
+  resolveBootGates,
+  writeBootGateEnv,
+  type BootGateOptions,
+  type BootGateState,
+} from '../../lib/boot-gates.js';
 import { readActiveDashboardBundle, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 
@@ -242,6 +249,13 @@ export function scrubAgentIdentityFromDashboardEnv(env: NodeJS.ProcessEnv): void
 export type SystemctlRunner = (args: readonly string[]) => string;
 
 export interface DashboardSpawnOptions extends BootGateOptions {
+  /**
+   * An already-resolved gate state, stamped into the spawn env verbatim so the
+   * invoking shell's gate env cannot change it. `pan reload` passes one: Deacon
+   * forced on, resume carried from the server it replaces (PAN-3899). Explicit
+   * `deacon`/`resume` options still apply on top.
+   */
+  readonly bootGates?: BootGateState;
   readonly serverPath?: string;
   readonly repoRoot?: string;
   readonly runSystemctl?: SystemctlRunner;
@@ -255,7 +269,9 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardS
       reason: `Dashboard bundle not found. Run \`npm run build\`. Searched: ${searchedBundlePaths().join(', ')}`,
     });
   }
-  const env = applyBootGateEnv({ ...process.env }, opts);
+  const baseEnv = { ...process.env };
+  if (opts?.bootGates) writeBootGateEnv(baseEnv, opts.bootGates);
+  const env = applyBootGateEnv(baseEnv, opts);
   scrubAgentIdentityFromDashboardEnv(env);
   const traefikEnv = config.traefikEnabled
     ? {

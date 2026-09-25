@@ -1,4 +1,5 @@
 import type { RuntimeName } from '../../lib/runtimes/types.js';
+import type { AgentRole } from '@overdeck/contracts';
 
 /**
  * Drive a conversation fork/handoff through the dashboard server.
@@ -32,6 +33,8 @@ export interface ForkViaServerOptions {
   title?: string;
   focus?: string;
   issueId?: string;
+  /** Pane role for the new conversation (PAN-3921); the server defaults to `conversation`. */
+  role?: AgentRole;
   projectKey?: string;
   handoffAuthor?: 'source' | 'external';
   handoffAuthorModel?: string;
@@ -91,6 +94,7 @@ export async function forkConversationViaServer(
   if (opts.title) body['title'] = opts.title;
   if (opts.focus) body['focus'] = opts.focus;
   if (opts.issueId) body['issueId'] = opts.issueId;
+  if (opts.role) body['role'] = opts.role;
   if (opts.projectKey) body['projectKey'] = opts.projectKey;
   if (opts.handoffAuthor) body['handoffAuthor'] = opts.handoffAuthor;
   if (opts.handoffAuthorModel) body['handoffAuthorModel'] = opts.handoffAuthorModel;

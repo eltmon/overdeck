@@ -89,7 +89,7 @@ describe('TUI readiness on a Herdr host', () => {
     await expect(waitForPromptReady('agent-pan-3960-codex', 'codex', 5)).resolves.toBe(true);
 
     expect(mocks.probeHerdrAgentLiveness).toHaveBeenCalledWith('agent-pan-3960-codex');
-    expect(mocks.readHerdrPaneText).toHaveBeenCalledWith('w1:p3', 80);
+    expect(mocks.readHerdrPaneText).toHaveBeenCalledWith('w1:p3', 80, 'visible'); // the TUI draws on the alternate screen (PAN-3921)
     expect(mocks.tmuxSessionExists).not.toHaveBeenCalled();
     expect(mocks.tmuxCapturePane).not.toHaveBeenCalled();
   });

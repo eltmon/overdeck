@@ -74,7 +74,8 @@ verify that the PID and listener are gone, then rerun `pan restart`. Do not use 
 broad `pkill` pattern: it can terminate the supervisor, agents, or unrelated Node
 processes. A fresh `EADDRINUSE` line fails restart immediately and names the same
 owner, while a health timeout leaves the newly spawned process running for
-inspection.
+inspection. A spawned process that already exited is reported as exited, not
+left running.
 
 ## Important Notes
 

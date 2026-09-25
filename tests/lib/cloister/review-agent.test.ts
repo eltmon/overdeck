@@ -100,8 +100,11 @@ const {
 vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
   agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
   // PAN-3939: reviewer kills close through the terminal backend. By default the
-  // close stands in for the tmux kill the assertions below count (see beforeEach).
+  // close stands in for the tmux kill the assertions below count (see beforeEach);
+  // like the real close, it never throws: a kill that fails is a `failed` outcome.
   closeAgentPaneDetailed: (agentId: string) => mockCloseAgentPaneDetailed(agentId),
+  // The shutdown sweep lists Herdr panes only on Herdr; these tests run on tmux.
+  resolveLaunchBackend: async () => ({ name: 'tmux' }),
 }));
 
 // PAN-3939: the synthesis dispatch guard asks the liveness oracle (mocked below
@@ -250,8 +253,12 @@ beforeEach(() => {
   mockClearFeedbackFiles.mockResolvedValue(undefined);
   mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
   mockCloseAgentPaneDetailed.mockImplementation(async (agentId: string) => {
-    await mockKillSessionAsync(agentId);
-    return { outcome: 'closed' };
+    try {
+      await mockKillSessionAsync(agentId);
+      return { outcome: 'closed' };
+    } catch (err) {
+      return { outcome: 'failed', reason: err instanceof Error ? err.message : String(err) };
+    }
   });
   mockIsAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
   mockRemoveAgentStateDir.mockResolvedValue({ removedFiles: 0, preservedTranscripts: 0, removedDir: true });
@@ -610,6 +617,45 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     const next = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
     expect(next).toEqual({ success: true, message: 'Self-review spawned: agent-pan-1982-review' });
     expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+  });
+
+  // #3853: the verdict guard lets an operator-requested run block an approved
+  // head. The request rides the parent's state and every dispatch rewrites it,
+  // so an automatic cycle never inherits it.
+  it('records an operator request on a fresh parent and clears it on the next plain dispatch', async () => {
+    await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, operatorRequested: true }));
+    const saved = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .filter((state) => state.id === 'agent-pan-1982-review');
+    expect(saved.at(-1)).toMatchObject({ reviewOperatorRequested: true });
+
+    mockSaveAgentStateAsync.mockClear();
+    await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+    const next = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .filter((state) => state.id === 'agent-pan-1982-review');
+    expect(next.length).toBeGreaterThan(0);
+    expect(next.at(-1)?.reviewOperatorRequested).toBeUndefined();
+  });
+
+  it('rewrites the operator request on a resumed parent', async () => {
+    const saved = { id: 'agent-pan-1982-review', status: 'running', reviewOperatorRequested: true } as Record<string, unknown>;
+    mockGetAgentState.mockImplementation((id: string) => (id === 'agent-pan-1982-review' ? saved : null));
+    mockGetLatestSessionIdSync.mockReturnValue('session-1');
+    mockResumeAgent.mockResolvedValue({ success: true });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(result.message).toContain('Review resumed');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    const resumedSave = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .find((state) => state.id === 'agent-pan-1982-review');
+    expect(resumedSave).toBeDefined();
+    expect(resumedSave!.reviewOperatorRequested).toBeUndefined();
+
+    mockSaveAgentStateAsync.mockClear();
+    await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, operatorRequested: true }));
+    const operatorSave = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .find((state) => state.id === 'agent-pan-1982-review');
+    expect(operatorSave).toMatchObject({ reviewOperatorRequested: true });
   });
 
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {

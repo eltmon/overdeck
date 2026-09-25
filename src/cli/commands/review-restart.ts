@@ -15,6 +15,7 @@ import chalk from 'chalk';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveBareNumericId } from '../../lib/issue-id.js';
+import { verdictCallerFromEnv } from '../../lib/cloister/verdict-caller.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 
@@ -93,7 +94,10 @@ export async function reviewRestartCommand(
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: opts.model }),
+      // #3853: the route grants operator standing to this run unless the
+      // caller says it is an agent session (the flywheel and the stall
+      // sweeper's recovery both run this command).
+      body: JSON.stringify({ model: opts.model, callerKind: verdictCallerFromEnv().kind }),
     });
 
     const result = parseReviewRestartResponse(await response.text(), response.ok);

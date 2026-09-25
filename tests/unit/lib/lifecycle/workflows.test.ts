@@ -1508,6 +1508,19 @@ describe('workflows', () => {
       expect(branchStep!.success).toBe(true);
     });
 
+    it('tears down the Docker stack by name when the workspace directory is already gone (PAN-3900)', async () => {
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await deepWipe(ctx);
+
+      const dockerStep = result.steps.find(s => s.step === 'teardown:docker');
+      expect(dockerStep).toBeDefined();
+      const commands = mockExecAsync.mock.calls.map(([first, second]) =>
+        Array.isArray(second) ? [first, ...second].join(' ') : String(first),
+      );
+      expect(commands).toContain('docker compose -p "overdeck-feature-pan-100" down -v --remove-orphans');
+      expect(commands).toContain('docker network rm "overdeck-feature-pan-100_devnet"');
+    });
+
     it('should skip branch deletion when deleteBranches is false', async () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await deepWipe(ctx, { deleteBranches: false });

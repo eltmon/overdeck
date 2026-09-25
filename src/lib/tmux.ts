@@ -293,7 +293,7 @@ export function sanitizeManagedServerGlobalEnv(cleanEnv: NodeJS.ProcessEnv): voi
     }
   }
   // Strip test-only pollution that must never reach a real session.
-  for (const key of ['OVERDECK_FRONTEND_DIR', 'OVERDECK_TEST_HOME_ROOT', 'OVERDECK_TEST_POLL_MS']) {
+  for (const key of ['OVERDECK_FRONTEND_DIR', 'OVERDECK_TEST_HOME_ROOT', 'OVERDECK_TEST_REAL_HOME', 'OVERDECK_TEST_POLL_MS']) {
     try {
       execFileSync('tmux', ['-L', sock, 'set-environment', '-g', '-u', key], { stdio: 'ignore' });
     } catch {

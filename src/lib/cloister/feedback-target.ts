@@ -2,6 +2,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 
+import { isOperatorPause } from '../agents/agent-state-read.js';
 import { readFeedbackAgentStates } from '../agents/agent-state-source.js';
 import { getReadableWorkspacePanPaths } from '../pan-dir/continue.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -205,14 +206,21 @@ async function startAgentForFeedback(
 /** Resurrection refused because the agent holds a pause the caller must keep. */
 const PAUSE_KEPT = 'pause-kept' as const;
 
-type PausedFacts = { paused?: boolean; pausedReason?: string; yieldedByScheduler?: boolean };
+type PausedFacts = { paused?: boolean; pausedBy?: 'operator'; pausedReason?: string; yieldedByScheduler?: boolean };
 
-/** How the ladder treats an agent's current pause: nothing to lift, liftable, or held. */
+/**
+ * How the ladder treats an agent's current pause: nothing to lift, liftable, or
+ * held. An operator pause (`isOperatorPause`, the same test `getIssuePause`
+ * uses) is held whatever reason a later machine pause wrote over it. A pause
+ * with no pipeline marker and no operator stamp (a memory shed, a migration, a
+ * pause from before PAN-3911) is held too.
+ */
 function classifyPause(
   state: PausedFacts,
   keepPause: ((pausedReason: string) => boolean) | undefined,
 ): 'none' | 'pipeline' | 'operator' | 'kept' {
   if (state.paused !== true) return 'none';
+  if (isOperatorPause(state)) return 'operator';
   const reason = state.pausedReason ?? '';
   const pipelinePause = reason.startsWith('needs-you:')
     || reason.startsWith('[governor-slot]')

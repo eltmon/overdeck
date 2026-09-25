@@ -17,6 +17,9 @@ import { randomUUID } from 'node:crypto';
 import { Context, Effect, Schema, Stream } from 'effect';
 
 import type { RuntimeName } from '../runtimes/types.js';
+import type {
+  ConversationPullRequests, PullRequestKey, PullRequestLink, PullRequestLinkedConversation, PullRequestLinkSource,
+} from '@overdeck/contracts';
 import { getOverdeckDatabase } from './infra.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
@@ -135,6 +138,10 @@ export class ConversationsResolver extends Context.Service<ConversationsResolver
   readonly list:          (f: ConversationFilter)  => Effect.Effect<ReadonlyArray<Conversation>>;
   readonly getCurrent:    ()                        => Effect.Effect<Conversation, ConversationNotFound>;
   readonly getHandoffDoc: (name: ConversationName)  => Effect.Effect<string, ConversationNotFound>;
+  /** PAN-3822: every PR link on a conversation (dismissed included) + the effective one. */
+  readonly listPullRequests:   (name: ConversationName) => Effect.Effect<ConversationPullRequests, ConversationNotFound>;
+  /** PAN-3822 reverse index: the conversations with a live link to a PR. */
+  readonly linkedToPullRequest: (key: PullRequestKey) => Effect.Effect<ReadonlyArray<PullRequestLinkedConversation>>;
 }>()('overdeck/ConversationsResolver') {}
 
 // ── TranscriptsResolver — shared read door (JSONL index + sacred file reads) ──
@@ -181,6 +188,10 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
   readonly setHarness: (name: ConversationName, harness: Harness) => Effect.Effect<Conversation, ConversationNotFound>;
   /** Explicit project assignment override (PAN-1577); pass null to clear it back to cwd-derived grouping. */
   readonly setProjectKey: (name: ConversationName, projectKey: string | null) => Effect.Effect<Conversation, ConversationNotFound>;
+  /** PAN-3822: explicit PR link (upsert) and unlink (tombstone via dismissed_at). */
+  readonly linkPullRequest:   (name: ConversationName, ref: PullRequestKey & { url: string }, source: Exclude<PullRequestLinkSource, 'branch'>) =>
+    Effect.Effect<PullRequestLink, ConversationNotFound>;
+  readonly unlinkPullRequest: (name: ConversationName, key: PullRequestKey) => Effect.Effect<{ unlinked: boolean }, ConversationNotFound>;
   readonly handoff:     (source: ConversationName, target: ConversationName, docPath: string) =>
     Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>;
   readonly clear:       (source: ConversationName) =>
@@ -251,6 +262,10 @@ export interface LegacyConversation {
   workspaceId: string | null;
   /** Explicit project assignment override. Null = fall back to deriving the project from cwd. */
   projectKey: string | null;
+  /** PAN-4185: launch without any Overdeck-injected context (launch bundle, briefing, memory hooks, resume contract). */
+  bareContext: boolean;
+  /** PAN-4185: Claude Code skips native CLAUDE.md and auto-memory loading (CLAUDE_CODE_DISABLE_CLAUDE_MDS). */
+  skipClaudeMd: boolean;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -340,6 +355,8 @@ interface LegacyConversationRow {
   spawn_error: string | null;
   workspace_id: string | null;
   project_key: string | null;
+  bare_context: number | null;
+  skip_claude_md: number | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -375,6 +392,8 @@ const LEGACY_CONVERSATION_SELECT = `
     c.spawn_error,
     c.workspace_id,
     c.project_key,
+    c.bare_context,
+    c.skip_claude_md,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -387,7 +406,7 @@ const LEGACY_CONVERSATION_SELECT = `
 
 const AGENT_CONVERSATION_PREFIXES = ['agent-', 'planning-', 'specialist-'];
 
-function isAgentConversationName(name: string): boolean {
+export function isAgentConversationName(name: string): boolean {
   return AGENT_CONVERSATION_PREFIXES.some((p) => name.startsWith(p));
 }
 
@@ -488,6 +507,8 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     forkRetryCount: row.fork_retry_count ?? 0,
     workspaceId: row.workspace_id ?? null,
     projectKey: row.project_key ?? null,
+    bareContext: row.bare_context === 1,
+    skipClaudeMd: row.skip_claude_md === 1,
   };
 }
 
@@ -788,6 +809,10 @@ export function createConversation(opts: {
   workspaceId?: string | null;
   /** Explicit registered-project association; never inferred from cwd at write time. */
   projectKey?: string | null;
+  /** PAN-4185: see LegacyConversation.bareContext. */
+  bareContext?: boolean;
+  /** PAN-4185: see LegacyConversation.skipClaudeMd. */
+  skipClaudeMd?: boolean;
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
@@ -802,8 +827,9 @@ export function createConversation(opts: {
     db.prepare(`
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
-         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?)
+         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key,
+         bare_context, skip_claude_md)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -821,6 +847,8 @@ export function createConversation(opts: {
       null,  // spawn_error starts null
       workspaceId,
       opts.projectKey ?? null,
+      opts.bareContext ? 1 : 0,
+      opts.skipClaudeMd ? 1 : 0,
     );
     if (opts.claudeSessionId) {
       db.prepare(`
