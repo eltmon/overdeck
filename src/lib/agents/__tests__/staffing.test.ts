@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IMPLICIT_TIER_NAME, resolveImplicitStaffing, resolveStaffing } from '../staffing.js';
 import { resolveModel } from '../../config-yaml/roles.js';
+import { mergeConfigs } from '../../config-yaml.js';
 import type { XBriefItem } from '../../xbrief/types.js';
 
 const WORK_ROLES = { work: { model: 'claude-sonnet-5' } } as never;
@@ -180,5 +181,30 @@ describe('distribution tiers (PAN-2391 / PAN-2397 W2)', () => {
       spawnKey: 'work:PAN-1',
     });
     expect(staffing.model).toBe('claude-haiku-4-5');
+  });
+});
+
+// PAN-4191 acceptance: a tier pointed at `workhorse:mid` follows the slot, so
+// changing workhorses.mid changes the model a medium-difficulty plan staffs.
+describe('tiers backed by workhorse refs (PAN-4191)', () => {
+  it('changing workhorses.mid re-points a medium-difficulty work agent', () => {
+    const load = (mid: string) => mergeConfigs({
+      workhorses: { mid, expensive: 'claude-opus-5-5' },
+      tiered_execution: {
+        enabled: true,
+        tiers: {
+          trivial: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'] },
+          'simple-medium': { model: 'workhorse:mid', harness: 'claude-code', difficulties: ['simple', 'medium'] },
+          complex: { model: 'workhorse:expensive', harness: 'claude-code', difficulties: ['complex', 'expert'] },
+        },
+        supervisor: { model: 'workhorse:expensive', harness: 'claude-code', subscribe: 'flagged' },
+        replay_threshold: 0.5,
+      },
+    }).config;
+
+    const medium = item('task', { difficulty: 'medium' });
+    expect(resolveStaffing(medium, { config: load('claude-sonnet-5') })).toMatchObject({ tierName: 'simple-medium', model: 'claude-sonnet-5', implicit: false });
+    expect(resolveStaffing(medium, { config: load('claude-opus-5-5') })).toMatchObject({ tierName: 'simple-medium', model: 'claude-opus-5-5', implicit: false });
+    expect(resolveStaffing(item('hard', { difficulty: 'complex' }), { config: load('claude-sonnet-5') }).model).toBe('claude-opus-5-5');
   });
 });
