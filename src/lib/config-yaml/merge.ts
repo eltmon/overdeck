@@ -7,6 +7,7 @@ import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { isTerminalBackendName } from '@overdeck/contracts';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
+import { normalizeOllamaConfig } from './ollama.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
   cloneDocsConfig,
@@ -161,6 +162,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     terminal: {
       ...DEFAULT_CONFIG.terminal,
     },
+    ollama: { ...DEFAULT_CONFIG.ollama },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
@@ -452,6 +454,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         warnInvalidTerminalBackend(config.terminal.backend);
       }
     }
+
+    // Merge the local Ollama endpoint (PAN-1641 D6). Each layer folds onto the value so
+    // far, field by field; the loop walks layers in reverse precedence order, so the
+    // highest-precedence layer lands last. Unlike terminal.backend, a bad value throws:
+    // a non-localhost base_url would ship every local-agent prompt off the machine.
+    result.ollama = normalizeOllamaConfig(config.ollama, result.ollama);
 
     // Merge conversation configuration
     if (config.conversations?.compaction_model) {
