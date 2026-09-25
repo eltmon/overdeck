@@ -42,6 +42,10 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
 
 - Shipped by Anthropic; Overdeck installs no special integration — drop in
   `claude` and run.
+- **Local models through Ollama.** Ollama 0.14 and newer serves the Anthropic
+  Messages API, so Claude Code drives a GPU model on your own machine the same
+  way it drives a cloud one. Model ids are `ollama:<tag>`, the run costs nothing,
+  and nothing leaves the host. See [Local models (Ollama)](/configuration/local-models).
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
 - The model picker includes Claude Opus 5.5 (`claude-opus-5-5`): 1M context,

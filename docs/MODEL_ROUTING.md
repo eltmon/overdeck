@@ -34,7 +34,7 @@ When Overdeck needs to make an LLM call, it resolves the model through this chai
 
 ## Available Providers
 
-Overdeck supports seven LLM providers:
+Overdeck supports eight model providers — seven cloud, plus a local one:
 
 | Provider | Auth Method | Notes |
 |----------|-------------|-------|
@@ -45,6 +45,7 @@ Overdeck supports seven LLM providers:
 | **MiniMax** | API key | M2.7, M2.7 Highspeed |
 | **Z.AI** | API key | GLM 5.1 |
 | **OpenRouter** | API key (optional provider) | 200+ models including Qwen, DeepSeek, Llama |
+| **Ollama (local)** | None — a local server, no key | Any pulled tag, addressed as `ollama:<tag>`; claude-code harness only |
 
 ### Provider Configuration
 
@@ -55,6 +56,24 @@ To configure a provider:
 2. Toggle the provider on
 3. Enter the API key (or use Codex/Claude Code subscription login)
 4. Optionally click **Test 2+3** to verify the key works with a simple prompt test
+
+## Ollama (local models)
+
+A model id beginning `ollama:` routes to the local Ollama server instead of any
+cloud provider, and that prefix check runs **first** in both
+`getProviderForModel` (`src/lib/providers.ts`) and `getModelProvider`
+(`src/lib/model-fallback.ts`) — before the `/` catch-all that would otherwise
+read an `ollama:hf.co/user/model:Q4` tag as an OpenRouter id.
+
+`apiLaunchModelId` (`src/lib/model-context-windows.ts`) strips the prefix, so
+every `--model` flag reaches the server as the bare tag through the one
+launch-arg door. `canUseHarness` (`src/lib/harness-policy.ts`) pins these ids to
+the `claude-code` harness: Ollama serves the Anthropic Messages API, which no
+other harness speaks. The launch env is built by a live preflight in
+`src/lib/agents/ollama-launch-env.ts` rather than from a provider API key, and
+local runs carry no pricing row, so they record `$0`.
+
+See [Local models (Ollama)](../configuration/local-models.mdx) for setup.
 
 ## OpenRouter
 

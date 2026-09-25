@@ -101,6 +101,7 @@
               "configuration/telemetry",
               "configuration/knowledge",
               "configuration/harnesses",
+              "configuration/local-models",
               "configuration/terminal-backend",
               "configuration/context-layers",
               "configuration/appearance",
