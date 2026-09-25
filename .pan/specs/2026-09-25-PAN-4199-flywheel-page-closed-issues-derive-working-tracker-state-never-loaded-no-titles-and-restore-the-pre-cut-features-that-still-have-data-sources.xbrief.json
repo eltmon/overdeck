@@ -4,17 +4,17 @@
     "created": "2026-09-25T05:57:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4199: Flywheel page: closed issues derive 'working' (tracker state never loaded), no titles, and restore the pre-Cut features that still have data sources",
-    "updated": "2026-09-25T06:00:23.118Z"
+    "updated": "2026-09-25T06:43:19.618Z"
   },
   "plan": {
     "id": "pan-4199",
     "title": "Flywheel page: closed issues derive 'working' (tracker state never loaded), no titles, and restore the pre-Cut features that still have data sources",
-    "status": "proposed",
+    "status": "running",
     "uid": "5072c37d-7b94-474d-8c7f-4d717cc18c6b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-25T05:57:04Z",
-    "updated": "2026-09-25T06:00:23.118Z",
+    "updated": "2026-09-25T06:43:19.618Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4199",
