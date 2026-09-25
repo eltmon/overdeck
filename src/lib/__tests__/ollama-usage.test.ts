@@ -10,7 +10,7 @@ describe('configuredOllamaModels', () => {
 
   it('collects ollama: ids from workhorses, role models, autonomous models, and sub-roles', () => {
     const { config } = mergeConfigs({
-      workhorses: { expensive: 'ollama:gemma4:12b' },
+      workhorses: { mid: 'ollama:gemma4:12b' },
       roles: {
         work: { model: 'ollama:qwen3:14b' },
         plan: { model: 'claude-opus-5', autonomousModel: 'ollama:gemma4:12b' },
@@ -23,6 +23,12 @@ describe('configuredOllamaModels', () => {
       'ollama:gemma4:12b',
       'ollama:qwen3:14b',
     ]);
+  });
+
+  it('finds a local model named only by a workhorse slot', () => {
+    const { config } = mergeConfigs({ workhorses: { mid: 'ollama:gemma4:12b' } });
+
+    expect(configuredOllamaModels(config)).toEqual(['ollama:gemma4:12b']);
   });
 
   it('reads each entry of a role model distribution', () => {
