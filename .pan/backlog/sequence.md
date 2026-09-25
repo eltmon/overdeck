@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:12:43.412742Z · model: claude-opus-5-5 · open: 801_
+_Last sequenced: 2026-09-25T05:20:35.757751Z · model: claude-opus-5-5 · open: 802_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -296,6 +296,7 @@ _Last sequenced: 2026-09-25T05:12:43.412742Z · model: claude-opus-5-5 · open: 
 | 346 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
 | 347 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
 | 348 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 349 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
 | 350 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
 | 351 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
 | 352 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
@@ -1116,10 +1117,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:12:43.412742Z",
+  "generatedAt": "2026-09-25T05:20:35.757751Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 801,
+  "openCount": 802,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11019,6 +11020,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "dependsOn": [],
       "why": "Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content.",
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4195",
+      "rank": 349,
+      "size": "M",
+      "importance": "medium",
+      "score": 63,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms",
+      "rationale": "New issue (2026-09-25). Agents and hooks invoke pan constantly, so a 0.5 s, 230 MB floor per call adds latency to every agent turn and memory pressure on the host. The fix (lazy action imports, bundle/compile-cache tuning, a startup regression check) is well scoped with a measurable target, so condition is ok; placed in a free slot among score-63 medium work.",
       "gate": "auto",
       "planning": "auto"
     }
