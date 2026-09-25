@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T04:33:15.260Z · model: claude-opus-5-5 · open: 801_
+_Last sequenced: 2026-09-25T04:39:18.243429Z · model: claude-opus-5-5 · open: 801_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -131,6 +131,7 @@ _Last sequenced: 2026-09-25T04:33:15.260Z · model: claude-opus-5-5 · open: 801
 | 164 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
 | 165 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
 | 166 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 167 | PAN-4191 | S | high | ok |  |  | Tier table pins literal models, so work agents ignore roles.work/workhorse:mid; tiers can't take workhorse: refs; opus-5 pin stale |
 | 168 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
@@ -181,7 +182,6 @@ _Last sequenced: 2026-09-25T04:33:15.260Z · model: claude-opus-5-5 · open: 801
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -1116,7 +1116,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T04:33:15.260Z",
+  "generatedAt": "2026-09-25T04:39:18.243429Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 801,
@@ -2165,6 +2165,19 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "planning": "auto"
     },
     {
+      "issue": "PAN-4184",
+      "rank": 118,
+      "size": "S",
+      "importance": "high",
+      "score": 81,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "--no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked",
+      "rationale": "New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified (\"very likely\"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2511",
       "rank": 119,
       "size": "XS",
@@ -2726,6 +2739,19 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "condition": "ok",
       "dependsOn": [],
       "why": "Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4191",
+      "rank": 167,
+      "size": "S",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Tier table pins literal models, so work agents ignore roles.work/workhorse:mid; tiers can't take workhorse: refs; opus-5 pin stale",
+      "rationale": "New issue: the operator re-pointed workhorses.mid expecting work agents to follow, but the enabled tier table silently overrode it with pinned literals (all work agents ran claude-sonnet-5, and complex runs a stale claude-opus-5). That is a model-routing correctness and cost problem with a verified reproduction and two concrete fix options, so it ranks with the other high-importance config and spawn defects rather than with routine feature work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3352,18 +3378,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "rationale": "Demoted from rank 64 (critical/92) because the closure of its blocker PAN-2828 and of PAN-3898 falsified most of the premise. Defect 1 — the verification gate demanding a vBRIEF checklist strikes never have — is fixed: src/dashboard/server/routes/workspaces/merge-strike.ts:36 sets skipPlanChecklist: true for request.kind === 'strike', and verification-runner.ts:775 honours it, so the incomplete-plan-items gate no longer fires for a strike. Defect 3 — the landing loop leaving strike_landing_state: 'recovering' after a transient fetch failure — describes deacon-strike-landing.ts, which the PAN-3917 cut deleted; no stored strike landing state remains to retry. Only defect 2 may survive: feedback delivery can still strand on feedback_delivery_needs_you (src/lib/cloister/review-verdict-feedback.ts:276) when the target agent has exited, although the strike carve-out removes the failure that used to trigger it. Held above the obsolete tail rather than sent to it, because that residual needs a rescope against the current code rather than a close.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-3527",
-      "rank": 229,
-      "size": "XS",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it.",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-3510",
@@ -11007,19 +11021,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4184",
-      "rank": 118,
-      "size": "S",
-      "importance": "high",
-      "score": 81,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "--no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked",
-      "rationale": "New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified (\"very likely\"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12030,6 +12031,13 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4191",
+      "to": "PAN-1852",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
