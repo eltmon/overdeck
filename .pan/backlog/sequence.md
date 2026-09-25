@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:53:05.015799Z · model: claude-opus-5-5 · open: 805_
+_Last sequenced: 2026-09-25T05:54:28.915224Z · model: claude-opus-5-5 · open: 806_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -245,6 +245,7 @@ _Last sequenced: 2026-09-25T05:53:05.015799Z · model: claude-opus-5-5 · open: 
 | 289 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 292 | PAN-4201 | M | medium | ok |  |  | Command Deck issue rows show a useless 'Allocated' chip and duplicate chips; show derived state, resources once, clearer hierarchy. |
 | 293 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 294 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
@@ -1120,10 +1121,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:53:05.015799Z",
+  "generatedAt": "2026-09-25T05:54:28.915224Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 805,
+  "openCount": 806,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11077,6 +11078,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "rationale": "New dependency-triage issue, already in the pipeline, so it takes a free slot by merit. It ranks high because it clears the only critical advisory in bun audit plus the high-severity AppImage advisory on an artifact we ship. The change is small, but the notarize 3 ESM-only hook and the desktop packaging invariants (ABI-143 rebuild, hardlink-free tarball) need a real packaging build to verify.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4201",
+      "rank": 292,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Command Deck issue rows show a useless 'Allocated' chip and duplicate chips; show derived state, resources once, clearer hierarchy.",
+      "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks medium, just below its sibling dashboard items PAN-4197 through PAN-4200, because it is visual polish on a working view rather than a correctness bug; the only data change is reading the derived issue state instead of a constant chip. It must reuse the shared semantic tokens that PAN-4197 is redefining, so it is advisory-linked to that issue to avoid forking a second palette.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12108,6 +12122,13 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4197",
+      "to": "PAN-4201",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
