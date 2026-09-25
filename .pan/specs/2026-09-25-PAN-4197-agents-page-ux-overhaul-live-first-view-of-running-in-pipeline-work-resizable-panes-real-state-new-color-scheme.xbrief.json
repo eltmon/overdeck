@@ -1,0 +1,751 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-25T05:55:13Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4197: Agents page UX overhaul: live-first view of running/in-pipeline work, resizable panes, real state, new color scheme",
+    "updated": "2026-09-25T06:39:56.596Z"
+  },
+  "plan": {
+    "id": "pan-4197",
+    "title": "Agents page UX overhaul: live-first view of running/in-pipeline work, resizable panes, real state, new color scheme",
+    "status": "running",
+    "uid": "ef695da8-f519-43d9-9507-a687e58d7b1a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 3,
+    "created": "2026-09-25T05:55:13Z",
+    "updated": "2026-09-25T06:39:56.596Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4197",
+        "label": "PAN-4197",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4197.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "agents-page",
+      "ux",
+      "design-tokens",
+      "agent-directory"
+    ],
+    "metadata": {
+      "sizeJustification": "One page's UX overhaul that the operator asked to run as a single pipeline pass with a mockup-first design and an Opus critic loop: the state tokens, the live-scope API, the live view and the History panes are judged together as one page in light and dark, so splitting them into sibling issues would split that critic loop. The surface is 26 files (2 of them deletions of the orphaned AgentCard primitive and its test); the subsystem count exceeds 6 only because the style guide (design/, sync-sources/), the user doc (reference/), the developer doc (docs/) and the e2e spec (tests/e2e) each count as their own subsystem.",
+      "canonicalFilename": "2026-09-25-PAN-4197-agents-page-ux-overhaul-live-first-view-of-running-in-pipeline-work-resizable-panes-real-state-new-color-scheme.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "/agents opens a Directory that mixes finished and live rows behind an unexplained 24h/7d window, with fixed-width panes. Its Grid view keeps every non-dead strike and labels it STRIKE RUNNING by role alone (FleetAgentsView isFleetAgent + verbBadgeForAgent), so 119 finished strikes render as running while the header says 1 active; Table and Timeline are stubs. The light-gray palette carries no state signal. The operator cannot see at a glance what is running and progressing, what is stuck or needs them, and what waits in the pipeline.",
+      "Proposal": "Replace the default /agents content with a Live view fed by a new GET /api/agent-directory?scope=live (derived on read from the pane inventory, state.json pause gates and derived issue state; never stored status). A pure client model classifies each entry into Needs you / Live / Waiting with one worded reason (14-row precedence), enriched in real time with the current tool, last output line and time since output. Rows preview in a resizable, collapsible pane and Open navigates to the live pane or conversation. The Directory stays as the History view behind one link, gaining resizable panes and an explained window. Five system-wide --state-* color tokens (blue live, amber needs-you, red stuck, neutral waiting, emerald done) with a contrast test give the page its color scheme in light and dark. Grid, Table, Timeline and the AgentCard primitive are deleted. Full detail: .pan/drafts/PAN-4197.md.",
+      "NonGoals": "- Changing global neutral tokens (--background, --card, --border, ...) or repainting any page other than /agents\n- Migrating VerbBadge or other surfaces to the --state-* tokens\n- Showing issue trees, plans, PR detail or history browsing inside the Live view\n- Showing planned/backlog issues, or issues in derived 'working' state whose agent is not running\n- Moving /agents out of the experimental-features gate\n- Adding any stored agent status, a new persisted table, or a per-agent governor API\n- Changing liveness semantics in src/lib/agents/liveness.ts, services/backend-inventory.ts or deriveServedAgentStatuses\n- Committing the .tmp/ mockup or screenshots\n- Keeping the Grid, Table or Timeline views behind any flag"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The Live view is built on GET /api/agent-directory with a new scope=live, not a new model or endpoint",
+        "rationale": "The directory already derives entry state from the pane inventory on every read and joins agents, conversations, workers, subagents and remote agents; reusing it (and DirectoryDetail for the preview) satisfies 'state from liveness and derived facts' with the least new code."
+      },
+      {
+        "summary": "Delete the Grid, Table and Timeline views and the AgentCard primitive instead of fixing them",
+        "rationale": "The Grid is the graveyard bug and duplicates Command Deck; Table and Timeline are 'Coming soon' stubs; the operator scoped the page to live and waiting only."
+      },
+      {
+        "summary": "The existing Directory becomes the single 'History' link (/agents?view=history, ?view=directory kept as an alias)",
+        "rationale": "The operator allowed 'at most one small link out to the existing history views'; the Directory is that view."
+      },
+      {
+        "summary": "'ready' (approved, green PR) is classified Needs you",
+        "rationale": "The server-side shipping role prepares merges 'for human merge', so a ready PR waits on the operator."
+      },
+      {
+        "summary": "CI failed is Waiting with the red tone; scheduler/machine pauses are Waiting ('held by Overdeck'); operator pauses are Needs you",
+        "rationale": "Style guide: red = broken, amber = a human must act; CI failures route to the work agent and machine holds clear themselves, only an operator pause needs the operator."
+      },
+      {
+        "summary": "A single click previews the agent's live transcript beside the list; Open/Enter/double-click navigates to its live pane or conversation",
+        "rationale": "Matches the Agent Deck live-preview pattern the operator cited while keeping the list in view; the preview is the agent's live conversation."
+      },
+      {
+        "summary": "Color scheme = five --state-* tokens in :root/.dark with fixed hex values (PRD D8), contrast-tested >= 4.5:1; global neutrals unchanged",
+        "rationale": "The issue asks for clear state colors, contrast and dark mode system-wide 'where they apply'; changing global neutrals would repaint every page, outside this issue."
+      },
+      {
+        "summary": "Mockup goes to the repo-root gitignored .tmp/ and is not committed; it is an implementation checkpoint at the start of live-view, not its own item",
+        "rationale": "The issue explicitly says mockups go in gitignored .tmp/; an uncommitted artifact cannot carry an Item: trailer commit."
+      },
+      {
+        "summary": "Model choice (Opus 5.5 work agent and critic) is recorded in continue.json for whoever starts the work, not enforced by the plan",
+        "rationale": "The planner does not spawn the work agent; model selection happens at pan start / the flywheel."
+      }
+    ],
+    "items": [
+      {
+        "id": "state-tokens",
+        "title": "Add system-wide agent state color tokens with a contrast test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:55:13Z",
+        "metadata": {
+          "issueLabel": "pan-4197",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "design",
+          "requiresInspection": true,
+          "foundationFor": [
+            "live-view"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/components/Agents/directory/DirectoryStateBadge.tsx",
+            "src/dashboard/frontend/src/__tests__/state-tokens-contrast.test.ts",
+            "design/style-guide/STYLE-GUIDE.md",
+            "sync-sources/dev-skills/pan-style-guide/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/__tests__/state-tokens-contrast.test.ts src/dashboard/frontend/src/components/Agents/directory/DirectoryDetail.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "state-tokens-contrast.test.ts passes with one assertion per foreground token per surface",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-14",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4197.md). In src/dashboard/frontend/src/index.css add the ten --state-{live,needs-you,stuck,waiting,done}[-foreground] tokens to :root (light values) and .dark (dark values) exactly as the PRD D8 table gives them, right after --signal-cost-foreground in each block. In the '@layer utilities' badge block add .badge-bg-state-<s> (8% color-mix), .badge-border-state-<s> (32%), .text-state-<s> (color: var(--state-<s>-foreground)) and .bg-state-<s> (background: var(--state-<s>)) for all five states. Re-point DirectoryStateBadge TONE: working->state-live, blocked->state-needs-you, stuck and api-error->state-stuck, done->state-done, idle->state-waiting; stopped/remote/no-status unchanged. Add src/dashboard/frontend/src/__tests__/state-tokens-contrast.test.ts that parses index.css (:root, first .dark, [data-theme=\"broadsheet\"], .dark [data-theme=\"broadsheet\"] blocks; hex and hsl() values) and asserts every --state-*-foreground has WCAG contrast >= 4.5 against the NFR-1 surfaces and that --state-live/-foreground hue is outside 90-170 degrees. Document the state tokens (token, meaning, always/never, running is never green) in design/style-guide/STYLE-GUIDE.md and sync-sources/dev-skills/pan-style-guide/SKILL.md (never .claude/skills)."
+        },
+        "items": [
+          {
+            "id": "state-tokens.ac1",
+            "title": "Given index.css, when state-tokens-contrast.test.ts runs, then it passes and reports each --state-*-foreground at >= 4.5:1 against Ledger and Broadsheet background and card surfaces in light and dark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-tokens.ac2",
+            "title": "Given a --state-*-foreground value edited to #cccccc in :root, when the contrast test runs, then it fails naming that token (verified locally, then reverted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-tokens.ac3",
+            "title": "Given a working directory entry, when DirectoryStateBadge renders it, then the badge element carries the badge-bg-state-live and text-state-live classes and no badge-bg-info class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-tokens.ac4",
+            "title": "Given STYLE-GUIDE.md and the pan-style-guide SKILL.md, when read, then each lists the five --state-* tokens with their meaning and states that live is blue and never green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-pause-facts",
+        "title": "Expose the state.json pause gate on native directory entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:55:13Z",
+        "metadata": {
+          "issueLabel": "pan-4197",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "packages/contracts/src/agent-directory.ts",
+            "src/dashboard/server/services/agent-directory.ts",
+            "src/dashboard/server/services/__tests__/agent-directory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-directory.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-directory.test.ts passes including the four new pause cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In packages/contracts/src/agent-directory.ts add DirectoryPauseBy = Literals(['operator','scheduler','machine']) and DirectoryPause = Struct({ by, reason: NullOr(String), since: NullOr(String) }) and an optional `pause` field on DirectoryEntry. In src/dashboard/server/services/agent-directory.ts add exported pauseFacts(state: AgentState): DirectoryPause | undefined (undefined unless paused === true; by = 'operator' when isOperatorPause(state) from src/lib/agents/agent-state-read.ts, 'scheduler' when yieldedByScheduler === true, else 'machine'; reason = pausedReason ?? null; since = pausedAt ?? yieldedAt ?? null) and spread it into native agent entries in step 1 only. Extend src/dashboard/server/services/__tests__/agent-directory.test.ts."
+        },
+        "items": [
+          {
+            "id": "directory-pause-facts.ac1",
+            "title": "Given a state.json with paused: true, pausedBy: 'operator', pausedReason: 'x', pausedAt: T, when buildAgentDirectory runs, then that entry returns pause { by: 'operator', reason: 'x', since: T }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-pause-facts.ac2",
+            "title": "Given a state.json with paused: true and yieldedByScheduler: true, when the directory builds, then the entry returns pause.by 'scheduler'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-pause-facts.ac3",
+            "title": "Given a state.json with paused: true and no pausedBy or yield flag, when the directory builds, then the entry returns pause.by 'machine'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-pause-facts.ac4",
+            "title": "Given an unpaused agent, a conversation and a subagent, when the directory builds, then none of their entries has a pause key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-live-scope",
+        "title": "Serve GET /api/agent-directory?scope=live with the live keep rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:55:13Z",
+        "metadata": {
+          "issueLabel": "pan-4197",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": true,
+          "foundationFor": [
+            "live-view"
+          ],
+          "files_scope": [
+            "packages/contracts/src/agent-directory.ts",
+            "src/dashboard/server/services/agent-directory.ts",
+            "src/dashboard/server/services/__tests__/agent-directory.test.ts",
+            "src/dashboard/server/routes/agent-directory.ts",
+            "src/dashboard/server/routes/__tests__/agent-directory-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-directory.test.ts src/dashboard/server/routes/__tests__/agent-directory-route.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass including the live-scope cases",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Contracts: DirectoryScope = Literals(['window','live']) and optional `scope` on AgentDirectoryResponse. Service: add derivedIssueStates dep (default: getSharedIssueService().listDerivedStates() via dynamic import, keyed by uppercase issueId, empty map on error); extract steps 1-6 of buildAgentDirectory into buildDirectoryEntries(now, deps) leaving window output unchanged apart from scope: 'window'; add LIVE_PIPELINE_ISSUE_STATES = {in-review, changes-requested, ready} and buildLiveAgentDirectory(deps) applying PRD FR-2 rules 1-3 (live state; pause gate on an issue not merged/closed or with no issue; newest-by-startedAt-then-id work/strike agent of an issue in a pipeline state), the same ancestor re-add and sort, returning { generatedAt, windowHours: 0, scope: 'live', entries }; memoize it 3 s in its own cache as getLiveAgentDirectory and reset it in _resetAgentDirectoryForTests. Route src/dashboard/server/routes/agent-directory.ts: scope absent -> unchanged; 'live' -> getLiveAgentDirectory(); other -> 400 { error: 'scope must be \"live\" when given' }. Update both header comments. Tests in the service and route test files per PRD WI-3 step 4."
+        },
+        "items": [
+          {
+            "id": "directory-live-scope.ac1",
+            "title": "Given a stopped strike agent whose issue derives as merged, when GET /api/agent-directory?scope=live is called, then the response excludes that entry and returns scope 'live'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-live-scope.ac2",
+            "title": "Given two stopped work agents of an issue deriving as in-review, when the live scope builds, then only the one with the newest startedAt is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-live-scope.ac3",
+            "title": "Given a paused native agent whose issue derives as working and another whose issue derives as closed, when the live scope builds, then the first is returned and the second is excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-live-scope.ac4",
+            "title": "Given a done subagent and a working subagent under a live parent, when the live scope builds, then only the working subagent is returned together with its parent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-live-scope.ac5",
+            "title": "Given ?scope=bogus, when the route is called, then it responds 400; given no scope, then it returns the window answer with scope 'window' and otherwise unchanged entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-model",
+        "title": "Classify live-scope entries into Needs you, Live and Waiting with one reason each",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:55:13Z",
+        "metadata": {
+          "issueLabel": "pan-4197",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "live-view",
+            "agents-shell"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/live/live-model.ts",
+            "src/dashboard/frontend/src/components/Agents/live/live-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Agents/live/live-model.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "live-model.test.ts passes with a case for each of the 14 precedence rows",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Create src/dashboard/frontend/src/components/Agents/live/live-model.ts (pure; no React, no store import) exporting the types and functions listed in the PRD (LiveSection, LiveTone, LiveReasonKind, LiveReason, LiveFacts, LiveRow, LiveSections, LIVE_QUIET_AFTER_MS = 5 min, classifyEntry, buildLiveSections, activityLabel, lastOutputLine). classifyEntry applies the 14-row precedence table in the PRD exactly (first match wins; 'issue agent' = kind agent + issueId + role work|strike). buildLiveSections nests kind==='subagent' entries under the row whose entry.id equals parentId (dropping orphans) and sorts needsYou ascending by since (missing last), live and waiting descending, ties by id. lastOutputLine returns the last non-empty ANSI-stripped line truncated to 160 chars with an ellipsis. Tests in live-model.test.ts per PRD WI-4."
+        },
+        "items": [
+          {
+            "id": "live-model.ac1",
+            "title": "Given one fixture per row of the PRD precedence table, when classifyEntry runs, then each returns the kind, section, tone and label that row names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-model.ac2",
+            "title": "Given a blocked entry that also has an operator pause, and a working entry that also has a scheduler pause, when classified, then they return question-waiting in needs-you and working in live respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-model.ac3",
+            "title": "Given a subagent whose parent is in the entries and one whose parent is not, when buildLiveSections runs, then the first appears in its parent row's children and the second is dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-model.ac4",
+            "title": "Given needs-you rows since 10:00 and 09:00 and live rows active at 10:00 and 11:00, when buildLiveSections runs, then needsYou orders 09:00 first and live orders 11:00 first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-model.ac5",
+            "title": "Given output lines ending in an ANSI-colored line and two blank lines, when lastOutputLine runs, then it returns that line without escape codes, truncated to 160 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-view",
+        "title": "Build the resizable Live view with activity rows and a collapsible preview",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:55:13Z",
+        "metadata": {
+          "issueLabel": "pan-4197",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.tsx",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentRow.tsx",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.test.tsx",
+            "src/dashboard/frontend/src/components/Agents/directory/useAgentDirectory.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.test.tsx src/dashboard/frontend/src/components/Agents/directory/useAgentDirectory.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "LiveAgentsView.test.tsx and useAgentDirectory.test.tsx pass",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-9",
+            "FR-10",
+            "FR-15",
+            "NFR-2",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. FIRST (implementation checkpoint D12): build the clickable standalone mockup at /home/eltmon/Projects/overdeck/.tmp/pan-4197-agents-live-mockup.html with the real tokens (copied @font-face, :root/.dark and Broadsheet blocks, self-hosted fonts), showing all three sections, preview pane, light and dark; screenshot it via Playwright in an isolated context and review it before coding; not committed. Then: change useAgentDirectory(request: DirectoryWindowHours | 'live') so 'live' fetches /api/agent-directory?scope=live under key [agent-directory, 'live'] with the unchanged poll/throttle. Create live/LiveAgentsView.tsx (data-component agents-live): react-resizable-panels Group with Panel id list (default 42, min 28) and Panel id preview (default 58, min 25, collapsible, collapsedSize 0) persisted by useDefaultLayout({ id: 'agents-live', storage: guarded localStorage }); preview = existing DirectoryDetail; Hide/Show preview button via usePanelRef collapse/expand; sections Needs you / Live / Waiting with eyebrow headers on bg-card and counts; selection in ?entry= via replaceState; up/down move, Enter opens; empty state agents-live-empty with History link. Create live/LiveAgentRow.tsx (data-component agents-live-row, data-entry-id, data-reason, data-tone): 3px rail bg-state-<tone>, glyph per D9 in text-state-<tone> (live glyph pulses), label + issue title + reason label in text-state-<tone>, second muted font-mono-ui line (live: last output line + age + '· quiet <age>' past 5 min; others: detail + since), nested subagent lines, Open button (data-testid agents-live-open, text-primary) calling navigateToDecisionSubject and hidden when decisionSubjectPath is null. Tests in live/LiveAgentsView.test.tsx per PRD WI-5 step 4, fake timers for the quiet case. No hardcoded hex in components."
+        },
+        "items": [
+          {
+            "id": "live-view.ac1",
+            "title": "Given a live-scope response with one blocked, one working and one idle in-review entry, when LiveAgentsView renders, then it shows sections Needs you, Live, Waiting in that order with counts 1, 1, 1 and the reasons 'question waiting', the activity label, and 'in review'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-view.ac2",
+            "title": "Given a working entry whose runtime snapshot has currentTool 'Bash' and agent output ending 'npm run build', when the row renders, then it shows 'running Bash' and 'npm run build'; after fake timers advance 6 minutes with no new activity, it shows '· quiet 6m'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-view.ac3",
+            "title": "Given the user clicks a row, when the click lands, then the URL gains ?entry=<id> and the preview pane renders directory-detail for that entry without navigating away",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-view.ac4",
+            "title": "Given an agent row with issue PAN-1 and a conversation row conv:foo, when their Open buttons are clicked, then the location becomes /issues/PAN-1 and /conv/foo respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-view.ac5",
+            "title": "Given an empty live-scope response, when the view renders, then agents-live-empty renders with a link to /agents?view=history, and the Hide preview button collapses the preview panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-shell",
+        "title": "Make Live the /agents default and remove the Grid, Table and Timeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:55:13Z",
+        "metadata": {
+          "issueLabel": "pan-4197",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
+            "src/dashboard/frontend/src/components/Agents/FleetAgentsView.test.tsx",
+            "src/dashboard/frontend/src/components/primitives/AgentCard.tsx",
+            "src/dashboard/frontend/src/components/primitives/AgentCard.test.tsx",
+            "tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Agents/FleetAgentsView.test.tsx",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "FleetAgentsView.test.tsx passes",
+            "typecheck, lint and build complete without errors",
+            "four PNG screenshots exist under .tmp/pan-4197/"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-11",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Rewrite src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx as a thin shell (< 150 lines): modes 'live' | 'history'; view=history or view=directory -> history (AgentsDirectory), anything else -> live (LiveAgentsView); TopBar keeps breadcrumb, meta = '<n> live · <m> need you · <k> waiting' in live mode (counts lifted from LiveAgentsView via an onCountsChange prop), actions = a History link (live) or Live link (history) plus the existing Start agent button. Delete ROLE_ORDER, FLEET_STATUSES, PHASE_FILTERS, filters and their URL helpers, DropdownFilter, AgentCardBoundary, metric tiles, cost query, verbBadgeForAgent, isFleetAgent, grid/table/timeline rendering and the search placeholder. Re-grep 'primitives/AgentCard' and delete src/dashboard/frontend/src/components/primitives/AgentCard.tsx and AgentCard.test.tsx. Rewrite FleetAgentsView.test.tsx for the shell. Update tests/e2e/styleguide-conformance.spec.ts per PRD WI-6 step 4. Then build (npm run build) and, in an isolated Playwright context against this workspace's dashboard, screenshot /agents and /agents?view=history in light and dark into /home/eltmon/Projects/overdeck/.tmp/pan-4197/ and inspect them (no green live rows, one colored signal per row, readable dark mode)."
+        },
+        "items": [
+          {
+            "id": "agents-shell.ac1",
+            "title": "Given /agents, /agents?view=grid and /agents?view=timeline, when FleetAgentsView renders, then each renders agents-live; given /agents?view=history or ?view=directory, then it renders agents-directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-shell.ac2",
+            "title": "Given any view mode, when the page renders, then no element with data-component agent-card, agents-coming-soon or agents-filter-row exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-shell.ac3",
+            "title": "Given live mode, when the History link is clicked, then the URL contains view=history; when the Live link is then clicked, then the view param is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-shell.ac4",
+            "title": "Given the repository after this item, when grep searches for primitives/AgentCard, then it returns no matches and both AgentCard files are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "history-panes",
+        "title": "Make the History view panes resizable and explain its window and counts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:55:13Z",
+        "metadata": {
+          "issueLabel": "pan-4197",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/directory/AgentsDirectory.tsx",
+            "src/dashboard/frontend/src/components/Agents/directory/DirectoryTree.tsx",
+            "src/dashboard/frontend/src/components/Agents/directory/AgentsDirectory.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Agents/directory/AgentsDirectory.test.tsx src/dashboard/frontend/src/components/Agents/directory/directory-tree.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "AgentsDirectory.test.tsx passes including the window-note and count-title cases",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In src/dashboard/frontend/src/components/Agents/directory/AgentsDirectory.tsx replace the CSS-grid wrapper with a react-resizable-panels Group: Panel id tree (default 20, min 12, collapsible, collapsedSize 0), Panel id list (default 35, min 20), Panel id detail (default 45, min 25), Separators between, persisted with useDefaultLayout({ id: 'agents-directory', storage: guarded localStorage }); keep every ref, keyboard handler and data-component; update the header comment. In DirectoryTree.tsx add the directory-window-note paragraph under the header ('Live agents always show. Finished ones show if active in the last 24 hours.' / '7 days') and give the count span title and aria-label '<live> live of <total> shown'. Extend AgentsDirectory.test.tsx per PRD WI-7 step 3."
+        },
+        "items": [
+          {
+            "id": "history-panes.ac1",
+            "title": "Given the History view, when it renders, then the tree, list and detail regions render inside react-resizable-panels panels with ids tree, list and detail and the keyboard pane navigation tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-panes.ac2",
+            "title": "Given the default 24h window, when the tree renders, then directory-window-note reads 'Live agents always show. Finished ones show if active in the last 24 hours.' and after selecting 7d it reads '7 days'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-panes.ac3",
+            "title": "Given a node with one live and two finished entries, when the tree renders, then its count shows 1/3 with title and aria-label '1 live of 3 shown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the Live view, the live scope and the state colors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:55:13Z",
+        "metadata": {
+          "issueLabel": "pan-4197",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "reference/agents-directory.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'scope=live' docs/DASHBOARD-ARCHITECTURE.md reference/agents-directory.mdx",
+            "grep -n 'title: Agents page' reference/agents-directory.mdx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep finds scope=live in DASHBOARD-ARCHITECTURE.md",
+            "grep finds the new title line",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. docs/DASHBOARD-ARCHITECTURE.md: retitle the 'Agents Directory (PAN-3920)' section to 'Agents page: Live and History (PAN-3920, PAN-4197)'; describe the Live default, the preview pane and 'agents-live' layout id, ?view=history, removal of Grid/Table/Timeline; add a 'Live scope' paragraph with the FR-2 keep rule, the pause field (FR-3) and the 400 on a bad scope; add the WI-4 reason precedence table (kind, section, tone); keep the Directory text as the History subsection with the resizable panes and window note. reference/agents-directory.mdx (keep the path; docs.json already lists it): title 'Agents page', new description, a 'Live' section (three sections, every FR-6 reason word with one line each, click previews vs Open navigates, Hide preview, resizing), a 'History' section (existing three-pane text plus resizing, collapse, the window note and the live/total count meaning), and a colors table for the five state tokens with 'running is never green'."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then its Agents page section states the three live-scope keep rules, the pause field's by values, the 400 response for a bad scope, and a reason-precedence table with 14 rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given reference/agents-directory.mdx, when rendered, then its title is 'Agents page' and it explains every FR-6 reason word, that a click previews while Open navigates, and that History shows finished agents active in the last 24 hours or 7 days",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given reference/agents-directory.mdx, when read, then its colors table maps blue to live, amber to needs you, red to stuck, grey to waiting and emerald to done, and states that running is never green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "directory-pause-facts",
+        "to": "directory-live-scope",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-pause-facts",
+        "to": "live-model",
+        "type": "blocks"
+      },
+      {
+        "from": "state-tokens",
+        "to": "live-view",
+        "type": "blocks"
+      },
+      {
+        "from": "live-model",
+        "to": "live-view",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-live-scope",
+        "to": "live-view",
+        "type": "blocks"
+      },
+      {
+        "from": "live-view",
+        "to": "agents-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "state-tokens",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-live-scope",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-shell",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "history-panes",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
