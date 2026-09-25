@@ -4,17 +4,17 @@
     "created": "2026-09-25T05:54:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1641: Run agents on local GPU models via a managed Ollama sidecar",
-    "updated": "2026-09-25T06:02:16.606Z"
+    "updated": "2026-09-25T06:44:30.373Z"
   },
   "plan": {
     "id": "pan-1641",
     "title": "Run agents on local GPU models via a managed Ollama sidecar",
-    "status": "proposed",
+    "status": "running",
     "uid": "3425768a-212c-4147-8771-2cd9fcfcd871",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-25T05:54:44Z",
-    "updated": "2026-09-25T06:02:16.606Z",
+    "updated": "2026-09-25T06:44:30.373Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1641",
