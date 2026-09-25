@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T07:49:07.745889Z · model: claude-opus-5-5 · open: 811_
+_Last sequenced: 2026-09-25T07:49:54.820773Z · model: claude-opus-5-5 · open: 812_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -51,6 +51,7 @@ _Last sequenced: 2026-09-25T07:49:07.745889Z · model: claude-opus-5-5 · open: 
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
+| 82 | PAN-4213 | M | high | ok |  | PAN-3983 | Merge-train follow-ups from #4066 reviews: stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
 | 83 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 84 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 85 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -1003,6 +1004,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4213 (rank 82)
+
+New issue (2026-09-25). Seven non-blocking follow-ups from four security review rounds on PR #4066, the merge-train restoration that fixes PAN-3983. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined. It ranks beside the other merge-path correctness fixes and after PAN-3983, because it hardens code that PR #4066 introduces.
+
 ### PAN-3096 (rank 83)
 
 New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
@@ -1115,10 +1120,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 
 codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
 
-### PAN-2331 (rank 116)
-
-Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1126,10 +1127,10 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T07:49:07.745889Z",
+  "generatedAt": "2026-09-25T07:49:54.820773Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 811,
+  "openCount": 812,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -1141,6 +1142,45 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "dependsOn": [],
       "why": "Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick",
       "rationale": "New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4212",
+      "rank": 20,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files",
+      "rationale": "New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4210",
+      "rank": 21,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start",
+      "rationale": "New in-pipeline bug. Deferred handoff retries are in-memory timers, so any dashboard restart strands planned issues until an operator runs pan start by hand (five issues on 2026-09-25). The fix re-derives pending handoffs from the pipeline journal at boot, which keeps the pipeline self-driving across reloads.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4211",
+      "rank": 22,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state",
+      "rationale": "New in-pipeline bug. A stale troubled flag blocks pan start, and the error names a command the Cut deleted, so the operator must hand-edit state.json. It needs a real clearing door (restored verb or --force/--fresh) plus corrected messages; high because it blocks restarts of affected issues such as PAN-1641.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1689,6 +1729,21 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "rationale": "New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4213",
+      "rank": 82,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3983"
+      ],
+      "why": "Merge-train follow-ups from #4066 reviews: stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests",
+      "rationale": "New issue (2026-09-25). Seven non-blocking follow-ups from four security review rounds on PR #4066, the merge-train restoration that fixes PAN-3983. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined. It ranks beside the other merge-path correctness fixes and after PAN-3983, because it hardens code that PR #4066 introduces.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-3096",
@@ -11126,45 +11181,6 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4212",
-      "rank": 20,
-      "size": "S",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files",
-      "rationale": "New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4210",
-      "rank": 21,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start",
-      "rationale": "New in-pipeline bug. Deferred handoff retries are in-memory timers, so any dashboard restart strands planned issues until an operator runs pan start by hand (five issues on 2026-09-25). The fix re-derives pending handoffs from the pipeline journal at boot, which keeps the pipeline self-driving across reloads.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4211",
-      "rank": 22,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state",
-      "rationale": "New in-pipeline bug. A stale troubled flag blocks pan start, and the error names a command the Cut deleted, so the operator must hand-edit state.json. It needs a real clearing door (restored verb or --force/--fresh) plus corrected messages; high because it blocks restarts of affected issues such as PAN-1641.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12259,6 +12275,13 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-3983",
+      "to": "PAN-4213",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
