@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4197",
   "created": "2026-09-25T06:40:33.339Z",
-  "updated": "2026-09-25T07:13:25.243Z",
+  "updated": "2026-09-25T07:13:34.008Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4197",
       "claimedAt": "2026-09-25T07:09:51.218Z",
       "doneAt": "2026-09-25T07:13:25.242Z"
+    },
+    "live-view": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4197",
+      "claimedAt": "2026-09-25T07:13:34.008Z"
     }
   }
 }
