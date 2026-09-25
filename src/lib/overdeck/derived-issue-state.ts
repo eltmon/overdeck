@@ -621,7 +621,7 @@ export function paneFromBackendSnapshot(
  * Pane liveness from the selected terminal backend's own inventory (D10). The
  * dashboard passes its cached inventory instead; this is what the CLI uses.
  */
-async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]> {
+export async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]> {
   const { Effect } = await import('effect');
   const { resolveLaunchBackend } = await import('../terminal-backends/launch.js');
 

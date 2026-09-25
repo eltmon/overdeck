@@ -80,6 +80,17 @@ export const FlywheelJournalSummary = Schema.Struct({
 })
 export type FlywheelJournalSummary = typeof FlywheelJournalSummary.Type
 
+/** One live agent pane in the flywheel's project, as the backend inventory reports it. */
+export const FlywheelAgentSummary = Schema.Struct({
+  issueId: Schema.String,
+  role: Schema.String,
+  harness: Schema.String,
+  model: Schema.String,
+  state: Schema.String,
+  agentId: Schema.optional(Schema.String),
+})
+export type FlywheelAgentSummary = typeof FlywheelAgentSummary.Type
+
 export const FlywheelInFlightRow = Schema.Struct({
   issueId: Schema.String,
   /** The tracker's title, or `null` when no tracker answered for this issue. */
@@ -89,6 +100,8 @@ export const FlywheelInFlightRow = Schema.Struct({
   pr: Schema.optional(DerivedPrState),
   /** Set when no configured tracker answered: the state is a guess, not a fact. */
   trackerUnknown: Schema.optional(Schema.Literal(true)),
+  /** Live agent panes on this issue. `working` with 0 means nobody is driving it. */
+  liveAgents: Schema.Number,
   lastJournal: Schema.NullOr(FlywheelJournalSummary),
 })
 export type FlywheelInFlightRow = typeof FlywheelInFlightRow.Type
@@ -109,6 +122,8 @@ export const FlywheelDerivedStatus = Schema.Struct({
   freshness: Schema.NullOr(FlywheelFreshness),
   policies: FlywheelPolicies,
   inFlight: Schema.Array(FlywheelInFlightRow),
+  /** Every live agent on an in-flight issue, by issue then role. */
+  agents: Schema.Array(FlywheelAgentSummary),
   orderBook: Schema.NullOr(FlywheelOrderBookSummary),
   projectRoot: Schema.String,
   generatedAt: Schema.String,

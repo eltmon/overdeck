@@ -22,7 +22,9 @@
 import { join } from 'node:path';
 
 import type {
+  BackendPane,
   DerivedIssueState,
+  FlywheelAgentSummary,
   FlywheelConversationSummary,
   FlywheelDerivedStatus,
   FlywheelFreshness,
@@ -59,10 +61,12 @@ export interface DeriveFlywheelStatusDeps {
    * is unknown — no configured tracker answered — and never a silent "open".
    */
   readTrackerIssues?: (issueIds: readonly string[]) => Promise<Readonly<Record<string, TrackerIssueFacts | null>>>;
+  /** The backend pane inventory, read once and shared by the rows and `loadStates`. */
+  listPanes?: () => readonly BackendPane[] | Promise<readonly BackendPane[]>;
   loadStates?: (
     projectPath: string,
     issueIds: readonly string[],
-    opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>> },
+    opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>>; panes: readonly BackendPane[] },
   ) => Promise<Map<string, DerivedIssueState>>;
   lastJournal?: (workspacePath: string) => PipelineJournalEntry | null | Promise<PipelineJournalEntry | null>;
   policies?: () => FlywheelPolicies | Promise<FlywheelPolicies>;
@@ -140,13 +144,23 @@ async function defaultReadTrackerIssues(
   return Object.fromEntries(ids.map((id, i) => [id, facts[i] ?? null]));
 }
 
+async function defaultListPanes(): Promise<readonly BackendPane[]> {
+  const { listPanesWithBackend } = await import('../overdeck/derived-issue-state.js');
+  return listPanesWithBackend(Date.now());
+}
+
 async function defaultLoadStates(
   projectPath: string,
   issueIds: readonly string[],
-  opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>> },
+  opts: { issues: Readonly<Record<string, TrackerIssueFacts | null>>; panes: readonly BackendPane[] },
 ): Promise<Map<string, DerivedIssueState>> {
   const { loadIssueStatesForProject } = await import('../overdeck/derived-issue-state.js');
-  return loadIssueStatesForProject(projectPath, issueIds, { issues: opts.issues });
+  return loadIssueStatesForProject(projectPath, issueIds, { issues: opts.issues, panes: opts.panes });
+}
+
+/** A pane that is still a running agent: not exited, and not finished. */
+function paneIsLive(pane: BackendPane): boolean {
+  return pane.state !== 'exited' && pane.state !== 'done';
 }
 
 async function defaultLastJournal(workspacePath: string): Promise<PipelineJournalEntry | null> {
@@ -248,12 +262,24 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
   const issueIds = workspaces.map((ws) => ws.issueId);
   // The tracker read comes first: `loadIssueStatesForProject` treats a missing
   // entry as unknown, so passing it through is what makes `closed` reachable.
-  const issues = workspaces.length
-    ? await (deps.readTrackerIssues ?? defaultReadTrackerIssues)(issueIds)
-    : {};
+  // One inventory read for the whole status: the rows count live agents from
+  // it and `loadStates` derives pane-driven attention from the same snapshot.
+  const [issues, panes] = workspaces.length
+    ? await Promise.all([
+        (deps.readTrackerIssues ?? defaultReadTrackerIssues)(issueIds),
+        (deps.listPanes ?? defaultListPanes)(),
+      ])
+    : [{} as Readonly<Record<string, TrackerIssueFacts | null>>, [] as readonly BackendPane[]];
   const states = workspaces.length
-    ? await (deps.loadStates ?? defaultLoadStates)(projectRoot, issueIds, { issues })
+    ? await (deps.loadStates ?? defaultLoadStates)(projectRoot, issueIds, { issues, panes })
     : new Map<string, DerivedIssueState>();
+  const livePanesByIssue = new Map<string, BackendPane[]>();
+  for (const pane of panes) {
+    if (!pane.issue || !paneIsLive(pane)) continue;
+    const id = pane.issue.toUpperCase();
+    const list = livePanesByIssue.get(id);
+    if (list) list.push(pane); else livePanesByIssue.set(id, [pane]);
+  }
   const lastJournal = deps.lastJournal ?? defaultLastJournal;
   const rows: FlywheelInFlightRow[] = await Promise.all(workspaces.map(async (ws) => {
     const id = ws.issueId.toUpperCase();
@@ -267,11 +293,26 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
       ...(derived?.attention ? { attention: derived.attention } : {}),
       ...(derived?.pr ? { pr: derived.pr } : {}),
       ...(issue ? {} : { trackerUnknown: true as const }),
+      liveAgents: livePanesByIssue.get(id)?.length ?? 0,
       lastJournal: entry ? { at: entry.at, type: entry.type, ...(entry.source ? { source: entry.source } : {}) } : null,
     };
   }));
   // A merged or closed issue's workspace lingers until close-out; it is not in flight.
   const inFlight = rows.filter((row) => row.state !== 'merged' && row.state !== 'closed');
+
+  const inFlightIds = new Set(inFlight.map((row) => row.issueId.toUpperCase()));
+  const agents: FlywheelAgentSummary[] = inFlight
+    .flatMap((row) => livePanesByIssue.get(row.issueId.toUpperCase()) ?? [])
+    .filter((pane) => inFlightIds.has((pane.issue ?? '').toUpperCase()))
+    .map((pane) => ({
+      issueId: (pane.issue ?? '').toUpperCase(),
+      role: pane.role,
+      harness: pane.harness,
+      model: pane.model,
+      state: pane.state,
+      ...(pane.agentId ? { agentId: pane.agentId } : {}),
+    }))
+    .sort((a, b) => a.issueId.localeCompare(b.issueId) || a.role.localeCompare(b.role));
 
   const [policies, orderBook] = await Promise.all([
     (deps.policies ?? defaultPolicies)(),
@@ -285,6 +326,7 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     freshness: lastTick ? freshnessFor(lastTick.at, now) : null,
     policies,
     inFlight,
+    agents,
     orderBook,
     projectRoot,
     generatedAt: new Date(now).toISOString(),

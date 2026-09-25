@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DerivedIssueState } from '@overdeck/contracts';
+import type { BackendPane, DerivedIssueState } from '@overdeck/contracts';
 
 import { deriveFlywheelStatus, freshnessFor, type DeriveFlywheelStatusDeps } from '../../../../src/lib/flywheel/derive-status.js';
 import type { LegacyConversation } from '../../../../src/lib/overdeck/conversations.js';
-import { loadIssueStatesForProject, readIssueFromTracker } from '../../../../src/lib/overdeck/derived-issue-state.js';
+import { listPanesWithBackend, loadIssueStatesForProject, readIssueFromTracker } from '../../../../src/lib/overdeck/derived-issue-state.js';
 
 // The deriver's defaults import this module lazily; the two names below are
 // everything it takes from it, so replacing the module wholesale is safe and
 // keeps the default `loadStates` / `readTrackerIssues` paths offline.
 vi.mock('../../../../src/lib/overdeck/derived-issue-state.js', () => ({
+  listPanesWithBackend: vi.fn(async () => []),
   loadIssueStatesForProject: vi.fn(async () => new Map()),
   readIssueFromTracker: vi.fn(async () => null),
 }));
@@ -43,6 +44,7 @@ function baseDeps(overrides: DeriveFlywheelStatusDeps = {}): DeriveFlywheelStatu
     resolvePlanHome: (root) => root,
     listWorkspaces: () => [],
     readTrackerIssues: async () => ({}),
+    listPanes: () => [],
     loadStates: async () => new Map(),
     lastJournal: () => null,
     policies: () => ({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false }),
@@ -145,7 +147,7 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
           : null),
       }),
     });
-    expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1', 'PAN-2'], { issues: {} });
+    expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1', 'PAN-2'], { issues: {}, panes: [] });
     expect(status.inFlight).toEqual([
       {
         issueId: 'PAN-1',
@@ -154,9 +156,10 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
         attention: 'needs-you',
         pr: derived.pr,
         trackerUnknown: true,
+        liveAgents: 0,
         lastJournal: { at: '2026-09-23T09:58:00.000Z', type: 'review.dispatched', source: 'pan-done' },
       },
-      { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, lastJournal: null },
+      { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, lastJournal: null },
     ]);
   });
 
@@ -226,6 +229,7 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
       });
       expect(loadStatesMock).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1'], {
         issues: { 'PAN-1': { open: false, labels: [] } },
+        panes: [],
       });
       expect(status.inFlight).toEqual([]);
     });
@@ -238,7 +242,7 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
         }),
       });
       expect(status.inFlight).toEqual([
-        { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, lastJournal: null },
+        { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, lastJournal: null },
       ]);
     });
 
@@ -284,6 +288,88 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
         deps: baseDeps({ listWorkspaces: () => workspaces('pan-9'), readTrackerIssues: undefined }),
       });
       expect(readIssueMock).toHaveBeenCalledWith('PAN-9');
+    });
+  });
+
+  describe('live agents (PAN-4199 FR-5)', () => {
+    const listPanesMock = vi.mocked(listPanesWithBackend);
+
+    function pane(issue: string, state: BackendPane['state'], role: BackendPane['role'] = 'work'): BackendPane {
+      return { id: `${issue}-${role}`, issue, role, harness: 'claude-code', model: 'claude-opus-5-5', state };
+    }
+
+    beforeEach(() => {
+      listPanesMock.mockReset();
+      listPanesMock.mockResolvedValue([]);
+      vi.mocked(loadIssueStatesForProject).mockReset();
+      vi.mocked(loadIssueStatesForProject).mockResolvedValue(new Map());
+    });
+
+    it('reports liveAgents 0 when no pane belongs to the issue (ac1)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [],
+        }),
+      });
+      expect(status.inFlight[0]?.liveAgents).toBe(0);
+      expect(status.agents).toEqual([]);
+    });
+
+    it('counts only live panes of in-flight issues (ac2)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [pane('PAN-1', 'working'), pane('PAN-1', 'exited', 'review'), pane('PAN-9', 'working')],
+        }),
+      });
+      expect(status.inFlight[0]?.liveAgents).toBe(1);
+      expect(status.agents).toEqual([
+        { issueId: 'PAN-1', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'working' },
+      ]);
+    });
+
+    it('reads the inventory once and hands the same panes to loadStates (ac3)', async () => {
+      const panes = [pane('PAN-1', 'working')];
+      listPanesMock.mockResolvedValue(panes);
+      const loadStates = vi.fn(async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]));
+      await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates,
+          // Left at the default so the real lazy `listPanesWithBackend` runs.
+          listPanes: undefined,
+        }),
+      });
+      expect(listPanesMock).toHaveBeenCalledTimes(1);
+      expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1'], { issues: {}, panes });
+    });
+
+    it('sorts agents by issue then role and drops a merged issue entirely', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [
+            { issueId: 'PAN-2', workspacePath: '/ws/feature-pan-2' },
+            { issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' },
+            { issueId: 'PAN-3', workspacePath: '/ws/feature-pan-3' },
+          ],
+          loadStates: async () => new Map<string, DerivedIssueState>([
+            ['PAN-1', { issueId: 'PAN-1', state: 'working' }],
+            ['PAN-2', { issueId: 'PAN-2', state: 'working' }],
+            ['PAN-3', { issueId: 'PAN-3', state: 'merged' }],
+          ]),
+          listPanes: () => [
+            pane('PAN-2', 'working', 'review'),
+            pane('PAN-1', 'working', 'work'),
+            pane('PAN-2', 'working', 'work'),
+            pane('PAN-3', 'working', 'work'),
+          ],
+        }),
+      });
+      expect(status.agents.map((agent) => `${agent.issueId}/${agent.role}`))
+        .toEqual(['PAN-1/work', 'PAN-2/review', 'PAN-2/work']);
     });
   });
 

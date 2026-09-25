@@ -38,6 +38,7 @@ import { readFlywheelReportFile, readFlywheelStateFile } from '../../../lib/flyw
 import { computeSubstrateStats } from '../../../lib/flywheel/substrate-stats.js';
 import type { TrackerIssueFacts } from '../../../lib/overdeck/derived-issue-state.js';
 import { jsonResponse } from '../http-helpers.js';
+import { getBackendPanes } from '../services/backend-inventory.js';
 import { loadIssueStatesForProject } from '../services/derived-issue-state.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { hasDashboardInternalToken, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
@@ -108,7 +109,9 @@ export function serverFlywheelStatusDeps(): DeriveFlywheelStatusDeps {
       }
       return [issueId, facts];
     })),
-    loadStates: (projectPath, issueIds, opts) => loadIssueStatesForProject(projectPath, issueIds, { issues: opts.issues }),
+    listPanes: () => getBackendPanes(),
+    loadStates: (projectPath, issueIds, opts) =>
+      loadIssueStatesForProject(projectPath, issueIds, { issues: opts.issues, panes: opts.panes }),
   };
 }
 
