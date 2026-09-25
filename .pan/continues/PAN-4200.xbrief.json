@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4200",
   "created": "2026-09-25T06:42:27.234Z",
-  "updated": "2026-09-25T07:08:44.941Z",
+  "updated": "2026-09-25T07:08:53.757Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4200",
       "claimedAt": "2026-09-25T07:07:44.874Z",
       "doneAt": "2026-09-25T07:08:44.941Z"
+    },
+    "wi4-guard-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4200",
+      "claimedAt": "2026-09-25T07:08:53.757Z"
     }
   }
 }
