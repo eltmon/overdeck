@@ -11,6 +11,7 @@ const running = {
     model: "claude-opus-5-5",
     harness: "claude-code",
     cwd: "/repos/overdeck",
+    createdAt: "2026-09-23T08:00:00.000Z",
     sessionAlive: true,
   },
   lastTick: {
@@ -52,6 +53,11 @@ describe("FlywheelDerivedStatus (PAN-3964 FR-1)", () => {
   it("decodes the idle shape (no conversation, no tick, no book)", () => {
     const idle = { ...running, run: "idle", conversation: null, lastTick: null, freshness: null, inFlight: [], orderBook: null }
     expect(decodeFlywheelDerivedStatus(idle).conversation).toBeNull()
+  })
+
+  it("rejects a running conversation with no createdAt (PAN-4199 ac2)", () => {
+    const { createdAt: _dropped, ...conversation } = running.conversation
+    expect(() => decodeFlywheelDerivedStatus({ ...running, conversation })).toThrow()
   })
 
   it("rejects a stored-run shape", () => {

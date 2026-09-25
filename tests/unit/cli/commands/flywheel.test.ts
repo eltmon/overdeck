@@ -49,7 +49,7 @@ async function run(...args: string[]): Promise<void> {
 
 const status: FlywheelDerivedStatus = {
   run: 'running',
-  conversation: { name: 'conv-flywheel', id: 1, title: 'Flywheel', model: 'm', harness: 'claude-code', cwd: '/repos/overdeck', sessionAlive: true },
+  conversation: { name: 'conv-flywheel', id: 1, title: 'Flywheel', model: 'm', harness: 'claude-code', cwd: '/repos/overdeck', createdAt: '2026-09-23T08:00:00.000Z', sessionAlive: true },
   lastTick: { tick: 3, pick: 'PAN-1', phase: 'watch', inFlight: ['PAN-1'], needsYou: 'decide', at: '2026-09-23T10:00:00.000Z' },
   freshness: 'live',
   policies: { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false },

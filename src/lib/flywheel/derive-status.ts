@@ -248,6 +248,7 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
         model: conv.model,
         harness: conv.harness,
         cwd: conv.cwd,
+        createdAt: conv.createdAt,
         sessionAlive,
       }
     : null;

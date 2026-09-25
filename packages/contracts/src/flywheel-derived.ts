@@ -51,6 +51,8 @@ export const FlywheelConversationSummary = Schema.Struct({
   model: Schema.NullOr(Schema.String),
   harness: Schema.NullOr(Schema.String),
   cwd: Schema.String,
+  /** When the conversation row was created — the page's elapsed run time. */
+  createdAt: Schema.String,
   sessionAlive: Schema.Boolean,
 })
 export type FlywheelConversationSummary = typeof FlywheelConversationSummary.Type

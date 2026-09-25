@@ -10,7 +10,7 @@ export function flywheelStatus(overrides: Partial<FlywheelDerivedStatus> = {}): 
   return {
     run: 'running',
     conversation: {
-      name: 'conv-flywheel', id: 42, title: 'Flywheel', model: 'claude-opus-5-5', harness: 'claude-code', cwd: '/repos/overdeck', sessionAlive: true,
+      name: 'conv-flywheel', id: 42, title: 'Flywheel', model: 'claude-opus-5-5', harness: 'claude-code', cwd: '/repos/overdeck', createdAt: '2026-09-23T08:00:00.000Z', sessionAlive: true,
     },
     lastTick: { tick: 3, pick: 'PAN-3964', phase: 'watch', inFlight: ['PAN-3964'], needsYou: null, at: '2026-09-23T09:59:40.000Z' },
     freshness: 'live',

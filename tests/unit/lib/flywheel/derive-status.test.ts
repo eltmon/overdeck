@@ -23,6 +23,7 @@ function conversation(overrides: Partial<LegacyConversation> = {}): LegacyConver
     tmuxSession: 'conv-flywheel',
     status: 'active',
     cwd: '/repos/overdeck',
+    createdAt: '2026-09-23T08:00:00.000Z',
     title: 'Flywheel',
     model: 'claude-opus-5-5',
     harness: 'claude-code',
@@ -445,6 +446,13 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
       expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-6']);
       expect(status.inFlight[0]?.inTick).toBe(true);
     });
+  });
+
+  it('carries the conversation creation time so the page can show elapsed run time (ac1)', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({ getConversation: () => conversation({ createdAt: '2026-09-23T08:00:00.000Z' }) }),
+    });
+    expect(status.conversation?.createdAt).toBe('2026-09-23T08:00:00.000Z');
   });
 
   it('never writes: every dependency it calls is a read', async () => {
