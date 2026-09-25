@@ -8,9 +8,55 @@ import type {
   ModelId,
   SettingsConfig,
   TieredExecutionConfig,
+  WorkhorsesConfig,
+  WorkhorseSlot,
   XBriefDifficulty,
   XBriefItemKind,
 } from '../types';
+
+// PAN-4191: a crew model may be a `workhorse:<slot>` ref, resolved through the
+// same workhorse slots roles.* use. The form keeps the ref (it is what gets
+// saved); cost, harness, fitness and labels read the resolved model.
+export const WORKHORSE_SLOT_IDS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
+
+export function isWorkhorseModelRef(model: string): boolean {
+  return model.startsWith('workhorse:');
+}
+
+export function resolveWorkhorseModel(model: ModelId, workhorses: WorkhorsesConfig | undefined): ModelId {
+  if (!isWorkhorseModelRef(model)) return model;
+  return workhorses?.[model.slice('workhorse:'.length) as WorkhorseSlot] ?? model;
+}
+
+/** roles.work's effective model: the ref (default workhorse:mid) resolved, the max-weight entry of a mix. */
+export function effectiveWorkModel(settings: Pick<SettingsConfig, 'roles' | 'workhorses'>): ModelId {
+  const configured: unknown = settings.roles?.work?.model ?? 'workhorse:mid';
+  const ref = Array.isArray(configured)
+    ? (configured as Array<{ model: string; weight: number }>).reduce((best, entry) => entry.weight > best.weight ? entry : best).model
+    : configured as string;
+  return resolveWorkhorseModel(ref, settings.workhorses);
+}
+
+function refAsModel<T extends { model: ModelId; modelRef?: string }>(entry: T): T {
+  const { modelRef, ...rest } = entry;
+  return { ...rest, model: modelRef ?? entry.model } as T;
+}
+
+/**
+ * PAN-4191: the server returns each tier's dereffed `model` beside its
+ * `modelRef`. The form edits the ref, so put it back into `model`: a save then
+ * writes the ref, and picking a literal model replaces it.
+ */
+export function withRefsAsModels(config: TieredExecutionConfig): TieredExecutionConfig {
+  return {
+    ...config,
+    tiers: Object.fromEntries(Object.entries(config.tiers ?? {}).map(([name, tier]) => [name, {
+      ...refAsModel(tier),
+      ...(tier.distribution ? { distribution: tier.distribution.map(refAsModel) } : {}),
+    }])),
+    ...(config.supervisor ? { supervisor: refAsModel(config.supervisor) } : {}),
+  };
+}
 
 export const DIFFICULTIES: readonly XBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
 
@@ -146,17 +192,19 @@ function modelDefinition(modelId: ModelId, catalog = MODELS_BY_PROVIDER): ModelD
   return Object.values(catalog).flatMap((provider) => provider.models).find((model) => model.id === modelId);
 }
 
-export function crewLabel(crew: Crew, catalog = MODELS_BY_PROVIDER): string {
+export function crewLabel(crew: Crew, catalog = MODELS_BY_PROVIDER, workhorses?: WorkhorsesConfig): string {
   if (crew.distribution) return `${crew.distribution.length}-model mix`;
-  return modelDefinition(crew.model, catalog)?.name ?? crew.model;
+  const resolved = resolveWorkhorseModel(crew.model, workhorses);
+  const name = modelDefinition(resolved, catalog)?.name ?? resolved;
+  return isWorkhorseModelRef(crew.model) ? `${crew.model} → ${name}` : name;
 }
 
-export function blendedCost(crew: Crew, catalog = MODELS_BY_PROVIDER): number | null {
+export function blendedCost(crew: Crew, catalog = MODELS_BY_PROVIDER, workhorses?: WorkhorsesConfig): number | null {
   const entries = crew.distribution ?? [{ model: crew.model, harness: crew.harness, weight: 100 }];
   let weightedCost = 0;
   let knownWeight = 0;
   for (const entry of entries) {
-    const cost = modelDefinition(entry.model, catalog)?.costPer1MTokens;
+    const cost = modelDefinition(resolveWorkhorseModel(entry.model, workhorses), catalog)?.costPer1MTokens;
     if (cost == null) continue;
     weightedCost += cost * entry.weight;
     knownWeight += entry.weight;
@@ -164,9 +212,10 @@ export function blendedCost(crew: Crew, catalog = MODELS_BY_PROVIDER): number | 
   return knownWeight === 0 ? null : weightedCost / knownWeight;
 }
 
-export function providerDefaultHarness(modelId: ModelId, settings: Pick<SettingsConfig, 'models'>): Harness {
+export function providerDefaultHarness(modelId: ModelId, settings: Pick<SettingsConfig, 'models'> & Partial<Pick<SettingsConfig, 'workhorses'>>): Harness {
+  const resolved = resolveWorkhorseModel(modelId, settings.workhorses);
   const provider = Object.entries(MODELS_BY_PROVIDER).find(([, definition]) =>
-    definition.models.some((model) => model.id === modelId),
+    definition.models.some((model) => model.id === resolved),
   )?.[0];
   const configured = provider
     ? settings.models.provider_harnesses?.[provider as keyof typeof settings.models.provider_harnesses]
@@ -213,10 +262,20 @@ function yamlLines(value: unknown, indent: number): string[] {
  * context: catalog = MODELS_BY_PROVIDER, provider = catalog group key,
  * enabled providers = settings.models.providers. */
 export function tierFitnessWarnings(
-  config: TieredExecutionConfig,
-  settings: Pick<SettingsConfig, 'models'>,
+  rawConfig: TieredExecutionConfig,
+  settings: Pick<SettingsConfig, 'models' | 'workhorses'>,
   catalog = MODELS_BY_PROVIDER,
 ): TierFitnessWarning[] {
+  // PAN-4191: judge the models the tiers launch, not their workhorse refs.
+  const resolve = <T extends { model: ModelId }>(entry: T): T => ({ ...entry, model: resolveWorkhorseModel(entry.model, settings.workhorses) });
+  const config: TieredExecutionConfig = {
+    ...rawConfig,
+    tiers: Object.fromEntries(Object.entries(rawConfig.tiers).map(([name, tier]) => [name, {
+      ...resolve(tier),
+      ...(tier.distribution ? { distribution: tier.distribution.map(resolve) } : {}),
+    }])),
+    ...(rawConfig.supervisor ? { supervisor: resolve(rawConfig.supervisor) } : {}),
+  };
   // PAN-3842 F-4: MODELS_BY_PROVIDER has no groq/cerebras/mistral groups, so
   // models the server knows — mistral-large-latest, llama-3.3-70b-versatile —
   // were reported "not in the model catalog" by Settings alone. Union in the
