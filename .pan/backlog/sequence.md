@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T04:39:18.243429Z · model: claude-opus-5-5 · open: 801_
+_Last sequenced: 2026-09-25T04:43:41.163262Z · model: claude-opus-5-5 · open: 800_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 23 | PAN-4134 | S | critical | ok |  |  | All lanes reported but synthesis died: recovery only hunts missing lane reports, so nothing re-runs synthesis and the review wedges |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
@@ -809,10 +808,6 @@ _Last sequenced: 2026-09-25T04:39:18.243429Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-3930 (rank 15)
-
-In pipeline — rank pinned.
-
 ### PAN-3983 (rank 19)
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
@@ -1109,6 +1104,10 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 
 Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
 
+### PAN-4184 (rank 118)
+
+New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1116,24 +1115,11 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T04:39:18.243429Z",
+  "generatedAt": "2026-09-25T04:43:41.163262Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 801,
+  "openCount": 800,
   "nodes": [
-    {
-      "issue": "PAN-3930",
-      "rank": 15,
-      "size": "S",
-      "importance": "low",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL",
-      "rationale": "In pipeline — rank pinned.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-3983",
       "rank": 19,
@@ -11860,13 +11846,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
     {
       "from": "PAN-3943",
       "to": "PAN-791",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3935",
-      "to": "PAN-3930",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
