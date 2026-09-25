@@ -401,6 +401,48 @@ describe('buildAgentDirectory', () => {
   });
 });
 
+describe('buildAgentDirectory — pause facts (PAN-4197 FR-3)', () => {
+  const entryFor = async (state: AgentState) => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [state],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: state.id, state: 'idle' })],
+    }));
+    return result.entries.find((entry) => entry.id === state.id)!;
+  };
+
+  it('reports an operator pause with its reason and time', async () => {
+    const entry = await entryFor(agent({
+      id: 'agent-pan-1', paused: true, pausedBy: 'operator', pausedReason: 'x', pausedAt: iso(HOUR),
+    }));
+    expect(entry.pause).toEqual({ by: 'operator', reason: 'x', since: iso(HOUR) });
+  });
+
+  it('reports a scheduler yield as a scheduler pause, since the yield time', async () => {
+    const entry = await entryFor(agent({
+      id: 'agent-pan-1', paused: true, yieldedByScheduler: true, yieldedAt: iso(2 * HOUR),
+    }));
+    expect(entry.pause).toEqual({ by: 'scheduler', reason: null, since: iso(2 * HOUR) });
+  });
+
+  it('reports a pause with no operator or scheduler mark as a machine pause', async () => {
+    const entry = await entryFor(agent({ id: 'agent-pan-1', paused: true }));
+    expect(entry.pause).toEqual({ by: 'machine', reason: null, since: null });
+  });
+
+  it('puts no pause key on an unpaused agent, a conversation or a subagent', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1', paused: false })],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: 'agent-pan-1', issue: 'PAN-1' })],
+      listConversations: async () => [conversation({ name: 'alpha' })],
+      listAgentSubagents: async () => [
+        { agentId: 'a1', agentType: 'Explore', description: 'find the route', mtimeMs: NOW - 10_000 },
+      ],
+    }));
+    expect(result.entries.map((entry) => entry.kind).sort()).toEqual(['agent', 'conversation', 'subagent']);
+    for (const entry of result.entries) expect(entry).not.toHaveProperty('pause');
+  });
+});
+
 function registration(overrides: Partial<ExternalRegistration> & { id: string }): ExternalRegistration {
   return {
     source: 'codex-plugin',

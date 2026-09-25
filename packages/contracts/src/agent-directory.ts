@@ -38,6 +38,16 @@ export type DirectoryTranscriptRef = typeof DirectoryTranscriptRef.Type
 export const DirectoryEntryLocation = Schema.Literals(["local", "remote"])
 export type DirectoryEntryLocation = typeof DirectoryEntryLocation.Type
 
+export const DirectoryPauseBy = Schema.Literals(["operator", "scheduler", "machine"])
+export type DirectoryPauseBy = typeof DirectoryPauseBy.Type
+
+export const DirectoryPause = Schema.Struct({
+  by: DirectoryPauseBy,
+  reason: Schema.NullOr(Schema.String),
+  since: Schema.NullOr(Schema.String),
+})
+export type DirectoryPause = typeof DirectoryPause.Type
+
 export const DirectoryEntry = Schema.Struct({
   id: Schema.String,
   kind: DirectoryEntryKind,
@@ -61,6 +71,8 @@ export const DirectoryEntry = Schema.Struct({
   costUsd: Schema.NullOr(Schema.Number),
   source: DirectoryEntrySource,
   transcript: Schema.NullOr(DirectoryTranscriptRef),
+  /** The pause gate from state.json, native agents only (PAN-4197). */
+  pause: Schema.optional(DirectoryPause),
 })
 export type DirectoryEntry = typeof DirectoryEntry.Type
 

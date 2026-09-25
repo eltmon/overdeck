@@ -35,11 +35,12 @@ import type {
   BackendPane,
   DirectoryEntry,
   DirectoryEntryState,
+  DirectoryPause,
   HarnessName,
 } from '@overdeck/contracts';
 import { getHarnessBehavior } from '@overdeck/contracts';
 
-import { listAgentStatesAsync, type AgentState } from '../../../lib/agents/agent-state-read.js';
+import { isOperatorPause, listAgentStatesAsync, type AgentState } from '../../../lib/agents/agent-state-read.js';
 import { latestWorkerReportAt as defaultLatestWorkerReportAt } from '../../../lib/agents/worker/report.js';
 import { readWorkerFacts } from '../../../lib/agents/worker/facts.js';
 import { workerNumber } from '../../../lib/agents/worker/ids.js';
@@ -223,6 +224,19 @@ export function isLiveDirectoryState(state: DirectoryEntryState): boolean {
   return state !== 'stopped' && state !== 'done';
 }
 
+/**
+ * The state.json pause gate as a directory fact (PAN-4197 FR-3): who paused
+ * the agent, why and since when. Undefined unless the agent is paused.
+ */
+export function pauseFacts(state: AgentState): DirectoryPause | undefined {
+  if (state.paused !== true) return undefined;
+  return {
+    by: isOperatorPause(state) ? 'operator' : state.yieldedByScheduler === true ? 'scheduler' : 'machine',
+    reason: state.pausedReason ?? null,
+    since: state.pausedAt ?? state.yieldedAt ?? null,
+  };
+}
+
 function paneState(pane: BackendPane | undefined): DirectoryEntryState {
   if (!pane) return 'stopped';
   return pane.state === 'exited' ? 'stopped' : pane.state;
@@ -349,6 +363,7 @@ export async function buildAgentDirectory(
     );
     const worker = workerFacts[index];
     const localState = worker ? workerState(pane, worker.reportAt) : paneState(pane);
+    const pause = pauseFacts(state);
     const entry: DirectoryEntry = {
       id: state.id,
       kind: 'agent',
@@ -367,6 +382,7 @@ export async function buildAgentDirectory(
       costUsd: null,
       source: 'overdeck',
       transcript: { route: 'agent', agentId: state.id },
+      ...(pause ? { pause } : {}),
     };
     candidates.push({ entry, cwd: state.workspace || null, explicitProjectKey: null });
     if (entry.state !== 'stopped') nativeParents.push({ entry, workspace: state.workspace ?? '' });
