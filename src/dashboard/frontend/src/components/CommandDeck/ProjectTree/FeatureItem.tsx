@@ -585,13 +585,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     };
   }, [expanded, feature.issueId, detailIdentifiers]);
 
-  const hasResources = feature.resourceDetails && (
-    feature.resourceDetails.dockerContainerCount > 0 ||
-    feature.resourceDetails.prs.length > 0 ||
-    feature.resourceDetails.localBranchCount > 0 ||
-    feature.resourceDetails.remoteBranchCount > 0 ||
-    Boolean(feature.resourceDetails.remoteAgent)
-  );
+  // PAN-4201: docker is the one fact both the resource cluster and the
+  // expanded Containers group could show — omit it from the cluster exactly
+  // when the group renders, so it appears once per render.
+  const showContainersGroup = expanded && (detailIdentifiers?.dockerContainerNames?.length ?? 0) > 0;
 
   const visibleSessions = useMemo(
     () => feature.sessions?.filter((session) => sessionMatchesFilter(session, filter)) ?? [],
@@ -815,7 +812,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           <FeatureAppLink frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} />
           {/* Merge-ready only — earlier phases have no stack, and a cached workspace query rendered a bogus chip for planning-phase issues (PAN-2996). */}
           {isReady && <FeatureUatChip summary={uatStackSummary} />}
-          <span data-section="ResourceStrip"><ResourceCluster feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></span>
+          <span data-section="ResourceStrip"><ResourceCluster feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} omit={showContainersGroup ? ['docker'] : undefined} /></span>
           <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe"
             role="img" title={pipelineLabel} aria-label={pipelineLabel}>
             {pipeline.map((seg, i) => (
@@ -914,11 +911,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         /></div>
       )}
 
-      {expanded && hasResources && detailIdentifiers && (
+      {showContainersGroup && (
         <div data-section="ResourcesGroup"><ResourcesGroup
           issueId={feature.issueId}
           defaultExpanded={aggregateSessions.length > 0 && activityState !== 'stopped'}
-          containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => {
+          containers={(detailIdentifiers?.dockerContainerNames ?? []).map((name) => {
             const stats = containerStats?.[name];
             return {
               name,
@@ -929,16 +926,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               id: stats?.id,
             };
           })}
-          branches={[
-            ...(detailIdentifiers.localBranchNames ?? []).map((name) => ({ name, isLocal: true as const })),
-            ...(detailIdentifiers.remoteBranchNames ?? []).map((name) => ({ name, isLocal: false as const })),
-          ]}
-          prs={(detailIdentifiers.prs ?? feature.resourceDetails?.prs ?? []).map((pr) => ({
-            number: pr.number,
-            title: pr.title,
-            state: pr.state,
-            isDraft: pr.isDraft,
-          }))}
         /></div>
       )}
     </IssueView>

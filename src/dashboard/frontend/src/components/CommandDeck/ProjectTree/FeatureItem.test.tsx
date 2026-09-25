@@ -1028,6 +1028,83 @@ describe('FeatureItem', () => {
     expect(rowButton?.querySelector('button')).toBeNull();
   });
 
+  it('renders no Resources/Containers header for a branch and a PR with no containers', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: ['feature/pan-821'],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [{ number: 123, title: 'Test PR', state: 'OPEN', isDraft: false }],
+        dockerContainerNames: [],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    })));
+
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['branch', 'pr'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 1,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [{ number: 123, title: 'Test PR', state: 'OPEN', isDraft: false }],
+            hasXbrief: false,
+            hasTasks: false,
+            hasPrd: false,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByText('Containers')).toBeNull());
+    expect(screen.queryByText('Resources')).toBeNull();
+    expect(screen.queryByText(/\(local\)/)).toBeNull();
+  });
+
+  it('shows the Containers group and no docker icon in the cluster for a feature with two containers', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: [],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [],
+        dockerContainerNames: ['pan-821-db', 'pan-821-cache'],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    })));
+
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['docker'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            hasPrd: false,
+            dockerContainerCount: 2,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Containers')).toBeInTheDocument());
+    expect(screen.queryByTitle(/^docker:/)).toBeNull();
+  });
+
   it('opens the xBRIEF viewer from keyboard-accessible chip without selecting the row', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();

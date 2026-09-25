@@ -130,15 +130,18 @@ function ResourceIcon({
 export function ResourceCluster({
   feature,
   onCleanupOrphanedResources,
+  omit,
 }: {
   feature: ProjectFeature;
   onCleanupOrphanedResources?: (issueId: string) => void;
+  /** Sources to exclude — e.g. 'docker' when the expanded Containers group already shows it, so each fact appears once per render. */
+  omit?: readonly ResourceSource[];
 }) {
   const details = feature.resourceDetails;
   const openTasksViewer = useDashboardStore((state) => state.openTasksViewer);
   const openPrdViewer = useDashboardStore((state) => state.openPrdViewer);
   const openXbriefViewer = useDashboardStore((state) => state.openXbriefViewer);
-  const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
+  const resources = RESOURCE_ICON_ORDER.filter((source) => !omit?.includes(source) && feature.resourceSources?.includes(source) && resourceSummary(feature, source));
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
   const orphaned = isOrphanedFeature(feature);
