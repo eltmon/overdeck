@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 802_
+_Last sequenced: 2026-09-25T05:43:00.488973Z · model: claude-opus-5-5 · open: 802_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1117,7 +1117,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:33:25.500737Z",
+  "generatedAt": "2026-09-25T05:43:00.488973Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 802,
