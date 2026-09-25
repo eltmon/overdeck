@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4197",
   "created": "2026-09-25T06:40:33.339Z",
-  "updated": "2026-09-25T08:13:44.531Z",
+  "updated": "2026-09-25T08:13:57.458Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -129,6 +129,10 @@
     "live-model.ac5": {
       "status": "completed",
       "doneAt": "2026-09-25T08:13:44.531Z"
+    },
+    "live-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T08:13:57.457Z"
     }
   }
 }
