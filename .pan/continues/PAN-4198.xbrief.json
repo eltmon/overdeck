@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4198",
   "created": "2026-09-25T06:47:47.581Z",
-  "updated": "2026-09-25T09:03:23.760Z",
+  "updated": "2026-09-25T09:03:33.957Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "wi-2-per-state-test.ac3": {
       "status": "completed",
       "doneAt": "2026-09-25T09:03:23.759Z"
+    },
+    "wi-2-per-state-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:03:33.957Z"
     }
   }
 }
