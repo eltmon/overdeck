@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T06:28:33.911060Z · model: claude-opus-5-5 · open: 807_
+_Last sequenced: 2026-09-25T06:29:37.735022Z · model: claude-opus-5-5 · open: 808_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -347,6 +347,7 @@ _Last sequenced: 2026-09-25T06:28:33.911060Z · model: claude-opus-5-5 · open: 
 | 392 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
+| 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -1122,10 +1123,10 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T06:28:33.911060Z",
+  "generatedAt": "2026-09-25T06:29:37.735022Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 807,
+  "openCount": 808,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -3360,6 +3361,32 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "planning": "auto"
     },
     {
+      "issue": "PAN-4200",
+      "rank": 228,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "bun audit critical: tar 6.2.1 via electron-builder 25; bump to builder 26 + notarize 3 + electron 40.10.6 to clear it.",
+      "rationale": "New dependency-triage issue, already in the pipeline, so it takes a free slot by merit. It ranks high because it clears the only critical advisory in bun audit plus the high-severity AppImage advisory on an artifact we ship. The change is small, but the notarize 3 ESM-only hook and the desktop packaging invariants (ABI-143 rebuild, hardlink-free tarball) need a real packaging build to verify.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4199",
+      "rank": 229,
+      "size": "L",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Restored Flywheel page shows closed issues as working, drops titles, and lost ~12 old affordances; derive each on read.",
+      "rationale": "New operator report, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high because the Flywheel page is the operator view of the pickup loop, and the default server path misreports closed issues as in flight, which is a correctness bug rather than polish. The remaining work restores lost affordances (merge-train rail, headline stats, report viewer, needs-you indicator) from sources that already exist, with mechanical per-item acceptance tests.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3510",
       "rank": 230,
       "size": "S",
@@ -3552,6 +3579,19 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "planning": "auto"
     },
     {
+      "issue": "PAN-4198",
+      "rank": 246,
+      "size": "L",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Right-click menu has 39 overlapping, jargon actions; trim per state, add Replan (archive branch, fresh plan) + pan replan CLI.",
+      "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high rather than medium because the Replan action turns a manual recovery procedure (archive a stale branch, wipe, re-plan from main) into one door, which the post-cut conflict wave on PAN-3668 and PAN-1641 showed is needed. The menu trim is a large but self-contained UX change with mechanical, per-state acceptance tests.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3789",
       "rank": 247,
       "size": "L",
@@ -3673,6 +3713,19 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "condition": "ok",
       "dependsOn": [],
       "why": "Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4197",
+      "rank": 257,
+      "size": "XL",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agents page shows finished strikes as running (not liveness-derived) and buries live work; operator asks live-first, resizable, recolor.",
+      "rationale": "New operator request. It ranks high rather than medium because problem 1 is a correctness bug: agent cards read stale stored status instead of the liveness door in src/lib/agents/liveness.ts, so the page misreports 119 finished strikes as running. The rest is a large UX redesign (live-first default, resizable panes, explained windows and counts, new state color tokens) that needs an interactive mockup first, so it sits with the other high-value dashboard UX items rather than in the substrate tier.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4097,6 +4150,19 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "planning": "auto"
     },
     {
+      "issue": "PAN-4201",
+      "rank": 292,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Command Deck issue rows show a useless 'Allocated' chip and duplicate chips; show derived state, resources once, clearer hierarchy.",
+      "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks medium, just below its sibling dashboard items PAN-4197 through PAN-4200, because it is visual polish on a working view rather than a correctness bug; the only data change is reading the derived issue state instead of a constant chip. It must reuse the shared semantic tokens that PAN-4197 is redefining, so it is advisory-linked to that issue to avoid forking a second palette.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1558",
       "rank": 293,
       "size": "M",
@@ -4265,6 +4331,21 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "planning": "interactive"
     },
     {
+      "issue": "PAN-4203",
+      "rank": 307,
+      "size": "L",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4198"
+      ],
+      "why": "Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main.",
+      "rationale": "New issue (2026-09-25), split from PAN-4198 by its planner to meet the plan-size gate. The Cut left several in-flight branches (PAN-3668, PAN-1641) unsyncable, and replanning them is currently a manual, error-prone procedure; this gives one core for CLI and dashboard with a fixture-proven archive-before-delete guarantee. Body is well-specified with verified file:line starting points. The menu entry needs PAN-4198 to land first, so it ranks behind that in-pipeline parent.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1246",
       "rank": 308,
       "size": "M",
@@ -4414,6 +4495,21 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "rationale": "Labelled substrate-improvement, so the label floor makes it at least high. Blocker PAN-2077 closed and parent epic PAN-2075 closed. Triage: boot reconciliation, the epic's first producer, is deleted, but the general Inbox-spine idea may still be worth pursuing for other producers (pending AUQ, cost alerts). Lifted from the stale tail; needs a re-scope before pickup. Blocker PAN-2077 closed since the prior run; dependsOn pruned.",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4204",
+      "rank": 320,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4203"
+      ],
+      "why": "Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts.",
+      "rationale": "New issue split from PAN-4198 (part 4). It depends explicitly on PAN-4203 because its main button calls the Replan endpoint, so it sits in the first free slot after PAN-4203. Scope is small and fully located (server message, route payload, two frontend callers, CLI hint), so condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1219",
@@ -4753,6 +4849,19 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "condition": "ok",
       "dependsOn": [],
       "why": "Strike merge door can report fetch failure after merge and land the same head twice",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4195",
+      "rank": 349,
+      "size": "M",
+      "importance": "medium",
+      "score": 63,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms",
+      "rationale": "New issue (2026-09-25). Agents and hooks invoke pan constantly, so a 0.5 s, 230 MB floor per call adds latency to every agent turn and memory pressure on the host. The fix (lazy action imports, bundle/compile-cache tuning, a startup regression check) is well scoped with a measurable target, so condition is ok; placed in a free slot among score-63 medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5298,6 +5407,19 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "dependsOn": [],
       "why": "Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard",
       "rationale": "The root-cause fix is on main with a regression test; what is left are two optional hardening follow-ups. Needs a re-scope to those.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4208",
+      "rank": 395,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "#4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets",
+      "rationale": "New issue (2026-09-25), filed from the #4205 review. #4205 cut pan --version from 560 to 180 ms but missed the PAN-4195 target of under 100 ms; item 1 closes that gap by keeping effect out of the telemetry config read. Item 2 adds CI coverage that lazy loading removed, so a broken import in tell/start/done fails CI instead of at run time. Scope is concrete with three numbered tasks, so condition is ok; placed just below PAN-4195 in a free slot among score-58 medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11001,114 +11123,6 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4195",
-      "rank": 349,
-      "size": "M",
-      "importance": "medium",
-      "score": 63,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms",
-      "rationale": "New issue (2026-09-25). Agents and hooks invoke pan constantly, so a 0.5 s, 230 MB floor per call adds latency to every agent turn and memory pressure on the host. The fix (lazy action imports, bundle/compile-cache tuning, a startup regression check) is well scoped with a measurable target, so condition is ok; placed in a free slot among score-63 medium work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4197",
-      "rank": 257,
-      "size": "XL",
-      "importance": "high",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Agents page shows finished strikes as running (not liveness-derived) and buries live work; operator asks live-first, resizable, recolor.",
-      "rationale": "New operator request. It ranks high rather than medium because problem 1 is a correctness bug: agent cards read stale stored status instead of the liveness door in src/lib/agents/liveness.ts, so the page misreports 119 finished strikes as running. The rest is a large UX redesign (live-first default, resizable panes, explained windows and counts, new state color tokens) that needs an interactive mockup first, so it sits with the other high-value dashboard UX items rather than in the substrate tier.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4198",
-      "rank": 246,
-      "size": "L",
-      "importance": "high",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Right-click menu has 39 overlapping, jargon actions; trim per state, add Replan (archive branch, fresh plan) + pan replan CLI.",
-      "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high rather than medium because the Replan action turns a manual recovery procedure (archive a stale branch, wipe, re-plan from main) into one door, which the post-cut conflict wave on PAN-3668 and PAN-1641 showed is needed. The menu trim is a large but self-contained UX change with mechanical, per-state acceptance tests.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4199",
-      "rank": 229,
-      "size": "L",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Restored Flywheel page shows closed issues as working, drops titles, and lost ~12 old affordances; derive each on read.",
-      "rationale": "New operator report, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high because the Flywheel page is the operator view of the pickup loop, and the default server path misreports closed issues as in flight, which is a correctness bug rather than polish. The remaining work restores lost affordances (merge-train rail, headline stats, report viewer, needs-you indicator) from sources that already exist, with mechanical per-item acceptance tests.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4200",
-      "rank": 228,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "bun audit critical: tar 6.2.1 via electron-builder 25; bump to builder 26 + notarize 3 + electron 40.10.6 to clear it.",
-      "rationale": "New dependency-triage issue, already in the pipeline, so it takes a free slot by merit. It ranks high because it clears the only critical advisory in bun audit plus the high-severity AppImage advisory on an artifact we ship. The change is small, but the notarize 3 ESM-only hook and the desktop packaging invariants (ABI-143 rebuild, hardlink-free tarball) need a real packaging build to verify.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4201",
-      "rank": 292,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Command Deck issue rows show a useless 'Allocated' chip and duplicate chips; show derived state, resources once, clearer hierarchy.",
-      "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks medium, just below its sibling dashboard items PAN-4197 through PAN-4200, because it is visual polish on a working view rather than a correctness bug; the only data change is reading the derived issue state instead of a constant chip. It must reuse the shared semantic tokens that PAN-4197 is redefining, so it is advisory-linked to that issue to avoid forking a second palette.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4203",
-      "rank": 307,
-      "size": "L",
-      "importance": "high",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4198"
-      ],
-      "why": "Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main.",
-      "rationale": "New issue (2026-09-25), split from PAN-4198 by its planner to meet the plan-size gate. The Cut left several in-flight branches (PAN-3668, PAN-1641) unsyncable, and replanning them is currently a manual, error-prone procedure; this gives one core for CLI and dashboard with a fixture-proven archive-before-delete guarantee. Body is well-specified with verified file:line starting points. The menu entry needs PAN-4198 to land first, so it ranks behind that in-pipeline parent.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4204",
-      "rank": 320,
-      "size": "S",
-      "importance": "medium",
-      "score": 55,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4203"
-      ],
-      "why": "Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts.",
-      "rationale": "New issue split from PAN-4198 (part 4). It depends explicitly on PAN-4203 because its main button calls the Replan endpoint, so it sits in the first free slot after PAN-4203. Scope is small and fully located (server message, route payload, two frontend callers, CLI hint), so condition is ok.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12168,6 +12182,13 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4208",
+      "to": "PAN-4195",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }
