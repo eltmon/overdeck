@@ -180,21 +180,20 @@ export async function advanceMergeQueue(
  * every merge, strike or normal — approval, green checks, the CI test job in a
  * `verification.tests: ci` project, and no failed required UAT at the head. A
  * strike is gated on its own `strike/<issue>` PR (`expectedBranch`).
+ *
+ * #3983: this is the only readiness check a merge gets. The gate proves the
+ * approval on the exact head (a GitHub review of it, or a verdict marker
+ * naming it), which the derived issue state cannot see.
  */
 export async function forgeMergeGateRefusal(
   issueId: string,
   request: TriggerMergeRequest = { kind: 'normal' },
-  gate: (issueId: string, options?: { preferBranch?: string; requireApprovalAtHead?: boolean }) => Promise<MergeGateVerdict>
+  gate: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateVerdict>
     = (id, options) => evaluateIssueMergeGate(id, {}, options),
 ): Promise<MergeEligibilityResult | null> {
   const expectedBranch = request.kind === 'strike' ? request.branchName : undefined;
   const expectedHeadSha = request.kind === 'normal' ? request.expectedHeadSha : undefined;
-  const options = {
-    ...(expectedBranch ? { preferBranch: expectedBranch } : {}),
-    // #3983: an automatic merge needs an approval that names the head.
-    ...(expectedHeadSha ? { requireApprovalAtHead: true } : {}),
-  };
-  const verdict = Object.keys(options).length > 0 ? await gate(issueId, options) : await gate(issueId);
+  const verdict = expectedBranch ? await gate(issueId, { preferBranch: expectedBranch }) : await gate(issueId);
   return mergeGateRefusal(verdict, expectedBranch, expectedHeadSha);
 }
 
@@ -255,8 +254,14 @@ export function mergeGateRefusal(
 }
 
 /**
- * The merge gate (FR-9): approvals, green checks, and forge mergeability, which
- * together are exactly `DerivedIssueState.state === 'ready'`.
+ * What the derived issue state alone refuses: an issue already merged, or a
+ * merge of it already running.
+ *
+ * #3983: approval, green checks and mergeability are the merge gate's
+ * (`forgeMergeGateRefusal`), not `DerivedIssueState.state === 'ready'`. The
+ * derived state reads approval only from the forge's `reviewDecision`, which
+ * is empty in a repo without required reviews, so it refused every PR
+ * approved by a verdict marker, from the Merge button and auto-merge alike.
  */
 export function normalMergeEligibility(
   derived: DerivedIssueState | null,
@@ -266,31 +271,10 @@ export function normalMergeEligibility(
   if (derived?.state === 'merged') {
     return { success: false, statusCode: 400, error: 'Already merged', state: 'merged' };
   }
-  if (derived?.state !== 'ready') {
-    const reason = mergeBlockReason(derived);
-    return {
-      success: false,
-      statusCode: 400,
-      error: `Cannot merge: ${reason}`,
-      ...(derived?.state ? { state: derived.state } : {}),
-    };
-  }
   if (run?.phase === 'merging' && activelyMerging) {
     return { success: false, statusCode: 400, error: 'Merge already in progress', outcome: 'merging' };
   }
   return null;
-}
-
-/** Which of the three forge conditions is missing, in the operator's words. */
-export function mergeBlockReason(derived: DerivedIssueState | null): string {
-  const pr = derived?.pr;
-  if (!pr) return 'no open pull request for this issue';
-  if (pr.reviewState === 'changes-requested') return 'the latest review requested changes';
-  if (pr.reviewState !== 'approved') return 'the pull request is not approved yet';
-  if (pr.checks === 'red') return 'checks are failing';
-  if (pr.checks !== 'green') return 'checks have not finished';
-  if (pr.mergeable === false) return 'the forge reports the pull request as conflicting';
-  return 'the forge has not finished computing mergeability';
 }
 
 /**

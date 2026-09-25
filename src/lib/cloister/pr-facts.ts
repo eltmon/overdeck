@@ -53,7 +53,9 @@ export interface PrFacts {
    * commit: an approval marker whose `sha=` names the head. Anything else,
    * including every forge approval (its review commit is read on the verdict
    * path only, `forgeApprovalAtHead`) and every GitLab MR, is left unset:
-   * not proven. The verdict guard refuses a rejection only on proof.
+   * not proven. The verdict guard refuses a rejection only on proof. The
+   * merge gate adds a GitHub review of the head (`withForgeApprovalAtHead`,
+   * #3983) before it judges approval.
    */
   approvedAtHead?: boolean;
   changesRequested: boolean;
@@ -684,6 +686,24 @@ export async function forgeApprovalAtHead(
   }
 }
 
+/**
+ * #3983: the facts with a GitHub review approving the exact head folded into
+ * `approvedAtHead`, for the merge gate. A marker naming the head already set
+ * it, so the reviews are read only when it is not proven yet and no rework is
+ * owed. `forgeApprovalAtHead` re-reads the head, so a push between the two
+ * reads leaves the approval unproven.
+ */
+export async function withForgeApprovalAtHead(
+  facts: PrFacts,
+  readReviews?: ReadGitHubReviews,
+): Promise<PrFacts> {
+  if (facts.forge !== 'github' || facts.approvedAtHead === true || facts.changesRequested || !facts.open) {
+    return facts;
+  }
+  const proven = await forgeApprovalAtHead(facts, readReviews);
+  return proven === true ? { ...facts, approvedAtHead: true } : facts;
+}
+
 export interface MergeReadiness {
   ready: boolean;
   /** Present when `ready` is false: the single reason that blocks the merge. */
@@ -709,6 +729,13 @@ export interface MergeReadinessPolicy {
    * so a failed UAT verdict at the current head blocks the merge.
    */
   uatRequired?: boolean;
+  /**
+   * #3983: on GitHub, approval for a merge must be proven on the exact head
+   * (`approvedAtHead`): a trusted marker whose `sha=` is the head, or a GitHub
+   * review approving it (`withForgeApprovalAtHead`). `reviewDecision` alone
+   * never counts. A GitLab approval is the forge's own and is taken as it is.
+   */
+  requireApprovalAtHead?: boolean;
 }
 
 /**
@@ -724,7 +751,16 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   if (facts.closed) return { ready: false, reason: 'PR is closed' };
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
-  if (!facts.approved) return { ready: false, reason: 'PR is not approved' };
+  if (policy.requireApprovalAtHead && facts.forge === 'github') {
+    if (facts.approvedAtHead !== true) {
+      return {
+        ready: false,
+        reason: `PR is not approved at PR HEAD ${head} (needs a GitHub approval of that commit or a verdict marker naming it)`,
+      };
+    }
+  } else if (!facts.approved) {
+    return { ready: false, reason: 'PR is not approved' };
+  }
   // FR-9 is a positive test on both: `none` (no checks reported for the head
   // commit) and `null` (the forge has not computed mergeability yet) are the
   // absence of evidence, not evidence of readiness. Merging on either is how a

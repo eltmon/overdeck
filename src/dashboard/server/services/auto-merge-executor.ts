@@ -195,7 +195,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     // trusted verdict marker), green checks, and mergeability (#4040, #3983).
     // Re-read on every tick, because a push or a failing check between
     // scheduling and the cooldown expiring must stop the merge.
-    const gate = await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id, {}, { requireApprovalAtHead: true })))(entry.issueId);
+    const gate = await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id)))(entry.issueId);
     // #3983: the cooldown covered the head that was scheduled. A new head gets
     // its own cooldown: blocking this row lets the scheduler re-arm it.
     const liveHead = gate.facts.headSha;

@@ -20,7 +20,7 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import type { TrackerType } from '../tracker/interface.js';
 import { resolveGitHubIssue } from '../tracker-utils.js';
 import { getProjectAutoMergeDefault, projectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
-import { evaluateMergeReadiness, getPrFacts, type PrFacts } from './pr-facts.js';
+import { evaluateMergeReadiness, getPrFacts, withForgeApprovalAtHead, type PrFacts, type ReadGitHubReviews } from './pr-facts.js';
 import { issueRunsTestsOnCi } from './verification-tests-mode.js';
 
 const execFileAsync = promisify(execFile);
@@ -43,6 +43,8 @@ export interface AutoMergeEligibilityDeps {
   isGlobalUatRequired?: () => boolean;
   /** #4021: true when the issue's project runs `verification.tests: ci`. */
   ciTestsRequired?: (issueId: string) => boolean;
+  /** #3983: the GitHub reviews read that proves an approval of the head. */
+  readReviews?: ReadGitHubReviews;
 }
 
 /** The per-issue auto-merge decision as the tracker's labels express it. */
@@ -134,7 +136,7 @@ export async function isAutoMergeEligible(
   issueId: string,
   deps: AutoMergeEligibilityDeps = {},
 ): Promise<AutoMergeEligibility> {
-  const facts = await (deps.getFacts ?? getPrFacts)(issueId);
+  const facts = await withForgeApprovalAtHead(await (deps.getFacts ?? getPrFacts)(issueId), deps.readReviews);
   // The UAT policy is applied below as the hold itself: an issue that requires
   // UAT is never auto-merged, so a failed UAT verdict (#4036) cannot reach here.
   const readiness = evaluateMergeReadiness(facts, {
