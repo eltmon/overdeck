@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-09-25T07:42:58.016Z",
+  "updated": "2026-09-25T08:00:31.762Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -414,9 +414,10 @@
       "doneAt": "2026-09-25T07:42:50.012Z"
     },
     "ollama-e2e-acceptance": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1641",
-      "claimedAt": "2026-09-25T07:42:58.016Z"
+      "claimedAt": "2026-09-25T07:42:58.016Z",
+      "doneAt": "2026-09-25T08:00:31.761Z"
     }
   }
 }
