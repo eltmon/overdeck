@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4200",
   "created": "2026-09-25T06:42:27.234Z",
-  "updated": "2026-09-25T07:07:44.874Z",
+  "updated": "2026-09-25T07:08:44.941Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-25T07:07:39.494Z"
     },
     "wi3-notarize-hook": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4200",
-      "claimedAt": "2026-09-25T07:07:44.874Z"
+      "claimedAt": "2026-09-25T07:07:44.874Z",
+      "doneAt": "2026-09-25T07:08:44.941Z"
     }
   }
 }
