@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4197",
   "created": "2026-09-25T06:40:33.339Z",
-  "updated": "2026-09-25T08:10:05.597Z",
+  "updated": "2026-09-25T08:10:09.835Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -65,6 +65,9 @@
       "status": "cancelled"
     },
     "live-model.ac4": {
+      "status": "cancelled"
+    },
+    "live-view.ac4": {
       "status": "cancelled"
     }
   }
