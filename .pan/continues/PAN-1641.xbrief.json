@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-09-25T08:27:36.704Z",
+  "updated": "2026-09-25T08:27:49.814Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -522,6 +522,10 @@
     "ollama-doctor-check.ac4": {
       "status": "completed",
       "doneAt": "2026-09-25T08:27:36.704Z"
+    },
+    "ollama-pan-up-ensure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T08:27:49.814Z"
     }
   }
 }
