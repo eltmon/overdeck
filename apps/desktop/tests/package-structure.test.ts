@@ -193,3 +193,37 @@ describe("scripts/smoke-appimage-cli.mjs", () => {
     expect(script).toContain('[cliEntry, "--version"]');
   });
 });
+
+describe("desktop packaging dependencies (PAN-4200)", () => {
+  it("pins electron-builder to the 26.x line", () => {
+    const pkg = readPkg();
+    const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+    expect(devDeps?.["electron-builder"]).toMatch(/^\^26\./);
+  });
+
+  it("pins @electron/notarize to the 3.x line", () => {
+    const pkg = readPkg();
+    const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+    expect(devDeps?.["@electron/notarize"]).toMatch(/^\^3\./);
+  });
+
+  it("pins electron to the exact version 40.10.6", () => {
+    const pkg = readPkg();
+    const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+    expect(devDeps?.electron).toBe("40.10.6");
+  });
+
+  it("keeps built-in notarization off in favor of the afterSign hook", () => {
+    const pkg = readPkg();
+    const build = pkg.build as Record<string, unknown> | undefined;
+    const mac = build?.mac as Record<string, unknown> | undefined;
+    expect(mac?.notarize).toBe(false);
+    expect(build?.afterSign).toBe("scripts/notarize.cjs");
+  });
+
+  it("has no notarize-2-only tool option and still passes the API-key fields", () => {
+    const script = FS.readFileSync(Path.join(desktopDir, "scripts/notarize.cjs"), "utf8");
+    expect(script).not.toContain('tool: "notarytool"');
+    expect(script).toContain("appleApiKey: APPLE_API_KEY");
+  });
+});
