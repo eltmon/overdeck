@@ -68,9 +68,9 @@ describe('classifyEntry — one case per precedence row', () => {
     ['12 ci running', entry({ id: 'a', state: 'stopped' }), { derived: derived({ state: 'working', pr: pr('pending') }) },
       { kind: 'ci-running', section: 'waiting', tone: 'waiting', label: 'CI running' }],
     ['13 idle', entry({ id: 'a', state: 'idle' }), {},
-      { kind: 'idle', section: 'waiting', tone: 'waiting', label: 'idle — no known blocker' }],
+      { kind: 'idle', section: 'idle', tone: 'waiting', label: 'idle — no known blocker' }],
     ['14 stopped', entry({ id: 'a', state: 'stopped' }), {},
-      { kind: 'stopped', section: 'waiting', tone: 'waiting', label: 'agent stopped' }],
+      { kind: 'stopped', section: 'idle', tone: 'waiting', label: 'agent stopped' }],
   ];
 
   it.each(cases)('row %s', (_name, subject, facts, expected) => {
@@ -122,22 +122,31 @@ describe('buildLiveSections', () => {
     ], () => ({}), NOW);
     expect(sections.live.map((row) => row.entry.id)).toEqual(['agent-1']);
     expect(sections.live[0]!.children.map((child) => child.id)).toEqual(['sub:agent-1:a']);
-    expect([...sections.needsYou, ...sections.waiting]).toEqual([]);
+    expect([...sections.needsYou, ...sections.waiting, ...sections.idle]).toEqual([]);
   });
 
-  it('sorts Needs you oldest wait first and Live most recent first, ties by id', () => {
+  it('sorts Needs you oldest wait first, Live by start time, Waiting and Idle most recent first, ties by id', () => {
     const sections = buildLiveSections([
       entry({ id: 'n-10', state: 'blocked', lastActivityAt: '2026-09-25T10:00:00.000Z' }),
       entry({ id: 'n-09', state: 'blocked', lastActivityAt: '2026-09-25T09:00:00.000Z' }),
       entry({ id: 'n-none', state: 'blocked', lastActivityAt: null }),
-      entry({ id: 'l-10', state: 'working', lastActivityAt: '2026-09-25T10:00:00.000Z' }),
-      entry({ id: 'l-11', state: 'working', lastActivityAt: '2026-09-25T11:00:00.000Z' }),
-      entry({ id: 'w-b', state: 'idle', lastActivityAt: '2026-09-25T08:00:00.000Z' }),
-      entry({ id: 'w-a', state: 'idle', lastActivityAt: '2026-09-25T08:00:00.000Z' }),
+      entry({ id: 'l-late', state: 'working', startedAt: '2026-09-25T09:00:00.000Z', lastActivityAt: '2026-09-25T11:59:00.000Z' }),
+      entry({ id: 'l-early', state: 'working', startedAt: '2026-09-25T08:00:00.000Z', lastActivityAt: '2026-09-25T10:00:00.000Z' }),
+      entry({ id: 'w-old', state: 'stopped', pause: { by: 'machine', reason: null, since: '2026-09-25T07:00:00.000Z' } }),
+      entry({ id: 'w-new', state: 'stopped', pause: { by: 'machine', reason: null, since: '2026-09-25T08:00:00.000Z' } }),
+      entry({ id: 'i-b', state: 'idle', lastActivityAt: '2026-09-25T08:00:00.000Z' }),
+      entry({ id: 'i-a', state: 'idle', lastActivityAt: '2026-09-25T08:00:00.000Z' }),
     ], () => ({}), NOW);
     expect(sections.needsYou.map((row) => row.entry.id)).toEqual(['n-09', 'n-10', 'n-none']);
-    expect(sections.live.map((row) => row.entry.id)).toEqual(['l-11', 'l-10']);
-    expect(sections.waiting.map((row) => row.entry.id)).toEqual(['w-a', 'w-b']);
+    expect(sections.live.map((row) => row.entry.id)).toEqual(['l-early', 'l-late']);
+    expect(sections.waiting.map((row) => row.entry.id)).toEqual(['w-new', 'w-old']);
+    expect(sections.idle.map((row) => row.entry.id)).toEqual(['i-a', 'i-b']);
+  });
+
+  it('keeps an idle row with no blocker out of Waiting', () => {
+    const sections = buildLiveSections([entry({ id: 'plan-1', role: 'plan', state: 'idle' })], () => ({}), NOW);
+    expect(sections.waiting).toEqual([]);
+    expect(sections.idle.map((row) => row.entry.id)).toEqual(['plan-1']);
   });
 
   it('dates a Live row from the runtime snapshot and a pause row from the pause', () => {

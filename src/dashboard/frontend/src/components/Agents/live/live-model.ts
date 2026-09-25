@@ -7,13 +7,15 @@
  * first (a blocked input, an operator pause, a broken agent, a PR ready to
  * merge), then machine work, then pipeline waits. The reason decides the
  * row's section (Needs you, Live, Waiting) and its state tone (the --state-*
- * tokens). Facts come from the entry itself plus real-time store facts the
+ * tokens). A row with nothing nameable to wait on (idle with no blocker, or
+ * stopped) is not Waiting: it goes to the Idle section, a collapsed footer
+ * the header does not count (UX critic round 1). Facts come from the entry itself plus real-time store facts the
  * caller passes in: the issue's derived state, the agent's pending inputs and
  * its runtime snapshot.
  */
 import type { DerivedIssueState, DirectoryEntry } from '@overdeck/contracts';
 
-export type LiveSection = 'needs-you' | 'live' | 'waiting';
+export type LiveSection = 'needs-you' | 'live' | 'waiting' | 'idle';
 export type LiveTone = 'live' | 'needs-you' | 'stuck' | 'waiting';
 export type LiveReasonKind =
   | 'question' | 'permission' | 'plan-approval' | 'paused' | 'api-error' | 'stuck' | 'ready-to-merge'
@@ -42,7 +44,7 @@ export interface LiveFacts {
 export interface LiveRow {
   entry: DirectoryEntry;
   reason: LiveReason;
-  /** Needs you: when the wait began. Live and Waiting: the last activity. */
+  /** Needs you: when the wait began. Live, Waiting and Idle: the last activity. */
   since: string | null;
   /** Subagents nested under this row (FR-8). */
   children: DirectoryEntry[];
@@ -52,6 +54,7 @@ export interface LiveSections {
   needsYou: LiveRow[];
   live: LiveRow[];
   waiting: LiveRow[];
+  idle: LiveRow[];
 }
 
 /** A Live row quiet longer than this shows `· quiet <age>` (FR-5). */
@@ -126,8 +129,8 @@ export function classifyEntry(entry: DirectoryEntry, facts: LiveFacts, now: Date
   if (derived?.state === 'changes-requested') return reason('changes-requested', 'waiting', 'waiting', 'changes requested');
   if (derived?.state === 'in-review') return reason('in-review', 'waiting', 'waiting', 'in review');
   if (derived?.pr?.checks === 'pending') return reason('ci-running', 'waiting', 'waiting', 'CI running');
-  if (entry.state === 'idle') return reason('idle', 'waiting', 'waiting', 'idle — no known blocker');
-  return reason('stopped', 'waiting', 'waiting', 'agent stopped');
+  if (entry.state === 'idle') return reason('idle', 'idle', 'waiting', 'idle — no known blocker');
+  return reason('stopped', 'idle', 'waiting', 'agent stopped');
 }
 
 function sinceOf(entry: DirectoryEntry, why: LiveReason, facts: LiveFacts): string | null {
@@ -141,11 +144,11 @@ function timeOf(iso: string | null): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-/** Oldest first (missing last) for Needs you; most recent first for Live and Waiting; ties by id. */
-function compareRows(direction: 'asc' | 'desc') {
+/** Orders rows by one timestamp, missing last, ties by id. */
+function compareRows(direction: 'asc' | 'desc', timeFor: (row: LiveRow) => string | null = (row) => row.since) {
   return (a: LiveRow, b: LiveRow): number => {
-    const at = timeOf(a.since);
-    const bt = timeOf(b.since);
+    const at = timeOf(timeFor(a));
+    const bt = timeOf(timeFor(b));
     if (at !== bt) {
       if (at === null) return 1;
       if (bt === null) return -1;
@@ -156,7 +159,7 @@ function compareRows(direction: 'asc' | 'desc') {
 }
 
 /**
- * Rows grouped into the three sections, sorted (FR-4, FR-7). A subagent nests
+ * Rows grouped into the sections, sorted (FR-4, FR-7). A subagent nests
  * under its parent row and is not a row of its own; one whose parent is not on
  * the page is dropped (FR-8).
  */
@@ -177,14 +180,18 @@ export function buildLiveSections(
     rows.get(entry.parentId)?.children.push(entry);
   }
 
-  const sections: LiveSections = { needsYou: [], live: [], waiting: [] };
+  const sections: LiveSections = { needsYou: [], live: [], waiting: [], idle: [] };
   for (const row of rows.values()) {
     if (row.reason.section === 'needs-you') sections.needsYou.push(row);
     else if (row.reason.section === 'live') sections.live.push(row);
-    else sections.waiting.push(row);
+    else if (row.reason.section === 'waiting') sections.waiting.push(row);
+    else sections.idle.push(row);
   }
   sections.needsYou.sort(compareRows('asc'));
-  sections.live.sort(compareRows('desc'));
+  // Live is ordered by start time, not activity, so rows never reshuffle under
+  // the pointer as agents write output; the age on line 2 is what moves.
+  sections.live.sort(compareRows('asc', (row) => row.entry.startedAt));
   sections.waiting.sort(compareRows('desc'));
+  sections.idle.sort(compareRows('desc'));
   return sections;
 }

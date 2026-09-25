@@ -2,15 +2,22 @@
  * One row of the Agents page Live view (PAN-4197 WI-5). The row carries one
  * colored signal (NFR-2): a 3px left rail, a glyph and the reason label, all
  * in the reason's state tone (--state-*). Everything else is foreground or
- * muted text. Line 2 says what a live agent is doing now (its last output
- * line, how long ago, and `quiet <age>` past five minutes) or what a waiting
- * row waits on and since when. Clicking selects (the preview pane shows it);
- * Open, Enter or a double-click navigates to the agent's live pane.
+ * muted text, and Open stays neutral so blue keeps meaning "live".
+ *
+ * Line 1 names the work: the issue id and its title (the role only when it is
+ * not `work`), or the conversation's label. Line 2 says why the row is here:
+ * the reason, then what a live agent is doing now (its last output line,
+ * streamed while the row is mounted) or what a waiting row waits on, then the
+ * age, and `quiet <age>` in the stuck tone once a live agent has been silent
+ * five minutes. Clicking selects (the preview pane shows it); Open, Enter or a
+ * double-click goes to the agent's live pane or the conversation.
  */
 import type { DirectoryEntry } from '@overdeck/contracts';
 
+import { useAgentOutputSubscription } from '../../../hooks/useAgentOutputSubscription';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
-import { decisionSubjectPath, type DecisionSubjectTarget } from '../../../lib/navigateToDecision';
+import { navigateToDecisionSubject } from '../../../lib/navigateToDecision';
+import { usePanesStore } from '../../../lib/panesStore';
 import { useDashboardStore } from '../../../lib/store';
 import { cn } from '../../../lib/utils';
 import { rowTitle } from '../directory/DirectoryList';
@@ -31,7 +38,7 @@ const TEXT: Record<LiveTone, string> = {
 };
 
 /** D9 glyphs, one per tone; aria-hidden, the reason label carries the meaning. */
-const GLYPH: Record<LiveTone, string> = {
+export const LIVE_GLYPH: Record<LiveTone, string> = {
   live: '●',
   'needs-you': '◐',
   stuck: '✕',
@@ -39,33 +46,85 @@ const GLYPH: Record<LiveTone, string> = {
 };
 
 /** Geist has no ◐; a symbol-capable stack keeps every glyph full size. */
-const GLYPH_FONT = 'ui-sans-serif, "DejaVu Sans", "Segoe UI Symbol", "Apple Symbols", sans-serif';
+export const GLYPH_FONT = 'ui-sans-serif, "DejaVu Sans", "Segoe UI Symbol", "Apple Symbols", sans-serif';
+
+/** Subagent lines shown under a row before `+N more`. */
+export const LIVE_SUBAGENT_LINES = 3;
 
 const EMPTY_LINES: readonly string[] = [];
+const UNASSIGNED_PROJECT = 'unassigned';
 
 export function liveRowDomId(entryId: string): string {
   return `agents-live-row-${entryId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
 }
 
-/** Where Open sends the operator: a conversation's page, else the agent's issue. */
-export function liveOpenTarget(entry: DirectoryEntry): DecisionSubjectTarget {
-  if (entry.kind === 'conversation') return { id: entry.id.replace(/^conv:/, ''), source: 'conversation' };
-  return { id: entry.id, source: 'agent', issueId: entry.issueId ?? undefined };
+/** Whether Open has somewhere to go: a conversation, or an agent with an issue. */
+export function canOpenLiveEntry(entry: DirectoryEntry): boolean {
+  return entry.kind === 'conversation' || (entry.kind !== 'subagent' && entry.issueId !== null);
+}
+
+/**
+ * Open goes to the live thing itself: a conversation's page, or the agent's
+ * session pane in its project's Command Deck (the same pane the rail tree
+ * opens). An agent with no registered project falls back to its issue.
+ */
+export function openLiveEntry(entry: DirectoryEntry): void {
+  if (entry.kind === 'conversation') {
+    navigateToDecisionSubject({ id: entry.id.replace(/^conv:/, ''), source: 'conversation' });
+    return;
+  }
+  if (!entry.issueId) return;
+  if (entry.projectKey === UNASSIGNED_PROJECT) {
+    navigateToDecisionSubject({ id: entry.id, source: 'agent', issueId: entry.issueId });
+    return;
+  }
+  const panes = usePanesStore.getState();
+  panes.ensureHome(entry.projectKey);
+  const existing = (panes.panesByWorkspace[entry.projectKey] ?? [])
+    .find((pane) => pane.paneType === 'agent' && pane.agentId === entry.id);
+  if (existing) panes.setActivePane(entry.projectKey, existing.paneId);
+  else {
+    const role = entry.role ?? 'agent';
+    panes.addPane(entry.projectKey, {
+      paneType: 'agent',
+      label: role.charAt(0).toUpperCase() + role.slice(1),
+      agentId: entry.id,
+      issueId: entry.issueId,
+    });
+  }
+  const path = `/command-deck/${encodeURIComponent(entry.projectKey)}`;
+  if (window.location.pathname !== path) window.history.pushState({}, '', path);
+  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 function ageOf(iso: string | null, now: Date): string {
   return formatRelativeTime(iso, now).replace(/ ago$/, '');
 }
 
-function secondLine(row: LiveRow, output: string | null, now: Date): string[] {
-  const { reason, since } = row;
-  if (reason.section !== 'live') {
-    return [reason.detail, since ? `since ${ageOf(since, now)}` : null].filter((part): part is string => Boolean(part));
+function isQuiet(row: LiveRow, now: Date): boolean {
+  if (row.reason.section !== 'live' || !row.since) return false;
+  const at = Date.parse(row.since);
+  return Number.isFinite(at) && now.getTime() - at > LIVE_QUIET_AFTER_MS;
+}
+
+/** Line 1: the issue id and title for an issue's agent, else the entry's label. */
+function RowName({ entry }: { entry: DirectoryEntry }) {
+  const title = rowTitle(entry);
+  if (entry.kind === 'agent' && entry.issueId) {
+    const role = entry.role && entry.role !== 'work' ? entry.role : null;
+    return (
+      <span className="min-w-0 flex-1 truncate text-[13px]" title={[entry.issueId, title, role].filter(Boolean).join(' · ')}>
+        <span className="font-mono-ui text-[12px] font-medium text-foreground">{entry.issueId}</span>
+        {title && <span className="text-muted-foreground"> {title}</span>}
+        {role && <span className="text-[11px] text-muted-foreground"> · {role}</span>}
+      </span>
+    );
   }
-  const parts = [output, since ? formatRelativeTime(since, now) : null];
-  const at = since ? Date.parse(since) : Number.NaN;
-  if (Number.isFinite(at) && now.getTime() - at > LIVE_QUIET_AFTER_MS) parts.push(`quiet ${ageOf(since, now)}`);
-  return parts.filter((part): part is string => Boolean(part));
+  return (
+    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground" title={entry.label}>
+      {entry.label}
+    </span>
+  );
 }
 
 interface LiveAgentRowProps {
@@ -78,11 +137,13 @@ interface LiveAgentRowProps {
 
 export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgentRowProps) {
   const { entry, reason, children } = row;
+  const live = reason.section === 'live';
+  useAgentOutputSubscription(entry.id, live && entry.kind === 'agent' && entry.location === 'local');
   const lines = useDashboardStore((state) => state.agentOutputById[entry.id] ?? EMPTY_LINES);
-  const output = reason.section === 'live' ? lastOutputLine(lines) : null;
-  const title = rowTitle(entry);
-  const canOpen = decisionSubjectPath(liveOpenTarget(entry)) !== null;
-  const line2 = secondLine(row, output, now);
+  const activity = live ? lastOutputLine(lines) : reason.detail;
+  const age = row.since ? ageOf(row.since, now) : '';
+  const quiet = isQuiet(row, now);
+  const hiddenChildren = Math.max(0, children.length - LIVE_SUBAGENT_LINES);
 
   return (
     <div
@@ -96,7 +157,7 @@ export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgent
       onClick={() => onSelect(entry.id)}
       onDoubleClick={() => onOpen(entry)}
       className={cn(
-        'relative flex cursor-pointer items-start gap-2 border-b border-border/60 py-2 pl-4 pr-3 hover:bg-accent',
+        'group relative flex cursor-pointer items-start gap-2 border-b border-border/60 py-2 pl-4 pr-3 hover:bg-accent',
         selected && 'bg-accent',
       )}
     >
@@ -106,51 +167,67 @@ export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgent
         className={cn('w-3 shrink-0 text-[11px] leading-[18px]', TEXT[reason.tone], reason.tone === 'live' && 'pulse')}
         style={{ fontFamily: GLYPH_FONT }}
       >
-        {GLYPH[reason.tone]}
+        {LIVE_GLYPH[reason.tone]}
       </span>
       <div role="gridcell" className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span
-            className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"
-            title={title ? `${entry.label} · ${title}` : entry.label}
-          >
-            {entry.label}
-            {title && <span className="font-normal text-muted-foreground"> · {title}</span>}
-          </span>
+          <RowName entry={entry} />
+          {canOpenLiveEntry(entry) && (
+            <button
+              type="button"
+              data-testid="agents-live-open"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen(entry);
+              }}
+              className={cn(
+                'shrink-0 text-[12px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100',
+                'focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                selected && 'opacity-100',
+              )}
+            >
+              Open
+            </button>
+          )}
+        </div>
+        <div data-component="agents-live-line" className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-[11px] text-muted-foreground">
           <span data-component="agents-live-reason" className={cn('shrink-0 text-[12px]', TEXT[reason.tone])}>
             {reason.label}
           </span>
+          {activity && (
+            <span data-component="agents-live-activity" className="min-w-0 truncate font-mono-ui" title={activity}>
+              · {activity}
+            </span>
+          )}
+          <span className="ml-auto flex shrink-0 items-baseline gap-1.5 pl-2 font-mono-ui tabular-nums" title={row.since ?? undefined}>
+            {age && <span data-component="agents-live-age">{age}</span>}
+            {quiet && <span data-component="agents-live-quiet" className="text-state-stuck">quiet {age}</span>}
+          </span>
         </div>
-        {line2.length > 0 && (
-          <div data-component="agents-live-line" className="mt-0.5 truncate font-mono-ui text-[11px] text-muted-foreground" title={line2.join(' · ')}>
-            {line2.join(' · ')}
+        {children.slice(0, LIVE_SUBAGENT_LINES).map((child) => {
+          const working = child.state === 'working';
+          return (
+            <div
+              key={child.id}
+              data-component="agents-live-subagent"
+              data-entry-id={child.id}
+              className="mt-0.5 flex min-w-0 items-baseline gap-1.5 font-mono-ui text-[11px] text-muted-foreground"
+              title={child.label}
+            >
+              <span aria-hidden="true">↳</span>
+              <span aria-hidden="true" className={working ? 'text-state-live' : undefined} style={{ fontFamily: GLYPH_FONT }}>
+                {working ? LIVE_GLYPH.live : LIVE_GLYPH.waiting}
+              </span>
+              <span className="min-w-0 truncate">{child.label}</span>
+            </div>
+          );
+        })}
+        {hiddenChildren > 0 && (
+          <div data-component="agents-live-subagent-more" className="mt-0.5 font-mono-ui text-[11px] text-muted-foreground">
+            ↳ +{hiddenChildren} more
           </div>
         )}
-        {children.map((child) => (
-          <div
-            key={child.id}
-            data-component="agents-live-subagent"
-            data-entry-id={child.id}
-            className="mt-0.5 truncate font-mono-ui text-[11px] text-muted-foreground"
-            title={child.label}
-          >
-            ↳ {child.label}
-          </div>
-        ))}
       </div>
-      {canOpen && (
-        <button
-          type="button"
-          data-testid="agents-live-open"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpen(entry);
-          }}
-          className="shrink-0 text-[12px] text-primary hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          Open
-        </button>
-      )}
     </div>
   );
 }

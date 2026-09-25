@@ -14,7 +14,7 @@
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
 
-import { guardedLayoutStorage } from '../panel-layout-storage';
+import { PANEL_SEPARATOR_CLASS, guardedLayoutStorage } from '../panel-layout-storage';
 
 import { DirectoryDetail } from './DirectoryDetail';
 import { DirectoryList } from './DirectoryList';
@@ -179,7 +179,7 @@ export function AgentsDirectory() {
             onKeyDown={onTreeKeyDown}
           />
         </Panel>
-        <Separator className="w-px bg-border" />
+        <Separator className={PANEL_SEPARATOR_CLASS} />
         <Panel id="list" defaultSize="35%" minSize="20%" className="flex h-full min-w-0 flex-col overflow-hidden">
           <DirectoryList
             ref={listRef}
@@ -196,7 +196,7 @@ export function AgentsDirectory() {
             onKeyDown={onListKeyDown}
           />
         </Panel>
-        <Separator className="w-px bg-border" />
+        <Separator className={PANEL_SEPARATOR_CLASS} />
         <Panel id="detail" defaultSize="45%" minSize="25%" className="flex h-full min-w-0 flex-col overflow-hidden">
           <div
             ref={detailRef}

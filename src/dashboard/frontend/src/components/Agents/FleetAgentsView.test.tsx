@@ -9,11 +9,11 @@ vi.mock('./directory/AgentsDirectory', () => ({
   AgentsDirectory: () => <div data-component="agents-directory">Agents Directory</div>,
 }));
 
-const liveCounts: LiveCounts = { live: 2, needsYou: 1, waiting: 3 };
+let liveCounts: LiveCounts = { live: 2, needsYou: 1, waiting: 0, idle: 14 };
 vi.mock('./live/LiveAgentsView', () => ({
-  LiveAgentsView: ({ onCountsChange }: { onCountsChange?: (counts: LiveCounts) => void }) => {
+  LiveAgentsView: ({ onCountsChange, previewHidden }: { onCountsChange?: (counts: LiveCounts) => void; previewHidden?: boolean }) => {
     useEffect(() => onCountsChange?.(liveCounts), [onCountsChange]);
-    return <div data-component="agents-live">Live</div>;
+    return <div data-component="agents-live" data-preview-hidden={String(previewHidden)}>Live</div>;
   },
 }));
 
@@ -34,7 +34,10 @@ function expectNoRemovedViews() {
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/agents');
+  liveCounts = { live: 2, needsYou: 1, waiting: 0, idle: 14 };
 });
+
+const metaPart = (key: string) => document.querySelector(`[data-component="agents-meta"] [data-meta-part="${key}"]`) as HTMLElement;
 
 describe('FleetAgentsView', () => {
   it('renders the Live view by default with the section counts in the header', () => {
@@ -42,8 +45,38 @@ describe('FleetAgentsView', () => {
     expect(document.querySelector('[data-component="agents-live"]')).not.toBeNull();
     expect(document.querySelector('[data-component="agents-directory"]')).toBeNull();
     expect(screen.getByText('Eltmon / Agents')).toBeInTheDocument();
-    expect(document.querySelector('[data-component="agents-meta"]')).toHaveTextContent('2 live · 1 need you · 3 waiting');
+    expect(metaPart('live')).toHaveTextContent('●2 live');
+    expect(metaPart('needs-you')).toHaveTextContent('◐1 need you');
+    expect(metaPart('waiting')).toHaveTextContent('○0 waiting');
+    expect(document.querySelector('[data-component="agents-meta"]')).not.toHaveTextContent('idle');
     expectNoRemovedViews();
+  });
+
+  it('dims zero counts and makes a nonzero need-you the loud, clickable count', () => {
+    renderAt('/agents');
+    expect(metaPart('waiting')).toHaveClass('opacity-50');
+    expect(metaPart('live')).not.toHaveClass('opacity-50');
+    const needsYou = metaPart('needs-you');
+    expect(needsYou.tagName).toBe('BUTTON');
+    expect(needsYou).toHaveClass('text-state-needs-you', 'font-medium');
+  });
+
+  it('shows a quiet need-you count when nothing needs the operator', () => {
+    liveCounts = { live: 1, needsYou: 0, waiting: 0, idle: 0 };
+    renderAt('/agents');
+    expect(metaPart('needs-you').tagName).toBe('SPAN');
+    expect(metaPart('needs-you')).toHaveClass('opacity-50');
+  });
+
+  it('the header preview toggle collapses and restores the Live preview', () => {
+    renderAt('/agents');
+    const toggle = screen.getByTestId('agents-live-preview-toggle');
+    expect(toggle).toHaveAttribute('aria-label', 'Hide preview');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-label', 'Show preview');
+    expect(document.querySelector('[data-component="agents-live"]')).toHaveAttribute('data-preview-hidden', 'true');
+    fireEvent.click(toggle);
+    expect(document.querySelector('[data-component="agents-live"]')).toHaveAttribute('data-preview-hidden', 'false');
   });
 
   it.each(['/agents?view=history', '/agents?view=directory'])('renders History at %s', (path) => {
@@ -51,6 +84,7 @@ describe('FleetAgentsView', () => {
     expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
     expect(document.querySelector('[data-component="agents-live"]')).toBeNull();
     expect(document.querySelector('[data-component="agents-meta"]')).toBeNull();
+    expect(screen.queryByTestId('agents-live-preview-toggle')).toBeNull();
     expectNoRemovedViews();
   });
 
