@@ -10,6 +10,7 @@ import { XTerminal } from './XTerminal';
 import { TasksPanel } from './TasksPanel';
 import { useConfirm } from './DialogProvider';
 import { PlanSetupScreen, type SetupProgressEvent } from './PlanSetupScreen';
+import { PlanOptionCheckbox } from './PlanOptionCheckbox';
 import { canUsePickerHarness, ModelHarnessPicker, type Harness, type HarnessPolicyDecisions, type ModelGroup } from './shared/ModelPicker';
 
 interface PlanDialogProps {
@@ -806,60 +807,37 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         </div>
 
                         {/* Checkboxes */}
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={startAfterPlanning}
-                            onChange={(e) => setStartAfterPlanning(e.target.checked)}
-                            className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
-                          />
-                          <span className="text-sm text-foreground">
-                            Start work as soon as the plan is ready
-                            <span className="text-muted-foreground ml-1">(a work agent picks it up the moment planning finalizes)</span>
-                          </span>
-                        </label>
+                        <PlanOptionCheckbox
+                          checked={startAfterPlanning}
+                          onChange={setStartAfterPlanning}
+                          label="Start work as soon as the plan is ready"
+                          hint="(a work agent picks it up the moment planning finalizes)"
+                        />
 
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={watchPlanning}
-                            onChange={(e) => { setWatchPlanning(e.target.checked); watchPlanningRef.current = e.target.checked; }}
-                            className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
-                          />
-                          <span className="text-sm text-foreground">
-                            Stay and watch planning
-                            <span className="text-muted-foreground ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
-                          </span>
-                        </label>
+                        <PlanOptionCheckbox
+                          checked={watchPlanning}
+                          onChange={(next) => { setWatchPlanning(next); watchPlanningRef.current = next; }}
+                          label="Stay and watch planning"
+                          hint="(keep dialog open; you'll see INPUT when agent needs you)"
+                        />
 
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={shadowMode}
-                            onChange={(e) => setShadowMode(e.target.checked)}
-                            className="w-4 h-4 rounded border-border bg-popover text-primary focus:ring-primary focus:ring-offset-background"
-                          />
-                          <span className="text-sm text-foreground">
-                            Shadow Engineering
-                            <span className="text-muted-foreground ml-1">(AI observes your workflow, doesn&apos;t modify code)</span>
-                          </span>
-                        </label>
+                        <PlanOptionCheckbox
+                          checked={shadowMode}
+                          onChange={setShadowMode}
+                          accent="primary"
+                          label="Shadow Engineering"
+                          hint="(AI observes your workflow, doesn't modify code)"
+                        />
 
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={startDocker}
-                            onChange={(e) => {
-                              setStartDocker(e.target.checked);
-                              localStorage.setItem('overdeck.planning.startDocker', String(e.target.checked));
-                            }}
-                            className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
-                          />
-                          <span className="text-sm text-foreground">
-                            Start Docker containers
-                            <span className="text-muted-foreground ml-1">(dev environment ready for testing)</span>
-                          </span>
-                        </label>
+                        <PlanOptionCheckbox
+                          checked={startDocker}
+                          onChange={(next) => {
+                            setStartDocker(next);
+                            localStorage.setItem('overdeck.planning.startDocker', String(next));
+                          }}
+                          label="Start Docker containers"
+                          hint="(dev environment ready for testing)"
+                        />
 
                         <ModelHarnessPicker
                           model={effectivePlanningModel}
