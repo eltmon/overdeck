@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4198",
   "created": "2026-09-25T06:47:47.581Z",
-  "updated": "2026-09-25T09:05:15.721Z",
+  "updated": "2026-09-25T09:05:26.158Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "wi-5-plan-dialog.ac1": {
       "status": "completed",
       "doneAt": "2026-09-25T09:05:15.721Z"
+    },
+    "wi-5-plan-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:05:26.158Z"
     }
   }
 }
