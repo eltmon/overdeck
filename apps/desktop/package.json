@@ -58,7 +58,6 @@
   "build": {
     "appId": "com.overdeck.app",
     "productName": "Overdeck",
-    "executableName": "overdeck",
     "generateUpdatesFilesForAllChannels": true,
     "publish": {
       "provider": "github",
@@ -120,6 +119,7 @@
       }
     ],
     "linux": {
+      "executableName": "overdeck",
       "target": [
         {
           "target": "AppImage",

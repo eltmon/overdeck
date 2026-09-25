@@ -227,10 +227,17 @@ describe("desktop packaging dependencies (PAN-4200)", () => {
     expect(script).toContain("appleApiKey: APPLE_API_KEY");
   });
 
-  it("sets a path-safe build.executableName (electron-builder 26 rejects the scoped package name)", () => {
+  it("sets a path-safe build.linux.executableName without touching mac/Windows naming", () => {
+    // electron-builder 26's AppImage target rejects the scoped package name
+    // ("@overdeck/desktop" sanitizes to "@overdeckdesktop"), but a top-level
+    // build.executableName renames the mac .app bundle and the Windows
+    // exe/install dir too (AppInfo applies it to every platform). Scoping it
+    // to build.linux keeps the Linux fix without touching the other targets.
     const pkg = readPkg();
     const build = pkg.build as Record<string, unknown> | undefined;
-    expect(build?.executableName).toMatch(/^[a-zA-Z0-9._ -]+$/);
+    const linux = build?.linux as Record<string, unknown> | undefined;
+    expect(linux?.executableName).toMatch(/^[a-zA-Z0-9._ -]+$/);
+    expect(build?.executableName).toBeUndefined();
   });
 
   it("ships cli/node_modules and server/node_modules as their own extraResources entries", () => {
