@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   messageAgent: vi.fn(),
   postMergeLifecycle: vi.fn(),
   rebaseFeatureBranch: vi.fn(),
+  reportCommitStatus: vi.fn(async () => undefined),
   sessionExists: vi.fn(),
   setMergeRun: vi.fn(),
 }));
@@ -80,7 +81,7 @@ vi.mock('../../../../../lib/github-app.js', () => ({
   isGitHubAppConfigured: vi.fn(() => true),
   isIntegrationPermissionError: vi.fn(() => false),
   parsePullRequestRef: vi.fn(() => ({ owner: 'eltmon', repo: 'overdeck', number: 3102 })),
-  reportCommitStatus: vi.fn(async () => undefined),
+  reportCommitStatus: (...args: unknown[]) => mocks.reportCommitStatus(...args),
   verifyAppCanMerge: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../../../../../lib/merge-set.js', () => ({
@@ -271,6 +272,36 @@ describe('triggerMerge server rebase escalation', () => {
         expect.any(String), 'feature/pan-3110', 'main', 'PAN-3110', { expectedHead: HEAD_SHA },
       );
       expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: REBASED }));
+    });
+
+    it('never verifies or pins a push that lands after the start check on an up-to-date branch (#4066 review, R3-1)', async () => {
+      // The approved head already contains main, so `merge-base` succeeds. The
+      // start check reads the PR branch at the approved head; the agent then
+      // pushes X, a child of it, and every later read of the branch sees X.
+      const PUSHED = 'd'.repeat(40);
+      gitHeads(HEAD_SHA, HEAD_SHA);
+      let remoteReads = 0;
+      mocks.execFile.mockImplementation(async (file, args) => {
+        if (file === 'gh' && args[0] === 'pr' && args[1] === 'list') return { stdout: JSON.stringify([{ url: PR_URL, state: 'OPEN' }]), stderr: '' };
+        if (file === 'git' && args[0] === 'merge-base') return { stdout: '', stderr: '' };
+        if (file === 'git' && args[0] === 'rev-parse' && args[1] === 'HEAD') return { stdout: `${HEAD_SHA}\n`, stderr: '' };
+        if (file === 'git' && args[0] === 'rev-parse') {
+          remoteReads += 1;
+          return { stdout: `${remoteReads === 1 ? HEAD_SHA : PUSHED}\n`, stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+      mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, skipped: true, newHead: HEAD_SHA }));
+
+      const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+      expect(mocks.mergeReviewArtifact).not.toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: PUSHED }));
+      expect(mocks.reportCommitStatus).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), PUSHED, expect.anything(), expect.anything(), expect.anything());
+      expect(mocks.rebaseFeatureBranch).toHaveBeenCalledWith(
+        expect.any(String), 'feature/pan-3110', 'main', 'PAN-3110', { expectedHead: HEAD_SHA },
+      );
+      expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+      expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: HEAD_SHA }));
     });
 
     it('refuses to start when a push landed on the PR branch after the approval', async () => {

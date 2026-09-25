@@ -964,7 +964,13 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
 
       // Pre-check: if origin/<branch> already contains origin/<target>, the branch
       // is already rebased — no rebase or push is needed.
-      const { alreadyRebased, currentHead } = await isBranchAlreadyRebased(workspacePath, branchName, targetBranch);
+      // #4066 review (R3-1): never for an automatic merge. The shortcut reads the
+      // PR branch now, so a push after the start check would become the verified
+      // and pinned head. `rebaseFeatureBranch` with `expectedHead` answers an
+      // up-to-date approved head with the approved head itself.
+      const { alreadyRebased, currentHead } = approvedHead
+        ? { alreadyRebased: false, currentHead: undefined }
+        : await isBranchAlreadyRebased(workspacePath, branchName, targetBranch);
 
       if (alreadyRebased && currentHead) {
         console.log(`[merge] ${branchName} already contains origin/${targetBranch} — skipping rebase request for ${issueId}`);
