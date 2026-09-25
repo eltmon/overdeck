@@ -4,17 +4,17 @@
     "created": "2026-09-25T05:55:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4197: Agents page UX overhaul: live-first view of running/in-pipeline work, resizable panes, real state, new color scheme",
-    "updated": "2026-09-25T05:55:24.850Z"
+    "updated": "2026-09-25T06:39:56.596Z"
   },
   "plan": {
     "id": "pan-4197",
     "title": "Agents page UX overhaul: live-first view of running/in-pipeline work, resizable panes, real state, new color scheme",
-    "status": "proposed",
+    "status": "running",
     "uid": "ef695da8-f519-43d9-9507-a687e58d7b1a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-25T05:55:13Z",
-    "updated": "2026-09-25T05:55:24.850Z",
+    "updated": "2026-09-25T06:39:56.596Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4197",
