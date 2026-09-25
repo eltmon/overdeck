@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4201",
   "created": "2026-09-25T06:42:41.599Z",
-  "updated": "2026-09-25T09:07:22.405Z",
+  "updated": "2026-09-25T09:07:32.566Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "resources-group-containers-only.ac5": {
       "status": "completed",
       "doneAt": "2026-09-25T09:07:22.405Z"
+    },
+    "screenshots-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:07:32.565Z"
     }
   }
 }
