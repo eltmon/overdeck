@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4198",
   "created": "2026-09-25T06:47:47.581Z",
-  "updated": "2026-09-25T08:13:56.036Z",
+  "updated": "2026-09-25T08:14:08.471Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4198",
       "claimedAt": "2026-09-25T07:55:59.000Z",
       "doneAt": "2026-09-25T08:13:56.036Z"
+    },
+    "wi-6-menu-screenshots": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4198",
+      "claimedAt": "2026-09-25T08:14:08.471Z"
     }
   }
 }
