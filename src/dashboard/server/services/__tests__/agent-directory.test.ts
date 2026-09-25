@@ -137,6 +137,15 @@ describe('buildAgentDirectory', () => {
     });
   });
 
+  it("lists a native agent that is a conversation's own pane once, as the conversation", async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'sequencer-runner', role: 'sequencer', issueId: 'sequencer-runner' })],
+      getBackendPanes: async () => [pane({ id: 'w9:p1', agentId: 'sequencer-runner' })],
+      listConversations: async () => [conversation({ name: 'sequencer-runner', tmuxSession: 'sequencer-runner', isWorking: true })],
+    }));
+    expect(result.entries.map((entry) => entry.id)).toEqual(['conv:sequencer-runner']);
+  });
+
   it('never lists conv-* agent dirs as native agents', async () => {
     const result = await buildAgentDirectory(24, deps({
       listAgentStates: () => [agent({ id: 'conv-flywheel', issueId: '' })],

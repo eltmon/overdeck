@@ -545,6 +545,19 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
     if (entry.state !== 'stopped') conversationParents.push({ entry, row });
   }
 
+  // A native agent whose id is a conversation's tmux session is that
+  // conversation's own pane (e.g. `sequencer-runner`): one pane, one row. The
+  // conversation keeps it, with its composer (PAN-4197).
+  const conversationSessions = new Set(conversationRows.filter(isConversationRow).map((row) => row.tmuxSession.toLowerCase()));
+  const isConversationPane = (entry: DirectoryEntry) =>
+    entry.kind === 'agent' && entry.source === 'overdeck' && conversationSessions.has(entry.id.toLowerCase());
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    if (isConversationPane(candidates[index]!.entry)) candidates.splice(index, 1);
+  }
+  for (let index = nativeParents.length - 1; index >= 0; index -= 1) {
+    if (isConversationPane(nativeParents[index]!.entry)) nativeParents.splice(index, 1);
+  }
+
   // 4. External agents (Phase C). They join before the parent remap so a
   //    registration naming a conversation's tmux session nests under it.
   for (const { entry, cwd } of external) candidates.push({ entry, cwd, explicitProjectKey: null });
