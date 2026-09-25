@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 
 import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
+import { FlywheelHeadlineStrip } from '../components/flywheel/FlywheelHeadlineStrip';
 import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookCard';
 import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
@@ -180,7 +181,10 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
           >
             <div role="tabpanel" aria-label={`Flywheel ${tab}`}>
               {tab === 'status' && (
-                <FlywheelStatusPane status={status} unreachable={unreachable} nowMs={nowMs} onNavigateIssue={onNavigateIssue} />
+                <div className="space-y-4">
+                  <FlywheelHeadlineStrip orderBook={status?.orderBook ?? null} />
+                  <FlywheelStatusPane status={status} unreachable={unreachable} nowMs={nowMs} onNavigateIssue={onNavigateIssue} />
+                </div>
               )}
               {tab === 'state' && <FlywheelStatePane />}
               {tab === 'stats' && <FlywheelStatsPanel />}

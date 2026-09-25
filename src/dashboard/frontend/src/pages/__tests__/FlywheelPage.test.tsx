@@ -17,6 +17,17 @@ import { flywheelStatus, renderWithQuery, stubFetch } from '../../components/fly
 
 const config = { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true };
 
+// The Stats tab and the headline strip share the ['flywheel','stats',30] query.
+const STATS = {
+  window: { days: 30, since: '2026-08-24T00:00:00.000Z', until: '2026-09-23T00:00:00.000Z' },
+  generatedAt: '2026-09-23T10:00:00.000Z',
+  criteria: {
+    c1_bugRate: { value: 0.25, count: 3, denominator: 12, status: 'yellow', trend: 'flat', dataSufficient: true },
+    c2_p0Bugs: { value: 0, status: 'green', trend: 'flat', dataSufficient: true },
+  },
+  bugs: [],
+};
+
 function setup(status: FlywheelDerivedStatus | 'unreachable') {
   return stubFetch((url, init) => {
     if (url === '/api/flywheel/status') {
@@ -27,6 +38,7 @@ function setup(status: FlywheelDerivedStatus | 'unreachable') {
     }
     if (url === '/api/merge-train/config') return Response.json(config);
     if (url === '/api/flywheel/state') return Response.json({ exists: false, path: '.pan/flywheel/state.md', content: null, lastModified: null });
+    if (url.startsWith('/api/flywheel/stats')) return Response.json(STATS);
     return undefined;
   });
 }
