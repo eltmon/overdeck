@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4201",
   "created": "2026-09-25T06:42:41.599Z",
-  "updated": "2026-09-25T08:33:24.377Z",
+  "updated": "2026-09-25T09:02:08.501Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4201",
       "claimedAt": "2026-09-25T08:26:01.576Z",
       "doneAt": "2026-09-25T08:33:24.377Z"
+    },
+    "state-badge-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:02:08.501Z"
     }
   }
 }
