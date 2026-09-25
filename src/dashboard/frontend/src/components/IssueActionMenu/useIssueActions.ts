@@ -105,20 +105,13 @@ const REVIEW_MODE_SUBMENU_OPTIONS = [
 function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue | undefined) {
   switch (action.key) {
     case 'startAgent':
-    case 'restartFromPlan':
       return { issueId, projectId: issue?.project?.id };
-    case 'startSkipPlanning':
-      return { issueId, projectId: issue?.project?.id, auto: true };
     case 'createWorkspace':
       return { issueId, projectId: issue?.project?.id };
     case 'resetIssue':
       return { deleteWorkspace: true };
-    case 'wipe':
-      return { deleteWorkspace: true };
     case 'cancel':
       return { wipeWorkspace: true };
-    case 'completeWorkReset':
-      return { spawn: false };
     case 'doneWork':
       return { message: `If implementation is complete, run: pan done ${issueId} -c "Implementation complete". If work remains, continue the current task.` };
     default:
@@ -129,7 +122,6 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
 function disabledReasonForAction(action: IssueActionEntry) {
   switch (action.key) {
     case 'plan':
-    case 'autoPlan':
       return 'Planning is available only before a plan exists and before the issue is done.';
     case 'startAgent':
       return 'Start agent is available after planning when no agent is running.';
@@ -140,10 +132,9 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'pause':
       return 'This action requires a running agent.';
     case 'resumeSession':
-    case 'resetSession':
       return 'This action requires a stopped agent with a resumable session.';
-    case 'completeWorkReset':
-      return 'This action requires an existing work agent with a workspace.';
+    case 'restartAgent':
+      return 'This action requires a work agent that has not reached review.';
     case 'requestReview':
       return 'Review can be requested after workspace work is idle and not already in review.';
     case 'restartReview':
@@ -155,23 +146,15 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'open':
       return 'Workspace does not exist';
     case 'syncMain':
-    case 'copySettings':
+      return 'Updating from main requires a workspace with no running agent.';
     case 'destroyWorkspace':
-      return 'This action requires an existing workspace.';
+      return 'Deleting the workspace is available only after the issue is closed.';
     case 'tasks':
       return 'No plan or tasks are available for this issue yet.';
-    case 'inference':
-      return 'No inference artifact is available for this issue.';
-    case 'discussions':
-      return 'No discussion artifact is available for this issue.';
-    case 'transcripts':
-      return 'No transcript artifact is available for this issue.';
     case 'closeOut':
       return 'Close out is available only after merge verification.';
     case 'merge':
       return 'Merge is available once review has approved and the PR is mergeable.';
-    case 'upload':
-      return 'Transcript upload is temporarily unavailable while its endpoint is rebuilt.';
     case 'reopen':
       return 'Reopen is available only for done or canceled issues.';
     case 'unpause':
@@ -183,39 +166,26 @@ function disabledReasonForAction(action: IssueActionEntry) {
 
 const dialogActionKeys = new Set<IssueActionKey>([
   'plan',
-  'autoPlan',
-  'startSkipPlanning',
   'tell',
   'open',
-  'upload',
+  // PAN-4198: Restart agent… asks keep-memory vs fresh-session in its dialog.
+  'restartAgent',
 ]);
 
 const artifactTabs: Partial<Record<IssueActionKey, string>> = {
   tasks: 'tasks',
-  inference: 'inference',
-  discussions: 'discussions',
-  transcripts: 'conversation',
 };
 
 function destructiveMessage(action: IssueActionEntry, issueId: string) {
   switch (action.key) {
     case 'closeOut':
       return `Close out ${issueId}?\n\nThis final cleanup archives workspace artifacts, cleans up agent state and workspace resources, and closes the tracker issue.`;
-    case 'wipe':
-      return `Wipe ${issueId}?\n\nThis is destructive and removes workspace and agent state for the issue.`;
     case 'destroyWorkspace':
       return `Destroy the workspace for ${issueId}?\n\nThis removes workspace resources but leaves the issue record intact.`;
     case 'resetIssue':
       return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears tasks and xBRIEF state, and moves the issue back to Todo.`;
     case 'cancel':
       return `Cancel ${issueId}?\n\nThis cancels the issue and wipes the workspace state for the abandoned run.`;
-    case 'resetSession':
-      return `Reset the saved session for ${issueId}?\n\nThe next start will create a fresh agent session.`;
-    case 'restartFromPlan':
-    case 'restartAgent':
-      return `Restart work for ${issueId}?\n\nThis stops the current agent path and starts a replacement run from existing context.`;
-    case 'completeWorkReset':
-      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, xBRIEF, tasks, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
     default:
       return `${action.label} for ${issueId}?`;
   }
@@ -435,6 +405,13 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     if (action.key === 'viewPr') {
       const url = state.prUrl ?? state.workspace?.mrUrl;
       if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // PAN-4198 (D9): "Open planning session" is navigation, not a POST — the
+    // drawer's conversation tab is where the live planning agent renders.
+    if (action.key === 'watchPlanning') {
+      openIssue(issueId, 'conversation');
       return;
     }
 

@@ -384,12 +384,11 @@ export function IssueActionDialogHost({ actions, onAfterClose }: { issueId?: str
 
   if (!activeDialog) return null;
 
-  if ((activeDialog.key === 'plan' || activeDialog.key === 'autoPlan' || activeDialog.key === 'startSkipPlanning') && issue) {
+  if (activeDialog.key === 'plan' && issue) {
     return (
       <PlanDialog
         issue={issue}
         isOpen
-        autoStart={activeDialog.key === 'startSkipPlanning'}
         onClose={handleClose}
         onComplete={handleClose}
       />

@@ -28,11 +28,9 @@ vi.mock('sonner', () => ({
 
 const prdActionKeys: readonly IssueActionKey[] = [
   'plan',
-  'autoPlan',
   'watchPlanning',
   'donePlanning',
   'startAgent',
-  'startSkipPlanning',
   'tell',
   'doneWork',
   'requestReview',
@@ -45,7 +43,6 @@ const prdActionKeys: readonly IssueActionKey[] = [
   'syncMain',
   'reopen',
   'closeOut',
-  'wipe',
   'destroyWorkspace',
   'open',
   'resetIssue',
@@ -55,16 +52,7 @@ const prdActionKeys: readonly IssueActionKey[] = [
 const preservedActionKeys: readonly IssueActionKey[] = [
   'cancel',
   'tasks',
-  'inference',
-  'discussions',
-  'transcripts',
-  'upload',
-  'syncDiscussions',
   'createWorkspace',
-  'copySettings',
-  'resetSession',
-  'completeWorkReset',
-  'restartFromPlan',
   'restartAgent',
   'addToOrderBook',
 ];
@@ -157,13 +145,11 @@ describe('ISSUE_ACTIONS', () => {
     expect(registered.size).toBe(ISSUE_ACTIONS.length);
   });
 
-  it('exports every action group once in the fixed six-group order (C-ACTIONS)', () => {
+  it('exports every action group once in the fixed four-group order (PAN-4198)', () => {
     expect(GROUP_ORDER).toEqual([
       'communicate',
       'lifecycle',
-      'recover',
       'inspect',
-      'navigation',
       'danger',
     ]);
     expect(new Set(GROUP_ORDER).size).toBe(GROUP_ORDER.length);
@@ -183,6 +169,7 @@ describe('ISSUE_ACTIONS', () => {
       expect(Array.isArray(action.phasePrimary), action.key).toBe(true);
       expect(['safe', 'dialog', 'destructive']).toContain(action.kind);
       expect(action.group.trim(), action.key).not.toBe('');
+      expect(['menu', 'contextual'], action.key).toContain(action.placement);
     }
   });
 
@@ -269,31 +256,42 @@ describe('ISSUE_ACTIONS', () => {
     }));
 
     expect(enabled).toContain('tasks');
-    expect(enabled).toContain('inference');
-    expect(enabled).toContain('discussions');
-    expect(enabled).toContain('transcripts');
     expect(enabled).toContain('syncMain');
     expect(enabled).toContain('resumeSession');
-    expect(enabled).toContain('resetSession');
   });
 
   it('declares real CLI verbs only for issue-scoped pan commands', () => {
-    expect(action('doneWork').label).toBe('Done — mark work complete & start review');
-    expect(action('restartReview').label).toBe('Re-run review on latest commit');
+    expect(action('doneWork').label).toBe('Finish work and start review');
+    expect(action('restartReview').label).toBe('Review again');
     expect(action('requestReview').panVerb).toBe('review request');
     expect(action('restartReview').panVerb).toBe('review restart');
     expect(action('stopAgent').panVerb).toBe('kill');
     expect(action('resetIssue').panVerb).toBeNull();
-    expect(action('restartFromPlan').panVerb).toBeNull();
     expect(action('restartAgent').panVerb).toBeNull();
-    expect(action('completeWorkReset').panVerb).toBeNull();
-    expect(action('completeWorkReset').kind).toBe('destructive');
-    expect(action('completeWorkReset').group).toBe('danger');
-    expect(action('completeWorkReset').endpoint).toBe('/api/agents/:agentId/restart-fresh');
+    // PAN-4198: one restart entry, and it opens a dialog that chooses between
+    // /restart, /recover and /restart-fresh.
+    expect(action('restartAgent').kind).toBe('dialog');
+    expect(action('restartAgent').endpoint).toBe('/api/agents/:agentId/restart');
+  });
+
+  it('keeps plain-language labels free of planning jargon (PAN-4198 FR-5)', () => {
+    for (const entry of ISSUE_ACTIONS) {
+      expect(entry.label, entry.key).not.toMatch(/done planning|watch planning/i);
+    }
+    expect(action('watchPlanning').label).toBe('Open planning session');
+    expect(action('donePlanning').label).toBe('Accept plan');
+    expect(action('resetIssue').label).toBe('Reset to Todo');
+  });
+
+  it('keeps card-invoked entries in the registry as contextual placements (PAN-4198 NFR-2)', () => {
+    for (const key of ['pause', 'recoverAgent', 'rebuildAndStart', 'createWorkspace'] as const) {
+      expect(action(key).placement, key).toBe('contextual');
+    }
+    expect(action('tell').placement).toBe('menu');
   });
 
   it('aligns PRD action kinds for lifecycle and navigation actions', () => {
-    expect(action('watchPlanning').kind).toBe('dialog');
+    expect(action('watchPlanning').kind).toBe('safe');
     expect(action('donePlanning').kind).toBe('safe');
     expect(action('doneWork').kind).toBe('safe');
     expect(action('requestReview').kind).toBe('safe');
@@ -303,7 +301,6 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('reopen').kind).toBe('safe');
     expect(action('open').kind).toBe('safe');
     expect(action('closeOut').kind).toBe('destructive');
-    expect(action('wipe').kind).toBe('destructive');
     expect(action('resetIssue').kind).toBe('destructive');
     expect(action('cancel').kind).toBe('destructive');
   });
@@ -334,7 +331,9 @@ describe('ISSUE_ACTIONS', () => {
     const planningActive: IssueActionState = { ...baseState, agent: { status: 'running', role: 'plan' }, derived: derivedState('planned'), panes: LIVE_PLAN_PANE, issueCanonicalState: 'in_progress' };
     const planAgentIdle: IssueActionState = { ...baseState, hasPlan: true, agent: { status: 'stopped', role: 'plan' }, derived: derivedState('planned') };
     const workRunning: IssueActionState = { ...baseState, hasPlan: true, agent: { status: 'running', role: 'work' }, derived: derivedState('working'), panes: [{ ...LIVE_PLAN_PANE[0], id: 'pane-work', role: 'work' as const }], issueCanonicalState: 'in_progress' };
-    const readyForReview: IssueActionState = { ...baseState, hasPlan: true, workspace: { exists: true }, agent: { status: 'stopped', role: 'work' } };
+    // PAN-4198: Request review is offered only while the issue is in the work
+    // state — after a PR exists, Review again is the action.
+    const readyForReview: IssueActionState = { ...baseState, hasPlan: true, workspace: { exists: true }, agent: { status: 'stopped', role: 'work' }, derived: derivedState('working') };
     const reviewRunning: IssueActionState = { ...baseState, derived: derivedState('in-review', { pr: OPEN_PR }) };
 
     expect(action('watchPlanning').enabledWhen(planningActive)).toBe(true);
@@ -378,7 +377,7 @@ describe('ISSUE_ACTIONS', () => {
   it('points rebuildAndStart at the chained workspace endpoint as a safe action', () => {
     expect(action('rebuildAndStart').endpoint).toBe('/api/workspaces/:id/rebuild-and-start');
     expect(action('rebuildAndStart').kind).toBe('safe');
-    expect(action('rebuildAndStart').group).toBe('recover');
+    expect(action('rebuildAndStart').group).toBe('lifecycle');
   });
 });
 
@@ -397,7 +396,9 @@ describe('requestReview mode submenu', () => {
     useDashboardStore.setState({
       issuesRaw: [reviewIssue()],
       agentsById: { 'agent-pan-3340': stoppedWorkAgent() },
-      derivedIssueStateByIssueId: {},
+      // PAN-4198: Request review is gated on the issue being in the work state
+      // with no PR yet, so the submenu fixture has to sit there.
+      derivedIssueStateByIssueId: { 'PAN-3340': { issueId: 'PAN-3340', state: 'working' } },
       backendPanesById: {},
       drawer: { issueId: null, tab: 'overview' },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -481,10 +482,10 @@ describe('getPhasePrimaryActions', () => {
     ['PLANNING', { ...baseState, agent: { status: 'running', role: 'plan' }, issueCanonicalState: 'in_progress' }, ['watchPlanning', 'donePlanning']],
     ['PLANNED_IDLE', { ...baseState, hasPlan: true, issueCanonicalState: 'todo' }, ['startAgent']],
     ['WORK_RUNNING', { ...baseState, agent: { status: 'running', role: 'work' }, issueCanonicalState: 'in_progress' }, ['tell', 'doneWork']],
-    ['INPUT', { ...baseState, agent: { status: 'running', role: 'work' }, hasPendingInput: true }, ['open', 'tell']],
-    ['REVIEW_RUNNING', { ...baseState, agent: { status: 'running', role: 'review' }, derived: derivedState('in-review', { pr: OPEN_PR }) }, ['tell', 'recoverAgent']],
-    ['CHANGES_REQUESTED', { ...baseState, derived: derivedState('changes-requested', { pr: OPEN_PR }) }, ['open', 'requestReview']],
-    ['STUCK', { ...baseState, agent: { status: 'failed', role: 'work' }, derived: derivedState('working', { attention: 'stuck' }) }, ['recoverAgent', 'tell']],
+    ['INPUT', { ...baseState, agent: { status: 'running', role: 'work' }, hasPendingInput: true }, ['tell']],
+    ['REVIEW_RUNNING', { ...baseState, agent: { status: 'running', role: 'review' }, derived: derivedState('in-review', { pr: OPEN_PR }) }, ['viewPr', 'restartReview']],
+    ['CHANGES_REQUESTED', { ...baseState, derived: derivedState('changes-requested', { pr: OPEN_PR }) }, ['resumeSession', 'restartAgent']],
+    ['STUCK', { ...baseState, agent: { status: 'failed', role: 'work' }, derived: derivedState('working', { attention: 'stuck' }) }, ['restartAgent', 'tell']],
     ['READY_TO_MERGE', { ...baseState, derived: derivedState('ready', { pr: OPEN_PR }), hasPr: true }, ['merge', 'viewPr']],
     ['MERGED', { ...baseState, isMerged: true, derived: derivedState('merged') }, ['closeOut']],
   ];

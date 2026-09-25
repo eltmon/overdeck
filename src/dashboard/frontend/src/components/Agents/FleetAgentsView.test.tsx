@@ -245,14 +245,13 @@ describe('FleetAgentsView', () => {
 
     const menu = screen.getByTestId('issue-action-overflow-menu');
     expect(within(menu).getAllByTestId('issue-action-tell').length).toBeGreaterThan(0);
-    // Stop lives behind the collapsed Danger disclosure (C-ACTIONS)
-    fireEvent.click(within(menu).getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
+    // PAN-4198: Stop/Pause/Unpause are Actions now, not Danger.
     expect(within(menu).getByTestId('issue-action-stopAgent')).toHaveTextContent('Stop agent');
     expect(within(menu).getByTestId('issue-action-pause')).toHaveTextContent('Pause agent');
-    expect(within(menu).getByTestId('issue-action-unpause')).toHaveTextContent('Unpause agent');
+    expect(within(menu).getByTestId('issue-action-unpause')).toHaveTextContent('Let agent continue');
     expect(within(menu).queryByTestId('issue-action-untroubled')).not.toBeInTheDocument();
     expect(within(menu).getAllByTestId('issue-action-recoverAgent')[0]).toHaveTextContent('Recover agent');
-    expect(within(menu).getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume session');
+    expect(within(menu).getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume');
     expect(within(menu).queryByTestId('issue-action-switchModel')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();

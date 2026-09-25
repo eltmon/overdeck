@@ -724,7 +724,7 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('issue-action-menu')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
-    expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('View PR');
+    expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('Open pull request');
     // Merge is a first-class registry action in the primary strip (no bespoke pin).
     await waitFor(() => {
       const mergeButton = screen.getByTestId('issue-action-merge');
@@ -799,34 +799,22 @@ describe('IssueDrawer', () => {
         "READY_TO_MERGE": [
           "issue-action-merge",
           "issue-action-syncMain",
-          "issue-action-copySettings",
-          "issue-action-tasks",
-          "issue-action-syncDiscussions",
           "issue-action-open",
+          "issue-action-tasks",
           "issue-action-resetIssue",
-          "issue-action-wipe",
-          "issue-action-destroyWorkspace",
           "issue-action-cancel",
-          "issue-action-restartFromPlan",
           "issue-action-viewPr",
         ],
         "WORK_RUNNING": [
           "issue-action-tell",
           "issue-action-doneWork",
-          "issue-action-syncMain",
-          "issue-action-copySettings",
-          "issue-action-tasks",
-          "issue-action-syncDiscussions",
-          "issue-action-open",
           "issue-action-stopAgent",
           "issue-action-pause",
-          "issue-action-resetIssue",
-          "issue-action-wipe",
-          "issue-action-destroyWorkspace",
-          "issue-action-cancel",
-          "issue-action-completeWorkReset",
-          "issue-action-restartFromPlan",
           "issue-action-restartAgent",
+          "issue-action-open",
+          "issue-action-tasks",
+          "issue-action-resetIssue",
+          "issue-action-cancel",
         ],
       }
     `);
@@ -867,8 +855,8 @@ describe('IssueDrawer', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
     const resetDialog = await screen.findByRole('alertdialog');
-    fireEvent.change(within(resetDialog).getByLabelText('Confirmation text'), { target: { value: 'Reset issue' } });
-    const resetConfirm = within(resetDialog).getByRole('button', { name: 'Reset issue' });
+    fireEvent.change(within(resetDialog).getByLabelText('Confirmation text'), { target: { value: 'Reset to Todo' } });
+    const resetConfirm = within(resetDialog).getByRole('button', { name: 'Reset to Todo' });
     await waitFor(() => expect(resetConfirm).not.toBeDisabled());
     fireEvent.click(resetConfirm);
     await waitFor(() => {

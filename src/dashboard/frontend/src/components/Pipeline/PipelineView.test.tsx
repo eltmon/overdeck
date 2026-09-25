@@ -338,7 +338,7 @@ describe('PipelineView', () => {
     fireEvent.contextMenu(row);
 
     const menu = screen.getByTestId('issue-action-overflow-menu');
-    expect(within(menu).getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
+    expect(within(menu).getByTestId('issue-action-startAgent')).toHaveTextContent('Start work');
   });
 
   it('opens the issue drawer from a Pipeline row without disturbing scroll position', () => {

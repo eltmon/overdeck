@@ -27,20 +27,18 @@ const legacyCommandDeckIssueActions = [
   { legacyKey: 'stopAgent', registryKey: 'stopAgent', surfaceText: 'Stop Agent' },
   { legacyKey: 'startAgent', registryKey: 'startAgent', surfaceText: 'Start Agent' },
   { legacyKey: 'resumeSession', registryKey: 'resumeSession', surfaceText: 'Resume Session' },
-  { legacyKey: 'resetSession', registryKey: 'resetSession', surfaceText: 'Reset Session' },
+  // PAN-4198 D6: Reset Session and Restart from plan both became options inside
+  // the one Restart agent… dialog. Copy Settings, Inference, Discussions,
+  // Transcripts, Upload and Sync have RETIREMENT_AUDIT rows in
+  // issueActions.parity.test.tsx naming their new home or drop reason.
+  { legacyKey: 'resetSession', registryKey: 'restartAgent', surfaceText: 'Reset Session' },
   { legacyKey: 'createWorkspace', registryKey: 'createWorkspace', surfaceText: 'Create Workspace' },
-  { legacyKey: 'copySettings', registryKey: 'copySettings', surfaceText: 'Copy Settings' },
   { legacyKey: 'closeOut', registryKey: 'closeOut', surfaceText: 'Close Out' },
   { legacyKey: 'tasks', registryKey: 'tasks', surfaceText: 'Tasks' },
-  { legacyKey: 'inference', registryKey: 'inference', surfaceText: 'Inference' },
-  { legacyKey: 'discussions', registryKey: 'discussions', surfaceText: 'Discussions' },
-  { legacyKey: 'transcripts', registryKey: 'transcripts', surfaceText: 'Transcripts' },
-  { legacyKey: 'upload', registryKey: 'upload', surfaceText: 'Upload' },
-  { legacyKey: 'syncDiscussions', registryKey: 'syncDiscussions', surfaceText: 'Sync' },
   { legacyKey: 'syncMain', registryKey: 'syncMain', surfaceText: 'Sync main' },
   { legacyKey: 'reopen', registryKey: 'reopen', surfaceText: 'Reopen' },
   { legacyKey: 'restartAgent', registryKey: 'restartAgent', surfaceText: 'Restart agent' },
-  { legacyKey: 'restartFromPlan', registryKey: 'restartFromPlan', surfaceText: 'Restart from plan' },
+  { legacyKey: 'restartFromPlan', registryKey: 'restartAgent', surfaceText: 'Restart from plan' },
   { legacyKey: 'resetIssue', registryKey: 'resetIssue', surfaceText: 'Reset issue' },
   { legacyKey: 'cancel', registryKey: 'cancel', surfaceText: 'Cancel Issue' },
 ] as const satisfies readonly { legacyKey: string; registryKey: IssueActionKey | null; surfaceText: string; note?: string }[];
@@ -49,13 +47,11 @@ const commandDeckGapActions = [
   'open',
 ] as const satisfies readonly IssueActionKey[];
 
+// PAN-4198 D6: the artifact badges (Inference, Discussions, Transcripts,
+// Upload, Sync) are viewers, not actions, and left the registry for the panes
+// and tabs named in RETIREMENT_AUDIT. Tasks is the one that stayed an action.
 const badgeBarActions = [
   { surfaceText: 'Tasks', registryKey: 'tasks' },
-  { surfaceText: 'Inference', registryKey: 'inference' },
-  { surfaceText: 'Discussions', registryKey: 'discussions' },
-  { surfaceText: 'Transcripts', registryKey: 'transcripts' },
-  { surfaceText: 'Upload', registryKey: 'upload' },
-  { surfaceText: 'Sync', registryKey: 'syncDiscussions' },
 ] as const satisfies readonly { surfaceText: string; registryKey: IssueActionKey }[];
 
 const statusFlowActions = [
@@ -65,7 +61,8 @@ const statusFlowActions = [
   { surfaceText: 'Stop Agent', registryKey: 'stopAgent' },
   { surfaceText: 'Start Agent', registryKey: 'startAgent' },
   { surfaceText: 'Resume Session', registryKey: 'resumeSession' },
-  { surfaceText: 'Reset Session', registryKey: 'resetSession' },
+  // PAN-4198 D6: folded into the Restart agent… dialog's fresh-session option.
+  { surfaceText: 'Reset Session', registryKey: 'restartAgent' },
   { surfaceText: 'Create Workspace', registryKey: 'createWorkspace' },
   { surfaceText: 'Reopen', registryKey: 'reopen' },
 ] as const satisfies readonly { surfaceText: string; registryKey: IssueActionKey | null; note?: string }[];

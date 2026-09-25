@@ -24,11 +24,12 @@ import { useDashboardStore } from '../store';
 import type { Agent, Issue } from '../../types';
 
 export const ISSUE_SCOPED_PAN_VERBS = [
+  // PAN-4198 D6: 'plan --auto' (autoPlan), 'start --auto' (startSkipPlanning)
+  // and 'wipe' left the registry with their UI entries. `pan plan --auto`,
+  // `pan start --auto` and `pan wipe` remain CLI verbs.
   'plan',
-  'plan --auto',
   'plan finalize',
   'start',
-  'start --auto',
   'tell',
   'done',
   'review request',
@@ -41,7 +42,6 @@ export const ISSUE_SCOPED_PAN_VERBS = [
   'sync-main',
   'reopen',
   'close',
-  'wipe',
   'destroy',
   'open',
 ] as const;
@@ -91,6 +91,72 @@ const AUDITED_REGISTRY_KEYS = [
 
 export const RETIREMENT_AUDIT = [
   {
+    retiredKey: 'autoPlan',
+    consumer: 'issue menu Auto-plan',
+    successorKeys: ['plan'],
+  },
+  {
+    retiredKey: 'startSkipPlanning',
+    consumer: 'issue menu Start without planning',
+    successorKeys: ['plan'],
+  },
+  {
+    retiredKey: 'wipe',
+    consumer: 'issue menu Wipe',
+    successorKeys: ['resetIssue'],
+  },
+  {
+    retiredKey: 'inference',
+    consumer: 'issue menu Inference',
+    successorKeys: [],
+    newHome: 'src/dashboard/frontend/src/components/Stage/panes/DocsPane.tsx',
+  },
+  {
+    retiredKey: 'discussions',
+    consumer: 'issue menu Discussions',
+    successorKeys: [],
+    newHome: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueDigTabs.tsx',
+  },
+  {
+    retiredKey: 'transcripts',
+    consumer: 'issue menu Transcripts',
+    successorKeys: [],
+    newHome: 'src/dashboard/frontend/src/lib/store.ts',
+  },
+  {
+    retiredKey: 'upload',
+    consumer: 'issue menu Upload transcript',
+    successorKeys: [],
+    dropped: 'Hard-disabled since it was added, with no handler behind it.',
+  },
+  {
+    retiredKey: 'syncDiscussions',
+    consumer: 'issue menu Sync discussions',
+    successorKeys: [],
+    dropped: 'Rare enough to be automation-only; POST /api/command-deck/planning/:id/sync-discussions stays.',
+  },
+  {
+    retiredKey: 'copySettings',
+    consumer: 'issue menu Copy settings',
+    successorKeys: [],
+    dropped: 'Rare enough to be automation-only; POST /api/issues/:id/copy-settings stays.',
+  },
+  {
+    retiredKey: 'resetSession',
+    consumer: 'issue menu Reset session',
+    successorKeys: ['restartAgent'],
+  },
+  {
+    retiredKey: 'completeWorkReset',
+    consumer: 'issue menu Complete work reset',
+    successorKeys: ['restartAgent'],
+  },
+  {
+    retiredKey: 'restartFromPlan',
+    consumer: 'issue menu Restart from plan',
+    successorKeys: ['restartAgent'],
+  },
+  {
     retiredKey: 'reviewTest',
     consumer: 'ReviewVerificationCard',
     successorKeys: ['restartReview'],
@@ -108,26 +174,27 @@ export const RETIREMENT_AUDIT = [
 ] as const satisfies ReadonlyArray<{
   retiredKey: string;
   consumer: string;
+  /** Live keys that took the work over. Empty when the action moved or was dropped. */
   successorKeys: readonly IssueActionKey[];
+  /** Repository-relative file that now owns the behavior (PAN-4198 D7). */
+  newHome?: string;
+  /** Why the action went away with no replacement (PAN-4198 D7). */
+  dropped?: string;
 }>;
 
 const DESTRUCTIVE_ACTION_KEYS = [
   'closeOut',
   'resetIssue',
-  'wipe',
   'destroyWorkspace',
   'cancel',
-  'resetSession',
-  'completeWorkReset',
-  'restartFromPlan',
-  'restartAgent',
 ] as const satisfies readonly IssueActionKey[];
 
 vi.mock('../../components/PanOpenInPicker', () => ({
   PanOpenInPicker: ({ openInCwd }: { openInCwd: string | null }) => <div data-testid="pan-open-picker">Open {openInCwd ?? ''}</div>,
 }));
 
-const commandFilesDir = resolve(process.cwd(), '../../../src/cli/commands');
+const repositoryRoot = resolve(process.cwd(), '../../..');
+const commandFilesDir = resolve(repositoryRoot, 'src/cli/commands');
 const commandFiles = new Set(readdirSync(commandFilesDir).filter((entry) => entry.endsWith('.ts')));
 
 function commandFileForPanVerb(panVerb: string) {
@@ -394,6 +461,12 @@ describe('issue action CLI ↔ dashboard parity', () => {
   });
 
   it('renders the order-book submenu from the shared issue action registry', async () => {
+    // PAN-4198 tightened canAddToOrderBook: an order book queues work that has
+    // not started, so the issue needs no live agent and a pre-work state.
+    useDashboardStore.setState({
+      agentsById: {},
+      derivedIssueStateByIssueId: { 'PAN-1331': { issueId: 'PAN-1331', state: 'planned' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
     renderLiveGroupedMenu();
 
     await screen.findByTestId('issue-action-addToOrderBook');
@@ -418,15 +491,7 @@ describe('issue action CLI ↔ dashboard parity', () => {
       'viewPr',
       'resetIssue',
       'tasks',
-      'inference',
-      'discussions',
-      'transcripts',
-      'upload',
-      'syncDiscussions',
       'createWorkspace',
-      'copySettings',
-      'resetSession',
-      'restartFromPlan',
       'restartAgent',
       'addToOrderBook',
       'cancel',
@@ -477,7 +542,7 @@ describe('issue action CLI ↔ dashboard parity', () => {
       }
     }
 
-    expect(screen.getAllByTestId('issue-action-wipe')).toHaveLength(1);
+    expect(screen.getAllByTestId('issue-action-resetIssue')).toHaveLength(1);
   });
 
   it('requires an explicit retirement audit for every registry key that disappears', () => {
@@ -490,9 +555,18 @@ describe('issue action CLI ↔ dashboard parity', () => {
     expect(activeKeys).not.toContain('reviewTest');
 
     for (const row of RETIREMENT_AUDIT) {
-      expect(row.successorKeys, row.consumer).not.toEqual([]);
+      const hasSuccessor = row.successorKeys.length > 0;
+      const hasNewHome = 'newHome' in row && !!row.newHome;
+      const hasDroppedReason = 'dropped' in row && !!row.dropped?.trim();
+      expect(
+        hasSuccessor || hasNewHome || hasDroppedReason,
+        `${row.retiredKey} (${row.consumer}) needs a successor, a new home, or a dropped reason`,
+      ).toBe(true);
       for (const successorKey of row.successorKeys) {
         expect(activeKeys, `${row.consumer} → ${successorKey}`).toContain(successorKey);
+      }
+      if (hasNewHome) {
+        expect(existsSync(resolve(repositoryRoot, row.newHome!)), `${row.retiredKey} → ${row.newHome}`).toBe(true);
       }
     }
   });
@@ -505,11 +579,11 @@ describe('issue action CLI ↔ dashboard parity', () => {
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/orders'));
     const callsBeforeSelection = fetchMock.mock.calls.length;
     fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
-    fireEvent.click(screen.getByTestId('issue-action-wipe'));
+    fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
 
     expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByLabelText('Confirmation text')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Wipe' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reset to Todo' })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledTimes(callsBeforeSelection);
   });
 });

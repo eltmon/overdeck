@@ -18,7 +18,8 @@ import {
 } from './IssueActionGroupedBody';
 import type { IssueActionView } from './useIssueActions';
 
-const NON_DANGER_GROUPS = ['communicate', 'lifecycle', 'recover', 'inspect', 'navigation'] as const;
+// PAN-4198: four groups — 'recover' folded into lifecycle, 'navigation' into inspect.
+const NON_DANGER_GROUPS = ['communicate', 'lifecycle', 'inspect'] as const;
 
 const invokes = new Map<IssueActionKey, ReturnType<typeof vi.fn>>();
 
@@ -115,14 +116,14 @@ describe('IssueActionContextMenu', () => {
     const menu = renderMenu({
       phase: 'WORK_RUNNING',
       primaryKeys: ['tell', 'doneWork'],
-      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'wipe'],
+      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'resetIssue'],
       nonIssueActions: [sessionArtifactInvocation(sessionExtra)],
     });
 
     expect(screen.getByText('Work running')).toBeInTheDocument();
     expect(screen.getByText(`4 available now · ${ISSUE_ACTIONS.length - 4} gated`)).toBeInTheDocument();
-    expect(screen.getAllByText('Tell agent')).toHaveLength(2);
-    expect(screen.getAllByText('Done — mark work complete & start review')).toHaveLength(2);
+    expect(screen.getAllByText('Message agent')).toHaveLength(2);
+    expect(screen.getAllByText('Finish work and start review')).toHaveLength(2);
 
     const sectionLabels = [
       screen.getByText('For this phase'),
@@ -136,7 +137,7 @@ describe('IssueActionContextMenu', () => {
     ];
     expectInDocumentOrder(sectionLabels);
 
-    expect(screen.queryByText('Wipe')).not.toBeInTheDocument();
+    expect(screen.queryByText('Reset to Todo')).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Danger (1 available)' })).toHaveAttribute('aria-expanded', 'false');
     expect(menu).toHaveClass('max-h-[70vh]', 'overflow-y-auto');
 
@@ -146,7 +147,7 @@ describe('IssueActionContextMenu', () => {
 
   it('renders the complete grouped body inside a plain non-Radix menu host', () => {
     const sessionExtra = vi.fn();
-    const all = actionViews(['plan', 'wipe'], ['plan', 'tell', 'wipe']);
+    const all = actionViews(['plan', 'resetIssue'], ['plan', 'tell', 'resetIssue']);
     const plan = all.find((view) => view.action.key === 'plan');
     expect(plan).toBeDefined();
 
@@ -165,11 +166,11 @@ describe('IssueActionContextMenu', () => {
       expect(container.querySelector(`[data-issue-action-section="${section}"]`)).toBeInTheDocument();
     }
     expect(container.querySelector('[data-issue-action-section="danger"]')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-resetIssue')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Danger (1 available)' }));
     expect(container.querySelector('[data-issue-action-section="danger"]')).toBeInTheDocument();
-    expect(screen.getByTestId('issue-action-wipe')).toBeInTheDocument();
+    expect(screen.getByTestId('issue-action-resetIssue')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('issue-action-explain-toggle'));
     expect(localStorage.getItem('overdeck.issueActions.explain')).toBe('true');
@@ -179,22 +180,22 @@ describe('IssueActionContextMenu', () => {
     expect(sessionExtra).toHaveBeenCalledOnce();
   });
 
-  it('leads a STUCK phase with Recover agent then Tell agent and preserves arrow-key focus', () => {
+  it('leads a STUCK phase with Restart agent then Message agent and preserves arrow-key focus', () => {
     const menu = renderMenu({
       phase: 'STUCK',
-      primaryKeys: ['recoverAgent', 'tell'],
-      enabledKeys: ['recoverAgent', 'tell'],
+      primaryKeys: ['restartAgent', 'tell'],
+      enabledKeys: ['restartAgent', 'tell'],
     });
 
     expect(screen.getByText('Stuck')).toBeInTheDocument();
-    const recoverRows = screen.getAllByText('Recover agent');
-    const tellRows = screen.getAllByText('Tell agent');
-    expect(recoverRows).toHaveLength(2);
+    const restartRows = screen.getAllByText('Restart agent…');
+    const tellRows = screen.getAllByText('Message agent');
+    expect(restartRows).toHaveLength(2);
     expect(tellRows).toHaveLength(2);
-    expectInDocumentOrder([recoverRows[0], tellRows[0]]);
+    expectInDocumentOrder([restartRows[0], tellRows[0]]);
 
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
-    expect(recoverRows[0].closest('[role="menuitem"]')).toHaveFocus();
+    expect(restartRows[0].closest('[role="menuitem"]')).toHaveFocus();
   });
 
   it('keeps disabled actions visible with their reason and never invokes them', () => {
@@ -212,9 +213,9 @@ describe('IssueActionContextMenu', () => {
     const wrapper = screen.getByTestId('issue-action-disabled-plan');
     const reasonId = wrapper.getAttribute('aria-describedby');
     expect(wrapper).toHaveClass('block');
-    expect(wrapper).toHaveAttribute('title', 'Plan is gated for this test.');
+    expect(wrapper).toHaveAttribute('title', 'Plan… is gated for this test.');
     expect(reasonId).toBeTruthy();
-    expect(document.getElementById(reasonId!)).toHaveTextContent('Plan is gated for this test.');
+    expect(document.getElementById(reasonId!)).toHaveTextContent('Plan… is gated for this test.');
     const disabledItem = within(wrapper).getByRole('menuitem');
     expect(disabledItem).toHaveAttribute('data-disabled');
     expect(disabledItem).toHaveAttribute('aria-describedby', reasonId);
@@ -232,13 +233,11 @@ describe('IssueActionContextMenu', () => {
     });
 
     const phaseSection = document.querySelector('[data-issue-action-section="phase"]') as HTMLElement;
-    expect(within(phaseSection).queryByText('Plan')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Tell agent')).toHaveLength(2);
+    expect(within(phaseSection).queryByText('Plan…')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Message agent')).toHaveLength(2);
     expect(document.querySelector('[data-issue-action-section="lifecycle"]')).toBeInTheDocument();
     expect(document.querySelector('[data-issue-action-section="communicate"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-issue-action-section="recover"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-issue-action-section="inspect"]')).not.toBeInTheDocument();
-    expect(document.querySelector('[data-issue-action-section="navigation"]')).not.toBeInTheDocument();
     expect(screen.queryByText('This session')).not.toBeInTheDocument();
   });
 
@@ -297,22 +296,22 @@ describe('IssueActionContextMenu', () => {
     renderMenu({
       phase: 'WORK_RUNNING',
       primaryKeys: ['tell', 'doneWork'],
-      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'wipe'],
+      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'resetIssue'],
     });
 
     const disclosure = screen.getByRole('menuitem', { name: 'Danger (1 available)' });
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-resetIssue')).not.toBeInTheDocument();
 
     fireEvent.click(disclosure);
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('issue-action-wipe')).toHaveClass('text-destructive');
+    expect(screen.getByTestId('issue-action-resetIssue')).toHaveClass('text-destructive');
 
     fireEvent.keyDown(disclosure, { key: 'Enter' });
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-resetIssue')).not.toBeInTheDocument();
 
     fireEvent.keyDown(disclosure, { key: ' ' });
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('issue-action-wipe')).toBeInTheDocument();
+    expect(screen.getByTestId('issue-action-resetIssue')).toBeInTheDocument();
   });
 });

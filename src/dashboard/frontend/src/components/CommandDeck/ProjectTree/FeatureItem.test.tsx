@@ -394,7 +394,11 @@ describe('FeatureItem', () => {
     expect(screen.queryByTestId('chevron-down')).not.toBeInTheDocument();
   });
 
-  it('renders the grouped issue menu and routes the single Wipe action through typed confirmation', async () => {
+  // PAN-4198 D6: the registry's `wipe` entry is retired (RETIREMENT_AUDIT row
+  // "wipe" → resetIssue). Cancel issue now carries what this case checks: a
+  // Danger row appears once, and it goes through the typed-confirmation dialog
+  // rather than the legacy window.confirm / onDeepWipe path.
+  it('renders the grouped issue menu and routes a Danger action through typed confirmation', async () => {
     const onDeepWipe = vi.fn();
     const windowConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderFeature(
@@ -412,22 +416,23 @@ describe('FeatureItem', () => {
     expect(screen.getByText('Issue actions')).toBeInTheDocument();
     expect(screen.getByText('Queued for plan')).toBeInTheDocument();
     expect(screen.getByText('For this phase')).toBeInTheDocument();
-    for (const section of ['Communicate', 'Lifecycle', 'Recover', 'Inspect', 'Navigate']) {
+    // PAN-4198: four groups — 'recover' folded into Actions, 'navigation' into Inspect.
+    for (const section of ['Communicate', 'Actions', 'Inspect']) {
       expect(within(menu).getByText(section)).toBeInTheDocument();
     }
 
     const danger = screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ });
     expect(danger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-cancel')).not.toBeInTheDocument();
 
     fireEvent.click(danger);
     expect(danger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getAllByRole('menuitem', { name: 'Wipe' })).toHaveLength(1);
+    expect(screen.getAllByRole('menuitem', { name: 'Cancel issue' })).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Wipe' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cancel issue' }));
     expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByLabelText('Confirmation text')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Wipe' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel issue' })).toBeDisabled();
     expect(windowConfirm).not.toHaveBeenCalled();
     expect(onDeepWipe).not.toHaveBeenCalled();
   });

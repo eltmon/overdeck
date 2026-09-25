@@ -943,7 +943,9 @@ describe('IssueCard', () => {
       );
     });
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('TEST-123 unpaused');
+      // PAN-3911 routes this through toastPauseOutcome, which always passes an
+      // options argument (undefined when there is no description).
+      expect(toast.success).toHaveBeenCalledWith('TEST-123 unpaused', undefined);
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['issues'] });
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['agents'] });
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['review-status'] });
@@ -1088,8 +1090,8 @@ describe('IssueCard', () => {
     expect(actionSets).toMatchInlineSnapshot(`
       {
         "CHANGES_REQUESTED": [
-          "issue-action-open",
-          "issue-action-requestReview",
+          "issue-action-resumeSession",
+          "issue-action-restartAgent",
         ],
         "QUEUED_FOR_PLAN": [
           "issue-action-plan",
