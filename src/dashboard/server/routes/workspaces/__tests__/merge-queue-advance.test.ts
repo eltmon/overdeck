@@ -293,15 +293,24 @@ describe('automaticMergeStartRefusal (#4066 review)', () => {
   it('on the direct path, starts only from the approved PR head', async () => {
     await expect(automaticMergeStartRefusal(approved, approved, '/ws', 'feature/pan-1')).resolves.toBeNull();
     await expect(automaticMergeStartRefusal(approved, 'b'.repeat(40), '/ws', 'feature/pan-1'))
-      .resolves.toContain('not the approved head');
+      .resolves.toEqual({ reason: expect.stringContaining('not the approved head') });
   });
 
   it('before a rebase, needs the worktree and the PR branch both at the approved head', async () => {
     await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
       git({ HEAD: approved, 'origin/feature/pan-1': approved }))).resolves.toBeNull();
     await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
-      git({ HEAD: 'c'.repeat(40), 'origin/feature/pan-1': approved }))).resolves.toContain('worktree HEAD');
+      git({ HEAD: 'c'.repeat(40), 'origin/feature/pan-1': approved }))).resolves.toEqual({ reason: expect.stringContaining('worktree HEAD') });
     await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
-      git({ HEAD: approved, 'origin/feature/pan-1': 'd'.repeat(40) }))).resolves.toContain('PR branch is at');
+      git({ HEAD: approved, 'origin/feature/pan-1': 'd'.repeat(40) }))).resolves.toEqual({ reason: expect.stringContaining('PR branch is at') });
+  });
+
+  it('marks a failed git read retryable, so a transient failure never fails the head for good', async () => {
+    const flaky = vi.fn(async (args: string[]) => {
+      if (args[0] === 'fetch') throw new Error('Could not resolve host: github.com');
+      return approved;
+    });
+    await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1', flaky))
+      .resolves.toEqual({ reason: expect.stringContaining('Could not resolve host'), retryable: true });
   });
 });

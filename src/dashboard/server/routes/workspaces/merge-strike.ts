@@ -280,6 +280,17 @@ export function automaticRebaseStartRefusal(
 }
 
 /**
+ * A reason an automatic merge may not start. `retryable` when a git read
+ * failed (a transient fetch or rev-parse failure): the executor retries it
+ * instead of failing the head for good. A head that was read and differs is
+ * a hard refusal.
+ */
+export interface AutomaticMergeStartRefusal {
+  reason: string;
+  retryable?: true;
+}
+
+/**
  * #4066 review: where an automatic merge may start. On the direct path
  * (`directHead`, the live PR head the forge reported) the PR must be at the
  * approved head, and the merge is then pinned to it. Otherwise the server
@@ -292,24 +303,27 @@ export async function automaticMergeStartRefusal(
   branchName: string,
   git: (args: string[], cwd: string) => Promise<string> = async (args, cwd) =>
     (await execFileAsync('git', args, { cwd, encoding: 'utf-8', timeout: 15_000 })).stdout.trim(),
-): Promise<string | null> {
+): Promise<AutomaticMergeStartRefusal | null> {
   if (directHead !== null) {
     return sameCommit(directHead, approvedHead)
       ? null
-      : `Cannot merge automatically: the PR head is ${directHead.slice(0, 12)}, not the approved head ${approvedHead.slice(0, 12)}`;
+      : { reason: `Cannot merge automatically: the PR head is ${directHead.slice(0, 12)}, not the approved head ${approvedHead.slice(0, 12)}` };
   }
+  let unreadable: string | null = null;
   const read = async (args: string[]): Promise<string | null> => {
     try {
       return (await git(args, workspacePath)) || null;
-    } catch {
+    } catch (error) {
+      unreadable ??= `git ${args.join(' ')} failed: ${error instanceof Error ? error.message.slice(0, 200) : String(error)}`;
       return null;
     }
   };
   await read(['fetch', 'origin', branchName]);
-  return automaticRebaseStartRefusal(approvedHead, {
-    worktree: await read(['rev-parse', 'HEAD']),
-    remote: await read(['rev-parse', `origin/${branchName}`]),
-  });
+  const worktree = await read(['rev-parse', 'HEAD']);
+  const remote = await read(['rev-parse', `origin/${branchName}`]);
+  if (unreadable) return { reason: `Cannot merge automatically yet: ${unreadable}`, retryable: true };
+  const refusal = automaticRebaseStartRefusal(approvedHead, { worktree, remote });
+  return refusal ? { reason: refusal } : null;
 }
 
 /** True when two SHAs (full or abbreviated) name the same commit. */

@@ -83,8 +83,14 @@ verdict, every time it's asked.
    to the `feature/<issue>` PR the merge lands, and a merge of any other PR is
    refused. An automatic merge merges only its approved head: directly when
    the PR is clean and still at it, otherwise through a server rebase of
-   exactly that commit, pinned to the result, never through the work agent
-   (see [auto-merge](../configuration/auto-merge.mdx)). Otherwise it:
+   exactly that commit in a server-owned detached worktree, pinned to the
+   result, never through the work agent
+   (see [auto-merge](../configuration/auto-merge.mdx)). A git read that fails
+   while checking where it may start is retried, never counted against that
+   head for good. Automatic merges are refused for polyrepo projects (their
+   merge sets are left to the operator) and for branches that track
+   `.planning/` files (stripping them pushes a head nobody approved); merge
+   those by hand. Otherwise it:
    - Merges a GitHub-clean PR directly when its head already contains the
      required base and checks are complete.
    - Otherwise runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)`

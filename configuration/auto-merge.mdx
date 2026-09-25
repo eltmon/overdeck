@@ -118,7 +118,10 @@ the approved head and to the PR the gate judged:
   merge then fails, the PR needs a fresh review before it can merge
   automatically again;
 - polyrepo merge sets and branches that track `.planning/` files are left to
-  the operator.
+  the operator: an automatic merge refuses them;
+- a git read that fails while checking where the merge may start (a `fetch`
+  or `rev-parse` failure) is retried within the merge retry budget instead of
+  failing that head for good. A head that was read and differs fails it.
 
 A commit made or pushed after the approval therefore fails the merge instead
 of landing code nobody approved.

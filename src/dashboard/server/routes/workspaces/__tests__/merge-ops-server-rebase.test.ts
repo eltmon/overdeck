@@ -284,6 +284,22 @@ describe('triggerMerge server rebase escalation', () => {
       expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
     });
 
+    it('retries, never fails for good, when the start check cannot read git (#4066 review, F1)', async () => {
+      gitHeads(HEAD_SHA, HEAD_SHA);
+      const heads = mocks.execFile.getMockImplementation()!;
+      mocks.execFile.mockImplementation(async (file, args, options) => {
+        if (file === 'git' && args[0] === 'fetch') throw new Error('Could not resolve host: github.com');
+        return heads(file, args, options);
+      });
+
+      const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+      expect(result).toEqual(expect.objectContaining({ success: false, retryable: true }));
+      expect(result.error).toContain('Could not resolve host');
+      expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
+      expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+    });
+
     it('refuses to start when the worktree holds a commit past the approved head', async () => {
       gitHeads('f'.repeat(40), HEAD_SHA);
 

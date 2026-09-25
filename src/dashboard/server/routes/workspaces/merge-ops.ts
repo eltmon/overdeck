@@ -946,9 +946,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     const startRefusal = approvedHead
       ? await automaticMergeStartRefusal(approvedHead, canMergeCleanPrDirectly ? preMergePrState!.headSha : null, workspacePath, branchName)
       : null;
-    if (startRefusal) return refuseMerge(startRefusal);
-
-    if (canMergeCleanPrDirectly) {
+    if (startRefusal?.retryable) rebaseResult = { success: false, reason: startRefusal.reason, retryable: true };
+    else if (startRefusal) return refuseMerge(startRefusal.reason);
+    else if (canMergeCleanPrDirectly) {
       console.log(`[merge] PR is CLEAN — merging directly without rebase for ${issueId}`);
       rebaseResult = { success: true, newHead: approvedHead ?? preMergePrState!.headSha };
     } else {
