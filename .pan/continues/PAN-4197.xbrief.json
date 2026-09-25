@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4197",
   "created": "2026-09-25T06:40:33.339Z",
-  "updated": "2026-09-25T08:15:21.812Z",
+  "updated": "2026-09-25T08:15:35.279Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -161,6 +161,10 @@
     "agents-shell.ac4": {
       "status": "completed",
       "doneAt": "2026-09-25T08:15:21.812Z"
+    },
+    "history-panes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T08:15:35.278Z"
     }
   }
 }
