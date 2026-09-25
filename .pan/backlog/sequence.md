@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T10:22:40.005974Z · model: claude-opus-5-5 · open: 813_
+_Last sequenced: 2026-09-25T10:24:44.275331Z · model: claude-opus-5-5 · open: 813_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1128,7 +1128,7 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T10:22:40.005974Z",
+  "generatedAt": "2026-09-25T10:24:44.275331Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 813,
