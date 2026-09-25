@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4201",
   "created": "2026-09-25T06:42:41.599Z",
-  "updated": "2026-09-25T09:05:07.551Z",
+  "updated": "2026-09-25T09:05:18.922Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "live-activity-signal.ac3": {
       "status": "completed",
       "doneAt": "2026-09-25T09:05:07.551Z"
+    },
+    "live-activity-signal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:05:18.922Z"
     }
   }
 }
