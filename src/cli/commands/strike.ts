@@ -22,6 +22,7 @@ import {
 import { resolveGitHubIssue, type IssueResolution } from '../../lib/tracker-utils.js';
 import { isHarnessProcessAlive, sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
+import { attachHintLines } from '../../lib/terminal-backends/attach-hint.js';
 
 const execAsync = promisify(exec);
 
@@ -398,7 +399,7 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
     console.log(`  Model:      ${agent.model}`);
     console.log('');
     console.log(chalk.dim('Commands:'));
-    console.log(`  Attach:   tmux -L overdeck attach -t ${agent.id}`);
+    for (const line of await attachHintLines(agent)) console.log(line);
     console.log(`  Message:  pan tell ${plan.issueId.toLowerCase()} "your message"`);
     console.log(`  Kill:     pan kill ${plan.issueId.toLowerCase()}`);
   } catch (error: any) {

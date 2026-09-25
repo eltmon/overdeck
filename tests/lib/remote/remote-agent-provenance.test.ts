@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
   commands: [] as string[],
+  determineModelCalls: [] as Array<{ model?: string; role?: string }>,
   failPushDaemon: false,
   launcherOptions: undefined as Record<string, unknown> | undefined,
   remoteFiles: new Map<string, string>(),
@@ -16,6 +17,13 @@ vi.mock('../../../src/lib/remote/fly-provider.js', () => ({
     getStatus: () => Effect.succeed('running'),
     ssh: () => Effect.succeed({ stdout: '', stderr: '', exitCode: 0 }),
   }),
+}));
+
+vi.mock('../../../src/lib/agents/provider-env.js', () => ({
+  determineModel: (options: { model?: string; role?: string }) => {
+    mocks.determineModelCalls.push(options);
+    return options.model ?? 'routed-work-model';
+  },
 }));
 
 vi.mock('../../../src/lib/pan-dir/record.js', () => ({
@@ -65,6 +73,7 @@ describe('remote agent provenance', () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.commands.length = 0;
+    mocks.determineModelCalls.length = 0;
     mocks.failPushDaemon = false;
     mocks.launcherOptions = undefined;
     mocks.remoteFiles.clear();
@@ -184,5 +193,28 @@ describe('remote agent provenance', () => {
     expect(launch).toContain('OVERDECK_AGENT_STARTED_BY=');
     expect(launch).toContain('operator:dashboard');
     expect(launch).toContain('claude --permission-mode');
+  });
+
+  it('resolves an unset model through work-role routing, never a literal', async () => {
+    const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
+    const state = await spawnRemoteAgent({
+      issueId: 'PAN-3114',
+      workspace: {
+        id: 'remote-pan-3114',
+        issue: 'PAN-3114',
+        provider: 'fly',
+        vmName: 'pan-3114-vm',
+        urls: {},
+        created: new Date('2026-07-26T00:00:00.000Z'),
+        location: 'remote',
+      },
+      prompt: 'implement the issue',
+      startedBy: 'operator:dashboard',
+      tier: 'ephemeral',
+    });
+
+    expect(mocks.determineModelCalls).toEqual([{ model: undefined, role: 'work' }]);
+    expect(mocks.launcherOptions?.model).toBe('routed-work-model');
+    expect(state.model).toBe('routed-work-model');
   });
 });

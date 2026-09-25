@@ -46,11 +46,11 @@ describe('recoveryFromBody', () => {
   });
 
   it('extracts a live-session recovery from a live-tmux 409, ahead of resumable', () => {
-    expect(recoveryFromBody({ error: '…has a live tmux session…', lifecycle: { agentId: 'agent-x', hasLiveTmuxSession: true } }))
+    expect(recoveryFromBody({ error: '…has a live tmux session…', lifecycle: { agentId: 'agent-x', hasLivePane: true } }))
       .toEqual({ kind: 'live-session', agentId: 'agent-x' });
     // A stopped-on-paper agent with a live session can look resumable — the
     // live session wins, because resume would just 409 again.
-    expect(recoveryFromBody({ lifecycle: { agentId: 'agent-x', hasLiveTmuxSession: true, canResumeSession: true } }))
+    expect(recoveryFromBody({ lifecycle: { agentId: 'agent-x', hasLivePane: true, canResumeSession: true } }))
       .toEqual({ kind: 'live-session', agentId: 'agent-x' });
   });
 });

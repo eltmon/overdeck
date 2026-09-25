@@ -553,6 +553,13 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               workspace: workspacePath,
               ...(artifactUrl ? { prUrl: artifactUrl } : {}),
               force: forceReview,
+              // The Full/Quick/None menu choice applies to this run only and
+              // is not persisted; later dispatches read `roles.review.mode`.
+              ...(requestedReviewMode.mode ? { reviewMode: requestedReviewMode.mode } : {}),
+              // #3853: this route is the dashboard's Request review / Re-run
+              // review door. The operator asked for this run, so its reviewer
+              // may block a head that is already approved.
+              operatorRequested: true,
             }));
 
             if (!reviewResult.success) {
@@ -718,6 +725,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               branch: branchNameRerun,
               ...(derived.pr?.url ? { prUrl: derived.pr.url } : {}),
               force: true,
+              // #3853: an operator forced this re-review of an approved PR.
+              operatorRequested: true,
             }));
 
             if (result.success) {

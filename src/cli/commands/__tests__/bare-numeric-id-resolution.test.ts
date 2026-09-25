@@ -33,17 +33,12 @@ const interventionMocks = vi.hoisted(() => ({
 }));
 
 const unpauseMocks = vi.hoisted(() => ({
-  getWorkAgentLifecycleStateSync: vi.fn(),
+  getWorkAgentLifecycleState: vi.fn(),
   resumeAgent: vi.fn(),
 }));
 
 const lifecycleMocks = vi.hoisted(() => ({
   closeOut: vi.fn(),
-}));
-
-const inspectMocks = vi.hoisted(() => ({
-  spawnInspectAgent: vi.fn(),
-  getInspectDiffContext: vi.fn(),
 }));
 
 const trackerMocks = vi.hoisted(() => ({
@@ -121,7 +116,7 @@ vi.mock('../../../lib/operator-interventions.js', () => ({
 }));
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
-  getWorkAgentLifecycleStateSync: unpauseMocks.getWorkAgentLifecycleStateSync,
+  getWorkAgentLifecycleState: unpauseMocks.getWorkAgentLifecycleState,
 }));
 
 vi.mock('../../../lib/agents/resume.js', () => ({
@@ -130,14 +125,6 @@ vi.mock('../../../lib/agents/resume.js', () => ({
 
 vi.mock('../../../lib/lifecycle/index.js', () => ({
   closeOut: lifecycleMocks.closeOut,
-}));
-
-vi.mock('../../../lib/cloister/inspect-agent.js', () => ({
-  spawnInspectAgent: inspectMocks.spawnInspectAgent,
-}));
-
-vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({
-  getInspectDiffContext: inspectMocks.getInspectDiffContext,
 }));
 
 vi.mock('../../../lib/xbrief/io.js', () => ({
@@ -239,22 +226,12 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
     workspaceMocks.findWorkspacePath.mockReturnValue(null);
     interventionMocks.appendOperatorInterventionEvent.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockResolvedValue(undefined);
-    unpauseMocks.getWorkAgentLifecycleStateSync.mockReset();
-    unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: false });
+    unpauseMocks.getWorkAgentLifecycleState.mockReset();
+    unpauseMocks.getWorkAgentLifecycleState.mockReturnValue({ canResumeSession: false });
     unpauseMocks.resumeAgent.mockReset();
     unpauseMocks.resumeAgent.mockResolvedValue({ success: true });
     lifecycleMocks.closeOut.mockReset();
     lifecycleMocks.closeOut.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
-    inspectMocks.spawnInspectAgent.mockReset();
-    inspectMocks.spawnInspectAgent.mockReturnValue(Effect.succeed({ success: true, tmuxSession: 'inspect-1', runId: 'run-1' }));
-    inspectMocks.getInspectDiffContext.mockReset();
-    inspectMocks.getInspectDiffContext.mockReturnValue(Effect.succeed({
-      currentHead: 'fedcba987654',
-      checkpoint: 'abcdef12',
-      diffStats: '1 file changed',
-      diffCommand: 'git diff abcdef123456...HEAD',
-      repos: [],
-    }));
     trackerMocks.resolveTrackerType.mockReset();
     trackerMocks.resolveTrackerType.mockReturnValue('rally');
     trackerMocks.isGitHubIssue.mockReset();
@@ -379,6 +356,24 @@ describe('resolveBareNumericId rollout (PAN-1173)', () => {
       'http://dashboard.test/api/specialists/overdeck/PAN-9999/reviewer/correctness/restart',
       expect.any(Object),
     );
+  });
+
+  // #3853: the route grants operator standing unless the caller is an agent.
+  it('tells the restart route whether an agent or the operator is calling', async () => {
+    const { reviewRestartCommand } = await import('../review-restart.js');
+    const postedBody = (call: number) =>
+      JSON.parse((vi.mocked(fetch).mock.calls[call][1] as RequestInit).body as string) as { callerKind?: string };
+
+    process.env.OVERDECK_AGENT_ID = 'flywheel-overdeck';
+    try {
+      await reviewRestartCommand('9999');
+    } finally {
+      delete process.env.OVERDECK_AGENT_ID;
+    }
+    await reviewRestartCommand('9999');
+
+    expect(postedBody(0).callerKind).toBe('agent');
+    expect(postedBody(1).callerKind).toBe('operator');
   });
 
   it('does not fail pan review restart when an accepted response is not JSON', async () => {

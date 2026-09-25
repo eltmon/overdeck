@@ -344,6 +344,48 @@ describe('XTerminal', () => {
     });
   });
 
+  it('never fits or sends a resize while the host is hidden', async () => {
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+    const ws = MockWebSocket.instances[0];
+    const fit = (FitAddon as unknown as {
+      instances: Array<{ fit: ReturnType<typeof vi.fn>; proposeDimensions: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
+    // Snapshot at the size the fit addon proposes, so going live sends no resize.
+    ws.onmessage?.({
+      data: `\u0000${JSON.stringify({ type: 'snapshot', cols: 100, rows: 30, data: '' })}`,
+    });
+    const resizes = () => ws.send.mock.calls.filter(([msg]) => JSON.parse(String(msg)).type === 'resize');
+    expect(resizes()).toHaveLength(0);
+
+    vi.useFakeTimers();
+    try {
+      // Hidden by the backend-outage boundary: no layout box. A percent-sized
+      // host would still let the fit addon propose a tiny grid.
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 0 });
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 0 });
+      fit.proposeDimensions.mockReturnValue({ cols: 9, rows: 5 });
+      fit.fit.mockClear();
+      window.dispatchEvent(new Event('resize'));
+      await vi.advanceTimersByTimeAsync(300);
+      expect(fit.fit).not.toHaveBeenCalled();
+      expect(resizes()).toHaveLength(0);
+
+      // Shown again at a real size: the resize goes through.
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 800 });
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 600 });
+      fit.proposeDimensions.mockReturnValue({ cols: 110, rows: 32 });
+      window.dispatchEvent(new Event('resize'));
+      await vi.advanceTimersByTimeAsync(300);
+      expect(resizes()).toEqual([[JSON.stringify({ type: 'resize', cols: 110, rows: 32 })]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows the Overdeck context menu on right-click', async () => {
     const { container } = render(<XTerminal sessionName="test-session" />);
 
@@ -778,12 +820,19 @@ describe('XTerminal - patient reconnect', () => {
     expect(MockWebSocket.instances).toHaveLength(2);
   });
 
-  it('treats close code 4404 as fatal without scheduling a retry', async () => {
+  it('retries a 4404 once, then treats a second 4404 as fatal (PAN-3921)', async () => {
     const onDisconnect = vi.fn();
     render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
     await act(async () => vi.advanceTimersByTimeAsync(0));
 
     act(() => MockWebSocket.instances[0].onclose?.({ code: 4404, reason: 'missing' }));
+    await act(async () => vi.advanceTimersByTimeAsync(3_000));
+
+    // The first 4404 may be a respawn gap: one reconnect, no "has ended" yet.
+    expect(MockWebSocket.instances).toHaveLength(2);
+    expect(onDisconnect).not.toHaveBeenCalled();
+
+    act(() => MockWebSocket.instances[1].onclose?.({ code: 4404, reason: 'missing' }));
     await act(async () => vi.runOnlyPendingTimersAsync());
 
     const term = (Terminal as unknown as {
@@ -791,8 +840,7 @@ describe('XTerminal - patient reconnect', () => {
     }).instances[0];
     expect(term.writeln).toHaveBeenCalledWith(expect.stringContaining('has ended'));
     expect(onDisconnect).toHaveBeenCalledOnce();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 });
 

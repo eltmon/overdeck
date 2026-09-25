@@ -6,6 +6,8 @@ import { DialogProvider } from './components/DialogProvider';
 import App from './App';
 import { installRecovery, RootErrorBoundary } from './recovery';
 import { useDesignLanguage } from './hooks/useDesignLanguage';
+import { installQueryRecovery } from './lib/queryRecovery';
+import { LinkPullRequestDialogHost } from './components/chat/LinkPullRequestDialog';
 import './index.css';
 
 void initTelemetry();
@@ -48,12 +50,17 @@ const queryClient = new QueryClient({
   },
 });
 
+// PAN-3527: the deck's project and conversation lists retry with backoff and
+// refetch when the RPC websocket reconnects, instead of latching empty.
+installQueryRecovery(queryClient);
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <RootErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <DialogProvider>
           <App />
+          <LinkPullRequestDialogHost />
         </DialogProvider>
       </QueryClientProvider>
     </RootErrorBoundary>

@@ -1,0 +1,131 @@
+---
+title: Review Commands
+description: Request, restart, and abort an issue's code review
+---
+
+# Review Commands
+
+`pan review` manages the review loop for an issue that already has a
+workspace and a feature branch. Every subcommand calls the running dashboard,
+so start it first with `pan up`. Without it, the command prints
+`Dashboard not running` and exits 1.
+
+```bash
+pan review request <id> [-m <text>]
+pan review restart <id> [--model <model>] [--role <role>]
+pan review abort <id>
+```
+
+Review needs no separate "start" step. `pan done` requests review as its last
+step, and a PR you open or mark ready by hand starts the same pipeline through
+the GitHub webhook. The verdict lands as a review on the PR, which is also
+where the dashboard reads it from.
+
+<Note>
+  The old convoy command no longer exists, and neither does the `run`
+  subcommand of `pan review`. The parallel reviewers that the convoy used to
+  launch are now the `full` review mode (see [Review modes](#review-modes)).
+</Note>
+
+## pan review request
+
+Request a re-review after fixing review feedback.
+
+```bash
+pan review request PAN-123
+pan review request PAN-123 -m "Handled the null session case and added a test"
+```
+
+**Options:**
+- `-m, --message <text>`: describes the fixes, and is recorded with the request
+
+This calls `POST /api/review/:issueId/request`, the same call `pan done` makes.
+The dashboard first runs verification on the branch and dispatches review once
+the verified branch is pushed, so a successful request prints `Verification
+started for <id>; review will start automatically when it passes`.
+
+Depending on the issue's state, the request can instead:
+
+- refuse, if the issue is already merged, the workspace does not exist, or the
+  workspace has uncommitted changes;
+- re-queue tests without a new review, if the PR is already approved but its
+  checks are not green;
+- succeed as a no-op, if the PR is approved and its checks are green.
+
+**Circuit breaker:** an issue gets at most 25 automatic re-review requests.
+After that the command exits 1 with `Circuit breaker triggered!`, and an
+operator has to click **Review** in the dashboard to continue. The count lives
+in dashboard memory, so it starts again from zero after a dashboard restart.
+
+## pan review restart
+
+Resume the review and re-dispatch every reviewer that has not produced its
+report.
+
+```bash
+# Resume the review with the configured models
+pan review restart PAN-123
+
+# Restart every reviewer on a different model
+pan review restart PAN-123 --model claude-sonnet-5
+
+# Re-run one reviewer lane
+pan review restart PAN-123 --role security
+```
+
+**Options:**
+- `--model <model>`: overrides the model for all restarted reviewers
+- `--role <role>`: restarts only one reviewer lane: `correctness`, `security`,
+  `performance`, or `requirements`
+
+`restart` kills the running reviewer sessions and keeps what is already done.
+Reports from reviewers that finished stay in place, and the review session is
+resumed rather than started over, so a restart on the same model checks the fix
+instead of re-reading the whole diff. The review session is started fresh only
+when `--model` changes the model.
+
+`--role` needs an active review run for the issue. Without one, the command
+exits 1 with `Active review run not found for <id>`.
+
+Restarting a review agent from the dashboard calls the same endpoint.
+
+## pan review abort
+
+Kill every running reviewer session for an issue.
+
+```bash
+pan review abort PAN-123
+```
+
+The command prints each session it killed, and a warning if any session could
+not be killed. It does not message the work agent, which stays idle. There is
+nothing to reset afterwards: whether the issue is in review is read from the
+PR, not from stored state.
+
+## Review modes
+
+The review mode is configuration, not a command flag. It comes from
+`roles.review.mode` in `~/.overdeck/config.yaml`.
+
+| Mode | Behavior |
+|------|----------|
+| `quick` (default) | One review agent does a combined correctness, security, performance, and requirements pass. |
+| `full` | Four parallel reviewer lanes (`correctness`, `security`, `performance`, `requirements`) plus a review parent that writes the synthesis. |
+| `none` | No AI review. The verification quality floor still applies. |
+
+```yaml
+roles:
+  review:
+    mode: full
+    sub:
+      security:
+        model: claude-opus-4-8
+```
+
+Each lane's model comes from `roles.review.sub.<lane>.model`. When that is not
+set, it falls back to `roles.review.model` and then to the built-in default.
+
+## Related Commands
+
+- [pan start](/cli/agent-commands) - Spawn a work agent
+- [Specialists](/features/specialists) - The review, test, and merge specialists

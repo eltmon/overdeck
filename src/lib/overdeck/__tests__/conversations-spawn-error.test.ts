@@ -67,4 +67,26 @@ describe('updateSpawnError (overdeck store)', () => {
     updateSpawnError('conv-spawn-clear', null);
     expect(getConversationByName('conv-spawn-clear')?.spawnError).toBeNull();
   });
+
+  // Review of #4137 (finding 2): markConversationRunning only touches rows
+  // that are not active, so an active row (a slow start marked failed, or a
+  // resume before the poller ended the row) kept its spawn error forever.
+  it('clears the spawn error on an active row once the conversation is running again', async () => {
+    const { createConversation, updateSpawnError, markConversationActive, getConversationByName } = await import('../conversations.js');
+
+    createConversation({
+      name: 'conv-spawn-resumed',
+      tmuxSession: 'conv-spawn-resumed',
+      cwd: TEST_HOME,
+      claudeSessionId: 'sess-spawn-resumed',
+      title: 'New conversation',
+      harness: 'claude-code',
+    });
+    updateSpawnError('conv-spawn-resumed', 'The conversation process exited before it was ready');
+    expect(getConversationByName('conv-spawn-resumed')?.status).toBe('active');
+
+    markConversationActive('conv-spawn-resumed');
+
+    expect(getConversationByName('conv-spawn-resumed')?.spawnError).toBeNull();
+  });
 });

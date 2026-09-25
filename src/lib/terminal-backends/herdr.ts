@@ -44,6 +44,7 @@ import {
   HerdrApiError,
 } from './herdr-api.js';
 import { controlTerminal, observeTerminal } from './herdr-stream.js';
+import { adoptIssueWorkspace, listIssueWorkspaces, type HerdrWorkspaceInfo } from './herdr-workspaces.js';
 import { checkPrompt } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
 import {
@@ -103,12 +104,6 @@ interface HerdrPaneInfo {
   terminal_title?: string | null;
   tokens?: Record<string, string>;
   name?: string | null;
-}
-
-interface HerdrWorkspaceInfo {
-  workspace_id: string;
-  label?: string;
-  tokens?: Record<string, string>;
 }
 
 function fail(operation: string, cause: unknown): TerminalBackendError {
@@ -506,7 +501,12 @@ export async function listHerdrAgents(
     if (!agentId) continue;
     record(agent, agentId, false);
   }
-  return [...byAgentId.values()];
+  // Herdr keeps a pane-bound pane `unknown` after its shell is back at the prompt: the
+  // foreground process decides; an unanswered probe keeps the state (PAN-3921).
+  return Promise.all([...byAgentId.values()].map(async (agent) => {
+    if (!agent.paneBound || agent.state === 'exited') return agent;
+    return (await paneProcessLiveness(agent.paneId, api)) === 'exited' ? { ...agent, state: 'exited' as const } : agent;
+  }));
 }
 
 /** Overdeck agent id: the `agentId` token; Herdr's own agent name only on an Overdeck-tokened pane (PAN-3920). */
@@ -515,13 +515,13 @@ const agentIdOf = (pane: HerdrPaneInfo): string | undefined => pane.tokens?.[AGE
 
 /** The recent terminal text of a Herdr pane — the backend's `capture-pane`. */
 export async function readHerdrPaneText(
-  paneId: string,
-  lines: number,
+  paneId: string, lines: number,
+  source: 'recent' | 'visible' = 'recent', // `visible` includes a full-screen TUI's alternate screen
   api: HerdrApiClient = getHerdrApiClient(),
 ): Promise<string> {
   const result = await api.call<{ text?: string }>('pane.read', {
     pane_id: paneId,
-    source: 'recent',
+    source,
     lines,
     strip_ansi: true,
   });
@@ -550,17 +550,13 @@ export class HerdrBackend implements TerminalBackend {
 
   /**
    * The issue's workspace. Looked up by the `issue` token first (a label can be
-   * renamed in the TUI; the token is ours), created and stamped when missing.
+   * renamed in the TUI; the token is ours), then re-adopted by its label when a
+   * Herdr restore dropped the token (#4096), created and stamped when missing.
    */
   workspaceFor(issueId: string, cwd: string): Effect.Effect<BackendResult<WorkspaceRef>, TerminalBackendError> {
     return attempt('workspaceFor', async () => {
-      const listed = await this.api.call<{ workspaces?: HerdrWorkspaceInfo[] }>('workspace.list', {});
-      const existing = (listed.workspaces ?? []).find(
-        (workspace) => workspace.tokens?.issue?.toLowerCase() === issueId.toLowerCase(),
-      );
-      if (existing) {
-        return { backend: BACKEND, workspaceId: existing.workspace_id, issueId, cwd };
-      }
+      const existing = await adoptIssueWorkspace(this.api, issueId, METADATA_SOURCE);
+      if (existing) return { backend: BACKEND, workspaceId: existing, issueId, cwd };
       const created = await this.api.call<{ workspace?: HerdrWorkspaceInfo }>('workspace.create', {
         cwd,
         label: issueId,
@@ -575,6 +571,11 @@ export class HerdrBackend implements TerminalBackend {
       });
       return { backend: BACKEND, workspaceId, issueId, cwd };
     });
+  }
+
+  /** Every workspace of the issue, by `issue` token or, once a restore dropped it, by label (#4096). */
+  async issueWorkspaceIds(issueId: string): Promise<string[]> {
+    return (await listIssueWorkspaces(this.api, issueId)).map((workspace) => workspace.workspace_id);
   }
 
   startAgent(

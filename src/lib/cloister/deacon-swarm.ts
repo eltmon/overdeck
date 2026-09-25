@@ -30,7 +30,7 @@ import { resolveAutomaticSwarmPolicy, resolveSwarmMaxSlots } from '../swarm-poli
 import type { SwarmInferCompletionMode } from './config.js';
 import {
   countRunningAgents,
-  countRunningSwarmSlotsForIssue,
+  countLiveSwarmSlotsForIssue,
   getConcurrencyLimits,
   releaseSwarmSlot,
   tryReserveSwarmSlot,
@@ -50,7 +50,7 @@ import {
 } from './deacon-swarm-completion.js';
 import type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
 export type { CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';
-import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
+import { gcMergedSlots, reapMergedSlotAgent, teardownSlotWorkspaceDocker } from './deacon-swarm-gc.js';
 import { gcMergedSlotsAndAdvance } from './deacon-swarm-advance.js';
 import {
   clearReleasedBlockedSwarmSlot,
@@ -143,7 +143,8 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   recordSlotAssignment,
   clearSlotAssignment,
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
-  registeredSlotCapacityAvailable: (issueId, selectedCount) => registeredSlotCapacityAvailable(issueId, selectedCount),
+  teardownSlotDocker: teardownSlotWorkspaceDocker,
+  registeredSlotCapacityAvailable: async (issueId, n) => registeredSlotCapacityAvailable(issueId, n, await countLiveSwarmSlotsForIssue(issueId)),
   tryReserveSwarmSlot: async () => tryReserveSwarmSlot(await countRunningAgents()),
   releaseSwarmSlot,
   spawnRun,
@@ -827,7 +828,7 @@ export async function dispatchNextWave(
       continue;
     }
 
-    if (!deps.registeredSlotCapacityAvailable(issueId, selectedItemIds.length)) {
+    if (!(await deps.registeredSlotCapacityAvailable(issueId, selectedItemIds.length))) {
       actions.push(`[swarm] deferred ${item.id} for ${issueId}: registered slot cap reached`);
       continue;
     }
@@ -1047,15 +1048,15 @@ function firstOverlappingItemId(
 }
 
 /**
- * Whether the issue may register another slot. Counts only tmux-ALIVE slot
- * sessions (stale agents-table rows blocked all dispatch at zero live slots
- * after a reset), capped by the same swarm reserve tryReserveSwarmSlot
- * enforces — never maxWorkAgents (PAN-2214).
+ * Whether the issue may register another slot. `liveSlotCount` counts only
+ * slots in the terminal backend's inventory (PAN-3926; stale rows blocked all
+ * dispatch at zero live slots after a reset), capped by the same swarm reserve
+ * tryReserveSwarmSlot enforces — never maxWorkAgents (PAN-2214).
  */
 export function registeredSlotCapacityAvailable(
   issueId: string,
   selectedCount: number,
-  liveSlotCount: number = countRunningSwarmSlotsForIssue(issueId),
+  liveSlotCount: number,
   limits: Pick<ConcurrencyLimits, 'reservedSwarmSlots'> = getConcurrencyLimits(),
 ): boolean {
   return liveSlotCount + selectedCount < limits.reservedSwarmSlots;

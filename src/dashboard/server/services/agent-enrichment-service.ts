@@ -234,6 +234,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 costSoFar: agent.costSoFar,
                 sessionId: agent.sessionId || undefined,
                 role: toRole(agent.role) ?? 'work',
+                hasLivePane: true,
+                // Deprecated alias of `hasLivePane` (#4105).
                 hasLiveTmuxSession: true,
                 hasPendingQuestion: undefined,
                 pendingQuestionCount: undefined,

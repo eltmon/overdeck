@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   invalidateAgentsCache: vi.fn(),
   spawnPanCommandDetached: vi.fn(),
   saveAgentStateSync: vi.fn(),
+  resolveRoutedSpawnModel: vi.fn(),
 }))
 
 vi.mock('../../../../lib/agents.js', async (importOriginal) => {
@@ -27,6 +28,7 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
     wipeAgentStateDirs: mocks.wipeAgentStateDirs,
     getProviderAuthMode: mocks.getProviderAuthMode,
     saveAgentStateSync: mocks.saveAgentStateSync,
+    resolveRoutedSpawnModel: mocks.resolveRoutedSpawnModel,
   }
 })
 
@@ -125,6 +127,7 @@ async function postRestartFresh(body: Record<string, unknown>) {
 describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837 review fix)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.resolveRoutedSpawnModel.mockReset()
     mocks.getAgentState.mockReturnValue(agentState as any)
     mocks.getIssueStage.mockReturnValue(null)
     mocks.detectPendingOperatorDecision.mockResolvedValue(null)
@@ -194,5 +197,45 @@ describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837
     // of 409ing on a leaked claim.
     await postRestartFresh({ spawn: true })
     expect(mocks.spawnPanCommandDetached).toHaveBeenCalledTimes(2)
+  })
+
+  describe('no recorded model (PAN-4145)', () => {
+    const unmodelled = { ...agentState, model: undefined }
+
+    it('validates the harness against the routed model, not a hardcoded fallback', async () => {
+      mocks.getAgentState.mockReturnValue(unmodelled as any)
+      mocks.resolveRoutedSpawnModel.mockReturnValue('kimi-code/k3')
+      mocks.canUseHarness.mockReturnValue({ allowed: true })
+
+      const response = await postRestartFresh({ spawn: true, harness: 'kimi-code' })
+
+      expect(mocks.resolveRoutedSpawnModel).toHaveBeenCalledWith({ role: 'work', issueId: 'PAN-1837', workspace: '/tmp/pan-1837' })
+      expect(mocks.canUseHarness).toHaveBeenCalledWith('kimi-code', 'kimi-code/k3', 'api-key')
+      expect(response.status).toBe(200)
+      expect(readJson(response).spawnedModel).toBe('kimi-code/k3')
+    })
+
+    it('returns 400 before any kill/wipe when no default model is configured', async () => {
+      mocks.getAgentState.mockReturnValue(unmodelled as any)
+      mocks.resolveRoutedSpawnModel.mockImplementation(() => {
+        throw new Error('No default model configured for role "work" (PAN-1837): workhorses.mid is not defined.')
+      })
+
+      const response = await postRestartFresh({ spawn: true })
+
+      expect(response.status).toBe(400)
+      expect(readJson(response).error).toContain('No default model configured')
+      expect(mocks.killSession).not.toHaveBeenCalled()
+      expect(mocks.wipeAgentStateDirs).not.toHaveBeenCalled()
+    })
+
+    it('needs no model for a wipe-only request', async () => {
+      mocks.getAgentState.mockReturnValue(unmodelled as any)
+
+      const response = await postRestartFresh({ spawn: false })
+
+      expect(response.status).toBe(200)
+      expect(mocks.resolveRoutedSpawnModel).not.toHaveBeenCalled()
+    })
   })
 })

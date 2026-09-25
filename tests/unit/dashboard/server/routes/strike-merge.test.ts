@@ -14,7 +14,7 @@ vi.mock('../../../../../src/lib/agents/agent-state.js', () => ({
   saveAgentStateSync: vi.fn(),
 }));
 vi.mock('../../../../../src/lib/work-agent-lifecycle.js', () => ({
-  getWorkAgentLifecycleStateSync: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
+  getWorkAgentLifecycleState: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
 }));
 vi.mock('../../../../../src/lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },

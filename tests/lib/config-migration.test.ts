@@ -152,7 +152,7 @@ describe('config-migration', () => {
       expect(yamlConfig.models?.providers?.google).toBe(false);
     });
 
-    it('should return empty overrides for legacy settings', () => {
+    it('writes no retired models.overrides key for legacy settings', () => {
       const legacySettings: SettingsConfig = {
         models: {
           specialists: {
@@ -173,9 +173,8 @@ describe('config-migration', () => {
 
       const yamlConfig = convertToYamlConfig(legacySettings);
 
-      // Legacy conversion doesn't create overrides (smart selection handles this)
-      expect(yamlConfig.models?.overrides).toBeDefined();
-      expect(Object.keys(yamlConfig.models?.overrides || {})).toHaveLength(0);
+      // models.overrides is retired (#4131); conversion must not manufacture it.
+      expect(yamlConfig.models).not.toHaveProperty('overrides');
     });
 
     it('should preserve all API keys', () => {
@@ -218,7 +217,6 @@ describe('config-migration', () => {
 
       expect(preview).toBeDefined();
       expect(preview.preset).toBeDefined();
-      expect(preview.overrides).toBeDefined();
     });
   });
 

@@ -30,6 +30,12 @@ vi.mock('../tmux.js', () => ({
   sessionExists: () => Effect.succeed(mockSessionExists()),
 }));
 
+// The tmux path re-asks a false sessionExists through the three-part probe.
+vi.mock('../agents/tmux-session-query.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agents/tmux-session-query.js')>()),
+  queryTmuxSession: vi.fn(async () => 'missing'),
+}));
+
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return { ...actual, existsSync: () => true };

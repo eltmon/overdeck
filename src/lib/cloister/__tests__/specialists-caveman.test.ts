@@ -31,12 +31,6 @@ afterEach(() => {
 });
 
 describe('buildSpecialistCavemanExports', () => {
-  it('returns empty string for inspect-agent (sentinel protection)', async () => {
-    const result = await buildSpecialistCavemanExports('inspect-agent', '/workspace', baseConfig);
-    expect(result).toBe('');
-    expect(mockReadVariant).not.toHaveBeenCalled();
-  });
-
   it('returns empty string when config.enabled is false', async () => {
     const result = await buildSpecialistCavemanExports('review-agent', '/workspace', { ...baseConfig, enabled: false });
     expect(result).toBe('');

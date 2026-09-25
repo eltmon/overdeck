@@ -28,13 +28,13 @@ Overdeck has built-in dashboard TTS playback for `activity.tts` events when `tts
 The TTS pipeline has three independent components:
 
 1. **Dashboard playback service** — subscribes to internal `activity.tts` events, resolves `tts.voice` / `tts.statusVoice` / `tts.voiceMap`, and forwards utterances to the daemon when dashboard TTS is enabled.
-2. **Qwen3-TTS HTTP daemon** (`skills/pan-tts/scripts/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
+2. **Qwen3-TTS HTTP daemon** (`sync-sources/skills/pan-tts/scripts/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
 3. **Optional SSE subscriber** (`~/Projects/pan-tts/`) — connects to Overdeck's `/events/stream`, formats condensed utterances, and forwards them to the daemon for external playback.
 
 ## Architecture
 
 ```
-pan dashboard                  qwen-tts daemon            audio out
+Overdeck dashboard             qwen-tts daemon            audio out
 ────────────────────────       ─────────────────          ─────────
 activity.tts ──▶ resolve voice ──▶ POST /speak ──▶         PipeWire
                  mute/filter      synthesize (GPU)
@@ -54,7 +54,7 @@ Optional external path:
 
 ## Qwen3-TTS HTTP Daemon
 
-**Source:** `skills/pan-tts/scripts/tts_daemon.py`
+**Source:** `sync-sources/skills/pan-tts/scripts/tts_daemon.py`
 
 The daemon loads `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` on `cuda:0` at startup and exposes three endpoints:
 
@@ -100,7 +100,7 @@ The subscriber is a small Python project that connects to Overdeck's SSE feed an
 
 ```yaml
 endpoint: http://127.0.0.1:3000/events/stream
-token: ${OVERDECK_EVENTS_TOKEN}   # optional, only if pan has the token set
+token: ${OVERDECK_EVENTS_TOKEN}   # optional, only if Overdeck has the token set
 
 filters:
   types: [activity.tts]
@@ -144,8 +144,10 @@ pan tts voices list
 pan tts voices show "Vivian Voice"
 pan tts voices play "Vivian Voice"
 pan tts voices set-default "Vivian Voice"
-pan tts voices map reviewStatus.passed "Vivian Voice"
+pan tts voices map workAgent.finished "Vivian Voice"
 ```
+
+Voice-map keys are `activity.tts` `eventType` values; the lifecycle keys are `planning.started`, `planning.finalized`, `workAgent.started`, and `workAgent.finished`.
 
 `pan tts test` reads `tts.voice` from `~/.overdeck/config.yaml`, resolves it in `~/.overdeck/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). On a fresh install with no saved system voice, the smoke test uses the daemon's default preset (`Vivian`, override via `QWEN_TTS_VOICE`) so the audio path can be verified before creating a voice library.
 
@@ -189,4 +191,4 @@ If nothing speaks:
 
 - `docs/EXTERNAL-EVENT-STREAM.md` — the public contract this skill depends on
 - `packages/contracts/src/events.ts` — canonical event schemas
-- `skills/pan-tts/scripts/tts_daemon.py` — Qwen3-TTS HTTP daemon source
+- `sync-sources/skills/pan-tts/scripts/tts_daemon.py` — Qwen3-TTS HTTP daemon source

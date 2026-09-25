@@ -15,6 +15,13 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `src/dashboard/server/services/*.ts` — domain services (cache, agent enrichment, TTS runtime/playback, etc.)
 - `src/dashboard/server/event-store.ts`, `read-model.ts` — event store and in-memory read model, at the server root
 
+**Deacon child process** (PAN-3922):
+- The dashboard forks `dist/dashboard/deacon.js` (`src/dashboard/server/deacon-main.ts`) through `services/deacon-supervisor.ts`. Cloister and deacon-lite run only in that child, never in the dashboard process.
+- IPC, parent to child: `{type:'patrol'}` (run one patrol now) and `{type:'reload-config'}`. Child to parent: `{type:'patrol-done', at, error}` after every completed deacon-lite tick, scheduled or manual.
+- The supervisor keeps the latest `patrol-done` report in memory, across child restarts. Nothing is written to disk.
+- `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
+- The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
+
 **Two WebSocket endpoints:**
 - `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
 - `/ws/terminal?session=<name>` — Raw WebSocket: live PTY terminal streaming via `ws` library.
@@ -47,8 +54,35 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
+- The snapshot's agent `status` is derived when it is served, not copied from the stored
+  record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
+  backend inventory (matched by terminal id, pane id or the `agentId` token, the way
+  `GET /api/agents` matches) is served `stopped`. Before the inventory has answered even
+  once (Herdr not up at dashboard boot), such rows are served `unknown`, never dead; after
+  that, a failed read keeps the last-good panes. Stored `stopped`/`error` and the `paused`
+  / `stoppedByUser` intent fields pass through unchanged. Only `agent-`, `planning-` and
+  `strike-` ids are derived, the set the inventory answers for
+  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`). A row served
+  `stopped` this way also has `hasLivePane` (and its deprecated alias
+  `hasLiveTmuxSession`) served `false`; a row served `unknown` keeps its stored flags.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
+- The Command Deck project list (`command-deck-projects`), project registry
+  (`registered-projects`) and conversation list (`conversations`) still load over
+  REST. `lib/queryRecovery.ts` (PAN-3527) retries any failure of them with
+  backoff (1s, 2s, 4s, 8s, 16s) and, when EventRouter re-bootstraps after a
+  `/ws/rpc` reconnect, cancels in-flight fetches and refetches them, so a failed
+  or hung fetch during a dashboard restart does not leave the sidebar empty.
+- The Command Deck's pipeline-membership banner (`ProjectMembershipBoundary`,
+  PAN-3527) tells a temporary outage from a settled answer. While a restarted
+  server's snapshot warms, `GET /api/pipeline/membership` returns 503 with
+  `{ status: 'loading', code: 'snapshot_loading' }` and `Retry-After: 5`. That
+  503, a failed or timed-out request, and a proxy 502/503/504 are transient:
+  the banner keeps retrying them (backoff capped at 30s, never sooner than
+  `Retry-After`), shows "retrying automatically" instead of the error alert, and
+  keeps its last good result meanwhile. A typed `status: 'unavailable'` body or
+  another HTTP error is a settled answer and shows the alert with its Retry
+  button. The membership query also joins the reconnect refetch above.
 
 **Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
 starts a discuss-first conversation through `POST /api/conversations` and opens
@@ -136,6 +170,27 @@ door that does not exist; a real record read door would be a separate change.
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.
+- The dashboard runs the built bundle, where `dashboard-db-worker.js` is its own entry in
+  `dist/dashboard/` (`src/dashboard/server/tsdown.config.ts`). `dashboard-db-task.ts`
+  resolves it from the `dist/` root, like the memory FTS worker, so it is found whichever
+  chunk the bundler puts the task module in.
+- Under a source run (Vitest, `tsx`) `dashboard-db-task.ts` loads as `.ts`. Node's type
+  stripping does not rewrite the worker's `.js` import specifiers, and a `--import tsx`
+  flag in `execArgv` does not reach a worker thread, so a raw `.ts` worker dies on its
+  first relative import. The `.ts` branch instead boots the thread through an `eval`
+  bootstrap that registers `tsx`'s resolver and then imports `dashboard-db-worker.ts`
+  (PAN-3930). Bun runs the `.ts` worker directly. Tests that boot the real worker call
+  `__testInternals.terminateWorkers()` in `afterEach`.
+- That bootstrap is `spawnModuleWorker` in `src/lib/module-worker.ts`; start any new
+  worker thread through it. The memory checkpoint worker uses it too:
+  `src/lib/memory/checkpoint-client.ts` resolves `dist/dashboard/checkpoint-worker.js`
+  from dashboard chunks and `dist/lib/memory/checkpoint-worker.js` (a root
+  `tsdown.config.ts` entry) from CLI chunks such as `pan memory backfill`.
+- The memory FTS worker uses it as well. `src/lib/memory/fts-db.ts` resolves
+  `dist/dashboard/memory-fts-worker.js` from dashboard chunks and
+  `dist/lib/memory/fts-worker.js` from CLI chunks. From source, only Vitest runs FTS
+  statements inline (memory tests mock modules and change `OVERDECK_HOME` per test,
+  and neither reaches a worker thread). A `tsx` run uses the worker.
 - Jobs that wait or run for more than one second emit
   `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
   The line identifies whether queue delay or worker execution caused the slowdown.
@@ -187,8 +242,45 @@ door that does not exist; a real record read door would be a separate change.
   exist yet) is retried on the next event fired by a surviving watcher — there is no
   timer or poll. If every watch attempt fails, the stream stays in `discovering`
   until an operator or later launch creates one of the watched roots.
-- `GET /api/conversations/:name/messages` serves registered conversations only. It
-  never scans agent directories or global session UUIDs to resolve an agent-backed row.
+- Pull requests on conversations (PAN-3822): the `conversation_pull_requests` table
+  holds PR links keyed by host/repository/number with a `source`, a `dismissed_at`
+  tombstone, and a `snapshot_json`. The pull-request sync sweep
+  (`services/pull-request-sync-service.ts`, primary dashboard only, boot +30 s then
+  every 60 s) reads each GitHub project's `gh pr list` once per sweep, links every PR
+  whose head branch equals a conversation's branch (`resolveConversationBranch`; never
+  the default branch) as a `branch` link, and refreshes stored snapshots of linked PRs
+  by due rule: unsynced and open every sweep, closed every 15 min, merged never. A
+  due GitHub link no listing covered gets one `gh pr view` (the fallback), and 3
+  consecutive failed reads skip that repository for 15 min. The last-read times
+  and failure counts are in memory only. A change emits the in-memory
+  `conversation.pull_requests_changed` event, which bumps `conversationsListRevision`.
+  `GET /api/conversations` rows carry `pullRequest` (the effective link from
+  `resolveEffectivePullRequest`) and `pullRequestCount`, read with one SQL query per
+  page. The door is `src/lib/overdeck/conversation-pull-requests.ts`. Explicit links
+  go through `conversation-pull-request-commands.ts`, which parses the ref
+  (`packages/contracts/src/pull-request-ref.ts`, shared with the dashboard: PR/MR URL, `#42`, `owner/repo#42`) and refuses a
+  repository not configured for the conversation's project
+  (`foreign_repository`). The dashboard routes
+  (`GET/POST/DELETE /api/conversations/:name/pull-requests`, the DELETE takes
+  `?ref=`) and `pan conv link-pr`/`unlink-pr`/`prs` both call it. An unlink always
+  sets `dismissed_at` rather than deleting, so the sweep cannot re-add the PR. A
+  `manual`/`agent` relink clears it; a `created` link does not. `created` links
+  come from `linkCreatedPullRequestToIssueConversations`, called after
+  `createReviewArtifact` in `review-artifacts.ts` and `pan done`: every
+  non-archived agent conversation with that `issue_id` gets the PR. Other reads,
+  all in `routes/conversation-pull-requests.ts`: `POST …/pull-requests/sync`
+  (forced `gh pr view` refresh of every live, unmerged link), `GET
+  /api/pull-requests?state=&project=` (every live link, with its conversation and
+  effective project), `GET /api/pull-requests/conversations?url=` (reverse index),
+  and `pullRequest` + `pullRequests` on `GET /api/conversations/:id`. A new table
+  goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
+  and bumps `OVERDECK_TABLE_COUNT`.
+- `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
+  rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
+  indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
+  lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
+  names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
+  subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
@@ -222,6 +314,23 @@ door that does not exist; a real record read door would be a separate change.
 - `pan pause sequencer-runner` prevents both explicit and automatic sequencer starts.
   The launcher checks the pause before preparation and immediately before spawning.
   Resume permission requires `pan unpause sequencer-runner`.
+- A sequencer pass does not close its pane when it finishes. `spawnSequencerAgent` clears a
+  finished run before it spawns, on the operator route and the auto-trigger alike.
+  `getSequencerRunStatus` decides through `isAlive` in `src/lib/agents/liveness.ts`: a run is
+  done when its pane has no live harness (`pane-dead`), it wrote a fresh `sequence.md`
+  (`fresh-sequence`), or its Herdr pane is idle or done at its prompt after the prompt was
+  delivered, with work activity older than 60 s (`pane-finished`, PAN-3923). When the backend
+  has no per-pane state (tmux), the runtime mirror's idle label stands in for Herdr's and passes
+  the same `isFinishedRoleRun` rule (`idle`, PAN-4172); the label alone never finishes a run.
+  A codex, kimi-code, pi, ACP or OpenCode sequencer reads `unknown` on Herdr; its transcript's
+  turn-complete marker stands in for the idle label under the same rule (`pane-finished`, #4169,
+  see "Non-Claude harnesses on Herdr" in `docs/TERMINAL-BACKENDS.md`).
+  `pane-finished` covers a dashboard restart, which empties the
+  in-process mirror, and a pass that failed before writing. After a restart the activity age
+  rests on the transcript heartbeat; if no activity signal resolves, the run is refused, never
+  reaped. `clearFinishedSequencerRun` probes a
+  `pane-finished` or `idle` run a second time 5 s later and stops it only if it still reads done;
+  after the stop it waits up to 3 s for the backend to drop the pane.
 
 **Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
 `docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared
@@ -229,6 +338,8 @@ components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
 marker so the no-loss gate proves that no existing surface disappeared.
 
 **God View:** `/god-view` centers the Confluence production canvas from [PAN-3447](https://github.com/eltmon/overdeck/issues/3447); its deliberate style-guide exemption and live-data contract are documented in `docs/GOD-VIEW.md`.
+
+**Derived issue state on board routes (PAN-3925):** routes that derive many issues go through the server adapter's batch doors in `services/derived-issue-state.ts`: `loadIssueStatesForProject` for one project, and `loadIssueStatesForIssues` for ids from many projects (one batch per project, the projects in parallel). A batch costs one `gh pr list` per repo, two `git for-each-ref` calls, and no per-issue spawn. The server batch doors read the PR listing stale-while-revalidate (`listRepoPullRequestsStaleOk`): a busy repo's listing takes ~11s, so once the 30s TTL passes, reads get the last listing immediately while a single refresh runs. A read waits for the forge only when no listing is younger than two minutes. Gates that act on readiness (merge scheduling, the ready set) keep the strict `listRepoPullRequests`. Route code must not call `getDerivedIssueState` in a loop.
 
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.

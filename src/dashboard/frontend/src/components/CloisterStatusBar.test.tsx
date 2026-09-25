@@ -3,6 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CloisterStatusBar } from './CloisterStatusBar';
 
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
+const toastWarning = vi.fn();
+vi.mock('sonner', () => ({
+  toast: {
+    success: (m: string) => toastSuccess(m),
+    error: (m: string) => toastError(m),
+    warning: (m: string) => toastWarning(m),
+  },
+}));
+
 const CLOISTER_STATUS = {
   running: true,
   lastCheck: '2026-05-16T00:00:00.000Z',
@@ -25,12 +36,17 @@ function renderStatusBar() {
   );
 }
 
-function mockFetch({ ttsEnabled, health }: {
+function mockFetch({ ttsEnabled, health, emergencyStop }: {
   ttsEnabled: boolean;
   health?: Response | Error;
+  emergencyStop?: Response | Error;
 }) {
   global.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = input.toString();
+    if (url === '/api/cloister/emergency-stop') {
+      if (emergencyStop instanceof Error) throw emergencyStop;
+      return emergencyStop ?? new Response(JSON.stringify({ killedAgents: ['agent-pan-1', 'agent-pan-2'] }), { status: 200 });
+    }
     if (url === '/api/cloister/status') {
       return new Response(JSON.stringify(CLOISTER_STATUS), { status: 200 });
     }
@@ -113,5 +129,60 @@ describe('CloisterStatusBar TTS health badge', () => {
     fireEvent.keyDown(popover, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Restart sessions' })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+});
+
+describe('CloisterStatusBar emergency stop', () => {
+  beforeEach(() => {
+    toastSuccess.mockClear();
+    toastError.mockClear();
+    toastWarning.mockClear();
+  });
+
+  async function fireStop() {
+    fireEvent.click(await screen.findByTitle(/Emergency stop — kill all agents/));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
+  }
+
+  it('toasts the kill count and closes the confirm when every agent is confirmed stopped', async () => {
+    mockFetch({ ttsEnabled: false });
+    renderStatusBar();
+
+    await fireStop();
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringContaining('killed 2 agents')));
+    expect(global.fetch).toHaveBeenCalledWith('/api/cloister/emergency-stop', { method: 'POST' });
+    expect(toastWarning).not.toHaveBeenCalled();
+    expect(screen.queryByText('Kill all?')).not.toBeInTheDocument();
+  });
+
+  it('#4109: warns, naming the agents it could not confirm stopped', async () => {
+    mockFetch({
+      ttsEnabled: false,
+      emergencyStop: new Response(
+        JSON.stringify({ killedAgents: ['agent-pan-1'], unconfirmedAgents: ['agent-pan-2', 'agent-pan-3'] }),
+        { status: 200 },
+      ),
+    });
+    renderStatusBar();
+
+    await fireStop();
+
+    await waitFor(() => expect(toastWarning).toHaveBeenCalledWith(
+      expect.stringContaining('stopped 1; 2 could not be confirmed stopped: agent-pan-2, agent-pan-3'),
+    ));
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('toasts an error and keeps the confirm open when the request fails', async () => {
+    mockFetch({ ttsEnabled: false, emergencyStop: new Response('boom', { status: 500 }) });
+    renderStatusBar();
+
+    await fireStop();
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Emergency stop request failed'));
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastWarning).not.toHaveBeenCalled();
+    expect(screen.getByText('Kill all?')).toBeInTheDocument();
   });
 });

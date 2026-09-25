@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock tmux.sessionExists — pending-respawn polls it. Each test resets
 // the mock's implementation so cases are independent.
@@ -14,6 +14,12 @@ vi.mock('../../../../lib/tmux.js', () => ({
   sessionExistsSync: vi.fn(),
 }));
 
+// A tmux host also asks Herdr about a conversation tmux does not hold
+// (PAN-3921 rollback safety); these cases have no Herdr.
+vi.mock('../../../../lib/terminal-backends/herdr.js', () => ({
+  probeHerdrAgentLiveness: vi.fn(async () => ({ kind: 'absent' })),
+}));
+
 import { sessionExists } from '../../../../lib/tmux.js';
 import {
   isRespawnPending,
@@ -22,7 +28,15 @@ import {
   waitForSessionRespawn,
 } from '../pending-respawn.js';
 
+import { hostTerminalBackendName } from '../../../../lib/terminal-backends/select.js';
+
 const mockedSessionExists = vi.mocked(sessionExists);
+
+// The conversation liveness door reads the host backend once (a real dynamic
+// import); memoize it before any test installs fake timers.
+beforeAll(async () => {
+  await hostTerminalBackendName();
+});
 
 describe('pending-respawn registry', () => {
   beforeEach(() => {

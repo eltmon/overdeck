@@ -49,9 +49,21 @@ The existing conversation transport carries subagent data:
 
 - A parent `pan.subscribeConversationMessages` stream emits `{ kind: "subagents", subagents }` after its initial message snapshot. A two-second poll emits a replacement list only when the list or a status changes.
 - The subscription payload accepts an optional `agentId`. When present, the same RPC streams the matching subagent JSONL through the existing snapshot and tail pipeline. Subagent transcript streams do not emit nested subagent-list events.
-- `GET /api/conversations/:name/messages` includes `subagents` for the parent response. `?agentId=<id>` returns one subagent transcript for ended conversations and other one-shot reads.
+- `GET /api/conversations/:name/messages` includes `subagents` for the parent response. `?agentId=<id>` returns one subagent transcript for ended conversations and other one-shot reads. `GET /api/conversations/:name/message-locator?byteOffset=N` accepts the same `?agentId=<id>` and resolves the offset against that subagent's transcript.
 
 The frontend keeps parent and subagent transcripts in separate React Query cache keys, so opening a subagent cannot replace the parent timeline.
+
+## Opening a subagent from search
+
+Conversation search indexes subagent transcripts too. Their chunks keep `session_id = agent-<id>` (the file basename) and also store `chunks.parent_session_id`, the parent session UUID taken from the `<parent-uuid>/subagents/` path. Schema v2 of the embeddings DB added the column and backfilled it once at open from `file_cursors`, with no re-embedding.
+
+A palette hit on a subagent chunk reports `conversationId` as the parent conversation's name (or the parent UUID when the parent has no conversation row), plus `parentSessionId` and the bare `subagentId`. The palette labels it `Subagent of …` and shows a distinct icon. Opening it:
+
+1. fetches `GET /api/conversations/:name/message-locator?byteOffset=N&agentId=<bare id>`, which resolves the offset inside the subagent transcript;
+2. opens the parent conversation pane with `targetSubagentId` beside the usual message target;
+3. `ConversationPanel` selects the rail row via `?subagent=<id>` once the subagent list contains it, and only `SubagentTranscript` receives the message target, so the main timeline never consumes it.
+
+Codex child threads are not indexed, so they never appear as search hits (PAN-3982).
 
 ## Status derivation
 
@@ -111,6 +123,43 @@ not subagents: they are separate `codex` processes with their own rollouts, outs
 conversation's transcript. Overdeck records them as **external agents** (`~/.overdeck/agents/ext-*`)
 and lists them in the Agents Directory under the conversation that launched them. See
 `reference/workers.mdx` "Externally spawned agents" and DASHBOARD-ARCHITECTURE.md "Agents Directory".
+
+### Child activity
+
+Selected subagent transcripts show the same animated “Working for …” row as
+main conversations, including the tool activity icon. Codex child activity comes
+from its own task lifecycle in the subagent list: Codex transcript snapshots have
+`streaming: false`, so that field cannot override a running child. Claude Code
+also uses the child stream's activity. Ended or disconnected parent sessions do
+not display stale child activity. The main agent's busy state does not determine
+whether a selected child is working.
+
+### Direct child composer
+
+The bottom composer appears only when the live Codex app-server host has
+classified the selected child as a descendant of its owner thread (announced by
+a `thread/started` naming an in-tree parent, or adopted from an in-tree
+`spawnAgent` item) and Codex reports it loaded with an idle or active turn.
+Owner, foreign (a native `/new` or `/fork` from an attached Codex CLI), and
+unannounced threads never accept input. Active turns receive `turn/steer` with
+the exact expected turn ID; idle children receive `turn/start` with the child's
+thread ID. Child notifications do not replace the host's owner thread or active
+turn. Input inherits the child's existing model and permissions. An attached
+native Codex CLI is a second client of the same app-server; child input from the
+dashboard does not change which thread that CLI shows.
+
+`GET /api/conversations/:name/subagents/:agentId/input` checks capability.
+`POST` to the same route accepts `{ "message": "..." }` and revalidates membership
+and availability. Input is literal text, including slash-prefixed text; parent
+composer commands are not intercepted. Drafts use a separate per-child key.
+The UI clears a draft only after the host acknowledges the selected recipient.
+An uncertain send is never automatically retried.
+
+Claude Code PTY sessions, Codex TUI sessions, old hosts, and unloaded children
+remain read-only. There is no relay through the parent, automatic replacement
+thread, or second process resuming a live transcript. A host upgrade requires
+restarting that conversation before its new operations are available; reloading
+the dashboard alone does not update an already-running host.
 
 ## Agent subagents (PAN-3920)
 

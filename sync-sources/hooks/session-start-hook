@@ -70,6 +70,13 @@ if [ -n "$MODEL" ]; then
   pan_emit_event "$AGENT_ID" "$BODY"
 fi
 
+# PAN-4185: a bare conversation gets no Overdeck-injected context. Everything
+# above (activity event, session index, ready.json, model_set) only observes and
+# must still run; everything below composes and injects context, so stop here.
+if [ "${OVERDECK_BARE_CONTEXT:-}" = "1" ]; then
+  exit 0
+fi
+
 INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
 if [ -z "$INTERNAL_TOKEN" ]; then
   TOKEN_PATH="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"

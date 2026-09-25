@@ -68,3 +68,25 @@ describe('handleConversationCreate empty model metadata', () => {
     }));
   });
 });
+
+describe('handleConversationCreate context opt-outs (PAN-4185)', () => {
+  it('stores bareContext and skipClaudeMd from the request on the conversation', async () => {
+    const res = await handleConversationCreate(
+      { model: 'claude-opus-5', bareContext: true, skipClaudeMd: true },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(mocks.createConversation).toHaveBeenCalledWith(expect.objectContaining({ bareContext: true, skipClaudeMd: true }));
+    const body = (res as unknown as { body: { body: Uint8Array } }).body.body;
+    expect(JSON.parse(new TextDecoder().decode(body))).toMatchObject({ bareContext: true, skipClaudeMd: true });
+  });
+
+  it('treats absent or non-boolean values as off', async () => {
+    await handleConversationCreate(
+      { model: 'claude-opus-5', bareContext: 'yes' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(mocks.createConversation).toHaveBeenCalledWith(expect.objectContaining({ bareContext: false, skipClaudeMd: false }));
+  });
+});

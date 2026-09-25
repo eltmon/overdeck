@@ -83,6 +83,32 @@ const {
 
 vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
   agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
+  // PAN-3939: reviewer kills close through the terminal backend. Here the close
+  // stands in for the tmux kill the assertions below count. Like the real
+  // close, it never throws: a kill that fails is a `failed` outcome.
+  closeAgentPaneDetailed: async (agentId: string) => {
+    try {
+      await mockKillSessionAsync(agentId);
+      return { outcome: 'closed' };
+    } catch (err) {
+      return { outcome: 'failed', reason: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  // The shutdown sweep lists Herdr panes only on Herdr; these tests run on tmux.
+  resolveLaunchBackend: async () => ({ name: 'tmux' }),
+}));
+
+// PAN-3939: the synthesis dispatch guard asks the liveness oracle. These tests
+// run with no reviewer alive; the backend paths are covered end to end in
+// src/lib/cloister/__tests__/review-agent-terminal-backend.test.ts.
+vi.mock('../../../src/lib/agents/liveness.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/agents/liveness.js')>(),
+  isAlive: vi.fn(async () => ({ alive: false, reason: 'no-session' })),
+}));
+
+vi.mock('../../../src/lib/overdeck/agents.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/overdeck/agents.js')>(),
+  listAgentIdsByPrefix: vi.fn(() => []),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -473,7 +499,7 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     );
 
     const dispatchBlock = agentSrc.match(
-      /const fullReview = isExtendedReviewEnabled\(opts\.issueId\);[\s\S]*?Review role \(self-review\) spawned/,
+      /const fullReview = reviewMode === 'full';[\s\S]*?Review role \(self-review\) spawned/,
     );
     expect(dispatchBlock).not.toBeNull();
     const block = dispatchBlock![0];
@@ -492,6 +518,94 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     // The fan-out itself (params.inScope.map -> spawnReviewSubRoleForIssue) lives in
     // review-convoy.ts and is exercised behaviorally by the review-rerun-scope and
     // convoy tests — no extra source introspection here (lint:source-introspection).
+  });
+
+  // #4118: the dashboard's Request review menu passes a mode for THIS run. It
+  // wins over roles.review.mode for that run and is never written anywhere, so
+  // the next dispatch without a mode resolves config again.
+  it('a requested full mode runs the convoy parent even when config says quick', async () => {
+    await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, reviewMode: 'full' }));
+
+    const parentCall = mockSpawnRun.mock.calls.find(([, , options]) => !options.subRole);
+    expect(parentCall).toBeDefined();
+    expect(parentCall![2].prompt).toContain('STANDBY — REVIEW SYNTHESIS for PAN-1982');
+    expect(parentCall![2].prompt).not.toContain('you are the sole reviewer');
+
+    // Config is unchanged: resolution still says quick, and a dispatch with no
+    // requested mode takes the quick self-review path.
+    expect(resolveReviewMode('PAN-1982')).toBe('quick');
+    expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
+    mockSpawnRun.mockClear();
+    const next = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+    expect(next).toEqual({ success: true, message: 'Self-review spawned: agent-pan-1982-review' });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    expect(mockSpawnRun.mock.calls[0][2].prompt).toContain('you are the sole reviewer');
+  });
+
+  it('a requested quick mode runs a single self-review even when config says full', async () => {
+    const fullConfig = { config: { roles: { review: { mode: 'full' as const } } } };
+    mockLoadConfigSync.mockReturnValue(fullConfig);
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, reviewMode: 'quick' }));
+
+    expect(result).toEqual({ success: true, message: 'Self-review spawned: agent-pan-1982-review' });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    expect(mockSpawnRun.mock.calls[0][2].prompt).toContain('you are the sole reviewer');
+    expect(fullConfig).toEqual({ config: { roles: { review: { mode: 'full' } } } });
+    expect(resolveReviewMode('PAN-1982')).toBe('full');
+  });
+
+  it('a requested none mode skips the AI review for this run only', async () => {
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, reviewMode: 'none' }));
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('(mode=none)');
+    expect(result.message).toContain('by request');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(resolveReviewMode('PAN-1982')).toBe('quick');
+
+    const next = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+    expect(next).toEqual({ success: true, message: 'Self-review spawned: agent-pan-1982-review' });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+  });
+
+  // #3853: the verdict guard lets an operator-requested run block an approved
+  // head. The request rides the parent's state and every dispatch rewrites it,
+  // so an automatic cycle never inherits it.
+  it('records an operator request on a fresh parent and clears it on the next plain dispatch', async () => {
+    await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, operatorRequested: true }));
+    const saved = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .filter((state) => state.id === 'agent-pan-1982-review');
+    expect(saved.at(-1)).toMatchObject({ reviewOperatorRequested: true });
+
+    mockSaveAgentStateAsync.mockClear();
+    await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+    const next = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .filter((state) => state.id === 'agent-pan-1982-review');
+    expect(next.length).toBeGreaterThan(0);
+    expect(next.at(-1)?.reviewOperatorRequested).toBeUndefined();
+  });
+
+  it('rewrites the operator request on a resumed parent', async () => {
+    const saved = { id: 'agent-pan-1982-review', status: 'running', reviewOperatorRequested: true } as Record<string, unknown>;
+    mockGetAgentState.mockImplementation((id: string) => (id === 'agent-pan-1982-review' ? saved : null));
+    mockGetLatestSessionIdSync.mockReturnValue('session-1');
+    mockResumeAgent.mockResolvedValue({ success: true });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
+
+    expect(result.message).toContain('Review resumed');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    const resumedSave = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .find((state) => state.id === 'agent-pan-1982-review');
+    expect(resumedSave).toBeDefined();
+    expect(resumedSave!.reviewOperatorRequested).toBeUndefined();
+
+    mockSaveAgentStateAsync.mockClear();
+    await Effect.runPromise(spawnReviewRoleForIssue({ ...reviewOpts, operatorRequested: true }));
+    const operatorSave = mockSaveAgentStateAsync.mock.calls.map(([state]) => state)
+      .find((state) => state.id === 'agent-pan-1982-review');
+    expect(operatorSave).toMatchObject({ reviewOperatorRequested: true });
   });
 
   it('full mode re-review resumes the parent before reusing the convoy fan-out path', async () => {

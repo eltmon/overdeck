@@ -374,14 +374,25 @@ export async function messageAgent(
       return { delivered: false, queuedToMail: true, reason: stopMsg };
     }
 
-    const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
-    if (agentState.model) {
-      const provider = getProviderForModel(agentState.model as ModelId);
-      if (provider.authType === 'credential-file') {
-        setupCredentialFileAuth(provider, agentState.workspace);
-      } else {
-        clearCredentialFileAuth(agentState.workspace);
-      }
+    // PAN-1048 C4: resume must relaunch with the agent's actual role, not
+    // hardcoded 'work'. A stopped review/test/ship run was previously
+    // resurrected as a work agent because launcher generation ignored the
+    // saved role. Use agentState.role and route through getRoleRuntimeBaseCommand
+    // so the role-specific .claude/agents/* definition file is loaded.
+    const resumeRole: Role = agentState.role ?? 'work';
+    // PAN-4145: no recorded model → the routed role model, never a literal.
+    const { resolveRoutedSpawnModel } = await import('../agents.js');
+    const resumeModel = agentState.model || resolveRoutedSpawnModel({
+      role: resumeRole,
+      issueId: agentState.issueId || normalizedId.replace(/^(agent|planning)-/, '').toUpperCase(),
+      workspace: agentState.workspace,
+    });
+    const providerEnv = await getProviderEnvForModel(resumeModel);
+    const provider = getProviderForModel(resumeModel as ModelId);
+    if (provider.authType === 'credential-file') {
+      setupCredentialFileAuth(provider, agentState.workspace);
+    } else {
+      clearCredentialFileAuth(agentState.workspace);
     }
 
     clearReadySignal(normalizedId);
@@ -389,19 +400,12 @@ export async function messageAgent(
     // no-op when there is none and never throws.
     await closeAgentPane(normalizedId);
 
-    const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
+    const providerExports = await getProviderExportsForModel(resumeModel);
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
-    // PAN-1048 C4: resume must relaunch with the agent's actual role, not
-    // hardcoded 'work'. A stopped review/test/ship run was previously
-    // resurrected as a work agent because launcher generation ignored the
-    // saved role. Use agentState.role and route through getRoleRuntimeBaseCommand
-    // so the role-specific .claude/agents/* definition file is loaded.
-    const resumeRole: Role = agentState.role ?? 'work';
     // PAN-1048 review feedback 006 (S1): Pi-backed resumes need the same
     // launcher fields the fresh-spawn path threads through generateLauncherScriptSync.
     // buildPiCommand throws on missing piSessionDir, so the previous fallback
     // emitted a launcher that would crash on resume for any Pi role agent.
-    const resumeModel = agentState.model || 'claude-sonnet-4-6';
     const fallbackHarness = agentState.harness ?? 'claude-code';
     const harnessLaunch = await prepareHarnessLaunch(fallbackHarness);
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
@@ -652,7 +656,8 @@ export async function messageAgent(
   // Codex's notify hook writes turn-completed at every idle boundary. Claiming
   // that marker makes the idle signal one-shot: the next message starts a turn,
   // and further messages queue until the hook reports the next completion.
-  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594).
+  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594);
+  // on Herdr the pane's agent_status answers as well (PAN-4186).
   const promptReady = await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);

@@ -9,6 +9,7 @@ import type { AgentState } from '../agents/agent-state.js'
 import { materializeAcpContextFile } from '../acp/context.js'
 import { acpTranscriptPath } from './storage/acp.js'
 import { listAgentStates } from '../agents/queries.js'
+import { isRuntimeAgentAlive } from './runtime-liveness.js'
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { resolveKimiNativeEffort } from '../kimi-effort.js'
@@ -271,7 +272,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return tmuxSessionExists(agentId)
+    return isRuntimeAgentAlive(agentId, this.name)
   }
 
   private home(): string {

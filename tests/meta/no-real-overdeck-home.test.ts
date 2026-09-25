@@ -1,18 +1,38 @@
-import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFile, copyFile, mkdir, open, rm, unlink, writeFile } from 'node:fs/promises';
+import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const OVERDECK_SEGMENT = `.${'overdeck'}`;
-const REAL_HOME_TARGET = join(homedir(), OVERDECK_SEGMENT, 'pan-test-guard');
+// tests/setup/overdeck-home.ts points HOME at a temp dir; this is the real one.
+const REAL_HOME = process.env.OVERDECK_TEST_REAL_HOME ?? homedir();
+const REAL_HOME_TARGET = join(REAL_HOME, OVERDECK_SEGMENT, 'pan-test-guard');
+const REAL_CLAUDE_PROJECTS_TARGET = join(REAL_HOME, '.claude', 'projects', '-pan-test-guard');
+const REAL_CLAUDE_JSON = join(REAL_HOME, '.claude.json');
 
 describe('real OVERDECK_HOME test guard', () => {
   it('sets OVERDECK_HOME to a per-worker temp directory', () => {
     expect(process.env.OVERDECK_HOME).toBeTruthy();
     expect(process.env.OVERDECK_HOME).toContain('pan-test-root-');
     expect(process.env.OVERDECK_HOME).toContain('worker-');
-    expect(process.env.OVERDECK_HOME).not.toBe(join(homedir(), OVERDECK_SEGMENT));
+    expect(process.env.OVERDECK_HOME).not.toBe(join(REAL_HOME, OVERDECK_SEGMENT));
+  });
+
+  // PAN-3905: spawn paths pre-trust dirs in ~/.claude.json, so HOME itself is
+  // a per-worker temp dir, apart from OVERDECK_HOME.
+  it('sets HOME to a per-worker temp directory', () => {
+    expect(process.env.OVERDECK_TEST_REAL_HOME).toBeTruthy();
+    expect(homedir()).toContain('pan-test-root-');
+    expect(homedir()).not.toBe(REAL_HOME);
+    expect(join(homedir(), OVERDECK_SEGMENT)).not.toBe(process.env.OVERDECK_HOME);
+  });
+
+  it('blocks writes to the real ~/.claude.json, its temp files and its lock', async () => {
+    expect(() => writeFileSync(REAL_CLAUDE_JSON, '{}')).toThrow('[test-guard]');
+    expect(() => writeFileSync(`${REAL_CLAUDE_JSON}.tmp-${process.pid}`, '{}')).toThrow('[test-guard]');
+    expect(() => mkdirSync(`${REAL_CLAUDE_JSON}.lock`)).toThrow('[test-guard]');
+    await expect(writeFile(`${REAL_CLAUDE_JSON}.tmp-${process.pid}`, '{}')).rejects.toThrow('[test-guard]');
   });
 
   it('blocks sync writes to the real ~/.overdeck tree', () => {
@@ -27,6 +47,36 @@ describe('real OVERDECK_HOME test guard', () => {
     await expect(writeFile(join(REAL_HOME_TARGET, 'file'), 'nope')).rejects.toThrow('[test-guard]');
     await expect(appendFile(join(REAL_HOME_TARGET, 'file'), 'nope')).rejects.toThrow('[test-guard]');
     await expect(rm(REAL_HOME_TARGET, { recursive: true, force: true })).rejects.toThrow('[test-guard]');
+  });
+
+  // PAN-3915: a test wrote and then deleted a transcript under the real
+  // ~/.claude/projects; those JSONL files are irreplaceable history.
+  it('blocks writes and deletes under the real ~/.claude/projects tree', async () => {
+    const transcript = join(REAL_CLAUDE_PROJECTS_TARGET, 'session.jsonl');
+    expect(() => mkdirSync(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true })).toThrow('[test-guard]');
+    expect(() => writeFileSync(transcript, '{}\n')).toThrow('[test-guard]');
+    expect(() => unlinkSync(transcript)).toThrow('[test-guard]');
+    expect(() => rmSync(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true, force: true })).toThrow('[test-guard]');
+    await expect(appendFile(transcript, '{}\n')).rejects.toThrow('[test-guard]');
+    await expect(unlink(transcript)).rejects.toThrow('[test-guard]');
+    await expect(rm(REAL_CLAUDE_PROJECTS_TARGET, { recursive: true, force: true })).rejects.toThrow('[test-guard]');
+  });
+
+  it('blocks copyFile and write-mode open into the real home trees', async () => {
+    const source = join(process.env.OVERDECK_HOME!, 'pan-3915-copy-source.jsonl');
+    writeFileSync(source, '{}\n');
+    for (const target of [
+      join(REAL_HOME_TARGET, 'file'),
+      join(REAL_CLAUDE_PROJECTS_TARGET, 'session.jsonl'),
+    ]) {
+      expect(() => copyFileSync(source, target)).toThrow('[test-guard]');
+      await expect(copyFile(source, target)).rejects.toThrow('[test-guard]');
+      expect(() => openSync(target, 'w')).toThrow('[test-guard]');
+      expect(() => openSync(target, 'a')).toThrow('[test-guard]');
+      await expect(open(target, 'w')).rejects.toThrow('[test-guard]');
+      // A read-only open is not a write: it reaches the fs and fails on the missing file.
+      expect(() => openSync(target, 'r')).toThrow(/ENOENT/);
+    }
   });
 
   it('has no direct homedir .overdeck write patterns in tests', () => {

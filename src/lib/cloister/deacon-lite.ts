@@ -2,13 +2,17 @@
  * Deacon-lite (PAN-3917 W4): the surviving watcher.
  *
  * Replaces the 3,400-line `deacon.ts` (~60 awaited patrol routines writing to
- * the record plane) with five routines that only observe and nudge/notify —
- * never reconcile a stored copy. See docs/PIPELINE-GATES.md and the PAN-3917
+ * the record plane) with a handful of routines that only observe and
+ * nudge/notify — never reconcile a stored copy. Two of them recover from the
+ * pipeline journal: `recoverStalledReviews` and `retryDeferredHandoffs`
+ * (PAN-4155, in deferred-handoff.ts). See docs/PIPELINE-GATES.md and the PAN-3917
  * PRD ("The patrol loop", FR-11, D1/D4/D5/D6/D7).
  *
  * No heartbeat file, no patrol-result aggregation, no firing budgets, no
  * invariant checker. Status is in-memory only (see getDeaconLiteStatus
- * below) and is lost on process restart by design.
+ * below) and is lost on process restart by design. The forked deacon child
+ * relays each completed tick to its parent through setPatrolRunObserver
+ * (PAN-3922), so the dashboard process can project the child's status.
  */
 import { existsSync } from 'node:fs';
 
@@ -23,8 +27,9 @@ import { listWorkspaces } from '../workspaces/resolver.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { appendPipelineEntry, lastPipelineEntry } from './pipeline-journal.js';
+import { retryDeferredHandoffs } from './deferred-handoff.js';
 
-export { checkApiErrorAgents };
+export { checkApiErrorAgents, retryDeferredHandoffs };
 
 // ============================================================================
 // checkStuckWorkAgents (FR-11): a work agent idle for N minutes whose feature
@@ -160,7 +165,7 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
 export const reapClosedIssueAgents = reconcileClosedIssueAgents;
 
 // ============================================================================
-// recoverStalledReviews: the one recovery routine, driven by the pipeline
+// recoverStalledReviews: the review recovery routine, driven by the pipeline
 // journal. A dashboard restart mid-convoy used to lose the convoy with nothing
 // left to re-dispatch from, and a dead reviewer pane blocked re-dispatch
 // forever (PAN-3939). The journal says what Overdeck last DID for an issue; if
@@ -243,6 +248,9 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
 
     const lastRedispatch = lastReviewRedispatchAt.get(issueId);
     if (lastRedispatch !== undefined && now - lastRedispatch < STALLED_REVIEW_COOLDOWN_MS) continue;
+    // The in-memory map dies with the deacon child; our own journal entry is
+    // the cooldown that survives a restart (PAN-3914).
+    if (last.type === 'review.redispatched' && now - at < STALLED_REVIEW_COOLDOWN_MS) continue;
 
     // Cheapest first: relaunching missing lanes against the existing run reuses
     // the parent's own state.json, which survives a server restart, so nothing
@@ -267,6 +275,19 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
       } else if (!recovery.success) {
         // Nothing was launched: do not journal a re-dispatch that never happened.
         console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);
+        continue;
+      } else if (!recovery.launched) {
+        // Every lane already reported: nothing to relaunch, so no re-dispatch
+        // to journal or report (PAN-3914). Cool down so the next tick does not
+        // re-probe the same convoy.
+        lastReviewRedispatchAt.set(issueId, now);
+        // A confirmed-dead synthesis parent is a real stall nothing here can
+        // recover (#4134): say so, once per cooldown. A live or indeterminate
+        // parent may still be synthesizing, so it stays quiet.
+        const parentId = `agent-${issueId.toLowerCase()}-review`;
+        if (isConfirmedDead(await isAlive(parentId))) {
+          console.warn(`[deacon-lite] ${issueId}: every review lane reported but no verdict was posted and the synthesis parent ${parentId} is dead — not recoverable here (#4134)`);
+        }
         continue;
       }
     } catch (err) {
@@ -301,6 +322,8 @@ export async function runDeaconLite(): Promise<void> {
   await reconcileAgentLiveness();
   await reapClosedIssueAgents();
   await recoverStalledReviews();
+  // PAN-4155: re-send a planning hand-off a spawn guardrail refused.
+  await retryDeferredHandoffs();
 }
 
 // ============================================================================
@@ -309,13 +332,24 @@ export async function runDeaconLite(): Promise<void> {
 // cleanly" (see module docstring).
 // ============================================================================
 
-const DEACON_LITE_INTERVAL_MS = 60_000; // the 60s cadence runScheduledPatrol used
+export const DEACON_LITE_INTERVAL_MS = 60_000; // the 60s cadence runScheduledPatrol used
+
+export interface PatrolRunReport {
+  at: string;
+  error: string | null;
+}
 
 let deaconLiteInterval: ReturnType<typeof setInterval> | null = null;
 let lastRunAt: string | null = null;
 let lastRunError: string | null = null;
+let patrolRunObserver: ((report: PatrolRunReport) => void) | null = null;
 
-async function tick(): Promise<void> {
+/** Registered by the deacon child to relay each completed tick to its parent process (PAN-3922). */
+export function setPatrolRunObserver(fn: ((report: PatrolRunReport) => void) | null): void {
+  patrolRunObserver = fn;
+}
+
+export async function runDeaconLitePatrol(): Promise<void> {
   try {
     await runDeaconLite();
     lastRunAt = new Date().toISOString();
@@ -325,12 +359,20 @@ async function tick(): Promise<void> {
     lastRunError = err instanceof Error ? err.message : String(err);
     console.error('[deacon-lite] run error:', err);
   }
+
+  if (patrolRunObserver) {
+    try {
+      patrolRunObserver({ at: lastRunAt, error: lastRunError });
+    } catch (err) {
+      console.error('[deacon-lite] patrol run observer failed:', err);
+    }
+  }
 }
 
 export function startDeaconLite(): void {
   if (deaconLiteInterval) return;
-  void tick();
-  deaconLiteInterval = setInterval(() => { void tick(); }, DEACON_LITE_INTERVAL_MS);
+  void runDeaconLitePatrol();
+  deaconLiteInterval = setInterval(() => { void runDeaconLitePatrol(); }, DEACON_LITE_INTERVAL_MS);
   deaconLiteInterval.unref?.();
 }
 

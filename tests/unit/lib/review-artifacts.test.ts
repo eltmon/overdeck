@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const { execMock, ensureMergeSetForIssueMock, upsertMergeSetMock, createReviewArtifactMock } = vi.hoisted(() => ({
+const { execMock, ensureMergeSetForIssueMock, upsertMergeSetMock, createReviewArtifactMock, linkCreatedMock } = vi.hoisted(() => ({
+  linkCreatedMock: vi.fn(),
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   ensureMergeSetForIssueMock: vi.fn(),
   upsertMergeSetMock: vi.fn(),
@@ -38,6 +39,10 @@ vi.mock('../../../src/lib/forge.js', () => ({
   getForgeAdapter: vi.fn(() => ({
     createReviewArtifact: createReviewArtifactMock,
   })),
+}));
+
+vi.mock('../../../src/lib/overdeck/conversation-pull-requests.js', () => ({
+  linkCreatedPullRequestToIssueConversations: linkCreatedMock,
 }));
 
 import { createReviewArtifactsForIssue } from '../../../src/lib/review-artifacts.js';
@@ -129,6 +134,8 @@ describe('review-artifacts', () => {
       },
     ]);
     expect(createReviewArtifactMock).toHaveBeenCalledOnce();
+    // PAN-3822: the opened PR is linked to the issue's agent conversations.
+    expect(linkCreatedMock).toHaveBeenCalledExactlyOnceWith('MIN-632', 'https://gitlab.example.com/merge_requests/7');
     expect(upsertMergeSetMock).toHaveBeenCalledWith(expect.objectContaining({
       status: 'reviewing',
       repos: expect.arrayContaining([

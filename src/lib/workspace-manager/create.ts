@@ -33,6 +33,11 @@ import {
   validateFeatureName,
 } from './worktree-ops.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
+import {
+  clearWorkspaceSetupIncomplete,
+  isWorkspaceSetupIncomplete,
+  markWorkspaceSetupIncomplete,
+} from './setup-marker.js';
 import { getProjectByPath, getWorkspaceForIssue } from '../workspaces/resolver.js';
 import { createWorkspace as createWorkspaceRow, deleteWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
 import { listProjectsSync } from '../projects.js';
@@ -250,7 +255,13 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // future workspace path. Stage it so `git worktree add` sees a clean target,
   // then merge it back into the real worktree after creation.
   let stagedMetadataPath: string | null = null;
-  if (existsSync(workspacePath)) {
+  // PAN-4171: an earlier create made the worktree but its setup never
+  // finished. Keep the worktree (it may hold work) and re-run the setup steps.
+  const resumingSetup = existsSync(workspacePath) && isWorkspaceSetupIncomplete(workspacePath);
+  if (resumingSetup) {
+    worktreeCreated = true;
+    result.steps.push('Resuming unfinished workspace setup');
+  } else if (existsSync(workspacePath)) {
     stagedMetadataPath = stagePreWorktreeMetadata(workspacePath);
     if (stagedMetadataPath) {
       result.steps.push('Staged pre-worktree .pan metadata');
@@ -267,7 +278,10 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   progress('Creating git worktree', `feature/${featureName}`);
 
   // Handle polyrepo vs monorepo
-  if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
+  if (resumingSetup) {
+    // The worktree (every polyrepo sub-repo included) was created by the run
+    // that wrote the marker; only the setup below is re-run.
+  } else if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     // Polyrepo workspaces need a root container for child repo worktrees and
     // symlinks. Monorepo worktrees must let git create the target directory.
     mkdirSync(workspacePath, { recursive: true });
@@ -340,6 +354,9 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // disk — any failure from here on must not delete the workspace row.
   worktreeCreated = true;
   restorePreWorktreeMetadata(stagedMetadataPath, workspacePath);
+  // PAN-4171: until the last setup step has run, a retry must resume setup
+  // rather than treat the existing directory as a ready workspace.
+  markWorkspaceSetupIncomplete(workspacePath);
 
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     // PAN-2386: polyrepo scaffold workspaces are separate git repos that check out
@@ -374,7 +391,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   const resolvedWorkspace = resolve(workspacePath);
   const resolvedPanDir = resolve(resolvedWorkspace, PAN_DIRNAME);
   const isUnderWorkspacesDir = resolvedWorkspace.match(/\/workspaces\/feature-[a-z0-9-]+$/);
-  if (isUnderWorkspacesDir && existsSync(join(resolvedWorkspace, '.git'))) {
+  if (!resumingSetup && isUnderWorkspacesDir && existsSync(join(resolvedWorkspace, '.git'))) {
     if (resolvedPanDir === join(resolvedWorkspace, PAN_DIRNAME) && existsSync(resolvedPanDir)) {
       for (const filePath of [
         join(resolvedPanDir, PAN_CONTINUE_FILENAME),
@@ -447,7 +464,8 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   } catch (installErr: any) {
     const msg = `Dependency install failed (${pkgManager}): ${installErr.message?.slice(0, 200)}`;
     result.errors.push(msg);
-    progress('Installing dependencies', 'Failed — workspace creation aborted', 'complete');
+    result.success = false;
+    progress('Installing dependencies', 'Failed — workspace creation aborted', 'error');
     return result;
   }
 
@@ -465,6 +483,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   } catch (hookErr: any) {
     result.errors.push(`Pre-rebase guard install failed: ${hookErr.message?.slice(0, 200)}`);
+    result.success = false;
     return result;
   }
 
@@ -480,7 +499,8 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       } catch (buildErr: any) {
         const msg = `Workspace package build failed (${pkg.path}): ${buildErr.message?.slice(0, 200)}`;
         result.errors.push(msg);
-        progress('Building workspace packages', `Failed on ${pkg.path} — workspace creation aborted`, 'complete');
+        result.success = false;
+        progress('Building workspace packages', `Failed on ${pkg.path} — workspace creation aborted`, 'error');
         return result;
       }
     }
@@ -498,7 +518,11 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     const mainVenvTldr = join(projectConfig.path, '.venv', 'bin', 'tldr');
     const mainVenvExists = existsSync(mainVenvTldr);
 
-    if (mainVenvExists) {
+    if (existsSync(tldrBin)) {
+      // PAN-4171: a resumed setup already has the venv; `cp -a` onto an
+      // existing directory would nest a second copy inside it.
+      result.steps.push('Python venv already present');
+    } else if (mainVenvExists) {
       // Copy the entire venv from main — faster than pip install (seconds vs 30s+)
       const mainVenvPath = join(projectConfig.path, '.venv');
       await execAsync(`cp -a "${mainVenvPath}" "${venvPath}"`);
@@ -541,7 +565,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       const mainTldrDir = join(projectConfig.path, '.tldr');
       const workspaceTldrDir = join(workspacePath, '.tldr');
 
-      if (existsSync(mainTldrDir)) {
+      if (existsSync(mainTldrDir) && !existsSync(workspaceTldrDir)) {
         await execAsync(`cp -r "${mainTldrDir}" "${workspaceTldrDir}"`);
         result.steps.push('Copied TLDR index from main branch');
       }
@@ -764,7 +788,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt
   try {
-    preTrustDirectory(workspacePath);
+    await preTrustDirectory(workspacePath);
     result.steps.push('Pre-trusted workspace in Claude Code');
   } catch {
     // Non-fatal — agent can still work, user will just see trust prompt
@@ -805,6 +829,10 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   } catch (memoryHookErr: unknown) {
     result.steps.push(`Memory hook setup skipped: ${memoryHookErr instanceof Error ? memoryHookErr.message : String(memoryHookErr)}`);
   }
+
+  // PAN-4171: every setup step has run. Soft failures above (ports, tunnel,
+  // Hume, Docker) are reported in `errors` but are not re-run on a retry.
+  clearWorkspaceSetupIncomplete(workspacePath);
 
   result.success = result.errors.length === 0;
   return result;

@@ -45,6 +45,6 @@ Settings page or edit `~/.overdeck/config.yaml` directly.
 ## See Also
 
 - `pan admin migrate-config` — migrate legacy settings.json → config.yaml
-- `pan admin state migrate-xbrief <project> [--dry-run]` — migrate state files to xBRIEF envelopes and extensions
+- `pan admin migrate-plan-home <project-key>` — copy open issues' planning artifacts from the legacy state directory into `.pan/`
 - `pan admin tracker <cmd>` — tracker-specific operations
 - `pan doctor` — verify configuration is valid

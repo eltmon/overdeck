@@ -147,6 +147,12 @@ export interface AgentState {
   backend?: TerminalBackendName;
   paneId?: string;
   /**
+   * Backend-native terminal handle of that pane (Herdr `term_…`). Herdr's
+   * `terminal attach` takes it for every agent, including pane-bound harnesses
+   * that have no Herdr agent record (PAN-3928). Absent on pre-PAN-3928 agents.
+   */
+  terminalId?: string;
+  /**
    * Delivery method for agent messages. 'auto' tries supervisor, then channels,
    * then tmux; explicit socket methods are strict (throw on failure); 'tmux'
    * bypasses socket transports entirely.
@@ -176,6 +182,11 @@ export interface AgentState {
   reviewOutputPath?: string;
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
+  /**
+   * #3853: the operator asked for the review parent's current run (a forced
+   * re-review). Rewritten on every dispatch, so an automatic cycle clears it.
+   */
+  reviewOperatorRequested?: boolean;
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
   /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
   reviewRetryAttempt?: number;
@@ -241,12 +252,14 @@ export function cleanAgentState(raw: AgentState): AgentState {
     supervisorEnabled: raw.supervisorEnabled,
     backend: raw.backend,
     paneId: raw.paneId,
+    terminalId: raw.terminalId,
     deliveryMethod: raw.deliveryMethod,
     reviewSubRole: raw.reviewSubRole,
     reviewRunId: raw.reviewRunId,
     reviewOutputPath: raw.reviewOutputPath,
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
+    reviewOperatorRequested: raw.reviewOperatorRequested,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,
     reviewContextManifestPath: raw.reviewContextManifestPath,

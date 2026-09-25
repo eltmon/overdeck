@@ -19,6 +19,8 @@ import {
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
+import { readRunningDashboardBootGates } from '../../lib/deploy/running-boot-gates.js';
+import { formatBootGateState, type BootGateState } from '../../lib/boot-gates.js';
 import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
@@ -69,6 +71,7 @@ export interface ReloadOptions {
   skipBuild?: boolean;
   healthTimeout?: string;
   deacon?: boolean;
+  resume?: boolean;
   force?: boolean;
 }
 
@@ -153,6 +156,20 @@ async function runReload(
   }
 
   if (refuseNonPrimaryDashboardCwd(process.cwd(), 'reload')) return;
+
+  // PAN-3899: a Deacon-off dashboard identifies as a peer, and a peer is refused
+  // the host dashboard port at config load. A `--no-deacon` reload would stop
+  // the running dashboard and spawn one that never listens, so refuse it here,
+  // before anything is built or stopped.
+  if (options.deacon === false) {
+    console.error(chalk.red(
+      'Refusing `pan reload --no-deacon`: a Deacon-off dashboard runs as a read-only peer, and a peer cannot '
+        + 'hold the host dashboard port, so the reload would stop the running dashboard and leave none. '
+        + 'Nothing was built or stopped. Run `pan reload` without --no-deacon; the reloaded dashboard runs Deacon.',
+    ));
+    process.exitCode = 2;
+    return;
+  }
 
   // A restart is voluntary, so the operator gate below is the only thing that
   // holds it. There is no deploy queue and no deploy window to consult.
@@ -321,6 +338,32 @@ async function runReload(
     await progress('restarting');
     startedAt = Date.now();
 
+    // PAN-3899: a reload replaces the server; it keeps the running server's
+    // resume gate instead of re-choosing it. Deacon is not carried: it is always
+    // on, because a Deacon-off server is a peer and cannot hold the host port
+    // (`--no-deacon` is refused above). The resolved state is stamped into the
+    // spawn env verbatim, so a stray OVERDECK_DISABLE_DEACON in the invoking
+    // shell cannot turn the replacement into a peer either. Explicit
+    // `--resume`/`--no-resume` still win.
+    const running = await readRunningDashboardBootGates(config.dashboardApiPort, repoRoot);
+    const resumeFlag = options.resume;
+    const bootGates: BootGateState = {
+      deacon: { enabled: true, source: options.deacon === true ? 'flag' : 'default' },
+      resume: resumeFlag !== undefined
+        ? { enabled: resumeFlag, source: 'flag' }
+        : running.gates?.resume ?? { enabled: true, source: 'default' },
+    };
+    console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
+    if (resumeFlag !== undefined) {
+      console.log(chalk.dim('  Resume gate set by --resume/--no-resume.'));
+    } else if (running.gates) {
+      console.log(chalk.dim('  Resume gate carried from the running dashboard.'));
+    } else {
+      console.log(chalk.yellow(
+        `  Could not read the running dashboard's resume gate (${running.reason}); using the default (resume=on).`,
+      ));
+    }
+
     let restartResult: DashboardRestartResult;
     try {
       await lock.refresh();
@@ -328,7 +371,7 @@ async function runReload(
       // persistence fails, abort while the old dashboard is still running.
       await recordReloadStatus(startedAt, false, undefined, 'stopping');
       restartResult = await restartDashboard(config, () => spawnDashboardDetached(config, {
-        deacon: options.deacon,
+        bootGates,
         serverPath: deployment?.serverPath,
         repoRoot,
       }), {
@@ -338,10 +381,17 @@ async function runReload(
     } catch (error) {
       if (deployment) {
         if (leavesDashboardRunning(error)) {
+          // PAN-3128: the new server is alive (a slow boot may still finish, or
+          // it is there to inspect) and executes from this generation, so the
+          // generation stays the active deployment and the CLI follows it.
           await activation?.commit();
           await reportCliRepoint(deployment.deployRoot);
           await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
         } else {
+          // Any other failure, including a new server that exited before it
+          // became healthy (PAN-3899), is never promoted: the previous bundle
+          // stays the recorded deployment, the primary `dist/` goes back to it,
+          // and the global CLI is not repointed.
           await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
           await activation?.rollback();
           await removeDashboardDeployment(repoRoot, deployment.deployRoot);

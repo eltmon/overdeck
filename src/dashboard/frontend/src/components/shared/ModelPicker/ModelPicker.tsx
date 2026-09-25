@@ -38,12 +38,23 @@ export function getProviderForPickerModel(modelId: string, groups: ModelGroup[])
   return undefined;
 }
 
+/**
+ * Picker-side policy lookup. While the model has no decision row (policy not
+ * loaded yet, or the model was not in the batch) the option stays usable and
+ * the server gate decides at spawn. Once the row exists, a harness missing
+ * from it has no policy decision and is not allowed.
+ */
 export function canUsePickerHarness(
   harness: Harness,
   modelId: string,
   policyDecisions?: HarnessPolicyDecisions,
 ): HarnessDecision {
-  return policyDecisions?.[modelId]?.[harness] ?? { allowed: true };
+  const modelDecisions = policyDecisions?.[modelId];
+  if (!modelDecisions) return { allowed: true };
+  return modelDecisions[harness] ?? {
+    allowed: false,
+    reason: `No harness-policy decision for ${harness} with this model. It cannot be selected until the server policy covers it.`,
+  };
 }
 
 export interface PickerModel {

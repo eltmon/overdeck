@@ -1,5 +1,12 @@
 # Overdeck Work Types
 
+> **Removed.** The work-type router this page describes was replaced by roles
+> and workhorse slots in PAN-1048 (`cfd48b80881`). Nothing picks a model from
+> `models.overrides` or a work-type ID any more. Configure models with
+> `roles.<role>.model`, `roles.review.sub.<lane>.model`, and `workhorses`; see
+> [CONFIGURATION.md](CONFIGURATION.md#removed-presets-work-type-overrides-thinking-levels)
+> and [MODEL-CALLS.md](MODEL-CALLS.md). This page is kept for history.
+
 Reference for the job settings Overdeck uses for model routing.
 
 This document is about **routed work types and model-selection slots**, not the high-level roster of Overdeck runtime agents. Use [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) if you want the newcomer-friendly map of what kinds of agents exist.
@@ -56,7 +63,6 @@ These are dedicated long-running workflow stages.
 | `specialist-review-agent` | Dedicated review pass before merge | `claude-opus-4-6` | Lower to Sonnet if you want to reduce cost on routine repos |
 | `specialist-test-agent` | Dedicated test specialist pass | `claude-sonnet-4-6` | Raise to GPT-5.4 for harder debugging-heavy test suites |
 | `specialist-merge-agent` | Merge prep, merge-time validation, conflict handling | `claude-sonnet-4-6` | Raise to Opus for very risky multi-repo or conflict-heavy workflows |
-| `specialist-inspect-agent` | Per-bead inspection gate during implementation — opt-in via `metadata.requiresInspection: true` on the bead's plan item (PAN-382, revised 2026-05-08; see `docs/prds/planned/PAN-382-inspect-specialist.md`) | `claude-sonnet-4-6` | Raise to Opus when spec fidelity is critical or diffs are complex |
 | `specialist-uat-agent` | Browser-based user acceptance testing after tests pass | `claude-sonnet-4-6` | Raise to Opus for high-stakes UX validation or complex product flows |
 
 ### Guidance

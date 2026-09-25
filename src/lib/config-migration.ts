@@ -63,7 +63,6 @@ export function convertToYamlConfig(settings: SettingsConfig): YamlConfig {
   const config: YamlConfig = {
     models: {
       providers,
-      overrides: {}, // No overrides from legacy
       gemini_thinking_level: 3,
     },
     api_keys: settings.api_keys,
@@ -89,7 +88,6 @@ export interface MigrationOptions {
  */
 export interface MigrationResult {
   success: boolean;
-  overridesCount: number;
   providersEnabled: string[];
   message: string;
   error?: string;
@@ -104,14 +102,12 @@ export function migrateConfig(options: MigrationOptions = {}): MigrationResult {
       if (existsSync(NEW_CONFIG_PATH)) {
         return {
           success: true,
-          overridesCount: 0,
           providersEnabled: ['anthropic'],
           message: 'Config already migrated (config.yaml exists)',
         };
       }
       return {
         success: false,
-        overridesCount: 0,
         providersEnabled: [],
         message: 'No legacy settings.json found to migrate',
       };
@@ -138,7 +134,6 @@ export function migrateConfig(options: MigrationOptions = {}): MigrationResult {
 
       return {
         success: true,
-        overridesCount: Object.keys(yamlConfig.models?.overrides || {}).length,
         providersEnabled,
         message: `Would migrate to smart selection with ${providersEnabled.length} providers enabled`,
       };
@@ -164,14 +159,12 @@ export function migrateConfig(options: MigrationOptions = {}): MigrationResult {
 
     return {
       success: true,
-      overridesCount: Object.keys(yamlConfig.models?.overrides || {}).length,
       providersEnabled,
       message: `Successfully migrated to smart selection with ${providersEnabled.length} providers`,
     };
   } catch (error: any) {
     return {
       success: false,
-      overridesCount: 0,
       providersEnabled: [],
       message: 'Migration failed',
       error: error.message,

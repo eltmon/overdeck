@@ -16,13 +16,14 @@ import { cvCommand } from './cv.js';
 import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
 import { pingAgent } from '../../lib/health.js';
-import { readAgentCV } from '../../lib/cv.js';
+import { readAgentCV, type AgentCV } from '../../lib/cv.js';
 import { getAgentRuntimeStateSync, getAgentState } from '../../lib/agents.js';
 import { getAgentEffectiveLastActivityMs, isAlive, type LivenessVerdict } from '../../lib/agents/liveness.js';
 import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { getDerivedIssueState } from '../../lib/overdeck/derived-issue-state.js';
 import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
 import { readPipelineJournal, type PipelineJournalEntry } from '../../lib/cloister/pipeline-journal.js';
+import type { DerivedIssueState } from '@overdeck/contracts';
 import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
 
 interface ShowOptions {
@@ -68,6 +69,41 @@ export function describeLiveness(
   }
 }
 
+/**
+ * The CV with this issue's outcome derived from its PR (PAN-3420).
+ *
+ * `startWork` records an `in_progress` entry at spawn, and nothing records the
+ * outcome, so a merged, closed-out issue would read "0% success, 1 active"
+ * forever. The PR owns that fact: a merged PR is a success. `closed` outranks
+ * `merged` in the derived state, and the forge attaches only an open or merged
+ * PR, so a closed issue with a PR merged too. A closed issue without one keeps
+ * its entry as it was — cancelled work is not a success. Nothing is written.
+ */
+export function deriveCvOutcome(
+  cv: AgentCV | null,
+  issueId: string,
+  issueState: Pick<DerivedIssueState, 'state' | 'pr'>,
+): AgentCV | null {
+  if (!cv) return null;
+  const shipped = issueState.state === 'merged' || (issueState.state === 'closed' && issueState.pr !== undefined);
+  if (!shipped) return cv;
+  const target = issueId.toUpperCase();
+  let flipped = 0;
+  const recentWork = (cv.recentWork ?? []).map((entry) => {
+    if (entry.outcome !== 'in_progress' || entry.issueId?.toUpperCase() !== target) return entry;
+    flipped++;
+    return { ...entry, outcome: 'success' as const };
+  });
+  if (flipped === 0) return cv;
+  const successCount = cv.stats.successCount + flipped;
+  const completed = successCount + cv.stats.failureCount + cv.stats.abandonedCount;
+  return {
+    ...cv,
+    recentWork,
+    stats: { ...cv.stats, successCount, successRate: completed > 0 ? successCount / completed : 0 },
+  };
+}
+
 /** How many journal entries the compact view shows, newest last. */
 const JOURNAL_LINES = 6;
 
@@ -99,6 +135,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
     }
     case 'review.verdict':
       return `${data.verdict ?? 'unknown'}${data.subRole ? ` (${data.subRole})` : ''}`;
+    case 'review.verdict-refused':
+      return `${data.status ?? 'unknown'} refused${typeof data.caller === 'string' ? ` (${data.caller})` : ''}`;
     case 'uat.verdict':
       return `${data.status ?? 'unknown'}${typeof data.anchor === 'string' ? ` head=${shortSha(data.anchor)}` : ''}`;
     case 'feedback.delivered':
@@ -110,6 +148,15 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
     case 'merge.completed':
     case 'merge.failed':
       return typeof data.reason === 'string' ? data.reason : '';
+    case 'strike.landed':
+      return `worktree ${data.worktreeRemoved ? 'removed' : 'kept'}, branch ${data.branchDeleted ? 'deleted' : 'kept'}`;
+    case 'handoff.deferred':
+    case 'handoff.retried':
+      return `attempt ${data.attempt ?? 0}: ${data.skipReason ?? data.reason ?? 'refused'}`;
+    case 'handoff.started':
+      return `${data.agentId ?? 'work agent'} on attempt ${data.attempt ?? '?'}`;
+    case 'handoff.abandoned':
+      return `${data.outcome ?? 'abandoned'}${typeof data.reason === 'string' ? ` — ${data.reason}` : typeof data.error === 'string' ? ` — ${data.error}` : ''}`;
     default:
       return '';
   }
@@ -162,7 +209,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   const liveness = hasAgent && backend !== 'tmux'
     ? await isAlive(agentId).catch((): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }))
     : null;
-  const cvData = readAgentCV(agentId);
+  const cvData = deriveCvOutcome(readAgentCV(agentId), issueId, issueState);
 
   // What Overdeck DID, from the workspace's append-only journal. No forge call
   // is added: this is a local file read, and the derived `state` above still
@@ -272,7 +319,8 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
           ? chalk.red
           : chalk.dim;
       const label = (entry.issueId ?? '(unknown)').slice(0, 60);
-      const when = outcome === 'in_progress'
+      // A derived outcome has no completion time; say when the work started.
+      const when = outcome === 'in_progress' || !entry.completedAt
         ? `${relativeTime(entry.startedAt)} started`
         : relativeTime(entry.completedAt);
       console.log(`    ${outcomeColor(outcome.padEnd(11))} ${chalk.dim(when.padEnd(18))} ${label}`);

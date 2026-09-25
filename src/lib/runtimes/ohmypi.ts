@@ -44,6 +44,7 @@ import type {
 } from './types.js'
 import { OHMYPI_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, createSession, listSessionsSync, getManagedTmuxSocketName } from '../tmux.js'
+import { isRuntimeAgentAlive } from './runtime-liveness.js'
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { generateLauncherScript } from '../launcher-generator.js'
@@ -405,7 +406,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return await Effect.runPromise(sessionExists(agentId))
+    return isRuntimeAgentAlive(agentId, this.name)
   }
 }
 

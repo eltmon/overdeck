@@ -69,7 +69,7 @@ are actually available and frontend/backend catalogs and normalization agree.
 8. Mark each requirement as implemented, partial, missing, not applicable, or out of scope.
 
 Do not run broad `git diff`, rediscover all changed files, or re-gather issue context that the manifest already provides.
-Do not run validation commands such as `validate-trace`, `pan validate-trace`, or other trace-checking CLIs. The context manifest already contains the trace data you need; verify it by reading the manifest and changed files only.
+Do not run trace-validation scripts or other trace-checking CLIs. The context manifest already contains the trace data you need; verify it by reading the manifest and changed files only.
 
 ### Stub UI BLOCKING rule
 

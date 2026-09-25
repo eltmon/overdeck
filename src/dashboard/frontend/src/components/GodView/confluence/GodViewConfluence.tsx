@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { isBackendOutage } from '../../../lib/backendOutageState';
 import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
 import { GodViewSidebar } from '../Sidebar';
@@ -9,6 +10,7 @@ import { IssueRail } from './IssueRail';
 import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
 import { useConfluenceChoreography, useSweepChoreography } from './useConfluenceChoreography';
+import { isClaimedLiveStatus, withObservedLiveness } from './liveness';
 import type { ConfluenceData, ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
 
@@ -57,7 +59,20 @@ export function GodViewConfluence({
 }: GodViewConfluenceProps) {
   const effectsRef = useRef<RiverCanvasHandle>(null);
   const { orbs, hookStream, meta } = data;
-  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  const agentRows = useDashboardStore(selectAgents);
+  const backendPanesById = useDashboardStore((state) => state.backendPanesById);
+  // The sidebar donut and the rail read agents as the terminal backend sees
+  // them — a stored `running` with no pane is stopped (PAN-3540).
+  const agents = useMemo(
+    () => withObservedLiveness(agentRows, backendPanesById) as unknown as Agent[],
+    [agentRows, backendPanesById],
+  );
+  // The AGENTS donut is a census: hosted agents only, never an `error` or
+  // `stopped` row left behind by one that died.
+  const hostedAgents = useMemo(
+    () => agents.filter((agent) => isClaimedLiveStatus(agent.status)),
+    [agents],
+  );
   const [hover, setHover] = useState<HoverState | null>(null);
   const [selectedId, setSelectedId] = useState(() => selectedConfluenceIssueId());
   // Operator-reopened D-3: orb/feed clicks open the in-canvas issue rail (the
@@ -82,7 +97,7 @@ export function GodViewConfluence({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || hasModalOrTextFocus()) return;
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || hasModalOrTextFocus() || isBackendOutage()) return;
       if (event.key === 'h' || event.key === '?') {
         event.preventDefault();
         onHelpOpenChange(!helpOpen);
@@ -156,7 +171,7 @@ export function GodViewConfluence({
         </section>
 
         <GodViewSidebar
-          agents={agents}
+          agents={hostedAgents}
           velocity={meta.velocity}
           onIssueHover={(issueId) => effectsRef.current?.emitRing(issueId, '#ffffff')}
           onIssueSelect={(issueId) => setRailId(issueId)}

@@ -22,19 +22,35 @@ appropriate for team workflows.
 
 ## Enabling
 
-Auto-merge is gated by one persisted toggle in the dashboard's
-`app_settings` store:
+Auto-merge is gated by the global `require_uat_before_merge` setting in the
+dashboard's `app_settings` store. Set it to `false` to turn auto-merge on. The
+merge train must be on as well (`merge_train_enabled: true`): while it is off,
+`POST /api/merge-train/auto-merge/schedule` refuses with
+`412 Merge train is disabled` and the executor skips its tick.
+
+There is no CLI for these settings. Change them in the dashboard or through
+`/api/merge-train/config`:
 
 ```bash
-# turn auto-merge on
-pan flywheel config --set flywheel.require_uat_before_merge=false
+# inspect current state
+curl http://localhost:3011/api/merge-train/config
+
+# turn auto-merge on (a POST needs the dashboard's internal token)
+curl -X POST http://localhost:3011/api/merge-train/config \
+  -H 'content-type: application/json' \
+  -H "x-overdeck-internal-token: $(cat ~/.overdeck/internal-token)" \
+  -d '{"require_uat_before_merge": false}'
 
 # turn it back off
-pan flywheel config --set flywheel.require_uat_before_merge=true
-
-# inspect current state
-pan flywheel config --get
+curl -X POST http://localhost:3011/api/merge-train/config \
+  -H 'content-type: application/json' \
+  -H "x-overdeck-internal-token: $(cat ~/.overdeck/internal-token)" \
+  -d '{"require_uat_before_merge": true}'
 ```
+
+`GET` returns all three settings: `auto_pickup_backlog`,
+`require_uat_before_merge`, and `merge_train_enabled`. `POST` changes only the
+keys in the body, and each value must be a boolean.
 
 The same toggle is exposed in the dashboard's Flywheel header as a checkbox.
 The default is `true` (auto-merge OFF — operator UAT required before merge).
@@ -90,10 +106,12 @@ in `~/.overdeck/projects.yaml`.
 <Note>
 **Auto-merge vs. UAT batch trains.** This toggle controls *per-issue* scheduled
 auto-merge — Overdeck merging one eligible PR at a time without a human click.
-The separate `flywheel.merge_train_enabled` flag enables [UAT batch
+The separate `merge_train_enabled` setting enables [UAT batch
 trains](/features/merge-batches), where ready features are assembled into one
-tested batch you promote together. They are independent flags: auto-merge ships
-individual PRs on a cooldown; batch trains assemble-and-promote a tested bundle.
+tested batch you promote together. Auto-merge ships individual PRs on a
+cooldown; batch trains assemble and promote a tested bundle. Auto-merge also
+needs the merge train on: with `merge_train_enabled` off, nothing is scheduled
+and nothing is merged.
 Leave `require_uat_before_merge` at its default (`true`, auto-merge OFF) when you
 want a human to UAT each batch before promoting it.
 </Note>
@@ -120,14 +138,22 @@ mean, not by clicking the indicator.
 
 ## Eligibility
 
-A PR is eligible for auto-merge only when **all** of these are true:
+Overdeck stores no merge-ready flag. Eligibility is computed from the PR's live
+facts each time it is checked (`isAutoMergeEligible` in
+`src/lib/cloister/auto-merge-eligibility.ts`). A PR is eligible for auto-merge
+only when **all** of these are true:
 
-- `readyForMerge` is `true` (review, test, and ship roles all passed)
-- The PR is open (not closed, not draft, not already merged)
-- GitHub reports all CI checks as completed and passing
-  (no `checksFailed` and no `checksPending`)
-- GitHub reports the PR as `mergeable` (no merge conflicts, branch protection
-  satisfied)
+- The PR is open (not closed, not a draft, not already merged)
+- The PR is approved, and its latest review does not request changes
+- The forge reports CI checks on the PR head, and all of them passed. Pending
+  checks, failing checks, and no reported checks each make the PR ineligible.
+  When the project runs `verification.tests: ci`, the CI test job must also
+  have run and passed on that head.
+- The forge reports the PR as `mergeable` (no merge conflicts, branch
+  protection satisfied). A PR whose mergeability the forge has not computed
+  yet is not eligible.
+- The issue is not held for UAT (its label, then the project default, then the
+  global setting; see above)
 - None of the **blocker labels** are present on the issue:
   - `needs-design`
   - `needs-discussion`
@@ -153,8 +179,11 @@ that gives the operator a predictable cancel window.
 
 Three ways to cancel an in-flight auto-merge during its cooldown:
 
-1. The dashboard's pending-auto-merges banner has a Cancel button.
-2. `DELETE /api/flywheel/auto-merge/:id` against the dashboard.
+1. The Pending auto-merges card on the dashboard's Flywheel page has a
+   Cancel button.
+2. `DELETE /api/merge-train/auto-merge/:id` against the dashboard. The route
+   needs the dashboard's internal token (the `x-overdeck-internal-token`
+   header) or a dashboard session.
 3. The CLI:
 
    ```bash
@@ -184,14 +213,15 @@ non-terminal status.
 
 ```bash
 # Pending entries currently in cooldown
-curl http://localhost:3011/api/flywheel/auto-merge/pending
+curl http://localhost:3011/api/merge-train/auto-merge/pending
 
 # Rows that failed or were blocked during the executor tick
-curl http://localhost:3011/api/flywheel/auto-merge/problems
+curl http://localhost:3011/api/merge-train/auto-merge/problems
 ```
 
-The dashboard's Flywheel page surfaces both lists with countdown and cancel
-controls.
+The Pending auto-merges card on the dashboard's Flywheel page shows the pending
+list with a countdown and a Cancel button. The dashboard does not show the
+problems list; read it from the endpoint.
 
 ## Failure handling
 
@@ -204,7 +234,9 @@ failed entry to clear it.
 
 ## Related
 
-- `pan flywheel config` — read/write the two flywheel autonomy toggles
+- `GET` / `POST /api/merge-train/config`: read and write
+  `require_uat_before_merge`, `merge_train_enabled`, and `auto_pickup_backlog`
+  (no CLI)
 - `pan merge cancel <id>` — cancel a pending auto-merge
 - `roles/flywheel.md` — the orchestrator's contract; references the toggle
   when deciding whether to call the scheduler vs. emitting a `merge`

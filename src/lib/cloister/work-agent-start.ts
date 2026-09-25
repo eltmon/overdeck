@@ -25,6 +25,13 @@ function classifySpawnSkip(status: number, body: Record<string, unknown>): strin
   return 'spawn-failed';
 }
 
+/**
+ * POST /api/agents for a work agent, as an unattended caller. It sends no
+ * guardrail acknowledgement, so every guardrail warning refuses it; the
+ * deferred planning hand-off retry relies on that (PAN-4155). If a caller ever
+ * needs one, send the scoped `guardrailAcknowledgedWarnings`, never the
+ * operator's blanket `guardrailAcknowledged: true`.
+ */
 export async function spawnWorkAgentThroughAgentsEndpoint(
   issueId: string,
   dashboardOrigin = internalDashboardOrigin(),

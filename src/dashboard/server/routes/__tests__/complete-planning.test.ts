@@ -23,9 +23,11 @@ import {
   completePlanningAutoSpawn,
   completePlanningAutoSpawnAndKill,
   completePlanningWorkspaceGitAddCommands,
+  recordPlanningAutoHandoffDeferred,
   recordPlanningAutoHandoffFailure,
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
+import { readPipelineJournal } from '../../../../lib/cloister/pipeline-journal.js';
 import { readAutoSpawnOnFinalizeFlagAsync, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
@@ -417,6 +419,9 @@ describe('completePlanningArtifacts', () => {
         role: 'work',
         startedBy: 'planning-auto-handoff',
         autoSpawnConsentRequired: true,
+        // PAN-3977: an unattended start acknowledges tight RAM and a high
+        // agent count only, never the ceiling or leaked specialists.
+        guardrailAcknowledgedWarnings: ['memory_tight', 'agent_count_high'],
       });
       return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 });
     };
@@ -430,6 +435,94 @@ describe('completePlanningArtifacts', () => {
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1146',
     });
+  });
+
+  // PAN-3977: the acknowledgement covers advisory warnings only. A hard
+  // guardrail block still refuses the spawn. PAN-4155: that refusal is a
+  // deferral deacon-lite retries, not a failure.
+  it('reports a hard guardrail block as a deferred handoff', async () => {
+    const result = await completePlanningAutoSpawn({
+      issueId: 'PAN-3977',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async () => new Response(JSON.stringify({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: 'Available RAM is critically low (1.2 GB).',
+        guardrails: { blocked: true, requiresAcknowledgement: false, status: 503 },
+      }), { status: 503 }),
+    });
+
+    expect(result).toEqual({
+      workAgentSpawned: false,
+      workAgentError: 'Available RAM is critically low (1.2 GB).',
+      workAgentSkipReason: 'guardrails',
+      workAgentHttpStatus: 503,
+      workAgentDeferred: true,
+    });
+    expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
+  });
+
+  // PAN-4155: only a response carrying a guardrail decision is deferred. The
+  // start gate and the dirty-tree guard also answer 409, and waiting does not
+  // fix either, so they stay failures.
+  it('does not defer a 409 that carries no guardrail decision', async () => {
+    const result = await completePlanningAutoSpawn({
+      issueId: 'PAN-4155',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async () => new Response(JSON.stringify({
+        success: false,
+        error: 'Workspace has uncommitted changes',
+      }), { status: 409 }),
+    });
+
+    expect(result).toEqual({
+      workAgentSpawned: false,
+      workAgentError: 'Workspace has uncommitted changes',
+      workAgentSkipReason: 'guardrails',
+      workAgentHttpStatus: 409,
+    });
+  });
+
+  it('journals a guardrail-deferred handoff for deacon-lite and records no planning failure', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-4155-deferred-'));
+    try {
+      const emitActivity = vi.fn();
+      const error = recordPlanningAutoHandoffDeferred({
+        issueId: 'PAN-4155',
+        workspacePath: workspace,
+        result: {
+          workAgentSpawned: false,
+          workAgentSkipReason: 'guardrails',
+          workAgentError: 'Agent ceiling reached',
+          workAgentHttpStatus: 429,
+          workAgentDeferred: true,
+        },
+        emitActivity,
+      });
+
+      expect(error).toBe('Agent ceiling reached');
+      const entries = readPipelineJournal(workspace);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        type: 'handoff.deferred',
+        issueId: 'PAN-4155',
+        source: 'complete-planning',
+        data: { attempt: 0, reason: 'guardrails', error: 'Agent ceiling reached', httpStatus: 429 },
+      });
+      const data = entries[0]!.data as { deferredAt: string; nextRetryAt: string };
+      expect(Date.parse(data.nextRetryAt) - Date.parse(data.deferredAt)).toBe(2 * 60_000);
+      expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+        source: 'plan',
+        level: 'warn',
+        issueId: 'PAN-4155',
+        message: expect.stringContaining('deferred by spawn guardrails'),
+      }));
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   it('reports queued container startup without claiming launch acceptance', async () => {
@@ -465,6 +558,7 @@ describe('completePlanningArtifacts', () => {
       workAgentSpawned: false,
       workAgentError: 'unauthorized',
       workAgentSkipReason: 'unauthorized',
+      workAgentHttpStatus: 401,
     });
     expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
     await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1146')).resolves.toBe(true);

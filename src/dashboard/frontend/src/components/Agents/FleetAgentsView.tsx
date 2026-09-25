@@ -167,7 +167,7 @@ function stuckHours(agent: Agent, now: Date) {
 }
 
 function verbBadgeForAgent(agent: Agent, now: Date, pendingPermissionAgentIds?: ReadonlySet<string>): VerbBadgeProps {
-  if (agent.status === 'unknown' && agent.hasLiveTmuxSession === false) {
+  if (agent.status === 'unknown' && agent.hasLivePane === false) {
     return { variant: 'UNREACHABLE' };
   }
   if (isAgentProblemStatus(agent.status)) {

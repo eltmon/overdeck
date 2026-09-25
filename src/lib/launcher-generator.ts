@@ -196,6 +196,8 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
 
   // Post-claude behavior
   keepAlive?: boolean;
+  /** Conversation Claude Code line runs as `exec`: Herdr detects the pane's foreground process (PAN-3921). */
+  execConversationHarness?: boolean;
   debugLog?: string;
   useScriptWrapper?: boolean;
   scriptLogFile?: string;
@@ -260,6 +262,14 @@ function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
   }
   return `node ${shellQuote(config.supervisorScriptPath)} ${cmd}`;
 }
+
+/**
+ * Printed by a conversation launcher once its harness exits; the keep-alive
+ * loop then holds the pane open. Readiness waits read it as "the harness
+ * exited" (PAN-3827).
+ */
+export const CONVERSATION_SESSION_ENDED_MARKER =
+  'Conversation session ended. Close this panel or click Resume to start a new session.';
 
 /**
  * Canonical launcher script generator.
@@ -473,7 +483,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
 
   if (config.spawnMode === 'conversation') {
     lines.push('echo ""');
-    lines.push('echo "Conversation session ended. Close this panel or click Resume to start a new session."');
+    lines.push(`echo "${CONVERSATION_SESSION_ENDED_MARKER}"`);
   }
 
   // Keep-alive loop
@@ -522,7 +532,7 @@ function buildCommand(config: LauncherConfig): string[] {
       return buildKimiCodeCommand(config, false);
     }
 
-    // Conversation panel doesn't use exec — it runs the command then loops
+    // On tmux the conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
       let cmd = config.baseCommand;
       cmd += buildChannelsArgs(config);
@@ -538,7 +548,8 @@ function buildCommand(config: LauncherConfig): string[] {
       if (config.extraArgs) {
         args.push(config.extraArgs);
       }
-      parts.push(wrapWithSupervisor(config, `${cmd} ${args.join(' ')}`.trim()));
+      const line = wrapWithSupervisor(config, `${cmd} ${args.join(' ')}`.trim());
+      parts.push(config.execConversationHarness ? `exec ${line}` : line);
     }
     return parts;
   }

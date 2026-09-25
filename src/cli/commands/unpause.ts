@@ -3,7 +3,7 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { clearAgentPaused, getAgentState, resolveAgentTarget } from '../../lib/agents.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
-import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleState } from '../../lib/work-agent-lifecycle.js';
 import { resumeAgent } from '../../lib/agents/resume.js';
 
 export async function unpauseCommand(id: string): Promise<void> {
@@ -39,7 +39,7 @@ export async function unpauseCommand(id: string): Promise<void> {
     // Resume immediately — unpause means "go now", not "wait for the Deacon's
     // next patrol". Only when there is actually a session to resume; a plain
     // stopped agent with no session is pointed at pan start instead.
-    if (wasPaused && getWorkAgentLifecycleStateSync(agentId).canResumeSession) {
+    if (wasPaused && (await getWorkAgentLifecycleState(agentId)).canResumeSession) {
       console.log(chalk.dim('Resuming now…'));
       const result = await resumeAgent(agentId);
       if (result.success) {

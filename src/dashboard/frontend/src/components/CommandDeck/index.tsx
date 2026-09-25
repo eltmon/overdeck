@@ -21,6 +21,7 @@ import { RetrospectiveButton } from './RetrospectiveButton';
 import { type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredHarness, loadStoredModel, onKnownModelsSync, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
+import { NewConversationContextOptions, loadStoredNewConversationContext, newConversationContextPayload, type NewConversationContext } from './NewConversationContextOptions';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgents } from '../../lib/store';
 import { useAgentSetInvalidation } from '../../lib/useAgentSetInvalidation';
@@ -154,6 +155,7 @@ interface CommandDeckProps {
     messageIndex: number;
     nonce: number;
     label: string;
+    subagentId?: string;
   } | null;
   onPendingConversationTargetConsumed?: () => void;
   /** Called when the selected conversation changes so App can sync the URL */
@@ -244,6 +246,7 @@ export function CommandDeck({
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
+  const [newConversationContext, setNewConversationContext] = useState<NewConversationContext>(loadStoredNewConversationContext);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
 
   // The mount-time loadStoredModel above runs before the picker's catalog
@@ -547,6 +550,7 @@ export function CommandDeck({
     messageId: string;
     messageIndex: number;
     nonce: number;
+    subagentId?: string;
   }, viewMode?: ViewMode) => {
     const store = usePanesStore.getState();
     store.ensureHome(projectKey);
@@ -559,6 +563,7 @@ export function CommandDeck({
         targetMessageId: target.messageId,
         targetMessageIndex: target.messageIndex,
         targetMessageNonce: target.nonce,
+        targetSubagentId: target.subagentId,
       });
     }
   }, []);
@@ -596,6 +601,7 @@ export function CommandDeck({
           messageId: pendingConversationTarget.messageId,
           messageIndex: pendingConversationTarget.messageIndex,
           nonce: pendingConversationTarget.nonce,
+          subagentId: pendingConversationTarget.subagentId,
         }
       : undefined;
     // Opening a conversation: the /conv/<id> route owns the URL, so switch the
@@ -937,7 +943,7 @@ export function CommandDeck({
           ...(harness ? { harness } : {}),
         }),
       });
-      const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean; isRunning?: boolean } };
+      const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLivePane?: boolean; isRunning?: boolean } };
       if (resumeRes.ok) {
         toast.success('Agent resumed');
         await refreshDashboardState(queryClient);
@@ -965,7 +971,7 @@ export function CommandDeck({
         return;
       }
       // Only fall through to start-fresh when there is genuinely no session to resume.
-      const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLiveTmuxSession;
+      const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLivePane;
       if (!noSession) {
         // A gate/resumable 409 opens the recovery dialog instead of toasting CLI text.
         if (openRecoveryForStartBlock(resumeRes.status, resumeData, issueId)) return;
@@ -1124,10 +1130,8 @@ export function CommandDeck({
   const createConversationForProject = useCallback(
     async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
       try {
-        const payload: Record<string, unknown> = {
-          model: sidebarModel,
-          harness: harnessOverride ?? sidebarHarness,
-        };
+        const harness = harnessOverride ?? sidebarHarness;
+        const payload: Record<string, unknown> = { model: sidebarModel, harness, ...newConversationContextPayload(newConversationContext, harness) };
         if (projectKey) payload.projectKey = projectKey;
         const trimmedMessage = message?.trim();
         if (trimmedMessage) payload.message = trimmedMessage;
@@ -1159,7 +1163,7 @@ export function CommandDeck({
         return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
       }
     },
-    [sidebarModel, sidebarHarness, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn],
+    [sidebarModel, sidebarHarness, newConversationContext, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn],
   );
 
   const handleNewConversation = useCallback(() => {
@@ -1372,7 +1376,7 @@ export function CommandDeck({
                 </button>
               </div>
             </div>
-
+            <NewConversationContextOptions value={newConversationContext} harness={sidebarHarness} onChange={setNewConversationContext} />
           </div>
 
           <div ref={sectionContainerRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>

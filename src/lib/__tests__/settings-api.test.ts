@@ -37,8 +37,8 @@ vi.mock('../config-yaml.js', () => ({
   },
   DEFAULT_ROLES: {
     plan: { model: 'workhorse:expensive' },
-    work: { model: 'workhorse:mid', sub: { inspect: { model: 'workhorse:cheap' }, 'inspect-deep': { model: 'workhorse:mid' } } },
-    review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' }, synthesis: { model: 'workhorse:expensive' } } },
+    work: { model: 'workhorse:mid' },
+    review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' } } },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
     strike: { model: 'workhorse:expensive' },
@@ -48,6 +48,7 @@ vi.mock('../config-yaml.js', () => ({
     flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
+  RETIRED_SUB_ROLES: { work: ['inspect', 'inspect-deep'], review: ['synthesis'] },
   loadConfigSync: () => mockLoadConfig(),
   getGlobalConfigPath: () => '/tmp/config.yaml',
   clearConfigCache: () => mockClearConfigCache(),
@@ -90,7 +91,6 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
   return {
     config: {
       enabledProviders: new Set(['anthropic']),
-      overrides: {},
       geminiThinkingLevel: 3,
       apiKeys: {},
       providerAuth: {},
@@ -234,13 +234,7 @@ describe('loadSettingsApi', () => {
     });
     expect(settings.roles).toMatchObject({
       plan: { model: 'workhorse:expensive' },
-      work: {
-        model: 'workhorse:mid',
-        sub: {
-          inspect: { model: 'workhorse:cheap' },
-          'inspect-deep': { model: 'workhorse:mid' },
-        },
-      },
+      work: { model: 'workhorse:mid' },
       review: {
         model: 'workhorse:expensive',
         sub: {
@@ -248,7 +242,6 @@ describe('loadSettingsApi', () => {
           correctness: { model: 'workhorse:mid' },
           performance: { model: 'workhorse:mid' },
           requirements: { model: 'workhorse:mid' },
-          synthesis: { model: 'workhorse:expensive' },
         },
       },
       test: { model: 'workhorse:mid' },
@@ -286,7 +279,7 @@ describe('loadSettingsApi', () => {
   it('overlays configured workhorses and roles on seeded defaults', async () => {
     mockLoadConfig.mockReturnValue(baseConfig({
       workhorses: { mid: 'gpt-5.5-mini' },
-      roles: { work: { model: 'workhorse:mid', sub: { inspect: { model: 'claude-haiku-4-5' } } } },
+      roles: { review: { model: 'workhorse:expensive', sub: { security: { model: 'claude-haiku-4-5' } } } },
     }));
 
     const { loadSettingsApi } = await import('../settings-api.js');
@@ -294,7 +287,8 @@ describe('loadSettingsApi', () => {
 
     expect(settings.workhorses?.mid).toBe('gpt-5.5-mini');
     expect(settings.workhorses?.expensive).toBe('claude-opus-4-7');
-    expect(settings.roles?.work?.sub?.inspect?.model).toBe('claude-haiku-4-5');
+    expect(settings.roles?.review?.sub?.security?.model).toBe('claude-haiku-4-5');
+    expect(settings.roles?.review?.sub?.correctness?.model).toBe('workhorse:mid');
   });
 
   it('removes role harness overrides when saved as null or empty', async () => {
@@ -415,7 +409,7 @@ describe('saveSettingsApi', () => {
       workhorses: { ...settings.workhorses, mid: 'gpt-5.5-mini' },
       roles: {
         ...settings.roles,
-        work: { model: 'workhorse:mid', sub: { inspect: { model: 'claude-haiku-4-5' } } },
+        review: { model: 'workhorse:expensive', sub: { correctness: { model: 'claude-haiku-4-5' } } },
       },
       memory: {
         provider: 'cliproxy',
@@ -439,7 +433,7 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('workhorses:');
     expect(written).toContain('mid: gpt-5.5-mini');
     expect(written).toContain('roles:');
-    expect(written).toContain('inspect:');
+    expect(written).toContain('correctness:');
     expect(written).toContain('memory:');
     expect(written).toContain('provider: cliproxy');
     expect(written).toContain('per_day_cost_cap_usd: 0');
@@ -854,8 +848,8 @@ describe('validateSettingsApi', () => {
     },
     roles: {
       plan: { model: 'workhorse:expensive' },
-      work: { model: 'workhorse:mid', sub: { inspect: { model: 'claude-haiku-4-5' } } },
-      review: { model: 'workhorse:expensive', sub: { security: { model: 'claude-opus-4-7' }, synthesis: { model: 'workhorse:expensive' } } },
+      work: { model: 'workhorse:mid' },
+      review: { model: 'workhorse:expensive', sub: { security: { model: 'claude-opus-4-7' }, correctness: { model: 'claude-haiku-4-5' } } },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
       flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
@@ -895,6 +889,34 @@ describe('validateSettingsApi', () => {
     const { validateSettingsApi } = await import('../settings-api.js');
 
     expect(validateSettingsApi(validSettings).valid).toBe(true);
+  });
+
+  it('accepts, and ignores, the retired work.inspect sub-roles (#3927)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        work: { model: 'workhorse:mid', sub: { inspect: { model: 'parent' }, 'inspect-deep': { model: 'parent' } } },
+      },
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('accepts, and ignores, the retired review.synthesis sub-role (#4131)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        review: { model: 'workhorse:expensive', sub: { synthesis: { model: 'workhorse:expensive' } } },
+      },
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it('rejects unknown roles and sub-roles', async () => {

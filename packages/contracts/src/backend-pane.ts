@@ -15,7 +15,7 @@ export const BackendPane = Schema.Struct({
   agentId: Schema.optional(Schema.String),
   /** Issue the pane belongs to; absent for operator conversations. */
   issue: Schema.optional(Schema.String),
-  role: Schema.Literals(["work", "worker", "review", "test", "uat", "strike", "plan"]),
+  role: Schema.Literals(["work", "worker", "review", "test", "uat", "strike", "plan", "conversation"]),
   harness: Schema.String,
   model: Schema.String,
   state: Schema.Literals(["idle", "working", "blocked", "done", "exited", "unknown"]),

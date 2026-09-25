@@ -47,6 +47,8 @@ export interface WorkspacePane {
   targetMessageId?: string
   targetMessageIndex?: number
   targetMessageNonce?: number
+  // bare subagent id whose transcript the message target points into (PAN-3982)
+  targetSubagentId?: string
   // terminal pane
   terminalId?: string | null
   // files / commits pane

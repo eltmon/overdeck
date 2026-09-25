@@ -44,8 +44,6 @@ export type RolesConfig = Partial<Record<RoleId, RoleConfig>>;
 
 export interface ModelsConfig {
   providers: ProvidersConfig;
-  /** Legacy model-route overrides are accepted only to preserve form round-trips. */
-  overrides: Partial<Record<string, ModelId>>;
   provider_harnesses?: Partial<Record<Provider, HarnessOverride>>;
   provider_default_harnesses?: Partial<Record<Provider, Harness>>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
@@ -69,12 +67,6 @@ export interface TrackerKeysConfig {
   github?: string;
   gitlab?: string;
   rally?: string;
-}
-
-export interface DeprecationWarning {
-  workType: string;
-  from: string;
-  to: string;
 }
 
 export interface TtsConfig {
@@ -177,7 +169,6 @@ export interface TieredExecutionConfig {
     model: ModelId;
     harness: Harness;
     subscribe: 'all' | 'flagged' | 'sampled';
-    owns_inspection?: boolean;
   };
   by_kind?: Partial<Record<XBriefItemKind, string>>;
   byKind?: Partial<Record<XBriefItemKind, string>>;
@@ -228,7 +219,6 @@ export interface SettingsConfig {
   tracker_keys?: TrackerKeysConfig;
   conversationSearch?: ConversationSearchConfig;
   tts?: TtsConfig;
-  deprecation_warnings?: DeprecationWarning[];
   tmux?: {
     config_mode?: 'managed' | 'inherit-user';
   };

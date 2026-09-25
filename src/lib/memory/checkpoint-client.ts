@@ -1,4 +1,5 @@
-import { Worker } from 'node:worker_threads';
+import type { Worker } from 'node:worker_threads';
+import { spawnModuleWorker } from '../module-worker.js';
 import type {
   ClaimTranscriptRangeInput,
   ClaimTranscriptRangeResult,
@@ -14,14 +15,7 @@ const pendingRequests = new Map<number, { resolve: (value: unknown) => void; rej
 function getCheckpointWorker(): Worker {
   if (worker) return worker;
 
-  const scriptPath = import.meta.url.endsWith('.ts')
-    ? new URL('./checkpoint-worker.ts', import.meta.url)
-    : new URL('./checkpoint-worker.js', import.meta.url);
-
-  const newWorker = new Worker(scriptPath, {
-    type: 'module',
-    execArgv: process.execArgv.filter((arg) => !arg.startsWith('--inspect')),
-  } as ConstructorParameters<typeof Worker>[1]);
+  const newWorker = spawnModuleWorker(checkpointWorkerUrl());
 
   newWorker.on('message', (message: { id: number; ok: boolean; result?: unknown; error?: string }) => {
     const request = pendingRequests.get(message.id);
@@ -52,6 +46,27 @@ function getCheckpointWorker(): Worker {
   return worker;
 }
 
+// Built workers are sibling entries of their bundle: `dist/dashboard/checkpoint-worker.js`
+// (src/dashboard/server/tsdown.config.ts) and `dist/lib/memory/checkpoint-worker.js`
+// (tsdown.config.ts, for the CLI's `pan memory backfill`). Resolve from the dist root so
+// the worker is found wherever the bundler puts the chunk that contains this module.
+// Same pattern as `memoryFtsWorkerUrl` (fts-db.ts).
+function checkpointWorkerUrl(moduleUrl = import.meta.url): URL {
+  if (moduleUrl.endsWith('.ts')) return new URL('./checkpoint-worker.ts', moduleUrl);
+
+  const distMarker = '/dist/';
+  const distIndex = moduleUrl.lastIndexOf(distMarker);
+  if (distIndex !== -1) {
+    const distRoot = moduleUrl.slice(0, distIndex + distMarker.length);
+    const workerPath = moduleUrl.startsWith(`${distRoot}dashboard/`)
+      ? 'dashboard/checkpoint-worker.js'
+      : 'lib/memory/checkpoint-worker.js';
+    return new URL(workerPath, distRoot);
+  }
+
+  return new URL('./checkpoint-worker.js', moduleUrl);
+}
+
 async function runInline(operation: string, payload: unknown): Promise<unknown> {
   const {
     claimTranscriptRange,
@@ -78,17 +93,29 @@ async function runInline(operation: string, payload: unknown): Promise<unknown> 
   }
 }
 
-function postWorkerRequest<T>(operation: string, payload: unknown): Promise<T> {
-  if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
-    return runInline(operation, payload) as Promise<T>;
-  }
-
+function requestViaWorker<T>(operation: string, payload: unknown): Promise<T> {
   const id = nextRequestId++;
   return new Promise<T>((resolve, reject) => {
     pendingRequests.set(id, { resolve: resolve as (value: unknown) => void, reject });
     getCheckpointWorker().postMessage({ id, operation, payload });
   });
 }
+
+function postWorkerRequest<T>(operation: string, payload: unknown): Promise<T> {
+  if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
+    return runInline(operation, payload) as Promise<T>;
+  }
+  return requestViaWorker<T>(operation, payload);
+}
+
+// The worker is never unref()'d, so a test that boots the real one must terminate it.
+async function terminateWorker(): Promise<void> {
+  const current = worker;
+  worker = null;
+  if (current) await current.terminate();
+}
+
+export const __testInternals = { checkpointWorkerUrl, requestViaWorker, terminateWorker };
 
 const toError = (cause: unknown): Error => cause instanceof Error ? cause : new Error(String(cause));
 

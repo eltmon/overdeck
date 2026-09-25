@@ -1,6 +1,7 @@
 import { parseMuseConversationMessages } from './muse-conversation-parser.js';
 import { randomUUID } from 'node:crypto';
-import { Worker } from 'node:worker_threads';
+import type { Worker } from 'node:worker_threads';
+import { spawnModuleWorker } from '../../../lib/module-worker.js';
 import {
   aggregateDiscoveredSessionCost,
   aggregateDiscoveredSessionCostBy,
@@ -142,11 +143,32 @@ export function formatSlowJobLine(input: {
   return `[db-jobs] slow: op=${input.op} lane=${input.lane} waitMs=${input.waitMs} runMs=${input.runMs} depth=${input.depth}${bytes}`;
 }
 
-function workerScriptUrl(): URL {
-  return import.meta.url.endsWith('.ts')
-    ? new URL('./dashboard-db-worker.ts', import.meta.url)
-    : new URL('./dashboard-db-worker.js', import.meta.url);
+// The dashboard runs from dist only: the server bundle and `dashboard-db-worker.js`
+// are sibling entries of `dist/dashboard/` (src/dashboard/server/tsdown.config.ts).
+// Resolve from the dist root so the worker is found wherever the bundler puts the
+// chunk that contains this module. Same pattern as `memoryFtsWorkerUrl` (fts-db.ts).
+function workerScriptUrl(moduleUrl = import.meta.url): URL {
+  if (moduleUrl.endsWith('.ts')) return new URL('./dashboard-db-worker.ts', moduleUrl);
+
+  const distMarker = '/dist/';
+  const distIndex = moduleUrl.lastIndexOf(distMarker);
+  if (distIndex !== -1) {
+    return new URL('dashboard/dashboard-db-worker.js', moduleUrl.slice(0, distIndex + distMarker.length));
+  }
+
+  return new URL('./dashboard-db-worker.js', moduleUrl);
 }
+
+// Workers are never unref()'d, so a test that boots a real one must terminate it.
+async function terminateWorkers(): Promise<void> {
+  for (const lane of Object.keys(workers) as WorkerLane[]) {
+    const worker = workers[lane];
+    workers[lane] = null;
+    if (worker) await worker.terminate();
+  }
+}
+
+export const __testInternals = { workerScriptUrl, terminateWorkers };
 
 function failPendingForLane(lane: WorkerLane, err: Error): void {
   for (const [id, job] of pending.entries()) {
@@ -202,9 +224,7 @@ function getWorker(lane: WorkerLane): Worker {
   const existing = workers[lane];
   if (existing) return existing;
 
-  const worker = new Worker(workerScriptUrl(), {
-    execArgv: process.execArgv.filter((arg) => !arg.startsWith('--inspect')),
-  } as ConstructorParameters<typeof Worker>[1]);
+  const worker = spawnModuleWorker(workerScriptUrl());
   workers[lane] = worker;
 
   worker.on('message', (message: WorkerResponse) => {

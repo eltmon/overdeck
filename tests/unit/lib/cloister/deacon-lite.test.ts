@@ -1,4 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const CONNECTION_LOST_FIXTURE = fileURLToPath(
+  new URL('../../../fixtures/claude-code-connection-lost.jsonl', import.meta.url),
+);
 
 const mocks = vi.hoisted(() => ({
   listAgentStates: vi.fn(),
@@ -72,6 +79,12 @@ const {
   reconcileAgentLiveness,
   reapClosedIssueAgents,
   runDeaconLite,
+  runDeaconLitePatrol,
+  setPatrolRunObserver,
+  getDeaconLiteStatus,
+  startDeaconLite,
+  stopDeaconLite,
+  DEACON_LITE_INTERVAL_MS,
   setAgentStoppedNotifier,
   __resetStuckWorkAgentCooldownForTests,
 } = await import('../../../../src/lib/cloister/deacon-lite.js');
@@ -105,6 +118,8 @@ describe('deacon-lite', () => {
   });
 
   afterEach(() => {
+    setPatrolRunObserver(null);
+    stopDeaconLite();
     vi.useRealTimers();
   });
 
@@ -170,6 +185,7 @@ describe('deacon-lite', () => {
     });
 
     it('resumes exactly once when a provider error is showing at the prompt', async () => {
+      mocks.isIdle.mockReturnValue(true);
       mocks.capturePaneText.mockReturnValue('API Error: Overloaded\n❯ ');
 
       const actions = await checkApiErrorAgents();
@@ -181,6 +197,48 @@ describe('deacon-lite', () => {
         expect.any(String),
         'deacon-lite:checkApiErrorAgents',
       );
+    });
+
+    // PAN-3948: Claude Code's "Connection lost mid-response" error, the exact
+    // text of a real transcript record (tests/fixtures/claude-code-connection-lost.jsonl),
+    // rendered in the pane above the idle prompt.
+    function connectionLostPane(): string {
+      const record = JSON.parse(readFileSync(CONNECTION_LOST_FIXTURE, 'utf8').trim()) as {
+        message: { content: Array<{ text: string }> };
+      };
+      return `● Working on it…\n  ⎿  ${record.message.content[0]!.text}\n\n❯ `;
+    }
+
+    it('resumes an idle planning agent left at the prompt by "Connection lost mid-response"', async () => {
+      mocks.liveAgentInventory.mockResolvedValue(inventory(['planning-pan-3937']));
+      mocks.isIdle.mockReturnValue(true);
+      mocks.capturePaneText.mockReturnValue(connectionLostPane());
+
+      const actions = await checkApiErrorAgents();
+
+      expect(mocks.isIdle).toHaveBeenCalledWith('planning-pan-3937', expect.any(Number), expect.any(Number));
+      expect(actions).toHaveLength(1);
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+        'planning-pan-3937',
+        expect.any(String),
+        'deacon-lite:checkApiErrorAgents',
+      );
+
+      // Rate-limited like every other pattern: the next tick inside the cooldown is a no-op.
+      const second = await checkApiErrorAgents();
+      expect(second).toEqual([]);
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('never nudges a working agent whose pane still shows the error', async () => {
+      mocks.isIdle.mockReturnValue(false);
+      mocks.capturePaneText.mockReturnValue(connectionLostPane());
+
+      const actions = await checkApiErrorAgents();
+
+      expect(actions).toEqual([]);
+      expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -299,6 +357,84 @@ describe('deacon-lite', () => {
       expect(mocks.listAgentStates).not.toHaveBeenCalled();
       expect(mocks.liveAgentInventory).not.toHaveBeenCalled();
       expect(mocks.reconcileClosedIssueAgents).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('runDeaconLitePatrol', () => {
+    it('reports a clean run and stamps lastRunAt', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      await runDeaconLitePatrol();
+
+      const expectedAt = new Date('2026-09-18T12:00:00.000Z').toISOString();
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith({ at: expectedAt, error: null });
+      expect(getDeaconLiteStatus().lastRunAt).toBe(expectedAt);
+    });
+
+    it('reports the error text when reconcileClosedIssueAgents rejects', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      mocks.reconcileClosedIssueAgents.mockRejectedValue(new Error('tracker down'));
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      await expect(runDeaconLitePatrol()).resolves.toBeUndefined();
+
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith(expect.objectContaining({ error: 'tracker down' }));
+      expect(getDeaconLiteStatus().lastRunError).toBe('tracker down');
+    });
+
+    it('still reports while globally paused, without running any routine', async () => {
+      mocks.isDeaconGloballyPaused.mockReturnValue(true);
+      mocks.listAgentStates.mockReturnValue([workAgent()]);
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      await runDeaconLitePatrol();
+
+      expect(mocks.listAgentStates).not.toHaveBeenCalled();
+      expect(mocks.liveAgentInventory).not.toHaveBeenCalled();
+      expect(mocks.reconcileClosedIssueAgents).not.toHaveBeenCalled();
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith(expect.objectContaining({ error: null }));
+    });
+
+    it('swallows a throwing observer and still resolves and stamps lastRunAt', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      setPatrolRunObserver(() => {
+        throw new Error('observer boom');
+      });
+
+      await expect(runDeaconLitePatrol()).resolves.toBeUndefined();
+
+      expect(getDeaconLiteStatus().lastRunAt).not.toBeNull();
+    });
+  });
+
+  describe('DEACON_LITE_INTERVAL_MS and startDeaconLite', () => {
+    it('exports the 60s interval constant and the runDeaconLitePatrol function', () => {
+      expect(DEACON_LITE_INTERVAL_MS).toBe(60_000);
+      expect(typeof runDeaconLitePatrol).toBe('function');
+    });
+
+    it('runs runDeaconLitePatrol immediately and again on every interval', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      startDeaconLite();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(observer).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(DEACON_LITE_INTERVAL_MS);
+      expect(observer).toHaveBeenCalledTimes(2);
     });
   });
 });

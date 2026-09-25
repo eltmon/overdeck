@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { resolve } from 'node:path';
 
+import { resolveBootGates, type BootGateState } from '../../lib/boot-gates.js';
 import { getDashboardIdentity, type DashboardIdentity } from './identity.js';
 
 export interface DashboardHealthBody extends DashboardIdentity {
@@ -10,6 +11,8 @@ export interface DashboardHealthBody extends DashboardIdentity {
   readonly serverPath: string;
   readonly processStartedAtMs: number;
   readonly serverMtimeMs: number | null;
+  /** The Deacon/resume gates this process booted with; `pan reload` carries them over (PAN-3899). */
+  readonly bootGates: BootGateState;
   readonly reason?: string;
 }
 
@@ -22,6 +25,7 @@ interface DashboardHealthDependencies {
   readonly serverPath?: string;
   readonly processStartedAtMs?: number;
   readonly statEntrypoint?: (path: string) => Promise<{ readonly mtimeMs: number }>;
+  readonly bootGates?: BootGateState;
 }
 
 /**
@@ -36,6 +40,7 @@ export async function buildDashboardHealthResponse(
   const processStartedAtMs = dependencies.processStartedAtMs ?? performance.timeOrigin;
   const serverPath = resolve(dependencies.serverPath ?? process.argv[1] ?? '');
   const statEntrypoint = dependencies.statEntrypoint ?? stat;
+  const bootGates = dependencies.bootGates ?? resolveBootGates();
   let serverMtimeMs: number | null = null;
 
   try {
@@ -51,6 +56,7 @@ export async function buildDashboardHealthResponse(
         serverPath,
         processStartedAtMs,
         serverMtimeMs,
+        bootGates,
         reason,
       },
     };
@@ -66,6 +72,7 @@ export async function buildDashboardHealthResponse(
         serverPath,
         processStartedAtMs,
         serverMtimeMs,
+        bootGates,
         reason: 'Dashboard entrypoint changed after this process started; delayed imports may no longer resolve.',
       },
     };
@@ -80,6 +87,7 @@ export async function buildDashboardHealthResponse(
       serverPath,
       processStartedAtMs,
       serverMtimeMs,
+      bootGates,
     },
   };
 }

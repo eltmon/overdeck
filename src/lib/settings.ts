@@ -284,7 +284,10 @@ export function getClaudeModelFlag(modelId: ModelId | string): string {
     'claude-sonnet-4-5': 'sonnet',
     'claude-haiku-4-5': 'haiku',
   };
-  return modelMap[modelId] || 'sonnet';
+  // Unknown IDs (a newer release, a dated ID) pass through unchanged: the
+  // `claude` CLI accepts full model IDs, and swapping in an alias would launch
+  // a different model than the one configured.
+  return modelMap[modelId] ?? modelId;
 }
 
 /**

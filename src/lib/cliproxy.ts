@@ -51,7 +51,10 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 // absolute expiry. The old scheme sharded the OpenAI prompt cache per Claude
 // session (user_id embeds the session uuid), rotated keys mid-session every
 // hour, and cold-started all caching on proxy restart.
-const CLIPROXY_RELEASE_VERSION = 'v7.2.113';
+// v7.3.16: current upstream release; keeps the version banner, the codex
+// oauth-model-alias remapping, and the management API Overdeck relies on, and
+// meets the Management Center web UI's minimum supported version (7.2.147).
+const CLIPROXY_RELEASE_VERSION = 'v7.3.16';
 
 function getCliproxyDir(): string {
   return join(OVERDECK_HOME, 'cliproxy');
@@ -440,7 +443,7 @@ export function execFailureStdout(err: unknown): string {
  * machines on whatever shipped first (PAN-1584 — stuck on 6.9.45, which breaks
  * gpt-5.5 work agents via a Codex "System messages are not allowed" rejection).
  * An unreadable version is treated as out-of-date so we re-pull rather than
- * trust a mystery binary. CLIProxyAPI v7.2.113 deliberately does not define
+ * trust a mystery binary. CLIProxyAPI (v7.2.113 through v7.3.16) deliberately does not define
  * `--version`: it prints this banner then exits 2, which avoids starting a server.
  */
 async function isCliproxyUpToDateTask(): Promise<boolean> {

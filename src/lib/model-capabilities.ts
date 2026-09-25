@@ -703,7 +703,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 98, // "1000+ tok/sec" per OpenAI launch material
       'context-length': 72, // 128K — smaller than the Codex base 400K
     },
-    notes: 'Ultra-fast coding research preview (Feb 2026). Text-only, 128K context, ChatGPT-Pro-only. Candidate for work.inspect / high-volume code scans when a Pro account is available.',
+    notes: 'Ultra-fast coding research preview (Feb 2026). Text-only, 128K context, ChatGPT-Pro-only. Candidate for high-volume code scans when a Pro account is available.',
   },
 
   // Retired OpenAI model IDs — kept for backward compat

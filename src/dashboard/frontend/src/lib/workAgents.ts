@@ -54,6 +54,6 @@ export function isAgentSessionAttachable(agent: Agent): boolean {
     isAgentSessionActive(agent) ||
     (agent.status === 'stopped' &&
       (agent.role ?? 'work') === 'work' &&
-      !!agent.lifecycle?.hasLiveTmuxSession)
+      !!agent.lifecycle?.hasLivePane)
   );
 }

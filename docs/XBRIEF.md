@@ -46,7 +46,7 @@ Every project's plan artifacts (drafts, specs, continues, orders, notes, backlog
 
 #### Canonical plan state (`.pan/`)
 
-`.pan/` lives in the project repo (or the configured plan-home repo for polyrepo projects), committed on the feature branch by the agent that writes it:
+`.pan/` lives in the project repo (or the configured plan-home repo for polyrepo projects), committed by whoever writes it. Per-issue artifacts (specs, continues, drafts) are committed on the feature branch. Project-level artifacts (orders, notes, the backlog sequence) are committed on `main` in the plan home, and `pan backlog write-sequence` and the `pan orders` write verbs also push their commit so local `main` does not drift ahead of origin (PAN-3923, #4108). When origin has moved, the push replays only the `.pan/` commits onto it and pushes. It never forces, and it warns instead of pushing when local `main` holds unpushed commits outside `.pan/`.
 
 ```
 .pan/
@@ -84,7 +84,7 @@ Workspace runtime files are local and gitignored.
 PRDs and xBRIEFs are distinct artifacts that flow through the same pipeline:
 
 1. **PRD drafted** — a human writes a markdown PRD to `.pan/drafts/<issue>.md`, or a planning agent authors a workspace-local draft that gets promoted there. `pan plan finalize` enforces the PRD's existence (PRD-first gate, PAN-2234), never overwriting an existing canonical draft.
-2. **Planning completes** — the planning agent converts the PRD into a machine-readable workspace xBRIEF, stamps it `status: "proposed"`, and `complete-planning` promotes it into `.pan/specs/` on the feature branch. Explicit `--no-promote` leaves the spec at `status: "proposed"` for a human to promote later with `pan plan done <issue-id>`.
+2. **Planning completes** — the planning agent converts the PRD into a machine-readable workspace xBRIEF, stamps it `status: "proposed"`, and `complete-planning` promotes it into `.pan/specs/` on the feature branch. For GitHub issues, `complete-planning` then adds the `planned` label, only after the spec is written and only when it is on disk; starting a planning session adds only the `planning` label (PAN-3953). Explicit `--no-promote` leaves the spec at `status: "proposed"` for a human to promote later with `pan plan done <issue-id>`.
 3. **Work starts** — `pan start` sets the spec's top-level `status` to `"active"` and `plan.status` to `"running"`, then commits and pushes that transition on the feature branch before returning. Work agents read the canonical spec via `findPlan()` and track item progress in `.pan/continues/<issue>.xbrief.json`.
 4. **Active plan repair** — if an item's declared scope and verification are mechanically incompatible, stop its running work session and return the issue to planning. Preserve stable item IDs, repair the ownership or verification in the planning draft, and re-finalize it. Planning quality-lints the replacement and rewrites the same canonical filename; matching continue-file state continues to apply.
 5. **Work completes** — after merge, `status` is updated to `"completed"` in the spec.

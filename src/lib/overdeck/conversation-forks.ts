@@ -4,10 +4,10 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
+import { loadConfigSync } from '../config-yaml.js';
 import { parseIssueId } from '../issue-id.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { resolveProjectKeyForCwdAsync } from '../projects.js';
@@ -41,6 +41,7 @@ import {
   waitForTmuxSession,
 } from './conversation-runtime.js';
 import { resolveConversationDeliveryMethod } from './conversation-delivery.js';
+import { conversationLaunchContext } from './conversation-launch-context.js';
 import { deliverAgentMessage, getAgentRuntimeStateSync, waitForReadySignal } from '../agents.js';
 import { getTranscriptAdapter } from '../conversations/transcript-adapter.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
@@ -65,7 +66,13 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
 import { activeComposerRegion } from '../pane-composer.js';
-import { capturePane, capturePaneViewport, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
+import { capturePane, capturePaneViewport, deliveryVerifyLine, sendKeysAsync, sessionExists } from '../tmux.js';
+import { Effect } from 'effect';
+import type { DeliveryResult } from '../agents/delivery.js';
+import { conversationHarnessAlive, conversationSessionAlive } from './conversation-liveness.js';
+import { writeConversationPaneRole } from './conversation-pane-role.js';
+import { getIssueWorkspacePath } from './issue-projects.js';
+import { isAgentRole, type AgentRole } from '@overdeck/contracts';
 import {
   readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
@@ -269,13 +276,13 @@ export function __resetForkPipelineRuntimeOverridesForTest(): void {
 async function forkSessionExists(sessionName: string): Promise<boolean> {
   return forkPipelineRuntimeOverrides.sessionExists
     ? forkPipelineRuntimeOverrides.sessionExists(sessionName)
-    : Effect.runPromise(sessionExists(sessionName));
+    : conversationSessionAlive(sessionName);
 }
 
 async function forkHarnessProcessAlive(sessionName: string): Promise<boolean> {
   return forkPipelineRuntimeOverrides.isHarnessProcessAlive
     ? forkPipelineRuntimeOverrides.isHarnessProcessAlive(sessionName)
-    : isHarnessProcessAlive(sessionName);
+    : conversationHarnessAlive(sessionName);
 }
 
 function forkRuntimeState(sessionName: string): ReturnType<typeof getAgentRuntimeStateSync> {
@@ -337,6 +344,7 @@ export async function ensureForkSessionReady(
     resume,
     conv.harness ?? 'claude-code',
     plainFork,
+    conversationLaunchContext(conv),
   );
   await forkWaitForTmuxSession(conv.tmuxSession);
 }
@@ -347,22 +355,36 @@ export async function ensureForkSessionReady(
  * composer stayed full after two standalone-Enter nudges and must be surfaced as
  * a failed fork without re-delivering duplicate text.
  */
+/** A refused or failed delivery must surface as a failed fork, never vanish (PAN-3921). */
+function assertForkDelivered(conv: Conversation, caller: string, delivery: DeliveryResult): void {
+  if (!delivery.ok) throw new Error(`[${caller}] fork summary not delivered to ${conv.name}: ${delivery.failure ?? delivery.path}`);
+}
+
+async function tmuxSessionPresent(sessionName: string): Promise<boolean> {
+  return Effect.runPromise(sessionExists(sessionName)).catch(() => false);
+}
+
 export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<'submitted' | 'stranded'> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
   const behavior = getHarnessBehavior(conv.harness);
   if (behavior.transcriptKind === 'ohmypi-jsonl') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
-    await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+    assertForkDelivered(conv, caller, await deliverAgentMessage(conv.tmuxSession, summary, caller, method));
     return 'submitted';
   }
   const ready = await waitForReadySignal(conv.tmuxSession, 60);
   if (!ready) {
     console.warn(`[${caller}] ready signal not detected for ${conv.name} within 60s — delivering and confirming anyway`);
   }
-  await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+  const delivery = await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+  assertForkDelivered(conv, caller, delivery);
   const outcome = await self.confirmForkPromptAccepted(conv.tmuxSession, 8000);
   if (outcome === 'accepted') return 'submitted';
+  // The composer evidence below reads the tmux pane. `agent.prompt` submits on
+  // its own, and a pane with no tmux session (Herdr) shows nothing to check, so
+  // an empty read there is no sign of a stranded turn (PAN-3921).
+  if (delivery.path === 'herdr' || !(await tmuxSessionPresent(conv.tmuxSession))) return 'submitted';
 
   const normalizePaneVerification = (value: string): string => value
     .replace(/[─-╿]/g, '')
@@ -704,6 +726,13 @@ export async function resolveForkProjectKey(
   return { projectKey: await resolveProjectKeyForCwdAsync(source.cwd) ?? undefined };
 }
 
+/** The issue's workspace directory when it exists on disk. */
+async function existingIssueWorkspace(issueId: string): Promise<string | undefined> {
+  const workspace = getIssueWorkspacePath(issueId);
+  if (!workspace) return undefined;
+  return (await stat(workspace).then((info) => info.isDirectory(), () => false)) ? workspace : undefined;
+}
+
 export async function handleConversationSummaryFork(
   name: string,
   body: Record<string, unknown>,
@@ -751,6 +780,11 @@ export async function handleConversationSummaryFork(
       }
       explicitIssueId = requestedIssueId.trim();
     }
+    const requestedRole = body['role'];
+    if (requestedRole !== undefined && !isAgentRole(requestedRole)) {
+      return jsonResponse({ error: 'Invalid role' }, { status: 400 });
+    }
+    const paneRole: AgentRole = isAgentRole(requestedRole) ? requestedRole : 'conversation';
     const requestedProject = body['projectKey'];
     if (requestedProject !== undefined && (typeof requestedProject !== 'string' || !requestedProject.trim())) {
       return jsonResponse({ error: 'Invalid projectKey' }, { status: 400 });
@@ -801,7 +835,10 @@ export async function handleConversationSummaryFork(
     if (typeof body['summaryModel'] === 'string' && summaryModel && !SAFE_MODEL_PATTERN.test(summaryModel)) {
       return jsonResponse({ error: 'Invalid summaryModel' }, { status: 400 });
     }
-    const effectiveCwd = cwd || conv.cwd || process.cwd();
+    // PAN-3921 FR-6: a handoff for an issue is placed in the issue's workspace
+    // when it exists; an explicit cwd still wins.
+    const issueWorkspaceCwd = !cwd && explicitIssueId ? await existingIssueWorkspace(explicitIssueId) : undefined;
+    const effectiveCwd = cwd || issueWorkspaceCwd || conv.cwd || process.cwd();
     if (forkMode === 'handoff' && !(await isInsideGitWorkTree(effectiveCwd))) {
       return jsonResponse({
         error: `Handoff cwd is not inside a git repository: ${effectiveCwd}. Run the handoff from a git working tree.`,
@@ -817,7 +854,9 @@ export async function handleConversationSummaryFork(
     const newName = `${timestamp}-${suffix}`;
     const newTmux = `conv-${newName}`;
     const launchModel = model || conv.model;
-    const effectiveSummaryModel = summaryModel || 'claude-sonnet-5';
+    // PAN-4160: same source generateSummaryForFork falls back to, so the
+    // summary harness is chosen for the model that actually runs.
+    const effectiveSummaryModel = summaryModel || loadConfigSync().config.conversations.forkSummaryModel;
     const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
     const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
     const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
@@ -836,7 +875,7 @@ export async function handleConversationSummaryFork(
     const newConv = createConversation({
       name: newName,
       tmuxSession: newTmux,
-      cwd: cwd || conv.cwd || process.cwd(),
+      cwd: effectiveCwd,
       issueId: explicitIssueId ?? conv.issueId ?? branchIssueId ?? undefined,
       projectKey: projectResult.projectKey,
       title: customTitle || defaultTitle,
@@ -851,6 +890,8 @@ export async function handleConversationSummaryFork(
       effort: conv.effort ?? undefined,
       harness: launchHarness,
       forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
+      // PAN-4185: a fork of a bare conversation stays bare.
+      ...conversationLaunchContext(conv),
     });
     const forkRequest = buildForkRequest({
       parentConversationName: conv.name,
@@ -867,6 +908,8 @@ export async function handleConversationSummaryFork(
       ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
       ...(customTitle !== undefined ? { title: customTitle } : {}),
     });
+    // Every later spawn of this conversation reads its pane role from here.
+    await writeConversationPaneRole(newTmux, paneRole);
     setForkRequest(newConv.name, JSON.stringify(forkRequest));
     markConversationActive(newConv.name);
     registerInFlightForkPipeline(

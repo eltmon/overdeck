@@ -82,9 +82,9 @@ Overdeck orchestrates issue work through five lifecycle **roles**. **You are run
 | **work** | Implementation from your xBRIEF tasks | workspace worktree | `roles/work.md` |
 | **review** | Review synthesis and approval/blocking decision | project root | `roles/review.md` |
 | **test** | Automated verification and required browser UAT | project root | `roles/test.md` |
-| server-side shipping | Rebase/readyForMerge preparation for human merge | project root | no spawned role file |
+| server-side shipping | Rebase and merge preparation for human merge (an approved PR with green checks is `ready`) | project root | no spawned role file |
 
-Sub-roles are configuration slots under a role, not independent lifecycle stages. Current sub-roles include `work.inspect`, `work.inspect-deep`, and the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). Plan acceptance criteria should say which outcomes these roles must verify; lifecycle dispatch decides when the role runs.
+Sub-roles are configuration slots under a role, not independent lifecycle stages. Current sub-roles are the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). Plan acceptance criteria should say which outcomes these roles must verify; lifecycle dispatch decides when the role runs.
 
 **Critical asymmetry:** the workspace `CLAUDE.md` you see is not necessarily the same context later roles see. Instructions you put in `continue.json` reach the work role (same workspace). Requirements that review/test and server-side shipping must enforce should be encoded in the xBRIEF as acceptance criteria, because those criteria propagate through the role prompts and downstream artifacts.
 
@@ -101,11 +101,11 @@ The review convoy sub-roles (`review.security`, `review.correctness`, `review.pe
 
 ### What happens after you finalize
 
-After `pan plan finalize`, the pipeline runs without you once the handoff gate opens: `pan start` / Start Agent for human-approved planning, or the `--auto-start` stamp for autonomous orchestrators. The downstream flow is `work` → optional `work.inspect`/`work.inspect-deep` on flagged xBRIEF tasks → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your xBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
+After `pan plan finalize`, the pipeline runs without you once the handoff gate opens: `pan start` / Start Agent for human-approved planning, or the `--auto-start` stamp for autonomous orchestrators. The downstream flow is `work` → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your xBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
 
 ## Process
 
-1. Read the issue and the PRD draft at `.pan/drafts/<ISSUE-ID>.md` through the read door if it exists. For cross-issue context, look up existing specs by issue ID via the read-only lifecycle index — never write or move files in `.pan/specs/` directly.
+1. Read the issue and the PRD draft at `.pan/drafts/<ISSUE-ID>.md` if it exists. For cross-issue context, look up existing specs by issue ID under `.pan/specs/` (`*-<ISSUE-ID>-*.xbrief.json`), read-only — never write or move files in `.pan/specs/` directly.
 2. Explore the codebase. Large-file `Read`s return TLDR summaries automatically — see TLDR section below. Use Read/Grep/Glob for everything else, but never edit
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach; write each question self-contained (situation, decision, option consequences) — the operator answers from a dialog without the transcript

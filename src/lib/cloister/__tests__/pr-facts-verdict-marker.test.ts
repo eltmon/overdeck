@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { evaluateMergeReadiness, formatVerdictMarker, getPrFacts, parseVerdictMarker, resetPrFactsCache } from '../pr-facts.js';
+import { getPrFacts, parseVerdictMarker, parseVerdictMarkerWithSha, resetPrFactsCache } from '../pr-facts.js';
 import type { IssuePullRequestData } from '../../overdeck/pull-requests.js';
 
 const HEAD = 'a7b64f7c0000000000000000000000000000abcd';
@@ -54,6 +54,18 @@ describe('parseVerdictMarker', () => {
     expect(parseVerdictMarker('prose\n<!-- overdeck-verdict: APPROVED -->')).toBeNull();
     expect(parseVerdictMarker('just a comment')).toBeNull();
     expect(parseVerdictMarker(undefined)).toBeNull();
+  });
+
+  it('#3853: reads a marker that names its commit, and the merge-ready read is unchanged', async () => {
+    expect(parseVerdictMarker(`<!-- overdeck-verdict: APPROVED sha=${HEAD} -->\n\nok`)).toBe('APPROVED');
+    expect(parseVerdictMarkerWithSha(`<!-- overdeck-verdict: APPROVED sha=${HEAD} -->`))
+      .toEqual({ verdict: 'APPROVED', sha: HEAD });
+    expect(parseVerdictMarkerWithSha('<!-- overdeck-verdict: APPROVED -->'))
+      .toEqual({ verdict: 'APPROVED', sha: null });
+    const facts = await factsFor(prFixture({
+      comments: [{ authorAssociation: 'OWNER', body: `<!-- overdeck-verdict: APPROVED sha=${HEAD} -->`, createdAt: '2026-09-19T10:05:00Z' }],
+    }));
+    expect(facts.approved).toBe(true);
   });
 });
 
@@ -117,65 +129,6 @@ describe('getPrFacts — verdict marker mapping', () => {
     expect(facts.reviewDecision).toBe('REVIEW_REQUIRED');
     expect(facts.approved).toBe(false);
     expect(facts.changesRequested).toBe(false);
-  });
-});
-
-describe('getPrFacts — approvals bind to the PR head (#3983)', () => {
-  const OLD = 'b1b2b3b40000000000000000000000000000ffff';
-  const GREEN: IssuePullRequestData['statusCheckRollup'] = [{ name: 'build', status: 'COMPLETED', conclusion: 'SUCCESS' }];
-
-  it('round-trips the head through the marker', () => {
-    expect(formatVerdictMarker('APPROVED', HEAD)).toBe(`<!-- overdeck-verdict: APPROVED sha=${HEAD} -->`);
-    expect(parseVerdictMarker(`${formatVerdictMarker('APPROVED', HEAD)}\n\nlgtm`)).toBe('APPROVED');
-    expect(formatVerdictMarker('APPROVED')).toBe('<!-- overdeck-verdict: APPROVED -->');
-  });
-
-  it('counts an approval that names the current head, for auto-merge too', async () => {
-    const facts = await factsFor(prFixture({
-      statusCheckRollup: GREEN,
-      comments: [{ authorAssociation: 'OWNER', body: `${formatVerdictMarker('APPROVED', HEAD)}\n\nlgtm`, createdAt: '2026-09-19T10:05:00Z' }],
-    }));
-    expect(facts.approved).toBe(true);
-    expect(facts.approvedAtHead).toBe(true);
-    expect(evaluateMergeReadiness(facts, { requireApprovalAtHead: true })).toEqual({ ready: true });
-  });
-
-  it('ignores an approval for an older head, however recent the comment', async () => {
-    // Committed at 10:00 but pushed after this 10:05 approval of the old head:
-    // the commit date cannot tell, the SHA can.
-    const facts = await factsFor(prFixture({
-      comments: [{ authorAssociation: 'OWNER', body: formatVerdictMarker('APPROVED', OLD), createdAt: '2026-09-19T10:05:00Z' }],
-    }));
-    expect(facts.approved).toBe(false);
-    expect(facts.approvedAtHead).toBe(false);
-  });
-
-  it('keeps a dated SHA-less approval for the manual Merge button, never for auto-merge', async () => {
-    const facts = await factsFor(prFixture({
-      statusCheckRollup: GREEN,
-      comments: [{ authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: APPROVED -->', createdAt: '2026-09-19T10:05:00Z' }],
-    }));
-    expect(facts.approved).toBe(true);
-    expect(facts.approvedAtHead).toBe(false);
-    expect(evaluateMergeReadiness(facts)).toEqual({ ready: true });
-    expect(evaluateMergeReadiness(facts, { requireApprovalAtHead: true })).toEqual({
-      ready: false,
-      reason: `PR approval does not name PR HEAD ${HEAD}`,
-    });
-  });
-
-  it('does not date a SHA-less approval against another commit when the head is not listed', async () => {
-    const facts = await factsFor(prFixture({
-      commits: [{ oid: OLD, committedDate: '2026-09-19T09:00:00Z' }],
-      comments: [{ authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: APPROVED -->', createdAt: '2026-09-19T10:05:00Z' }],
-    }));
-    expect(facts.approved).toBe(false);
-    expect(facts.approvedAtHead).toBe(false);
-  });
-
-  it('treats a forge review approval as bound to the head', async () => {
-    const facts = await factsFor(prFixture({ reviewDecision: 'APPROVED' }));
-    expect(facts.approvedAtHead).toBe(true);
   });
 });
 

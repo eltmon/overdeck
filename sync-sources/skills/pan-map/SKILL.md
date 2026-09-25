@@ -5,16 +5,16 @@ description: "Topical: bootstrap or refresh Overdeck codebase map files for proj
 
 # Overdeck Codebase Map
 
-Use this skill when a project needs durable orientation files before or during planning. There is no `pan map` CLI verb; the deliverable is committed markdown under `.pan/context/codebase/`.
+Use this skill when a project needs durable orientation files before or during planning. There is no pan map CLI verb; the deliverable is committed markdown under `.overdeck/context/codebase/`.
 
 ## Goal
 
 Create or refresh these four files:
 
-- `.pan/context/codebase/architecture.md` — subsystems, entry points, data flow, key directories.
-- `.pan/context/codebase/conventions.md` — naming, style, test placement, idioms agents must imitate.
-- `.pan/context/codebase/concerns.md` — cross-cutting traps, async-only rules, known footguns, hazard list.
-- `.pan/context/codebase/stack.md` — languages, frameworks, package manager, build/test commands, versions.
+- `.overdeck/context/codebase/architecture.md` — subsystems, entry points, data flow, key directories.
+- `.overdeck/context/codebase/conventions.md` — naming, style, test placement, idioms agents must imitate.
+- `.overdeck/context/codebase/concerns.md` — cross-cutting traps, async-only rules, known footguns, hazard list.
+- `.overdeck/context/codebase/stack.md` — languages, frameworks, package manager, build/test commands, versions.
 
 Each file should be an orientation digest, not full documentation:
 
@@ -25,7 +25,7 @@ Each file should be an orientation digest, not full documentation:
 
 ## Workflow
 
-1. Read existing `.pan/context/codebase/` files if present.
+1. Read existing `.overdeck/context/codebase/` files if present.
 2. Explore only enough code to confirm architecture, conventions, concerns, and stack.
 3. Write or refresh all four files together so they stay internally consistent.
 4. Commit the map with the project changes that introduced or refreshed it.

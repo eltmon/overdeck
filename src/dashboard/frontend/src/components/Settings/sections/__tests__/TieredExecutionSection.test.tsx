@@ -18,7 +18,6 @@ function baseSettings(overrides: Partial<SettingsConfig> = {}): SettingsConfig {
         nous: false,
         dashscope: false,
       },
-      overrides: {},
     },
     api_keys: {},
     ...overrides,
@@ -259,7 +258,6 @@ describe('TieredExecutionSection', () => {
       model: 'claude-sonnet-5',
       harness: 'claude-code',
       subscribe: 'flagged',
-      owns_inspection: true,
     });
   });
 
@@ -468,7 +466,6 @@ describe('TieredExecutionSection', () => {
               model: 'claude-haiku-4-5',
               harness: 'claude-code',
               subscribe: 'flagged',
-              owns_inspection: false,
             },
             replay_threshold: 0.5,
           },
@@ -487,12 +484,9 @@ describe('TieredExecutionSection', () => {
 
     fireEvent.change(screen.getByLabelText('Subscribe'), { target: { value: 'all' } });
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor.subscribe).toBe('all');
-
-    fireEvent.click(screen.getByRole('switch', { name: 'Supervisor owns inspection' }));
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor.owns_inspection).toBe(true);
   });
 
-  it('preserves effective inspection ownership when the field is omitted', () => {
+  it('shows no inspection-ownership control for the retired owns_inspection setting', () => {
     const onSettingsChange = vi.fn();
     render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
       enabled: false,
@@ -502,11 +496,11 @@ describe('TieredExecutionSection', () => {
       replay_threshold: 0.5,
     } })} onSettingsChange={onSettingsChange} />);
 
-    expect(screen.getByRole('button', { name: /Standing reviewer/ }).textContent).toContain('owns inspection');
+    expect(screen.getByRole('button', { name: /Standing reviewer/ }).textContent).not.toContain('inspection');
     fireEvent.click(screen.getByRole('button', { name: /Standing reviewer/ }));
-    expect(screen.getByRole('switch', { name: 'Supervisor owns inspection' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('switch', { name: 'Supervisor owns inspection' })).toBeNull();
     fireEvent.change(screen.getByLabelText('Subscribe'), { target: { value: 'all' } });
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor.owns_inspection).toBe(true);
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor).not.toHaveProperty('owns_inspection');
   });
 
   it('adds and removes overrides while the default stays quiet', () => {
@@ -717,7 +711,7 @@ describe('no-loss inventory', () => {
           ],
         },
       },
-      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged', owns_inspection: true },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
       by_kind: {},
       feed: { callouts: 'off', max_diff_bytes: null, exclude: [], exclude_subjects: [] },
       escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
@@ -741,7 +735,6 @@ describe('no-loss inventory', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Standing reviewer/ }));
     expect(screen.getByLabelText('Subscribe')).toBeTruthy();
-    expect(screen.getByRole('switch', { name: 'Supervisor owns inspection' })).toBeTruthy();
     expect(screen.getByLabelText('Kind to override').querySelectorAll('option')).toHaveLength(9);
     expect(screen.getByLabelText('Crew for kind override')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Add override' })).toBeTruthy();

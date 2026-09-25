@@ -242,7 +242,21 @@ const postPlanningMessageRoute = HttpRouter.add(
           });
         }
 
-        // Session not alive — restart with continuation prompt
+        // Session not alive — restart with continuation prompt. Resolve the
+        // plan model first, before any side effect: a model that cannot be
+        // resolved fails loudly, never falls back to a literal (PAN-4160).
+        let msgPlanningModel: string;
+        try {
+          msgPlanningModel = resolveModel('plan', undefined, loadYamlConfig().config);
+        } catch (error: unknown) {
+          const cause = error instanceof Error ? error.message : String(error);
+          console.error('Cannot relaunch planning session: plan model unresolved:', error);
+          return jsonResponse(
+            { success: false, error: `No default model configured for the plan role: ${cause}` },
+            { status: 500 },
+          );
+        }
+
         const outputFile = join(planningDir, 'output.jsonl');
         let conversationLog = '';
         const outputContent = await readFile(outputFile, 'utf-8').catch(() => null);
@@ -311,10 +325,6 @@ Continue the PLANNING session. Do NOT implement anything.
         }
 
         const { getAgentCommand } = await import('../../../../lib/settings.js');
-        let msgPlanningModel = 'claude-sonnet-5';
-        try {
-          msgPlanningModel = resolveModel('plan', undefined, loadYamlConfig().config);
-        } catch { /* fall back to default */ }
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
         const msgPermissionFlags = getClaudePermissionFlagsString();
         const msgCmdWithArgs =

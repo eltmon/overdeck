@@ -18,7 +18,7 @@ Every CLI command has a counterpart in the dashboard, where the same agents, con
 />
 
 <Tip>
-  The CLI and dashboard operate on the same state. You can spawn an agent from the terminal with `pan work issue MIN-123` and watch its reasoning stream into the Command Deck, or start it from the board and drive it from the CLI — they are two views of one orchestrator.
+  The CLI and dashboard operate on the same state. You can spawn an agent from the terminal with `pan start MIN-123` and watch its reasoning stream into the Command Deck, or start it from the board and drive it from the CLI — they are two views of one orchestrator.
 </Tip>
 
 ## Philosophy
@@ -37,13 +37,12 @@ Overdeck commands are organized into logical groups:
 | Group | Purpose | Examples |
 |-------|---------|----------|
 | **Core** | System management | `pan up`, `pan down`, `pan sync`, `pan doctor` |
-| **Work** | Agent management | `pan work issue`, `pan work status`, `pan work tell` |
+| **Work** | Agent management | `pan start`, `pan status`, `pan tell`, `pan kill` |
 | **Workspace** | Workspace lifecycle | `pan workspace create`, `pan workspace destroy` |
-| **Convoy** | Multi-agent orchestration | `pan convoy start`, `pan convoy status` |
+| **Review** | Code review loop | `pan review request`, `pan review restart`, `pan review abort` |
 | **Project** | Project registry | `pan project add`, `pan project list` |
-| **Specialists** | Specialist agent management | `pan specialists status`, `pan specialists wake` |
-| **Remote** | Remote workspace management | `pan remote init`, `pan remote status` |
-| **Cloister** | AI lifecycle manager | `pan cloister start`, `pan cloister status` |
+| **Conversations** | Session history and conversation metadata | `pan conv list`, `pan conv move`, `pan conv link-pr` ([linking pull requests](/features/conversations#linking-a-pull-request-by-hand)) |
+| **Admin** | Specialists, remote workspaces, Cloister | `pan admin specialists list`, `pan admin remote status`, `pan admin cloister status` |
 
 ## Installation & Setup
 
@@ -68,10 +67,10 @@ pan doctor
 Most commands accept an issue identifier (e.g., `MIN-123`, `42`):
 
 ```bash
-pan work issue MIN-123      # Spawn agent
-pan work tell MIN-123 "msg" # Send message
-pan work status             # List all agents
-pan work kill MIN-123       # Stop agent
+pan start MIN-123           # Spawn agent
+pan tell MIN-123 "msg"      # Send message
+pan status                  # List all agents
+pan kill MIN-123            # Stop agent
 ```
 
 ### Workspace management
@@ -101,7 +100,7 @@ The dashboard provides a visual interface for all CLI operations.
 pan --help
 
 # Command-specific help
-pan work --help
+pan start --help
 pan workspace --help
 
 # Command documentation
@@ -140,4 +139,4 @@ Overdeck stores configuration in:
 - [Core Commands](/cli/core-commands) - System management commands
 - [Agent Commands](/cli/agent-commands) - Manage AI agents
 - [Workspace Commands](/cli/workspace-commands) - Workspace management
-- [Convoy Commands](/cli/convoy-commands) - Multi-agent orchestration
+- [Review Commands](/cli/review-commands) - Request, restart, and abort code review

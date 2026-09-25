@@ -1,20 +1,20 @@
 /** Cloister crash recovery and poke escalation seam. */
 import { Effect } from 'effect';
 import { createHash } from 'crypto';
-import { exec, execFile } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { DomainEvent } from '@overdeck/contracts';
 import { CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentState, saveAgentStateSync } from '../agents.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import { setCloisterSpawnsPaused } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
-import { exactPaneTarget, getManagedTmuxSocketName } from '../tmux.js';
+import { readAgentPaneText } from '../terminal-backends/agent-pane-io.js';
 import { advancingPhaseFromPrFacts, isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 /**
  * Agent crash tracker for auto-restart
@@ -51,7 +51,7 @@ export interface CrashHost {
   spawnsPaused: boolean;
   pokeProgress: Map<string, { fingerprint: string; ineffective: number }>;
   eventStore: { append(event: Omit<DomainEvent, 'sequence'>): number } | null;
-  progressFingerprint(agentId: string): Promise<string>;
+  progressFingerprint(agentId: string): Promise<string | null>;
   pokeAgentWithEscalation(agentId: string): Promise<void>;
   checkForMassDeaths(): void;
   pauseSpawns(reason: string): void;
@@ -101,9 +101,30 @@ export function pokeAgent(host: CrashHost, agentId: string): void {
   });
 }
 
-/** PAN-2452: fingerprint of observable progress — workspace HEAD + pane tail.
- * Unchanged fingerprint across pokes = the poke did nothing. */
-export async function progressFingerprint(_host: CrashHost, agentId: string): Promise<string> {
+/**
+ * PAN-2452: fingerprint of observable progress — workspace HEAD, pane tail,
+ * and the runtime heartbeat. An unchanged fingerprint across pokes means the
+ * poke did nothing.
+ *
+ * #4121: the pane is read through the host's terminal backend. A Herdr agent
+ * has no tmux session, and the old `tmux capture-pane` read hashed the empty
+ * string on every check. That left HEAD as the only moving part, so an agent
+ * that was working but hadn't committed looked frozen and reached the tier-3
+ * pause. A pane that can't be read (the read throws or returns no text, which
+ * Herdr's `recent` source can do for a full-screen TUI) makes the fingerprint
+ * unknown (`null`), never "unchanged". The heartbeat (the transcript mtime for
+ * claude-code) is part of the fingerprint because it doesn't depend on the
+ * backend.
+ */
+export async function progressFingerprint(_host: CrashHost, agentId: string): Promise<string | null> {
+  let pane: string;
+  try {
+    pane = await readAgentPaneText(agentId, CONTEXT_OVERFLOW_TAIL_LINES);
+  } catch {
+    return null;
+  }
+  if (!pane.trim()) return null;
+
   const state = getAgentState(agentId);
   let head = '';
   if (state?.workspace) {
@@ -117,17 +138,13 @@ export async function progressFingerprint(_host: CrashHost, agentId: string): Pr
       }
     } catch { /* workspace may be gone; pane still fingerprints */ }
   }
-  let pane = '';
+  let heartbeat = '';
   try {
-    const { stdout } = await execFileAsync(
-      'tmux',
-      ['-L', getManagedTmuxSocketName(), 'capture-pane', '-t', exactPaneTarget(agentId), '-p', '-S', `-${CONTEXT_OVERFLOW_TAIL_LINES}`],
-      { encoding: 'utf-8' },
-    );
-    pane = stdout;
-  } catch { /* session may be gone */ }
+    const ms = getRuntimeForAgent(agentId)?.getHeartbeat(agentId)?.timestamp.getTime();
+    if (ms !== undefined && Number.isFinite(ms)) heartbeat = String(ms);
+  } catch { /* no heartbeat source; HEAD and pane still fingerprint */ }
   const paneHash = createHash('sha1').update(pane).digest('hex').slice(0, 12);
-  return `${head}:${paneHash}`;
+  return `${head}:${paneHash}:${heartbeat}`;
 }
 
 export async function pokeAgentWithEscalation(host: CrashHost, agentId: string): Promise<void> {
@@ -140,14 +157,28 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
   // never change — so every cycle would count another "ineffective" poke until
   // tier 3 paused it with a fabricated idle-alive reason. Boot gates
   // (--no-resume) make that the normal post-reboot state for the whole fleet.
-  if (!(await runtime.isRunning(agentId))) {
-    host.pokeProgress.delete(agentId);
+  // Liveness comes from the backend-aware oracle (#4116): a Herdr agent has no
+  // tmux session. Unknown liveness (backend unreachable) is not a poke target
+  // either, and leaves the progress streak untouched — it is not a death, and
+  // a poke that cannot land must not count toward the tier-3 pause.
+  const liveness = await isAlive(agentId);
+  if (!liveness.alive) {
+    if (isConfirmedDead(liveness)) host.pokeProgress.delete(agentId);
     return;
   }
 
+  // #4121: an unknown fingerprint (the pane could not be read) is not "no
+  // progress". No poke, and the progress streak is left untouched.
   const fingerprint = await host.progressFingerprint(agentId);
+  if (fingerprint === null) return;
   const prior = host.pokeProgress.get(agentId);
-  const ineffective = prior && prior.fingerprint === fingerprint ? prior.ineffective + 1 : 0;
+  // A fingerprint that moved since the last poke is observed progress: the
+  // agent is working, so record the new baseline and don't poke it.
+  if (prior && prior.fingerprint !== fingerprint) {
+    host.pokeProgress.set(agentId, { fingerprint, ineffective: 0 });
+    return;
+  }
+  const ineffective = prior ? prior.ineffective + 1 : 0;
   host.pokeProgress.set(agentId, { fingerprint, ineffective });
 
   // Tier 3 (5th no-progress poke): stop poking — surface to the operator.
@@ -234,6 +265,14 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
   const agentState = getAgentState(agentId);
   if (!agentState || agentState.status === 'stopped') {
     console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
+    return;
+  }
+  // #4116: only a confirmed death is a crash. An agent the liveness oracle
+  // reads alive, or cannot read at all (backend unreachable), is left alone —
+  // no crash count, no heartbeat_dead, no mass-death pause.
+  const liveness = await isAlive(agentId);
+  if (!isConfirmedDead(liveness)) {
+    console.log(`🔔 Agent ${agentId} is not confirmed dead (${liveness.alive ? 'alive' : liveness.reason}); skipping crash handling`);
     return;
   }
   const runtimeState = getAgentRuntimeStateSync(agentId);

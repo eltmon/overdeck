@@ -1,4 +1,5 @@
 import { deliverAgentMessage } from '../agents/delivery.js';
+import { isIdle } from '../agents/liveness.js';
 import { captureLiveAgentPaneText, listLiveAgentPanes } from '../terminal-backends/inventory.js';
 
 // ============================================================================
@@ -18,6 +19,11 @@ const API_ERROR_PATTERNS = [
   'API Error: Rate limit',
   'API Error: Request was aborted',
   'API Error: Timed out',
+  // PAN-3948: Claude Code prints "API Error: Connection lost mid-response. The
+  // response above may be incomplete." when the stream drops mid-turn, then
+  // sits at the prompt. Match the prefix only: the full sentence can wrap in a
+  // narrow pane capture.
+  'API Error: Connection lost mid-response',
   '529 Overloaded',
   '502 Bad Gateway',
   '503 Service Unavailable',
@@ -28,6 +34,16 @@ const API_ERROR_PATTERNS = [
  * Prevents spamming agents that are hitting persistent errors.
  */
 const API_ERROR_RECOVERY_COOLDOWN_MS = 5 * 60_000; // 5 minutes
+
+/**
+ * PAN-3948: how long an agent's work activity (runtime mirror + transcript
+ * heartbeat, via liveness.ts `isIdle`) must be stale before a provider error in
+ * its pane counts as the reason it stopped. The `❯` input box shows while a
+ * turn is in flight too, and an old error stays in the last 100 lines after
+ * the agent resumed, so pane text alone cannot tell a wedged agent from a
+ * working one. Two patrol ticks (the patrol runs every 60s).
+ */
+const API_ERROR_IDLE_THRESHOLD_MS = 2 * 60_000;
 
 /** Track API-error recovery attempts per agent (in-memory only — no record write). */
 const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
@@ -63,6 +79,8 @@ export async function checkApiErrorAgents(): Promise<string[]> {
   for (const pane of agentPanes) {
     const recovery = apiErrorRecoveryState.get(pane.agentId);
     if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) continue;
+    // Never nudge a working agent: only one whose work activity has gone stale.
+    if (!isIdle(pane.agentId, API_ERROR_IDLE_THRESHOLD_MS, now)) continue;
 
     const paneOutput = await captureLiveAgentPaneText(pane, 100);
     if (!paneOutput?.trim()) continue;

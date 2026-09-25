@@ -117,17 +117,55 @@ describe('postReviewVerdict — self-review refusal fallback', () => {
     expect(args[args.indexOf('--body') + 1]).toContain('<!-- overdeck-verdict: APPROVED -->');
   });
 
-  it('binds the marker to the PR head it was given for (#3983)', async () => {
-    const head = 'A7B64F7C0000000000000000000000000000ABCD';
+  it('#3853: names the head in the marker when the head is the reviewed commit', async () => {
     const runGh = vi.fn(async (args: string[]) => {
       if (args[1] === 'review') throw selfReviewError();
     });
     await postReviewVerdict(
-      { issueId: 'PAN-1', verdict: 'approve', body: 'ship it', facts: ghFacts({ headSha: head }) },
+      {
+        issueId: 'PAN-1', verdict: 'approve', body: 'ship it',
+        facts: ghFacts({ headSha: 'CCC97C773F0B1BF70450E9CE0BA4A09CDEB25A54' }),
+        reviewedHead: 'ccc97c77',
+      },
       baseDeps({ runGh }),
     );
     const [args] = runGh.mock.calls[1] as unknown as [string[]];
-    expect(args[args.indexOf('--body') + 1].startsWith(`<!-- overdeck-verdict: APPROVED sha=${head.toLowerCase()} -->`)).toBe(true);
+    expect(args[args.indexOf('--body') + 1].startsWith(
+      '<!-- overdeck-verdict: APPROVED sha=ccc97c773f0b1bf70450e9ce0ba4a09cdeb25a54 -->',
+    )).toBe(true);
+  });
+
+  // #3853: the review ran on H1 and the head moved to H2 before the verdict
+  // was posted. Naming H2 would "prove" an approval of code nobody reviewed,
+  // and the next cycle's real blocker on H2 would be refused.
+  it('#3853: writes no sha= when the head moved during the review', async () => {
+    const runGh = vi.fn(async (args: string[]) => {
+      if (args[1] === 'review') throw selfReviewError();
+    });
+    await postReviewVerdict(
+      {
+        issueId: 'PAN-1', verdict: 'approve', body: 'ship it',
+        facts: ghFacts({ headSha: 'bbbbbbbb00000000000000000000000000000000' }),
+        reviewedHead: 'aaaaaaaa',
+      },
+      baseDeps({ runGh }),
+    );
+    const [args] = runGh.mock.calls[1] as unknown as [string[]];
+    const body = args[args.indexOf('--body') + 1];
+    expect(body.startsWith('<!-- overdeck-verdict: APPROVED -->')).toBe(true);
+    expect(body).not.toContain('sha=');
+  });
+
+  it('#3853: writes no sha= when the reviewed commit is unknown', async () => {
+    const runGh = vi.fn(async (args: string[]) => {
+      if (args[1] === 'review') throw selfReviewError();
+    });
+    await postReviewVerdict(
+      { issueId: 'PAN-1', verdict: 'approve', body: 'ship it', facts: ghFacts({ headSha: 'bbbbbbbb00000000000000000000000000000000' }) },
+      baseDeps({ runGh }),
+    );
+    const [args] = runGh.mock.calls[1] as unknown as [string[]];
+    expect(args[args.indexOf('--body') + 1]).not.toContain('sha=');
   });
 
   it('does not fall back for any other gh error', async () => {

@@ -30,6 +30,113 @@ export async function getContainersReferencingWorkspacePath(
   return containers;
 }
 
+/** Compose stamps this label on every network it creates for a project. */
+const COMPOSE_PROJECT_LABEL = 'com.docker.compose.project';
+
+export interface ComposeProjectNetworkRemoval {
+  /** Networks removed (or already absent) this call. */
+  removed: string[];
+  /** Networks that still exist after the attempt. */
+  remaining: string[];
+  steps: string[];
+}
+
+/**
+ * Remove every bridge network belonging to one compose project (PAN-3900).
+ *
+ * `docker compose down` does not reliably remove a stack's networks: shared
+ * infra (overdeck-traefik) attaches to every workspace network for routing, so
+ * compose's own `network rm` fails with "has active endpoints", and when the
+ * compose files are gone there is nothing for compose to act on at all. Each
+ * leaked network holds one slot of Docker's ~31-slot bridge pool until the pool
+ * is exhausted and no workspace stack can be created.
+ *
+ * Networks are selected by the compose project label, so only this project's
+ * networks (`_devnet`, `_default`, or any custom name) are touched. Attached
+ * containers of this project are force-removed; any other container is only
+ * disconnected, never removed. Every value travels as an argv entry: the
+ * project name can come from workspace-declared content (PAN-3049).
+ */
+export async function removeComposeProjectNetworks(
+  composeProjectName: string,
+): Promise<ComposeProjectNetworkRemoval> {
+  const result: ComposeProjectNetworkRemoval = { removed: [], remaining: [], steps: [] };
+
+  let networks: string[];
+  try {
+    const { stdout } = await execFileAsync(
+      'docker',
+      ['network', 'ls', '--filter', `label=${COMPOSE_PROJECT_LABEL}=${composeProjectName}`, '--format', '{{.Name}}'],
+      { encoding: 'utf-8', timeout: 30000 },
+    );
+    networks = String(stdout ?? '').split('\n').map((line) => line.trim()).filter(Boolean);
+  } catch (error: any) {
+    result.steps.push(
+      `Network discovery attempted (${error.message?.split('\n')[0] || 'could not list networks'})`,
+    );
+    return result;
+  }
+
+  for (const network of networks) {
+    try {
+      const { stdout } = await execFileAsync(
+        'docker',
+        ['ps', '-a', '--filter', `network=${network}`, '--format', `{{.ID}}\t{{.Label "${COMPOSE_PROJECT_LABEL}"}}`],
+        { encoding: 'utf-8', timeout: 30000 },
+      );
+      const attached = String(stdout ?? '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [id, project = ''] = line.split('\t');
+          return { id, project };
+        });
+      const own = attached.filter((c) => c.project === composeProjectName);
+      const foreign = attached.filter((c) => c.project !== composeProjectName);
+      if (own.length > 0) {
+        await execFileAsync('docker', ['rm', '-f', ...own.map((c) => c.id)], { timeout: 30000 }).then(
+          () => result.steps.push(`Removed ${own.length} container(s) attached to ${network}`),
+          (rmError: any) => result.steps.push(
+            `Container removal attempted (${rmError.message?.split('\n')[0] || 'containers may be in use'})`,
+          ),
+        );
+      }
+      for (const container of foreign) {
+        await execFileAsync('docker', ['network', 'disconnect', '-f', network, container.id], { timeout: 30000 }).then(
+          () => result.steps.push(`Disconnected foreign container ${container.id} from ${network}`),
+          (disconnectError: any) => result.steps.push(
+            `Container disconnect attempted (${disconnectError.message?.split('\n')[0] || 'may already be detached'})`,
+          ),
+        );
+      }
+    } catch (error: any) {
+      result.steps.push(
+        `Container discovery attempted (${error.message?.split('\n')[0] || 'could not list containers'})`,
+      );
+    }
+
+    try {
+      await execFileAsync('docker', ['network', 'rm', network], { timeout: 30000 });
+      result.removed.push(network);
+      result.steps.push(`Removed Docker network ${network}`);
+    } catch (error: any) {
+      const message = String(error?.message ?? '').toLowerCase();
+      if (message.includes('not found') || message.includes('no such network')) {
+        result.removed.push(network);
+        result.steps.push(`Docker network ${network} already absent`);
+      } else {
+        result.remaining.push(network);
+        result.steps.push(
+          `Docker network rm attempted for ${network} (${error.message?.split('\n')[0] || 'network may be in use'})`,
+        );
+      }
+    }
+  }
+
+  return result;
+}
+
 /** Stop every Docker resource associated with the supplied workspace. */
 export async function stopWorkspaceDocker(
   workspacePath: string,
@@ -118,6 +225,13 @@ export async function stopWorkspaceDocker(
       }
     }
   }
+
+  // PAN-3900: compose down leaves the project's networks behind whenever a
+  // foreign container (traefik) is attached or the compose files are gone.
+  // Remove them explicitly, including when no compose files or containers
+  // were found — a network with no containers is exactly the leaked shape.
+  const networkRemoval = await removeComposeProjectNetworks(composeProjectName);
+  result.steps.push(...networkRemoval.steps);
 
   // Clean up Docker-created files (root-owned in containers)
   try {
@@ -266,6 +380,15 @@ export async function teardownWorkspaceDockerByName(
     }
   }
 
+  // 3b. PAN-3900: remove the project's other labeled networks (`_default`,
+  //     custom names) that the `_devnet`-only step above does not name.
+  const labeledLeftovers: string[] = [];
+  for (const composeProjectName of composeProjectNames) {
+    const removal = await removeComposeProjectNetworks(composeProjectName);
+    result.steps.push(...removal.steps);
+    labeledLeftovers.push(...removal.remaining);
+  }
+
   // 4. Verify every matching network is actually gone.
   try {
     const { stdout } = await execAsync(
@@ -276,7 +399,8 @@ export async function teardownWorkspaceDockerByName(
     const remaining = networks.filter(
       (name) =>
         [...composeProjectNames].some((project) => name === `${project}_devnet`) ||
-        name.endsWith(`-${featureFolder}_devnet`),
+        name.endsWith(`-${featureFolder}_devnet`) ||
+        labeledLeftovers.includes(name),
     );
     result.networkRemoved = remaining.length === 0;
     if (remaining.length > 0) result.remainingNetworks = remaining;

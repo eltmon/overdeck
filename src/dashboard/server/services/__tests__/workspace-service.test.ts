@@ -119,8 +119,9 @@ describe('WorkspaceService Effect service', () => {
     });
 
     it('is idempotent — returns path without error when workspace already exists', async () => {
-      // Workspace already exists — should NOT call createWorkspace
-      mockExistsSync.mockReturnValue(true);
+      // Workspace already exists and its setup finished (no PAN-4171
+      // setup-incomplete marker) — should NOT call createWorkspace
+      mockExistsSync.mockImplementation((path: string) => !path.endsWith('.overdeck/setup-incomplete'));
 
       const { WorkspaceService, WorkspaceServiceLive } = await import('../workspace-service.js');
 

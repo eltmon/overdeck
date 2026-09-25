@@ -32,6 +32,26 @@ function runGuard(root: string, scanRoot: string, script: string): { ok: boolean
   }
 }
 
+// No scan-root argument: the default `src` scan plus the Markdown pass over
+// src/lib/cloister/prompts/ and sync-sources/ (the fixture root is the cwd).
+function runGuardWithMarkdownPass(root: string, script: string): { ok: boolean; output: string } {
+  try {
+    const output = execFileSync('bash', [script], { cwd: root, encoding: 'utf-8' });
+    return { ok: true, output };
+  } catch (error: any) {
+    return {
+      ok: false,
+      output: [error.stdout ?? '', error.stderr ?? ''].join('\n'),
+    };
+  }
+}
+
+function writeFixtureFile(root: string, relPath: string, content: string): void {
+  const path = join(root, relPath);
+  mkdirSync(join(path, '..'), { recursive: true });
+  writeFileSync(path, content);
+}
+
 afterEach(() => {
   for (const root of tempRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -138,5 +158,66 @@ describe('guard-no-state-layer.sh', () => {
     const result = runGuard(fixture.root, fixture.scanRoot, fixture.script);
 
     expect(result.ok).toBe(true);
+  });
+
+  // PAN-3929: agent-shipped Markdown is held to the code pass's full pattern
+  // set, deleted status fields included.
+  describe('Markdown pass', () => {
+    it('fails on a deleted status field in a synced skill', () => {
+      const fixture = makeFixture();
+      writeFixtureFile(fixture.root, 'sync-sources/skills/x/SKILL.md', 'Check readyForMerge=true first.\n');
+
+      const result = runGuardWithMarkdownPass(fixture.root, fixture.script);
+
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain('sync-sources/skills/x/SKILL.md:1: readyForMerge');
+    });
+
+    it('fails on a deleted status field in a runtime prompt', () => {
+      const fixture = makeFixture();
+      writeFixtureFile(fixture.root, 'src/lib/cloister/prompts/p.md', 'Wait until mergeStatus is merged.\n');
+
+      const result = runGuardWithMarkdownPass(fixture.root, fixture.script);
+
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain('src/lib/cloister/prompts/p.md:1:');
+    });
+
+    // PAN-3934: roles/*.md is appended to role sessions as the system prompt.
+    it('fails on a deleted status field in a role prompt', () => {
+      const fixture = makeFixture();
+      writeFixtureFile(fixture.root, 'roles/test.md', 'Record testStatus and uatStatus separately.\n');
+
+      const result = runGuardWithMarkdownPass(fixture.root, fixture.script);
+
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain('roles/test.md:1:');
+    });
+
+    it('passes the two by-name exempt files', () => {
+      const fixture = makeFixture();
+      const content = 'The overdeck-state branch held readyForMerge.\n';
+      writeFixtureFile(fixture.root, 'sync-sources/rules/protect-overdeck-state-branch.md', content);
+      writeFixtureFile(fixture.root, 'sync-sources/skills/pan-admin-migrate-plan-home/SKILL.md', content);
+
+      const result = runGuardWithMarkdownPass(fixture.root, fixture.script);
+
+      expect(result.ok).toBe(true);
+      expect(result.output).toContain('guard-no-state-layer passed');
+    });
+
+    it('passes a skill that describes the derived model', () => {
+      const fixture = makeFixture();
+      writeFixtureFile(
+        fixture.root,
+        'sync-sources/skills/y/SKILL.md',
+        'Read the derived state, then `pr.reviewState` and `pr.checks` from `pan show --json`.\n',
+      );
+
+      const result = runGuardWithMarkdownPass(fixture.root, fixture.script);
+
+      expect(result.ok).toBe(true);
+      expect(result.output).toContain('guard-no-state-layer passed');
+    });
   });
 });

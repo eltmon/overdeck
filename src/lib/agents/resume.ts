@@ -307,6 +307,13 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     console.warn(`[resumeAgent] Failed to append resume entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
   }
 
+  // PAN-3923 review 2: the relaunch below marks the run `starting`. Every exit
+  // that does not reach markAgentRunning restores the status (and stoppedAt)
+  // the run had before, so a failed resume stays visible to auto-resume
+  // (`stopped`) and crash detection (`running`) instead of sitting at
+  // `starting` with no pane.
+  let priorStatus: { status: typeof agentState.status; stoppedAt: typeof agentState.stoppedAt } | undefined;
+  let resumed = false;
   try {
     const resumeStartedAt = new Date().toISOString();
     const startedBy = opts?.startedBy?.trim() || agentState.startedBy?.trim() || 'resume-agent';
@@ -442,6 +449,14 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
+
+    // PAN-3923 review (F3): the relaunched harness sits idle at its prompt
+    // until the continue message lands. Mark the run `starting`, as
+    // restartAgent does, so a concurrent same-id dispatch never reaps it.
+    // markAgentRunning below flips it back once the message is delivered.
+    priorStatus = { status: agentState.status, stoppedAt: agentState.stoppedAt };
+    agentState.status = 'starting';
+    saveAgentStateSync(agentState);
 
     // PAN-3960: relaunch through the terminal backend the host selects NOW —
     // never the backend the agent's previous pane used — with the same four
@@ -654,6 +669,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
       markAgentRunning(agentState, { preserveFailureTracking: true });
       saveAgentStateSync(agentState);
     }
+    resumed = true;
 
     // PAN-3917: the context_overflow `stuck` flag this used to clear lived on a
     // `review_status` row. The table is dropped and nothing writes the flag any
@@ -668,6 +684,17 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
       success: false,
       error: `Failed to resume agent: ${msg}`
     };
+  } finally {
+    if (priorStatus && !resumed) {
+      agentState.status = priorStatus.status;
+      if (priorStatus.stoppedAt) agentState.stoppedAt = priorStatus.stoppedAt;
+      else delete agentState.stoppedAt;
+      try {
+        saveAgentStateSync(agentState);
+      } catch (restoreError) {
+        logAgentLifecycle(normalizedId, `resumeAgent: could not restore status ${priorStatus.status} after a failed resume: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}`);
+      }
+    }
   }
 }
 

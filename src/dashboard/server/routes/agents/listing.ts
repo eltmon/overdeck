@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
+import type { DerivedIssueState } from '@overdeck/contracts';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
@@ -19,7 +20,7 @@ import { computeAgentEnrichment, isBlockedOnPendingInput } from '../../../../lib
 import { normalizeAwaitingInputPrompt } from '../../../../lib/agent-input-detection.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { resolveAgentGitInfo } from '../../services/git-info.js';
-import { getDerivedIssueState } from '../../services/derived-issue-state.js';
+import { loadIssueStatesForIssues } from '../../services/derived-issue-state.js';
 import {
   AGENTS_CACHE_TTL_MS,
   agentsCache,
@@ -47,6 +48,15 @@ export function liveAgentHealthStatus(enrichment: {
   pendingQuestionReason?: string;
 }): 'healthy' | 'warning' {
   return isBlockedOnPendingInput(enrichment) ? 'warning' : 'healthy';
+}
+
+/** The issue a registered agent works on: its stamped id, else the one its name carries. */
+function issueIdOf(state: AgentState): string {
+  const name = state.id;
+  const isPlanning = name.startsWith('planning-');
+  const isStrike = name.startsWith('strike-');
+  return state.issueId?.toUpperCase() ||
+    (isPlanning ? name.replace('planning-', '') : isStrike ? name.replace('strike-', '') : name.replace('agent-', '')).toUpperCase();
 }
 
 // ─── Route: GET /api/agents ───────────────────────────────────────────────────
@@ -77,13 +87,25 @@ export const getAgentsRoute = HttpRouter.add(
         const registeredStates = listAgentStates()
           .filter((state) => state.id.startsWith('agent-') || state.id.startsWith('planning-') || state.id.startsWith('strike-'));
 
+        // PAN-3925: every stopped agent's issue derives in one batch per
+        // project, started by the first stopped agent that needs it, instead
+        // of a single-issue derivation (three spawns) per agent.
+        let derivedBatch: Promise<Map<string, DerivedIssueState>> | null = null;
+        const derivedFor = (issueId: string): Promise<DerivedIssueState | null> => {
+          derivedBatch ??= loadIssueStatesForIssues(
+            registeredStates
+              .filter((state) => { const pane = paneById.get(state.id); return pane === undefined || pane.state === 'exited'; })
+              .map(issueIdOf),
+          ).catch(() => new Map<string, DerivedIssueState>());
+          return derivedBatch.then((states) => states.get(issueId) ?? null);
+        };
+
         const allAgents = (yield* Effect.promise(() => Promise.all(
           registeredStates.map(async (state) => {
             const name = state.id;
             const isPlanning = name.startsWith('planning-');
             const isStrike = name.startsWith('strike-');
-            const issueId = state.issueId?.toUpperCase() ||
-              (isPlanning ? name.replace('planning-', '') : isStrike ? name.replace('strike-', '') : name.replace('agent-', '')).toUpperCase();
+            const issueId = issueIdOf(state);
             const pane = paneById.get(name);
             const live = pane !== undefined && pane.state !== 'exited';
             const remoteState = await readRemoteAgentState(name);
@@ -111,7 +133,7 @@ export const getAgentsRoute = HttpRouter.add(
               const stoppedAt = stoppedTimestamp ? new Date(stoppedTimestamp) : null;
               // Keep a recently-stopped agent visible while its PR is still in
               // play: that is the forge's answer, not a stored status row.
-              const derived = await getDerivedIssueState(issueId).catch(() => null);
+              const derived = await derivedFor(issueId);
               const keepStoppedAgentVisible = derived !== null
                 && derived.state !== 'merged'
                 && derived.state !== 'closed'
@@ -146,6 +168,8 @@ export const getAgentsRoute = HttpRouter.add(
                 git: state.branch ? { branch: state.branch, uncommittedFiles: 0, latestCommit: '' } : null,
                 type: 'agent',
                 role,
+                hasLivePane: false,
+                // Deprecated alias of `hasLivePane`: true for a pane on either backend, not only tmux (#4105).
                 hasLiveTmuxSession: false,
                 hasPendingQuestion: needsInput,
                 pendingQuestionCount: 0,
@@ -194,6 +218,8 @@ export const getAgentsRoute = HttpRouter.add(
               git: gitStatus,
               type: 'agent',
               role,
+              hasLivePane: true,
+              // Deprecated alias of `hasLivePane`: true for a pane on either backend, not only tmux (#4105).
               hasLiveTmuxSession: true,
               hasPendingQuestion: enrichment.hasPendingQuestion || pane?.state === 'blocked',
               pendingQuestionCount: enrichment.pendingQuestionCount,

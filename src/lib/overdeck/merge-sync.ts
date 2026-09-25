@@ -179,7 +179,7 @@ export function requeueToPending(id: number, nextScheduledMergeAt: string): bool
  *
  * The executor holds a row in 'merging' only across an in-process `await` on
  * triggerMerge(). If the server dies inside that window the row is stranded there
- * forever: `/api/flywheel/auto-merge/problems` reports only 'blocked' and 'failed',
+ * forever: `/api/merge-train/auto-merge/problems` reports only 'blocked' and 'failed',
  * the deacon reconciler skips active rows that are not 'pending', and nothing else
  * ever revisits it — so a permanently wedged merge reads as in-progress to every
  * surface. Requeue to 'pending' so the next executor tick re-evaluates eligibility;

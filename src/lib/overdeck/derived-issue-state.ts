@@ -77,6 +77,14 @@ const execFileAsync = promisify(execFile);
 /** How long a repo's PR listing is served before the forge is read again. */
 export const PR_CACHE_TTL_MS = 30_000;
 
+/**
+ * How old a settled PR listing may be and still answer a board read while a
+ * refresh runs behind it (PAN-3925). One `gh pr list --state all` with
+ * `statusCheckRollup` takes ~11s on a busy repo, so a hard TTL expiry made
+ * every read after it wait for the forge.
+ */
+export const PR_LISTING_MAX_STALE_MS = 2 * 60_000;
+
 /** Idle for this long with unpushed commits is `stuck`. */
 export const DEFAULT_STUCK_AFTER_MS = 20 * 60_000;
 
@@ -250,7 +258,7 @@ export function toChecksState(
   return 'green';
 }
 
-interface GhPrRow {
+export interface GhPrRow {
   number?: number;
   url?: string;
   state?: string;
@@ -262,24 +270,61 @@ interface GhPrRow {
   title?: string;
   headRefName?: string;
   isDraft?: boolean;
+  baseRefName?: string;
+  updatedAt?: string | null;
+  closedAt?: string | null;
+  author?: { login?: string } | null;
 }
 
-const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup';
+const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
 /** One `gh pr list` per repo, cached briefly — the batch door's forge read. */
-const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[]>(PR_CACHE_TTL_MS);
+const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[] | null>(PR_CACHE_TTL_MS);
 
+/** The last listing each repo answered successfully, and when (PAN-3925). */
+const lastRepoPullRequests = new Map<string, { readonly rows: readonly GhPrRow[]; readonly settledAt: number }>();
+
+/** The repo's PR listing; empty when the read failed. */
 export async function listRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[]> {
+  return (await readRepoPullRequests(projectPath)) ?? [];
+}
+
+/**
+ * The repo's PR listing, or null when the read failed (rate limit, auth,
+ * network), so a caller that backs off can tell "failed" from "no PRs".
+ */
+export async function readRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[] | null> {
   return cachedRepoPullRequests(projectPath, async () => {
     try {
       const { stdout } = await execFileAsync('gh', [
         'pr', 'list', '--state', 'all', '--limit', '200', '--json', GH_PR_FIELDS,
       ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000 });
-      return JSON.parse(stdout || '[]') as GhPrRow[];
+      const rows = JSON.parse(stdout || '[]') as GhPrRow[];
+      lastRepoPullRequests.set(projectPath, { rows, settledAt: Date.now() });
+      return rows;
     } catch {
-      return [];
+      return null;
     }
   });
+}
+
+/**
+ * The repo's PR listing for board reads: stale-while-revalidate over
+ * `listRepoPullRequests` (PAN-3925). Inside the TTL this is the cached
+ * listing. Past it, the last good listing answers at once while one refresh
+ * runs behind it, until that listing is older than `maxStaleMs`; then the read
+ * waits for the forge. A failed refresh keeps serving the last good listing
+ * inside that bound instead of an empty one. Gates that act on readiness keep
+ * `listRepoPullRequests`.
+ */
+export async function listRepoPullRequestsStaleOk(
+  projectPath: string,
+  maxStaleMs: number = PR_LISTING_MAX_STALE_MS,
+): Promise<readonly GhPrRow[]> {
+  const fresh = listRepoPullRequests(projectPath);
+  const last = lastRepoPullRequests.get(projectPath);
+  if (!last || Date.now() - last.settledAt > maxStaleMs) return fresh;
+  return last.rows;
 }
 
 /** A `gh` row → the PR facts, or null when the PR is closed without merging. */
@@ -723,11 +768,13 @@ export async function loadIssueStatesForProject(
      * missing (or `null`) entry is unknown — never assumed open.
      */
     readonly issues?: Readonly<Record<string, TrackerIssueFacts | null>>;
+    /** The repo's PR listing; `listRepoPullRequests` when omitted. */
+    readonly listPullRequests?: (projectPath: string) => Promise<readonly GhPrRow[]>;
   } = {},
 ): Promise<Map<string, DerivedIssueState>> {
   const now = (deps.now ?? Date.now)();
   const gitlab = forgeForProject(projectPath) === 'gitlab';
-  const rows = gitlab ? [] : await listRepoPullRequests(projectPath);
+  const rows = gitlab ? [] : await (deps.listPullRequests ?? listRepoPullRequests)(projectPath);
   const prByIssue = new Map<string, LoadedPr>();
   if (!gitlab) {
     for (const row of rows) {

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -8,6 +8,7 @@ import type { ChunkInsert, EmbeddingsDbHandle } from '../../database/conversatio
 import type { ConversationEmbeddingProvider } from '../embedding-provider.js';
 import type { NormalizedConversationSearchConfig } from '../../config-yaml.js';
 import { encodeClaudeProjectDir } from '../../runtimes/storage/claude-code.js';
+import { parentSessionIdFromPath } from '../transcript-paths.js';
 
 let tmpDir: string | undefined;
 
@@ -132,6 +133,22 @@ describe('conversation search indexer', () => {
     expect(db.cursors.has(keptPath)).toBe(true);
   });
 
+  it('records the parent session id on subagent chunks (PAN-3982)', async () => {
+    const dir = makeTmpDir();
+    const parent = '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607';
+    const projectDir = join(dir, 'projects', 'enc');
+    mkdirSync(join(projectDir, parent, 'subagents'), { recursive: true });
+    writeFileSync(join(projectDir, `${parent}.jsonl`), line(message('user', 'parent text')));
+    writeFileSync(join(projectDir, parent, 'subagents', 'agent-abc123.jsonl'), line(message('user', 'subagent text')));
+    const db = fakeDb();
+
+    await indexConversationSearch({ config: config(), roots: [dir], db, provider: fakeProvider() });
+
+    const byText = Object.fromEntries(db.chunks.map((chunk) => [chunk.text, chunk]));
+    expect(byText['subagent text']).toMatchObject({ sessionId: 'agent-abc123', parentSessionId: parent });
+    expect(byText['parent text']).toMatchObject({ sessionId: parent, parentSessionId: null });
+  });
+
   it('never indexes background AI utility transcripts, and prunes ones already indexed', async () => {
     const dir = makeTmpDir();
     const overdeckHome = join(dir, 'overdeck-home');
@@ -170,6 +187,42 @@ describe('conversation search indexer', () => {
     const direct = await indexConversationFile({ filePath: backgroundPath, config: config(), db, provider });
     expect(direct.chunksIndexed).toBe(0);
     expect(db.chunks.map((chunk) => chunk.sessionId)).toEqual(['session-real']);
+  });
+
+  it('skips a transcript deleted before indexing instead of reporting an error (PAN-3915)', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'session-gone.jsonl');
+    writeFileSync(filePath, line(message('user', 'short-lived')));
+    rmSync(filePath);
+    const provider = fakeProvider();
+
+    const result = await indexConversationFile({ filePath, config: config(), db: fakeDb(), provider });
+
+    expect(result.errors).toEqual([]);
+    expect(result.chunksSkipped).toBe(1);
+    expect(provider.embed).not.toHaveBeenCalled();
+  });
+
+  it('skips a transcript older than modifiedSince from its stat, before the cursor lookup (PAN-3915)', async () => {
+    const root = makeTmpDir();
+    const projectDir = join(root, '-home-user-project');
+    mkdirSync(projectDir);
+    const oldFile = join(projectDir, '11111111-1111-4111-8111-111111111111.jsonl');
+    const newFile = join(projectDir, '22222222-2222-4222-8222-222222222222.jsonl');
+    writeFileSync(oldFile, line(message('user', 'old transcript')));
+    writeFileSync(newFile, line(message('user', 'new transcript')));
+    const since = Date.now() - 60_000;
+    utimesSync(oldFile, new Date(since - 1), new Date(since - 1));
+    const db = fakeDb();
+    const getCursor = vi.spyOn(db, 'getCursor');
+
+    const result = await indexConversationSearch({ config: config(), db, provider: fakeProvider(), roots: [root], modifiedSince: since });
+
+    expect(result.errors).toEqual([]);
+    expect(result.chunksSkipped).toBe(1);
+    expect(db.chunks.map((chunk) => chunk.text).join('\n')).toContain('new transcript');
+    expect(db.chunks.map((chunk) => chunk.text).join('\n')).not.toContain('old transcript');
+    expect(getCursor).not.toHaveBeenCalledWith(oldFile);
   });
 
   it('no-ops when conversation search is disabled', async () => {
@@ -252,5 +305,16 @@ describe('conversation search indexer', () => {
     expect(provider.embed).not.toHaveBeenCalled();
     expect(provider.estimateCost).toHaveBeenCalledWith(['cost estimate text']);
     expect(estimate).toMatchObject({ filesScanned: 1, chunksEstimated: 1, disabled: false, estimatedUsd: 0.00000008 });
+  });
+});
+
+describe('parentSessionIdFromPath', () => {
+  const parent = '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607';
+
+  it('returns the parent uuid only for <uuid>/subagents/agent-*.jsonl', () => {
+    expect(parentSessionIdFromPath(`/h/.claude/projects/enc/${parent}/subagents/agent-abc.jsonl`)).toBe(parent);
+    expect(parentSessionIdFromPath(`/h/.claude/projects/enc/${parent}.jsonl`)).toBeNull();
+    expect(parentSessionIdFromPath('/h/.claude/projects/enc/not-a-uuid/subagents/agent-abc.jsonl')).toBeNull();
+    expect(parentSessionIdFromPath(`C:\\h\\.claude\\projects\\enc\\${parent}\\subagents\\agent-abc.jsonl`)).toBe(parent);
   });
 });

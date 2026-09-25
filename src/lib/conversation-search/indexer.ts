@@ -6,6 +6,7 @@ import { getOverdeckHome } from '../paths.js';
 import { claudeProjectsRoot, encodeClaudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../overdeck/conversations-search.js';
 import { chunkConversationJsonl, getLastCompleteJsonlOffset, type ConversationChunkRecord } from './chunker.js';
+import { parentSessionIdFromPath, projectIdFromPath, sessionIdFromPath } from './transcript-paths.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
 
 export interface ConversationIndexProgress {
@@ -22,6 +23,13 @@ export interface ConversationIndexerOptions {
   roots?: string[];
   now?: () => string;
   signal?: AbortSignal;
+  /**
+   * Epoch ms. When set, a transcript whose mtime is older is skipped from its
+   * stat alone, before the cursor lookup or any content read. The watcher's
+   * catch-up after a restart uses it to index only what changed while the
+   * watcher was down (PAN-3915).
+   */
+  modifiedSince?: number;
   /** Invoked once per file (before it is embedded) and once at completion, for live progress UIs. */
   onProgress?: (progress: ConversationIndexProgress) => void;
 }
@@ -200,6 +208,10 @@ export async function indexConversationFile(
   try {
     throwIfAborted(options.signal);
     const stat = await fs.stat(options.filePath);
+    if (options.modifiedSince != null && stat.mtimeMs < options.modifiedSince) {
+      result.chunksSkipped += 1;
+      return result;
+    }
     const fromOffset = options.fullReindex ? 0 : owned.db.getCursor(options.filePath);
     if (fromOffset >= stat.size) {
       result.chunksSkipped += 1;
@@ -218,6 +230,7 @@ export async function indexConversationFile(
       filePath: options.filePath,
       sessionId: options.sessionId ?? sessionIdFromPath(options.filePath),
       projectId: options.projectId ?? projectIdFromPath(options.filePath),
+      parentSessionId: parentSessionIdFromPath(options.filePath),
       fromOffset,
       toOffset: stat.size,
       signal: options.signal,
@@ -243,11 +256,21 @@ export async function indexConversationFile(
     return result;
   } catch (error) {
     if (isAbortError(error)) throw error;
+    // PAN-3915: a transcript deleted while it was being indexed is a prune, not
+    // an indexing failure; the watcher's unlink handler drops its chunks.
+    if (isMissingFileError(error)) {
+      result.chunksSkipped += 1;
+      return result;
+    }
     result.errors.push({ filePath: options.filePath, message: error instanceof Error ? error.message : String(error) });
     return result;
   } finally {
     owned.close();
   }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as NodeJS.ErrnoException).code === 'ENOENT';
 }
 
 async function indexBatch(input: {
@@ -369,13 +392,4 @@ function defaultConversationRoots(): string[] {
   return [claudeProjectsRoot()];
 }
 
-export function sessionIdFromPath(filePath: string): string {
-  return basename(filePath).replace(/\.jsonl$/, '');
-}
-
-function projectIdFromPath(filePath: string): string {
-  const parts = filePath.split(/[\\/]+/);
-  const projectsIndex = parts.lastIndexOf('projects');
-  if (projectsIndex >= 0 && parts[projectsIndex + 1]) return parts[projectsIndex + 1]!;
-  return 'unknown';
-}
+export { sessionIdFromPath } from './transcript-paths.js';

@@ -17,6 +17,13 @@ vi.mock('../tmux-cli.js', () => ({
   tmuxSessionExists: tmuxMocks.tmuxSessionExists,
 }));
 
+const livenessMocks = vi.hoisted(() => ({
+  isRuntimeAgentAlive: vi.fn(async (): Promise<boolean> => false),
+}));
+vi.mock('../runtime-liveness.js', () => ({
+  isRuntimeAgentAlive: livenessMocks.isRuntimeAgentAlive,
+}));
+
 const agentStateMocks = vi.hoisted(() => ({ getAgentState: vi.fn(), saveAgentStateSync: vi.fn() }));
 vi.mock('../../agents/agent-state.js', () => ({
   getAgentState: agentStateMocks.getAgentState,
@@ -41,6 +48,20 @@ import {
   kimiWorkDirKey,
 } from '../storage/kimi-code.js';
 import { readSessionIndex } from '../../session-history.js';
+import { registerTerminalBackend } from '../../terminal-backends/registry.js';
+import { fakeTerminalBackend, type FakeTerminalBackend } from '../../../../tests/helpers/fake-terminal-backend.js';
+
+/** A recording fake backend whose startAgent runs `onStart` first (the harness writing its session). */
+function launchingBackend(name: 'tmux' | 'herdr', onStart: () => void = () => {}): FakeTerminalBackend {
+  const backend = fakeTerminalBackend(name);
+  const start = backend.startAgent.bind(backend);
+  return Object.assign(backend, {
+    startAgent: vi.fn((...args: Parameters<typeof start>) => {
+      onStart();
+      return start(...args);
+    }),
+  });
+}
 
 const tempHomes: string[] = [];
 
@@ -278,9 +299,7 @@ describe('KimiCodeRuntimeSync', () => {
     // A pre-existing session in the bucket must NOT be mistaken for the new one.
     writeWireFixture(kimiHome, workspace, 'session_preexisting');
 
-    tmuxMocks.tmuxCreateSession.mockImplementation(async () => {
-      writeWireFixture(kimiHome, workspace, 'session_fresh');
-    });
+    const backend = launchingBackend('tmux', () => writeWireFixture(kimiHome, workspace, 'session_fresh'));
     tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
 
     const writePtyTokenFor = vi.fn(async (agentId: string) => {
@@ -303,6 +322,7 @@ describe('KimiCodeRuntimeSync', () => {
       deliverMessage,
       resolveSupervisorScriptPath: () => '/dist/pty-supervisor.js',
       writePtyTokenFor,
+      resolveBackend: async () => backend,
     });
 
     const agent = await runtime.spawnAgent({
@@ -321,13 +341,18 @@ describe('KimiCodeRuntimeSync', () => {
       model: 'k3',
       workspace,
     });
-    expect(tmuxMocks.tmuxCreateSession).toHaveBeenCalledWith(
-      'agent-kimi-spawn',
-      workspace,
-      expect.stringContaining('launcher.sh'),
-      { EXTRA: 'value' },
-    );
+    // PAN-3936: launched through launchAgentPane on the tmux backend, never a
+    // direct tmux-cli createSession.
     const launcherScript = join(overdeckHome, 'agents', 'agent-kimi-spawn', 'launcher.sh');
+    expect(tmuxMocks.tmuxCreateSession).not.toHaveBeenCalled();
+    expect(backend.starts).toHaveLength(1);
+    expect(backend.starts[0]!.spec).toMatchObject({
+      name: 'agent-kimi-spawn',
+      cwd: workspace,
+      argv: ['bash', launcherScript],
+      env: { EXTRA: 'value' },
+      tokens: { harness: 'kimi-code', model: 'k3', role: 'work' },
+    });
     expect(existsSync(launcherScript)).toBe(true);
     const launcherContent = readFileSync(launcherScript, 'utf-8');
     // The launcher chokepoint translates the stored model id to what the kimi
@@ -360,7 +385,7 @@ describe('KimiCodeRuntimeSync', () => {
     // it BEFORE the tmux session (and thus the supervisor process) exists.
     expect(writePtyTokenFor).toHaveBeenCalledWith('agent-kimi-spawn');
     expect(writePtyTokenFor.mock.invocationCallOrder[0]).toBeLessThan(
-      tmuxMocks.tmuxCreateSession.mock.invocationCallOrder[0],
+      vi.mocked(backend.startAgent).mock.invocationCallOrder[0]!,
     );
     const tokenPath = join(overdeckHome, 'agents', 'agent-kimi-spawn', 'pty-token');
     expect(existsSync(tokenPath)).toBe(true);
@@ -372,12 +397,99 @@ describe('KimiCodeRuntimeSync', () => {
     );
   });
 
+  it('launches on Herdr through launchAgentPane and keeps the PTY supervisor as its delivery path (PAN-3936)', async () => {
+    const kimiHome = makeHome();
+    const overdeckHome = makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
+    const workspace = '/tmp/kimi-herdr-workspace';
+    const backend = launchingBackend('herdr', () => writeWireFixture(kimiHome, workspace, 'session_herdr'));
+    const state: Record<string, unknown> = {
+      id: 'agent-pan-3936-review', issueId: 'PAN-3936', role: 'review', workspace,
+    };
+    agentStateMocks.getAgentState.mockReturnValue(state);
+    const writePtyTokenFor = vi.fn(async () => 'test-token');
+    const resolveSupervisorScriptPath = vi.fn(() => '/dist/pty-supervisor.js');
+
+    const runtime = new KimiCodeRuntimeSync({
+      overdeckHome,
+      kimiHome,
+      prepareLaunch: async () => ({ binaryPath: '/opt/kimi/bin/kimi', pathExport: 'export PATH=/opt/kimi/bin:"$PATH"' }),
+      deliverMessage: vi.fn(async () => ({ ok: true })),
+      resolveSupervisorScriptPath,
+      writePtyTokenFor,
+      resolveBackend: async () => backend,
+    });
+
+    const agent = await runtime.spawnAgent({
+      agentId: 'agent-pan-3936-review',
+      workspace,
+      model: 'k3',
+      runtime: 'kimi-code',
+    });
+
+    expect(agent.sessionId).toBe('session_herdr');
+    expect(tmuxMocks.tmuxCreateSession).not.toHaveBeenCalled();
+    expect(backend.starts).toHaveLength(1);
+    const launcherScript = join(overdeckHome, 'agents', 'agent-pan-3936-review', 'launcher.sh');
+    expect(backend.starts[0]!.workspace.issueId).toBe('PAN-3936');
+    expect(backend.starts[0]!.spec).toMatchObject({
+      name: 'agent-pan-3936-review',
+      cwd: workspace,
+      argv: ['bash', launcherScript],
+      detection: 'not-required',
+      tokens: { issue: 'PAN-3936', role: 'review', harness: 'kimi-code', model: 'k3' },
+    });
+    const launcherContent = readFileSync(launcherScript, 'utf-8');
+    // Herdr holds no agent record for a pane-bound kimi, so the supervisor
+    // socket is its delivery path: the wrapper and its token stay (PAN-3921 rule).
+    expect(launcherContent).toContain("node '/dist/pty-supervisor.js'");
+    expect(launcherContent).toMatch(/kimi -m 'kimi-code\/k3-256k' --yolo/);
+    expect(writePtyTokenFor).toHaveBeenCalledWith('agent-pan-3936-review');
+    expect(writePtyTokenFor.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(backend.startAgent).mock.invocationCallOrder[0]!,
+    );
+    // The state records the Herdr pane and the supervisor.
+    expect(state).toMatchObject({ backend: 'herdr', paneId: 'w1:p-agent-pan-3936-review', supervisorEnabled: true });
+  });
+
+  it('closes the Herdr pane when no new session appears within the readiness timeout (PAN-3936)', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    const kimiHome = makeHome();
+    const overdeckHome = makeHome();
+    const backend = launchingBackend('herdr');
+    registerTerminalBackend(backend);
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(false);
+
+    const runtime = new KimiCodeRuntimeSync({
+      overdeckHome,
+      kimiHome,
+      prepareLaunch: async () => ({ binaryPath: '/opt/kimi/bin/kimi', pathExport: 'export PATH=/opt/kimi/bin:"$PATH"' }),
+      resolveSupervisorScriptPath: () => '/dist/pty-supervisor.js',
+      writePtyTokenFor: vi.fn(async () => 'test-token'),
+      resolveBackend: async () => backend,
+    });
+
+    const spawn = runtime.spawnAgent({
+      agentId: 'agent-kimi-herdr-timeout',
+      workspace: '/tmp/kimi-herdr-timeout-workspace',
+      model: 'k3',
+      runtime: 'kimi-code',
+    });
+    const rejection = expect(spawn).rejects.toThrow('did not write a new session under its workDirKey bucket');
+    await drainFakeTimersUntilSettled(spawn, 250);
+
+    await rejection;
+    expect(backend.closes).toEqual([
+      expect.objectContaining({ backend: 'herdr', paneId: 'w1:p-agent-kimi-herdr-timeout' }),
+    ]);
+    expect(tmuxMocks.tmuxKillSession).not.toHaveBeenCalled();
+  }, 30_000);
+
   it('kills the tmux session and throws when no new session appears within the readiness timeout', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
     const workspace = '/tmp/kimi-timeout-workspace';
-    tmuxMocks.tmuxCreateSession.mockResolvedValue(undefined);
     tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
 
     const runtime = new KimiCodeRuntimeSync({
@@ -386,6 +498,7 @@ describe('KimiCodeRuntimeSync', () => {
       prepareLaunch: async () => ({ binaryPath: '/opt/kimi/bin/kimi', pathExport: 'export PATH=/opt/kimi/bin:"$PATH"' }),
       resolveSupervisorScriptPath: () => '/dist/pty-supervisor.js',
       writePtyTokenFor: vi.fn(async () => 'test-token'),
+      resolveBackend: async () => fakeTerminalBackend('tmux'),
     });
 
     const spawn = runtime.spawnAgent({
@@ -466,11 +579,12 @@ describe('KimiCodeRuntimeSync', () => {
     expect(tmuxMocks.tmuxKillSession).toHaveBeenCalledWith('agent-kill-fallback');
   });
 
-  it('isRunning mirrors tmuxSessionExists (AC4)', async () => {
-    tmuxMocks.tmuxSessionExists.mockResolvedValue(true);
+  it('isRunning answers through the backend-aware liveness oracle (AC4, #4116)', async () => {
+    livenessMocks.isRuntimeAgentAlive.mockResolvedValueOnce(true);
     const runtime = new KimiCodeRuntimeSync({ overdeckHome: makeHome(), kimiHome: makeHome() });
     await expect(runtime.isRunning('agent-x')).resolves.toBe(true);
-    expect(tmuxMocks.tmuxSessionExists).toHaveBeenCalledWith('agent-x');
+    expect(livenessMocks.isRuntimeAgentAlive).toHaveBeenCalledWith('agent-x', 'kimi-code');
+    expect(tmuxMocks.tmuxSessionExists).not.toHaveBeenCalledWith('agent-x');
   });
 
   it('listSessions returns only kimi-code agents with a captured session id (AC4)', () => {

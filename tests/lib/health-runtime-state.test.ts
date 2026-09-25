@@ -12,6 +12,7 @@ const {
   getAgentStateMock,
   getAgentRuntimeStateMock,
   getAgentEffectiveLastActivityMsMock,
+  isAliveMock,
 } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
   mkdirSyncMock: vi.fn(),
@@ -23,6 +24,7 @@ const {
   getAgentStateMock: vi.fn(),
   getAgentRuntimeStateMock: vi.fn(),
   getAgentEffectiveLastActivityMsMock: vi.fn(),
+  isAliveMock: vi.fn(),
 }));
 
 vi.mock('fs', () => ({
@@ -47,8 +49,12 @@ vi.mock('../../src/lib/agents.js', () => ({
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));
 
+// Fake backend: the liveness oracle answers, never a tmux has-session (#4109).
 vi.mock('../../src/lib/agents/liveness.js', () => ({
   getAgentEffectiveLastActivityMs: getAgentEffectiveLastActivityMsMock,
+  isAlive: isAliveMock,
+  isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
+    !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
 
 describe('health runtime-state classification', () => {
@@ -57,6 +63,7 @@ describe('health runtime-state classification', () => {
     vi.clearAllMocks();
     existsSyncMock.mockReturnValue(false);
     sessionExistsAsyncMock.mockResolvedValue(true);
+    isAliveMock.mockResolvedValue({ alive: true, paneAlive: true });
     getAgentStateMock.mockReturnValue(null);
     getAgentRuntimeStateMock.mockReturnValue(null);
     getAgentEffectiveLastActivityMsMock.mockReturnValue(null);
@@ -127,5 +134,62 @@ describe('health runtime-state classification', () => {
     expect(health.status).toBe('stopped');
     expect(health.reason).toBe('Agent was intentionally stopped');
     expect(health.consecutiveFailures).toBe(0);
+  });
+
+  it('#4109: a live Herdr agent (no tmux session) is not classified dead', async () => {
+    sessionExistsAsyncMock.mockResolvedValue(false);
+    isAliveMock.mockResolvedValue({ alive: true, paneAlive: true });
+    getAgentStateMock.mockReturnValue({ status: 'running' });
+    getAgentEffectiveLastActivityMsMock.mockReturnValue(Date.now());
+
+    const { pingAgent } = await import('../../src/lib/health.js');
+    const health = await Effect.runPromise(pingAgent('agent-pan-4109'));
+
+    expect(health.status).toBe('healthy');
+    expect(health.consecutiveFailures).toBe(0);
+  });
+
+  it('#4109: an unknown liveness answer is a warning and never counts toward the force-kill threshold', async () => {
+    isAliveMock.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+    getAgentStateMock.mockReturnValue({ status: 'running' });
+
+    const { pingAgent } = await import('../../src/lib/health.js');
+    const health = await Effect.runPromise(pingAgent('agent-pan-4109'));
+
+    expect(health.status).toBe('warning');
+    expect(health.consecutiveFailures).toBe(0);
+  });
+
+  it('#4109: a confirmed-dead verdict is still dead', async () => {
+    isAliveMock.mockResolvedValue({ alive: false, reason: 'no-session' });
+    getAgentStateMock.mockReturnValue({ status: 'running' });
+
+    const { pingAgent } = await import('../../src/lib/health.js');
+    const health = await Effect.runPromise(pingAgent('agent-pan-4109'));
+
+    expect(health.status).toBe('dead');
+    expect(health.consecutiveFailures).toBe(1);
+  });
+
+  it('#4109: an unknown ping neither increments nor resets the dead-ping counter carried across pings', async () => {
+    // Persist health.json across pings in memory.
+    const files = new Map<string, string>();
+    existsSyncMock.mockImplementation((path: string) => files.has(path));
+    readFileSyncMock.mockImplementation((path: string) => files.get(path));
+    writeFileSyncMock.mockImplementation((path: string, data: string) => { files.set(path, data); });
+    getAgentStateMock.mockReturnValue({ status: 'running' });
+
+    const { pingAgent } = await import('../../src/lib/health.js');
+    const ping = async (verdict: { alive: boolean; reason?: string; paneAlive?: boolean }) => {
+      isAliveMock.mockResolvedValue(verdict);
+      return Effect.runPromise(pingAgent('agent-pan-4109'));
+    };
+
+    expect((await ping({ alive: false, reason: 'no-session' })).consecutiveFailures).toBe(1);
+    const unknown = await ping({ alive: false, reason: 'runtime-indeterminate' });
+    expect(unknown.status).toBe('warning');
+    expect(unknown.consecutiveFailures).toBe(1);
+    expect((await ping({ alive: false, reason: 'no-session' })).consecutiveFailures).toBe(2);
+    expect((await ping({ alive: true, paneAlive: true })).consecutiveFailures).toBe(0);
   });
 });

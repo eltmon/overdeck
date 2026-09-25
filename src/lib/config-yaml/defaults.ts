@@ -51,6 +51,14 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   // This is the explicit product default, shown and changeable in Settings —
   // a user-set models.default_conversation_model always overrides it.
   defaultConversationModel: 'claude-sonnet-5',
+  // PAN-4160: documented default for the Command Deck status review
+  // (`models.status_review_model`); replaces a literal in command-deck.ts.
+  statusReviewModel: 'claude-sonnet-5',
+  // models.provider_fallback_model: the Anthropic model substituted when a
+  // selected model's provider is disabled and the model has no explicit entry
+  // in FALLBACK_MAP (src/lib/model-fallback.ts). Sonnet, not Opus, to keep the
+  // silent substitute's cost reasonable.
+  providerFallbackModel: 'claude-sonnet-5',
   apiKeys: {},
   providerAuth: {},
   providerPlan: {},
@@ -59,7 +67,6 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),
   tieredExecution: { ...DEFAULT_TIERED_EXECUTION_CONFIG },
-  overrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
   conversations: {
@@ -67,6 +74,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     manualCompactMode: 'claude-code',
     richCompaction: true,
     titleModel: 'claude-haiku-4-5',
+    // PAN-4160: the one documented default for fork summaries (replaces two
+    // disagreeing literals in conversation-forks.ts and summary-fork.ts). A
+    // fork summary serializes the whole conversation in one shot, so it needs
+    // a 1M-context model.
+    forkSummaryModel: 'claude-sonnet-5',
     // PAN-3860: deliberately no default here (unlike compactionModel/
     // titleModel above) — the previous default lived as a private literal in
     // summary-fork.ts, which is exactly the hardcoded-fallback pattern the

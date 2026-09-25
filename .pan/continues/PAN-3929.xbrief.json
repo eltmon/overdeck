@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-3929",
+  "created": "2026-09-19T13:29:06.828Z",
+  "updated": "2026-09-19T13:29:06.828Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pipeline-status-derived": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3929",
+      "claimedAt": "2026-09-19T13:29:06.828Z"
+    }
+  }
+}

@@ -26,8 +26,7 @@
  * `isRespawnPending()` is true.
  */
 
-import { Effect } from 'effect';
-import { sessionExists } from '../../../lib/tmux.js';
+import { conversationSessionAlive } from '../../../lib/overdeck/conversation-liveness.js';
 
 /** Session name → the in-flight respawn's mark (when it began, epoch ms). */
 const pendingRespawns = new Map<string, { readonly startedAtMs: number }>();
@@ -79,11 +78,11 @@ export async function waitForSessionRespawn(
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await Effect.runPromise(sessionExists(sessionName))) return true;
+    if (await conversationSessionAlive(sessionName)) return true;
     if (!pendingRespawns.has(sessionName)) {
-      return Effect.runPromise(sessionExists(sessionName));
+      return conversationSessionAlive(sessionName);
     }
     await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  return Effect.runPromise(sessionExists(sessionName));
+  return conversationSessionAlive(sessionName);
 }

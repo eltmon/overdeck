@@ -13,11 +13,13 @@ import {
   ProjectCiSuite,
   ResourceStats,
   RestartGateSnapshot,
+  ProjectDeploySnapshot,
   Role,
   SequenceNumber,
   WaitingReason,
 } from "./types"
 import { DerivedIssueState } from "./derived-issue-state"
+import { PullRequestLink } from "./pull-request-links"
 import { BackendPane } from "./backend-pane"
 import {
   MemoryObservation,
@@ -126,6 +128,24 @@ export const RestartGateChangedEvent = Schema.Struct({
 })
 export type RestartGateChangedEvent = typeof RestartGateChangedEvent.Type
 
+/**
+ * The set of in-flight project deploys changed (PAN-3751).
+ *
+ * The payload is the COMPLETE projection keyed by project key, so the reducer
+ * is a plain replace. The server derives it from runtime files (restart lock,
+ * restart gate, restart-status journal) and emits it in-memory only, like
+ * `restart_gate.changed`: it is never persisted and never replayed at boot.
+ */
+export const ProjectDeployChangedEvent = Schema.Struct({
+  type: Schema.Literal("project.deploy_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    deploys: Schema.Record(Schema.String, ProjectDeploySnapshot),
+  }),
+})
+export type ProjectDeployChangedEvent = typeof ProjectDeployChangedEvent.Type
+
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
 /** Replaces socket.io `agents:changed` (event: 'started') */
@@ -200,6 +220,9 @@ export const AgentStatusChangedEvent = Schema.Struct({
     issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     status: AgentStatus,
     previousStatus: Schema.optional(AgentStatus),
+    /** The agent has a live pane on its terminal backend (Herdr or tmux). */
+    hasLivePane: Schema.optional(Schema.Boolean),
+    /** @deprecated Alias of `hasLivePane`, kept for events written before it existed (#4105). */
     hasLiveTmuxSession: Schema.optional(Schema.Boolean),
     stoppedByUser: Schema.optional(Schema.Boolean),
     stoppedByPause: Schema.optional(Schema.Boolean),
@@ -1325,6 +1348,19 @@ export const ConversationTitleChangedEvent = Schema.Struct({
 })
 export type ConversationTitleChangedEvent = typeof ConversationTitleChangedEvent.Type
 
+/** Emitted (in-memory only) when a conversation's pull-request links or their
+ * snapshots change (PAN-3822), so the list and open panel refresh the badge. */
+export const ConversationPullRequestsChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.pull_requests_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    effective: Schema.NullOr(PullRequestLink),
+  }),
+})
+export type ConversationPullRequestsChangedEvent = typeof ConversationPullRequestsChangedEvent.Type
+
 /** Emitted (in-memory only) when a PermissionRequest hook fires or resolves for a conversation. */
 export const ConversationPermissionChangedEvent = Schema.Struct({
   type: Schema.Literal("conversation.permission_changed"),
@@ -1481,6 +1517,7 @@ export const DomainEvent = Schema.Union([
   ProjectCiSuiteObservedEvent,
   ProjectCiHeadObservedEvent,
   RestartGateChangedEvent,
+  ProjectDeployChangedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,
@@ -1572,6 +1609,7 @@ export const DomainEvent = Schema.Union([
   ConversationCreatedEvent,
   ConversationMovedEvent,
   ConversationTitleChangedEvent,
+  ConversationPullRequestsChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
   ScanProgressEvent,

@@ -52,7 +52,7 @@ const interventionMocks = vi.hoisted(() => ({
 }));
 
 const unpauseMocks = vi.hoisted(() => ({
-  getWorkAgentLifecycleStateSync: vi.fn(),
+  getWorkAgentLifecycleState: vi.fn(),
   resumeAgent: vi.fn(),
 }));
 
@@ -135,7 +135,7 @@ vi.mock('../../../lib/operator-interventions.js', () => ({
 }));
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
-  getWorkAgentLifecycleStateSync: unpauseMocks.getWorkAgentLifecycleStateSync,
+  getWorkAgentLifecycleState: unpauseMocks.getWorkAgentLifecycleState,
 }));
 
 vi.mock('../../../lib/agents/resume.js', () => ({
@@ -176,8 +176,8 @@ describe('operator intervention CLI emission', () => {
     lifecycleMocks.resetToTodo.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockResolvedValue(undefined);
-    unpauseMocks.getWorkAgentLifecycleStateSync.mockReset();
-    unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: false });
+    unpauseMocks.getWorkAgentLifecycleState.mockReset();
+    unpauseMocks.getWorkAgentLifecycleState.mockReturnValue({ canResumeSession: false });
     unpauseMocks.resumeAgent.mockReset();
     unpauseMocks.resumeAgent.mockResolvedValue({ success: true });
     workspaceMocks.stopWorkspaceDocker.mockResolvedValue({ containersFound: false, steps: [] });
@@ -316,7 +316,7 @@ describe('operator intervention CLI emission', () => {
 
   it('emits an unpause intervention and resumes when pan unpause clears a pause gate', async () => {
     agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-1', paused: true });
-    unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: true });
+    unpauseMocks.getWorkAgentLifecycleState.mockReturnValue({ canResumeSession: true });
 
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('PAN-1');
@@ -332,13 +332,13 @@ describe('operator intervention CLI emission', () => {
 
   it('does not emit an intervention or resume when the agent was already unpaused', async () => {
     agentMocks.getAgentState.mockReturnValue({ issueId: 'PAN-1', paused: false });
-    unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: true });
+    unpauseMocks.getWorkAgentLifecycleState.mockReturnValue({ canResumeSession: true });
 
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('PAN-1');
 
     expect(interventionMocks.appendOperatorInterventionEvent).not.toHaveBeenCalled();
-    expect(unpauseMocks.getWorkAgentLifecycleStateSync).not.toHaveBeenCalled();
+    expect(unpauseMocks.getWorkAgentLifecycleState).not.toHaveBeenCalled();
     expect(unpauseMocks.resumeAgent).not.toHaveBeenCalled();
   });
 

@@ -90,8 +90,7 @@ import { registerProjectCommands } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
-import { restartCommand } from './commands/restart.js';
-import { reloadCommand } from './commands/reload.js';
+import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
 import { createCostCommand } from './commands/cost.js';
 import { createMemoryCommand } from './commands/memory.js';
 import { createBriefingCommand } from './commands/briefing.js';
@@ -359,17 +358,17 @@ backlog
       return exitCli(1);
     }
     writeSequenceMd(projectRoot, result.doc);
-    // Whoever writes a .pan/ artifact commits it — no daemon does it for you.
-    const { commitPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
-    const { resolvePlanHome } = await import('../lib/pan-dir/paths.js');
-    const commit = await commitPlanArtifacts({
-      cwd: resolvePlanHome(projectRoot),
-      paths: ['.pan/backlog'],
-      message: 'chore(workspace): backlog sequence',
-    });
+    // Whoever writes a .pan/ artifact commits it; the sequence commit is pushed too (PAN-3923).
+    const { commitPlanArtifacts, pushPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
+    const planHome = (await import('../lib/pan-dir/paths.js')).resolvePlanHome(projectRoot);
+    const commit = await commitPlanArtifacts({ cwd: planHome, paths: ['.pan/backlog'], message: 'chore(workspace): backlog sequence' });
     console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
     if (!commit.committed && commit.reason !== 'nothing to commit') {
       console.error(chalk.yellow(`  ⚠ Could not commit the sequence: ${commit.reason}`));
+    } else {
+      const push = await pushPlanArtifacts(planHome);
+      const warning = push.pushed ? push.warning : push.skipped ? undefined : push.reason;
+      if (warning) console.error(chalk.yellow(`  ⚠ Sequence push: ${warning}`));
     }
   });
 
@@ -447,7 +446,8 @@ program
   .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
   .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
-  .option('--issue <id>', 'Issue ID to associate with the new conversation')
+  .option('--issue <id>', 'Issue ID to associate with the new conversation; without --cwd the new conversation starts in the issue workspace when it exists')
+  .option('--role <role>', 'Pane role for the new conversation: conversation (default), work, review, test, plan. With --issue, review makes the handoff the issue\'s Review row')
   .option('--title <title>', 'Title for the new conversation; defaults to "Handoff: <focus>" (first ~70 chars) or "Handoff: <source title>" without focus')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
@@ -597,17 +597,7 @@ program
   .option('--no-resume', 'Disable agent auto-resume (opt out of the default-on auto-resume)')
   .action(devCommand);
 
-program
-  .command('up')
-  .description('Start dashboard (and Traefik if enabled)')
-  .option('--detach', 'Run in background')
-  .option('--skip-traefik', 'Skip Traefik startup')
-  .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON')
-  .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
-  .option('--resume', 'Enable agent auto-resume on boot — auto-resume is ON by default (flag kept for explicitness)')
-  .option('--no-resume', 'Disable agent auto-resume (opt out of the default-on auto-resume)')
-  .option('--no-open', 'Do not open the dashboard app/browser after startup')
-  .option('--seed-from-legacy', 'Seed a fresh local database from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty local database.')
+defineUpCommand(program)
   .action(async (options) => { const restartModule = await import('./commands/restart.js'); if (restartModule.refuseNonPrimaryDashboardCwd(process.cwd(), 'start')) return;
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
@@ -1169,7 +1159,7 @@ program
         console.log(chalk.green(`✓ Stopped ${killed.length} review session(s)`));
       }
       if (failed.length > 0) {
-        console.log(chalk.yellow(`⚠ Failed to stop ${failed.length} review session(s)`));
+        console.log(chalk.yellow(`⚠ Failed to stop ${failed.length} review session(s): ${failed.join(', ')}`));
       }
       if (killed.length === 0 && failed.length === 0) {
         console.log(chalk.dim('  No review sessions running'));
@@ -1230,44 +1220,7 @@ program
 
     console.log('');
   });
-program
-  .command('reload')
-  .description('Build Overdeck, then restart the dashboard only after the build succeeds')
-  .option('--skip-build', 'Skip npm run build and restart the existing bundle')
-  .option('--force', 'Bypass the agent deploy-window gate (agent-initiated reloads are otherwise refused while deploy-window block reasons are active)')
-  .option('--health-timeout <duration>', 'Dashboard /api/health wait budget — ms, or Ns/Nm suffix (default 30s; floor 1000ms)')
-  .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload')
-  .action(reloadCommand);
-
-// Scoped restart: `pan restart` defaults to the dashboard only and never
-// touches CLIProxy / Traefik / TLDR. Use `--full` for the nuclear option.
-// See src/cli/commands/restart.ts for the scope contract.
-const restart = program
-  .command('restart')
-  .description('Restart a platform component (default: dashboard only — leaves CLIProxy, Traefik, TLDR running)')
-  .option('--dashboard', 'Restart only the dashboard (default)')
-  .option('--cliproxy', 'Restart only the CLIProxy sidecar')
-  .option('--traefik', 'Restart only Traefik')
-  .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
-  .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION). For dashboard scope: bypass the agent deploy-window gate (agent-initiated restarts are otherwise refused while deploy-window block reasons are active)')
-  .option('--health-timeout <duration>', 'Dashboard /api/health wait budget — ms, or Ns/Nm suffix (default 15s; floor 1000ms)')
-  .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON')
-  .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
-  .option('--resume', 'Enable agent auto-resume on boot — auto-resume is ON by default (flag kept for explicitness)')
-  .option('--no-resume', 'Disable agent auto-resume on restart (opt out of the default-on auto-resume)')
-  .option('--now', 'Skip the operator-approval wait: approve everything already waiting, then restart the dashboard immediately')
-  .action(restartCommand);
-
-// Dashboard, reload and post-merge deploy restarts wait for operator approval so
-// they cannot interrupt live work. This releases whatever is waiting — the same
-// thing the dashboard banner's "Restart now" button does.
-restart
-  .command('approve')
-  .description('Approve every dashboard restart request that is waiting for the operator')
-  .action(async () => {
-    const { restartApproveCommand } = await import('./commands/restart.js');
-    await restartApproveCommand();
-  });
+registerReloadAndRestartCommands(program);
 
 // Project management commands
 const project = program.command('project').description('Project registry for multi-project workspace support');

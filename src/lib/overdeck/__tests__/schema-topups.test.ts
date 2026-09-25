@@ -42,6 +42,21 @@ afterEach(() => {
 });
 
 describe('overdeck schema top-ups', () => {
+  it('creates conversation_pull_requests and its key index, and restores them on an existing database (PAN-3822)', () => {
+    const dbPath = makeDbPath();
+    let db = getOverdeckDatabase(dbPath);
+    const names = () => db
+      .prepare(`SELECT name FROM sqlite_master WHERE name IN ('conversation_pull_requests', 'idx_conversation_pull_requests_key') ORDER BY name`)
+      .all<{ name: string }>()
+      .map((row) => row.name);
+    expect(names()).toEqual(['conversation_pull_requests', 'idx_conversation_pull_requests_key']);
+
+    db.exec('DROP TABLE conversation_pull_requests');
+    closeOverdeckDatabase();
+    db = getOverdeckDatabase(dbPath);
+    expect(names()).toEqual(['conversation_pull_requests', 'idx_conversation_pull_requests_key']);
+  });
+
   it('creates cost-event lookup indexes in a fresh database', () => {
     const db = getOverdeckDatabase(makeDbPath());
 

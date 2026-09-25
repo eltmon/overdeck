@@ -53,7 +53,7 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan backup`, `pan restore` | `--help` is sufficient; no judgment calls. |
 | `pan caveman-compress` | Internal-only utility. |
 | `pan fork`, `pan unarchive-conversation`, `pan resume` | Single-purpose, output is self-explanatory. |
-| `pan map` | No CLI verb exists; `/pan-map` is a topical skill for bootstrapping `.pan/context/codebase/` orientation files. |
+| `pan map` | No CLI verb exists; `/pan-map` is a topical skill for bootstrapping `.overdeck/context/codebase/` orientation files. |
 | `pan open` | Trivial — opens an editor. |
 | `pan recover`, `pan restore` | Recovery flows are documented in workflow skills (`pan-diagnose`). |
 | `pan scope`, `pan staffing`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
@@ -75,6 +75,8 @@ This list is **deliberate, not aspirational.** Adding a wrapper for any of these
 3. Fails CI if any reference doesn't exist on the current CLI.
 
 Workflow / reference / topical skills are not subject to the strict invocation-parse check, but the linter still flags obviously stale references (e.g., a command that no longer exists at all).
+
+`scripts/guard-no-state-layer.sh` (`npm run lint:no-state-layer`) also scans every `.md` under `sync-sources/`, `src/lib/cloister/prompts/`, and `roles/` with the same pattern set it applies to `src/`: the deleted record plane (`records/`, `statusOverrides`, `IssueRecord`), the deleted status fields (`readyForMerge`, `recoveryTrips`, `reviewStatus`, `testStatus`, `verificationStatus`, `inspectStatus`, `mergeStatus`, `releaseStatus`), `overdeck-state`, `task-door`, `auto-commit`, and the deleted `/api/review/:id/status` endpoint. Describe the derived model instead (`state`, `attention`, `pr.reviewState`, `pr.checks`, `pr.mergeable`, as `pan show <id> --json` prints them). Two files are exempt by name: `sync-sources/rules/protect-overdeck-state-branch.md` and `sync-sources/skills/pan-admin-migrate-plan-home/SKILL.md`.
 
 ### When the linter trips you up
 

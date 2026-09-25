@@ -31,6 +31,7 @@ import {
   type PrerequisiteResolver,
 } from '../../lib/system-prerequisites.js';
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
+import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkHerdr } from './doctor-herdr.js';
@@ -458,7 +459,8 @@ type DoctorDashboardAgent = {
   status?: unknown;
   startedAt?: unknown;
   lastActivity?: unknown;
-  hasLiveTmuxSession?: unknown;
+  hasLivePane?: unknown;
+  hasLiveTmuxSession?: unknown; // @deprecated alias of hasLivePane, read as a fallback (#4105)
 };
 
 function normalizeDoctorAgentId(agentId: string): string {
@@ -557,9 +559,7 @@ export function checkStoppedListClassification(options: {
     const classification = classifyDashboardAgent({
       issueId,
       status: status as AgentStatus,
-      hasLiveTmuxSession: typeof dashboardAgent.hasLiveTmuxSession === 'boolean'
-        ? dashboardAgent.hasLiveTmuxSession
-        : undefined,
+      hasLivePane: [dashboardAgent.hasLivePane, dashboardAgent.hasLiveTmuxSession].find((v): v is boolean => typeof v === 'boolean'),
       lastActivity: stringField(dashboardAgent.lastActivity),
       startedAt: stringField(dashboardAgent.startedAt) ?? stringField(state.startedAt),
     }, options.nowMs);
@@ -581,7 +581,7 @@ export function checkStoppedListClassification(options: {
     name: 'Stopped-List Classification',
     status: 'warn',
     message: `${misclassified.length} running agent${misclassified.length === 1 ? '' : 's'} with live tmux would not classify as active: ${misclassified.join(', ')}`,
-    fix: 'PAN-1419: ensure /api/agents and read-model snapshots preserve hasLiveTmuxSession for live tmux agents.',
+    fix: 'PAN-1419: ensure /api/agents and read-model snapshots preserve hasLivePane for agents with a live pane.',
   };
 }
 
@@ -816,7 +816,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     });
   }
 
-  checks.push(checkDeployedHooksDrift());
+  checks.push(checkDeployedHooksDrift(), await checkSyncSourceCheckout()); // PAN-3327, PAN-3881
   checks.push(await checkCliGenerationLink());
 
   // Check environment variables

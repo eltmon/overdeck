@@ -91,7 +91,7 @@ Before starting any work, you MUST read these files to understand the full conte
 1. **Review the per-issue record** injected above under "Per-Issue Record" — decisions, hazards, resumePoint, and sessionHistory from the planning agent. (If the block is absent, the record does not exist yet for this issue.)
 2. **Read `CLAUDE.md`** (in workspace) - Contains workspace-specific instructions and warnings.
 3. **Read `{{PROJECT_ROOT}}/CLAUDE.md`** - Contains project-wide development guidelines.
-4. **Skim `.pan/context/codebase/` (if present)** — project-wide orientation: architecture, conventions, known traps.
+4. **Skim `.overdeck/context/codebase/` (if present)** — project-wide orientation: architecture, conventions, known traps.
 5. **Check `feedback[]` in the per-issue record** — If the record has a non-empty `feedback` array, each entry contains inline specialist feedback (review issues, test failures, merge blocks) requiring action. This is the primary feedback source (Layer 1+). The `SPECIALIST FEEDBACK` section below injects these entries for you.
    Also check `.pan/feedback/` for filesystem feedback entries when present.
 
@@ -339,7 +339,7 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 
 **If you see feedback files in `.pan/feedback/`:** read and address them before resubmitting. Ignore obsolete legacy feedback leftovers if any remain in older workspaces.
 
-**WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan done` to signal completion.
+**WARNING:** Never approve or merge your own PR (`gh pr review --approve`, `gh pr merge`) — approval is a PR review that belongs to the reviewer and the operator. Agents MUST use `pan done` to signal completion.
 {{/LOCAL}}
 {{#REMOTE}}
 When ALL tasks are complete:

@@ -47,6 +47,24 @@ click:
   alt="The composer model and harness picker, showing Claude Code / Pi / Codex harnesses over Anthropic and other provider models with per-million pricing"
 />
 
+### Starting a bare conversation
+
+Two checkboxes sit under the `+` in the Command Deck header. Your browser
+remembers what you last chose.
+
+- **No context** starts the conversation without Overdeck's context: no
+  bundled rules, no project or workspace layers, no session briefing, no memory
+  injection on each prompt, and no resume message. It starts faster and costs
+  fewer tokens per turn. The conversation still shows up in the dashboard with
+  live activity, and resuming or forking it keeps it bare.
+- **Skip CLAUDE.md** (Claude Code only) also turns off Claude Code's own
+  memory: `~/.claude/CLAUDE.md`, project `CLAUDE.md` files and auto memory.
+  Without it, a bare conversation still reads those files, because Claude Code
+  loads them itself.
+
+See [Bare conversations](https://github.com/eltmon/overdeck/blob/main/docs/CONTEXT-LAYERS.md#bare-conversations-no-overdeck-context)
+for the full list of what is skipped and what keeps running.
+
 ### Native OpenCode CLI in Terminal
 
 For an OpenCode conversation, **Terminal** attaches OpenCode's own interactive
@@ -337,6 +355,103 @@ conversation to try an alternative approach, keep the original intact, compare
 both, and continue with the one you like. Cheaper than restarting from scratch,
 and the original's context is never lost.
 
+## Pull requests on conversations
+
+A conversation shows the pull request its work lives on. A badge next to the
+branch chip, on the conversation row and in the open conversation's header,
+shows the PR number, colored by state: blue
+for open, amber when a review needs a human, green for merged, red for closed
+without merging, and muted for drafts. A `×` marks failing checks. Hover it for
+the repository, number, state, and title; click it to open the PR. `+N` means the
+conversation has more than one linked PR.
+
+Links come from **branch detection**. About 30 seconds after the dashboard starts,
+and every 60 seconds after that, Overdeck reads each GitHub project's pull
+requests once and links every PR whose head branch equals the branch a
+conversation's working directory is on. Agent conversations whose workspace
+cannot be read fall back to `feature/<issue>`. A conversation on the project's
+default branch is never linked by branch. The same sweep refreshes the stored
+state of linked PRs, so the badge renders without a live GitHub call. Open PRs
+refresh on every sweep, closed PRs at most every 15 minutes, and merged PRs are
+final and never re-read. A linked PR the project listing doesn't include (older
+than its 200 most recent PRs, in another repository, or on a conversation
+outside any GitHub project) is read on its own. After three failed reads in a
+row, Overdeck skips that repository for 15 minutes.
+
+### Linking a pull request by hand
+
+Open a conversation's actions (the row's `⋮`, the open conversation's header
+`⋮`, or a right-click on the row, the header, or its tab) and choose **Link pull
+request…**. Type a PR URL, a
+GitLab merge request URL, `#42`, or `owner/repo#42`, then press Enter. `#42`
+means PR 42 of the conversation's project repository. When the conversation
+shows a PR, the same menu offers **Unlink #42**.
+
+**Pull requests…** in the same menu opens a dialog that lists every PR linked to
+the conversation. It shows why each one is linked (`manual`, `agent`, `created`,
+`branch-detected`, or `unlinked`) and which one the badge shows. From there you
+can link another PR, unlink or relink one, and refresh their status from the
+forge.
+
+In a transcript, right-click a pull request or merge request link and choose
+**Link to conversation**. If that PR is the one the conversation shows, the menu
+offers **Unlink from conversation** instead.
+
+Agents and scripts use the CLI. `<query>` is the conversation name, or a title
+fragment that matches exactly one conversation (`pan conv current` prints the
+one you're in):
+
+```bash
+pan conv link-pr <query> <url|#42|owner/repo#42>   # --source agent|manual
+pan conv unlink-pr <query> <url|#42|owner/repo#42>
+pan conv prs <query> [--json]                      # * marks the PR shown
+```
+
+`link-pr` records the source `agent` when it runs inside an agent
+(`OVERDECK_AGENT_ID` is set) and `manual` otherwise. The verbs go through the
+dashboard, so every open client updates at once. With the dashboard down they
+write the link directly. They exit 2 when no conversation matches, and 1 on any
+other error.
+
+Rules:
+
+- Only a repository configured for the conversation's project can be linked:
+  the project's `github_repo` or `gitlab_repo`, a URL-shaped
+  `workspace.repos[].remote`, or the `origin` remote of the project checkout or
+  of the conversation's working directory. Anything else is refused, and
+  nothing is stored.
+- A PR you link by hand wins over one found by branch detection.
+- Unlinking hides the link, and branch detection won't add that PR back. Linking
+  the same PR by hand again restores it.
+- A new link fetches the PR's state within seconds, so it doesn't wait for the
+  next sweep.
+
+When the pipeline opens the pull request for an issue (`pan done`, or the review
+pipeline), it links that PR to every agent conversation for the issue, with the
+source `created`. Those conversations show the PR at once, without waiting for a
+sweep. The pipeline never restores a PR you unlinked.
+
+The other direction works too: an issue's **Code** card lists every conversation
+linked to the issue's PR, with why it's linked (opened by the pipeline, linked
+by hand, linked by an agent, or on the same branch). Click one to open it.
+
+Linking never archives or stops a conversation unless you turn on auto-archive:
+
+```bash
+pan conv auto-archive-on-merge        # prints on or off (default: off)
+pan conv auto-archive-on-merge on     # or off
+```
+
+When it's on, an operator conversation is archived when a linked PR goes from
+open to merged or closed and every PR still linked to it is merged or closed.
+It happens once, at that change, so a conversation you unarchive stays. A
+conversation whose terminal session is still alive is never archived, nothing is
+ever stopped, and agent conversations are never archived (the pipeline owns
+them).
+
+Not yet shipped (tracked in [#3822](https://github.com/eltmon/overdeck/issues/3822)):
+GitLab merge request status, the Pull requests page, and search by PR number.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
@@ -344,3 +459,20 @@ and the original's context is never lost.
 - [Harnesses](/configuration/harnesses) — `claude-code` vs `pi`, and the ToS rules that gate them
 - `pan conv current` (alias `pan conv whoami`) — print the conversation you're running inside
 - `pan fork [conv]` — create a summary or plain fork without asking the source agent to author a handoff
+
+## Subagent activity and direct messages
+
+Select a child in the conversation's agent rail to read its transcript. Active
+children display “Working for …” with the same activity indicator as the main
+conversation.
+
+A bottom composer appears when the selected child supports direct messages.
+For Codex, this requires a loaded child in a conversation running the structured
+app-server transport. Messages go to that child's existing thread, with its
+current model and permissions. Drafts are separate for each child.
+
+Claude Code sessions, Codex terminal sessions, and unavailable children show the
+transcript without a composer. Messages are never relayed through the main agent.
+Existing Codex conversations need a restart after upgrading their host before
+they can expose this capability. If delivery cannot be confirmed, check the
+child's transcript before retrying.

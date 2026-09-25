@@ -103,6 +103,42 @@ describe('stopWorkspaceDocker — canonical resolver (PAN-3049)', () => {
     }
   });
 
+  it('removes the project networks compose down left behind (PAN-3900)', async () => {
+    const workspacePath = makeWorkspace('export COMPOSE_PROJECT_NAME="myn-feature-min-901"\n');
+    mockExecAsync.mockImplementation(async (cmd: string, argv?: string[]) => {
+      if (cmd === 'docker' && Array.isArray(argv) && argv[0] === 'network' && argv[1] === 'ls') {
+        return { stdout: 'myn-feature-min-901_devnet\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+    const stopDocker = await loadStopDocker();
+
+    await stopDocker(workspacePath, 'min-901');
+
+    expect(commandsOf()).toContain(
+      'docker network ls --filter label=com.docker.compose.project=myn-feature-min-901 --format {{.Name}}',
+    );
+    expect(commandsOf()).toContain('docker network rm myn-feature-min-901_devnet');
+  });
+
+  it('removes a leaked network even when the compose files and containers are gone (PAN-3900)', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'pan-stop-docker-'));
+    const workspacePath = join(tmpRoot, 'workspaces', 'feature-pan-3894');
+    mkdirSync(workspacePath, { recursive: true });
+    mockExecAsync.mockImplementation(async (cmd: string, argv?: string[]) => {
+      if (cmd === 'docker' && Array.isArray(argv) && argv[0] === 'network' && argv[1] === 'ls') {
+        return { stdout: 'overdeck-feature-pan-3894_devnet\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+    const stopDocker = await loadStopDocker();
+
+    const result = await stopDocker(workspacePath, 'pan-3894');
+
+    expect(result.containersFound).toBe(false);
+    expect(commandsOf()).toContain('docker network rm overdeck-feature-pan-3894_devnet');
+  });
+
   it('propagates the resolver mismatch error instead of silently tearing down the wrong stack', async () => {
     const workspacePath = makeWorkspace('export COMPOSE_PROJECT_NAME="victim-project"\n');
     const stopDocker = await loadStopDocker();

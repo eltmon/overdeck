@@ -331,6 +331,8 @@ describe('runForkPipeline spawn-pending window (PAN-3860)', () => {
     // attempted and deadlocked on real I/O scheduling; splitting the coverage
     // across the two suites keeps both reliable.)
     let resolveAuthoring!: (value: { docText: string; docPath: string }) => void;
+    // Clear call history left by earlier tests: the wait below keys on this call.
+    vi.mocked(authorHandoffExternal).mockClear();
     vi.mocked(authorHandoffExternal).mockImplementation(
       () => new Promise((resolve) => { resolveAuthoring = resolve; }),
     );
@@ -349,10 +351,12 @@ describe('runForkPipeline spawn-pending window (PAN-3860)', () => {
       'focus text',
       'external',
     );
-    // Give the pipeline a chance to reach (and block on) the authoring call
+    // Wait until the pipeline has reached (and blocked on) the authoring call
     // before resolving it, so this genuinely exercises "spawn happens after
-    // authoring finishes" rather than a same-tick resolution.
-    await new Promise((r) => setTimeout(r, 10));
+    // authoring finishes" rather than a same-tick resolution. Wait on the call
+    // itself, not a fixed sleep: the async file reads before it can take any
+    // amount of time on a loaded runner.
+    await vi.waitFor(() => expect(authorHandoffExternal).toHaveBeenCalledTimes(1), { timeout: 4000 });
     expect(ensureSpy).not.toHaveBeenCalled();
     resolveAuthoring({ docText: '# Handoff\n\n## Suggested skills\n\nnone', docPath: '/tmp/handoff.md' });
     await expect(pipeline).resolves.toBeUndefined();

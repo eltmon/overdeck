@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -97,6 +97,13 @@ describe('waitForAcpHostReady', () => {
 });
 
 describe('waitForPromptReady — kimi-code TUI (PAN-1837)', () => {
+  // The pane reads go through the backend door (PAN-3921), which loads its
+  // modules and memoizes the host backend with real I/O; do that before any
+  // case installs fake timers.
+  beforeAll(async () => {
+    const { readAgentPaneText } = await import('../../terminal-backends/agent-pane-io.js');
+    await readAgentPaneText('agent-kimi-warmup', 1).catch(() => '');
+  });
   afterEach(() => {
     tmuxMocks.sessionExists.mockReset();
     tmuxMocks.capturePane.mockReset();

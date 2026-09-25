@@ -7,7 +7,7 @@ import { jsonResponse } from "./http-helpers.js";
  *   - Node (prod): NodeHttpServer + NodeServices
  *
  * Routes:
- *   GET  /api/health  → { status: "ok", repoRoot, mode }
+ *   GET  /api/health  → { status: "ok", repoRoot, mode, bootGates, … }
  *   GET  /ws/rpc      → WebSocket RPC (PanRpcGroup)
  *   GET  /ws/terminal  → Raw WebSocket terminal (bypasses Effect RPC)
  *   GET  *            → static files from OVERDECK_FRONTEND_DIR
@@ -61,6 +61,7 @@ import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
+import { conversationPullRequestRoutes } from './routes/conversation-pull-requests.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { projectsRouteLayer } from './routes/projects.js';
 import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
@@ -365,6 +366,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   conversationsRouteLayer,
   conversationsRetrospectiveRouteLayer,
   conversationCompanionTerminalRouteLayer,
+  conversationPullRequestRoutes,
   eventsRouteLayer,
   projectsRouteLayer,
   projectsMergeTrainRouteLayer,

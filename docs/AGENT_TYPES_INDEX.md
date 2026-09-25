@@ -30,7 +30,7 @@ These are the roles a new Overdeck user is most likely to care about first.
 | `work` | Active | Implements beads in the issue workspace | `roles/work.md`, `.pan/continue.json`, and the active xBRIEF |
 | `review` | Active | Reviews the completed branch and decides approve vs changes requested | `roles/review.md` plus review convoy subagents |
 | `test` | Active | Runs automated checks and required browser UAT | `roles/test.md` |
-| server-side shipping | Active | Rebases approved work and derives `readyForMerge` for the human Merge button | `rebaseFeatureBranch()` + review-status gates; no spawned role file |
+| server-side shipping | Active | Rebases approved work; the human Merge button follows the derived `ready` state (approved PR, green checks, mergeable) | `rebaseFeatureBranch()` + `evaluateIssueMergeGate()` (`src/lib/cloister/merge-gate.ts`); no spawned role file |
 
 ## Sub-roles
 
@@ -38,8 +38,6 @@ Sub-roles are not standalone Overdeck pipeline stages. They are model and instru
 
 | Sub-role | Parent role | Purpose |
 |---|---|---|
-| `work.inspect` | `work` | Per-bead spec verification for beads flagged `metadata.requiresInspection: true` |
-| `work.inspect-deep` | `work` | Stronger inspection path for high-risk beads flagged with `metadata.inspectionDepth: "deep"` |
 | `review.security` | `review` | Security-focused review lens |
 | `review.correctness` | `review` | Correctness and edge-case review lens |
 | `review.performance` | `review` | Performance and scalability review lens |
@@ -53,10 +51,11 @@ A newcomer-friendly way to think about the normal flow is:
 
 1. **`plan`** turns the issue into an xBRIEF plan and beads.
 2. **`work`** implements the planned beads.
-3. **`work.inspect` / `work.inspect-deep`** verify flagged beads during implementation.
-4. **`review`** performs code review and synthesizes the convoy findings.
-5. **`test`** runs project verification and any required browser UAT.
-6. Server-side shipping prepares the branch for human merge.
+3. **`review`** performs code review and synthesizes the convoy findings.
+4. **`test`** runs project verification and any required browser UAT.
+5. Server-side shipping prepares the branch for human merge.
+
+The `work.inspect` and `work.inspect-deep` sub-roles were deleted with the inspection gate and `pan inspect` (PAN-3917 FR-14); see [THE-CUT.md](THE-CUT.md).
 
 Not every project or run will emphasize every sub-role equally, but the spawned roles plus server-side shipping are the core mental model.
 
@@ -64,13 +63,12 @@ Not every project or run will emphasize every sub-role equally, but the spawned 
 
 Some names you will see in settings or `.claude/agents/` are not lifecycle roles.
 
-Examples:
-- `review:security`
-- `review:requirements`
-- `subagent:explore`
-- `cli:interactive`
-
-These are real and important, but they are better understood as **role-internal helpers or routed contexts** than as the primary Overdeck roles a newcomer should picture first.
+Removed: work-type IDs such as `review:security`, `review:requirements`,
+`subagent:explore` and `cli:interactive` were routing keys for the old
+work-type router, deleted in PAN-1048. Nothing routes on them any more, and
+`review:*` keys in `models.overrides` do nothing. The review lanes are now
+sub-roles of the `review` role (`roles.review.sub.<lane>`); see
+[CONFIGURATION.md](CONFIGURATION.md#review-mode-and-reviewer-models).
 
 ## Where model selection fits
 

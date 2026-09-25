@@ -29,7 +29,7 @@
 - **Build:** `npm run build` (tsdown + Vite). **Dev:** `npm run dev`.
 - **Quality gates** (must pass before `pan done`): `npm run typecheck`, `npm run lint`, and `npx vitest run <the test files you touched>`. Never run the full `npm test` on the host: it runs once, on CI, against the PR head, and a red CI test job returns as verification feedback (`verification.tests`, PAN-3965 — [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md)).
 - **Workspaces** are git worktrees at `workspaces/feature-<issue>/` with their own `bun install` — never symlink node_modules.
-- **Planning artifacts** (drafts, specs, continues, orders, notes, backlog sequence) live under `.pan/` in the project repo (or the configured plan-home repo for polyrepo projects), committed on the feature branch.
+- **Planning artifacts** (drafts, specs, continues, orders, notes, backlog sequence) live under `.pan/` in the project repo (or the configured plan-home repo for polyrepo projects), committed on the feature branch (per-issue) or on main in the plan home (orders, notes, backlog sequence; `pan backlog write-sequence` also pushes its commit).
 
 ## Key Invariants (one-liners)
 

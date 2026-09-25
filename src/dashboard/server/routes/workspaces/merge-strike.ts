@@ -12,7 +12,7 @@ import {
   getAgentState,
   saveAgentStateSync,
 } from '../../../../lib/agents/agent-state.js';
-import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { evaluateIssueMergeGate } from '../../../../lib/cloister/merge-gate.js';
 import type { MergeReadiness } from '../../../../lib/cloister/pr-facts.js';
 import type { VerificationRunnerOptions } from '../../../../lib/cloister/verification-types.js';
@@ -360,7 +360,7 @@ export async function ensureAgentReadyForMerge(issueId: string, workspacePath: s
   const agentId = options?.agentId ?? `agent-${issueId.toLowerCase()}`;
   const gateNote = await clearMergePreparationGate(agentId);
   const gateSuffix = gateNote ? ` (${gateNote})` : '';
-  const lifecycle = getWorkAgentLifecycleStateSync(agentId);
+  const lifecycle = await getWorkAgentLifecycleState(agentId);
   if (lifecycle.hasLiveTmuxSession) {
     assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));
     return { recovered: true, agentId, detail: `Work agent already running; sent merge preparation request${gateSuffix}.` };
@@ -368,7 +368,7 @@ export async function ensureAgentReadyForMerge(issueId: string, workspacePath: s
   const agentState = getAgentState(agentId);
   if (agentState) try {
     assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));
-    const updatedLifecycle = getWorkAgentLifecycleStateSync(agentId);
+    const updatedLifecycle = await getWorkAgentLifecycleState(agentId);
     const verb = updatedLifecycle.canResumeSession ? 'Resumed' : 'Restarted';
     return { recovered: true, agentId, detail: `${verb} work agent and sent merge preparation request${gateSuffix}.` };
   } catch (error) {

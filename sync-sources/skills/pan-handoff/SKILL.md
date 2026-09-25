@@ -74,6 +74,7 @@ pan handoff source-conv --model claude-opus-4-7 wire the Stripe webhook into che
 pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap clean handoff
 pan handoff source-conv --author source uses-source-agent-and-pollutes-its-context
 pan handoff source-conv --issue PAN-1234 continue the API wiring
+pan handoff self --issue PAN-1234 --role review "review the PR"
 pan handoff source-conv --title "Checkout webhook repair" continue the API wiring
 ```
 
@@ -81,7 +82,9 @@ pan handoff source-conv --title "Checkout webhook repair" continue the API wirin
 
 Use `--project <key-or-name>` when the successor runs from a `--cwd` outside the registered project's directory, such as an isolated worktree. The `--cwd` value must be an absolute path to an existing directory under your home directory (see "Where to run it, and where the successor lives" above). The explicit project wins over the source association; without the flag, the successor inherits the source conversation's project. Unknown projects reject the request and create no conversation.
 
-Use `--issue <id>` to attach the new conversation to a specific issue (e.g. `PAN-1234`). The flag is validated; an invalid ID rejects the request and creates no conversation. When `--issue` is omitted, the new conversation inherits the source conversation's issue association, if any.
+Use `--issue <id>` to attach the new conversation to a specific issue (e.g. `PAN-1234`). The flag is validated; an invalid ID rejects the request and creates no conversation. When `--issue` is omitted, the new conversation inherits the source conversation's issue association, if any. With `--issue` and no `--cwd`, the new conversation starts in the issue workspace (`workspaces/feature-<issue>`) when it exists.
+
+Use `--role <role>` to set the new conversation's pane role: `conversation` (the default), `work`, `review`, `test` or `plan`. A handoff with `--issue` and `--role review` appears as that issue's Review row in the dashboard; without `--role` it is an issue-scoped conversation. The role sticks across every respawn and resume of that conversation.
 
 ## When to use
 

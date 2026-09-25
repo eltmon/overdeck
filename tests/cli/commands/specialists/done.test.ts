@@ -20,6 +20,9 @@ const {
   mockGetPrFacts,
   mockRelayUatFailureFeedback,
   mockAppendPipelineEntry,
+  mockForgeApprovalAtHead,
+  mockGetAgentState,
+  mockEmitActivityEntry,
 } = vi.hoisted(() => ({
   mockDiscoverArtifact: vi.fn(),
   mockCommentOnArtifact: vi.fn(),
@@ -30,6 +33,13 @@ const {
   mockGetPrFacts: vi.fn(),
   mockRelayUatFailureFeedback: vi.fn(),
   mockAppendPipelineEntry: vi.fn(),
+  mockForgeApprovalAtHead: vi.fn(),
+  mockGetAgentState: vi.fn(),
+  mockEmitActivityEntry: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/activity-logger.js', () => ({
+  emitActivityEntry: mockEmitActivityEntry,
 }));
 
 vi.mock('../../../../src/lib/cloister/uat-failure-feedback.js', () => ({
@@ -48,6 +58,11 @@ vi.mock('../../../../src/lib/cloister/pr-review-verdict.js', () => ({
 vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
   getPrFacts: mockGetPrFacts,
   resetPrFactsCache: vi.fn(),
+  forgeApprovalAtHead: mockForgeApprovalAtHead,
+}));
+
+vi.mock('../../../../src/lib/agents/agent-state-read.js', () => ({
+  getAgentState: mockGetAgentState,
 }));
 
 vi.mock('../../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
@@ -83,6 +98,11 @@ describe('specialists done command', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // #3853: the caller's identity decides the override door; default to an
+    // operator shell so the suite does not inherit the runner's agent id.
+    vi.stubEnv('OVERDECK_AGENT_ID', '');
+    mockGetAgentState.mockReturnValue(null);
+    mockForgeApprovalAtHead.mockResolvedValue(undefined);
 
     mockGetIssueWorkspacePath.mockReturnValue('/project/workspaces/feature-pan-1059');
     mockDiscoverArtifact.mockReturnValue(Effect.succeed({
@@ -112,6 +132,7 @@ describe('specialists done command', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('rejects an unknown specialist role', async () => {
@@ -210,6 +231,7 @@ describe('specialists done command', () => {
       issueId: 'PAN-1059',
       verdict: 'request-changes',
       body: expect.stringContaining('review verdict: blocked'),
+      reviewedHead: 'abcdef12',
     });
     expect(mockPostReviewVerdict.mock.calls[0][0].body).toContain('correctness blocker');
     expect(mockCommentOnArtifact).not.toHaveBeenCalled();
@@ -233,6 +255,177 @@ describe('specialists done command', () => {
       verdict: 'failed',
       notes: 'synthesis crashed',
       prUrl: ARTIFACT_URL,
+    });
+  });
+
+  describe('#3853: the override door refuses agent sessions', () => {
+    // A forge approval: the shared PR read never proves it at head; the guard
+    // path reads the reviews' commit shas (`forgeApprovalAtHead`).
+    const FORGE_APPROVED = {
+      issueId: 'PAN-1059', forge: 'github', url: ARTIFACT_URL, number: 1059, open: true,
+      approved: true, changesRequested: false, headSha: 'abcdef1234567890',
+    };
+
+    async function recordAsSynthesizer(status: 'passed' | 'blocked' | 'failed', notes = 'three reproduced blockers') {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
+      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      const error = vi.spyOn(console, 'error');
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+      await doneCommand('review', 'pan-1059', { status, notes, runId: 'agent-pan-1059-review-abcdef12' });
+      return { exit, stderr: error.mock.calls.map((c) => String(c[0])).join('\n') };
+    }
+
+    it('refuses the synthesizer reversing a GitHub review that approved the exact head sha', async () => {
+      mockGetPrFacts.mockResolvedValue(FORGE_APPROVED);
+      mockForgeApprovalAtHead.mockResolvedValue(true);
+
+      const { exit, stderr } = await recordAsSynthesizer('blocked', 'Operator-authorized override: three blockers');
+
+      expect(mockForgeApprovalAtHead).toHaveBeenCalledWith(FORGE_APPROVED);
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(stderr).toContain('cannot reverse an approval on the commit it approved');
+      // The refusal must not teach the bypass, and must not steer the agent to
+      // re-record its blocker as a pass (a wrong refusal would then turn a real
+      // blocker into an approval). It stops and leaves the operator a comment.
+      expect(stderr).not.toMatch(/conv-|OVERDECK_AGENT_ID|outside any agent session/);
+      expect(stderr).not.toMatch(/record\s+`?passed/i);
+      expect(stderr).toContain('record no verdict');
+      expect(stderr).toContain(`gh pr comment ${ARTIFACT_URL}`);
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+      expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+      // The refusal leaves a durable trace for the operator.
+      expect(mockAppendPipelineEntry).toHaveBeenCalledOnce();
+      expect(mockAppendPipelineEntry).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059', {
+        type: 'review.verdict-refused',
+        issueId: 'PAN-1059',
+        source: 'pan-specialists-done',
+        data: expect.objectContaining({
+          status: 'blocked',
+          caller: 'agent-pan-1059-review',
+          runId: 'agent-pan-1059-review-abcdef12',
+          reason: expect.stringContaining('cannot reverse an approval'),
+        }),
+      });
+      expect(mockEmitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+        level: 'warn', issueId: 'PAN-1059',
+      }));
+    });
+
+    it('refuses on a verdict marker proven at head without reading reviews again', async () => {
+      mockGetPrFacts.mockResolvedValue({ ...FORGE_APPROVED, approvedAtHead: true });
+
+      const { exit } = await recordAsSynthesizer('failed');
+
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(mockForgeApprovalAtHead).not.toHaveBeenCalled();
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['the approval is on an older commit', false],
+      ['the review list is empty', false],
+      ['the reviews could not be read', undefined],
+    ])('lets the review agent block when %s', async (_why, proof) => {
+      mockGetPrFacts.mockResolvedValue(FORGE_APPROVED);
+      mockForgeApprovalAtHead.mockResolvedValue(proof);
+
+      const { exit } = await recordAsSynthesizer('blocked', 'new blocker');
+
+      expect(exit).not.toHaveBeenCalledWith(1);
+      expect(mockPostReviewVerdict).toHaveBeenCalledWith({
+        issueId: 'PAN-1059',
+        verdict: 'request-changes',
+        body: expect.stringContaining('new blocker'),
+        facts: FORGE_APPROVED,
+        reviewedHead: 'abcdef12',
+      });
+    });
+
+    it('lets an operator-requested re-review block an approved head', async () => {
+      mockGetPrFacts.mockResolvedValue({ ...FORGE_APPROVED, approvedAtHead: true });
+      mockGetAgentState.mockReturnValue({ id: 'agent-pan-1059-review', reviewOperatorRequested: true });
+
+      const { exit } = await recordAsSynthesizer('blocked', 'operator asked for a full review');
+
+      expect(mockGetAgentState).toHaveBeenCalledWith('agent-pan-1059-review');
+      expect(exit).not.toHaveBeenCalledWith(1);
+      expect(mockForgeApprovalAtHead).not.toHaveBeenCalled();
+      expect(mockPostReviewVerdict).toHaveBeenCalledWith(expect.objectContaining({ verdict: 'request-changes' }));
+    });
+
+    it('still refuses the automatic cycle whose state carries no operator request', async () => {
+      mockGetPrFacts.mockResolvedValue(FORGE_APPROVED);
+      mockForgeApprovalAtHead.mockResolvedValue(true);
+      mockGetAgentState.mockReturnValue({ id: 'agent-pan-1059-review' });
+
+      const { exit } = await recordAsSynthesizer('blocked');
+
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+    });
+
+    it('reads no review shas for a pass', async () => {
+      mockGetPrFacts.mockResolvedValue(FORGE_APPROVED);
+
+      await recordAsSynthesizer('passed', 'lgtm');
+
+      expect(mockForgeApprovalAtHead).not.toHaveBeenCalled();
+      expect(mockPostReviewVerdict).toHaveBeenCalledWith(expect.objectContaining({ verdict: 'approve' }));
+    });
+
+    // #3853: the marker's sha= must be the commit the run reviewed. done.ts
+    // hands postReviewVerdict the head from the run id; postReviewVerdict
+    // names the head only when it still is that commit.
+    it('passes the reviewed head from --run-id, not the head at post time', async () => {
+      mockGetPrFacts.mockResolvedValue({ ...FORGE_APPROVED, headSha: 'bbbbbbbb00000000000000000000000000000000' });
+
+      await recordAsSynthesizer('passed', 'lgtm');
+
+      expect(mockPostReviewVerdict.mock.calls[0][0]).toMatchObject({ reviewedHead: 'abcdef12' });
+    });
+
+    it('falls back to the review parent\'s current run when --run-id is absent', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
+      mockGetAgentState.mockReturnValue({ id: 'agent-pan-1059-review', reviewRunId: 'agent-pan-1059-review-1234abcd' });
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'lgtm' });
+
+      expect(mockPostReviewVerdict.mock.calls[0][0]).toMatchObject({ reviewedHead: '1234abcd' });
+    });
+
+    it('passes no reviewed head when the run id names no commit', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'lgtm', runId: 'agent-pan-1059-review' });
+
+      expect(mockPostReviewVerdict.mock.calls[0][0]).not.toHaveProperty('reviewedHead');
+    });
+
+    it('refuses a non-review agent session recording any review verdict', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059');
+      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'self-approval' });
+
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+    });
+
+    it('accepts the operator override from a conv-* conversation', async () => {
+      vi.stubEnv('OVERDECK_AGENT_ID', 'conv-20260916-2706');
+      mockGetPrFacts.mockResolvedValue({ ...FORGE_APPROVED, approvedAtHead: true });
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'blocked', notes: 'operator blocks' });
+
+      expect(mockPostReviewVerdict).toHaveBeenCalledWith({
+        issueId: 'PAN-1059',
+        verdict: 'request-changes',
+        body: expect.stringContaining('operator blocks'),
+      });
     });
   });
 

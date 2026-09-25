@@ -186,6 +186,7 @@ function EditorRefPlugin({ editorRef }: EditorRefPluginProps) {
 export interface ComposerPromptEditorProps {
   conversationName: string;
   harness?: Harness;
+  slashCommandsEnabled?: boolean;
   disabled?: boolean;
   placeholder?: string;
   onCommandKeyDown: (key: 'Enter') => void;
@@ -335,6 +336,7 @@ export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ComposerPromptEditor({
+  slashCommandsEnabled = true,
   conversationName,
   harness = 'claude-code',
   disabled = false,
@@ -391,13 +393,14 @@ export function ComposerPromptEditor({
     };
   }, [text]);
 
-  const slashCommands = useMemo(() => getSlashCommands(harness), [harness]);
+  const slashCommands = useMemo(() => slashCommandsEnabled ? getSlashCommands(harness) : [], [harness, slashCommandsEnabled]);
   const filteredCommands = useMemo(
     () => filterCommands(slashCommands, slashContext?.filterText ?? ''),
     [slashCommands, slashContext],
   );
 
   const handleSlashKey = useCallback((root: HTMLElement) => {
+    if (!slashCommandsEnabled) return;
     const selection = window.getSelection();
     let anchorRect: DOMRect | null = null;
 
@@ -417,7 +420,7 @@ export function ComposerPromptEditor({
     pendingSlashTriggerRef.current = true;
     setIsSlashMenuOpen(true);
     setSelectedIndex(0);
-  }, []);
+  }, [slashCommandsEnabled]);
 
   const handleSlashSelect = useCallback(
     (command: SlashCommand) => {

@@ -2,10 +2,13 @@
 import { Effect } from 'effect';
 import { getAgentState, listRunningAgents } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
+import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
 import type { HealthState } from '../runtimes/types.js';
 import { writeHealthEvent } from '../overdeck/health-events.js';
 import type { CloisterConfig } from './config.js';
 import { checkCostLimits, type CostAlert } from './cost-monitor.js';
+import { determineModel } from '../agents/provider-env.js';
 import { performHandoff } from './handoff.js';
 import { createHandoffEvent, logHandoffEvent } from './handoff-logger.js';
 import { getAgentHealth, getAgentsNeedingAttention, type AgentHealth } from './health.js';
@@ -51,22 +54,42 @@ export interface HealthHost {
  */
 export async function performHealthCheck(host: HealthHost): Promise<void> {
     try {
-      const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => a.tmuxActive);
+      // Live = present in the selected backend's inventory (#4109), not the
+      // tmux-only `tmuxActive` flag, which is false for every Herdr agent. An
+      // unreadable inventory is unknown liveness: skip this round and keep
+      // previousRunningAgents, so an outage never reads as every agent crashing
+      // (auto-restart) and the next readable round still diffs correctly.
+      const liveIds = await listLiveAgentIds();
+      if (liveIds === null) {
+        console.warn('[cloister] Terminal backend inventory unreadable — skipping this health check (liveness unknown)');
+        host.lastCheck = new Date();
+        return;
+      }
+      const runningAgents = (await Effect.runPromise(listRunningAgents())).filter((a) => liveIds.has(a.id));
       const agentIds = runningAgents.map((a) => a.id);
       const currentRunningSet = new Set(agentIds);
 
-      // Detect crashed agents (were running before, not running now)
+      // Detect crashed agents (were running before, not running now). Absence
+      // from the inventory is not proof of death (#4109 review): the oracle
+      // must confirm it. An agent it cannot confirm dead is carried into the
+      // next round's set and re-checked, never handed to handleAgentCrash.
+      const nextRunningSet = new Set(currentRunningSet);
       if (host.previousRunningAgents.size > 0 && host.config.auto_restart?.enabled) {
         for (const previousAgentId of host.previousRunningAgents) {
-          if (!currentRunningSet.has(previousAgentId)) {
-            // Agent crashed!
+          if (currentRunningSet.has(previousAgentId)) continue;
+          const verdict = await isAlive(previousAgentId).catch(
+            (): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }),
+          );
+          if (isConfirmedDead(verdict)) {
             await host.handleAgentCrash(previousAgentId);
+          } else {
+            nextRunningSet.add(previousAgentId);
           }
         }
       }
 
       // Update the set of running agents for next check
-      host.previousRunningAgents = currentRunningSet;
+      host.previousRunningAgents = nextRunningSet;
 
       // PAN-3917: the completion-marker fallback scan is deleted with the rest
       // of Appendix A — `pan done` opens the PR, and the PR is the completion
@@ -262,7 +285,7 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
           // are handled by the `pan done` → completion marker → specialist pipeline flow.
           // Do NOT perform a model-swap handoff here — it passes the specialist name as a model ID
           // which is invalid and causes the agent to respawn with an unusable model.
-          const specialistNames = ['review-agent', 'test-agent', 'merge-agent', 'inspect-agent', 'uat-agent'];
+          const specialistNames = ['review-agent', 'test-agent', 'merge-agent', 'uat-agent'];
           if (trigger.type === 'task_complete' && specialistNames.includes(trigger.suggestedModel || '')) {
             console.log(`[cloister] Skipping handoff for ${health.agentId}: task_complete triggers specialist dispatch via completion marker, not model swap`);
             continue;
@@ -272,9 +295,24 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
 
           console.log(`🔔 Handoff triggered for ${health.agentId}: ${trigger.reason}`);
 
+          // PAN-4160: a trigger without a suggested model hands off to the
+          // agent's configured role model — the routing spawns use — never a literal.
+          let targetModel = trigger.suggestedModel;
+          if (!targetModel) {
+            try {
+              targetModel = determineModel({ role: agentState.role, spawnKey: `${agentState.role}:${agentState.issueId}` });
+            } catch (error) {
+              const reason = error instanceof Error ? error.message : String(error);
+              const message = `No default model configured for role "${agentState.role}" (${agentState.issueId}): ${reason}. Set roles.${agentState.role}.model in config.yaml.`;
+              host.emit({ type: 'handoff_completed', agentId: health.agentId, result: { success: false, method: 'kill-spawn', error: message } });
+              console.error(`✗ Handoff skipped for ${health.agentId}: ${message}`);
+              continue;
+            }
+          }
+
           // Perform handoff
           const result = await performHandoff(health.agentId, {
-            targetModel: trigger.suggestedModel || 'sonnet',
+            targetModel,
             reason: trigger.reason,
           });
 
@@ -294,7 +332,7 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
           }
 
           if (result.success) {
-            console.log(`✓ Handoff completed: ${health.agentId} → ${result.newAgentId} (${trigger.suggestedModel})`);
+            console.log(`✓ Handoff completed: ${health.agentId} → ${result.newAgentId} (${targetModel})`);
           } else {
             console.error(`✗ Handoff failed: ${result.error}`);
           }

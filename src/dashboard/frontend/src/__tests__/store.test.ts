@@ -204,7 +204,7 @@ describe('applyEventReducer — agent events', () => {
     const state: DashboardState = { ...emptyState, agentsById: { 'agent-1': baseAgent } }
     const event = makeEvent('agent.stopped', 3, { agentId: 'agent-1', issueId: 'PAN-1' })
     const next = applyEventReducer(state, event)
-    expect(next.agentsById['agent-1']).toMatchObject({ status: 'stopped', hasLiveTmuxSession: false })
+    expect(next.agentsById['agent-1']).toMatchObject({ status: 'stopped', hasLivePane: false, hasLiveTmuxSession: false })
     expect(Object.keys(next.agentsById)).toHaveLength(1)
   })
 
@@ -214,6 +214,8 @@ describe('applyEventReducer — agent events', () => {
     const next = applyEventReducer(state, event)
     expect(next.agentsById['agent-1']!.status).toBe('stopped')
     expect(next.agentsById['agent-1']!.hasLiveTmuxSession).toBe(false)
+    // #4105: an event carrying only the deprecated name still sets hasLivePane.
+    expect(next.agentsById['agent-1']!.hasLivePane).toBe(false)
   })
 
   it('agent.status_changed leaves agentsById unchanged if agent not found', () => {

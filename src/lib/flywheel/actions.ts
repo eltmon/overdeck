@@ -67,7 +67,7 @@ export interface FlywheelActionDeps extends Pick<
   DeriveFlywheelStatusDeps,
   'getConversation' | 'sessionAlive' | 'readTranscript' | 'resolveProjectPath' | 'resolvePlanHome'
 > {
-  /** Raw tmux session probe — true even for a row-less orphan session. */
+  /** Raw pane probe on the host backend — true even for a row-less orphan session. */
   tmuxSessionExists?: (session: string) => Promise<boolean>;
   killSession?: (session: string) => Promise<void>;
   resolveModelAndHarness?: (opts: { model?: string; harness?: string }) => Promise<{ model: string; harness: RuntimeName }>;
@@ -77,9 +77,7 @@ export interface FlywheelActionDeps extends Pick<
   }) => unknown;
   spawnSession?: (session: string, cwd: string, claudeSessionId: string, model: string, harness: RuntimeName) => Promise<void>;
   waitReady?: (session: string, harness: RuntimeName, mode: 'spawn' | 'respawn') => Promise<void>;
-  /** Type raw keys (a slash command, `Enter`). */
-  sendKeys?: (session: string, keys: string, caller: string) => Promise<void>;
-  /** Paste a message and submit it. */
+  /** Deliver a message (a slash command, a request) to the loop and submit it. */
   sendMessage?: (session: string, message: string, caller: string) => Promise<void>;
   stopConversation?: (name: string) => Promise<HandlerResult>;
   /** Undo a start that failed after its conversation row was written. */
@@ -93,13 +91,13 @@ export interface FlywheelActionDeps extends Pick<
 // ─── lazy defaults ───────────────────────────────────────────────────────────
 
 async function defaultTmuxSessionExists(session: string): Promise<boolean> {
-  const [{ Effect }, { sessionExists }] = await Promise.all([import('effect'), import('../tmux.js')]);
-  return Effect.runPromise(sessionExists(session));
+  const { conversationSessionAlive } = await import('../overdeck/conversation-liveness.js');
+  return conversationSessionAlive(session);
 }
 
 async function defaultKillSession(session: string): Promise<void> {
-  const [{ Effect }, { killSession }] = await Promise.all([import('effect'), import('../tmux.js')]);
-  await Effect.runPromise(killSession(session));
+  const { closeConversationPane } = await import('../overdeck/conversation-liveness.js');
+  await closeConversationPane(session);
 }
 
 async function defaultResolveModelAndHarness(opts: { model?: string; harness?: string }): Promise<{ model: string; harness: RuntimeName }> {
@@ -130,14 +128,11 @@ async function defaultWaitReady(session: string, harness: RuntimeName, mode: 'sp
   await waitForConversationRuntimeReady(session, harness, mode);
 }
 
-async function defaultSendKeys(session: string, keys: string, caller: string): Promise<void> {
-  const { sendKeysAsync } = await import('../tmux.js');
-  await sendKeysAsync(session, keys, caller);
-}
-
+/** Through the delivery door, so the message reaches a Herdr pane or a tmux session alike (PAN-3921). */
 async function defaultSendMessage(session: string, message: string, caller: string): Promise<void> {
-  const [{ Effect }, { sendKeys }] = await Promise.all([import('effect'), import('../tmux.js')]);
-  await Effect.runPromise(sendKeys(session, message, caller));
+  const { deliverAgentMessage } = await import('../agents.js');
+  const delivery = await deliverAgentMessage(session, message, caller);
+  if (!delivery.ok) throw new Error(`Flywheel message not delivered (${caller}): ${delivery.failure ?? delivery.path}`);
 }
 
 async function handlerResult(response: import('effect/unstable/http').HttpServerResponse.HttpServerResponse): Promise<HandlerResult> {
@@ -226,9 +221,7 @@ export async function startFlywheel(opts: FlywheelStartOptions = {}, deps: Flywh
   try {
     await (deps.spawnSession ?? defaultSpawnSession)(FLYWHEEL_CONVERSATION_SESSION, cwd, claudeSessionId, model, harness);
     await (deps.waitReady ?? defaultWaitReady)(FLYWHEEL_CONVERSATION_SESSION, harness, 'spawn');
-    const sendKeys = deps.sendKeys ?? defaultSendKeys;
-    await sendKeys(FLYWHEEL_CONVERSATION_SESSION, prompt, 'pan flywheel start');
-    await sendKeys(FLYWHEEL_CONVERSATION_SESSION, 'Enter', 'pan flywheel start');
+    await (deps.sendMessage ?? defaultSendMessage)(FLYWHEEL_CONVERSATION_SESSION, prompt, 'pan flywheel start');
   } catch (error) {
     // A start that never reached the loop must not leave a row that reads as
     // `paused` (which would demand --fresh) or a half-started session.
@@ -264,9 +257,7 @@ export async function resumeFlywheel(deps: FlywheelActionDeps = {}): Promise<{ s
   // The harness was already alive (the loop is still running its turn):
   // re-sending the skill would queue a second `/pan-flywheel` into it.
   if (result.reattached) return { session: FLYWHEEL_CONVERSATION_SESSION };
-  const sendKeys = deps.sendKeys ?? defaultSendKeys;
-  await sendKeys(FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_SKILL_COMMAND, 'pan flywheel resume');
-  await sendKeys(FLYWHEEL_CONVERSATION_SESSION, 'Enter', 'pan flywheel resume');
+  await (deps.sendMessage ?? defaultSendMessage)(FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_SKILL_COMMAND, 'pan flywheel resume');
   return { session: FLYWHEEL_CONVERSATION_SESSION };
 }
 

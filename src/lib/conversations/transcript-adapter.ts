@@ -12,7 +12,8 @@ import { parseMuseRecords } from '../cost-parsers/muse-parser.js';
  *   'thinking_level_change'|...`, with the user/assistant role nested in
  *   `entry.message.role` and blocks of type `text|thinking|toolCall|toolResult`.
  * - ACP records have top-level `role`, `content`, and optional normalized
- *   `toolCalls` written by the persistent ACP host.
+ *   `toolCalls` written by the persistent ACP host. `thought` records carry
+ *   agent reasoning and are left out of the serialized conversation.
  * - Codex rollout records have top-level `type: 'event_msg'|'response_item'`
  *   with user/assistant messages and tool calls nested in `entry.payload`.
  * - Future harnesses will have their own shapes.

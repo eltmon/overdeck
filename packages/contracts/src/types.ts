@@ -31,6 +31,21 @@ export interface PipelineMembershipUnavailableBody {
   projectKey: string
 }
 
+/**
+ * PAN-3527 — the membership snapshot has not been gathered yet (a freshly
+ * restarted server warming its cache). Sent with HTTP 503 and a `Retry-After`
+ * header. Unlike `PipelineMembershipUnavailableBody` (a settled answer about
+ * the project), this is a temporary state: callers retry it.
+ */
+export const PIPELINE_MEMBERSHIP_LOADING_CODE = "snapshot_loading" as const
+
+export interface PipelineMembershipLoadingBody {
+  status: "loading"
+  code: typeof PIPELINE_MEMBERSHIP_LOADING_CODE
+  error: string
+  projectKey: string
+}
+
 /** Server-computed pipeline membership attached to dashboard issue DTOs. */
 export interface IssuePipelineMembership {
   available?: boolean
@@ -304,6 +319,12 @@ export const AgentSnapshot = Schema.Struct({
   phase: Schema.optional(Schema.String),
   workType: Schema.optional(Schema.String),
   roleRunHead: Schema.optional(Schema.String),
+  /** The agent has a live pane on its terminal backend (Herdr or tmux). */
+  hasLivePane: Schema.optional(Schema.Boolean),
+  /**
+   * @deprecated Misnamed alias of `hasLivePane`: true for a live pane on either
+   * backend, not only a tmux session. Still populated for compatibility (#4105).
+   */
   hasLiveTmuxSession: Schema.optional(Schema.Boolean),
   stoppedByUser: Schema.optional(Schema.Boolean),
   paused: Schema.optional(Schema.Boolean),
@@ -452,6 +473,40 @@ export const ProjectCiSnapshot = Schema.Struct({
 })
 export type ProjectCiSnapshot = typeof ProjectCiSnapshot.Type
 
+// ─── Project Deploy (PAN-3751) ───────────────────────────────────────────────
+
+/**
+ * Where an in-flight dashboard self-deploy (`pan reload`) stands.
+ *
+ * `building` the reload holds the restart lock and is building from origin/main;
+ * `awaiting-approval` the build is ready and the reload waits on the restart gate;
+ * `restarting` the operator approved and the old dashboard is being replaced;
+ * `failed` the last reload recorded a failure (visible for a short window).
+ */
+export const ProjectDeployPhase = Schema.Literals(["building", "awaiting-approval", "restarting", "failed"])
+export type ProjectDeployPhase = typeof ProjectDeployPhase.Type
+
+/**
+ * One project's deploy, derived on the server from live runtime files: the
+ * restart lock, the restart gate, the restart-status journal and the reload
+ * process's own stdout. Nothing here is stored; a server restart re-derives it.
+ */
+export const ProjectDeploySnapshot = Schema.Struct({
+  projectKey: Schema.String,
+  trigger: Schema.String,
+  phase: ProjectDeployPhase,
+  /** The deploying process, while it is alive. */
+  pid: Schema.optional(Schema.Number),
+  /** When the server first observed this deploy (for `failed`, when it failed). */
+  startedAt: Schema.String,
+  error: Schema.optional(Schema.String),
+  /** The reload's output file, when its stdout is a regular file. */
+  logPath: Schema.optional(Schema.String),
+  /** Last lines of `logPath`. */
+  logTail: Schema.optional(Schema.Array(Schema.String)),
+})
+export type ProjectDeploySnapshot = typeof ProjectDeploySnapshot.Type
+
 // ─── Restart Gate (PAN-3729) ─────────────────────────────────────────────────
 
 /** What kind of process asked for the voluntary dashboard restart. */
@@ -524,6 +579,8 @@ export const DashboardSnapshot = Schema.Struct({
   embedProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EmbedProgressSnapshot)),
   ciByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectCiSnapshot)),
   restartGate: Schema.optional(RestartGateSnapshot),
+  /** PAN-3751 — in-flight deploys keyed by project key. */
+  deployByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectDeploySnapshot)),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type

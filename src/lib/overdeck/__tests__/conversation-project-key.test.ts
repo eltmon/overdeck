@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -84,5 +84,12 @@ describe('conversation project association (PAN-3419)', () => {
     await expect(resolveProjectKeyForCwdAsync(join(NESTED_PATH, 'src'))).resolves.toBe('nested-key');
     await expect(resolveProjectKeyForCwdAsync(join(ROOT_PATH, 'other'))).resolves.toBe('root-key');
     await expect(resolveProjectKeyForCwdAsync(join(TEST_HOME, 'outside'))).resolves.toBeNull();
+  });
+
+  it('resolves a symlinked cwd to the project it really lives in', async () => {
+    const link = join(TEST_HOME, 'linked-nested');
+    symlinkSync(NESTED_PATH, link);
+    await expect(resolveProjectKeyForCwdAsync(join(link, 'src'))).resolves.toBe('nested-key');
+    await expect(resolveProjectKeyForCwdAsync(`${ROOT_PATH}-sibling`)).resolves.toBeNull();
   });
 });

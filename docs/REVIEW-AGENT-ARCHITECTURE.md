@@ -50,23 +50,27 @@ decision. `postReviewVerdict` therefore tries two identities, in order:
    whose first line is a machine marker:
 
    ```
-   <!-- overdeck-verdict: CHANGES_REQUESTED sha=<PR head> -->
+   <!-- overdeck-verdict: CHANGES_REQUESTED sha=<head> -->
    ```
 
-   (or `APPROVED`), followed by the verdict body. `sha=` is the PR head the
-   verdict was posted for (#3983); it is left out only when the head could not
-   be read. The result carries `via: 'comment'` so the CLI can say which path
-   was used.
+   (or `APPROVED`), followed by the verdict body. `sha=` names the commit the
+   review run reviewed (#3853), and is written only while that commit is still
+   the PR head; a marker posted without it, or before it existed,
+   still reads as a verdict but proves nothing about which commit it approved. The result carries
+   `via: 'comment'` so the CLI can say which path was used.
 
 `pr-facts` reads both. A real forge `reviewDecision` always wins; only when the
-forge reached no decision does it take the newest marker comment. An `APPROVED`
-marker counts only for the head it names: once another commit lands it is
-stale, however recent the comment — a stale approval must never merge commits
-it never saw. A legacy marker without `sha=` is dated against the head commit
-instead (and is stale when the head is not in the PR's commit list); it still
-counts for the manual Merge button, but auto-merge accepts only a head-bound
-approval (`approvedAtHead`). A stale `CHANGES_REQUESTED` still counts, because
-rework stays owed until a newer verdict says otherwise.
+forge reached no decision does it take the newest marker comment. A stale
+`CHANGES_REQUESTED` still counts, because rework stays owed until a newer
+verdict says otherwise.
+
+**Approval for a merge is bound to the head commit (#3983).** Every GitHub
+merge door (the Merge button, the merge queue, the auto-merge scheduler,
+schedule door and executor) accepts exactly two proofs: a GitHub `APPROVED`
+review whose `commit.oid` is the PR head (`forgeApprovalAtHead`), or a trusted
+`APPROVED` marker whose `sha=` is the PR head (`approvedAtHead`). A marker
+without `sha=`, or one naming another commit, never approves a merge, however
+recent the comment. See [PIPELINE-GATES.md](PIPELINE-GATES.md).
 
 GitLab is unchanged: approval is `glab mr approve`, a rejection is an MR note,
 and there is no marker.
@@ -76,7 +80,22 @@ and there is no marker.
 ## Review modes
 
 `spawnReviewRoleForIssue()` resolves the review mode at the single review entry
-point, so manual requests, automatic dispatch, and recovery use the same mode.
+point, so manual requests, automatic dispatch, and recovery use the same mode:
+`roles.review.mode` from merged project and global config, defaulting to `quick`.
+A caller may pass `reviewMode` for one run. The dashboard's Request review menu
+(Full, Quick, None) sends it through `POST /api/review/:id/trigger`. It takes
+precedence over config for that run only and is never persisted, so the next
+dispatch resolves config again.
+
+Because a run's mode can differ from config, the dashboard's reviewer tree
+reads the mode from the run itself (`currentRunIsConvoy` in
+`src/dashboard/server/routes/reviewer-tree.ts`). The review parent's
+`reviewRunId` names the current run. The tree shows the four convoy lanes only
+when a lane's state row carries that `reviewRunId`, or its `<role>.md` report
+is in `.pan/review/<runId>/`. A self-review writes into the same run directory,
+so the directory alone does not show the mode. Each lane's status comes from
+that same directory: a lane whose `<role>.md` is there is done, and a live
+reviewer whose report isn't there yet is working on the current round.
 
 | Mode | Behavior |
 | --- | --- |

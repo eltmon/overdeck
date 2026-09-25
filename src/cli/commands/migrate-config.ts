@@ -62,7 +62,6 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
 
     console.log(chalk.bold('Migration Summary:'));
     console.log(`  Selection: ${chalk.cyan('Smart (capability-based)')}`);
-    console.log(`  Overrides: ${chalk.cyan(preview.overridesCount)} work types`);
     console.log(`  Providers: ${chalk.cyan(preview.providersEnabled.join(', '))}`);
     console.log('');
 
@@ -81,7 +80,6 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
     if (preview.success) {
       console.log(chalk.bold('Migration will:'));
       console.log(`  • Create config.yaml with ${chalk.cyan('smart (capability-based)')} selection`);
-      console.log(`  • Apply ${chalk.cyan(preview.overridesCount)} work type overrides`);
       console.log(`  • Enable providers: ${chalk.cyan(preview.providersEnabled.join(', '))}`);
       if (options.backup !== false) {
         console.log('  • Back up settings.json to settings.json.backup');
@@ -134,7 +132,6 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
   console.log('');
   console.log(chalk.bold('Details:'));
   console.log(`  ${chalk.dim('Selection:')} ${chalk.cyan('Smart (capability-based)')}`);
-  console.log(`  ${chalk.dim('Work type overrides:')} ${chalk.cyan(result.overridesCount)}`);
   console.log(`  ${chalk.dim('Enabled providers:')} ${chalk.cyan(result.providersEnabled.join(', '))}`);
   console.log('');
 
@@ -149,7 +146,7 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
   console.log(chalk.bold('Next steps:'));
   console.log('  1. Review your new config: ' + chalk.cyan('~/.overdeck/config.yaml'));
   console.log('  2. Enable additional providers for more model options');
-  console.log('  3. Add work type overrides if you prefer specific models for tasks');
+  console.log('  3. Set per-role models under roles.<role>.model if you prefer specific models');
   console.log('  4. Documentation: ' + chalk.cyan('docs/CONFIGURATION.md'));
   console.log('');
 }

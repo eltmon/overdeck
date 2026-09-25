@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canUseHarness } from '../harness-policy.js'
+import { canUseHarness, POLICY_RUNTIME_NAMES } from '../harness-policy.js'
 import type { RuntimeName } from '../runtimes/types.js'
 import type { AuthMode } from '../subscription-types.js'
 
@@ -76,10 +76,10 @@ describe('canUseHarness', () => {
     }
   })
 
-  it.each(PROVIDERS)('allows pi (legacy) + %s on every authMode (normalizer converts pi→ohmypi before policy check)', provider => {
+  it.each(PROVIDERS)('gives pi (legacy) + %s the ohmypi decision on every authMode (never a free pass)', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
-      expect(canUseHarness('pi', model, authMode)).toEqual({ allowed: true })
+      expect(canUseHarness('pi', model, authMode)).toEqual(canUseHarness('ohmypi', model, authMode))
     }
   })
 
@@ -199,7 +199,7 @@ describe('canUseHarness', () => {
       for (const provider of PROVIDERS) {
         for (const authMode of AUTH_MODES) {
           const isBlockedCell =
-            (harness === 'ohmypi' && provider === 'anthropic' && authMode === 'subscription')
+            ((harness === 'ohmypi' || harness === 'pi') && provider === 'anthropic' && authMode === 'subscription')
             || harness === 'acp'
             || harness === 'kimi-code'
           cells.push({ harness, provider, authMode, allowed: !isBlockedCell })
@@ -216,6 +216,37 @@ describe('canUseHarness', () => {
       ).toBe(cell.allowed)
       if (!cell.allowed) {
         expect(decision.reason, 'blocked cell must carry a reason').toBeTruthy()
+      }
+    }
+  })
+
+  it('denies a harness with no policy decision instead of allowing it by default', () => {
+    for (const authMode of AUTH_MODES) {
+      for (const model of Object.values(MODEL_BY_PROVIDER)) {
+        const decision = canUseHarness('future-harness' as RuntimeName, model, authMode)
+        expect(decision.allowed, `${model} / ${authMode ?? 'unset'}`).toBe(false)
+        expect(decision.reason).toContain('no harness-policy decision')
+      }
+    }
+  })
+
+  it('applies the ohmypi ToS block to a raw legacy "pi" harness', () => {
+    expect(canUseHarness('pi' as RuntimeName, 'claude-sonnet-4-6', 'subscription')).toEqual(
+      canUseHarness('ohmypi', 'claude-sonnet-4-6', 'subscription'),
+    )
+    expect(canUseHarness('pi' as RuntimeName, 'claude-sonnet-4-6', 'subscription').allowed).toBe(false)
+  })
+
+  it('gives every RuntimeName an explicit policy decision', () => {
+    expect([...POLICY_RUNTIME_NAMES].sort()).toEqual(
+      ['acp', 'claude-code', 'codex', 'kimi-code', 'muse', 'ohmypi', 'opencode'],
+    )
+    for (const harness of POLICY_RUNTIME_NAMES) {
+      for (const authMode of AUTH_MODES) {
+        for (const model of [...Object.values(MODEL_BY_PROVIDER), 'k3', 'opencode/big-pickle', 'muse-spark-1.3']) {
+          const decision = canUseHarness(harness, model, authMode)
+          expect(decision.reason ?? '', `${harness} / ${model}`).not.toContain('no harness-policy decision')
+        }
       }
     }
   })

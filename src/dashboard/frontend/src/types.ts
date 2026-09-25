@@ -67,6 +67,9 @@ export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'co
 export interface WorkAgentLifecycle {
   agentId: string;
   hasAgentState: boolean;
+  /** The agent has a live pane on its terminal backend (Herdr or tmux). */
+  hasLivePane: boolean;
+  /** @deprecated Misnamed alias of `hasLivePane`: true for a live pane on either backend (#4105). */
   hasLiveTmuxSession: boolean;
   hasSavedSession: boolean;
   hasWorkspace: boolean;
@@ -98,6 +101,12 @@ export interface Agent {
   pid?: number;
   startedAt: string;
   lastActivity?: string;
+  /** `GET /api/agents`: the agent has a live pane on its terminal backend (Herdr or tmux). */
+  hasLivePane?: boolean;
+  /**
+   * @deprecated Misnamed: true for a live pane on either backend, not only a
+   * tmux session. Sent as an alias of `hasLivePane` (#4105); read `hasLivePane`.
+   */
   hasLiveTmuxSession?: boolean;
   stoppedByUser?: boolean;
   paused?: boolean;
@@ -122,7 +131,7 @@ export interface Agent {
   /**
    * @deprecated PAN-1048 — server stopped emitting this; kept on the type
    * temporarily so older test fixtures still compile while their references
-   * are removed. New code MUST consume `role` plus `lifecycle.hasLiveTmuxSession`
+   * are removed. New code MUST consume `role` plus `lifecycle.hasLivePane`
    * instead of branching on this field.
    */
   agentPhase?: 'planning' | 'implementation' | 'exploration' | string;

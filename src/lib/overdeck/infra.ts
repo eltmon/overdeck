@@ -110,6 +110,14 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // #3983: the PR head an auto-merge was scheduled for, so a cancel or a
   // failure holds only for that head and a new push re-arms the scheduler.
   runSchemaTopUp(db, 'ALTER TABLE `pending_auto_merges` ADD COLUMN `head_sha` text');
+  // PAN-4185: bare conversations (no Overdeck-injected context) and the
+  // native CLAUDE.md opt-out persist on the row so resume/restart/fork keep them.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `bare_context` integer NOT NULL DEFAULT 0');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `skip_claude_md` integer NOT NULL DEFAULT 0');
+  // PAN-3822: pull requests linked to conversations (branch-detected by the
+  // pull-request sync sweep). Mirrors the init migration for existing DBs.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_pull_requests` (`conversation_id` text NOT NULL, `host` text NOT NULL, `repository` text NOT NULL, `number` integer NOT NULL, `url` text NOT NULL, `source` text NOT NULL, `linked_at` integer NOT NULL, `dismissed_at` integer, `snapshot_json` text, PRIMARY KEY(`conversation_id`, `host`, `repository`, `number`), FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_pull_requests_key` ON `conversation_pull_requests` (`host`, `repository`, `number`)');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

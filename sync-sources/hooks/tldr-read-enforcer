@@ -12,6 +12,7 @@
 #   - TLDR command fails (graceful degradation)
 #   - Summary too sparse to be useful (< 100 tokens for file > 5KB)
 #   - Recently edited files (in .tldr/dirty-files — agent needs to verify changes)
+#   - Bare conversations (OVERDECK_BARE_CONTEXT=1, PAN-4185): no injected summaries
 
 # Don't use set -e — never break Claude Code execution
 INPUT=$(cat 2>/dev/null || echo '{}')
@@ -19,6 +20,12 @@ INPUT=$(cat 2>/dev/null || echo '{}')
 # Only act on Read tool
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
 if [ "$TOOL_NAME" != "Read" ]; then
+  exit 0
+fi
+
+# Bypass: a bare conversation (PAN-4185) reads files natively — the summary
+# this hook returns is Overdeck-injected context.
+if [ "${OVERDECK_BARE_CONTEXT:-}" = "1" ]; then
   exit 0
 fi
 

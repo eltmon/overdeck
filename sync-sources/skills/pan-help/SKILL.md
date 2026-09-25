@@ -168,9 +168,9 @@ pan status
 # 4. Send message to agent if needed
 pan tell PAN-3 "Run the tests"
 
-# 5. When done, review and approve
-pan review pending
-pan approve PAN-3
+# 5. When done, review and approve the PR
+gh pr list
+gh pr review <pr-number> --approve
 ```
 
 ### Managing Workspaces

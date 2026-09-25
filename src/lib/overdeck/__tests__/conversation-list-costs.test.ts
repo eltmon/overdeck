@@ -14,6 +14,7 @@ vi.mock('../conversation-reads.js', () => ({
   askUserQuestionSnapshotFromScan: vi.fn(),
 }));
 vi.mock('../conversation-delivery.js', () => ({ codexConversationPendingInput: async () => ({ kinds: [] }) }));
+vi.mock('../conversation-pull-requests.js', () => ({ listPullRequestLinksForConversations: () => new Map() }));
 vi.mock('../../../dashboard/server/services/git-info.js', () => ({
   resolveConversationGitInfo: async () => ({ branch: 'feature/example', isWorktree: true }),
 }));
@@ -37,7 +38,7 @@ describe('conversation list worker costs', () => {
       ...row, totalCost: [7, 0, 9][index], totalTokens: [70, 0, 90][index],
       sessionAlive: false, isWorking: false, currentTool: null, isFavorited: index === 0,
       compacting: false, contextUsage: null, lastActivityAt: null, branch: 'feature/example',
-      isWorktree: true, pendingInputCount: 0, pendingInputKinds: [], pendingAskUserQuestion: undefined,
+      isWorktree: true, pullRequest: null, pullRequestCount: 0, pendingInputCount: 0, pendingInputKinds: [], pendingAskUserQuestion: undefined,
       transcriptMissing: true, needsTerminal: false,
     })));
     expect(ledger).toHaveBeenCalledOnce();
