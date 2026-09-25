@@ -577,6 +577,12 @@ defineUpCommand(program)
 
     console.log(chalk.bold('Starting Overdeck...\n'));
 
+    // PAN-1641: start the local Ollama server only when the config names an
+    // ollama: model. Never fails `pan up`.
+    await (await import('./commands/up-ollama.js')).ensureOllamaForUp(
+      (await import('../lib/config-yaml.js')).loadConfigSync().config,
+    );
+
     // Refuse to start a detached production dashboard on top of a running
     // interactive `pan dev` session — they would fight over the same ports.
     {
