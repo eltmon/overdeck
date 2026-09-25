@@ -36,6 +36,8 @@ import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkHerdr } from './doctor-herdr.js';
 import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
+import { checkOllama } from './doctor-ollama.js';
+import { loadConfigSync as loadYamlConfig } from '../../lib/config-yaml.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
 import { checkPlanHomePanIgnore } from './doctor-plan-home-ignore.js';
 import {
@@ -768,6 +770,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+
+  // Ollama (PAN-1641): silent unless a local model is configured or installed.
+  for (const c of await checkOllama({ config: loadYamlConfig().config })) checks.push(c);
   try {
     for (const c of await checkHerdr()) checks.push(c); // PAN-3956: terminal backend + Herdr
   } catch (error) {
