@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T07:35:07.945814Z · model: claude-opus-5-5 · open: 811_
+_Last sequenced: 2026-09-25T07:48:20.347654Z · model: claude-opus-5-5 · open: 811_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1126,7 +1126,7 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T07:35:07.945814Z",
+  "generatedAt": "2026-09-25T07:48:20.347654Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 811,
