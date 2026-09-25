@@ -394,6 +394,19 @@ describe('FeatureItem', () => {
     expect(screen.queryByTestId('chevron-down')).not.toBeInTheDocument();
   });
 
+  it('carries the full title in the title attribute for a 120-character title', () => {
+    const longTitle = 'A'.repeat(120);
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature()}
+        title={longTitle}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText(longTitle)).toHaveAttribute('title', longTitle);
+  });
+
   it('renders the grouped issue menu and routes the single Wipe action through typed confirmation', async () => {
     const onDeepWipe = vi.fn();
     const windowConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
