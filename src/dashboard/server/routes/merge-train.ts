@@ -56,6 +56,7 @@ import {
   type ScheduleAutoMergeInput,
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
+import { removeQueuedMerge } from '../../../lib/overdeck/merge.js';
 import { listReadyIssuesForProject } from '../services/derived-issue-state.js';
 import { evaluateIssueMergeGate, type MergeGateResult } from '../../../lib/cloister/merge-gate.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
@@ -529,6 +530,8 @@ export interface AutoMergeCancelDeps {
   cancel?: (id: number, cancelledBy: string) => boolean;
   countRemaining?: (issueId: string) => number;
   announce?: (issueId: string) => void;
+  /** Drop the issue's waiting merge-queue entry; `removeQueuedMerge` by default. */
+  removeQueued?: (issueId: string) => number;
 }
 
 function announceAutoMergeScheduled(issueId: string, _entry: PendingAutoMerge): void {
@@ -669,6 +672,13 @@ export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCanc
     return { status: 404, body: { error: `No pending auto-merge for ${issueId}` } };
   }
 
+  // #4066 review: a cancel stops the merge wherever it waits, the project
+  // merge queue included.
+  try {
+    (deps.removeQueued ?? removeQueuedMerge)(issueId);
+  } catch (error) {
+    console.warn(`[auto-merge] could not drop ${issueId} from the merge queue: ${error instanceof Error ? error.message : String(error)}`);
+  }
   (deps.announce ?? announceAutoMergeCancelled)(issueId);
   return {
     status: 200,

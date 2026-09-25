@@ -14,8 +14,8 @@
  *
  *   - its project's effective merge-train flag is on, and the executor's kill
  *     switch (`OVERDECK_DISABLE_AUTO_MERGE=1`) is off;
- *   - it has an open PR on a branch the merge gate links to it
- *     (`feature/<id>` or `strike/<id>`) with green checks;
+ *   - it has an open PR on its `feature/<id>` branch with green checks (a
+ *     strike PR is the operator's to merge, PAN-3973);
  *   - the door's policy check passes, which reads no forge: the issue is opted
  *     in to auto-merge (not held for UAT) and the train is on globally;
  *   - the one merge gate, `evaluateIssueMergeGate`, says the PR is ready: its
@@ -79,13 +79,13 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * The issue a PR branch belongs to, by the branches the merge gate probes for
- * an issue's PR (`resolveIssuePullRequestRef`): `feature/<id>` and
- * `strike/<id>`. A PR on any other branch cannot pass the gate, so it is not a
- * candidate.
+ * The issue a PR branch belongs to, for automatic merging: `feature/<id>`, the
+ * branch `triggerMerge` lands and the merge gate is bound to. A strike PR
+ * (`strike/<id>`) is merged by the operator since PAN-3973, so it is never a
+ * candidate; nor is a PR on any other branch.
  */
 export function issueIdFromGateBranch(branch: string | undefined): string | null {
-  const match = /^(?:feature|strike)\/([a-z][a-z0-9]*-\d+)$/i.exec(branch ?? '');
+  const match = /^feature\/([a-z][a-z0-9]*-\d+)$/i.exec(branch ?? '');
   return match?.[1] ? match[1].toUpperCase() : null;
 }
 

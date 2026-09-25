@@ -209,24 +209,31 @@ describe('DELETE /api/merge-train/auto-merge/:id', () => {
   const entry = { id: 7, issueId: 'PAN-3917', status: 'pending' as const };
 
   it('cancels a pending auto-merge and reports the remaining count', () => {
+    const removeQueued = vi.fn(() => 1);
     const result = deleteAutoMergePayload('pan-3917', {
       now: () => new Date('2026-09-18T12:00:00Z'),
       getPending: () => entry as never,
       cancel: () => true,
       countRemaining: () => 0,
       announce: vi.fn(),
+      removeQueued,
     });
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ status: 'cancelled', cancelledBy: 'operator', remainingActionable: 0 });
+    // #4066 review: the cancel also drops the issue's waiting queue entry.
+    expect(removeQueued).toHaveBeenCalledWith('PAN-3917');
   });
 
   it('returns 409 once the entry is merging', () => {
+    const removeQueued = vi.fn(() => 0);
     const result = deleteAutoMergePayload('PAN-3917', {
       getPending: () => ({ ...entry, status: 'merging' }) as never,
       cancel: () => false,
       announce: vi.fn(),
+      removeQueued,
     });
     expect(result.status).toBe(409);
+    expect(removeQueued).not.toHaveBeenCalled();
   });
 
   it('returns 404 when nothing is pending', () => {

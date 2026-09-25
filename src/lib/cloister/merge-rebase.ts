@@ -25,16 +25,49 @@ export interface RebaseResult {
   conflictFiles?: string[];
   reason?: string;
   newHead?: string;
-}async function rebaseFeatureBranchBody(
+}
+
+export interface RebaseOptions {
+  /**
+   * #4066 review: rebase exactly this commit, the approved head of an
+   * automatic merge. The worktree HEAD must be it before the rebase, the
+   * rebase must have started from it (`ORIG_HEAD`), and the push sends the
+   * rebased commit by sha with a lease on this head. A commit the work agent
+   * makes or pushes meanwhile fails the rebase instead of riding along.
+   */
+  expectedHead?: string;
+}
+
+function sameSha(a: string, b: string): boolean {
+  const x = a.trim().toLowerCase();
+  const y = b.trim().toLowerCase();
+  return x.length > 0 && y.length > 0 && (x.startsWith(y) || y.startsWith(x));
+}
+
+async function rebaseFeatureBranchBody(
   workspacePath: string,
   featureBranch: string,
   baseBranch: string,
   issueId: string,
+  options: RebaseOptions = {},
 ): Promise<RebaseResult> {
   const execOpts = { cwd: workspacePath, encoding: 'utf-8' as const, timeout: 120_000 };
   const logPrefix = `[merge-rebase] ${issueId}`;
+  const expectedHead = options.expectedHead?.trim().toLowerCase();
+  const worktreeHead = async (ref = 'HEAD'): Promise<string> =>
+    (await execAsync(`git rev-parse ${ref}`, execOpts)).stdout.trim();
 
   try {
+    if (expectedHead) {
+      const head = await worktreeHead();
+      if (!sameSha(head, expectedHead)) {
+        return {
+          success: false,
+          reason: `worktree HEAD ${head.slice(0, 12)} is not the approved head ${expectedHead.slice(0, 12)}`,
+        };
+      }
+    }
+
     // Pre-flight: clean up stale git locks
     const lockFile = join(workspacePath, '.git', 'index.lock');
     if (existsSync(lockFile)) {
@@ -55,6 +88,12 @@ export interface RebaseResult {
       execOpts,
     );
     const behind = parseInt(behindCount.trim(), 10);
+
+    if (behind === 0 && expectedHead) {
+      // Nothing to rebase and nothing to push: the approved head is the head.
+      console.log(`${logPrefix} Already up-to-date with origin/${baseBranch}`);
+      return { success: true, skipped: true, newHead: expectedHead };
+    }
 
     if (behind === 0) {
       console.log(`${logPrefix} Already up-to-date with origin/${baseBranch}`);
@@ -104,6 +143,23 @@ export interface RebaseResult {
       return { success: false, conflictFiles, reason };
     }
 
+    if (expectedHead) {
+      const rebased = await worktreeHead();
+      const startedFrom = await worktreeHead('ORIG_HEAD');
+      if (!sameSha(startedFrom, expectedHead)) {
+        return {
+          success: false,
+          reason: `the rebase started from ${startedFrom.slice(0, 12)}, not the approved head ${expectedHead.slice(0, 12)}; nothing was pushed`,
+        };
+      }
+      console.log(`${logPrefix} Pushing rebased approved head ${rebased.slice(0, 8)}...`);
+      await execAsync(
+        `git push --force-with-lease=refs/heads/${featureBranch}:${expectedHead} origin ${rebased}:refs/heads/${featureBranch}`,
+        execOpts,
+      );
+      return { success: true, newHead: rebased };
+    }
+
     // Step 5: Push with --force-with-lease
     console.log(`${logPrefix} Pushing rebased branch...`);
     await execAsync(
@@ -137,9 +193,10 @@ export function rebaseFeatureBranch(
   featureBranch: string,
   baseBranch: string,
   issueId: string,
+  options: RebaseOptions = {},
 ): Effect.Effect<RebaseResult, GitError | MergeConflictError> {
   const wrapped: Effect.Effect<RebaseResult, GitError> = Effect.tryPromise({
-    try: () => rebaseFeatureBranchBody(workspacePath, featureBranch, baseBranch, issueId),
+    try: () => rebaseFeatureBranchBody(workspacePath, featureBranch, baseBranch, issueId, options),
     catch: (cause) =>
       new GitError({
         command: ['git', 'rebase', baseBranch],

@@ -516,11 +516,12 @@ describe('latestAutoMergeAllowsSchedule (#3983)', () => {
 });
 
 describe('listScheduleCandidates (#3983)', () => {
-  it('lists open green PRs on gate-linked branches without reading the forge review decision', async () => {
+  it('lists open green feature PRs without reading the forge review decision', async () => {
     const rows: ListedPr[] = [
       listed(),
+      // #4066 review: a strike PR is the operator's to merge (PAN-3973).
       listed({ number: 43, headRefName: 'strike/pan-43' }),
-      // The gate probes feature/<id> and strike/<id> only: nothing links these.
+      // Automatic merges land feature/<id> only: nothing links these.
       listed({ number: 44, headRefName: 'fix/pan-3983-merge-train-schedule' }),
       listed({ number: 45, headRefName: 'feat/pan-45' }),
       listed({ number: 46, headRefName: 'feature/pan-46', isDraft: true }),
@@ -533,12 +534,12 @@ describe('listScheduleCandidates (#3983)', () => {
       listed({ number: 52, headRefName: 'feature/pan-52', mergeable: 'UNKNOWN' }),
     ];
     await expect(listScheduleCandidates('/repos/overdeck', { listPullRequests: async () => rows }))
-      .resolves.toEqual(['PAN-42', 'PAN-43', 'PAN-52']);
+      .resolves.toEqual(['PAN-42', 'PAN-52']);
   });
 
-  it('links an issue by the branches the merge gate probes', () => {
+  it('links an issue by its feature branch only, never a strike branch', () => {
     expect(issueIdFromGateBranch('feature/pan-3983')).toBe('PAN-3983');
-    expect(issueIdFromGateBranch('strike/min-1039')).toBe('MIN-1039');
+    expect(issueIdFromGateBranch('strike/min-1039')).toBeNull();
     expect(issueIdFromGateBranch('fix/pan-3983-merge-train-schedule')).toBeNull();
     expect(issueIdFromGateBranch(undefined)).toBeNull();
   });

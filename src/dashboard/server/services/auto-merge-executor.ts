@@ -72,7 +72,7 @@ export interface AutoMergeExecutorDeps {
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
-  mergeIssue?: (issueId: string, headSha?: string) => Promise<MergeResult>;
+  mergeIssue?: (issueId: string, headSha: string) => Promise<MergeResult>;
   /**
    * #3983: the tracker's live answer for the issue; null when no tracker
    * answered. `readIssueFromTracker` by default.
@@ -137,10 +137,10 @@ function failureReason(result: MergeResult): string {
   return result.error ?? result.message ?? `merge returned status ${result.statusCode ?? 'unknown'}`;
 }
 
-async function defaultMergeIssue(issueId: string, headSha?: string): Promise<MergeResult> {
+async function defaultMergeIssue(issueId: string, headSha: string): Promise<MergeResult> {
   const { triggerMerge } = await import('../routes/workspaces/merge-ops.js');
   // #3983: pin the merge to the head this row was scheduled for.
-  return triggerMerge(issueId, headSha ? { kind: 'normal', expectedHeadSha: headSha } : { kind: 'normal' });
+  return triggerMerge(issueId, { kind: 'normal', expectedHeadSha: headSha });
 }
 
 function defaultAnnounceFailure(issueId: string, reason: string): void {
@@ -181,6 +181,16 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     if (isPaused()) {
       log('[auto-merge] merge train disabled, skipping tick');
       return;
+    }
+
+    // #4066 review: an automatic merge is bound to the head it was scheduled
+    // for. A row without one (written before heads were recorded) cannot be
+    // pinned, so it never merges; the operator re-schedules it.
+    if (!entry.headSha) {
+      if (!(deps.markBlocked ?? markBlocked)(entry.id, `${entry.issueId} auto-merge has no scheduled PR head to pin; re-schedule it`)) {
+        log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+      }
+      continue;
     }
 
     const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);

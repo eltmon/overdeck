@@ -42,7 +42,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { postInternalPipelineNotifyRoute } from './internal-pipeline-notify.js';
-import { activeStrikeMerge, advanceMergeQueue, automaticMergePin, forgeMergeGateRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, advanceMergeQueue, automaticMergeHead, automaticMergePin, automaticMergeStartRefusal, forgeMergeGate, mergeTargetRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
@@ -359,8 +359,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     const ineligible = normalMergeEligibility(derived, pendingOp?.type === 'merge' && pendingOp?.status === 'running', run);
     if (ineligible) return ineligible;
   }
-  const gateRefusal = await forgeMergeGateRefusal(issueId, request);
-  if (gateRefusal) return { ...gateRefusal, state: derived.state };
+  const gate = await forgeMergeGate(issueId, request);
+  if (gate.refusal) return { ...gate.refusal, state: derived.state };
+  const approvedHead = automaticMergeHead(request);
 
   if (run?.phase === 'merging') {
     const pendingOp = getPendingOperation(issueId);
@@ -384,6 +385,11 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   const normalizedId = issueId.toUpperCase();
   const currentlyMerging = getCurrentMerge(projectKey);
   if (request.kind === 'strike' && currentlyMerging === normalizedId) return { success: true, statusCode: 200, message: 'Strike merge already in progress', outcome: 'merging' };
+  // #4066 review: an automatic merge never waits on the queue, which would start it
+  // with none of its pin or policy checks; the executor retries with every check.
+  if (currentlyMerging && currentlyMerging !== normalizedId && approvedHead) {
+    return { success: false, statusCode: 409, error: `Another merge (${currentlyMerging}) is in progress; the automatic merge retries on the executor's next tick`, deferred: true, outcome: 'queued' };
+  }
   if (currentlyMerging && currentlyMerging !== normalizedId) {
     // Another merge is in progress — queue this one
     const position = enqueueMerge(projectKey, normalizedId);
@@ -427,6 +433,11 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   const normalizedMergeId = issueId.toUpperCase();
   _serverManagedMerges.add(normalizedMergeId);
   setPendingOperation(issueId, 'merge');
+  const refuseMerge = (error: string): TriggerMergeResult => {
+    setStatus(issueId, { phase: 'failed', notes: error });
+    completePendingOperation(issueId, error);
+    return { success: false, statusCode: 409, error };
+  };
   let queueAdvanced = false, preserveQueue = false;
   const advanceQueue = (): void => {
     if (queueAdvanced) return;
@@ -455,6 +466,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       }
       const artifactUrl = remotePrimaryRepo?.artifactUrl || prResult.prUrl;
       const artifactId = remotePrimaryRepo?.artifactId;
+      const remoteTargetRefusal = mergeTargetRefusal(gate.facts, artifactUrl);
+      if (remoteTargetRefusal) return refuseMerge(remoteTargetRefusal.error);
 
       try {
         console.log(`[merge] Merging ${remoteForge} review artifact for ${issueId}...`);
@@ -463,7 +476,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           url: artifactUrl,
           id: artifactId,
           method: 'squash',
-          ...(await automaticMergePin(request)),
+          ...automaticMergePin(request),
         });
 
         setStatus(issueId, { phase: 'merged', notes: null });
@@ -502,6 +515,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       completePendingOperation(issueId, error);
       return { success: false, statusCode: retryable ? 500 : 400, error, ...(retryable ? { retryable: true } : {}) };
     }
+    // #4066 review: the gate judged one PR; a polyrepo merge lands several, unpinned.
+    if (isPolyrepo && projectConfig?.workspace?.repos && approvedHead) return refuseMerge('Cannot merge automatically: a polyrepo merge set lands more than the one PR the merge gate judged; merge it by hand');
     if (isPolyrepo && projectConfig?.workspace?.repos) {
       console.log(`[merge] Polyrepo detected for ${issueId}, coordinating merge set...`);
       const { getMergeSet, ensureMergeSetForIssue, upsertMergeSet, withRepoState } = await import('../../../../lib/merge-set.js');
@@ -859,6 +874,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       return { success: false, statusCode: 400, error };
     }
 
+    const targetRefusal = mergeTargetRefusal(gate.facts, artifactUrl);
+    if (targetRefusal) return refuseMerge(targetRefusal.error);
+
     let preMergePrState: GitHubPullRequestState | undefined;
     // Reject stale prUrl state from cancel-flow or manual closure before rebase/merge (PAN-509).
     if (githubPrRef) {
@@ -925,9 +943,14 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string; retryable?: boolean } | undefined;
     const canMergeCleanPrDirectly = preMergePrState?.mergeable === true && preMergePrState.mergeableState === 'clean' && !preMergePrState.checksFailed && !preMergePrState.checksPending && !preMergePrState.draft && !preMergePrState.merged;
 
+    const startRefusal = approvedHead
+      ? await automaticMergeStartRefusal(approvedHead, canMergeCleanPrDirectly ? preMergePrState!.headSha : null, workspacePath, branchName)
+      : null;
+    if (startRefusal) return refuseMerge(startRefusal);
+
     if (canMergeCleanPrDirectly) {
       console.log(`[merge] PR is CLEAN — merging directly without rebase for ${issueId}`);
-      rebaseResult = { success: true, newHead: preMergePrState!.headSha };
+      rebaseResult = { success: true, newHead: approvedHead ?? preMergePrState!.headSha };
     } else {
       const agentId = request.kind === 'strike' ? request.recoveryTarget : `agent-${issueId.toLowerCase()}`;
       const rebaseMsg = request.kind === 'strike'
@@ -956,6 +979,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           rebaseMsg,
           allowFreshStart: request.kind !== 'strike',
           liveAgentOnly: request.kind === 'strike',
+          ...(approvedHead ? { expectedHead: approvedHead } : {}),
           setStatus: update => setStatus(issueId, update),
         });
       }
@@ -991,6 +1015,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       return { success: false, statusCode: 500, error };
     }
 
+    if (approvedHead && !rebaseResult.newHead) return refuseMerge('Cannot merge automatically: the server could not name the commit it verified');
+
     setStatus(issueId, { step: 'stripping-planning' });
     // Strip .planning/ artifacts before merge — these are workspace-local
     // scratch files (STATE.md, feedback/) that must never land on main (#888).
@@ -999,6 +1025,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         'git ls-files -- .planning/ 2>/dev/null || true',
         { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
       );
+      // #4066 review: stripping pushes a new head, which an automatic merge's pin refuses.
+      if (hasPlanning.trim() && approvedHead) return refuseMerge(`Cannot merge automatically: ${branchName} tracks .planning/ files, which only a manual merge strips`);
       if (hasPlanning.trim()) {
         console.log(`[merge] Stripping .planning/ artifacts from ${branchName} before merge...`);
         await execAsync('git rm -r --cached .planning/', { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 });
@@ -1035,8 +1063,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         if (isGitHubAppConfigured()) {
           const ref = parsePullRequestRef({ url: artifactUrl });
           if (ref) {
-            const { stdout: tipShaRaw } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 });
-            const tipSha = tipShaRaw.trim();
+            const tipSha = approvedHead
+              ? rebaseResult.newHead!
+              : (await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 })).stdout.trim();
             const ci = await getCiCheckRunsState(ref.owner, ref.repo, tipSha);
             if (ci.green && ci.total > 0) {
               skipLocalVerification = true;
@@ -1109,7 +1138,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       const { getPullRequestState, isGitHubAppConfigured, reportCommitStatus } = await import('../../../../lib/github-app.js');
       if (githubPrRef && isGitHubAppConfigured()) {
         const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
-        const sha = prState.headSha.trim();
+        // An automatic merge stamps the commit it verified, never a later push.
+        const sha = approvedHead ? rebaseResult.newHead! : prState.headSha.trim();
         if (sha) {
           await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'overdeck/review', 'Review passed');
           // PAN-3847: the description states what backed the stamp — the merge
@@ -1134,7 +1164,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         id: artifactId,
         cwd: workspacePath,
         method: 'squash',
-        ...(await automaticMergePin(request, workspacePath)),
+        ...automaticMergePin(request, rebaseResult.newHead),
       });
       artifactMerged = true;
     } catch (prMergeErr: any) {

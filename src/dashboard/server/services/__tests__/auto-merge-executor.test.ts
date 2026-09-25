@@ -79,6 +79,7 @@ function pendingEntry(overrides: Partial<PendingAutoMerge> = {}): PendingAutoMer
     status: 'pending',
     scheduledMergeAt: '2026-05-25T09:59:59.000Z',
     scheduledAt: '2026-05-25T09:54:59.000Z',
+    headSha: 'aaaaaaaaaaaaaaaa',
     ...overrides,
   };
 }
@@ -228,7 +229,7 @@ describe('auto-merge executor', () => {
       markFailed,
     });
 
-    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', undefined);
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
     expect(markMerged).toHaveBeenCalledWith(1);
     expect(markFailed).not.toHaveBeenCalled();
   });
@@ -561,6 +562,30 @@ describe('auto-merge executor', () => {
 
     expect(mergeIssue).toHaveBeenCalledWith('PAN-1486', 'aaaaaaaaaaaaaaaa');
     expect(markMerged).toHaveBeenCalledWith(1);
+  });
+
+  // #4066 review: an automatic merge is pinned to its scheduled head; a row
+  // without one cannot be, so it never reaches triggerMerge unpinned.
+  it('blocks a row with no scheduled head instead of merging it unpinned', async () => {
+    const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
+    const markBlocked = vi.fn(() => true);
+    const isEligible = vi.fn(async () => ({ eligible: true as const }));
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ headSha: undefined })],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible,
+      mergeGate: async () => gate(),
+      transition: () => true,
+      mergeIssue,
+      markBlocked,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 auto-merge has no scheduled PR head to pin; re-schedule it');
+    expect(isEligible).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
   });
 
   it('starts the retry budget over per process rather than persisting it', async () => {

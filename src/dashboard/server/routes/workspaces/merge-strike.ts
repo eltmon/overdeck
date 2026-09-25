@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
@@ -22,16 +22,25 @@ import { sessionExists } from '../../../../lib/tmux.js';
 import type { MergeRunPatch, MergeRunPhase } from '../../services/merge-queue-service.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
 }
 /**
- * `expectedHeadSha` (#3983): the auto-merge executor's scheduled head. The
- * merge is refused unless the PR is still at it and its approval names it, and
- * the forge merge is pinned to the commit the server verified.
+ * `expectedHeadSha` (#3983): the auto-merge executor's scheduled head, which
+ * marks the merge automatic. The merge is refused unless the PR is still at it
+ * and its approval names it; the server merges that commit or its own rebase
+ * of it, pinned by sha, and never another push. An automatic merge is never
+ * put on the project merge queue (#4066 review): when another merge holds the
+ * slot it is deferred, and the executor re-runs every check on its next try.
  */
 export type TriggerMergeRequest = { kind: 'normal'; expectedHeadSha?: string } | StrikeMergeRequest;
+
+/** The approved head an automatic merge is bound to, or null for a manual merge or a strike. */
+export function automaticMergeHead(request: TriggerMergeRequest): string | null {
+  return request.kind === 'normal' && request.expectedHeadSha ? request.expectedHeadSha : null;
+}
 
 export function mergeVerificationOptions(
   request: TriggerMergeRequest,
@@ -125,7 +134,7 @@ export interface MergeQueueAdvanceDeps {
 
 /** What `evaluateIssueMergeGate` answers, narrowed to what the merge doors read. */
 export interface MergeGateVerdict extends MergeReadiness {
-  facts?: { headBranch: string | null; headSha?: string | null };
+  facts?: { headBranch: string | null; headSha?: string | null; url?: string | null };
 }
 
 /**
@@ -178,40 +187,129 @@ export async function advanceMergeQueue(
 /**
  * #4016/#4021/#4036: `triggerMerge`'s gate over the forge's PR facts, for
  * every merge, strike or normal — approval, green checks, the CI test job in a
- * `verification.tests: ci` project, and no failed required UAT at the head. A
- * strike is gated on its own `strike/<issue>` PR (`expectedBranch`).
+ * `verification.tests: ci` project, and no failed required UAT at the head.
  *
  * #3983: this is the only readiness check a merge gets. The gate proves the
  * approval on the exact head (a GitHub review of it, or a verdict marker
  * naming it), which the derived issue state cannot see.
+ *
+ * #4066 review: the gate is bound to the PR the merge lands. A strike is gated
+ * on its `strike/<issue>` PR and a normal merge on `feature/<issue>`, the
+ * branch `triggerMerge` lands, so an approved strike PR can never stand in for
+ * an unreviewed feature PR. Asking for the branch also skips the 60 s PR-facts
+ * cache, so the head an automatic merge is checked against is read now. The
+ * passing verdict's PR is returned so the caller can refuse to merge any other.
  */
-export async function forgeMergeGateRefusal(
+export async function forgeMergeGate(
   issueId: string,
   request: TriggerMergeRequest = { kind: 'normal' },
   gate: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateVerdict>
     = (id, options) => evaluateIssueMergeGate(id, {}, options),
+): Promise<{ refusal: MergeEligibilityResult | null; facts?: MergeGateVerdict['facts'] }> {
+  const expectedBranch = request.kind === 'strike' ? request.branchName : `feature/${issueId.toLowerCase()}`;
+  const verdict = await gate(issueId, { preferBranch: expectedBranch });
+  const refusal = mergeGateRefusal(verdict, expectedBranch, automaticMergeHead(request) ?? undefined);
+  return refusal ? { refusal } : { refusal: null, facts: verdict.facts };
+}
+
+/** {@link forgeMergeGate}'s refusal alone, for the doors that do not merge. */
+export async function forgeMergeGateRefusal(
+  issueId: string,
+  request: TriggerMergeRequest = { kind: 'normal' },
+  gate?: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateVerdict>,
 ): Promise<MergeEligibilityResult | null> {
-  const expectedBranch = request.kind === 'strike' ? request.branchName : undefined;
-  const expectedHeadSha = request.kind === 'normal' ? request.expectedHeadSha : undefined;
-  const verdict = expectedBranch ? await gate(issueId, { preferBranch: expectedBranch }) : await gate(issueId);
-  return mergeGateRefusal(verdict, expectedBranch, expectedHeadSha);
+  return (await forgeMergeGate(issueId, request, gate)).refusal;
+}
+
+function normalizePrUrl(url: string): string {
+  return url.trim().replace(/\/+$/, '').toLowerCase();
 }
 
 /**
- * #3983: the forge-merge pin for an automatic merge — `{}` for a manual one.
- * With a workspace, the pin is the commit the server just verified there (the
- * scheduled head, or the server's own rebase of it); without one (a remote
- * workspace, which the server does not rebase) it is the scheduled head. A
- * push after that fails the merge instead of landing unseen code.
+ * #4066 review: refuse a merge whose forge artifact is not the PR the gate
+ * passed. `ensurePRExists` can reuse a remembered URL or open a new PR, and
+ * neither was what the gate judged.
  */
-export async function automaticMergePin(
+export function mergeTargetRefusal(
+  gateFacts: MergeGateVerdict['facts'],
+  artifactUrl: string | null | undefined,
+): MergeEligibilityResult | null {
+  const gated = gateFacts?.url ?? null;
+  if (gated && artifactUrl && normalizePrUrl(gated) === normalizePrUrl(artifactUrl)) return null;
+  return {
+    success: false,
+    statusCode: 409,
+    error: `Cannot merge: the merge gate passed ${gated ?? 'no pull request'}, but the merge would land ${artifactUrl ?? 'no pull request'}`,
+  };
+}
+
+/**
+ * #3983: the forge-merge pin for an automatic merge, `{}` for a manual one.
+ * `verifiedHead` is the commit the server verified for this merge: the
+ * approved head itself on the direct path, or the server's own rebase of it
+ * (`rebaseFeatureBranch` with `expectedHead`). It is never read back from the
+ * work agent's worktree, which the agent may have moved. A push after that
+ * fails the merge instead of landing unseen code.
+ */
+export function automaticMergePin(
   request: TriggerMergeRequest,
-  workspacePath?: string,
-): Promise<{ matchHeadCommit?: string }> {
-  if (request.kind !== 'normal' || !request.expectedHeadSha) return {};
-  if (!workspacePath) return { matchHeadCommit: request.expectedHeadSha };
-  const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 });
-  return { matchHeadCommit: stdout.trim() };
+  verifiedHead?: string | null,
+): { matchHeadCommit?: string } {
+  const approved = automaticMergeHead(request);
+  if (!approved) return {};
+  return { matchHeadCommit: verifiedHead ?? approved };
+}
+
+/**
+ * #4066 review: an automatic merge may only start from the approved head. The
+ * worktree the server rebases and the PR branch on the forge must both be at
+ * it, or a commit made or pushed after the approval would be rebased and
+ * merged unreviewed.
+ */
+export function automaticRebaseStartRefusal(
+  expectedHeadSha: string,
+  heads: { worktree: string | null; remote: string | null },
+): string | null {
+  if (!heads.worktree || !sameCommit(heads.worktree, expectedHeadSha)) {
+    return `Cannot merge automatically: the worktree HEAD ${heads.worktree?.slice(0, 12) ?? 'unknown'} is not the approved head ${expectedHeadSha.slice(0, 12)}`;
+  }
+  if (!heads.remote || !sameCommit(heads.remote, expectedHeadSha)) {
+    return `Cannot merge automatically: the PR branch is at ${heads.remote?.slice(0, 12) ?? 'unknown'}, not the approved head ${expectedHeadSha.slice(0, 12)}`;
+  }
+  return null;
+}
+
+/**
+ * #4066 review: where an automatic merge may start. On the direct path
+ * (`directHead`, the live PR head the forge reported) the PR must be at the
+ * approved head, and the merge is then pinned to it. Otherwise the server
+ * rebases, so the worktree and `origin/<branch>` must both be at it.
+ */
+export async function automaticMergeStartRefusal(
+  approvedHead: string,
+  directHead: string | null,
+  workspacePath: string,
+  branchName: string,
+  git: (args: string[], cwd: string) => Promise<string> = async (args, cwd) =>
+    (await execFileAsync('git', args, { cwd, encoding: 'utf-8', timeout: 15_000 })).stdout.trim(),
+): Promise<string | null> {
+  if (directHead !== null) {
+    return sameCommit(directHead, approvedHead)
+      ? null
+      : `Cannot merge automatically: the PR head is ${directHead.slice(0, 12)}, not the approved head ${approvedHead.slice(0, 12)}`;
+  }
+  const read = async (args: string[]): Promise<string | null> => {
+    try {
+      return (await git(args, workspacePath)) || null;
+    } catch {
+      return null;
+    }
+  };
+  await read(['fetch', 'origin', branchName]);
+  return automaticRebaseStartRefusal(approvedHead, {
+    worktree: await read(['rev-parse', 'HEAD']),
+    remote: await read(['rev-parse', `origin/${branchName}`]),
+  });
 }
 
 /** True when two SHAs (full or abbreviated) name the same commit. */
@@ -387,15 +485,24 @@ export async function rebaseWithAgentFallback(options: {
    * agent whose contract ended with the PR URL.
    */
   liveAgentOnly?: boolean;
+  /**
+   * #4066 review: an automatic merge's approved head. The server rebases
+   * exactly that commit (`rebaseFeatureBranch` with `expectedHead`) and never
+   * hands the rebase to the work agent: whatever the agent pushed would be
+   * merged as `newHead` without a review.
+   */
+  expectedHead?: string;
   setStatus: (update: MergeRunPatch) => void;
 }): Promise<RebaseEscalationResult> {
-  const { issueId, workspacePath, branchName, targetBranch, agentId, rebaseMsg, allowFreshStart, liveAgentOnly, setStatus } = options;
+  const { issueId, workspacePath, branchName, targetBranch, agentId, rebaseMsg, allowFreshStart, liveAgentOnly, expectedHead, setStatus } = options;
   let serverRebaseReason: string | undefined;
   let conflictFiles: string[] = [];
 
   if (existsSync(workspacePath)) {
     try {
-      const result = await Effect.runPromise(rebaseFeatureBranch(workspacePath, branchName, targetBranch, issueId));
+      const result = await Effect.runPromise(rebaseFeatureBranch(
+        workspacePath, branchName, targetBranch, issueId, expectedHead ? { expectedHead } : {},
+      ));
       console.log(`[merge] Server-side rebase completed for ${issueId}`);
       return { success: true, newHead: result.newHead };
     } catch (error: unknown) {
@@ -407,8 +514,15 @@ export async function rebaseWithAgentFallback(options: {
       serverRebaseReason = conflictFiles.length > 0
         ? `Rebase conflicts in: ${conflictFiles.join(', ')}`
         : message || 'Server-side rebase failed';
-      console.warn(`[merge] ${serverRebaseReason} — escalating to the work agent for ${issueId}`);
+      if (!expectedHead) console.warn(`[merge] ${serverRebaseReason} — escalating to the work agent for ${issueId}`);
     }
+  }
+
+  if (expectedHead) {
+    const reason = `${serverRebaseReason ?? 'the workspace is missing'}; an automatic merge is rebased by the server only, `
+      + 'so merge it by hand once the branch is up to date';
+    console.log(`[merge] ${reason} (${issueId})`);
+    return { success: false, reason, conflictFiles, retryable: false };
   }
 
   // Positive evidence only: an indeterminate probe (a Herdr socket that does

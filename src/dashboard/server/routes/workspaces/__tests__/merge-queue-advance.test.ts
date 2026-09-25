@@ -25,7 +25,14 @@ vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleState: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
 }));
 
-const { advanceMergeQueue, automaticMergePin, forgeMergeGateRefusal, mergeGateRefusal } = await import('../merge-strike.js');
+const {
+  advanceMergeQueue,
+  automaticMergePin,
+  automaticMergeStartRefusal,
+  forgeMergeGateRefusal,
+  mergeGateRefusal,
+  mergeTargetRefusal,
+} = await import('../merge-strike.js');
 type MergeQueueAdvanceDeps = Parameters<typeof advanceMergeQueue>[0];
 type MergeGateVerdict = Awaited<ReturnType<MergeQueueAdvanceDeps['checkMergeGate']>>;
 
@@ -226,7 +233,8 @@ describe('forgeMergeGateRefusal (#3983)', () => {
   it('asks the one gate, and holds an automatic merge to its scheduled head', async () => {
     const gate = vi.fn(async () => ({ ready: true, facts: { headBranch: 'feature/pan-1', headSha: 'aaaaaaaa' } }));
     await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal', expectedHeadSha: 'aaaaaaaa' }, gate)).resolves.toBeNull();
-    expect(gate).toHaveBeenCalledWith('PAN-1');
+    // #4066 review: bound to the feature PR, which also skips the facts cache.
+    expect(gate).toHaveBeenCalledWith('PAN-1', { preferBranch: 'feature/pan-1' });
     await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal', expectedHeadSha: 'bbbbbbbb' }, gate))
       .resolves.toEqual(expect.objectContaining({ statusCode: 409 }));
   });
@@ -235,21 +243,65 @@ describe('forgeMergeGateRefusal (#3983)', () => {
     const gate = vi.fn(async () => ({ ready: false, reason: 'PR is not approved at PR HEAD aaaaaaaa', facts: { headBranch: 'feature/pan-1' } }));
     await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal' }, gate))
       .resolves.toEqual(expect.objectContaining({ error: 'Cannot merge: PR is not approved at PR HEAD aaaaaaaa' }));
-    expect(gate).toHaveBeenCalledWith('PAN-1');
+    expect(gate).toHaveBeenCalledWith('PAN-1', { preferBranch: 'feature/pan-1' });
+  });
+
+  // #4066 review: an approved strike PR must not stand in for the feature PR
+  // a normal merge lands.
+  it('refuses a normal merge whose gate passed a strike PR', async () => {
+    const gate = vi.fn(async () => ({ ready: true, facts: { headBranch: 'strike/pan-1', headSha: 'aaaaaaaa' } }));
+    await expect(forgeMergeGateRefusal('PAN-1', { kind: 'normal' }, gate))
+      .resolves.toEqual(expect.objectContaining({ error: 'Cannot merge: the open pull request is on strike/pan-1, not feature/pan-1' }));
+  });
+});
+
+describe('mergeTargetRefusal (#4066 review)', () => {
+  const url = 'https://github.com/eltmon/overdeck/pull/1';
+  it('lets through the PR the gate passed', () => {
+    expect(mergeTargetRefusal({ headBranch: 'feature/pan-1', url }, `${url}/`)).toBeNull();
+  });
+
+  it('refuses any other PR, or none', () => {
+    expect(mergeTargetRefusal({ headBranch: 'feature/pan-1', url }, 'https://github.com/eltmon/overdeck/pull/2'))
+      .toEqual(expect.objectContaining({ statusCode: 409 }));
+    expect(mergeTargetRefusal({ headBranch: 'feature/pan-1', url: null }, url))
+      .toEqual(expect.objectContaining({ statusCode: 409 }));
   });
 });
 
 describe('automaticMergePin (#3983)', () => {
-  it('pins nothing for a manual merge', async () => {
-    await expect(automaticMergePin({ kind: 'normal' }, process.cwd())).resolves.toEqual({});
+  it('pins nothing for a manual merge', () => {
+    expect(automaticMergePin({ kind: 'normal' }, 'abc1234')).toEqual({});
   });
 
-  it('pins a remote merge to the scheduled head', async () => {
-    await expect(automaticMergePin({ kind: 'normal', expectedHeadSha: 'abc1234' })).resolves.toEqual({ matchHeadCommit: 'abc1234' });
+  it('pins a remote merge to the scheduled head', () => {
+    expect(automaticMergePin({ kind: 'normal', expectedHeadSha: 'abc1234' })).toEqual({ matchHeadCommit: 'abc1234' });
   });
 
-  it('pins a local merge to the commit the workspace holds after the server rebase', async () => {
-    const pin = await automaticMergePin({ kind: 'normal', expectedHeadSha: 'abc1234' }, process.cwd());
-    expect(pin.matchHeadCommit).toMatch(/^[0-9a-f]{40}$/);
+  it("pins a local merge to the commit the server verified (its rebase of the approved head)", () => {
+    expect(automaticMergePin({ kind: 'normal', expectedHeadSha: 'abc1234' }, 'def5678')).toEqual({ matchHeadCommit: 'def5678' });
+  });
+});
+
+describe('automaticMergeStartRefusal (#4066 review)', () => {
+  const approved = 'a'.repeat(40);
+  const git = (heads: Record<string, string>) => vi.fn(async (args: string[]) => {
+    if (args[0] === 'fetch') return '';
+    return heads[args[1] ?? ''] ?? '';
+  });
+
+  it('on the direct path, starts only from the approved PR head', async () => {
+    await expect(automaticMergeStartRefusal(approved, approved, '/ws', 'feature/pan-1')).resolves.toBeNull();
+    await expect(automaticMergeStartRefusal(approved, 'b'.repeat(40), '/ws', 'feature/pan-1'))
+      .resolves.toContain('not the approved head');
+  });
+
+  it('before a rebase, needs the worktree and the PR branch both at the approved head', async () => {
+    await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
+      git({ HEAD: approved, 'origin/feature/pan-1': approved }))).resolves.toBeNull();
+    await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
+      git({ HEAD: 'c'.repeat(40), 'origin/feature/pan-1': approved }))).resolves.toContain('worktree HEAD');
+    await expect(automaticMergeStartRefusal(approved, null, '/ws', 'feature/pan-1',
+      git({ HEAD: approved, 'origin/feature/pan-1': 'd'.repeat(40) }))).resolves.toContain('PR branch is at');
   });
 });
