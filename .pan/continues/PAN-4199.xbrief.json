@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4199",
   "created": "2026-09-25T06:46:14.958Z",
-  "updated": "2026-09-25T07:18:28.685Z",
+  "updated": "2026-09-25T07:18:29.898Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4199",
       "claimedAt": "2026-09-25T07:14:53.331Z",
       "doneAt": "2026-09-25T07:18:28.685Z"
+    },
+    "wi6-cli-format": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4199",
+      "claimedAt": "2026-09-25T07:18:29.898Z"
     }
   }
 }
