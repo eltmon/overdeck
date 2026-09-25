@@ -1,627 +1,98 @@
-import { useQuery } from '@tanstack/react-query';
-import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
+/**
+ * The Agents page shell (PAN-4197 WI-6). `/agents` opens the Live view — what
+ * is running, what needs the operator, what waits in the pipeline — and
+ * `/agents?view=history` opens the Agents Directory (History), where finished
+ * agents live. `?view=directory` is the old name for History; any other
+ * `view` value opens Live. The Grid, Table and Timeline views are gone (D2).
+ *
+ * The header shows the Live view's section counts and one link to the other
+ * view, plus Start agent when the page can navigate to the issues board.
+ */
+import { useCallback, useEffect, useState, type MouseEvent } from 'react';
 
-import { isAgentProblemStatus, isAgentRunningStatus } from '../../lib/pipeline-state';
-import { isAwaitingInput } from '../../lib/pendingInput';
-import { useSharedTick } from '../../lib/useSharedTick';
-import { formatRelativeTime } from '../../lib/formatRelativeTime';
-import { useDashboardStore, selectAgents, selectIssues, selectPendingPermissionAgentIds } from '../../lib/store';
-import { cn } from '../../lib/utils';
-import type { Agent, Issue } from '../../types';
-import AgentCard, { type AgentCardRole } from '../primitives/AgentCard';
-import MetricStrip from '../primitives/MetricStrip';
-import TopBar from '../primitives/TopBar';
 import Button from '../primitives/Button';
-import type { VerbBadgeProps } from '../primitives/VerbBadge';
-import { IssueActionMenu } from '../IssueActionMenu';
-import { StartAgentCta } from '../issue-view';
+import TopBar from '../primitives/TopBar';
 import { AgentsDirectory } from './directory/AgentsDirectory';
+import { LiveAgentsView, type LiveCounts } from './live/LiveAgentsView';
 
-const ROLE_ORDER = {
-  plan: 0,
-  work: 1,
-  strike: 2,
-  review: 3,
-  test: 4,
-  ship: 5,
-  flywheel: 6,
-  sequencer: 7,
-  knowledge: 8,
-  worker: 9,
-} satisfies Record<AgentCardRole, number>;
-
-const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'stalled', 'starting', 'running', 'failed', 'error', 'unknown']);
-const PHASE_FILTERS = ['work', 'strike', 'review', 'ship', 'plan', 'stuck'] as const;
-type AgentPhaseFilter = typeof PHASE_FILTERS[number];
-
-type AgentsFilterState = {
-  phases: AgentPhaseFilter[];
-  projects: string[];
-  models: string[];
-};
-
-type FilterOption = {
-  id: string;
-  name: string;
-};
-
-// PAN-3920: the Agents Directory is the default view; grid/table/timeline are
-// kept unchanged behind ?view= (D11).
-type AgentsViewMode = 'directory' | 'grid' | 'table' | 'timeline';
-const VIEW_MODES: AgentsViewMode[] = ['directory', 'grid', 'table', 'timeline'];
-const DEFAULT_VIEW_MODE: AgentsViewMode = 'directory';
-
-type CostSummaryResponse = {
-  today?: {
-    totalCost?: number;
-    totalTokens?: number;
-  };
-};
-
-async function fetchCostSummary(): Promise<CostSummaryResponse> {
-  const res = await fetch('/api/costs/summary');
-  if (!res.ok) throw new Error('Failed to fetch cost summary');
-  return res.json();
-}
+type AgentsViewMode = 'live' | 'history';
 
 function readViewMode(): AgentsViewMode {
-  if (typeof window === 'undefined') return DEFAULT_VIEW_MODE;
-  const params = new URLSearchParams(window.location.search);
-  const view = params.get('view');
-  return VIEW_MODES.includes(view as AgentsViewMode) ? (view as AgentsViewMode) : DEFAULT_VIEW_MODE;
+  if (typeof window === 'undefined') return 'live';
+  const view = new URLSearchParams(window.location.search).get('view');
+  return view === 'history' || view === 'directory' ? 'history' : 'live';
 }
 
-function replaceViewUrl(view: AgentsViewMode) {
-  if (typeof window === 'undefined') return;
+function viewHref(view: AgentsViewMode): string {
+  if (typeof window === 'undefined') return view === 'history' ? '/agents?view=history' : '/agents';
   const url = new URL(window.location.href);
-  if (view === DEFAULT_VIEW_MODE) {
-    url.searchParams.delete('view');
-  } else {
-    url.searchParams.set('view', view);
-  }
-  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  if (view === 'history') url.searchParams.set('view', 'history');
+  else url.searchParams.delete('view');
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
-function agentRole(agent: Agent): AgentCardRole {
-  return agent.role ?? 'work';
-}
-
-function issueKey(issueId: string | undefined) {
-  return issueId?.toLowerCase() ?? '';
-}
-
-function issueProject(issue: Issue | undefined) {
-  return issue?.project?.name ?? issue?.sourceRepo ?? issue?.source ?? 'Unassigned project';
-}
-
-function issueProjectOption(issue: Issue | undefined): FilterOption {
-  const name = issueProject(issue);
-  return { id: issue?.project?.id ?? issue?.project?.name ?? issue?.sourceRepo ?? issue?.source ?? name, name };
-}
-
-
-/** PAN-2384: one malformed agent row must never take down the whole fleet
- * view — exactly when agents are spawning is when the operator looks here.
- * A row that throws renders a single broken-card placeholder instead. */
-class AgentCardBoundary extends Component<{ agentId: string; children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  render() {
-    if (this.state.failed) {
-      return (
-        <div className="rounded-[18px] border border-border bg-card px-4 py-6 text-xs text-muted-foreground">
-          Agent card failed to render ({this.props.agentId}) — see console; the rest of the fleet is unaffected.
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-function compactModel(model: string | null | undefined) {
-  // PAN-2384: agent rows can lack a model during their spawn window despite
-  // the type — a partial row must never crash the fleet view.
-  if (!model) return 'model pending';
-  return model.replace(/^claude-/, '').replace(/-202\d{5,8}$/, '');
-}
-
-function formatDuration(ms: number) {
-  if (!Number.isFinite(ms) || ms < 0) return '—';
-  const safeMs = Math.max(0, ms);
-  const hours = Math.floor(safeMs / 3_600_000);
-  const minutes = Math.floor((safeMs % 3_600_000) / 60_000);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
-
-function formatCost(value: number) {
-  if (value >= 100) return `$${value.toFixed(0)}`;
-  if (value >= 10) return `$${value.toFixed(1)}`;
-  if (value >= 1) return `$${value.toFixed(2)}`;
-  if (value > 0) return `$${value.toFixed(3)}`;
-  return '$0';
-}
-
-function formatTokens(tokens: number) {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(0)}K`;
-  return String(tokens);
-}
-
-function isRunningAgent(agent: Agent) {
-  return isAgentRunningStatus(agent.status);
-}
-
-function MetricIcon({ label }: { label: string }) {
-  return <span aria-hidden="true">{label}</span>;
-}
-
-function stuckHours(agent: Agent, now: Date) {
-  const since = agent.firstFailureInRunAt ?? agent.lastFailureAt ?? agent.lastActivity ?? agent.startedAt;
-  if (!since) return 0;
-  const sinceTime = new Date(since).getTime();
-  if (Number.isNaN(sinceTime)) return 0;
-  return Math.max(0, Math.floor((now.getTime() - sinceTime) / 3_600_000));
-}
-
-function verbBadgeForAgent(agent: Agent, now: Date, pendingPermissionAgentIds?: ReadonlySet<string>): VerbBadgeProps {
-  if (agent.status === 'unknown' && agent.hasLivePane === false) {
-    return { variant: 'UNREACHABLE' };
-  }
-  if (isAgentProblemStatus(agent.status)) {
-    return { variant: 'STUCK · Nh', hours: stuckHours(agent, now) };
-  }
-  if (isAwaitingInput(agent, pendingPermissionAgentIds)) return { variant: 'INPUT' };
-
-  switch (agent.role) {
-    case 'plan':
-      return { variant: 'PLANNING' };
-    case 'review':
-    case 'test':
-      return { variant: 'REVIEW RUNNING' };
-    case 'ship':
-      return { variant: 'SHIP RUNNING' };
-    case 'strike':
-      return { variant: 'STRIKE RUNNING' };
-    case 'knowledge':
-    case 'work':
-    default:
-      return { variant: 'WORK RUNNING' };
-  }
-}
-
-function agentPhase(agent: Agent): AgentPhaseFilter {
-  if (isAgentProblemStatus(agent.status)) return 'stuck';
-  const role = agentRole(agent);
-  if (role === 'test') return 'review';
-  if (role === 'flywheel') return 'work';
-  if (role === 'sequencer') return 'work';
-  if (role === 'knowledge') return 'work';
-  if (role === 'worker') return 'work';
-  if (role === 'strike') return 'strike';
-  return role;
-}
-
-function isFleetAgent(agent: Agent) {
-  // Strike agents are intentionally short-lived — they exit cleanly after their
-  // analyze/implement/merge/verify cycle. Keep finished strikes visible so the
-  // operator can review what each one decided (PR landed vs. self-aborted with
-  // recommendation) instead of losing them off the dashboard the moment Claude
-  // exits. Work/review/test agents still get the strict isFleetAgent filter.
-  if (agent.role === 'strike') return agent.status !== 'dead';
-  return agent.status !== 'dead' && agent.status !== 'stopped' && (Boolean(agent.role) || FLEET_STATUSES.has(agent.status));
-}
-
-function parseList(value: string | null) {
-  return value?.split(',').map((item) => item.trim()).filter(Boolean) ?? [];
-}
-
-function readFilterState(): AgentsFilterState {
-  if (typeof window === 'undefined') return { phases: [], projects: [], models: [] };
-
-  const params = new URLSearchParams(window.location.search);
-  const phases = parseList(params.get('phase')).filter((phase): phase is AgentPhaseFilter => PHASE_FILTERS.includes(phase as AgentPhaseFilter));
-  return {
-    phases,
-    projects: parseList(params.get('projects')),
-    models: parseList(params.get('models')),
-  };
-}
-
-function replaceFilterUrl(filter: AgentsFilterState) {
+function replaceViewUrl(view: AgentsViewMode): void {
   if (typeof window === 'undefined') return;
-
-  const url = new URL(window.location.href);
-  if (filter.phases.length > 0) {
-    url.searchParams.set('phase', filter.phases.join(','));
-  } else {
-    url.searchParams.delete('phase');
-  }
-
-  if (filter.projects.length > 0) {
-    url.searchParams.set('projects', filter.projects.join(','));
-  } else {
-    url.searchParams.delete('projects');
-  }
-
-  if (filter.models.length > 0) {
-    url.searchParams.set('models', filter.models.join(','));
-  } else {
-    url.searchParams.delete('models');
-  }
-
-  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-}
-
-function toggleValue(values: string[], value: string) {
-  return values.includes(value) ? values.filter((selected) => selected !== value) : [...values, value];
-}
-
-function filterSummary(selected: string[], options: FilterOption[], fallback: string) {
-  if (selected.length === 0) return fallback;
-  if (selected.length === 1) return options.find((option) => option.id === selected[0])?.name ?? selected[0];
-  return `${selected.length} selected`;
-}
-
-function DropdownFilter({ label, selected, options, onToggle }: {
-  label: string;
-  selected: string[];
-  options: FilterOption[];
-  onToggle: (id: string) => void;
-}) {
-  if (options.length === 0) return null;
-
-  return (
-    <details className="group relative" data-component="agents-filter-dropdown">
-      <summary className="flex cursor-pointer list-none items-center gap-[6px] rounded-[var(--radius-sm)] border border-border bg-card px-[10px] py-[6px] text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
-        <span>{label}</span>
-        <span className="max-w-[160px] truncate text-foreground">{filterSummary(selected, options, 'All')}</span>
-      </summary>
-      <div className="absolute left-0 top-[calc(100%+6px)] z-20 min-w-[220px] rounded-[14px] border border-border bg-popover p-[6px] shadow-lg">
-        {options.map((option) => {
-          const checked = selected.includes(option.id);
-          return (
-            <label key={option.id} className="flex cursor-pointer items-center gap-[8px] rounded-[10px] px-[8px] py-[7px] text-[12px] text-popover-foreground hover:bg-accent">
-              <input
-                type="checkbox"
-                className="h-3.5 w-3.5 accent-primary"
-                checked={checked}
-                onChange={() => onToggle(option.id)}
-              />
-              <span className="truncate">{option.name}</span>
-            </label>
-          );
-        })}
-      </div>
-    </details>
-  );
+  window.history.replaceState(null, '', viewHref(view));
 }
 
 export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: () => void } = {}) {
-  const now = useSharedTick();
-  const agents = useDashboardStore(selectAgents) as Agent[];
-  const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
-  const issues = useDashboardStore(selectIssues) as Issue[];
-  const agentOutputById = useDashboardStore((state) => state.agentOutputById);
-  const openIssue = useDashboardStore((state) => state.openIssue);
-  const [filter, setFilter] = useState(readFilterState);
   const [viewMode, setViewMode] = useState<AgentsViewMode>(readViewMode);
-  const { data: costSummary } = useQuery({
-    queryKey: ['agents-fleet-cost-summary'],
-    queryFn: fetchCostSummary,
-    refetchInterval: 30_000,
-  });
+  const [counts, setCounts] = useState<LiveCounts | null>(null);
 
   useEffect(() => {
-    const handlePopState = () => {
-      setFilter(readFilterState());
-      setViewMode(readViewMode());
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    const onPopState = () => setViewMode(readViewMode());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  const issuesById = useMemo(() => {
-    const map = new Map<string, Issue>();
-    for (const issue of issues) {
-      map.set(issue.identifier.toLowerCase(), issue);
-      map.set(issue.id.toLowerCase(), issue);
-    }
-    return map;
-  }, [issues]);
-
-  const fleetAgents = useMemo(() => (
-    agents
-      .filter(isFleetAgent)
-      .sort((a, b) => {
-        const stuckDelta = Number(isAgentProblemStatus(b.status)) - Number(isAgentProblemStatus(a.status));
-        if (stuckDelta !== 0) return stuckDelta;
-        const roleDelta = ROLE_ORDER[agentRole(a)] - ROLE_ORDER[agentRole(b)];
-        if (roleDelta !== 0) return roleDelta;
-        return (b.lastActivity ?? b.startedAt ?? '').localeCompare(a.lastActivity ?? a.startedAt ?? '');
-      })
-  ), [agents]);
-
-  const projectOptions = useMemo(() => {
-    const map = new Map<string, FilterOption>();
-    for (const agent of fleetAgents) {
-      const issue = issuesById.get(issueKey(agent.issueId));
-      const option = issueProjectOption(issue);
-      if (!map.has(option.id)) map.set(option.id, option);
-    }
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [fleetAgents, issuesById]);
-
-  const modelOptions = useMemo(() => {
-    const map = new Map<string, FilterOption>();
-    for (const agent of fleetAgents) {
-      if (!agent.model) continue; // PAN-2384: spawn-window rows have no model yet
-      if (!map.has(agent.model)) map.set(agent.model, { id: agent.model, name: compactModel(agent.model) });
-    }
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [fleetAgents]);
-
-  const filteredAgents = useMemo(() => fleetAgents.filter((agent) => {
-    const issue = issuesById.get(issueKey(agent.issueId));
-    if (filter.phases.length > 0 && !filter.phases.includes(agentPhase(agent))) return false;
-    if (filter.projects.length > 0 && !filter.projects.includes(issueProjectOption(issue).id)) return false;
-    if (filter.models.length > 0 && !filter.models.includes(agent.model)) return false;
-    return true;
-  }), [filter, fleetAgents, issuesById]);
-
-  const metricTiles = useMemo(() => {
-    const runningAgents = fleetAgents.filter(isRunningAgent);
-    const stuckAgents = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status));
-    const queuedAgents = fleetAgents.filter((agent) => agent.status === 'starting');
-    const avgRuntime = (() => {
-      if (runningAgents.length === 0) return 0;
-      const durations = runningAgents.map((agent) => new Date(agent.startedAt).getTime());
-      const finiteDurations = durations.filter((t) => Number.isFinite(t));
-      if (finiteDurations.length === 0) return 0;
-      const sum = finiteDurations.reduce((total, t) => total + Math.max(0, now.getTime() - t), 0);
-      return sum / finiteDurations.length;
-    })();
-    const cost24h = costSummary?.today?.totalCost ?? 0;
-    const tokens24h = costSummary?.today?.totalTokens ?? 0;
-
-    return [
-      { id: 'running', eyebrow: 'Running', value: runningAgents.length, sub: 'live agents', icon: <MetricIcon label="▶" />, signal: 'info' as const },
-      { id: 'stuck', eyebrow: 'Stuck', value: stuckAgents.length, sub: 'needs attention', icon: <MetricIcon label="!" />, signal: 'destructive' as const },
-      {
-        id: 'cost',
-        eyebrow: 'Cost 24h',
-        value: formatCost(cost24h),
-        sub: 'cost events',
-        icon: <MetricIcon label="$" />,
-        signal: 'cost' as const,
-        title: 'Open /costs for canonical 24h spend numbers',
-      },
-      { id: 'tokens', eyebrow: 'Tokens 24h', value: formatTokens(tokens24h), sub: 'cost events', icon: <MetricIcon label="#" />, signal: 'muted' as const },
-      { id: 'runtime', eyebrow: 'Avg runtime', value: formatDuration(avgRuntime), sub: 'running agents', icon: <MetricIcon label="⏱" />, signal: 'review' as const },
-      { id: 'queue', eyebrow: 'Queue', value: queuedAgents.length, sub: 'starting agents', icon: <MetricIcon label="…" />, signal: 'warning' as const },
-    ];
-  }, [costSummary, fleetAgents, now]);
-
-  function updateFilter(next: AgentsFilterState) {
-    setFilter(next);
-    replaceFilterUrl(next);
-  }
-
-  function updateViewMode(view: AgentsViewMode) {
+  const showView = useCallback((view: AgentsViewMode) => {
     setViewMode(view);
     replaceViewUrl(view);
-  }
+  }, []);
+  const showHistory = useCallback(() => showView('history'), [showView]);
 
-  function togglePhase(phase: AgentPhaseFilter) {
-    updateFilter({ ...filter, phases: toggleValue(filter.phases, phase) as AgentPhaseFilter[] });
-  }
+  const other: AgentsViewMode = viewMode === 'live' ? 'history' : 'live';
+  const onSwitchClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    showView(other);
+  };
 
-  function clearPhases() {
-    updateFilter({ ...filter, phases: [] });
-  }
-
-  function toggleProject(projectId: string) {
-    updateFilter({ ...filter, projects: toggleValue(filter.projects, projectId) });
-  }
-
-  function toggleModel(model: string) {
-    updateFilter({ ...filter, models: toggleValue(filter.models, model) });
-  }
-
-  function openAgentIssue(issueId: string) {
-    openIssue(issueId, 'overview');
-    const url = new URL(window.location.href);
-    url.hash = 'active-agent';
-    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
-  }
-
-  const runningCount = fleetAgents.filter(isRunningAgent).length;
-  const stuckCount = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status)).length;
-  const cumulativeRuntimeMs = fleetAgents
-    .filter(isRunningAgent)
-    .reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0);
-  // The header stats stay on one line and drop their lower-priority parts as
-  // the bar narrows (runtime first, then tokens); the full line is the tooltip.
-  // The directory has no metric tiles, so there the line also carries the 24h
-  // cost and tokens (the cost summary query the page already fetches).
-  const directoryCost = viewMode === 'directory' ? costSummary?.today : undefined;
-  const metaParts: Array<{ key: string; text: string; className?: string }> = [
-    { key: 'counts', text: `${runningCount} active · ${stuckCount} stuck` },
-    { key: 'runtime', text: `${formatDuration(cumulativeRuntimeMs)} cumulative runtime`, className: 'hidden @[1200px]/topbar:inline' },
-    ...(directoryCost ? [
-      { key: 'cost', text: `${formatCost(directoryCost.totalCost ?? 0)} 24h` },
-      { key: 'tokens', text: `${formatTokens(directoryCost.totalTokens ?? 0)} tokens`, className: 'hidden @[900px]/topbar:inline' },
-    ] : []),
-  ];
-  const metaTitle = metaParts.map((part) => part.text).join(' · ');
-  const meta = (
-    <span data-component="agents-meta" title={metaTitle} className="block truncate whitespace-nowrap">
-      {metaParts.map((part, index) => (
-        <span key={part.key} data-meta-part={part.key} className={part.className}>
-          {index > 0 ? ' · ' : ''}{part.text}
-        </span>
-      ))}
+  const meta = viewMode === 'live' && counts && (
+    <span data-component="agents-meta" className="block truncate whitespace-nowrap">
+      {counts.live} live · {counts.needsYou} need you · {counts.waiting} waiting
     </span>
   );
-
-  const content = (() => {
-    if (viewMode === 'directory') {
-      return (
-        <div className="min-h-0 flex-1">
-          <AgentsDirectory />
-        </div>
-      );
-    }
-    if (fleetAgents.length === 0) {
-      return (
-        <div className="p-6">
-          <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
-            No running or stuck agents.
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="p-6">
-        <MetricStrip tiles={metricTiles} columns={6} variant="agents" className="mb-[14px]" />
-        <div className="mb-[14px] flex flex-wrap items-center gap-[8px] rounded-[18px] border border-border bg-background/80 px-[12px] py-[10px]" data-component="agents-filter-row">
-          <div className="flex items-center gap-[4px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]" aria-label="Agents phase filter">
-            <button
-              type="button"
-              className={cn(
-                'rounded-[calc(var(--radius-sm)-2px)] px-[9px] py-[5px] text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground',
-                filter.phases.length === 0 && 'bg-accent text-foreground',
-              )}
-              aria-pressed={filter.phases.length === 0}
-              onClick={clearPhases}
-            >
-              All
-            </button>
-            {PHASE_FILTERS.map((phase) => (
-              <button
-                key={phase}
-                type="button"
-                className={cn(
-                  'rounded-[calc(var(--radius-sm)-2px)] px-[9px] py-[5px] text-[11px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground',
-                  filter.phases.includes(phase) && 'bg-accent text-foreground',
-                )}
-                aria-pressed={filter.phases.includes(phase)}
-                onClick={() => togglePhase(phase)}
-              >
-                {phase}
-              </button>
-            ))}
-          </div>
-          <DropdownFilter label="Project" selected={filter.projects} options={projectOptions} onToggle={toggleProject} />
-          <DropdownFilter label="Model" selected={filter.models} options={modelOptions} onToggle={toggleModel} />
-          <span className="ml-auto text-[11px] font-medium text-muted-foreground">{filteredAgents.length} / {fleetAgents.length} agents</span>
-        </div>
-        {viewMode === 'grid' && (
-          filteredAgents.length === 0 ? (
-            <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
-              No agents match the selected filters.
-            </div>
-          ) : (
-            <div className="grid gap-[14px] [grid-template-columns:repeat(auto-fill,minmax(360px,1fr))]">
-              {filteredAgents.map((agent) => {
-                const issue = issuesById.get(issueKey(agent.issueId));
-                const role = agentRole(agent);
-                const output = agentOutputById[agent.id] ?? [];
-                const stuck = isAgentProblemStatus(agent.status);
-                const lastHeard = agent.lastActivity ? formatRelativeTime(agent.lastActivity, now) : '—';
-                const runtime = formatDuration(now.getTime() - new Date(agent.startedAt).getTime());
-
-                return (
-                  <AgentCardBoundary key={agent.id} agentId={agent.id}>
-                  <AgentCard
-                    id={agent.id}
-                    name={agent.issueId ?? agent.id}
-                    role={role}
-                    issue={agent.issueId ? {
-                      id: agent.issueId,
-                      title: issue?.title ?? agent.issueId,
-                      project: issueProject(issue),
-                    } : undefined}
-                    meta={[
-                      { label: 'Model', value: compactModel(agent.model) },
-                      { label: 'Runtime', value: runtime },
-                      { label: 'Last heard', value: lastHeard },
-                    ]}
-                    streamLines={output.slice(-16)}
-                    verbBadge={verbBadgeForAgent(agent, now, pendingPermissionAgentIds)}
-                    stuck={stuck}
-                    stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
-                    onOpenIssue={agent.issueId ? () => openAgentIssue(agent.issueId!) : undefined}
-                    actionMenu={agent.issueId ? (
-                      <div className="inline-flex items-center gap-2">
-                        <StartAgentCta issueId={agent.issueId} density="rail" surface="inline" />
-                        <IssueActionMenu issueId={agent.issueId} mode="overflow-only" agentScopeOnly className="inline-flex" />
-                      </div>
-                    ) : undefined}
-                  />
-                  </AgentCardBoundary>
-                );
-              })}
-            </div>
-          )
-        )}
-        {viewMode === 'table' && (
-          <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground" data-component="agents-coming-soon">
-            Coming soon
-          </div>
-        )}
-        {viewMode === 'timeline' && (
-          <div className="rounded-[18px] border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground" data-component="agents-coming-soon">
-            Coming soon
-          </div>
-        )}
-      </div>
-    );
-  })();
 
   return (
     <section data-component="fleet-agents-view" className="flex h-full w-full flex-col">
       <TopBar
-        className="@container/topbar"
         breadcrumb="Eltmon / Agents"
-        meta={meta}
-        search={
-          <div className="flex min-w-[140px] items-center gap-[6px] whitespace-nowrap rounded-[var(--radius-sm)] border border-border bg-card px-[10px] py-[6px] text-[12px] text-muted-foreground">
-            <svg className="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-            <span className="min-w-0 truncate">Search agents by name, issue, model…</span>
-          </div>
-        }
-        segmentedControl={
-          <div className="flex items-center gap-[2px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]">
-            {VIEW_MODES.map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={cn(
-                  'whitespace-nowrap rounded-[calc(var(--radius-sm)-2px)] px-[10px] py-[5px] text-[11px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground',
-                  viewMode === mode && 'bg-accent text-foreground',
-                )}
-                aria-pressed={viewMode === mode}
-                onClick={() => updateViewMode(mode)}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-        }
+        meta={meta || undefined}
         actions={
-          onNavigateToIssues && (
-            <Button size="sm" variant="primary" className="shrink-0 whitespace-nowrap" onClick={onNavigateToIssues}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="mr-[6px]"><path d="M5 4 19 12 5 20Z" fill="currentColor" /></svg>
-              Start agent
-            </Button>
-          )
+          <div className="flex items-center gap-3">
+            <a
+              href={viewHref(other)}
+              data-testid="agents-view-link"
+              onClick={onSwitchClick}
+              className="whitespace-nowrap text-[12px] text-primary hover:underline"
+            >
+              {other === 'history' ? 'History' : 'Live'}
+            </a>
+            {onNavigateToIssues && (
+              <Button size="sm" variant="primary" className="shrink-0 whitespace-nowrap" onClick={onNavigateToIssues}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="mr-[6px]"><path d="M5 4 19 12 5 20Z" fill="currentColor" /></svg>
+                Start agent
+              </Button>
+            )}
+          </div>
         }
       />
-      {content}
+      <div className="min-h-0 flex-1">
+        {viewMode === 'live'
+          ? <LiveAgentsView onCountsChange={setCounts} onShowHistory={showHistory} />
+          : <AgentsDirectory />}
+      </div>
     </section>
   );
 }
