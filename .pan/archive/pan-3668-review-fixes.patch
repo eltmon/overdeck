@@ -1,0 +1,604 @@
+From 76a5f838bdc41232a0bf334d619bb64161d30519 Mon Sep 17 00:00:00 2001
+From: "panopticon-agent[bot]"
+ <4205044+panopticon-agent[bot]@users.noreply.github.com>
+Date: Thu, 24 Sep 2026 12:25:58 -0400
+Subject: [PATCH] wip(infra): preserve uncommitted PAN-3668 review fixes before
+ closing #3670
+
+Last review-round fixes that were never committed: the prime-agent block for
+Anthropic models on subscription auth (harness-policy*.ts), Anthropic
+subscription routing dropped from provider-map.ts, a 3s kill-abort timeout,
+the framer byte-count fix, and matching docs and tests. They still call
+pre-PAN-4002 names (canUseHarnessSync, getProviderForModelSync).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ configuration/harnesses.mdx                   | 15 +++++-
+ .../sections/ProviderManagementSection.tsx    | 15 +++++-
+ src/lib/__tests__/harness-policy.test.ts      | 29 +++++++++--
+ src/lib/harness-policy-decisions.ts           | 11 ++++-
+ src/lib/harness-policy.ts                     | 45 ++++++++++++++---
+ src/lib/overdeck/conversation-runtime.ts      |  5 +-
+ .../__tests__/provider-map.test.ts            | 37 +++++++++++++-
+ src/lib/prime-agent/jsonl-framing.ts          |  6 ++-
+ src/lib/prime-agent/provider-map.ts           | 49 ++++++++++++++-----
+ src/lib/prime-agent/session-controller.ts     |  9 ++++
+ src/lib/runtimes/prime-agent.ts               |  4 +-
+ .../routes/settings-harness-policy.test.ts    | 34 ++++++++++++-
+ .../lib/prime-agent-no-loss-audit.test.ts     | 28 +++++++++++
+ 13 files changed, 250 insertions(+), 37 deletions(-)
+
+diff --git a/configuration/harnesses.mdx b/configuration/harnesses.mdx
+index 30f43de5ed4..ad59b35dcb4 100644
+--- a/configuration/harnesses.mdx
++++ b/configuration/harnesses.mdx
+@@ -518,11 +518,12 @@ every pipeline spawn for that role inherits it.
+ 
+ ## ToS rules
+ 
+-There is exactly **one blocked combination**, gated by
++The rule is about which **binary** invokes the model, so it covers every
++third-party harness, not a list of names. It is gated by
+ `canUseHarness(harness, model, authMode)` in `src/lib/harness-policy.ts`:
+ 
+ <Warning>
+-**Blocked:** `ohmypi` + Anthropic model + Anthropic auth = `subscription`
++**Blocked:** `ohmypi` or `prime-agent` + Anthropic model + Anthropic auth = `subscription`
+ </Warning>
+ 
+ This is required by the Claude Code subscription terms — only the `claude-code`
+@@ -536,6 +537,16 @@ OAuth subscription. Everything else is allowed:
+ | ohmypi | Anthropic | API key | ✅ |
+ | ohmypi | Anthropic | subscription | 🚫 |
+ | ohmypi | Anthropic | unset (no Anthropic auth) | ✅ |
++| prime-agent | non-Anthropic (OpenAI/Google/Kimi/MiniMax/OpenRouter/Z.AI/MiMo) | any | ✅ |
++| prime-agent | Anthropic | API key | ✅ |
++| prime-agent | Anthropic | subscription | 🚫 |
++| prime-agent | Anthropic | unset (no Anthropic auth) | ✅ |
++
++A harness with no explicit branch in `canUseHarnessSync` reaches the terminal
++legacy fallthrough and is **allowed everywhere**, including this cell — so
++adding a harness means adding its branch and its
++`buildHarnessPolicyDecisions` key, which
++`tests/unit/lib/prime-agent-no-loss-audit.test.ts` now enforces mechanically.
+ 
+ The gate is evaluated at every spawn entry point and at every picker UI so a
+ stale Settings selection cannot bypass it. When the pipeline routes a role run
+diff --git a/src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx b/src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx
+index 91f22fbab73..442878d4fdb 100644
+--- a/src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx
++++ b/src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx
+@@ -77,6 +77,16 @@ function harnessLabel(harness: Harness): string {
+   return HARNESS_LABELS[harness];
+ }
+ 
++/**
++ * Providers `src/lib/prime-agent/provider-map.ts` can route. Offering
++ * `prime-agent` for anything else writes a config that fails at launch with a
++ * PrimeAgentProviderMappingError — loud, but only after the operator picked it.
++ * Keep in step with API_KEY_PROVIDER_IDS there.
++ */
++const PRIME_AGENT_PROVIDERS = new Set<Provider>([
++  'anthropic', 'openai', 'google', 'kimi', 'minimax', 'openrouter', 'zai', 'mimo',
++]);
++
+ /**
+  * Harness choices offered for a provider. `acp` and `kimi-code` are Kimi-only
+  * at the policy gate (src/lib/harness-policy.ts), so offering them on another
+@@ -85,8 +95,9 @@ function harnessLabel(harness: Harness): string {
+ function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
+   if (provider === 'opencode' || provider === 'opencode-go') return ['opencode'];
+   if (provider === 'meta') return ['muse'];
+-  const shared: Harness[] = ['claude-code', 'ohmypi', 'codex', 'prime-agent'];
+-  return provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
++  const shared: Harness[] = ['claude-code', 'ohmypi', 'codex'];
++  const withPrime: Harness[] = PRIME_AGENT_PROVIDERS.has(provider) ? [...shared, 'prime-agent'] : shared;
++  return provider === 'kimi' ? [...withPrime, 'acp', 'kimi-code'] : withPrime;
+ }
+ 
+ /**
+diff --git a/src/lib/__tests__/harness-policy.test.ts b/src/lib/__tests__/harness-policy.test.ts
+index cce6f2b10a3..fe28ad3520d 100644
+--- a/src/lib/__tests__/harness-policy.test.ts
++++ b/src/lib/__tests__/harness-policy.test.ts
+@@ -16,7 +16,7 @@ const MODEL_BY_PROVIDER = {
+   openrouter: 'qwen/qwen3.6-plus:free',
+ } as const
+ 
+-const HARNESSES: Array<RuntimeName | 'pi'> = ['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code']
++const HARNESSES: Array<RuntimeName | 'pi'> = ['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'prime-agent']
+ const HARNESSES_WITHOUT_ACP = HARNESSES.filter((harness) => harness !== 'acp' && harness !== 'kimi-code')
+ const PROVIDERS = Object.keys(MODEL_BY_PROVIDER) as Array<keyof typeof MODEL_BY_PROVIDER>
+ const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', undefined]
+@@ -193,20 +193,41 @@ describe('canUseHarness', () => {
+     },
+   )
+ 
+-  it('covers the full 6 x 5 x 3 matrix including Kimi-only ACP and Kimi Code policy', () => {
++  it('AC(PAN-3668): blocks prime-agent + Anthropic + subscription on the same Terms of Service grounds as ohmypi', () => {
++    // prime-agent previously reached canUseHarnessSync's terminal legacy
++    // fallthrough, so this cell returned { allowed: true } with no reason and
++    // the pickers offered it unlocked. The rule is about which binary invokes
++    // the model, so every third-party harness is covered, not a name list.
++    const decision = canUseHarnessSync('prime-agent', MODEL_BY_PROVIDER.anthropic, 'subscription')
++    expect(decision.allowed).toBe(false)
++    expect(decision.reason).toBeTruthy()
++    expect(decision.reason!.toLowerCase()).toContain('terms of service')
++    expect(decision.reason!.toLowerCase()).toContain('prime agent')
++    expect(decision.reason!.toLowerCase()).toContain('api-key')
++  })
++
++  it('allows prime-agent + Anthropic + api-key', () => {
++    expect(canUseHarnessSync('prime-agent', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
++  })
++
++  it('allows prime-agent + Anthropic + undefined authMode (no subscription engaged)', () => {
++    expect(canUseHarnessSync('prime-agent', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
++  })
++
++  it('covers the full 7 x 5 x 3 matrix including Kimi-only ACP and Kimi Code policy', () => {
+     const cells: Array<{ harness: RuntimeName | 'pi'; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
+     for (const harness of HARNESSES) {
+       for (const provider of PROVIDERS) {
+         for (const authMode of AUTH_MODES) {
+           const isBlockedCell =
+-            (harness === 'ohmypi' && provider === 'anthropic' && authMode === 'subscription')
++            ((harness === 'ohmypi' || harness === 'prime-agent') && provider === 'anthropic' && authMode === 'subscription')
+             || harness === 'acp'
+             || harness === 'kimi-code'
+           cells.push({ harness, provider, authMode, allowed: !isBlockedCell })
+         }
+       }
+     }
+-    expect(cells).toHaveLength(6 * 5 * 3)
++    expect(cells).toHaveLength(7 * 5 * 3)
+     for (const cell of cells) {
+       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
+       const decision = canUseHarnessSync(cell.harness, model, cell.authMode)
+diff --git a/src/lib/harness-policy-decisions.ts b/src/lib/harness-policy-decisions.ts
+index 826c84c8db0..4c2dec32d80 100644
+--- a/src/lib/harness-policy-decisions.ts
++++ b/src/lib/harness-policy-decisions.ts
+@@ -15,10 +15,18 @@
+ import { getProviderForModelSync } from './providers.js';
+ import { canUseHarnessSync } from './harness-policy.js';
+ import type { AuthMode } from './subscription-types.js';
++import type { RuntimeName } from './runtimes/types.js';
+ 
++/**
++ * Keyed by RuntimeName, not by `string`, so leaving a harness out of the
++ * builder below is a typecheck failure rather than a silent picker default.
++ * PAN-2528 lost the ohmypi ToS block that way (wrong key), and PAN-3668 lost
++ * every prime-agent decision the same way (missing key) — the pickers resolve
++ * an absent entry as `?? { allowed: true }`.
++ */
+ export type HarnessPolicyDecisionMap = Record<
+   string,
+-  Record<string, { allowed: boolean; reason?: string }>
++  Record<RuntimeName, { allowed: boolean; reason?: string }>
+ >;
+ 
+ export type HarnessPolicyAuthModeResolver = (model: string) => Promise<AuthMode | undefined>;
+@@ -82,6 +90,7 @@ export async function buildHarnessPolicyDecisions(
+       opencode: canUseHarnessSync('opencode', model, authMode),
+       'kimi-code': canUseHarnessSync('kimi-code', model, authMode),
+       muse: canUseHarnessSync('muse', model, authMode),
++      'prime-agent': canUseHarnessSync('prime-agent', model, authMode),
+     };
+   }
+   return decisions;
+diff --git a/src/lib/harness-policy.ts b/src/lib/harness-policy.ts
+index 4b44e3160ee..ba9423c40db 100644
+--- a/src/lib/harness-policy.ts
++++ b/src/lib/harness-policy.ts
+@@ -9,17 +9,26 @@
+  * Rules:
+  *   1. gpt-5.5 and the gpt-5.6 family require ChatGPT subscription auth — OpenAI
+  *      does not expose them via the standard API-key endpoint. (PAN-1067)
+- *   2. ohmypi running an Anthropic model under Anthropic *subscription* auth is
+- *      blocked (Claude Code subscription terms forbid using the Anthropic
+- *      subscription with non-Anthropic harnesses). (Formerly applied to 'pi'.)
++ *   2. A non-Anthropic harness running an Anthropic model under Anthropic
++ *      *subscription* auth is blocked (Claude Code subscription terms forbid
++ *      using the Anthropic subscription with non-Anthropic harnesses). This
++ *      applies to ohmypi (formerly 'pi') and to prime-agent (PAN-3668): the
++ *      rule is about which BINARY invokes the model, so every third-party
++ *      harness is covered, not a list of names that happens to be current.
+  *
+  * Allowed cells:
+  *   - claude-code + any provider + any authMode -> allowed (modulo rule 1)
+- *   - ohmypi + non-Anthropic provider + any authMode -> allowed (modulo rule 1)
+- *   - ohmypi + Anthropic provider + api-key -> allowed
+- *   - ohmypi + Anthropic provider + subscription -> BLOCKED
+- *   - ohmypi + Anthropic provider + undefined authMode -> allowed (no
+- *     subscription is in play, so the ToS bar is not engaged)
++ *   - ohmypi/prime-agent + non-Anthropic provider + any authMode -> allowed
++ *     (modulo rule 1)
++ *   - ohmypi/prime-agent + Anthropic provider + api-key -> allowed
++ *   - ohmypi/prime-agent + Anthropic provider + subscription -> BLOCKED
++ *   - ohmypi/prime-agent + Anthropic provider + undefined authMode -> allowed
++ *     (no subscription is in play, so the ToS bar is not engaged)
++ *
++ * A NEW harness must get an explicit branch in canUseHarnessSync and a key in
++ * buildHarnessPolicyDecisions. Reaching the terminal fallthrough means the
++ * pickers offer every cell unlocked and the ToS bar is silently not engaged —
++ * the PAN-3668 defect, and the PAN-2528 one before it.
+  */
+ 
+ import { Effect } from 'effect'
+@@ -44,6 +53,15 @@ const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
+ /** Canonical reason returned for the blocked cell (exposed for tests + UI). */
+ export const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
+ 
++const PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
++  allowed: false,
++  reason:
++    'Claude Code subscription Terms of Service restrict Anthropic models to the Claude Code harness — Prime Agent cannot run Anthropic models under subscription auth. ' +
++    'To proceed, switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for Prime Agent.',
++}
++
++export const PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
++
+ const ACP_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
+   allowed: false,
+   reason: 'ACP currently supports the Kimi provider only. Pick a Kimi model or use the provider\'s supported harness.',
+@@ -149,6 +167,17 @@ export function canUseHarnessSync(
+     return ALLOWED
+   }
+ 
++  if (harness === 'prime-agent') {
++    // Same Terms of Service bar as ohmypi: prime-agent is a third-party binary,
++    // and the Claude Code subscription may only be invoked by claude-code
++    // itself. Without this branch the harness reached the fallthrough below and
++    // every cell — including this one — resolved to allowed (PAN-3668).
++    if (getProviderForModelSync(model).name === 'anthropic' && authMode === 'subscription') {
++      return PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK
++    }
++    return ALLOWED
++  }
++
+   // harness === 'pi' (legacy — normalizer converts 'pi' → 'ohmypi' at settings load)
+   return ALLOWED
+ }
+diff --git a/src/lib/overdeck/conversation-runtime.ts b/src/lib/overdeck/conversation-runtime.ts
+index 9d884aa9546..8cec0aaddc5 100644
+--- a/src/lib/overdeck/conversation-runtime.ts
++++ b/src/lib/overdeck/conversation-runtime.ts
+@@ -351,7 +351,10 @@ export async function handleConversationSwitchModel(
+   const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
+   const requestedHarness = body['harness'];
+   let harness: RuntimeName = currentHarness;
+-  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode' || requestedHarness === 'muse') {
++  // Every RuntimeName plus the legacy 'pi' alias. A harness missing from this
++  // list is not rejected — it is silently ignored and the conversation keeps
++  // its current harness, so switching to it looks like a no-op (PAN-3668).
++  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode' || requestedHarness === 'muse' || requestedHarness === 'prime-agent') {
+     const requestedRuntime: RuntimeName = requestedHarness === 'pi' ? 'ohmypi' : requestedHarness;
+     if (requestedRuntime !== currentHarness) {
+       const policyModel = model ?? conv.model ?? '';
+diff --git a/src/lib/prime-agent/__tests__/provider-map.test.ts b/src/lib/prime-agent/__tests__/provider-map.test.ts
+index 70c616a17d8..13c91862ca2 100644
+--- a/src/lib/prime-agent/__tests__/provider-map.test.ts
++++ b/src/lib/prime-agent/__tests__/provider-map.test.ts
+@@ -1,3 +1,6 @@
++import { mkdtempSync, rmSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import {
+   assertPrimeAgentCredentialAvailable,
+@@ -17,6 +20,16 @@ describe('resolvePrimeAgentModelRoute', () => {
+     expect(resolvePrimeAgentModelRoute('gpt-5.4', 'subscription')).toEqual({ provider: 'openai-codex', model: 'gpt-5.4' });
+   });
+ 
++  it('refuses Anthropic subscription routing with the Terms of Service reason', () => {
++    // getProviderAuthMode answers 'subscription' automatically for every
++    // Anthropic model on a Claude-subscription host, so this is the cell an
++    // operator actually lands in — it must say why, not "no verified mapping".
++    expect(() => resolvePrimeAgentModelRoute('claude-sonnet-4-6', 'subscription'))
++      .toThrow(PrimeAgentProviderMappingError);
++    expect(() => resolvePrimeAgentModelRoute('claude-sonnet-4-6', 'subscription'))
++      .toThrow(/Terms of Service/);
++  });
++
+   it('rejects an unsupported provider instead of choosing a fallback', () => {
+     expect(() => resolvePrimeAgentModelRoute('ql-swift-8b')).toThrow(PrimeAgentProviderMappingError);
+     expect(() => resolvePrimeAgentModelRoute('ql-swift-8b')).toThrow('no fallback model was selected');
+@@ -31,9 +44,18 @@ describe('resolvePrimeAgentModelRoute', () => {
+ 
+ describe('assertPrimeAgentCredentialAvailable', () => {
+   const saved = { ...process.env };
++  let home: string;
+ 
+-  beforeEach(() => { vi.resetModules(); });
++  beforeEach(() => {
++    vi.resetModules();
++    // The gate falls back to loadSettingsSync(), which reads
++    // $OVERDECK_HOME/settings.json. Without an empty home of our own this
++    // assertion inverts on any host that has api_keys.minimax configured.
++    home = mkdtempSync(join(tmpdir(), 'prime-credential-'));
++    process.env.OVERDECK_HOME = home;
++  });
+   afterEach(() => {
++    rmSync(home, { recursive: true, force: true });
+     for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
+     Object.assign(process.env, saved);
+   });
+@@ -54,4 +76,17 @@ describe('assertPrimeAgentCredentialAvailable', () => {
+     expect(() => assertPrimeAgentCredentialAvailable('gemini-3.1-pro-preview', 'subscription'))
+       .toThrow(PrimeAgentCredentialError);
+   });
++
++  it('refuses Anthropic subscription auth, which harness policy blocks', () => {
++    // The Claude Code subscription may only be invoked by claude-code, so
++    // Prime carries no Anthropic subscription credential entry at all.
++    expect(() => assertPrimeAgentCredentialAvailable('claude-sonnet-4-6', 'subscription'))
++      .toThrow(PrimeAgentCredentialError);
++  });
++
++  it('names only the environment variable for a provider settings.json does not declare', () => {
++    delete process.env.ANTHROPIC_API_KEY;
++    expect(() => assertPrimeAgentCredentialAvailable('claude-sonnet-4-6')).toThrow('ANTHROPIC_API_KEY');
++    expect(() => assertPrimeAgentCredentialAvailable('claude-sonnet-4-6')).not.toThrow('api_keys.');
++  });
+ });
+diff --git a/src/lib/prime-agent/jsonl-framing.ts b/src/lib/prime-agent/jsonl-framing.ts
+index 51011bd0a5a..043909b7c04 100644
+--- a/src/lib/prime-agent/jsonl-framing.ts
++++ b/src/lib/prime-agent/jsonl-framing.ts
+@@ -79,10 +79,12 @@ export class PrimeAgentJsonlFramer {
+       if (this.bufferedBytes > this.maxRecordBytes) {
+         // An unterminated prefix past the cap cannot be recovered per record —
+         // there is no boundary yet. Drop it and report, so the framer keeps
+-        // bounded memory and resynchronises on the next newline.
++        // bounded memory and resynchronises on the next newline. The count is
++        // everything discarded, not just the chunk that crossed the line.
++        const discarded = this.bufferedBytes;
+         this.chunks = [];
+         this.bufferedBytes = 0;
+-        errors.push(this.oversizedError(tail.byteLength));
++        errors.push(this.oversizedError(discarded));
+       }
+     }
+     return { records, errors };
+diff --git a/src/lib/prime-agent/provider-map.ts b/src/lib/prime-agent/provider-map.ts
+index 978519114a4..8d4f03a0b3d 100644
+--- a/src/lib/prime-agent/provider-map.ts
++++ b/src/lib/prime-agent/provider-map.ts
+@@ -3,8 +3,9 @@ import type { AuthMode } from '../subscription-types.js';
+ import { getProviderForModelSync } from '../providers.js';
+ import { existsSync } from 'node:fs';
+ import { homedir } from 'node:os';
+-import { loadSettingsSync } from '../settings.js';
++import { loadSettingsSync, type ApiKeysConfig } from '../settings.js';
+ import { SETTINGS_FILE } from '../paths.js';
++import { PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../harness-policy.js';
+ 
+ export class PrimeAgentProviderMappingError extends Error {
+   constructor(message: string) {
+@@ -26,28 +27,33 @@ export class PrimeAgentCredentialError extends Error {
+  * variable or auth file AND the command that configures it, so both halves live
+  * here next to the provider they belong to rather than in generic doctor text.
+  */
+-const API_KEY_CREDENTIALS: Partial<Record<ModelProvider, { envVar: string; settingsKey: string }>> = {
+-  anthropic: { envVar: 'ANTHROPIC_API_KEY', settingsKey: 'anthropic' },
++const API_KEY_CREDENTIALS: Partial<Record<ModelProvider, { envVar: string; settingsKey?: keyof ApiKeysConfig }>> = {
++  anthropic: { envVar: 'ANTHROPIC_API_KEY' },
+   openai: { envVar: 'OPENAI_API_KEY', settingsKey: 'openai' },
+   google: { envVar: 'GEMINI_API_KEY', settingsKey: 'google' },
+   kimi: { envVar: 'KIMI_API_KEY', settingsKey: 'kimi' },
+   minimax: { envVar: 'MINIMAX_API_KEY', settingsKey: 'minimax' },
+-  openrouter: { envVar: 'OPENROUTER_API_KEY', settingsKey: 'openrouter' },
+-  zai: { envVar: 'ZAI_API_KEY', settingsKey: 'zai' },
++  openrouter: { envVar: 'OPENROUTER_API_KEY' },
++  zai: { envVar: 'ZAI_API_KEY' },
+   mimo: { envVar: 'MIMO_API_KEY', settingsKey: 'mimo' },
+   xai: { envVar: 'XAI_API_KEY', settingsKey: 'xai' },
+-  groq: { envVar: 'GROQ_API_KEY', settingsKey: 'groq' },
+-  cerebras: { envVar: 'CEREBRAS_API_KEY', settingsKey: 'cerebras' },
+-  mistral: { envVar: 'MISTRAL_API_KEY', settingsKey: 'mistral' },
++  groq: { envVar: 'GROQ_API_KEY' },
++  cerebras: { envVar: 'CEREBRAS_API_KEY' },
++  mistral: { envVar: 'MISTRAL_API_KEY' },
+ };
+ 
+ /**
+  * The auth file and login command behind each subscription path, for the same
+  * reason. Subscription use is billed as extra usage by the provider — it is not
+  * equivalent to using that subscription in the provider's own client.
++ *
++ * Anthropic is deliberately absent. The Claude Code subscription may only be
++ * invoked by the claude-code binary, so `canUseHarnessSync('prime-agent', <an
++ * Anthropic model>, 'subscription')` blocks that cell outright (PAN-3668);
++ * carrying a credential entry for it here would describe a path harness policy
++ * refuses. Anthropic models reach Prime Agent through ANTHROPIC_API_KEY.
+  */
+ const SUBSCRIPTION_CREDENTIALS: Partial<Record<ModelProvider, { authFile: string; command: string }>> = {
+-  anthropic: { authFile: '~/.claude/.credentials.json', command: 'claude /login' },
+   openai: { authFile: '~/.codex/auth.json', command: 'pan pi-auth login' },
+ };
+ 
+@@ -66,8 +72,8 @@ const API_KEY_PROVIDER_IDS: Partial<Record<ModelProvider, string>> = {
+   mistral: 'mistral',
+ };
+ 
++/** See SUBSCRIPTION_CREDENTIALS: Anthropic subscription auth is blocked by harness policy. */
+ const SUBSCRIPTION_PROVIDER_IDS: Partial<Record<ModelProvider, string>> = {
+-  anthropic: 'anthropic',
+   openai: 'openai-codex',
+ };
+ 
+@@ -81,6 +87,15 @@ export function resolvePrimeAgentModelRoute(model: string, authMode: AuthMode =
+   const overdeckProvider = getProviderForModelSync(model).name;
+   const provider = (authMode === 'subscription' ? SUBSCRIPTION_PROVIDER_IDS : API_KEY_PROVIDER_IDS)[overdeckProvider];
+   if (!provider) {
++    // On a Claude-subscription host getProviderAuthMode answers 'subscription'
++    // for every Anthropic model automatically, so this is the cell an operator
++    // actually lands in. Say why it is refused rather than reporting a generic
++    // missing mapping.
++    if (overdeckProvider === 'anthropic' && authMode === 'subscription') {
++      throw new PrimeAgentProviderMappingError(
++        `${PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON} (model "${model}")`,
++      );
++    }
+     throw new PrimeAgentProviderMappingError(
+       `Prime Agent does not support Overdeck provider "${overdeckProvider}" with ${authMode} authentication for model "${model}". Configure a verified provider/model mapping; no fallback model was selected.`,
+     );
+@@ -117,10 +132,18 @@ export function assertPrimeAgentCredentialAvailable(model: string, authMode: Aut
+     );
+   }
+   if (process.env[credential.envVar]) return;
+-  const configured = (loadSettingsSync().api_keys as Record<string, string | undefined> | undefined)?.[credential.settingsKey];
+-  if (configured) return;
++  // Only providers ApiKeysConfig declares are offered as a settings option;
++  // the rest are reachable only by hand-editing settings.json, so pointing an
++  // operator at a key the Settings UI cannot write would be dead advice.
++  if (credential.settingsKey) {
++    if (loadSettingsSync().api_keys?.[credential.settingsKey]) return;
++    throw new PrimeAgentCredentialError(
++      `Prime Agent cannot launch "${model}": no credential for Overdeck provider "${overdeckProvider}". `
++      + `Export ${credential.envVar}, or set "api_keys.${credential.settingsKey}" in ${SETTINGS_FILE}.`,
++    );
++  }
+   throw new PrimeAgentCredentialError(
+     `Prime Agent cannot launch "${model}": no credential for Overdeck provider "${overdeckProvider}". `
+-    + `Export ${credential.envVar}, or set "api_keys.${credential.settingsKey}" in ${SETTINGS_FILE}.`,
++    + `Export ${credential.envVar}.`,
+   );
+ }
+diff --git a/src/lib/prime-agent/session-controller.ts b/src/lib/prime-agent/session-controller.ts
+index 5a09e7a1981..6e73c1513a1 100644
+--- a/src/lib/prime-agent/session-controller.ts
++++ b/src/lib/prime-agent/session-controller.ts
+@@ -24,6 +24,15 @@ export const PRIME_AGENT_KILL_GRACE_MS = 1_000;
+  */
+ export const PRIME_AGENT_HOST_REQUEST_TIMEOUT_MS = 30_000;
+ 
++/**
++ * Deadline for the abort that precedes a kill. Much shorter than a message
++ * POST: `killAgent` tolerates abort failure and terminates regardless, so
++ * waiting the full 30 s on a wedged host only delays bringing the tree down
++ * while Cloister has already emitted `killed_agent` — the dashboard would show
++ * the agent killed for half a minute while it still ran.
++ */
++export const PRIME_AGENT_ABORT_TIMEOUT_MS = 3_000;
++
+ /**
+  * The Prime child is owned by a separate host process (`src/lib/prime-agent/host.ts`)
+  * and reached over its unix socket — never in-process. The host decides between
+diff --git a/src/lib/runtimes/prime-agent.ts b/src/lib/runtimes/prime-agent.ts
+index 6756ed823b8..7b7bfe6d0d3 100644
+--- a/src/lib/runtimes/prime-agent.ts
++++ b/src/lib/runtimes/prime-agent.ts
+@@ -14,7 +14,7 @@ import type {
+   TokenUsage,
+ } from './types.js';
+ import { getAgentDir } from '../agents/agent-state.js';
+-import { deliverPrimeAgentMessage, postPrimeAgentHost, PRIME_AGENT_KILL_GRACE_MS } from '../prime-agent/session-controller.js';
++import { deliverPrimeAgentMessage, postPrimeAgentHost, PRIME_AGENT_ABORT_TIMEOUT_MS, PRIME_AGENT_KILL_GRACE_MS } from '../prime-agent/session-controller.js';
+ import { tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
+ import { tmuxCreateSession } from './tmux-cli.js';
+ import { getProviderAuthMode } from '../agents/provider-auth.js';
+@@ -70,7 +70,7 @@ const productionController: PrimeAgentRuntimeController = {
+     }
+   },
+   async send(agentId, message) { await deliverPrimeAgentMessage(agentId, message); },
+-  async abort(agentId) { await postPrimeAgentHost(agentId, { op: 'abort' }); },
++  async abort(agentId) { await postPrimeAgentHost(agentId, { op: 'abort' }, PRIME_AGENT_ABORT_TIMEOUT_MS); },
+   async terminate(agentId) { await tmuxKillSession(agentId); },
+   async isRunning(agentId) { return existsSync(join(getAgentDir(agentId), 'prime-agent-token')) && await tmuxSessionExists(agentId); },
+   stats(agentId) { return readStats(agentId)?.stats ?? null; },
+diff --git a/tests/unit/dashboard/server/routes/settings-harness-policy.test.ts b/tests/unit/dashboard/server/routes/settings-harness-policy.test.ts
+index 4edaaa0d840..dc94275b491 100644
+--- a/tests/unit/dashboard/server/routes/settings-harness-policy.test.ts
++++ b/tests/unit/dashboard/server/routes/settings-harness-policy.test.ts
+@@ -19,7 +19,11 @@ import {
+   buildHarnessPolicyDecisions,
+   parseHarnessPolicyModels,
+ } from '../../../../../src/lib/harness-policy-decisions.js';
+-import { OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../../../../../src/lib/harness-policy.js';
++import {
++  OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON,
++  PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON,
++} from '../../../../../src/lib/harness-policy.js';
++import { KNOWN_HARNESSES } from '@overdeck/contracts';
+ import type { AuthMode } from '../../../../../src/lib/subscription-types.js';
+ 
+ type Resolver = (model: string) => Promise<AuthMode | undefined>;
+@@ -53,6 +57,34 @@ describe('buildHarnessPolicyDecisions', () => {
+     expect(ohmypi?.reason).toBe(OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON);
+   });
+ 
++  it('PAN-3668: serves a prime-agent decision so the picker can lock the ToS cell', async () => {
++    // A missing key is not a missing block — ModelPicker resolves an absent
++    // entry as `?? { allowed: true }`, so an omitted harness is offered
++    // unlocked in every cell, including ones the gate refuses at spawn.
++    const decisions = await buildHarnessPolicyDecisions(
++      [ANTHROPIC_MODEL],
++      authModeResolver('subscription'),
++    );
++
++    const prime = decisions[ANTHROPIC_MODEL]?.['prime-agent'];
++    expect(prime).toBeDefined();
++    expect(prime?.allowed).toBe(false);
++    expect(prime?.reason).toBe(PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON);
++  });
++
++  it('PAN-3668: every harness the runtime knows gets a decision key', async () => {
++    const decisions = await buildHarnessPolicyDecisions(
++      [ANTHROPIC_MODEL, OPENAI_MODEL],
++      authModeResolver('subscription'),
++    );
++
++    for (const model of [ANTHROPIC_MODEL, OPENAI_MODEL]) {
++      const perModel = decisions[model];
++      expect(perModel).toBeDefined();
++      expect(Object.keys(perModel!).sort()).toEqual([...KNOWN_HARNESSES].sort());
++    }
++  });
++
+   it('ac2: emits an "ohmypi" key (no legacy "pi" key) for every model', async () => {
+     const decisions = await buildHarnessPolicyDecisions(
+       [ANTHROPIC_MODEL, OPENAI_MODEL],
+diff --git a/tests/unit/lib/prime-agent-no-loss-audit.test.ts b/tests/unit/lib/prime-agent-no-loss-audit.test.ts
+index b76e88f34a5..59f20c3ee5c 100644
+--- a/tests/unit/lib/prime-agent-no-loss-audit.test.ts
++++ b/tests/unit/lib/prime-agent-no-loss-audit.test.ts
+@@ -39,6 +39,34 @@ describe('Prime Agent no-loss audit', () => {
+     expect(source(path)).toContain('prime-agent');
+   });
+ 
++  // The harness-policy gate is the enumeration this work missed for nine
++  // commits and three review cycles: canUseHarnessSync fell through to its
++  // legacy `return ALLOWED` for prime-agent, and buildHarnessPolicyDecisions
++  // omitted the key so the pickers resolved it as `?? { allowed: true }` —
++  // exactly the PAN-2528 failure mode, repeated. The gate is the one
++  // enumeration that encodes a Terms of Service rule, so a harness missing
++  // from it fails open. Assert it mechanically rather than by review.
++  it.each([
++    'src/lib/harness-policy.ts',
++    'src/lib/harness-policy-decisions.ts',
++  ])('%s decides every harness explicitly', (path) => {
++    const content = source(path);
++    for (const harness of ALL) expect(content, `${path} omitted ${harness}`).toMatch(new RegExp(`["']${harness}["']`));
++  });
++
++  it('gives a third-party harness no Anthropic subscription path', () => {
++    // The Claude Code subscription may only be invoked by the claude-code
++    // binary. prime-agent carries neither a subscription provider id nor a
++    // subscription credential entry for Anthropic, so the cell cannot be
++    // reached even if the policy branch were removed.
++    const providerMap = source('src/lib/prime-agent/provider-map.ts');
++    const subscriptionBlock = providerMap.slice(
++      providerMap.indexOf('const SUBSCRIPTION_PROVIDER_IDS'),
++      providerMap.indexOf('export interface PrimeAgentModelRoute'),
++    );
++    expect(subscriptionBlock).not.toContain('anthropic');
++  });
++
+   it('registers explicit runtime, transcript, cost, and frontend homes', () => {
+     expect(source('src/lib/runtimes/index.ts')).toContain("register(createPrimeAgentRuntimeSync())");
+     expect(source('src/lib/conversations/transcript-adapter.ts')).toContain("'prime-agent': primeAgentAdapter");
+-- 
+2.43.0
+
