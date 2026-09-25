@@ -103,7 +103,7 @@ function errorText(cause: unknown): string {
 }
 
 /**
- * Author the verdict as `panopticon-agent[bot]` when the GitHub App is
+ * Author the verdict as the App's bot (`<app-slug>[bot]`) when the GitHub App is
  * installed. The bot is never the PR author, so GitHub accepts the review that
  * it refuses from the operator's own account. A token failure is not a verdict
  * failure: fall through to the plain `gh` identity and let the marker fallback

@@ -1,12 +1,12 @@
 /**
  * GitHub App Integration (PAN-536)
  *
- * Generates short-lived installation access tokens for the panopticon-agent GitHub App.
+ * Generates short-lived installation access tokens for the Overdeck GitHub App.
  * Agents push via HTTPS with these tokens instead of the user's SSH key, so commits
- * show as `panopticon-agent[bot]` with a verified badge.
+ * show as the App's bot (`<app-slug>[bot]`, e.g. `overdeck-agent[bot]`) with a verified badge.
  *
  * Credentials stored at: ~/.overdeck/github-app/
- *   - app-id, private-key.pem, installation-id
+ *   - app-id, private-key.pem, installation-id, app-slug
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -746,15 +746,92 @@ export async function mergePullRequestWithApp(
   });
 }
 
+/** An App slug as GitHub issues it: lower-case letters, digits and dashes. */
+function parseAppSlug(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const slug = raw.trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9-]*$/.test(slug) ? slug : null;
+}
+
+/** The slug `scripts/create-github-app.mjs` writes beside the App's credentials. */
+function readAppSlugFile(): string | null {
+  try {
+    return parseAppSlug(readFileSync(join(APP_DIR, 'app-slug'), 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+/** The slug of the App the on-disk key belongs to, from `GET /app` under its JWT. */
+async function fetchAppSlug(config: GitHubAppConfig): Promise<string> {
+  const jwt = generateJWT(config.appId, config.privateKey);
+  const data = await withGitHubTimeout('GET /app', async (signal) => {
+    const response = await fetch('https://api.github.com/app', {
+      headers: {
+        'Authorization': `Bearer ${jwt}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'overdeck',
+      },
+      signal,
+    });
+    if (!response.ok) throw new Error(`GET /app failed: ${response.status} ${await response.text()}`);
+    return await response.json() as { slug?: unknown };
+  });
+  const slug = parseAppSlug(data.slug);
+  if (!slug) throw new Error('GET /app returned no slug');
+  return slug;
+}
+
+let appSlugPromise: Promise<string> | null = null;
+let resolvedAppSlug: string | null = null;
+
 /**
- * Get the bot identity for git config
+ * #4066 review (R3-2): the configured App's bot login, `<slug>[bot]`, which
+ * is who the review agent's verdicts are authored by. The slug comes from the
+ * App itself: the `app-slug` file its setup writes, else `GET /app` under the
+ * App's JWT. Resolved once per process.
+ *
+ * `null` means no App is configured. With an App configured and its slug
+ * unreadable it throws, so a caller deciding who approved trusts no bot rather
+ * than a guessed one; a failed resolution is not cached.
+ */
+export async function resolveAppBotLogin(): Promise<string | null> {
+  if (!isGitHubAppConfigured()) return null;
+  appSlugPromise ??= (async () => {
+    const fromFile = readAppSlugFile();
+    if (fromFile) return fromFile;
+    const config = loadGitHubAppConfig();
+    if (!config) throw new Error('GitHub App credentials are unreadable');
+    return fetchAppSlug(config);
+  })();
+  try {
+    resolvedAppSlug = await appSlugPromise;
+    return `${resolvedAppSlug}[bot]`;
+  } catch (error) {
+    appSlugPromise = null;
+    throw error;
+  }
+}
+
+/** Test seam: forget the resolved App slug. */
+export function resetAppBotLoginCache(): void {
+  appSlugPromise = null;
+  resolvedAppSlug = null;
+}
+
+/**
+ * The bot identity for git config: the App's slug from `app-slug` (or one
+ * {@link resolveAppBotLogin} already resolved). This only names commits. Who
+ * approved a merge is decided by {@link resolveAppBotLogin}, which never
+ * guesses; the legacy name stands in here only when the slug is unknown.
  */
 export function getBotIdentity(appConfig?: GitHubAppConfig): { name: string; email: string } {
   const config = appConfig || loadGitHubAppConfig();
   const appId = config?.appId || '0';
+  const slug = readAppSlugFile() ?? resolvedAppSlug ?? 'panopticon-agent';
   return {
-    name: 'panopticon-agent[bot]',
-    email: `${appId}+panopticon-agent[bot]@users.noreply.github.com`,
+    name: `${slug}[bot]`,
+    email: `${appId}+${slug}[bot]@users.noreply.github.com`,
   };
 }
 

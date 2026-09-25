@@ -21,8 +21,24 @@ import { promisify } from 'node:util';
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssue, type ResolvedProjectRepo } from '../project-repos.js';
+import { approvalProvenAtHead, recordReadApprovalAtHead } from './approval-at-head.js';
+import {
+  NO_TRUSTED_AUTHORS,
+  defaultAppBotLogin,
+  defaultOverdeckLogins,
+  defaultReadAuthorKinds,
+  isOverdeckIdentity,
+  normalizeLogin,
+  trustedAuthorsFrom,
+  withAuthorKinds,
+  type ForgeAuthor,
+  type ReadAuthorKinds,
+  type TrustedAuthors,
+} from './forge-identity.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestCheckName } from './verification-tests-mode.js';
+
+export type { ForgeAuthor, ReadAuthorKinds, TrustedAuthors } from './forge-identity.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -53,7 +69,9 @@ export interface PrFacts {
    * commit: an approval marker whose `sha=` names the head. Anything else,
    * including every forge approval (its review commit is read on the verdict
    * path only, `forgeApprovalAtHead`) and every GitLab MR, is left unset:
-   * not proven. The verdict guard refuses a rejection only on proof.
+   * not proven. The verdict guard refuses a rejection only on proof. The
+   * merge gate adds a GitHub review of the head (`withForgeApprovalAtHead`,
+   * #3983) before it judges approval.
    */
   approvedAtHead?: boolean;
   changesRequested: boolean;
@@ -90,6 +108,13 @@ export interface PrFacts {
 }
 
 export { formatUatMarker, parseUatVerdict } from './uat-verdict-marker.js';
+export {
+  approvalProvenAtHead,
+  cachedApprovalAtHead,
+  onApprovalAtHeadChanged,
+  recordApprovalAtHead,
+  resetApprovalAtHeadCache,
+} from './approval-at-head.js';
 
 /** A browser-UAT verdict read back from a PR comment (#4036). */
 export interface UatVerdict {
@@ -111,12 +136,22 @@ export interface PrFactsDeps {
   resolveRepos?: typeof resolveProjectReposForIssue;
   listGitLabMrs?: typeof listOpenGitLabMergeRequests;
   viewGitLabMr?: (projectPath: string, iid: number) => Promise<GitLabMrView>;
+  /** The MR's approvals (`GET /projects/:id/merge_requests/:iid/approvals`). */
+  readGitLabApprovals?: (projectPath: string, iid: number) => Promise<GitLabMrApprovals>;
   /**
    * The GitHub logins Overdeck posts verdict comments as (the `gh` user, the
    * GitHub App bot). Read only when a verdict marker comes from an author
    * whose association alone does not make it trusted.
    */
   overdeckLogins?: () => Promise<readonly string[]>;
+  /**
+   * #4066 review: the GitHub App's bot login (`<slug>[bot]`), null without
+   * the App; it throws when the App is configured but its slug is unknown
+   * (`markerApproversFor`).
+   */
+  appBotLogin?: () => Promise<string | null>;
+  /** #4066 review (R3-2): the account type of comment authors, by comment node id. */
+  readAuthorKinds?: ReadAuthorKinds;
 }
 
 export interface PrFactsOptions {
@@ -138,9 +173,22 @@ export interface GitLabMrView {
   merge_status?: string;
   has_conflicts?: boolean;
   approvals_before_merge?: number | null;
-  approved?: boolean;
   head_pipeline?: { status?: string } | null;
   pipeline?: { status?: string } | null;
+}
+
+/**
+ * #4066 review: what GitLab's `/merge_requests/:iid/approvals` endpoint
+ * reports. `glab mr view -F json` carries no approval at all, and the
+ * endpoint's own `approved` is true whenever the project requires no approvals
+ * (`approvals_required: 0`, as the MYN backend does), so only `approved_by`,
+ * which `glab mr approve` fills, is evidence someone approved the MR.
+ */
+export interface GitLabMrApprovals {
+  approved?: boolean;
+  approvals_required?: number;
+  approvals_left?: number;
+  approved_by?: ReadonlyArray<{ user?: { username?: string | null } | null }> | null;
 }
 
 /**
@@ -285,12 +333,8 @@ type PrComment = NonNullable<IssuePullRequestData['comments']>[number];
 /** GitHub author associations whose comments carry verdicts (#4040 review). */
 const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
-/** The logins Overdeck posts as, lower-cased with any `[bot]` suffix dropped. */
-export type TrustedAuthors = ReadonlySet<string>;
-
-function normalizeLogin(login: string): string {
-  return login.trim().toLowerCase().replace(/\[bot\]$/, '');
-}
+/** Who may approve by marker: any trusted author (no App), or the App's bot (its slug). */
+type MarkerApprovers = 'any-trusted' | ReadonlySet<string>;
 
 /**
  * Whether a comment may declare a verdict. The repository is public and anyone
@@ -301,8 +345,13 @@ function normalizeLogin(login: string): string {
 function isTrustedComment(comment: PrComment | undefined, trusted: TrustedAuthors): boolean {
   if (!comment) return false;
   if (TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))) return true;
-  const login = comment.author?.login;
-  return Boolean(login) && trusted.has(normalizeLogin(login!));
+  return isOverdeckIdentity(comment.author, trusted);
+}
+
+/** A trusted comment's marker counts, except an `APPROVED` one from other than the App's bot. */
+function markerCounts(comment: PrComment | undefined, verdict: MarkerVerdict, approvers: MarkerApprovers): boolean {
+  if (verdict !== 'APPROVED' || approvers === 'any-trusted') return true;
+  return isOverdeckIdentity(comment?.author, { users: new Set(), bots: approvers });
 }
 
 function carriesMarker(comment: PrComment | undefined): boolean {
@@ -316,12 +365,16 @@ function carriesMarker(comment: PrComment | undefined): boolean {
  * approval must never merge commits it never saw. A stale CHANGES_REQUESTED
  * still counts — rework stays owed until a newer verdict says otherwise.
  */
-function markerVerdictFromComments(pr: IssuePullRequestData, trusted: TrustedAuthors): MarkerVerdict | null {
+function markerVerdictFromComments(
+  pr: IssuePullRequestData,
+  trusted: TrustedAuthors,
+  approvers: MarkerApprovers,
+): MarkerVerdict | null {
   const comments = pr.comments ?? [];
   for (let index = comments.length - 1; index >= 0; index -= 1) {
     if (!isTrustedComment(comments[index], trusted)) continue;
     const verdict = parseVerdictMarker(comments[index]?.body);
-    if (!verdict) continue;
+    if (!verdict || !markerCounts(comments[index], verdict, approvers)) continue;
     if (verdict === 'APPROVED') {
       const headAt = headCommitTime(pr);
       const commentAt = Date.parse(comments[index]?.createdAt ?? '');
@@ -374,20 +427,25 @@ function uatVerdictAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): Ua
  * head commit by `sha=`. Only a sha proves it; a marker without one, or one
  * dated by its timestamp, proves nothing.
  */
-function approvalMarkerAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): boolean {
+function approvalMarkerAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors, approvers: MarkerApprovers): boolean {
   const head = pr.headRefOid;
   if (!head) return false;
   const comments = pr.comments ?? [];
   for (let index = comments.length - 1; index >= 0; index -= 1) {
     if (!isTrustedComment(comments[index], trusted)) continue;
     const marker = parseVerdictMarkerWithSha(comments[index]?.body);
-    if (!marker) continue;
+    if (!marker || !markerCounts(comments[index], marker.verdict, approvers)) continue;
     return marker.verdict === 'APPROVED' && marker.sha !== null && sameCommit(marker.sha, head);
   }
   return false;
 }
 
-function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: TrustedAuthors = new Set()): PrFacts {
+function gitHubFacts(
+  issueId: string,
+  pr: IssuePullRequestData,
+  trusted: TrustedAuthors = NO_TRUSTED_AUTHORS,
+  approvers: MarkerApprovers = new Set(),
+): PrFacts {
   const state = normalize(pr.state);
   const merged = state === 'MERGED' || Boolean(pr.mergedAt);
   const mergeable = normalize(pr.mergeable);
@@ -395,7 +453,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
   const forgeDecision = decision === 'APPROVED' || decision === 'CHANGES_REQUESTED' ? decision : null;
   // Only consult the marker when the forge itself reached no decision.
   const effective: PrReviewDecision = forgeDecision
-    ?? markerVerdictFromComments(pr, trusted)
+    ?? markerVerdictFromComments(pr, trusted, approvers)
     ?? (decision === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : null);
   return {
     issueId: issueId.toUpperCase(),
@@ -413,7 +471,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
     approved: effective === 'APPROVED',
     // #3853: proven only by a marker naming the head. A forge approval's
     // review commit is read on the verdict path alone (`forgeApprovalAtHead`).
-    ...(effective === 'APPROVED' && forgeDecision === null && approvalMarkerAtHead(pr, trusted)
+    ...(effective === 'APPROVED' && forgeDecision === null && approvalMarkerAtHead(pr, trusted, approvers)
       ? { approvedAtHead: true }
       : {}),
     changesRequested: effective === 'CHANGES_REQUESTED',
@@ -425,6 +483,15 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
     testJobSucceeded: testJobSucceeded(pr.statusCheckRollup),
     uatVerdict: uatVerdictAtHead(pr, trusted),
   };
+}
+
+async function defaultReadGitLabApprovals(projectPath: string, iid: number): Promise<GitLabMrApprovals> {
+  const { stdout } = await execFileAsync(
+    'glab',
+    ['api', `projects/${encodeURIComponent(projectPath)}/merge_requests/${iid}/approvals`],
+    { encoding: 'utf-8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 },
+  );
+  return JSON.parse(stdout) as GitLabMrApprovals;
 }
 
 async function defaultViewGitLabMr(projectPath: string, iid: number): Promise<GitLabMrView> {
@@ -453,7 +520,12 @@ function gitLabChecks(view: GitLabMrView): ChecksVerdict {
   return 'pending';
 }
 
-function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMrView | null): PrFacts {
+function gitLabFacts(
+  issueId: string,
+  row: GitLabMergeRequestRow,
+  view: GitLabMrView | null,
+  approvals: GitLabMrApprovals | null = null,
+): PrFacts {
   const state = (view?.state ?? row.state ?? '').toLowerCase();
   const merged = state === 'merged';
   const detailed = view?.detailed_merge_status;
@@ -465,9 +537,11 @@ function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMr
         ? true
         : null;
   // GitLab has no "request changes" primitive; approval is the only verdict the
-  // forge models. `not_approved` means the MR is otherwise mergeable but has no
-  // approval yet, which is `REVIEW_REQUIRED`, not "changes requested".
-  const approved = view?.approved === true || (detailed != null && detailed === 'mergeable');
+  // forge models. #4066 review: approval is positive evidence only, a named
+  // approver in `approved_by` (what `glab mr approve` records). A `mergeable`
+  // merge status says the pipeline passed and nothing conflicts; with zero
+  // approvals required it says nothing about whether anyone approved.
+  const approved = (approvals?.approved_by?.length ?? 0) > 0;
   return {
     issueId: issueId.toUpperCase(),
     forge: 'gitlab',
@@ -537,53 +611,61 @@ export async function getPrFacts(
   }
   const facts = await readPrFacts(issueId, deps, options);
   // An error is a lookup failure, not an answer — never cache it.
-  if (cacheable && !facts.error) prFactsCache.set(key, { at: Date.now(), facts });
+  if (cacheable && !facts.error) {
+    prFactsCache.set(key, { at: Date.now(), facts });
+    // #4066 review: a trusted marker naming the head, read here by any
+    // caller, also answers the board's `ready` for that head.
+    recordReadApprovalAtHead(facts);
+  }
   return facts;
 }
 
-/**
- * The logins Overdeck posts verdicts as: the authenticated `gh` user and, when
- * the GitHub App is configured, its bot. Resolved once per process; an empty
- * answer (gh unreachable) is not cached, so the next read tries again.
- */
-let overdeckLoginsPromise: Promise<readonly string[]> | null = null;
+let warnedMarkerApprovalTrust = false;
 
-async function readOverdeckLogins(): Promise<readonly string[]> {
-  const logins: string[] = [];
-  try {
-    const { stdout } = await execFileAsync('gh', ['api', 'user', '--jq', '.login'], {
-      encoding: 'utf-8', timeout: 15_000,
-    });
-    if (stdout.trim()) logins.push(stdout.trim());
-  } catch {
-    // Not authenticated as a user (or offline): association alone decides.
-  }
-  try {
-    const { getBotIdentity, isGitHubAppConfigured } = await import('../github-app.js');
-    if (isGitHubAppConfigured()) logins.push(getBotIdentity().name);
-  } catch {
-    // No app configuration readable.
-  }
-  return logins;
+/** Whether a marker comment's author is trusted only if it is one of Overdeck's identities. */
+function markerNeedsIdentity(comment: PrComment): boolean {
+  return carriesMarker(comment) && !TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation));
 }
 
-async function defaultOverdeckLogins(): Promise<readonly string[]> {
-  overdeckLoginsPromise ??= readOverdeckLogins();
-  const logins = await overdeckLoginsPromise;
-  if (logins.length === 0) overdeckLoginsPromise = null;
-  return logins;
+/** The PR with the account type of every marker author that needs one. */
+async function withCommentAuthorKinds(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<IssuePullRequestData> {
+  const comments = pr.comments ?? [];
+  if (!comments.some(markerNeedsIdentity)) return pr;
+  return { ...pr, comments: await withAuthorKinds(comments, markerNeedsIdentity, deps.readAuthorKinds ?? defaultReadAuthorKinds) };
+}
+
+/**
+ * #4066 review: agents hold the operator's `gh` credentials (`OWNER`), so with
+ * the GitHub App configured only its bot approves by marker. Without it, any
+ * trusted author does, logged once as operator-credential trust. A failed read
+ * approves nothing. `CHANGES_REQUESTED` markers are unaffected.
+ */
+async function markerApproversFor(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<MarkerApprovers> {
+  const hasApprovalMarker = (pr.comments ?? []).some((comment) => parseVerdictMarker(comment.body) === 'APPROVED');
+  if (!hasApprovalMarker) return new Set();
+  let bot: string | null;
+  try {
+    bot = await (deps.appBotLogin ?? defaultAppBotLogin)();
+  } catch {
+    // The App is configured but its bot is unknown: no marker approves.
+    return new Set();
+  }
+  if (bot) return new Set([normalizeLogin(bot)]);
+  if (!warnedMarkerApprovalTrust) {
+    warnedMarkerApprovalTrust = true;
+    console.warn('[pr-facts] No GitHub App configured: an APPROVED verdict marker counts from any trusted author, '
+      + 'i.e. from anyone (any agent) holding the operator\'s GitHub credentials. Configure the App to close this.');
+  }
+  return 'any-trusted';
 }
 
 /** Resolve Overdeck's own logins only when some marker's author needs it. */
 async function trustedAuthorsFor(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<TrustedAuthors> {
-  const needsIdentity = (pr.comments ?? []).some((comment) => (
-    carriesMarker(comment) && !TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))
-  ));
-  if (!needsIdentity) return new Set();
+  if (!(pr.comments ?? []).some(markerNeedsIdentity)) return NO_TRUSTED_AUTHORS;
   try {
-    return new Set((await (deps.overdeckLogins ?? defaultOverdeckLogins)()).map(normalizeLogin));
+    return trustedAuthorsFrom(await (deps.overdeckLogins ?? defaultOverdeckLogins)());
   } catch {
-    return new Set();
+    return NO_TRUSTED_AUTHORS;
   }
 }
 
@@ -591,7 +673,10 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
   const fetchGitHubPr = deps.fetchGitHubPr ?? fetchIssuePullRequest;
   try {
     const gh = await fetchGitHubPr(issueId, options.preferBranch ? { preferBranch: options.preferBranch } : {});
-    if (gh.pr) return gitHubFacts(issueId, gh.pr, await trustedAuthorsFor(gh.pr, deps));
+    if (gh.pr) {
+      const pr = await withCommentAuthorKinds(gh.pr, deps);
+      return gitHubFacts(issueId, pr, await trustedAuthorsFor(pr, deps), await markerApproversFor(pr, deps));
+    }
     if (gh.error) return emptyPrFacts(issueId, gh.error);
   } catch (cause) {
     return emptyPrFacts(issueId, `GitHub PR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
@@ -615,8 +700,9 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
     if (!row?.iid) return emptyPrFacts(issueId);
     const projectPath = parseGitLabProjectPath(row.web_url);
     if (!projectPath) return gitLabFacts(issueId, row, null);
+    let view: GitLabMrView;
     try {
-      return gitLabFacts(issueId, row, await viewGitLabMr(projectPath, row.iid));
+      view = await viewGitLabMr(projectPath, row.iid);
     } catch (cause) {
       // Without the MR view there is no approval, pipeline or mergeability to
       // judge. Keep the row's identity but say why, so a refusal names the
@@ -626,36 +712,121 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
         error: `GitLab MR view failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
       };
     }
+    try {
+      return gitLabFacts(issueId, row, view, await (deps.readGitLabApprovals ?? defaultReadGitLabApprovals)(projectPath, row.iid));
+    } catch (cause) {
+      // No approvals read is no approval: the refusal names the failed read.
+      return {
+        ...gitLabFacts(issueId, row, view),
+        error: `GitLab MR approvals read failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      };
+    }
   } catch (cause) {
     return emptyPrFacts(issueId, `GitLab MR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
   }
 }
 
+/**
+ * One GitHub review as `gh pr view --json reviews` reports it, with the
+ * author's account type (`__typename`) added where the trust rule needs it.
+ */
+export interface GitHubReviewRecord {
+  /** The review's GraphQL node id, by which its author's type is read. */
+  id?: string | null;
+  state?: string;
+  submittedAt?: string | null;
+  authorAssociation?: string | null;
+  author?: ForgeAuthor | null;
+  commit?: { oid?: string } | null;
+}
+
 /** A PR's head and its reviews, each with the commit it judged, from one read. */
 export interface GitHubReviewsAtHead {
   headRefOid?: string | null;
-  reviews?: ReadonlyArray<{ state?: string; commit?: { oid?: string } | null }> | null;
+  reviews?: ReadonlyArray<GitHubReviewRecord> | null;
 }
 
 export type ReadGitHubReviews = (repo: string, number: number) => Promise<GitHubReviewsAtHead>;
 
-async function defaultReadGitHubReviews(repo: string, number: number): Promise<GitHubReviewsAtHead> {
+/** Review states that are a verdict; `COMMENTED` and `PENDING` do not replace one. */
+const VERDICT_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED']);
+
+/** A verdict review trusted only if its author is one of Overdeck's identities. */
+function reviewNeedsIdentity(review: GitHubReviewRecord): boolean {
+  return VERDICT_REVIEW_STATES.has(normalize(review.state))
+    && !TRUSTED_ASSOCIATIONS.has(normalize(review.authorAssociation));
+}
+
+async function defaultReadGitHubReviews(
+  repo: string,
+  number: number,
+  readAuthorKinds: ReadAuthorKinds = defaultReadAuthorKinds,
+): Promise<GitHubReviewsAtHead> {
   const { stdout } = await execFileAsync(
     'gh',
     [
       'pr', 'view', String(number), '--repo', repo, '--json', 'headRefOid,reviews',
-      '--jq', '{headRefOid, reviews: [.reviews[] | {state, commit: {oid: .commit.oid}}]}',
+      '--jq',
+      '{headRefOid, reviews: [.reviews[] | {id, state, submittedAt, authorAssociation, author: {login: .author.login}, commit: {oid: .commit.oid}}]}',
     ],
     { encoding: 'utf-8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 },
   );
-  return JSON.parse(stdout) as GitHubReviewsAtHead;
+  const read = JSON.parse(stdout) as GitHubReviewsAtHead;
+  // #4066 review (R3-2): the review agent's verdicts are the App bot's
+  // reviews (`CONTRIBUTOR`), trusted only as a typed `Bot`.
+  return { ...read, reviews: await withAuthorKinds(read.reviews ?? [], reviewNeedsIdentity, readAuthorKinds) };
+}
+
+/**
+ * Whether a review may count toward a merge: the same rule verdict markers
+ * follow (`isTrustedComment`). The repository is public, so any GitHub account
+ * can submit an APPROVED review; only `OWNER` / `MEMBER` / `COLLABORATOR` or
+ * the identity Overdeck posts as counts.
+ */
+function isTrustedReview(review: GitHubReviewRecord, trusted: TrustedAuthors): boolean {
+  if (TRUSTED_ASSOCIATIONS.has(normalize(review.authorAssociation))) return true;
+  return isOverdeckIdentity(review.author, trusted);
+}
+
+/**
+ * #4066 review: each trusted author's latest verdict review, by login. A
+ * later `CHANGES_REQUESTED` or a dismissal replaces an earlier approval, the
+ * way GitHub itself reads a reviewer's standing verdict; a `COMMENTED` review
+ * does not. A review with no author login cannot be attributed, so it is
+ * ignored.
+ */
+function latestTrustedVerdicts(
+  reviews: ReadonlyArray<GitHubReviewRecord>,
+  trusted: TrustedAuthors,
+): GitHubReviewRecord[] {
+  const latest = new Map<string, { review: GitHubReviewRecord; at: number; index: number }>();
+  reviews.forEach((review, index) => {
+    if (!VERDICT_REVIEW_STATES.has(normalize(review.state))) return;
+    const login = review.author?.login;
+    if (!login || !isTrustedReview(review, trusted)) return;
+    // A person and a bot may share a login; each is its own reviewer.
+    const key = `${review.author?.__typename ?? ''}:${normalizeLogin(login)}`;
+    const parsed = Date.parse(review.submittedAt ?? '');
+    const at = Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+    const current = latest.get(key);
+    // `gh` lists reviews oldest first; the index breaks a tie or a missing date.
+    if (!current || at > current.at || (at === current.at && index > current.index)) {
+      latest.set(key, { review, at, index });
+    }
+  });
+  return [...latest.values()].map((entry) => entry.review);
 }
 
 /**
  * #3853: whether a GitHub review approved the exact head commit, by the
  * review's `commit.oid` (`latestReviews` reports that oid empty; `reviews`
- * does not). Only the verdict guard asks, and only for an agent's rejection,
- * so the shared `gh pr view` field list every PR read uses stays as it is.
+ * does not). The verdict guard asks it for an agent's rejection, and the
+ * merge gate asks it through {@link withForgeApprovalAtHead}.
+ *
+ * #4066 review: only a trusted author's review counts (the marker rule), and
+ * only each author's latest verdict: an author whose newest review is
+ * `CHANGES_REQUESTED` or dismissed has withdrawn the approval. Any trusted
+ * author's standing `CHANGES_REQUESTED` leaves the head unapproved.
  *
  * The head is re-read in the same call: a push between the PR read and this
  * one leaves the approval unproven rather than proven against a stale head.
@@ -668,6 +839,7 @@ async function defaultReadGitHubReviews(repo: string, number: number): Promise<G
 export async function forgeApprovalAtHead(
   facts: Pick<PrFacts, 'forge' | 'url' | 'number' | 'headSha'>,
   readReviews: ReadGitHubReviews = defaultReadGitHubReviews,
+  overdeckLogins: () => Promise<readonly string[]> = defaultOverdeckLogins,
 ): Promise<boolean | undefined> {
   if (facts.forge !== 'github' || !facts.headSha || !facts.number) return undefined;
   const repo = facts.url?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
@@ -676,12 +848,50 @@ export async function forgeApprovalAtHead(
   try {
     const read = await readReviews(`${repo[1]}/${repo[2]}`, facts.number);
     if (read.headRefOid?.toLowerCase() !== head) return undefined;
-    return (read.reviews ?? []).some((review) => (
+    const reviews = read.reviews ?? [];
+    // Overdeck's own logins are resolved only when some review's author is
+    // not trusted by association alone.
+    let trusted: TrustedAuthors = NO_TRUSTED_AUTHORS;
+    if (reviews.some(reviewNeedsIdentity)) {
+      try {
+        trusted = trustedAuthorsFrom(await overdeckLogins());
+      } catch {
+        trusted = NO_TRUSTED_AUTHORS;
+      }
+    }
+    const standing = latestTrustedVerdicts(reviews, trusted);
+    if (standing.some((review) => normalize(review.state) === 'CHANGES_REQUESTED')) return false;
+    return standing.some((review) => (
       normalize(review.state) === 'APPROVED' && review.commit?.oid?.toLowerCase() === head
     ));
   } catch {
     return undefined;
   }
+}
+
+/**
+ * #3983: the facts with a GitHub review approving the exact head folded into
+ * `approvedAtHead`, for the merge gate. A marker naming the head already set
+ * it, so the reviews are read only when it is not proven yet, no rework is
+ * owed, and the PR is otherwise mergeable (open, not a draft, green, forge
+ * `mergeable`): the gate refuses every other PR whatever its reviews say, so
+ * the merge-ready walk costs no extra read for them. `forgeApprovalAtHead`
+ * re-reads the head, so a push between the two reads leaves the approval
+ * unproven.
+ */
+export async function withForgeApprovalAtHead(
+  facts: PrFacts,
+  readReviews?: ReadGitHubReviews,
+  overdeckLogins?: () => Promise<readonly string[]>,
+): Promise<PrFacts> {
+  if (
+    facts.forge !== 'github' || facts.approvedAtHead === true || facts.changesRequested
+    || !facts.open || facts.draft || facts.checks !== 'green' || facts.mergeable !== true
+  ) {
+    return facts;
+  }
+  const proven = await forgeApprovalAtHead(facts, readReviews, overdeckLogins);
+  return proven === true ? { ...facts, approvedAtHead: true } : facts;
 }
 
 export interface MergeReadiness {
@@ -709,6 +919,13 @@ export interface MergeReadinessPolicy {
    * so a failed UAT verdict at the current head blocks the merge.
    */
   uatRequired?: boolean;
+  /**
+   * #3983: on GitHub, approval for a merge must be proven on the exact head
+   * (`approvedAtHead`): a trusted marker whose `sha=` is the head, or a GitHub
+   * review approving it (`withForgeApprovalAtHead`). `reviewDecision` alone
+   * never counts. A GitLab approval is the forge's own and is taken as it is.
+   */
+  requireApprovalAtHead?: boolean;
 }
 
 /**
@@ -724,7 +941,16 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   if (facts.closed) return { ready: false, reason: 'PR is closed' };
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
-  if (!facts.approved) return { ready: false, reason: 'PR is not approved' };
+  if (policy.requireApprovalAtHead && facts.forge === 'github') {
+    if (!approvalProvenAtHead(facts)) {
+      return {
+        ready: false,
+        reason: `PR is not approved at PR HEAD ${head} (needs a review approving that commit)`,
+      };
+    }
+  } else if (policy.requireApprovalAtHead ? !approvalProvenAtHead(facts) : !facts.approved) {
+    return { ready: false, reason: 'PR is not approved' };
+  }
   // FR-9 is a positive test on both: `none` (no checks reported for the head
   // commit) and `null` (the forge has not computed mergeability yet) are the
   // absence of evidence, not evidence of readiness. Merging on either is how a

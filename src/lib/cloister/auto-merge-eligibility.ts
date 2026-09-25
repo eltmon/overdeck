@@ -20,10 +20,13 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import type { TrackerType } from '../tracker/interface.js';
 import { resolveGitHubIssue } from '../tracker-utils.js';
 import { getProjectAutoMergeDefault, projectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
-import { evaluateMergeReadiness, getPrFacts, type PrFacts } from './pr-facts.js';
+import { evaluateMergeReadiness, getPrFacts, withForgeApprovalAtHead, type PrFacts, type ReadGitHubReviews } from './pr-facts.js';
 import { issueRunsTestsOnCi } from './verification-tests-mode.js';
 
 const execFileAsync = promisify(execFile);
+
+/** #3983: a hung `gh issue view` must fail the read, not stall its caller. */
+const LABEL_READ_TIMEOUT_MS = 15_000;
 
 export const BLOCKER_LABELS = ['needs-design', 'needs-discussion', 'do-not-merge'] as const;
 
@@ -40,6 +43,10 @@ export interface AutoMergeEligibilityDeps {
   isGlobalUatRequired?: () => boolean;
   /** #4021: true when the issue's project runs `verification.tests: ci`. */
   ciTestsRequired?: (issueId: string) => boolean;
+  /** #3983: the GitHub reviews read that proves an approval of the head. */
+  readReviews?: ReadGitHubReviews;
+  /** The logins Overdeck posts as, for a review whose association alone is not trusted. */
+  overdeckLogins?: () => Promise<readonly string[]>;
 }
 
 /** The per-issue auto-merge decision as the tracker's labels express it. */
@@ -77,7 +84,7 @@ async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
     'labels',
     '--jq',
     '.labels[].name',
-  ], { encoding: 'utf-8' });
+  ], { encoding: 'utf-8', timeout: LABEL_READ_TIMEOUT_MS });
 
   return stdout.trim().split('\n').filter(Boolean);
 }
@@ -131,11 +138,13 @@ export async function isAutoMergeEligible(
   issueId: string,
   deps: AutoMergeEligibilityDeps = {},
 ): Promise<AutoMergeEligibility> {
-  const facts = await (deps.getFacts ?? getPrFacts)(issueId);
+  const facts = await withForgeApprovalAtHead(await (deps.getFacts ?? getPrFacts)(issueId), deps.readReviews, deps.overdeckLogins);
   // The UAT policy is applied below as the hold itself: an issue that requires
   // UAT is never auto-merged, so a failed UAT verdict (#4036) cannot reach here.
   const readiness = evaluateMergeReadiness(facts, {
     ciTestsRequired: facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId),
+    // #3983: auto-merge needs an approval bound to the head.
+    requireApprovalAtHead: true,
   });
   if (!readiness.ready) {
     return { eligible: false, reason: readiness.reason ?? 'PR is not ready to merge' };

@@ -251,6 +251,59 @@ describe('forge adapters', () => {
     expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
   });
 
+  it('pins a gh merge to the expected head commit (#3983)', async () => {
+    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    await getForgeAdapter('github').mergeReviewArtifact({
+      forge: 'github',
+      url: 'https://github.com/org/repo/pull/42',
+      cwd: '/tmp/repo',
+      method: 'squash',
+      matchHeadCommit: 'ABC1234DEF',
+    });
+
+    expect(execMock).toHaveBeenCalledWith(
+      'gh pr merge https://github.com/org/repo/pull/42 --squash --match-head-commit abc1234def',
+      expect.objectContaining({ cwd: '/tmp/repo' }),
+    );
+  });
+
+  it('refuses a pin that is not a commit SHA (#3983)', async () => {
+    await expect(getForgeAdapter('github').mergeReviewArtifact({
+      forge: 'github',
+      url: 'https://github.com/org/repo/pull/42',
+      method: 'squash',
+      matchHeadCommit: 'main; rm -rf /',
+    })).rejects.toThrow('is not a commit SHA');
+    expect(execMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a GitHub App merge when the PR head moved off the pin (#3983)', async () => {
+    isGitHubAppConfiguredMock.mockReturnValue(true);
+    getPullRequestStateMock.mockResolvedValueOnce({
+      owner: 'org',
+      repo: 'repo',
+      number: 42,
+      state: 'OPEN',
+      merged: false,
+      mergeable: true,
+      mergeableState: 'clean',
+      draft: false,
+      headSha: 'fff999',
+      baseBranch: 'main',
+      checksPending: false,
+      checksFailed: false,
+    });
+
+    await expect(getForgeAdapter('github').mergeReviewArtifact({
+      forge: 'github',
+      url: 'https://github.com/org/repo/pull/42',
+      method: 'squash',
+      matchHeadCommit: 'abc1234',
+    })).rejects.toThrow('not the pinned abc1234');
+    expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
+  });
+
   it('merges GitHub PRs through the GitHub App once checks settle', async () => {
     vi.useFakeTimers();
     isGitHubAppConfiguredMock.mockReturnValue(true);
