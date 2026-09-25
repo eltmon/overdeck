@@ -45,11 +45,11 @@
     "electron-updater": "^6.8.9"
   },
   "devDependencies": {
-    "@electron/notarize": "^2.5.0",
+    "@electron/notarize": "^3.1.1",
     "@overdeck/contracts": "workspace:*",
     "@types/node": "^22.20.4",
     "electron": "40.6.0",
-    "electron-builder": "^25.1.8",
+    "electron-builder": "^26.15.3",
     "tsdown": "^0.21.10",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11",
