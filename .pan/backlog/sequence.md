@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T06:11:24.928811Z · model: claude-opus-5-5 · open: 807_
+_Last sequenced: 2026-09-25T06:14:27.202611Z · model: claude-opus-5-5 · open: 807_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1122,7 +1122,7 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T06:11:24.928811Z",
+  "generatedAt": "2026-09-25T06:14:27.202611Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 807,
