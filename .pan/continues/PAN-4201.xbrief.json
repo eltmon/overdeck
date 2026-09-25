@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4201",
   "created": "2026-09-25T06:42:41.599Z",
-  "updated": "2026-09-25T06:56:44.678Z",
+  "updated": "2026-09-25T06:57:09.680Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4201",
       "claimedAt": "2026-09-25T06:46:18.595Z",
       "doneAt": "2026-09-25T06:56:44.678Z"
+    },
+    "wire-state-badge": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4201",
+      "claimedAt": "2026-09-25T06:57:09.680Z"
     }
   }
 }
