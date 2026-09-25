@@ -19,7 +19,9 @@ import {
   type PrFactsDeps,
 } from '../pr-facts.js';
 import {
+  UNIDENTIFIED_PANE_AGENT_ID,
   isIssueReviewSession,
+  readAncestorAgentIds,
   reviewVerdictRefusal,
   verdictCallerFromEnv,
 } from '../verdict-caller.js';
@@ -30,20 +32,48 @@ const OLDER = '1c36f7db9148c7dd9da6d43cf9884d959e433307';
 const HEAD_AT = '2026-09-16T19:00:00Z';
 
 describe('verdictCallerFromEnv', () => {
+  const noAncestors = () => [];
+
   it('reads a shell without OVERDECK_AGENT_ID as an operator', () => {
-    expect(verdictCallerFromEnv({})).toEqual({ kind: 'operator', id: null });
-    expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: '  ' })).toEqual({ kind: 'operator', id: null });
+    expect(verdictCallerFromEnv({}, noAncestors)).toEqual({ kind: 'operator', id: null });
+    expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: '  ' }, noAncestors)).toEqual({ kind: 'operator', id: null });
   });
 
   it('reads a conv-* conversation as an operator', () => {
-    expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: 'conv-20260916-2706' }))
+    expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: 'conv-20260916-2706' }, () => ['conv-20260916-2706']))
       .toEqual({ kind: 'operator', id: 'conv-20260916-2706' });
   });
 
   it('reads every other managed session as an agent', () => {
     for (const id of ['agent-pan-3836-review', 'agent-pan-3836', 'flywheel-overdeck', 'planning-pan-3836']) {
-      expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: id })).toEqual({ kind: 'agent', id });
+      expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: id }, noAncestors)).toEqual({ kind: 'agent', id });
     }
+  });
+
+  // #4066 review: an agent holds the operator's shell and can rewrite its own
+  // environment, but not the environment its harness process started with.
+  it("names the nearest agent ancestor, whatever the caller's own environment says", () => {
+    const ancestors = () => ['agent-pan-3836', 'conv-20260916-2706'];
+    for (const env of [{}, { OVERDECK_AGENT_ID: 'conv-20260916-2706' }, { OVERDECK_AGENT_ID: 'agent-pan-3836-review' }]) {
+      expect(verdictCallerFromEnv(env, ancestors)).toEqual({ kind: 'agent', id: 'agent-pan-3836' });
+    }
+    expect(verdictCallerFromEnv({}, () => ['conv-1', 'agent-pan-1-review'])).toEqual({ kind: 'agent', id: 'agent-pan-1-review' });
+  });
+
+  it('reads a pane that unset its agent id but kept its issue or session type as an agent', () => {
+    expect(verdictCallerFromEnv({ OVERDECK_ISSUE_ID: 'PAN-3836' }, noAncestors))
+      .toEqual({ kind: 'agent', id: UNIDENTIFIED_PANE_AGENT_ID });
+    expect(verdictCallerFromEnv({ OVERDECK_SESSION_TYPE: 'work' }, noAncestors))
+      .toEqual({ kind: 'agent', id: UNIDENTIFIED_PANE_AGENT_ID });
+  });
+
+  it('falls back to the environment when the ancestors cannot be read', () => {
+    expect(verdictCallerFromEnv({}, () => { throw new Error('no /proc'); })).toEqual({ kind: 'operator', id: null });
+  });
+
+  it('reads the real process tree: this test runner has no agent ancestor it did not inherit', () => {
+    // Sanity only: the reader walks /proc and returns ids, never throws.
+    expect(Array.isArray(readAncestorAgentIds())).toBe(true);
   });
 });
 
