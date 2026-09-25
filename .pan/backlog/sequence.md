@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T08:28:52.405632Z · model: claude-opus-5-5 · open: 811_
+_Last sequenced: 2026-09-25T08:35:32.626399Z · model: claude-opus-5-5 · open: 812_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,7 @@ _Last sequenced: 2026-09-25T08:28:52.405632Z · model: claude-opus-5-5 · open: 
 | 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
 | 21 | PAN-4210 | M | critical | ok |  |  | Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start |
 | 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
+| 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -831,6 +832,10 @@ New in-pipeline bug. Deferred handoff retries are in-memory timers, so any dashb
 
 New in-pipeline bug. A stale troubled flag blocks pan start, and the error names a command the Cut deleted, so the operator must hand-edit state.json. It needs a real clearing door (restored verb or --force/--fresh) plus corrected messages; high because it blocks restarts of affected issues such as PAN-1641.
 
+### PAN-4217 (rank 23)
+
+New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
+
 ### PAN-3566 (rank 26)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
@@ -1115,10 +1120,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 
 codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
 
-### PAN-2331 (rank 116)
-
-Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1126,10 +1127,10 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T08:28:52.405632Z",
+  "generatedAt": "2026-09-25T08:35:32.626399Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 811,
+  "openCount": 812,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -11165,6 +11166,19 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4217",
+      "rank": 23,
+      "size": "S",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it",
+      "rationale": "New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12257,6 +12271,20 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "from": "PAN-3237",
       "to": "PAN-4210",
       "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4199",
+      "to": "PAN-4217",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4217",
+      "to": "PAN-4199",
+      "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.6
     }
