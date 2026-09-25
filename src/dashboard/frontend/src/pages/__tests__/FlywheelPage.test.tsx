@@ -38,6 +38,7 @@ function setup(status: FlywheelDerivedStatus | 'unreachable') {
     }
     if (url === '/api/merge-train/config') return Response.json(config);
     if (url === '/api/flywheel/state') return Response.json({ exists: false, path: '.pan/flywheel/state.md', content: null, lastModified: null });
+    if (url === '/api/flywheel/report') return Response.json({ exists: false, path: '.pan/flywheel/report.md', content: null, lastModified: null });
     if (url.startsWith('/api/flywheel/stats')) return Response.json(STATS);
     return undefined;
   });
@@ -94,12 +95,16 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     expect(screen.queryByRole('switch', { name: 'Merge train' })).toBeNull();
   });
 
-  it('tabs switch between Status, State, and Stats', async () => {
+  it('tabs switch between Status, State, Report, and Stats (PAN-4199 ac3)', async () => {
     setup(flywheelStatus());
     renderWithQuery(<FlywheelPage />);
     expect(await screen.findByTestId('flywheel-status-pane')).toBeInTheDocument();
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(tabs).toEqual(['status', 'state', 'report', 'stats']);
     fireEvent.click(screen.getByRole('tab', { name: 'state' }));
     expect(await screen.findByText('No flywheel state yet.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'report' }));
+    expect(await screen.findByText('No report yet')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'stats' }));
     expect(screen.getByRole('group', { name: 'Stats window' })).toBeInTheDocument();
     expect(screen.getByTestId('flywheel-conversation-pane')).toBeInTheDocument();

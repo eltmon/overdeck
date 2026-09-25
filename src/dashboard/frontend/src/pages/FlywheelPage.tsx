@@ -13,7 +13,7 @@ import { Activity } from 'lucide-react';
 import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import { FlywheelHeadlineStrip } from '../components/flywheel/FlywheelHeadlineStrip';
 import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookCard';
-import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
+import { FlywheelReportPane, FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
 import { FlywheelStatusPane, FreshnessBadge } from '../components/flywheel/FlywheelStatusPane';
 import { FlywheelUatBatchesCard } from '../components/flywheel/FlywheelUatBatchesCard';
@@ -21,7 +21,8 @@ import { PendingAutoMergesCard } from '../components/flywheel/PendingAutoMergesC
 import { RailCard, StatusBadge, ToggleSwitch } from '../components/flywheel/primitives';
 import { useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
 
-type RailTab = 'status' | 'state' | 'stats';
+type RailTab = 'status' | 'state' | 'report' | 'stats';
+const RAIL_TABS = ['status', 'state', 'report', 'stats'] as const;
 
 export const FLYWHEEL_SPLIT_STORAGE_KEY = 'overdeck.ui.flywheelSplitWidth';
 const SPLIT_MIN_LEFT = 360;
@@ -164,7 +165,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
             ariaLabel="Flywheel run status"
             actions={(
               <div className="flex rounded-md border border-border p-0.5 text-[11px]" role="tablist" aria-label="Flywheel rail tabs">
-                {(['status', 'state', 'stats'] as const).map((id) => (
+                {RAIL_TABS.map((id) => (
                   <button
                     key={id}
                     type="button"
@@ -187,6 +188,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
                 </div>
               )}
               {tab === 'state' && <FlywheelStatePane />}
+              {tab === 'report' && <FlywheelReportPane />}
               {tab === 'stats' && <FlywheelStatsPanel />}
             </div>
           </RailCard>
