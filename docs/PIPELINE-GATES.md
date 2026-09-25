@@ -285,6 +285,16 @@ merge (the executor's, carrying the scheduled head) merges only that head: see
 It never joins the project merge queue; when another merge holds the slot it is
 deferred and the executor re-runs every check on its next try.
 
+**A manual merge is pinned too (#4066 review).** The Merge button, merge-next
+and the project queue merge the head the gate passed (`mergeHeadPin`, sent as
+`gh pr merge --match-head-commit`, the App merge's `sha` or `glab mr merge
+--sha`). When the merge lands the PR as it is (a clean PR, or a branch already
+up to date with its base), a live head that differs from the gated head is
+refused first (`Cannot merge: the PR head moved to …`); click Merge again to
+gate the new head. When the merge makes its own head (its rebase, or the
+`.planning/` strip), it is pinned to that commit. Either way a push that lands
+after that point fails the merge. A strike landing is not pinned.
+
 **The Merge button (#4066 review).** The board's derived `ready` applies the
 gate's approval rule, not the forge's `reviewDecision`. Every gate evaluation
 records its approval answer per issue and head (`recordApprovalAtHead`); the

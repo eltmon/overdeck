@@ -261,6 +261,38 @@ export function automaticMergePin(
 }
 
 /**
+ * #4066 review: the head a merge is pinned to. An automatic merge is pinned as
+ * {@link automaticMergePin} says. A manual merge (the Merge button, the merge
+ * train, the queue) is pinned to the head the server merges: the head the
+ * merge gate passed, or the commit the merge's own rebase or `.planning/`
+ * strip produced. A push that lands after that fails the merge instead of
+ * landing code the gate never saw. A strike landing is not pinned.
+ */
+export function mergeHeadPin(
+  request: TriggerMergeRequest,
+  head?: string | null,
+): { matchHeadCommit?: string } {
+  if (automaticMergeHead(request)) return automaticMergePin(request, head);
+  return request.kind === 'normal' && head ? { matchHeadCommit: head } : {};
+}
+
+/**
+ * #4066 review: a manual merge about to land the PR's live head as it is (the
+ * direct path, or a branch already up to date) refuses when that head is not
+ * the one the merge gate passed: a push landed in between. Null when the heads
+ * agree, either is unknown, or the merge is automatic or a strike.
+ */
+export function manualMergeHeadMoved(
+  request: TriggerMergeRequest,
+  gatedHead: string | null | undefined,
+  liveHead: string | null | undefined,
+): string | null {
+  if (request.kind !== 'normal' || automaticMergeHead(request) || !gatedHead || !liveHead) return null;
+  if (sameCommit(liveHead, gatedHead)) return null;
+  return `Cannot merge: the PR head moved to ${liveHead.slice(0, 12)} after the merge gate passed ${gatedHead.slice(0, 12)}; merge again to check the new head`;
+}
+
+/**
  * #4066 review: an automatic merge may only start from the approved head. The
  * worktree the server rebases and the PR branch on the forge must both be at
  * it, or a commit made or pushed after the approval would be rebased and

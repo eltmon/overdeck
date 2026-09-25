@@ -90,7 +90,10 @@ verdict, every time it's asked.
    head for good. Automatic merges are refused for polyrepo projects (their
    merge sets are left to the operator) and for branches that track
    `.planning/` files (stripping them pushes a head nobody approved); merge
-   those by hand. Otherwise it:
+   those by hand. A manual merge is pinned as well: to the head the gate
+   passed, refused if the PR moved off it before a merge that lands the PR as
+   it is, or to the commit its own rebase or `.planning/` strip produced
+   (see [PIPELINE-GATES](PIPELINE-GATES.md)). Otherwise it:
    - Merges a GitHub-clean PR directly when its head already contains the
      required base and checks are complete.
    - Otherwise runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)`

@@ -110,6 +110,8 @@ vi.mock('../merge-strike.js', () => ({
   ensureAgentReadyForMerge: vi.fn(),
   automaticMergeHead: vi.fn(() => null),
   automaticMergePin: vi.fn(() => ({})),
+  manualMergeHeadMoved: vi.fn(() => null),
+  mergeHeadPin: vi.fn(() => ({})),
   automaticMergeStartRefusal: vi.fn(async () => null),
   forgeMergeGate: vi.fn(async () => ({ refusal: null, facts: { headBranch: 'feature/pan-1', url: null } })),
   forgeMergeGateRefusal: vi.fn(async () => null),

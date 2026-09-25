@@ -229,6 +229,39 @@ describe('triggerMerge server rebase escalation', () => {
     }
   });
 
+  // #4066 review: a manual merge of an up-to-date branch lands the branch as
+  // it is, so it must still be the head the merge gate passed.
+  it('refuses a manual merge when the up-to-date branch moved after the merge gate passed', async () => {
+    const PUSHED = 'd'.repeat(40);
+    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110', headSha: HEAD_SHA, url: PR_URL } });
+    mocks.execFile.mockImplementation(async (file, args) => {
+      if (file === 'gh' && args[0] === 'pr' && args[1] === 'list') return { stdout: JSON.stringify([{ url: PR_URL, state: 'OPEN' }]), stderr: '' };
+      if (file === 'git' && args[0] === 'rev-parse') return { stdout: `${PUSHED}\n`, stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409 }));
+    expect(result.error).toContain(`the PR head moved to ${PUSHED.slice(0, 12)}`);
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+  });
+
+  it('pins a manual up-to-date merge to the head the merge gate passed', async () => {
+    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110', headSha: HEAD_SHA, url: PR_URL } });
+    mocks.execFile.mockImplementation(async (file, args) => {
+      if (file === 'gh' && args[0] === 'pr' && args[1] === 'list') return { stdout: JSON.stringify([{ url: PR_URL, state: 'OPEN' }]), stderr: '' };
+      if (file === 'git' && args[0] === 'rev-parse') return { stdout: `${HEAD_SHA}\n`, stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+    expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: HEAD_SHA }));
+  });
+
   it('engages the work agent after a server-side conflict', async () => {
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.fail({
       message: 'conflict',

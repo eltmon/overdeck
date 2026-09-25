@@ -168,6 +168,8 @@ vi.mock('../merge-strike.js', async (importOriginal) => {
   mergeTargetRefusal: actual.mergeTargetRefusal,
   automaticMergeHead: actual.automaticMergeHead,
   automaticMergePin: actual.automaticMergePin,
+  manualMergeHeadMoved: actual.manualMergeHeadMoved,
+  mergeHeadPin: actual.mergeHeadPin,
   automaticMergeStartRefusal: actual.automaticMergeStartRefusal,
   activeStrikeMerge: vi.fn(() => false),
   advanceMergeQueue: vi.fn(async () => {}),
@@ -252,8 +254,24 @@ describe('triggerMerge clean PR direct merge', () => {
       url: PR_URL,
       method: 'squash',
     }));
-    // A manual merge is not pinned.
-    expect(mocks.mergeReviewArtifact.mock.calls[0]?.[0]).not.toHaveProperty('matchHeadCommit');
+    // #4066 review: a manual merge is pinned to the head the merge gate passed.
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: HEAD_SHA }));
+  });
+
+  // #4066 review: the Merge button's gate passed one head; a push landed
+  // before the merge. The manual merge refuses instead of landing it unseen.
+  it('refuses a manual merge when the PR head moved after the merge gate passed', async () => {
+    const pushed = 'c'.repeat(40);
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ headSha: pushed }));
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({
+      success: false,
+      statusCode: 409,
+      error: `Cannot merge: the PR head moved to ${pushed.slice(0, 12)} after the merge gate passed ${HEAD_SHA.slice(0, 12)}; merge again to check the new head`,
+    }));
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
   });
 
   it('pins an automatic merge to the verified head commit (#3983)', async () => {

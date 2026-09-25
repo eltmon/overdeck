@@ -28,6 +28,8 @@ vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
 const {
   advanceMergeQueue,
   automaticMergePin,
+  manualMergeHeadMoved,
+  mergeHeadPin,
   automaticMergeStartRefusal,
   forgeMergeGateRefusal,
   mergeGateRefusal,
@@ -266,6 +268,25 @@ describe('mergeTargetRefusal (#4066 review)', () => {
       .toEqual(expect.objectContaining({ statusCode: 409 }));
     expect(mergeTargetRefusal({ headBranch: 'feature/pan-1', url: null }, url))
       .toEqual(expect.objectContaining({ statusCode: 409 }));
+  });
+});
+
+describe('mergeHeadPin and manualMergeHeadMoved (#4066 review)', () => {
+  it('pins a manual merge to the head it lands, an automatic one as before, and never a strike', () => {
+    expect(mergeHeadPin({ kind: 'normal' }, 'abc1234')).toEqual({ matchHeadCommit: 'abc1234' });
+    expect(mergeHeadPin({ kind: 'normal' }, null)).toEqual({});
+    expect(mergeHeadPin({ kind: 'normal', expectedHeadSha: 'abc1234' }, 'def5678')).toEqual({ matchHeadCommit: 'def5678' });
+    expect(mergeHeadPin({ kind: 'normal', expectedHeadSha: 'abc1234' })).toEqual({ matchHeadCommit: 'abc1234' });
+    expect(mergeHeadPin({
+      kind: 'strike', markerHead: 'abc1234', workspacePath: '/w', branchName: 'strike/pan-1', recoveryTarget: 'agent-pan-1',
+    }, 'abc1234')).toEqual({});
+  });
+
+  it('refuses a manual merge only when the head it would land is not the gated head', () => {
+    expect(manualMergeHeadMoved({ kind: 'normal' }, 'abc1234', 'abc1234ffff')).toBeNull();
+    expect(manualMergeHeadMoved({ kind: 'normal' }, 'abc1234', 'def5678')).toContain('the PR head moved to def5678');
+    expect(manualMergeHeadMoved({ kind: 'normal' }, null, 'def5678')).toBeNull();
+    expect(manualMergeHeadMoved({ kind: 'normal', expectedHeadSha: 'abc1234' }, 'abc1234', 'def5678')).toBeNull();
   });
 });
 
