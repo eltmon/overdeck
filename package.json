@@ -74,6 +74,10 @@
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0-beta.73",
+    "dompurify": "^3.4.13",
+    "lodash-es": "^4.18.0",
+    "nanoid": "^3.3.18",
+    "tar": "^7.5.21",
     "unrun": "0.2.39"
   },
   "scripts": {
