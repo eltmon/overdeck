@@ -1,0 +1,614 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-25T06:04:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4198: Trim the issue right-click menu to state-relevant actions (Replan split to #4203, sync-main conflict UX split to #4204)",
+    "updated": "2026-09-25T06:10:19.107Z"
+  },
+  "plan": {
+    "id": "pan-4198",
+    "title": "Trim the issue right-click menu to state-relevant actions; add Replan (archive branch + fresh plan from main)",
+    "status": "proposed",
+    "uid": "dc229c5e-e568-43d3-a9e1-f4a144453451",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-25T06:04:54Z",
+    "updated": "2026-09-25T06:10:19.107Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4198",
+        "label": "PAN-4198",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4198.md",
+        "label": "PRD draft (.pan/drafts/pan-4198.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4203",
+        "label": "PAN-4203 (Replan, split sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4204",
+        "label": "PAN-4204 (sync-main conflict UX, split sibling)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "issue-actions",
+      "ux"
+    ],
+    "metadata": {
+      "splitNote": "Parts 3 (Replan) and 4 (sync-main conflict UX) of the original request were split into #4203 and #4204 because the full surface exceeded the 25-file / 6-subsystem finalize gate. This plan covers parts 1-2 (menu trim + consolidation).",
+      "canonicalFilename": "2026-09-25-PAN-4198-trim-the-issue-right-click-menu-to-state-relevant-actions-add-replan-archive-branch-fresh-plan-from-main.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The issue right-click menu (shared grouped body in IssueActionGroupedBody.tsx, driven by ISSUE_ACTIONS in src/dashboard/frontend/src/lib/issueActions.ts) renders all 39 registry actions, including disabled ones with a 'gated' count, and repeats phase primaries. It offers seven overlapping ways to retry an agent, five teardown actions, and jargon like 'Watch planning' (a placeholder dialog) and 'Done planning'. 'Auto-plan' names an unregistered endpoint; 'Start without planning' never sends autoStart; 'Upload transcript' is hard-disabled. The operator cannot tell what half of it means.",
+      "Proposal": "Reshape the registry: add a placement field (menu | contextual), collapse groups to Communicate / Actions / Inspect / Danger, retire 12 overlapping or dead keys with a widened RETIREMENT_AUDIT, relabel everything in plain language, and add getMenuActions(state). Menus render only enabled menu-placed actions, primaries once under 'Next step', Danger only when non-empty, session extras under a collapsed Debug disclosure. Consolidate retry into a 'Restart agent…' dialog (keep memory → /restart or /recover; fresh session → /restart-fresh {spawn:true}) and planning into one 'Plan…' dialog with a 'Start work as soon as the plan is ready' checkbox (autoStart:true). A per-derived-state unit test pins the exact menu set (≤10) for 10 fixtures. Docs and Playwright screenshots follow. No server, CLI or src/lib changes.",
+      "NonGoals": "- The Replan action, `pan replan`, and archive-before-reset (owned by #4203)\n- The sync-main conflict dialog / toast change (owned by #4204)\n- Any server route, CLI verb, or src/lib change; retired UI actions' endpoints (/copy-settings, /sync-discussions, /reset-session, /restart-fresh {spawn:false}, /deep-wipe) stay registered\n- Deleting `pan wipe` or any CLI verb\n- The Zone B session strip (ZoneBActionStrip.tsx, ZONE_B_SESSION_ACTIONS) and its pinned key set\n- The hand-built AgentStepRow right-click menu and the ContainerNode menu\n- CommandPalette.tsx (does not use the registry)\n- A new Start dialog\n- Fixing the stale verifying-on-main-badge reference in pan-1190-verify-close-out.spec.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the four-part request: menu trim + consolidation stay here; Replan → #4203; sync-main conflict UX → #4204.",
+        "rationale": "The full surface is ~30 files across >6 path subsystems, which fails the finalize size gate; each part is independently shippable and the menu budget reserves room for the Replan entry."
+      },
+      {
+        "summary": "Menus hide gated actions instead of showing them disabled.",
+        "rationale": "The acceptance criterion counts visible menu items (≤10); one grouped body serves every menu surface so they stay consistent."
+      },
+      {
+        "summary": "'Start without planning' becomes a PlanDialog checkbox sending autoStart:true, not a Start-dialog option.",
+        "rationale": "No Start dialog exists (startAgent POSTs directly) and the case only arises for unplanned issues, whose entry point is the Plan dialog; the old action never sent autoStart at all."
+      },
+      {
+        "summary": "Restart dialog offers two options (keep memory / fresh session), not three.",
+        "rationale": "restartFromPlan (POST /api/agents) and restart-fresh {spawn:true} produce the same new run on the same branch; the latter also clears stale agent state."
+      },
+      {
+        "summary": "Keys with live card consumers (pause, recoverAgent, rebuildAndStart, createWorkspace) become placement:'contextual' instead of being retired.",
+        "rationale": "NeedsYouSlot, AgentActivityCards, spotlight, AgentsLane, WorkspaceCard and the agent-scope menu invoke them by key; retiring them would break those surfaces."
+      },
+      {
+        "summary": "Wipe is removed from the issue menu; Reset to Todo is its successor.",
+        "rationale": "deepWipeIssue runs the same runDestructiveIssueLifecycle(id,'reset') teardown plus an archive-row flag; `pan wipe` stays in the CLI."
+      },
+      {
+        "summary": "RETIREMENT_AUDIT rows may name a newHome file or a dropped reason when no successor key exists.",
+        "rationale": "upload, syncDiscussions, copySettings, inference, discussions and transcripts have no registry successor; this mirrors THE-CUT.md's 'new home or dropped (why)' idiom instead of deleting the audit."
+      },
+      {
+        "summary": "'Open planning session' dispatches openIssue(issueId, 'conversation').",
+        "rationale": "It is the existing store action that opens the issue drawer on its live conversation; today's action opens a placeholder frame."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi-1-registry-reshape",
+        "title": "Reshape the issue action registry: placement field, four groups, 12 retired keys, plain labels, getMenuActions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:04:54Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4198",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi-2-per-state-test",
+            "wi-3-enabled-only-render",
+            "wi-4-restart-dialog",
+            "wi-5-plan-dialog"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.c-actions.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.c-actions.test.ts src/lib/__tests__/issueActions.parity.test.tsx src/lib/__tests__/issueActions.no-actions-lost.test.ts src/components/CommandDeck/__tests__/action-parity.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all five registry test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "It runs first (wave 0) and no other item touches its files concurrently; wi-3/wi-4 share useIssueActions.ts and IssueActionMenu.tsx with it but are blocked on it by DAG edges."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 and the 'Target registry' table exactly. In issueActions.ts: add `placement: 'menu' | 'contextual'` to IssueActionEntry; set IssueActionGroup = 'communicate' | 'lifecycle' | 'inspect' | 'danger', GROUP_LABELS {communicate:'Communicate', lifecycle:'Actions', inspect:'Inspect', danger:'Danger'}, GROUP_ORDER ['communicate','lifecycle','inspect','danger']; remove the 12 D6 keys (autoPlan, startSkipPlanning, restartFromPlan, completeWorkReset, resetSession, wipe, inference, discussions, transcripts, upload, syncDiscussions, copySettings) from IssueActionKey and ISSUE_ACTION_DEFINITIONS; apply every label/description/group/kind/placement from the table (pause, recoverAgent, rebuildAndStart, createWorkspace are 'contextual'; restartAgent kind 'dialog'; watchPlanning kind 'safe'); add predicates canResumeWork, canRestartAgent, canSyncMain, canResetIssue, canDestroyWorkspace (= hasWorkspace && isDoneOrCanceled — the server's cleanup-workspace route 409s unless the tracker issue is closed/done), tightened canAddToOrderBook and requestReview per the PRD snippet; replace PHASE_PRIMARY_KEYS with the PRD map; add `export function getMenuActions(state)`; delete canStartWithoutPlanning and the orphaned 'Complete review reset' comment. In useIssueActions.ts: drop retired keys from dialogActionKeys, artifactTabs (keep tasks), bodyForAction, destructiveMessage; add restartAgent to dialogActionKeys; in runAction dispatch watchPlanning as `openIssue(issueId, 'conversation')` and return. In IssueActionMenu.tsx: PlanDialog branch condition becomes `activeDialog.key === 'plan'` and drop the autoStart prop. Update inventory.ts actionRelocation rows naming retired keys. Update the five test files per PRD WI-1 step 6, including widening RETIREMENT_AUDIT to allow `newHome` (existing file) or `dropped` (reason) and adding the 12 rows; DESTRUCTIVE_ACTION_KEYS becomes ['closeOut','resetIssue','destroyWorkspace','cancel']. If a predicate disagrees with the PRD's 'Expected menu per derived state' table, the table wins."
+        },
+        "items": [
+          {
+            "id": "wi-1-registry-reshape.ac1",
+            "title": "Given the updated registry, when `npm run typecheck` runs, then it exits 0 and IssueActionKey no longer contains any of the 12 retired keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-registry-reshape.ac2",
+            "title": "GROUP_ORDER equals ['communicate','lifecycle','inspect','danger'] and issueActions.test.ts asserts that exact array and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-registry-reshape.ac3",
+            "title": "issueActions.parity.test.tsx passes with a RETIREMENT_AUDIT row for each of the 12 retired keys, each carrying a live successorKey, an existing newHome file, or a non-empty dropped reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-registry-reshape.ac4",
+            "title": "Given the phase is PLANNING, when the 'Open planning session' action is invoked, then the dispatcher calls openIssue(issueId, 'conversation') and posts no HTTP request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-registry-reshape.ac5",
+            "title": "Given the new registry, ISSUE_ACTIONS still contains pause, recoverAgent, rebuildAndStart and createWorkspace with placement 'contextual', so NeedsYouSlot, AgentsLane and WorkspaceCard key lookups resolve to an action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-2-per-state-test",
+        "title": "Add the per-derived-state menu test pinning the exact action set for 10 fixtures",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:04:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.menu-by-state.test.ts",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/issueActions.menu-by-state.test.ts"
+          ],
+          "expected_outputs": [
+            "issueActions.menu-by-state.test.ts passes with 12 tests (10 fixtures + label test + description test)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/__tests__/issueActions.menu-by-state.test.ts with one `it` per row of the PRD table 'Expected menu per derived state' (backlog, parked, planning, planned, working, in-review, changes-requested, ready, merged, closed). Build fixtures with a baseState helper shaped like issueActions.c-actions.test.ts:110-125 (WORK_PANE; PLAN_PANE = same shape with role 'plan', state 'working'). Assert `new Set(getMenuActions(state).map(a => a.key))` equals the listed set and the length is ≤ 10. Add: no ISSUE_ACTIONS label matches /done planning|watch planning/i; every description matches /^[^\\n]+\\.$/ and does not contain \". \". Append the new file path to the root package.json `test:frontend-subset` script (line 131) because CI runs only that subset (.github/workflows/ci.yml:234)."
+        },
+        "items": [
+          {
+            "id": "wi-2-per-state-test.ac1",
+            "title": "For each of the 10 fixtures, the test asserts getMenuActions returns exactly the PRD's listed key set and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-per-state-test.ac2",
+            "title": "The test rejects any fixture whose menu set exceeds 10 keys (expect(length).toBeLessThanOrEqual(10) per fixture)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-per-state-test.ac3",
+            "title": "The test fails if any registry label contains 'Done planning' or 'Watch planning', or any description is not a single sentence ending in a period",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-per-state-test.ac4",
+            "title": "The root package.json test:frontend-subset script contains src/lib/__tests__/issueActions.menu-by-state.test.ts, so CI runs it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-3-enabled-only-render",
+        "title": "Render only enabled menu-placed actions: primaries once under 'Next step', Danger only when non-empty, session extras under Debug",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:04:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionContextMenu.test.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/IssueActionMenu src/lib/__tests__/issue-actions-surface-parity.test.tsx src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueActionMenu tests, surface parity test and IssueMissionControl test pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In IssueActionGroupedBody.tsx: render only views with `enabled && action.placement === 'menu'`; delete the 'N available now · M gated' line (line 210); rename the 'For this phase' label to 'Next step'; exclude enabled primary keys from the group sections and from Danger; render the Danger disclosure only when it has ≥1 enabled item, header text 'Danger'; replace the always-open 'This session' section with a collapsed 'Debug' disclosure (aria-controls='issue-action-debug-items', same toggle pattern as Danger at lines 251-268). In useIssueActions.ts `layout` (lines 507-518) compute secondary/overflow from enabled menu-placed views only. In IssueActionMenu.tsx the agentScopeOnly path filters by AGENT_SCOPE_ACTION_KEYS and enabled, ignoring placement, so Pause and Recover stay in FleetAgentsView. Update the four test files per PRD WI-3 step 6 (surface-parity expectedActions uses getMenuActions per fixture; context-menu test asserts no 'gated' text, primaries once, Debug toggle; IssueActionMenu test drops the wipe case; IssueMissionControl mocks include placement and assert no Danger section when nothing is enabled)."
+        },
+        "items": [
+          {
+            "id": "wi-3-enabled-only-render.ac1",
+            "title": "Given a working-state issue, when the context menu opens, then it renders no disabled action rows and no text matching /gated/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-enabled-only-render.ac2",
+            "title": "Given an enabled phase primary, when the menu renders, then that action's label appears exactly once (under 'Next step')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-enabled-only-render.ac3",
+            "title": "Given no Danger action is enabled, when the menu renders, then no 'Danger' disclosure is present; given FeatureItem session extras, they render only after the collapsed 'Debug' toggle is activated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-enabled-only-render.ac4",
+            "title": "Given agentScopeOnly with a live paused-capable agent, when the menu renders, then 'Pause agent' is still offered even though its placement is contextual",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-4-restart-dialog",
+        "title": "Add the 'Restart agent…' dialog routing keep-memory to /restart or /recover and fresh-session to /restart-fresh",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:04:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/RestartAgentDialog.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/RestartAgentDialog.test.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/IssueActionMenu/RestartAgentDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "RestartAgentDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 and decisions D10/D11. In useIssueActions.ts add optional `endpoint?: string` to PostActionInput and to submitDialogAction(action, body, endpoint?); the mutation fetches interpolateEndpoint(input.endpoint ?? action.endpoint, issueId, agent, state, selectedTaskId), so 409 recovery, error alert and refresh stay shared. Expose `state` (IssueActionState) on UseIssueActionsResult if not already exposed. Create RestartAgentDialog.tsx inside ActionDialogFrame with two radio options: 'Keep its memory' (default) and 'Fresh session' (copy: 'The workspace, branch, plan and tasks stay. The agent's saved conversation is discarded.') and one 'Restart' button. Routing: keep + live agent (status not in stopped/failed/dead/error/stuck) → '/api/agents/:agentId/restart' body {graceful:true}; keep + stopped → '/api/agents/:agentId/recover' body {}; fresh → '/api/agents/:agentId/restart-fresh' body {spawn:true}. Add the IssueActionDialogHost branch for activeDialog.key === 'restartAgent'. Follow pan-style-guide (no pill badges, no decorative color)."
+        },
+        "items": [
+          {
+            "id": "wi-4-restart-dialog.ac1",
+            "title": "Given a live agent and 'Keep its memory', when Restart is clicked, then fetch receives POST /api/agents/agent-pan-1/restart with body {graceful:true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-restart-dialog.ac2",
+            "title": "Given a stopped agent and 'Keep its memory', when Restart is clicked, then fetch receives POST /api/agents/agent-pan-1/recover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-restart-dialog.ac3",
+            "title": "Given 'Fresh session', when Restart is clicked, then fetch receives POST /api/agents/agent-pan-1/restart-fresh with body {spawn:true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-restart-dialog.ac4",
+            "title": "Given the 'Restart agent…' menu item is invoked, then the dialog host renders RestartAgentDialog with the two restart options instead of the generic fallback frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-5-plan-dialog",
+        "title": "Make 'Plan…' one dialog with 'Plan with me' / 'Plan automatically' and a start-after-planning checkbox",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:04:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/PlanDialog.tsx",
+            "src/dashboard/frontend/src/components/PlanDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/PlanDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PlanDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 and D8. In PlanDialog.tsx remove the `autoStart` prop (line 21, 91), `autoStartTriggered` (line 111) and the auto-click effect (lines 506-513). Add `const [startAfterPlanning, setStartAfterPlanning] = useState(false)` and a checkbox labeled 'Start work as soon as the plan is ready' alongside the existing checkboxes (~lines 816-856). Add `autoStart: startAfterPlanning` to the start-planning POST body (line 216); the server maps it to autoSpawnOnFinalize (src/lib/overdeck/planning-sessions.ts:169,430). Relabel the buttons at lines 914 and 922 to 'Plan with me' and 'Plan automatically'. Add a PlanDialog.test.tsx case asserting the POST body."
+        },
+        "items": [
+          {
+            "id": "wi-5-plan-dialog.ac1",
+            "title": "Given the 'Start work as soon as the plan is ready' box is checked, when 'Plan automatically' is clicked, then the POST to /api/issues/:id/start-planning carries auto:true and autoStart:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-plan-dialog.ac2",
+            "title": "Given the box is unchecked, when 'Plan with me' is clicked, then the POST body carries autoStart:false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-plan-dialog.ac3",
+            "title": "PlanDialog renders buttons labeled 'Plan with me' and 'Plan automatically' and no longer accepts an autoStart prop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-6-menu-screenshots",
+        "title": "Add a Playwright spec that captures the menu in 3 states in light and dark themes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:04:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4198-issue-menu.spec.ts",
+            "docs/images/pan-4198/*.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4198-issue-menu.spec.ts"
+          ],
+          "expected_outputs": [
+            "6 PNG files written to docs/images/pan-4198/ (planned, working, changes-requested × light, dark)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. Seed state the way src/dashboard/frontend/tests/pan-1190-verify-close-out.spec.ts:20-133 does (page.route('**/src/lib/wsTransport.ts*') returning a module with a snapshot including derivedIssueStates, plus page.route for /api/*). Seed three issues in derived states planned, working, changes-requested. Use an isolated browser context (no shared Playwright session). Right-click each issue row in the project tree, screenshot the open menu in light and dark themes, and write 6 PNGs to docs/images/pan-4198/<state>-<theme>.png (test-results/ is gitignored, and GitHub has no API to upload images into a PR body). Implementation checkpoint: if the stubbed transport cannot render the project tree, right-click a Kanban card instead (KanbanCards.tsx:663-668 opens the same grouped body) and note the fallback in the PR. Commit the PNGs and embed them in the PR description as https://github.com/eltmon/overdeck/blob/feature/pan-4198/docs/images/pan-4198/<file>.png?raw=true links."
+        },
+        "items": [
+          {
+            "id": "wi-6-menu-screenshots.ac1",
+            "title": "Running the spec produces 6 PNG screenshots (3 states × light/dark) of the open issue menu under docs/images/pan-4198/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-menu-screenshots.ac2",
+            "title": "Each screenshot renders only the expected menu items for its state and no 'gated' text or disabled rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-menu-screenshots.ac3",
+            "title": "The PNGs are committed under docs/images/pan-4198/ and the PR description contains an image link to each of the six files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-7-docs",
+        "title": "Document the trimmed menu in docs/ISSUE-VIEW.md, reference/architecture.mdx and the OKF issue-actions concept",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:04:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4198",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "reference/architecture.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Reset to' docs/ISSUE-VIEW.md reference/architecture.mdx",
+            "grep -niE 'done planning|watch planning' docs/ISSUE-VIEW.md || true"
+          ],
+          "expected_outputs": [
+            "each file reports a count of at least 1 for 'Reset to'",
+            "no 'Done planning' / 'Watch planning' matches in docs/ISSUE-VIEW.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. docs/ISSUE-VIEW.md: rewrite §'Issue action registry contract' (line 65) and §'Protected issue-row action menu' (line 77) to state that menus render only enabled `placement: 'menu'` actions, the four groups (Communicate / Actions / Inspect / Danger), the 'Next step' section with primaries shown once, the collapsed Debug disclosure, the retired-key table from PRD D6, and the per-derived-state table from the PRD. reference/architecture.mdx line 166: replace 'click \"Deep Wipe\"' with 'choose **Reset to Todo** from the issue's right-click menu'. OKF concept /home/eltmon/Projects/overdeck-knowledge/frontend/issue-actions.md (outside this repo): update via `/okf author` so its Action → endpoint list drops the retired keys and adds placement plus the Restart dialog routing; if that bundle is not writable from the work session, paste the concept delta into the PR description under 'OKF follow-up'."
+        },
+        "items": [
+          {
+            "id": "wi-7-docs.ac1",
+            "title": "docs/ISSUE-VIEW.md contains the rule that menus render only enabled menu-placed actions and contains a table of the 12 retired keys with their successor or new home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-docs.ac2",
+            "title": "reference/architecture.mdx contains the instruction to use the issue right-click menu's reset action (label 'Reset to …') and no longer contains 'click \"Deep Wipe\"'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-docs.ac3",
+            "title": "The OKF issue-actions concept contains no retired key (donePlanning label, restartFromPlan, completeWorkReset, wipe) as a menu action, or the PR description contains the concept delta under 'OKF follow-up'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi-1-registry-reshape",
+        "to": "wi-2-per-state-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-registry-reshape",
+        "to": "wi-3-enabled-only-render",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-registry-reshape",
+        "to": "wi-4-restart-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3-enabled-only-render",
+        "to": "wi-4-restart-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-registry-reshape",
+        "to": "wi-5-plan-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3-enabled-only-render",
+        "to": "wi-6-menu-screenshots",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
