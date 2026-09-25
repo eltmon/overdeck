@@ -7,6 +7,11 @@ vi.mock('../../components/flywheel/FlywheelConversationPane', () => ({
 }));
 vi.mock('../../components/flywheel/FlywheelOrderBookCard', () => ({ FlywheelOrderBookCard: () => null }));
 vi.mock('../../components/flywheel/PendingAutoMergesCard', () => ({ PendingAutoMergesCard: () => null }));
+// Both have their own tests and their own network; here only their presence
+// in the page matters, and an unmocked one leaks fetches past the test body.
+vi.mock('../../components/flywheel/FlywheelHeadlineStrip', () => ({
+  FlywheelHeadlineStrip: () => <section aria-label="Flywheel headline" />,
+}));
 // The card's own test covers its counts; here only its presence in the rail matters.
 vi.mock('../../components/flywheel/FlywheelUatBatchesCard', () => ({
   FlywheelUatBatchesCard: () => <section aria-label="UAT batches" />,

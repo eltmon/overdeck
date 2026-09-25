@@ -31,7 +31,8 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(row).toHaveTextContent('#4001 · review-requested · pending');
     expect(row).toHaveTextContent('review.dispatched · 5m ago');
     expect(screen.getByTestId('flywheel-inflight-PAN-3920')).toHaveTextContent('working');
-    fireEvent.click(screen.getByRole('button', { name: 'PAN-3964' }));
+    // The Live agents list also links PAN-3964, so scope to this row's button.
+    fireEvent.click(row.querySelector('button')!);
     expect(onNavigateIssue).toHaveBeenCalledWith('PAN-3964');
   });
 
@@ -101,6 +102,41 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
 
       render(<FlywheelStatusPane status={rowsStatus([{}, {}], { inFlightSource: 'census' })} unreachable={false} nowMs={NOW} />);
       expect(screen.getByRole('region', { name: 'In-flight issues' })).toHaveTextContent('2 feature workspaces');
+    });
+  });
+
+  describe('live agents (PAN-4199 WI-14)', () => {
+    const AGENTS = [
+      { issueId: 'PAN-3964', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'working' },
+      { issueId: 'PAN-3920', role: 'review', harness: 'codex', model: 'gpt-5.5', state: 'blocked' },
+    ];
+
+    it('lists every agent with its issue, role, model, and pane state (ac1)', () => {
+      render(<FlywheelStatusPane status={flywheelStatus({ agents: AGENTS })} unreachable={false} nowMs={NOW} />);
+      const section = screen.getByRole('region', { name: 'Live agents' });
+      expect(section).toHaveTextContent('Agents · 2');
+      for (const agent of AGENTS) {
+        const row = screen.getByTestId(`flywheel-agent-${agent.issueId}-${agent.role}`);
+        expect(row).toHaveTextContent(agent.issueId);
+        expect(row).toHaveTextContent(agent.role);
+        expect(row).toHaveTextContent(agent.model);
+        expect(row).toHaveTextContent(agent.state);
+      }
+    });
+
+    it('navigates to the issue from an agent row (ac2)', () => {
+      const onNavigateIssue = vi.fn();
+      render(
+        <FlywheelStatusPane status={flywheelStatus({ agents: [AGENTS[1]!] })} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />,
+      );
+      const row = screen.getByTestId('flywheel-agent-PAN-3920-review');
+      fireEvent.click(row.querySelector('button')!);
+      expect(onNavigateIssue).toHaveBeenCalledWith('PAN-3920');
+    });
+
+    it('says so plainly when no pane is live (ac3)', () => {
+      render(<FlywheelStatusPane status={flywheelStatus({ agents: [] })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByText('No agent panes are live for these issues.')).toBeInTheDocument();
     });
   });
 

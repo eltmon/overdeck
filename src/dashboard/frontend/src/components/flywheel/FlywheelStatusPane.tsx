@@ -33,6 +33,9 @@ export function FreshnessBadge({ freshness, at, nowMs }: { freshness: FlywheelFr
 
 const ATTENTION_TONE: Record<string, Tone> = { 'needs-you': 'warning', stuck: 'destructive', 'api-error': 'destructive' };
 
+/** A pane state is the machine's, not the operator's: only `blocked` is on them. */
+const PANE_STATE_TONE: Record<string, Tone> = { working: 'info', blocked: 'warning' };
+
 /**
  * What the board is counting. A running loop's own tick list is the authority
  * on what it picked up; with no tick, the rows are just the workspace census
@@ -199,6 +202,36 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
               ))}
             </tbody>
           </table>
+        )}
+      </section>
+
+      <section aria-label="Live agents">
+        <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Agents · {status.agents.length}
+        </h3>
+        {status.agents.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No agent panes are live for these issues.</p>
+        ) : (
+          <ul className="space-y-1 text-xs">
+            {status.agents.map((agent) => (
+              <li
+                key={`${agent.issueId}-${agent.role}-${agent.agentId ?? ''}`}
+                className="flex items-baseline gap-2"
+                data-testid={`flywheel-agent-${agent.issueId}-${agent.role}`}
+              >
+                <button
+                  type="button"
+                  className="whitespace-nowrap font-mono text-foreground hover:underline"
+                  onClick={() => onNavigateIssue?.(agent.issueId)}
+                >
+                  {agent.issueId}
+                </button>
+                <span className="text-muted-foreground">{agent.role}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground">{agent.model}</span>
+                <StatusBadge tone={PANE_STATE_TONE[agent.state] ?? 'neutral'}>{agent.state}</StatusBadge>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>
