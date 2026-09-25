@@ -135,4 +135,20 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
-<!-- last-verified: 2026-09-20 -->
+- **Unknown harness strings silently behave like Claude Code** — `getHarnessBehavior`
+  (`packages/contracts/src/harness-behavior.ts`) and `getTranscriptAdapter`
+  (`src/lib/conversations/transcript-adapter.ts`) fall back to Claude, and ~40
+  hand-copied harness unions/guard chains (not imported from contracts) compile fine
+  when a new literal is missing. Only 7 Records are type-forced (BEHAVIORS,
+  POLICY_RUNTIME_NAMES, harness-policy `unlisted: never`, policy decisions,
+  HARNESS_BINARY_BY_RUNTIME, HARNESS_MARKERS, frontend HARNESS_BRANDS/HARNESS_LABELS).
+  Adding a harness needs a full grep, not typecheck (PAN-3668 PRD has the list).
+- **`AcpRuntimeSync.spawnAgent`/`killAgent` are tmux-only** (`src/lib/runtimes/acp.ts`
+  `tmuxCreateSession`, `tmux list-panes`) — Cloister crash respawn/kill miss ACP and
+  OpenCode panes on a Herdr host. Host-backed harnesses are also hardcoded as
+  `acp || opencode` pairs across delivery/messaging/recovery/conversation-runtime.
+- **Prime Agent RPC mode spawns a detached per-user daemon** (verified 0.8.0) that
+  outlives its client and is restarted by resident workers; managed launches must use
+  a private `--daemon-socket` and reap its process group (PAN-3668 D2/D3).
+
+<!-- last-verified: 2026-09-25 -->
