@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T06:18:38.656065Z · model: claude-opus-5-5 · open: 808_
+_Last sequenced: 2026-09-25T06:28:33.911060Z · model: claude-opus-5-5 · open: 807_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 18 | PAN-4206 | S | critical | ok |  |  | Plain Herdr shell panes default to role=work, so the 10-agent ceiling reads 14/10 and every work-agent start is deferred |
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -816,10 +815,6 @@ _Last sequenced: 2026-09-25T06:18:38.656065Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-4206 (rank 18)
-
-New issue (2026-09-25). paneFromBackendSnapshot defaults an untokened pane to the work role, so operator shells and each workspace first pane count toward admittedWorkAgentCount. Every new workspace adds a phantom agent, and the guardrail already holds the planned starts for PAN-4198, PAN-4199 and PAN-4201. It blocks all pickup, so it ranks in the free slot ahead of PAN-3983. The root cause is named and the fix is small.
-
 ### PAN-3983 (rank 19)
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
@@ -1116,6 +1111,10 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 
 New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
 
+### PAN-2511 (rank 119)
+
+Work agents burn 20+ min on false test failures — sandbox denies spawnSync git (EPERM); a per-issue cycle-time sink.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1123,10 +1122,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T06:18:38.656065Z",
+  "generatedAt": "2026-09-25T06:28:33.911060Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 808,
+  "openCount": 807,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11110,19 +11109,6 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "rationale": "New issue split from PAN-4198 (part 4). It depends explicitly on PAN-4203 because its main button calls the Replan endpoint, so it sits in the first free slot after PAN-4203. Scope is small and fully located (server message, route payload, two frontend callers, CLI hint), so condition is ok.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4206",
-      "rank": 18,
-      "size": "S",
-      "importance": "critical",
-      "score": 93,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Plain Herdr shell panes default to role=work, so the 10-agent ceiling reads 14/10 and every work-agent start is deferred",
-      "rationale": "New issue (2026-09-25). paneFromBackendSnapshot defaults an untokened pane to the work role, so operator shells and each workspace first pane count toward admittedWorkAgentCount. Every new workspace adds a phantom agent, and the guardrail already holds the planned starts for PAN-4198, PAN-4199 and PAN-4201. It blocks all pickup, so it ranks in the free slot ahead of PAN-3983. The root cause is named and the fix is small.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12182,27 +12168,6 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-4206",
-      "to": "PAN-4198",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-4206",
-      "to": "PAN-4199",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-4206",
-      "to": "PAN-4201",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.85
     }
   ]
 }
