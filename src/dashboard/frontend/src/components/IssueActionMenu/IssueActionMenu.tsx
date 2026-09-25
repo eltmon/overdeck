@@ -24,6 +24,7 @@ import {
   type NonIssueActionInvocation,
 } from './IssueActionGroupedBody';
 import { IssueOpenInDialog } from './IssueOpenInDialog';
+import { RestartAgentDialog } from './RestartAgentDialog';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
 import { useIssueActions } from './useIssueActions';
 
@@ -314,13 +315,13 @@ function OverflowButton({
   );
 }
 
-type ActionDialogFrameProps = {
+export type ActionDialogFrameProps = {
   label: string;
   onClose: () => void;
   children: ReactNode;
 };
 
-function ActionDialogFrame({ label, onClose, children }: ActionDialogFrameProps) {
+export function ActionDialogFrame({ label, onClose, children }: ActionDialogFrameProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
@@ -426,6 +427,10 @@ export function IssueActionDialogHost({ actions, onAfterClose }: { issueId?: str
 
   if (activeDialog.key === 'addToOrderBook') {
     return <NewOrderBookDialog actions={actions} onClose={handleClose} />;
+  }
+
+  if (activeDialog.key === 'restartAgent') {
+    return <RestartAgentDialog action={activeDialog.action} actions={actions} onClose={handleClose} />;
   }
 
   return (

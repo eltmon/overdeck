@@ -58,7 +58,13 @@ export type UseIssueActionsResult = IssueActionLayout & {
   phase: PipelinePhase;
   activeDialog: IssueActionDialogState;
   closeDialog: () => void;
-  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => void;
+  submitDialogAction: (
+    action: IssueActionEntry,
+    body?: Record<string, unknown>,
+    selectedTaskId?: string | null,
+    /** PAN-4198 (D11): overrides `action.endpoint` for this one call. */
+    endpoint?: string,
+  ) => void;
   createOrderBookForIssue: (name: string) => Promise<void>;
   isActionPending: (key: IssueActionKey) => boolean;
 };
@@ -67,6 +73,8 @@ type PostActionInput = {
   action: IssueActionEntry;
   body?: Record<string, unknown>;
   selectedTaskId?: string | null;
+  /** PAN-4198 (D11): posted instead of `action.endpoint` when present. */
+  endpoint?: string;
 };
 
 function activeAgentForIssue(agents: Agent[], issueId: string) {
@@ -275,10 +283,11 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
   const postActionMutation = useMutation({
-    mutationFn: async ({ action, body, selectedTaskId }: PostActionInput) => {
-      if (!action.endpoint) return { success: true };
+    mutationFn: async ({ action, body, selectedTaskId, endpoint }: PostActionInput) => {
+      const target = endpoint ?? action.endpoint;
+      if (!target) return { success: true };
       const payload = body ?? bodyForAction(action, issueId, issue);
-      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), {
+      const response = await fetch(interpolateEndpoint(target, issueId, agent, state, selectedTaskId), {
         method: 'POST',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),
@@ -297,7 +306,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
           openRecovery({
             ...recovery,
             issueId,
-            retry: { url: interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), body: payload ?? {} },
+            retry: { url: interpolateEndpoint(target, issueId, agent, state, selectedTaskId), body: payload ?? {} },
           });
           return { success: false, recovery: true };
         }
@@ -340,9 +349,14 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     onSettled: () => setPendingKey(null),
   });
 
-  const submitDialogAction = useCallback((action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => {
+  const submitDialogAction = useCallback((
+    action: IssueActionEntry,
+    body?: Record<string, unknown>,
+    selectedTaskId?: string | null,
+    endpoint?: string,
+  ) => {
     setPendingKey(action.key);
-    postActionMutation.mutate({ action, body, selectedTaskId });
+    postActionMutation.mutate({ action, body, selectedTaskId, endpoint });
   }, [postActionMutation]);
 
   const addToOrderBookMutation = useMutation({

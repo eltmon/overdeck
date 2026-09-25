@@ -496,7 +496,12 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
 
 const hasAgent = (state: IssueActionState) => !!state.agent;
 const hasWorkspace = (state: IssueActionState) => state.workspace?.exists === true;
-const hasLiveAgent = (state: IssueActionState) => !!state.agent && !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(state.agent.status);
+/**
+ * PAN-4198: exported because RestartAgentDialog routes keep-memory to /restart
+ * for a live agent and /recover for a stopped one, and that has to be the same
+ * liveness rule the registry gates Stop agent and Message agent with.
+ */
+export const hasLiveAgent = (state: IssueActionState) => !!state.agent && !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(state.agent.status);
 const hasStoppedAgent = (state: IssueActionState) => !hasLiveAgent(state);
 const hasResumableSession = (state: IssueActionState) => hasStoppedAgent(state) && state.lifecycle?.canResumeSession === true;
 const isPaused = (state: IssueActionState) => state.agent?.paused === true;
