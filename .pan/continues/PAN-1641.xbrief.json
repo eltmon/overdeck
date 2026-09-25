@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-09-25T08:24:39.158Z",
+  "updated": "2026-09-25T08:24:51.374Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -466,6 +466,10 @@
     "ollama-provider-routing.ac4": {
       "status": "completed",
       "doneAt": "2026-09-25T08:24:39.158Z"
+    },
+    "ollama-spawn-env.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T08:24:51.373Z"
     }
   }
 }
