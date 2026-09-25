@@ -125,9 +125,9 @@ export function LiveAgentsView({ onCountsChange, onShowHistory }: LiveAgentsView
     setPreviewHidden(!previewHidden);
   };
 
-  // Dragging the preview below its minimum collapses it too; keep the button honest.
-  const onPreviewResize = useCallback((size: PanelSize, _id: string | number | undefined, previous: PanelSize | undefined) => {
-    if (previous === undefined) return;
+  // Dragging the preview below its minimum collapses it too, and a saved
+  // layout can open it collapsed; keep the button honest in both cases.
+  const onPreviewResize = useCallback((size: PanelSize) => {
     setPreviewHidden(size.asPercentage === 0);
   }, []);
 
