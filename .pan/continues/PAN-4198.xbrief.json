@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4198",
   "created": "2026-09-25T06:47:47.581Z",
-  "updated": "2026-09-25T09:04:52.387Z",
+  "updated": "2026-09-25T09:05:03.927Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "wi-4-restart-dialog.ac3": {
       "status": "completed",
       "doneAt": "2026-09-25T09:04:52.386Z"
+    },
+    "wi-4-restart-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:05:03.927Z"
     }
   }
 }
