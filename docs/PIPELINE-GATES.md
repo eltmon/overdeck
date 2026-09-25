@@ -298,7 +298,9 @@ the scheduler, so its button appears once some gate evaluation or marker read
 has proven it; the Merge endpoint itself always asks the gate. Conditions 3 and
 4 still surface as the refusal when the button is clicked. The UAT train's
 candidate set (`listReadyIssuesForProject`) keeps the forge's own decision: it
-is mostly held issues, and it merges nothing.
+is mostly held issues the scheduler never gates. Promoting a UAT batch lands
+each member only when its derived state is `ready`, so the promote click runs
+the gate for every member first, recording a fresh answer for its head.
 
 **Trusted verdict comments.** The repository is public and anyone can comment
 on a PR, so a verdict marker counts only when its comment's author is `OWNER`,
@@ -394,7 +396,10 @@ agent that daemonizes out of its harness's process tree and scrubs all three
 variables is read as the operator, and any agent can post an
 `overdeck-verdict: APPROVED sha=<head>` comment with `gh pr comment` without
 going through this command at all; the marker trust rule cannot tell that
-comment from the review agent's. Closing that needs verdicts posted under an
+comment from the review agent's. The ancestry read fails the other way too: a
+long-lived process started from an agent pane (a tmux or Herdr server, a
+dashboard) passes that agent's id to everything beneath it, so an operator
+conversation under it is read as that agent and its override is refused. Closing that needs verdicts posted under an
 identity agents cannot use (the GitHub App, with markers trusted only from
 it).
 

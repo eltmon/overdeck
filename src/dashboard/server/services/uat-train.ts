@@ -55,6 +55,7 @@ import {
   type UatGenerationRepo,
 } from '../../../lib/overdeck/merge-sync.js';
 import { getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
+import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPath, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
@@ -778,6 +779,11 @@ export async function postUatGenerationPromotePayload(
   await Promise.all((getUatGeneration(name)?.members ?? []).map(async (member) => {
     const issueId = member.issueId.toUpperCase();
     try {
+      // #4066 review: derived `ready` applies the merge gate's approval answer
+      // for the member's head. The auto-merge scheduler never gates a member
+      // held for UAT, so run the gate here (the operator's promote click) to
+      // record a fresh answer before deriving.
+      await evaluateIssueMergeGate(issueId);
       const derived = await getDerivedIssueState(issueId);
       memberStates.set(issueId, derived.state === 'ready'
         ? { eligible: true }
