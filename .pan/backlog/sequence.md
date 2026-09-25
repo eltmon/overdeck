@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T01:28:23.764Z · model: claude-opus-5-5 · open: 802_
+_Last sequenced: 2026-09-25T01:51:41.077Z · model: claude-opus-5-5 · open: 802_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1117,7 +1117,7 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T01:28:23.764Z",
+  "generatedAt": "2026-09-25T01:51:41.077Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 802,
