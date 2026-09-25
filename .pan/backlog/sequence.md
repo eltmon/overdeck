@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T04:44:10.309030Z · model: claude-opus-5-5 · open: 800_
+_Last sequenced: 2026-09-25T05:05:31.826953Z · model: claude-opus-5-5 · open: 801_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -207,32 +207,33 @@ _Last sequenced: 2026-09-25T04:44:10.309030Z · model: claude-opus-5-5 · open: 
 | 254 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
-| 257 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
-| 258 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
-| 259 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
-| 260 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 261 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 262 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
-| 263 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 264 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 265 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
-| 266 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 267 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
-| 268 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 269 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 270 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 271 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 272 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 273 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
-| 274 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 275 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 276 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
-| 277 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
-| 278 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
-| 279 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
-| 280 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
-| 281 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 282 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 257 | PAN-4193 | S | medium | ok |  |  | EINTR from @parcel/watcher poll() trips the PAN-3915 breaker, so conversation search stops indexing; resubscribe on EINTR instead |
+| 258 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
+| 259 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
+| 260 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
+| 261 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 262 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 263 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
+| 264 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 266 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
+| 267 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
+| 268 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
+| 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 272 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 273 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 274 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
+| 275 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 277 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
+| 278 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
+| 279 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
+| 280 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
+| 281 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
+| 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 283 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
 | 284 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
 | 285 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
 | 286 | PAN-2754 | S | high | ok |  |  | `always` is inert |
@@ -1115,10 +1116,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T04:44:10.309030Z",
+  "generatedAt": "2026-09-25T05:05:31.826953Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 800,
+  "openCount": 801,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -3683,8 +3684,21 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "planning": "auto"
     },
     {
-      "issue": "PAN-3533",
+      "issue": "PAN-4193",
       "rank": 257,
+      "size": "S",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "EINTR from @parcel/watcher poll() trips the PAN-3915 breaker, so conversation search stops indexing; resubscribe on EINTR instead",
+      "rationale": "New issue (2026-09-25). The root cause is traced to upstream @parcel/watcher throwing on EINTR, and the fix is small and scoped to two watcher services with a clear sanity cap. It sits next to PAN-3771 because both leave conversation search silently broken for the operator.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3533",
+      "rank": 258,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -3696,7 +3710,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-3107",
-      "rank": 258,
+      "rank": 259,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -3708,7 +3722,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-3762",
-      "rank": 259,
+      "rank": 260,
       "size": "XL",
       "importance": "high",
       "score": 64,
@@ -3721,7 +3735,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-1666",
-      "rank": 260,
+      "rank": 261,
       "size": "XL",
       "importance": "medium",
       "score": 63,
@@ -3735,7 +3749,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-1556",
-      "rank": 261,
+      "rank": 262,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -3748,7 +3762,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2188",
-      "rank": 262,
+      "rank": 263,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3761,7 +3775,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2190",
-      "rank": 263,
+      "rank": 264,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -3774,7 +3788,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2233",
-      "rank": 264,
+      "rank": 265,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -3787,7 +3801,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2008",
-      "rank": 265,
+      "rank": 266,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3802,7 +3816,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-1325",
-      "rank": 266,
+      "rank": 267,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -3814,7 +3828,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-1728",
-      "rank": 267,
+      "rank": 268,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -3827,7 +3841,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2241",
-      "rank": 268,
+      "rank": 269,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3839,7 +3853,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2242",
-      "rank": 269,
+      "rank": 270,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3851,7 +3865,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2240",
-      "rank": 270,
+      "rank": 271,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3863,7 +3877,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2243",
-      "rank": 271,
+      "rank": 272,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -3875,7 +3889,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2202",
-      "rank": 272,
+      "rank": 273,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3887,7 +3901,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2195",
-      "rank": 273,
+      "rank": 274,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3900,7 +3914,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2237",
-      "rank": 274,
+      "rank": 275,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3912,7 +3926,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2487",
-      "rank": 275,
+      "rank": 276,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3924,7 +3938,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2469",
-      "rank": 276,
+      "rank": 277,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3936,7 +3950,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2212",
-      "rank": 277,
+      "rank": 278,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3948,7 +3962,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2213",
-      "rank": 278,
+      "rank": 279,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3960,7 +3974,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2211",
-      "rank": 279,
+      "rank": 280,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3972,7 +3986,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2210",
-      "rank": 280,
+      "rank": 281,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3984,7 +3998,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2201",
-      "rank": 281,
+      "rank": 282,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -3996,7 +4010,7 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     },
     {
       "issue": "PAN-2646",
-      "rank": 282,
+      "rank": 283,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -12014,6 +12028,13 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     {
       "from": "PAN-4191",
       "to": "PAN-1852",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4193",
+      "to": "PAN-3771",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
