@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4198",
   "created": "2026-09-25T06:47:47.581Z",
-  "updated": "2026-09-25T09:06:04.510Z",
+  "updated": "2026-09-25T09:06:13.539Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "wi-6-menu-screenshots.ac3": {
       "status": "completed",
       "doneAt": "2026-09-25T09:06:04.510Z"
+    },
+    "wi-7-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:06:13.539Z"
     }
   }
 }
