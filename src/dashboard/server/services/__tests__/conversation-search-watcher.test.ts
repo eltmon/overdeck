@@ -8,7 +8,7 @@ import type { EmbeddingsDbHandle } from '../../../../lib/database/conversation-e
 import type { ConversationEmbeddingProvider } from '../../../../lib/conversation-search/embedding-provider.js';
 import { getConversationSearchHealth, resetConversationSearchHealthForTests } from '../../../../lib/conversation-search/health.js';
 import { indexConversationSearch } from '../../../../lib/conversation-search/indexer.js';
-import { ConversationDirectoryWatcher } from '../conversation-directory-watcher.js';
+import { ConversationDirectoryWatcher, isInterruptedPollError } from '../conversation-directory-watcher.js';
 import { ConversationSearchWatcher, startConversationSearchWatcher, stopConversationSearchWatcher, syncConversationSearchWatcher, type ConversationSearchWatcherOptions } from '../conversation-search-watcher.js';
 
 class FakeWatcher {
@@ -317,12 +317,12 @@ describe('conversation search watcher', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(getConversationSearchHealth().watcher).toMatchObject({ state: 'running', restarts: 0 });
 
-      watchers[0]!.emitError(new Error('Unable to poll: Interrupted system call'));
+      watchers[0]!.emitError(new Error('Unable to poll: Bad file descriptor'));
       await vi.advanceTimersByTimeAsync(0);
       expect(watchers[0]!.close).toHaveBeenCalledTimes(1);
       expect(getConversationSearchHealth().watcher).toMatchObject({
         state: 'restarting',
-        lastErrorReason: 'Unable to poll: Interrupted system call',
+        lastErrorReason: 'Unable to poll: Bad file descriptor',
       });
 
       await vi.advanceTimersByTimeAsync(999);
@@ -334,7 +334,7 @@ describe('conversation search watcher', () => {
       expect(getConversationSearchHealth().watcher).toMatchObject({
         state: 'running',
         restarts: 1,
-        lastErrorReason: 'Unable to poll: Interrupted system call',
+        lastErrorReason: 'Unable to poll: Bad file descriptor',
         nextRestartAt: null,
       });
 
@@ -404,7 +404,7 @@ describe('conversation search watcher', () => {
       expect(failing.lastErrorReason).toBe('network down');
       expect(failing.lastSuccessAt).toBeNull();
 
-      watchers[0]!.emitError(new Error('Unable to poll: Interrupted system call'));
+      watchers[0]!.emitError(new Error('Unable to poll: Bad file descriptor'));
       await vi.advanceTimersByTimeAsync(1_000);
 
       const recovered = getConversationSearchHealth();
@@ -582,6 +582,134 @@ describe('conversation search watcher', () => {
 
       await watcher.stop();
       await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(watchFactory).toHaveBeenCalledTimes(1);
+      expect(getConversationSearchHealth().watcher).toBeNull();
+    });
+  });
+  describe('EINTR from the parcel inotify poll (PAN-4193)', () => {
+    const eintr = () => new Error('Unable to poll: Interrupted system call');
+
+    it('classifies the parcel poll EINTR as benign and nothing else', () => {
+      expect(isInterruptedPollError(eintr())).toBe(true);
+      expect(isInterruptedPollError(Object.assign(new Error('poll failed'), { code: 'EINTR' }))).toBe(true);
+      expect(isInterruptedPollError(new Error('Unable to poll: Bad file descriptor'))).toBe(false);
+      expect(isInterruptedPollError(Object.assign(new Error('ENOSPC: System limit for number of file watchers reached'), { code: 'ENOSPC' }))).toBe(false);
+      expect(isInterruptedPollError('Interrupted system call')).toBe(false);
+      expect(isInterruptedPollError(null)).toBe(false);
+    });
+
+    it('resubscribes after a fixed tick, runs a bounded catch-up each time, and never trips the breaker', async () => {
+      vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'));
+      const { watcher, watchers, watchFactory, indexAll } = restartableWatcher();
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Far past the 5-restart breaker, at a rate well under the per-minute cap.
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const errorAt = Date.now();
+        watchers[attempt]!.emitError(eintr());
+        await vi.advanceTimersByTimeAsync(49);
+        expect(watchers[attempt]!.close).toHaveBeenCalledTimes(1);
+        expect(watchFactory).toHaveBeenCalledTimes(attempt + 1);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(watchFactory).toHaveBeenCalledTimes(attempt + 2);
+        expect(indexAll).toHaveBeenCalledTimes(attempt + 2);
+        expect(indexAll).toHaveBeenLastCalledWith(expect.objectContaining({ modifiedSince: errorAt - 5_000 }));
+        await vi.advanceTimersByTimeAsync(10_000);
+      }
+
+      expect(watcher.failed).toBe(false);
+      expect(getConversationSearchHealth().watcher).toMatchObject({
+        state: 'running',
+        restarts: 40,
+        lastErrorReason: 'Unable to poll: Interrupted system call',
+        nextRestartAt: null,
+      });
+
+      await watcher.stop();
+    });
+
+    it('leaves the backoff state alone: a real error after EINTR resubscribes still sees the healthy window', async () => {
+      const { watcher, watchers, watchFactory } = restartableWatcher();
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+
+      watchers[0]!.emitError(new Error('real error'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(watchFactory).toHaveBeenCalledTimes(2);
+
+      // Up for 4s in all, with an EINTR resubscribe partway through.
+      await vi.advanceTimersByTimeAsync(3_000);
+      watchers[1]!.emitError(eintr());
+      await vi.advanceTimersByTimeAsync(50);
+      expect(watchFactory).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(950);
+
+      // The watcher stayed up for the full 4s cap, so the backoff starts over at 1s.
+      watchers[2]!.emitError(new Error('another real error'));
+      await vi.advanceTimersByTimeAsync(999);
+      expect(watchFactory).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(watchFactory).toHaveBeenCalledTimes(4);
+
+      await watcher.stop();
+    });
+
+    it('treats EINTR past 30 resubscribes a minute as a real failure and trips the breaker', async () => {
+      const { watcher, watchers, watchFactory } = restartableWatcher();
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        watchers[attempt]!.emitError(eintr());
+        await vi.advanceTimersByTimeAsync(50);
+      }
+      expect(watchFactory).toHaveBeenCalledTimes(31);
+
+      // Over the cap: backoff and breaker, exactly as for any other error.
+      for (const [step, delay] of [1_000, 2_000, 4_000, 4_000, 4_000].entries()) {
+        const current = 30 + step;
+        watchers[current]!.emitError(eintr());
+        await vi.advanceTimersByTimeAsync(50);
+        expect(watchFactory).toHaveBeenCalledTimes(current + 1);
+        expect(getConversationSearchHealth().watcher?.state).toBe('restarting');
+        await vi.advanceTimersByTimeAsync(delay - 50);
+        expect(watchFactory).toHaveBeenCalledTimes(current + 2);
+      }
+      expect(watcher.failed).toBe(false);
+
+      watchers[35]!.emitError(eintr());
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      expect(watchFactory).toHaveBeenCalledTimes(36);
+      expect(watcher.failed).toBe(true);
+      expect(getConversationSearchHealth().watcher).toMatchObject({ state: 'failed', nextRestartAt: null });
+
+      await watcher.stop();
+    });
+
+    it('a cap of 0 sends EINTR down the regular backoff path', async () => {
+      const { watcher, watchers, watchFactory } = restartableWatcher({ maxInterruptedResubscribesPerMinute: 0 });
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+
+      watchers[0]!.emitError(eintr());
+      await vi.advanceTimersByTimeAsync(999);
+      expect(watchFactory).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(watchFactory).toHaveBeenCalledTimes(2);
+
+      await watcher.stop();
+    });
+
+    it('stop() cancels a pending EINTR resubscribe', async () => {
+      const { watcher, watchers, watchFactory } = restartableWatcher();
+      watcher.start();
+      await vi.advanceTimersByTimeAsync(0);
+      watchers[0]!.emitError(eintr());
+
+      await watcher.stop();
+      await vi.advanceTimersByTimeAsync(1_000);
 
       expect(watchFactory).toHaveBeenCalledTimes(1);
       expect(getConversationSearchHealth().watcher).toBeNull();

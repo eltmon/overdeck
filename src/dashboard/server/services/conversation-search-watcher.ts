@@ -12,7 +12,7 @@ import {
 } from '../../../lib/conversation-search/health.js';
 import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
-import { ConversationDirectoryWatcher } from './conversation-directory-watcher.js';
+import { ConversationDirectoryWatcher, isInterruptedPollError } from './conversation-directory-watcher.js';
 import { claudeProjectsRoot } from '../../../lib/runtimes/storage/claude-code.js';
 
 interface WatcherLike {
@@ -41,6 +41,11 @@ export interface ConversationSearchWatcherOptions {
   restartMaxDelayMs?: number;
   /** Re-armed watchers in a row that may fail inside the healthy window before restarts stop. */
   maxConsecutiveRestarts?: number;
+  /**
+   * EINTR resubscribes allowed in a sliding minute before an EINTR counts as a
+   * real failure (backoff + breaker). See isInterruptedPollError.
+   */
+  maxInterruptedResubscribesPerMinute?: number;
   log?: Pick<Console, 'log' | 'warn'>;
 }
 
@@ -50,6 +55,15 @@ const DEFAULT_WRITE_POLL_MS = 50;
 const DEFAULT_RESTART_BASE_DELAY_MS = 1_000;
 const DEFAULT_RESTART_MAX_DELAY_MS = 60_000;
 const DEFAULT_MAX_CONSECUTIVE_RESTARTS = 5;
+const DEFAULT_MAX_INTERRUPTED_RESUBSCRIBES_PER_MINUTE = 30;
+const INTERRUPTED_RESUBSCRIBE_WINDOW_MS = 60_000;
+/**
+ * Fixed, non-growing delay before an EINTR resubscribe. Parcel drops the dead
+ * backend from its (unlocked) shared map on its own thread right after queuing
+ * the error callback; a tick of slack keeps the new subscribe from picking up
+ * the dying backend.
+ */
+const INTERRUPTED_RESUBSCRIBE_DELAY_MS = 50;
 /** Catch-up looks back this far before the first watcher error, for writes whose events were lost as it died. */
 const CATCH_UP_MARGIN_MS = 5_000;
 
@@ -91,6 +105,7 @@ export class ConversationSearchWatcher {
   private readonly restartBaseDelayMs: number;
   private readonly restartMaxDelayMs: number;
   private readonly maxConsecutiveRestarts: number;
+  private readonly maxInterruptedResubscribesPerMinute: number;
   private readonly log: Pick<Console, 'log' | 'warn'>;
   readonly signature: string;
   private watcher: WatcherLike | null = null;
@@ -107,6 +122,8 @@ export class ConversationSearchWatcher {
   /** A restart happened while a sweep was running; run the catch-up once it ends. */
   private catchUpPending = false;
   private breakerTripped = false;
+  /** When each recent EINTR resubscribe happened; pruned to the last minute. */
+  private interruptedResubscribes: number[] = [];
   private readonly activeTasks = new Set<Promise<void>>();
   private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly queued = new Set<string>();
@@ -126,6 +143,7 @@ export class ConversationSearchWatcher {
     this.restartBaseDelayMs = Math.max(1, options.restartBaseDelayMs ?? DEFAULT_RESTART_BASE_DELAY_MS);
     this.restartMaxDelayMs = Math.max(this.restartBaseDelayMs, options.restartMaxDelayMs ?? DEFAULT_RESTART_MAX_DELAY_MS);
     this.maxConsecutiveRestarts = Math.max(0, options.maxConsecutiveRestarts ?? DEFAULT_MAX_CONSECUTIVE_RESTARTS);
+    this.maxInterruptedResubscribesPerMinute = Math.max(0, options.maxInterruptedResubscribesPerMinute ?? DEFAULT_MAX_INTERRUPTED_RESUBSCRIBES_PER_MINUTE);
     this.log = options.log ?? console;
   }
 
@@ -225,6 +243,7 @@ export class ConversationSearchWatcher {
     this.watcher = null;
     const now = Date.now();
     this.outageStartedAt ??= now;
+    if (this.tryInterruptedResubscribe(watcher, error, now)) return;
     // Only a watcher that stayed up for a full backoff cap starts the backoff over,
     // so an error loop (even one with events in between) cannot restart faster.
     if (now - this.lastArmedAt >= this.restartMaxDelayMs) this.consecutiveWatcherErrors = 0;
@@ -243,14 +262,47 @@ export class ConversationSearchWatcher {
     this.restartTimer = setTimeout(() => {
       this.restartTimer = null;
       if (this.stopped) return;
-      this.armWatcher();
-      recordConversationSearchWatcherRestarted();
+      this.rearmAndCatchUp();
       this.log.log('[conversation-search] watcher restarted');
-      // Transcripts written while the watcher was dead produced no events. A
-      // sweep already running may have passed them, so queue one after it.
-      if (this.startupTask) this.catchUpPending = true;
-      else this.runFullIndex('catch-up');
     }, delayMs);
+  }
+
+  /**
+   * PAN-4193: an EINTR from parcel's inotify poll (see isInterruptedPollError)
+   * is a signal landing on the backend thread, not a broken watch. Resubscribe
+   * after a fixed tick with no backoff, and leave the breaker's counter and
+   * healthy window alone. Past the per-minute cap it falls through and counts
+   * as a real failure. Returns whether the error was handled here.
+   */
+  private tryInterruptedResubscribe(watcher: WatcherLike, error: unknown, now: number): boolean {
+    if (!isInterruptedPollError(error)) return false;
+    this.interruptedResubscribes = this.interruptedResubscribes.filter((at) => now - at < INTERRUPTED_RESUBSCRIBE_WINDOW_MS);
+    if (this.interruptedResubscribes.length >= this.maxInterruptedResubscribesPerMinute) {
+      this.log.warn(`[conversation-search] watcher interrupted ${this.interruptedResubscribes.length} times in the last minute; treating it as a failure`);
+      return false;
+    }
+    this.interruptedResubscribes.push(now);
+    this.closeErroredWatcher(watcher);
+    recordConversationSearchWatcherError(error, INTERRUPTED_RESUBSCRIBE_DELAY_MS);
+    this.log.log('[conversation-search] watcher poll interrupted (EINTR), resubscribing');
+    // Resubscribing must not look like a fresh arm to the breaker's healthy window.
+    const armedAt = this.lastArmedAt;
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null;
+      if (this.stopped) return;
+      this.rearmAndCatchUp();
+      this.lastArmedAt = armedAt;
+    }, INTERRUPTED_RESUBSCRIBE_DELAY_MS);
+    return true;
+  }
+
+  private rearmAndCatchUp(): void {
+    this.armWatcher();
+    recordConversationSearchWatcherRestarted();
+    // Transcripts written while the watcher was dead produced no events. A
+    // sweep already running may have passed them, so queue one after it.
+    if (this.startupTask) this.catchUpPending = true;
+    else this.runFullIndex('catch-up');
   }
 
   private closeErroredWatcher(watcher: WatcherLike): void {

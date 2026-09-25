@@ -7,6 +7,28 @@ type ErrorHandler = (error: unknown) => void;
 type Subscription = Awaited<ReturnType<typeof parcelWatcher.subscribe>>;
 
 /**
+ * PAN-4193: true for the error a subscription dies with when a signal
+ * interrupts parcel's inotify poll.
+ *
+ * `@parcel/watcher` 2.6.0 `src/linux/InotifyBackend.cc` (`InotifyBackend::start`,
+ * ~:40-42) throws `runtime_error("Unable to poll: " + strerror(errno))` whenever
+ * `poll()` returns < 0, including EINTR, instead of retrying. `Backend::handleError`
+ * then sends that error to every subscription on the backend and drops it from the
+ * shared map, so the inotify thread is gone and the subscriptions are dead. The
+ * dashboard spawns many children, so SIGCHLD makes this routine. Nothing is wrong
+ * with the watched tree: a fresh subscribe gets a fresh backend thread.
+ *
+ * The error reaches JS as a plain `Error` with no `code`, so the message is the
+ * real signal; `code === 'EINTR'` covers any wrapper that sets one.
+ */
+export function isInterruptedPollError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  if ((error as NodeJS.ErrnoException).code === 'EINTR') return true;
+  const message = error instanceof Error ? error.message : String((error as { message?: unknown }).message ?? '');
+  return /Interrupted system call|\bEINTR\b/.test(message);
+}
+
+/**
  * Watch conversation trees through one native recursive subscription per root.
  *
  * Node's fs.watch/chokidar implementations retain one FSEventWrap per watched
@@ -57,6 +79,9 @@ export class ConversationDirectoryWatcher {
       const subscription = await parcelWatcher.subscribe(root, (error, events) => {
         if (this.stopped) return;
         if (error) {
+          // An EINTR error (see isInterruptedPollError) leaves this subscription
+          // dead too. It is forwarded, not resubscribed here, so the owner can
+          // run its catch-up for events lost while the subscription was down.
           this.emitError(error);
           return;
         }
