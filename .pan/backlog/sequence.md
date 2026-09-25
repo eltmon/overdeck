@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T09:05:37.157504Z · model: claude-opus-5-5 · open: 812_
+_Last sequenced: 2026-09-25T09:14:07.319761Z · model: claude-opus-5-5 · open: 813_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -9,6 +9,7 @@ _Last sequenced: 2026-09-25T09:05:37.157504Z · model: claude-opus-5-5 · open: 
 | 21 | PAN-4210 | M | critical | ok |  |  | Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start |
 | 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
+| 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -836,6 +837,10 @@ New in-pipeline bug. A stale troubled flag blocks pan start, and the error names
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
 
+### PAN-4219 (rank 24)
+
+New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
+
 ### PAN-3566 (rank 26)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
@@ -1116,10 +1121,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 
 New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
 
-### PAN-2639 (rank 115)
-
-codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1127,10 +1128,10 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T09:05:37.157504Z",
+  "generatedAt": "2026-09-25T09:14:07.319761Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 812,
+  "openCount": 813,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -11179,6 +11180,19 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "rationale": "New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4219",
+      "rank": 24,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix.",
+      "rationale": "New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12287,6 +12301,20 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4201",
+      "to": "PAN-4219",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4217",
+      "to": "PAN-4219",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
     }
   ]
 }
