@@ -284,7 +284,7 @@ describe('evaluateIssueMergeGate — approval bound to the PR head (#3983)', () 
     expect(readReviews).not.toHaveBeenCalled();
   });
 
-  it('takes a GitLab approval as the forge gives it', async () => {
+  it('takes a GitLab approval (a named approver, read into `approved`) as proof', async () => {
     const facts = readyFacts('MIN-1', { forge: 'gitlab', approvedAtHead: undefined });
     const result = await evaluateIssueMergeGate('MIN-1', { getFacts: async () => facts, ciTestsRequired: () => false });
     expect(result.ready).toBe(true);

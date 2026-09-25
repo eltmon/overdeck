@@ -113,6 +113,8 @@ export interface PrFactsDeps {
   resolveRepos?: typeof resolveProjectReposForIssue;
   listGitLabMrs?: typeof listOpenGitLabMergeRequests;
   viewGitLabMr?: (projectPath: string, iid: number) => Promise<GitLabMrView>;
+  /** The MR's approvals (`GET /projects/:id/merge_requests/:iid/approvals`). */
+  readGitLabApprovals?: (projectPath: string, iid: number) => Promise<GitLabMrApprovals>;
   /**
    * The GitHub logins Overdeck posts verdict comments as (the `gh` user, the
    * GitHub App bot). Read only when a verdict marker comes from an author
@@ -140,9 +142,22 @@ export interface GitLabMrView {
   merge_status?: string;
   has_conflicts?: boolean;
   approvals_before_merge?: number | null;
-  approved?: boolean;
   head_pipeline?: { status?: string } | null;
   pipeline?: { status?: string } | null;
+}
+
+/**
+ * #4066 review: what GitLab's `/merge_requests/:iid/approvals` endpoint
+ * reports. `glab mr view -F json` carries no approval at all, and the
+ * endpoint's own `approved` is true whenever the project requires no approvals
+ * (`approvals_required: 0`, as the MYN backend does), so only `approved_by`,
+ * which `glab mr approve` fills, is evidence someone approved the MR.
+ */
+export interface GitLabMrApprovals {
+  approved?: boolean;
+  approvals_required?: number;
+  approvals_left?: number;
+  approved_by?: ReadonlyArray<{ user?: { username?: string | null } | null }> | null;
 }
 
 /**
@@ -429,6 +444,15 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: Trusted
   };
 }
 
+async function defaultReadGitLabApprovals(projectPath: string, iid: number): Promise<GitLabMrApprovals> {
+  const { stdout } = await execFileAsync(
+    'glab',
+    ['api', `projects/${encodeURIComponent(projectPath)}/merge_requests/${iid}/approvals`],
+    { encoding: 'utf-8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 },
+  );
+  return JSON.parse(stdout) as GitLabMrApprovals;
+}
+
 async function defaultViewGitLabMr(projectPath: string, iid: number): Promise<GitLabMrView> {
   const { stdout } = await execFileAsync(
     'glab',
@@ -455,7 +479,12 @@ function gitLabChecks(view: GitLabMrView): ChecksVerdict {
   return 'pending';
 }
 
-function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMrView | null): PrFacts {
+function gitLabFacts(
+  issueId: string,
+  row: GitLabMergeRequestRow,
+  view: GitLabMrView | null,
+  approvals: GitLabMrApprovals | null = null,
+): PrFacts {
   const state = (view?.state ?? row.state ?? '').toLowerCase();
   const merged = state === 'merged';
   const detailed = view?.detailed_merge_status;
@@ -467,9 +496,11 @@ function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMr
         ? true
         : null;
   // GitLab has no "request changes" primitive; approval is the only verdict the
-  // forge models. `not_approved` means the MR is otherwise mergeable but has no
-  // approval yet, which is `REVIEW_REQUIRED`, not "changes requested".
-  const approved = view?.approved === true || (detailed != null && detailed === 'mergeable');
+  // forge models. #4066 review: approval is positive evidence only, a named
+  // approver in `approved_by` (what `glab mr approve` records). A `mergeable`
+  // merge status says the pipeline passed and nothing conflicts; with zero
+  // approvals required it says nothing about whether anyone approved.
+  const approved = (approvals?.approved_by?.length ?? 0) > 0;
   return {
     issueId: issueId.toUpperCase(),
     forge: 'gitlab',
@@ -617,8 +648,9 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
     if (!row?.iid) return emptyPrFacts(issueId);
     const projectPath = parseGitLabProjectPath(row.web_url);
     if (!projectPath) return gitLabFacts(issueId, row, null);
+    let view: GitLabMrView;
     try {
-      return gitLabFacts(issueId, row, await viewGitLabMr(projectPath, row.iid));
+      view = await viewGitLabMr(projectPath, row.iid);
     } catch (cause) {
       // Without the MR view there is no approval, pipeline or mergeability to
       // judge. Keep the row's identity but say why, so a refusal names the
@@ -626,6 +658,15 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsO
       return {
         ...gitLabFacts(issueId, row, null),
         error: `GitLab MR view failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      };
+    }
+    try {
+      return gitLabFacts(issueId, row, view, await (deps.readGitLabApprovals ?? defaultReadGitLabApprovals)(projectPath, row.iid));
+    } catch (cause) {
+      // No approvals read is no approval: the refusal names the failed read.
+      return {
+        ...gitLabFacts(issueId, row, view),
+        error: `GitLab MR approvals read failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
       };
     }
   } catch (cause) {

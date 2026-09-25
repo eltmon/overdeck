@@ -14,6 +14,7 @@ import {
   getPrFacts,
   resetPrFactsCache,
   type GitHubReviewRecord,
+  type GitLabMrApprovals,
   type GitLabMrView,
   type PrFactsDeps,
 } from '../pr-facts.js';
@@ -202,7 +203,10 @@ describe('getPrFacts — approvedAtHead (GitHub)', () => {
 describe('getPrFacts — approvedAtHead (GitLab)', () => {
   const WEB_URL = 'https://gitlab.com/mind-your-now/frontend/-/merge_requests/77';
 
-  function deps(view: GitLabMrView): PrFactsDeps {
+  function deps(
+    view: GitLabMrView,
+    approvals: GitLabMrApprovals = { approved: true, approvals_required: 0, approved_by: [] },
+  ): PrFactsDeps {
     return {
       fetchGitHubPr: async (issueId) => ({ issueId, pr: null }),
       resolveRepos: () => [{
@@ -210,6 +214,7 @@ describe('getPrFacts — approvedAtHead (GitLab)', () => {
       }] as never,
       listGitLabMrs: async () => [{ iid: 77, source_branch: 'feature/min-77', web_url: WEB_URL, state: 'opened' }] as never,
       viewGitLabMr: async () => view,
+      readGitLabApprovals: async () => approvals,
     };
   }
 
@@ -219,8 +224,8 @@ describe('getPrFacts — approvedAtHead (GitLab)', () => {
       iid: 77, state: 'opened', web_url: WEB_URL, sha: 'f00d', source_branch: 'feature/min-77',
       detailed_merge_status: 'mergeable',
     }));
-    // Merge readiness still reads the MR as it did.
-    expect(facts.approved).toBe(true);
+    // #4066 review: a mergeable MR with nobody in `approved_by` is not approved.
+    expect(facts.approved).toBe(false);
     expect(facts.mergeable).toBe(true);
     expect(facts.approvedAtHead).toBeUndefined();
     expect(await forgeApprovalAtHead(facts, async () => { throw new Error('not GitHub'); })).toBeUndefined();
@@ -233,8 +238,9 @@ describe('getPrFacts — approvedAtHead (GitLab)', () => {
     resetPrFactsCache();
     const facts = await getPrFacts('MIN-77', deps({
       iid: 77, state: 'opened', web_url: WEB_URL, sha: 'f00d', source_branch: 'feature/min-77',
-      detailed_merge_status: 'mergeable', approved: true,
-    }));
+      detailed_merge_status: 'mergeable',
+    }, { approved: true, approvals_required: 0, approved_by: [{ user: { username: 'eltmon' } }] }));
+    expect(facts.approved).toBe(true);
     expect(facts.approvedAtHead).toBeUndefined();
   });
 });
