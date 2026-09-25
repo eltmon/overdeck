@@ -565,11 +565,56 @@ so re-verifies nothing; only a parent with no run state at all falls back to the
 full review door. At most one re-dispatch per issue per hour: the cooldown is
 held in memory and, because the deacon child's memory dies on restart, also read
 back from the routine's own `review.redispatched` entry. A recovery that launches
-nothing (every lane already wrote its report) journals and reports nothing, so
-the routine never claims a re-dispatch that did not happen (PAN-3914). When the
-synthesis parent `agent-<issue>-review` is also confirmed dead, that stall is not
-recoverable here (#4134), so the routine logs a `[deacon-lite]` warning once per
-cooldown; a live or indeterminate parent stays quiet.
+nothing journals and reports nothing, so the routine never claims a re-dispatch
+that did not happen (PAN-3914). While some lane is still live without a report
+and the synthesis parent `agent-<issue>-review` is confirmed dead, the routine
+logs a `[deacon-lite]` warning once per cooldown; a live or indeterminate parent
+stays quiet.
+
+When every lane of the run already wrote its report, there is no lane to
+relaunch; what is missing is the synthesis (#4134). The routine then re-runs the
+synthesis step (`redispatchReviewSynthesis` in `review-synthesis-recovery.ts`,
+with a prompt that says the reports are already on disk) only when all of these
+hold: no `review.verdict` is journaled for the run, the run has had fewer than
+three synthesis re-dispatches, the liveness oracle (`isAlive` +
+`isConfirmedDead`) confirms the parent `agent-<issue>-review` dead, and the
+cooldown above has passed. The cooldown starts before the relaunch, and an
+in-flight guard makes an overlapping patrol tick do nothing. The issue pause
+hold comes first: a paused issue, or one whose pause cannot be read, never
+reaches lane or synthesis recovery (PAN-3911).
+
+Under the per-issue review lifecycle lock, the relaunch re-checks everything
+that can change under it and does nothing unless all of it still holds:
+
+- the parent's resume gates allow an **autonomous** relaunch
+  (`decideResumeGate(…, 'autonomous')`): `stoppedByUser`, `paused`, `troubled`
+  and failure backoff all hold it. The hold is logged once.
+- the operator did not abort the review: `pan review abort` journals
+  `review.aborted`, and an abort after the last `review.dispatched` holds it
+  (as the journal's last entry, it also stops the patrol outright).
+- the parent is still confirmed dead, and its saved `reviewRunId` is still the
+  run being recovered.
+- the run id still names the workspace HEAD (`agent-<issue>-review-<head8>`, the
+  idempotency guard's comparison). A run for a head that moved, or an unreadable
+  head, is stale and is never synthesized: recovery logs it and leaves the next
+  review to the dispatch that owns the current head (`pan done`, the webhook,
+  `pan review request`).
+
+It resumes the saved parent session when there is one. A refused resume is
+final: "appears healthy" means another caller already relaunched the parent,
+and a gate refusal is an operator hold. Only a parent with no session to resume
+(or a harness/model drift) gets a fresh spawn: its dead pane is closed and only
+the parent's own state dir is reset (the lanes' state dirs and `sessions.json`
+indexes stay). A fresh spawn for the same run carries the parent's
+`reviewOperatorRequested` flag (#4139).
+
+An indeterminate probe is never death: it takes no action, logs once per
+unknown streak, and re-probes after five minutes rather than every tick. The
+re-dispatch is journaled as `review.redispatched` with
+`via: synthesis-recovery` and the `runId`, which is also the restart-proof
+cooldown and the retry count. After three for one run the routine journals
+`review.synthesis-gave-up`, warns in the activity feed, and stops: that entry is
+the journal's last, so the patrol leaves the issue to the operator.
 
 **Accepted v1 gaps** (stated in the module, deliberately not built): a convoy
 where some reviewers posted a verdict and one died is not recovered, because the

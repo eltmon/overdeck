@@ -57,6 +57,9 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/preemption.ts|const result = await resumeAgent(agent.id);',
   'lib/cloister/preemption.ts|const result = await resumeAgent(agentId);',
   'lib/cloister/review-agent.ts|const resumeResult = await resumeAgent(reviewAgentId, prompt);',
+  // #4134: synthesis recovery resumes a confirmed-dead review parent with the
+  // synthesis prompt; a refused resume is returned as a failed recovery.
+  'lib/cloister/review-synthesis-recovery.ts|const resumed = await resumeAgent(parentId, prompt);',
   'lib/cloister/review-convoy.ts|await messageAgent(params.synthesisAgentId, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);',
   'lib/cloister/review-convoy.ts|const resumeResult = await resumeAgent(reviewerAgent, prompt);',
   'lib/cloister/review-verdict-feedback.ts|deliveryOutcome = await messageAgent(',

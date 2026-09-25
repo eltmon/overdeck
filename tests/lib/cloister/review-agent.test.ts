@@ -16,7 +16,8 @@
  */
 
 import { Effect } from 'effect';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHash } from 'node:crypto';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, readFileSync as readTestFileSync, rmSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 
@@ -32,6 +33,11 @@ import {
   spawnReviewRoleForIssue,
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
+import {
+  redispatchReviewSynthesis,
+  __resetSynthesisRecoveryForTests,
+} from '../../../src/lib/cloister/review-synthesis-recovery.js';
+import { appendPipelineEntry } from '../../../src/lib/cloister/pipeline-journal.js';
 
 const {
   mockKillSessionAsync,
@@ -56,6 +62,11 @@ const {
   mockWipeAgentStateDirs,
   mockMarkAgentStoppedState,
   mockConvergeRowFromVerdictOfRecord,
+  mockCloseAgentPaneDetailed,
+  mockIsAlive,
+  mockRemoveAgentStateDir,
+  mockResolveWorkspaceRepoRoots,
+  mockSnapshotWorkspaceHeads,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockListSessionNames: vi.fn().mockReturnValue([]),
@@ -79,32 +90,26 @@ const {
   mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
   mockMarkAgentStoppedState: vi.fn((state: { id?: string; status?: string }) => ({ ...state, status: 'stopped' })),
   mockConvergeRowFromVerdictOfRecord: vi.fn(),
+  mockCloseAgentPaneDetailed: vi.fn(),
+  mockIsAlive: vi.fn(),
+  mockRemoveAgentStateDir: vi.fn(),
+  mockResolveWorkspaceRepoRoots: vi.fn(),
+  mockSnapshotWorkspaceHeads: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
   agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
-  // PAN-3939: reviewer kills close through the terminal backend. Here the close
-  // stands in for the tmux kill the assertions below count. Like the real
-  // close, it never throws: a kill that fails is a `failed` outcome.
-  closeAgentPaneDetailed: async (agentId: string) => {
-    try {
-      await mockKillSessionAsync(agentId);
-      return { outcome: 'closed' };
-    } catch (err) {
-      return { outcome: 'failed', reason: err instanceof Error ? err.message : String(err) };
-    }
-  },
+  // PAN-3939: reviewer kills close through the terminal backend. By default the
+  // close stands in for the tmux kill the assertions below count (see beforeEach);
+  // like the real close, it never throws: a kill that fails is a `failed` outcome.
+  closeAgentPaneDetailed: (agentId: string) => mockCloseAgentPaneDetailed(agentId),
   // The shutdown sweep lists Herdr panes only on Herdr; these tests run on tmux.
   resolveLaunchBackend: async () => ({ name: 'tmux' }),
 }));
 
-// PAN-3939: the synthesis dispatch guard asks the liveness oracle. These tests
-// run with no reviewer alive; the backend paths are covered end to end in
-// src/lib/cloister/__tests__/review-agent-terminal-backend.test.ts.
-vi.mock('../../../src/lib/agents/liveness.js', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../../../src/lib/agents/liveness.js')>(),
-  isAlive: vi.fn(async () => ({ alive: false, reason: 'no-session' })),
-}));
+// PAN-3939: the synthesis dispatch guard asks the liveness oracle (mocked below
+// through mockIsAlive, which defaults to no reviewer alive); the backend paths are
+// covered end to end in src/lib/cloister/__tests__/review-agent-terminal-backend.test.ts.
 
 vi.mock('../../../src/lib/overdeck/agents.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../src/lib/overdeck/agents.js')>(),
@@ -140,11 +145,46 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getProviderAuthMode: vi.fn(async () => 'apikey'),
 }));
 
-vi.mock('../../../src/lib/agents/agent-state.js', () => ({
-  getAgentState: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
-  saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
-  markAgentStoppedState: (...args: Parameters<typeof mockMarkAgentStoppedState>) => mockMarkAgentStoppedState(...args),
+vi.mock('../../../src/lib/agents/agent-state.js', async () => {
+  // The resume-gate policy is pure: synthesis recovery runs the real one.
+  const actual = await vi.importActual<typeof import('../../../src/lib/agents/agent-state.js')>('../../../src/lib/agents/agent-state.js');
+  return {
+    getAgentState: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
+    saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
+    markAgentStoppedState: (...args: Parameters<typeof mockMarkAgentStoppedState>) => mockMarkAgentStoppedState(...args),
+    decideResumeGate: actual.decideResumeGate,
+    getAgentResumeGateBlockReason: actual.getAgentResumeGateBlockReason,
+  };
+});
+
+vi.mock('../../../src/lib/agents/liveness.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/agents/liveness.js')>()),
+  isAlive: (agentId: string) => mockIsAlive(agentId),
 }));
+
+vi.mock('../../../src/lib/agents/state-dir-removal.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/agents/state-dir-removal.js')>()),
+  removeAgentStateDir: (dirPath: string) => mockRemoveAgentStateDir(dirPath),
+}));
+
+// The run id embeds the workspace head; these seams let a case pin that head.
+vi.mock('../../../src/lib/project-repos.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/project-repos.js')>();
+  return {
+    ...actual,
+    resolveWorkspaceRepoRoots: (...args: Parameters<typeof actual.resolveWorkspaceRepoRoots>) =>
+      (mockResolveWorkspaceRepoRoots.getMockImplementation() ? mockResolveWorkspaceRepoRoots(...args) : actual.resolveWorkspaceRepoRoots(...args)),
+  };
+});
+
+vi.mock('../../../src/lib/git-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/git-utils.js')>();
+  return {
+    ...actual,
+    snapshotWorkspaceHeads: (...args: Parameters<typeof actual.snapshotWorkspaceHeads>) =>
+      (mockSnapshotWorkspaceHeads.getMockImplementation() ? mockSnapshotWorkspaceHeads(...args) : actual.snapshotWorkspaceHeads(...args)),
+  };
+});
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfigSync: mockLoadConfigSync,
@@ -212,6 +252,16 @@ beforeEach(() => {
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockClearFeedbackFiles.mockResolvedValue(undefined);
   mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
+  mockCloseAgentPaneDetailed.mockImplementation(async (agentId: string) => {
+    try {
+      await mockKillSessionAsync(agentId);
+      return { outcome: 'closed' };
+    } catch (err) {
+      return { outcome: 'failed', reason: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  mockIsAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+  mockRemoveAgentStateDir.mockResolvedValue({ removedFiles: 0, preservedTranscripts: 0, removedDir: true });
 });
 
 const REVIEW_MODE_WORKSPACE = '/tmp/pan-review-mode';
@@ -1238,8 +1288,296 @@ describe('convoy orchestration', () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('already launched');
+    expect(result.allReported).toBe(false);
     expect(mockSpawnRun).not.toHaveBeenCalled();
     expect(mockMarkAgentStoppedState).not.toHaveBeenCalled();
+  });
+
+  // #4134: the no-op answer says whether every lane's report is on disk, so
+  // deacon-lite can tell "all reported, synthesis missing" from "lanes live".
+  it('reports allReported and the run when every lane already wrote its report', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    prepareWorkspace(workspace);
+    const manifestPath = writeReviewManifest(workspace);
+    const reviewDir = dirname(manifestPath);
+    for (const role of ['security', 'correctness', 'performance', 'requirements']) {
+      writeFileSync(`${reviewDir}/${role}.md`, `${role} complete`, 'utf-8');
+    }
+    mockGetAgentState.mockImplementation((agentId: string) => agentId === 'agent-pan-1059-review'
+      ? { id: agentId, workspace, reviewRunId: REVIEW_AGENT_RUN_ID, reviewContextManifestPath: manifestPath }
+      : null);
+
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
+
+    expect(result).toMatchObject({ success: true, runId: REVIEW_AGENT_RUN_ID, allReported: true });
+    expect(result.launched).toBeUndefined();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+});
+
+// #4134: re-running the synthesis step of a convoy whose lanes all reported.
+describe('redispatchReviewSynthesis', () => {
+  const PARENT_ID = 'agent-pan-1059-review';
+  const WORKSPACE = REVIEW_AGENT_DEFAULT_WORKSPACE;
+  const ANCHOR = 'pan-1059-heads-anchor';
+  const HEAD8 = createHash('sha1').update(ANCHOR).digest('hex').substring(0, 8);
+  const RUN_ID = `agent-pan-1059-review-${HEAD8}`;
+  const REVIEW_DIR = `${WORKSPACE}/.pan/review/${RUN_ID}`;
+
+  function savedParent(overrides: Record<string, unknown> = {}) {
+    return {
+      id: PARENT_ID,
+      issueId: 'PAN-1059',
+      workspace: WORKSPACE,
+      role: 'review',
+      model: 'review-model',
+      harness: 'claude-code',
+      status: 'stopped',
+      reviewRunId: RUN_ID,
+      startedAt: '2000-01-01T00:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  function withParent(overrides: Record<string, unknown> = {}): void {
+    mockGetAgentState.mockImplementation((agentId: string) => (agentId === PARENT_ID ? savedParent(overrides) : null) as never);
+  }
+
+  function withSession(): void {
+    mockGetLatestSessionIdSync.mockReturnValue('saved-session' as never);
+  }
+
+  const redispatch = () => redispatchReviewSynthesis('PAN-1059', { workspace: WORKSPACE, runId: RUN_ID, source: 'test' });
+
+  function expectNothingLaunched(): void {
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(mockCloseAgentPaneDetailed).not.toHaveBeenCalled();
+    expect(mockRemoveAgentStateDir).not.toHaveBeenCalled();
+    expect(mockWipeAgentStateDirs).not.toHaveBeenCalled();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  }
+
+  beforeEach(async () => {
+    __resetSynthesisRecoveryForTests();
+    prepareWorkspace(WORKSPACE);
+    mkdirSync(REVIEW_DIR, { recursive: true });
+    writeFileSync(`${REVIEW_DIR}/context.json`, '{}', 'utf-8');
+    // Pin the workspace head: the run id names it.
+    mockResolveWorkspaceRepoRoots.mockReturnValue([{ isPolyrepo: true }]);
+    mockSnapshotWorkspaceHeads.mockResolvedValue(ANCHOR);
+    mockSpawnRun.mockResolvedValue({ id: PARENT_ID });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    // Back to the real head probes for the rest of the file.
+    mockResolveWorkspaceRepoRoots.mockReset();
+    mockSnapshotWorkspaceHeads.mockReset();
+    vi.mocked(console.warn).mockRestore();
+  });
+
+  it('resumes the saved parent with a prompt that starts synthesis now, and launches no reviewer', async () => {
+    withParent();
+    withSession();
+    mockResumeAgent.mockResolvedValue({ success: true });
+
+    const result = await redispatch();
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain(`resumed ${PARENT_ID} for run ${RUN_ID}`);
+    expect(mockResumeAgent).toHaveBeenCalledTimes(1);
+    const [resumedId, prompt] = mockResumeAgent.mock.calls[0] as [string, string];
+    expect(resumedId).toBe(PARENT_ID);
+    expect(prompt).toContain('RECOVERY');
+    expect(prompt).toContain('No REVIEWER_* signals will arrive');
+    expect(prompt).toContain(`${REVIEW_DIR}/correctness.md`);
+    expect(prompt).toContain(`--run-id "${RUN_ID}"`);
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      id: PARENT_ID,
+      reviewRunId: RUN_ID,
+      reviewDeadlineAt: expect.any(String),
+    }));
+  });
+
+  it('closes the dead pane, resets only the parent state dir, and spawns a fresh parent when there is no session to resume', async () => {
+    withParent();
+    mockCloseAgentPaneDetailed.mockResolvedValue({ outcome: 'closed' });
+
+    const result = await redispatch();
+
+    expect(result.success).toBe(true);
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(mockCloseAgentPaneDetailed).toHaveBeenCalledWith(PARENT_ID);
+    // The lanes already reported: their state dirs and session indexes stay.
+    expect(mockWipeAgentStateDirs).not.toHaveBeenCalled();
+    expect(mockRemoveAgentStateDir).toHaveBeenCalledTimes(1);
+    expect(mockRemoveAgentStateDir).toHaveBeenCalledWith(`/tmp/pan-review-agent-test-agents/${PARENT_ID}`);
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    const [issueId, role, options] = mockSpawnRun.mock.calls[0] as [string, string, { prompt: string; subRole?: string }];
+    expect([issueId, role]).toEqual(['PAN-1059', 'review']);
+    expect(options.subRole).toBeUndefined();
+    expect(options.prompt).toContain('RECOVERY');
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({ id: PARENT_ID, reviewRunId: RUN_ID }));
+  });
+
+  it('spawns nothing when the dead parent pane cannot be closed', async () => {
+    withParent();
+    mockCloseAgentPaneDetailed.mockResolvedValue({ outcome: 'failed', reason: 'herdr could not close pane p1' });
+
+    const result = await redispatch();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('herdr could not close pane p1');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+
+  // Finding 1: a refused resume is final — "appears healthy" means someone
+  // else already relaunched the parent, and it must not be killed and wiped.
+  it('treats a refused resume as final: a "healthy" refusal closes, wipes and spawns nothing', async () => {
+    withParent();
+    withSession();
+    mockResumeAgent.mockResolvedValue({
+      success: false,
+      error: `Cannot resume ${PARENT_ID}: it appears healthy (its pane is up and the harness process is alive) — there is nothing to resume.`,
+    });
+
+    const result = await redispatch();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('appears healthy');
+    expect(mockResumeAgent).toHaveBeenCalledTimes(1);
+    expect(mockCloseAgentPaneDetailed).not.toHaveBeenCalled();
+    expect(mockRemoveAgentStateDir).not.toHaveBeenCalled();
+    expect(mockWipeAgentStateDirs).not.toHaveBeenCalled();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+
+  it('lets exactly one of two overlapping callers relaunch the parent', async () => {
+    withParent();
+    withSession();
+    let finishResume: (value: { success: boolean }) => void = () => {};
+    mockResumeAgent.mockImplementation(() => new Promise((resolve) => { finishResume = resolve; }));
+
+    const first = redispatch();
+    const second = await redispatch();
+    await vi.waitFor(() => expect(mockResumeAgent).toHaveBeenCalledTimes(1));
+    finishResume({ success: true });
+
+    expect((await first).success).toBe(true);
+    expect(second).toMatchObject({ success: false, held: true });
+    expect(second.message).toContain('already in flight');
+    expect(mockResumeAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when a later caller finds the parent alive again under the lock', async () => {
+    withParent();
+    withSession();
+    mockIsAlive.mockResolvedValue({ alive: true, paneAlive: true });
+
+    const result = await redispatch();
+
+    expect(result).toMatchObject({ success: false, held: true });
+    expect(mockIsAlive).toHaveBeenCalledWith(PARENT_ID);
+    expectNothingLaunched();
+  });
+
+  it('does nothing while the parent liveness is indeterminate', async () => {
+    withParent();
+    mockIsAlive.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+
+    expect((await redispatch()).success).toBe(false);
+    expectNothingLaunched();
+  });
+
+  it('does nothing when the parent now holds a different run', async () => {
+    withParent({ reviewRunId: 'agent-pan-1059-review-99999999' });
+    withSession();
+
+    const result = await redispatch();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('agent-pan-1059-review-99999999');
+    expectNothingLaunched();
+  });
+
+  // Finding 2: a patrol never overrides an operator hold.
+  it.each([
+    ['stoppedByUser', { stoppedByUser: true }],
+    ['paused', { paused: true, pausedReason: 'operator hold' }],
+    ['troubled', { troubled: true, consecutiveFailures: 3 }],
+  ])('holds a parent that is %s, and logs the hold once', async (_gate, gate) => {
+    withParent(gate);
+    withSession();
+    mockResumeAgent.mockResolvedValue({ success: true });
+
+    const first = await redispatch();
+    const second = await redispatch();
+
+    expect(first).toMatchObject({ success: false, held: true });
+    expect(second).toMatchObject({ success: false, held: true });
+    expectNothingLaunched();
+    expect(vi.mocked(console.warn).mock.calls.filter(([line]) => String(line).includes('held'))).toHaveLength(1);
+  });
+
+  it('holds a review the operator aborted after its dispatch, and acts once it is dispatched again', async () => {
+    withParent();
+    withSession();
+    mockResumeAgent.mockResolvedValue({ success: true });
+    appendPipelineEntry(WORKSPACE, { type: 'review.dispatched', issueId: 'PAN-1059', data: { runId: RUN_ID } });
+    appendPipelineEntry(WORKSPACE, { type: 'review.aborted', issueId: 'PAN-1059', source: 'review-abort' });
+
+    const held = await redispatch();
+    expect(held).toMatchObject({ success: false, held: true });
+    expect(held.message).toContain('aborted');
+    expectNothingLaunched();
+
+    appendPipelineEntry(WORKSPACE, { type: 'review.dispatched', issueId: 'PAN-1059', data: { runId: RUN_ID } });
+    expect((await redispatch()).success).toBe(true);
+  });
+
+  // Finding 3: a run for a head that moved is never synthesized.
+  it('does not synthesize a run whose head is no longer the workspace HEAD', async () => {
+    withParent();
+    withSession();
+    mockSnapshotWorkspaceHeads.mockResolvedValue('pan-1059-heads-after-a-push');
+
+    const result = await redispatch();
+
+    expect(result).toMatchObject({ success: false, held: true });
+    expect(result.message).toContain('stale');
+    expectNothingLaunched();
+  });
+
+  it('does not synthesize when the workspace HEAD cannot be read', async () => {
+    withParent();
+    withSession();
+    mockSnapshotWorkspaceHeads.mockResolvedValue(null);
+
+    expect((await redispatch()).success).toBe(false);
+    expectNothingLaunched();
+  });
+
+  // Finding 5 (#4139): recovery finishes the same run, so an operator's
+  // request survives a fresh spawn.
+  it('carries reviewOperatorRequested onto the fresh parent for the same run', async () => {
+    withParent({ reviewOperatorRequested: true });
+
+    expect((await redispatch()).success).toBe(true);
+
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      id: PARENT_ID, reviewRunId: RUN_ID, reviewOperatorRequested: true,
+    }));
+  });
+
+  it('writes no reviewOperatorRequested when the old state has none', async () => {
+    withParent();
+
+    expect((await redispatch()).success).toBe(true);
+
+    const saved = mockSaveAgentStateAsync.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(saved).not.toHaveProperty('reviewOperatorRequested');
   });
 });
 
