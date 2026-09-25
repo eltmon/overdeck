@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4200",
   "created": "2026-09-25T06:42:27.234Z",
-  "updated": "2026-09-25T07:13:00.435Z",
+  "updated": "2026-09-25T07:32:19.956Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-25T07:12:54.095Z"
     },
     "wi6-linux-verify": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4200",
-      "claimedAt": "2026-09-25T07:13:00.435Z"
+      "claimedAt": "2026-09-25T07:13:00.435Z",
+      "doneAt": "2026-09-25T07:32:19.955Z"
     }
   }
 }
