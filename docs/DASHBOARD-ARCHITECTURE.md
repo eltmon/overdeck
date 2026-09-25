@@ -358,12 +358,18 @@ marker so the no-loss gate proves that no existing surface disappeared.
 `/agents` opens the **Live view** (`components/Agents/live/`): what is running and progressing,
 what needs the operator, and what waits in the pipeline, with nothing finished. Rows fall into
 three sections, **Needs you**, **Live** and **Waiting**, each row with one reason (table below).
-A list pane and a collapsible preview pane sit in `react-resizable-panels`, saved in localStorage
-under the layout id `agents-live`. The preview is `DirectoryDetail` (header, issue context, live
-transcript). A click selects and previews (`?entry=`, replaceState); **Open**, Enter or a
-double-click navigates to the agent's issue view or the conversation via
-`navigateToDecisionSubject`. The header shows `<n> live · <m> need you · <k> waiting` and one
-**History** link. `?view=history` (and the old `?view=directory`) opens the Agents Directory,
+Rows with nothing nameable to wait on (idle with no blocker, or stopped) are not Waiting: they
+fold into a collapsed **Idle** footer (`▸ N idle sessions · History`, the choice kept in
+localStorage) that the header does not count. A list pane (at least 360px) and a collapsible
+preview pane sit in `react-resizable-panels`, saved in localStorage under the layout id
+`agents-live`. The preview is `DirectoryDetail` (header, issue context, live transcript), dated
+from the runtime snapshot like the row. A click selects and previews (`?entry=`, replaceState);
+**Open** (neutral, shown on hover or selection), Enter or a double-click goes to the live thing:
+a conversation's `/conv/<name>`, or the agent's session pane in its project's Command Deck (the
+`agent` pane the rail tree opens, then `/command-deck/<project>`); an agent with no registered
+project falls back to `/issues/<id>`. The header shows the counts in the glyph vocabulary
+(`● 6 live  ◐ 1 need you  ○ 3 waiting`; zero counts dimmed, a nonzero need-you in its tone and
+clickable to scroll to the section), the preview toggle, and one **History** link. `?view=history` (and the old `?view=directory`) opens the Agents Directory,
 described below as History; any other `view` opens Live. The Grid, Table and Timeline views are
 gone: the Grid showed every non-dead strike as running. The page is still behind the
 experimental-features gate.
@@ -378,7 +384,9 @@ experimental-features gate.
 3. it is the newest (by `startedAt`, then id) `work`/`strike` agent of an issue whose derived
    state is `in-review`, `changes-requested` or `ready`.
 
-Every ancestor of a kept entry is re-added, and the sort is the window answer's. The derived
+Every ancestor of a kept entry is re-added, and the sort is the window answer's. In both scopes a
+native agent whose id is a conversation's tmux session is that conversation's own pane and is
+listed once, as the conversation. The derived
 states come from `getSharedIssueService().listDerivedStates()` on the server, so the client never
 receives the full history to filter. The answer is memoized 3 s in its own cache; a `scope` other
 than `live` answers 400, and `windowHours` is ignored with `scope=live`. The window answer carries
@@ -405,12 +413,16 @@ The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `w
 | 10 | issue agent, issue `changes-requested` | changes requested | Waiting | waiting |
 | 11 | issue agent, issue `in-review` | in review | Waiting | waiting |
 | 12 | issue agent, PR checks pending | CI running | Waiting | waiting |
-| 13 | `idle` | idle — no known blocker | Waiting | waiting |
-| 14 | otherwise | agent stopped | Waiting | waiting |
+| 13 | `idle` | idle — no known blocker | Idle | waiting |
+| 14 | otherwise | agent stopped | Idle | waiting |
 
-Needs you sorts oldest wait first; Live and Waiting sort most recent activity first. A subagent
-nests under its parent row. A live row's second line is its last output line, its age, and
-`quiet <age>` past five minutes. Tones are the `--state-*` tokens in `index.css` (live blue and
+Needs you sorts oldest wait first. Live sorts by start time so rows never reshuffle under the
+pointer as agents write output; Waiting and Idle sort most recent activity first. A subagent
+nests under its parent row (at most three lines, then `+N more`, each with its state glyph). A
+row's first line is the issue id and title (the role only when it is not `work`); its second
+line is the reason, then what it is doing or waiting on, then the age. For a live agent that is
+its last output line, streamed through `useAgentOutputSubscription` while the row is mounted,
+and `quiet <age>` in the stuck tone past five minutes. Tones are the `--state-*` tokens in `index.css` (live blue and
 never green, needs-you amber, stuck red, waiting warm neutral, done emerald); see the style
 guide's "State Tokens". The same tokens tone the History row badge.
 

@@ -15,14 +15,20 @@ features** to see it in the navigation.
 
 ## Live
 
-The top bar counts the rows: `2 live · 1 need you · 3 waiting`. The list has
-three sections, in this order:
+The top bar counts the rows: `● 2 live  ◐ 1 need you  ○ 3 waiting`. A zero
+count is dimmed. When something needs you, that count is the loudest thing on
+the bar; click it to jump to the section. The list has three sections, in this
+order:
 
 | Section | What is in it |
 | --- | --- |
 | **Needs you** | Something only you can move: a question, a permission prompt, a plan to approve, an agent you paused, a broken agent, or a PR ready to merge. The oldest wait is first. |
-| **Live** | Agents running a turn now. The most recent activity is first. When nothing runs, the section says **Nothing running right now.** |
-| **Waiting** | Work waiting on the pipeline or idle: in review, changes requested, CI running or failed, held by Overdeck, idle, or stopped after its PR opened. The most recent activity is first. |
+| **Live** | Agents running a turn now, in the order they started, so rows stay put while agents work. When nothing runs, the section says **Nothing running right now.** |
+| **Waiting** | Work waiting on something you can name: in review, changes requested, CI running or failed, or held by Overdeck. The most recent activity is first. |
+
+Sessions with nothing to wait on (idle with no known blocker, or stopped) are
+not counted. They fold into one line at the bottom, `▸ 14 idle sessions ·
+History`; click it to list them in place. The page remembers whether it is open.
 
 Each row says in words why it is where it is:
 
@@ -40,17 +46,22 @@ Each row says in words why it is where it is:
 | **held by Overdeck** | Overdeck paused it (a scheduler yield or another machine pause). |
 | **CI failed** | The PR's checks failed. The work agent gets the failure, not you. |
 | **changes requested**, **in review**, **CI running** | The PR is in the review pipeline. |
-| **idle — no known blocker** | The agent is alive but idle and nothing known is blocking it. |
-| **agent stopped** | The agent's pane is gone and its issue still waits in the pipeline. |
+| **idle — no known blocker** | The agent is alive but idle and nothing known is blocking it (in the idle line). |
+| **agent stopped** | The agent's pane is gone (in the idle line). |
 
-A subagent shows as a `↳` line under the agent that started it.
+An issue's agent is named by its issue id and title; the role shows only when
+it is not `work`. The second line is the reason, then what the agent is doing
+or waiting on, then how long ago. A subagent shows as a `↳` line under the
+agent that started it, with `●` while it works; after three, the row says
+`+N more`.
 
 Click a row to preview it: the right pane shows its header, its issue and PR,
 and its live transcript, and the list stays in view. Use `↑` / `↓` to move the
-selection. **Open**, `Enter` or a double-click goes to the agent's live pane
-(its issue view) or to the conversation. Drag the divider to resize the panes;
-the sizes are remembered. **Hide preview** collapses the preview pane, and
-**Show preview** brings it back.
+selection. **Open** (on the row you hover or select), `Enter` or a
+double-click goes to the agent's live session in its project's Command Deck, or
+to the conversation. Drag the divider to resize the panes; the sizes are
+remembered. The panel button in the top bar hides the preview pane and brings
+it back.
 
 ## What the colors mean
 
@@ -61,7 +72,7 @@ Each row has one color, the same on both views:
 | Blue | **Live**: a machine is running a turn. Running is blue, never green. |
 | Amber | **Needs you**: waiting for you to answer, approve, unpause or merge. |
 | Red | **Stuck or broken**: stuck, an API error, or CI failed. |
-| Grey | **Waiting**: idle, held, in review or stopped. In History, remote agents are grey too. |
+| Grey | **Waiting** and idle: held, in review, idle or stopped. In History, remote agents are grey too. |
 | Emerald | **Done**: a subagent, worker or external agent finished. |
 
 ## History
