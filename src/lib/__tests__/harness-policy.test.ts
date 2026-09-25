@@ -251,3 +251,24 @@ describe('canUseHarness', () => {
     }
   })
 })
+
+describe('Ollama harness pin (PAN-1641)', () => {
+  it('allows ollama: models on claude-code', () => {
+    expect(canUseHarness('claude-code', 'ollama:gemma4:12b', undefined).allowed).toBe(true)
+  })
+
+  it('blocks every other harness', () => {
+    for (const harness of ['ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse'] as RuntimeName[]) {
+      expect(canUseHarness(harness, 'ollama:gemma4:12b', undefined).allowed).toBe(false)
+    }
+  })
+
+  // The opencode and muse harnesses reject any foreign model in their own earlier
+  // branches, so only the remaining harnesses reach the Ollama pin's message.
+  it('names claude-code in the reason for the harnesses the Ollama pin owns', () => {
+    for (const harness of ['ohmypi', 'codex', 'acp', 'kimi-code'] as RuntimeName[]) {
+      const decision = canUseHarness(harness, 'ollama:gemma4:12b', undefined)
+      expect(decision.allowed === false && decision.reason).toContain('claude-code')
+    }
+  })
+})

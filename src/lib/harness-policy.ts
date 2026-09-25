@@ -121,6 +121,13 @@ export function canUseHarness(
       reason: 'Muse Code supports Meta Muse models. Select a Muse Spark model with the Muse Code harness.',
     };
   }
+  // Ollama serves the Anthropic Messages API, which only claude-code speaks natively.
+  if (providerName === 'ollama' && harness !== 'claude-code') {
+    return {
+      allowed: false,
+      reason: 'Local Ollama models (ollama:<tag>) run on the claude-code harness in this release. Select claude-code.',
+    };
+  }
   // Model-level auth restrictions apply to every harness.
   const modelAuth = canUseModelWithAuth(model, authMode)
   if (!modelAuth.allowed) return modelAuth

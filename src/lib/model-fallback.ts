@@ -13,7 +13,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go' | 'ollama';
 
 /**
  * Map of model ID to provider
@@ -250,6 +250,8 @@ export function isOpenRouterModel(modelId: string): boolean {
  * Get the provider for a model ID
  */
 export function getModelProvider(modelId: ModelId | string): ModelProvider {
+  // Before the OpenRouter check: an Ollama tag may contain '/' (hf.co/... pulls).
+  if (modelId.startsWith('ollama:')) return 'ollama';
   if (modelId.startsWith('opencode/')) return 'opencode';
   if (modelId.startsWith('opencode-go/')) return 'opencode-go';
   if (isOpenRouterModel(modelId)) return 'openrouter';
