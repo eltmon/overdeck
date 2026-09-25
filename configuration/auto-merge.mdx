@@ -66,9 +66,10 @@ on the branches the merge gate links to an issue (`feature/<id>`,
    auto-merge: its `auto-merge` / `hold-for-uat` label, then the project
    default, then this toggle (no forge read);
 2. the merge gate (`evaluateIssueMergeGate`) says the PR is ready. Approval is
-   a forge review or a trusted `overdeck-verdict` marker comment that names the
-   PR head (`sha=`), so a repo without branch protection still qualifies, but
-   an approval of an older commit never does;
+   a GitHub review approving the exact PR head commit, or a trusted
+   `overdeck-verdict` marker comment whose `sha=` is the PR head, so a repo
+   without branch protection still qualifies. An approval of an older commit,
+   or a marker without `sha=`, never does;
 3. the issue's latest auto-merge entry allows a new one.
 
 It schedules through the same door as `POST /api/merge-train/auto-merge/schedule`.
@@ -144,7 +145,9 @@ facts each time it is checked (`isAutoMergeEligible` in
 only when **all** of these are true:
 
 - The PR is open (not closed, not a draft, not already merged)
-- The PR is approved, and its latest review does not request changes
+- The PR is approved on its exact head commit (a GitHub review of that commit,
+  or a verdict marker whose `sha=` names it; a GitLab MR's own approval), and
+  its latest review does not request changes
 - The forge reports CI checks on the PR head, and all of them passed. Pending
   checks, failing checks, and no reported checks each make the PR ineligible.
   When the project runs `verification.tests: ci`, the CI test job must also

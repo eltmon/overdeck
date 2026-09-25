@@ -243,11 +243,14 @@ schedules a ready, opted-in PR on the merge-train reconciler tick.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 
-1. it exists, is open, is not a draft, and is approved (a forge review
-   decision, else a trusted verdict marker comment, below) with no changes
-   requested. The automatic path (the auto-merge scheduler, schedule endpoint
-   and executor) also requires the approval to name the PR head: a forge
-   approval, or a marker whose `sha=` is the head (#3983);
+1. it exists, is open, is not a draft, has no changes requested, and is
+   **approved on its exact head commit** (#3983): a GitHub review whose
+   `commit.oid` is the PR head (`forgeApprovalAtHead`, read only when no marker
+   already proves it), or a trusted `overdeck-verdict: APPROVED` marker whose
+   `sha=` is the PR head (`approvedAtHead`). `reviewDecision` alone never
+   counts, and neither does a marker without `sha=` or one naming another
+   commit. This holds for every door, the Merge button included. A GitLab MR's
+   approval is the forge's own and counts as GitLab reports it;
 2. its checks on the head are all green (`none` and `pending` are not green;
    a GitLab pipeline that `skipped` is green, as the board reads it);
 3. **the CI test job passed on the head** when the project runs
@@ -258,10 +261,13 @@ read when the question is asked. The PR is merge-ready when, in order:
 5. the forge reports it `mergeable`.
 
 A refusal names the first failing condition, e.g. `Cannot merge: browser UAT
-failed on PR HEAD <sha>`. The board's derived `ready` state (and so whether
-the Merge button is enabled) is computed from the batched PR listing and
-covers conditions 1, 2 and 5 only; conditions 3 and 4 surface as that
-refusal when the button is clicked. A forge read that fails is itself the
+failed on PR HEAD <sha>`. `triggerMerge` takes readiness from this gate alone;
+the derived issue state refuses only an issue already merged or a merge
+already running (#3983). The board's derived `ready` state (and so whether
+the Merge button is shown) is computed from the batched PR listing's
+`reviewDecision`, checks and mergeability, so it does not see a marker
+approval; conditions 3 and 4 surface as the refusal when the button is
+clicked. A forge read that fails is itself the
 refusal, e.g. `Cannot merge: GitLab MR view failed for !77: …`.
 
 **Trusted verdict comments.** The repository is public and anyone can comment
@@ -357,8 +363,8 @@ commit. A head that moved during the review gets a marker without `sha=`, so a
 later cycle can block the new head. A forge review posted with `gh pr review`
 still attaches to the head at submit time (follow-up: post it through the
 reviews API with `commit_id`). The
-reviews are read only on this path (`forgeApprovalAtHead` in `pr-facts`), for
-an agent's rejection of an approved PR, so the shared PR read stays small.
+reviews are read by `forgeApprovalAtHead` in `pr-facts`, only on this path
+and in the merge gate (#3983), so the shared PR read stays small.
 Anything short of proof lets the verdict through: a GitLab MR (GitLab ties no
 approval to a sha, and `mergeable` is not an approval), an approval of an
 older commit, an empty review list, a marker without `sha=`, or a failed

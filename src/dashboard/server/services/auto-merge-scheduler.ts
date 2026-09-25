@@ -19,7 +19,8 @@
  *   - the door's policy check passes, which reads no forge: the issue is opted
  *     in to auto-merge (not held for UAT) and the train is on globally;
  *   - the one merge gate, `evaluateIssueMergeGate`, says the PR is ready: its
- *     approval is a forge review or a trusted verdict marker comment;
+ *     approval is a GitHub review of the exact head commit or a trusted
+ *     verdict marker whose `sha=` names it;
  *   - the issue's latest auto-merge row allows a new one
  *     ({@link latestAutoMergeAllowsSchedule}): nothing pending or merging, no
  *     operator cancel on the issue, and no failed merge at this same PR head;
