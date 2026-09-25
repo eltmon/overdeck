@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4199",
   "created": "2026-09-25T06:46:14.958Z",
-  "updated": "2026-09-25T07:25:48.301Z",
+  "updated": "2026-09-25T07:39:29.377Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-09-25T07:25:33.006Z"
     },
     "wi10-ui-orphan-start-fresh": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4199",
-      "claimedAt": "2026-09-25T07:25:48.301Z"
+      "claimedAt": "2026-09-25T07:25:48.301Z",
+      "doneAt": "2026-09-25T07:39:29.377Z"
     }
   }
 }
