@@ -2,11 +2,10 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
-  ChevronRight, ChevronDown, FolderOpen, GitBranch,
-  BookText, Bug, Container, FileText, Radio, Workflow, MessageSquare,
+  ChevronRight, ChevronDown, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
-import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
+import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
 import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
@@ -26,6 +25,7 @@ import { useDerivedIssueState } from '../../../lib/store';
 import { resolveFeatureStateBadge } from './featureStateBadge';
 import { StatusDot } from '../StatusDot';
 import { PIPE_ORDER, PIPE_CLASS, PIPE_STEP_LABELS, derivePipeline, describePipeline, describePipeSegment } from './pipelineStrip';
+import { ResourceCluster } from './ResourceCluster';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -59,265 +59,6 @@ interface FeatureItemProps {
   onCleanupOrphanedResources?: (issueId: string) => void;
   onOpenPlanDialog?: (issueId: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
-}
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'prd', 'tasks', 'pr', 'docker'];
-
-function resourceColor(_feature: ProjectFeature): string {
-  // v1.2 color restraint: resources are infrastructure facts, not status —
-  // always neutral. Exceptional states (CI failing) color individual chips.
-  return 'var(--muted-foreground)';
-}
-
-function formatPrState(pr: { number: number; title: string; state: string; isDraft: boolean }): string {
-  const normalizedState = pr.state.toLowerCase();
-  return pr.isDraft ? `${normalizedState}, draft` : normalizedState;
-}
-
-function resourceSummary(feature: ProjectFeature, source: ResourceSource): { label: string; detail: string } | null {
-  const details = feature.resourceDetails;
-  if (!details) return null;
-  switch (source) {
-    case 'workspace':
-      return details.hasWorkspace ? { label: 'workspace', detail: 'allocated' } : null;
-    case 'branch': {
-      const parts: string[] = [];
-      if (details.localBranchCount > 0) parts.push(`local ${details.localBranchCount}`);
-      if (details.remoteBranchCount > 0) parts.push(`remote ${details.remoteBranchCount}`);
-      return parts.length > 0 ? { label: 'branch', detail: parts.join(' · ') } : null;
-    }
-    case 'tmux':
-      return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
-    case 'vbrief':
-      return details.hasXbrief ? { label: 'xBRIEF', detail: 'present' } : null;
-    case 'prd':
-      return details.hasPrd ? { label: 'PRD', detail: 'present' } : null;
-    case 'tasks':
-      return details.hasTasks ? { label: 'tasks', detail: 'present' } : null;
-    case 'pr':
-      return details.prs.length > 0
-        ? {
-            label: 'PR',
-            detail: details.prs.map((pr) => `#${pr.number} (${formatPrState(pr)})`).join(' · '),
-          }
-        : null;
-    case 'docker':
-      return details.dockerContainerCount > 0 ? { label: 'docker', detail: `${details.dockerContainerCount} container${details.dockerContainerCount === 1 ? '' : 's'}` } : null;
-    case 'remote-agent':
-      return details.remoteAgent ? { label: 'fly.io', detail: `${details.remoteAgent.vmName} (${details.remoteAgent.status})` } : null;
-    default:
-      return null;
-  }
-}
-
-function isOrphanedFeature(feature: ProjectFeature): boolean {
-  const state = feature.stateLabel.toLowerCase();
-  const rawState = feature.rawTrackerState?.toLowerCase() ?? '';
-  return state.includes('closed') || state.includes('done') || rawState.includes('closed') || rawState.includes('done');
-}
-
-function ResourceIcon({
-  source,
-  feature,
-  onActivate,
-}: {
-  source: ResourceSource;
-  feature: ProjectFeature;
-  onActivate?: () => void;
-}) {
-  const color = resourceColor(feature);
-  const summary = resourceSummary(feature, source);
-  if (!summary) return null;
-  const props = { size: 12, color, 'aria-hidden': true as const };
-  const icon = source === 'workspace' ? <FolderOpen {...props} />
-    : source === 'branch' ? <GitBranch {...props} />
-      : source === 'tmux' ? <Radio {...props} />
-        : source === 'vbrief' ? <BookText {...props} />
-          : source === 'prd' ? <FileText {...props} />
-            : source === 'tasks' ? <Bug {...props} />
-            : source === 'pr' ? <Workflow {...props} />
-              : <Container {...props} />;
-  const label = source === 'pr' ? summary.detail.split(' ')[0]
-    : source === 'branch' ? `branch ${summary.detail}`
-      : source === 'docker' ? `stack ${summary.detail.split(' ')[0]}`
-        : summary.label;
-  const content = <>{icon}<span>{label}</span></>;
-
-  if (onActivate) {
-    return (
-      <button
-        type="button"
-        className={styles.featureResourceChip}
-        title={`${summary.label}: ${summary.detail}`}
-        aria-label={`Open ${summary.label} for ${feature.issueId}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onActivate();
-        }}
-        onFocus={(event) => event.stopPropagation()}
-        onBlur={(event) => event.stopPropagation()}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <span className={styles.featureResourceChip} title={`${summary.label}: ${summary.detail}`}>
-      {content}
-    </span>
-  );
-}
-
-function ResourceStrip({
-  feature,
-  onCleanupOrphanedResources,
-}: {
-  feature: ProjectFeature;
-  onCleanupOrphanedResources?: (issueId: string) => void;
-}) {
-  const details = feature.resourceDetails;
-  const openTasksViewer = useDashboardStore((state) => state.openTasksViewer);
-  const openPrdViewer = useDashboardStore((state) => state.openPrdViewer);
-  const openXbriefViewer = useDashboardStore((state) => state.openXbriefViewer);
-  const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
-  const orphaned = isOrphanedFeature(feature);
-  const shouldRender = resources.length > 0;
-
-  useEffect(() => {
-    if (!shouldRender) return;
-    if (!popoverOpen) return;
-    if (!details) return;
-    if (!feature.issueId) return;
-    if (detailIdentifiers) return;
-
-    let cancelled = false;
-    void fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/resource-details`)
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<ProjectFeatureResourceIdentifiers>;
-      })
-      .then((payload) => {
-        if (cancelled || !payload) return;
-        setDetailIdentifiers(payload);
-      })
-      .catch(() => {
-        // Fall back to summary-only rows when detail fetch fails.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [shouldRender, popoverOpen, details, feature.issueId, detailIdentifiers]);
-
-  const resourceRows = useMemo(() => {
-    if (!details) return [] as Array<{ key: string; label: string }>;
-
-    const identifiers = detailIdentifiers;
-    const rows: Array<{ key: string; label: string }> = [];
-
-    if ((identifiers?.workspacePaths.length ?? 0) > 0) {
-      for (const workspacePath of identifiers?.workspacePaths ?? []) {
-        rows.push({ key: `workspace-${workspacePath}`, label: `workspace: ${workspacePath}` });
-      }
-    } else if (details.hasWorkspace) {
-      rows.push({ key: 'workspace', label: 'workspace allocated' });
-    }
-
-    if ((identifiers?.localBranchNames.length ?? 0) > 0 || (identifiers?.remoteBranchNames.length ?? 0) > 0) {
-      for (const branchName of identifiers?.localBranchNames ?? []) {
-        rows.push({ key: `local-branch-${branchName}`, label: `branch (local): ${branchName}` });
-      }
-      for (const branchName of identifiers?.remoteBranchNames ?? []) {
-        rows.push({ key: `remote-branch-${branchName}`, label: `branch (remote): ${branchName}` });
-      }
-    } else if (details.localBranchCount > 0 || details.remoteBranchCount > 0) {
-      rows.push({ key: 'branch', label: `branches: ${details.localBranchCount} local · ${details.remoteBranchCount} remote` });
-    }
-
-    if ((identifiers?.tmuxSessionNames.length ?? 0) > 0) {
-      for (const sessionName of identifiers?.tmuxSessionNames ?? []) {
-        rows.push({ key: `tmux-${sessionName}`, label: `tmux: ${sessionName}` });
-      }
-    } else if (details.tmuxSessionCount > 0) {
-      rows.push({ key: 'tmux', label: `tmux: ${details.tmuxSessionCount} active session${details.tmuxSessionCount === 1 ? '' : 's'}` });
-    }
-
-    if (details.remoteAgent) {
-      rows.push({ key: 'remote-agent', label: `fly.io: ${details.remoteAgent.vmName} · ${details.remoteAgent.status} · ${details.remoteAgent.model}` });
-    }
-
-    if (details.hasXbrief) rows.push({ key: 'vbrief', label: 'xBRIEF present' });
-    if (details.hasPrd) rows.push({ key: 'prd', label: 'PRD present' });
-    if (details.hasTasks) rows.push({ key: 'tasks', label: 'tasks present' });
-    for (const pr of identifiers?.prs ?? details.prs) {
-      rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
-    }
-
-    if ((identifiers?.dockerContainerNames.length ?? 0) > 0) {
-      for (const containerName of identifiers?.dockerContainerNames ?? []) {
-        rows.push({ key: `docker-${containerName}`, label: `docker: ${containerName}` });
-      }
-    } else if (details.dockerContainerCount > 0) {
-      rows.push({ key: 'docker', label: `docker: ${details.dockerContainerCount} running container${details.dockerContainerCount === 1 ? '' : 's'}` });
-    }
-
-    return rows;
-  }, [details, detailIdentifiers]);
-
-  if (!shouldRender) return null;
-
-  return (
-    <span
-      className={`${styles.featureResourceStrip} ${styles.featureResourceLine}`}
-      onMouseEnter={() => setPopoverOpen(true)}
-      onMouseLeave={() => setPopoverOpen(false)}
-      onFocus={() => setPopoverOpen(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setPopoverOpen(false);
-        }
-      }}
-    >
-      {resources.map((source) => (
-        <ResourceIcon
-          key={source}
-          source={source}
-          feature={feature}
-          onActivate={source === 'vbrief'
-            ? () => openXbriefViewer(feature.issueId)
-            : source === 'tasks'
-              ? () => openTasksViewer(feature.issueId)
-              : source === 'prd'
-                ? () => openPrdViewer(feature.issueId)
-                : undefined}
-        />
-      ))}
-      {details && popoverOpen && (
-        <span className={styles.featureResourcePopover}>
-          {resourceRows.map((row) => (
-            <span key={row.key} className={styles.featureResourceRow}>
-              <span>{row.label}</span>
-              {orphaned && onCleanupOrphanedResources && !row.key.startsWith('pr-') && (
-                <button
-                  type="button"
-                  className={styles.featureResourceCleanupButton}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onCleanupOrphanedResources(feature.issueId);
-                  }}
-                  title={`Clean up orphaned ${row.key} resources`}
-                >
-                  Cleanup
-                </button>
-              )}
-            </span>
-          ))}
-        </span>
-      )}
-    </span>
-  );
 }
 
 function StatusIcon({ status, agentStatus, stateLabel, isRally, isReady }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; isReady?: boolean }) {
@@ -1074,6 +815,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           <FeatureAppLink frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} />
           {/* Merge-ready only — earlier phases have no stack, and a cached workspace query rendered a bogus chip for planning-phase issues (PAN-2996). */}
           {isReady && <FeatureUatChip summary={uatStackSummary} />}
+          <span data-section="ResourceStrip"><ResourceCluster feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></span>
           <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe"
             role="img" title={pipelineLabel} aria-label={pipelineLabel}>
             {pipeline.map((seg, i) => (
@@ -1086,12 +828,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       </div>
         </IssuePeek>
       </div>
-      <div data-section="ResourceStrip"><ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></div>
-      {feature.resourceDetails?.hasTasks && feature.taskTotals && (
-        <button type="button" data-section="Tasks summary" className={styles.featureBadge} onClick={(event) => { event.stopPropagation(); onSelect?.(); }} title="Open issue tasks">
-          tasks {feature.taskTotals.closed}/{feature.taskTotals.total}</button>
-      )}
-
       {expanded && (
         <div data-section="ShipDoorTreeRow"><RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} /></div>
       )}

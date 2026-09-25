@@ -974,6 +974,60 @@ describe('FeatureItem', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
   });
 
+  it('shows no visible workspace/branch label text — resource facts live in title/aria-label', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['workspace', 'branch'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 1,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText('workspace')).toBeNull();
+    expect(screen.queryByText('branch local 1')).toBeNull();
+    expect(screen.getByTitle('workspace: allocated')).toBeInTheDocument();
+    expect(screen.getByTitle('branch: local 1')).toBeInTheDocument();
+  });
+
+  it('never nests a resource cluster button inside the row button', () => {
+    const { container } = renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['workspace', 'vbrief', 'tasks', 'prd'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: true,
+            hasTasks: true,
+            hasPrd: true,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    const rowButton = container.querySelector('[data-section="ResourceStrip"]')?.closest('button');
+    expect(rowButton).not.toBeNull();
+    expect(rowButton?.querySelector('button')).toBeNull();
+  });
+
   it('opens the xBRIEF viewer from keyboard-accessible chip without selecting the row', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();

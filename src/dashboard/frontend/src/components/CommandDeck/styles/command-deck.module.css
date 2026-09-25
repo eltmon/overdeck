@@ -480,24 +480,19 @@
 .featureResourceChip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 4px;
+  gap: 2px;
+  height: 16px;
+  padding: 0 2px;
   font-size: 10px;
   color: var(--muted-foreground);
-  background: color-mix(in srgb, var(--foreground) 3%, transparent);
-  border: 1px solid var(--border);
+  background: none;
+  border: none;
   font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   white-space: nowrap;
 }
 
-.featureResourceLine {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  padding: 0 6px 5px 27px;
+.featureResourceChip:hover {
+  color: var(--foreground);
 }
 
 .featureResourceStrip {
