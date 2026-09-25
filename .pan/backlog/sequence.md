@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:20:35.757751Z · model: claude-opus-5-5 · open: 802_
+_Last sequenced: 2026-09-25T05:21:21.320678Z · model: claude-opus-5-5 · open: 801_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -207,7 +207,6 @@ _Last sequenced: 2026-09-25T05:20:35.757751Z · model: claude-opus-5-5 · open: 
 | 254 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
-| 257 | PAN-4193 | S | medium | ok |  |  | EINTR from @parcel/watcher poll() trips the PAN-3915 breaker, so conversation search stops indexing; resubscribe on EINTR instead |
 | 258 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
 | 259 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
 | 260 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
@@ -1117,10 +1116,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:20:35.757751Z",
+  "generatedAt": "2026-09-25T05:21:21.320678Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 802,
+  "openCount": 801,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -3681,19 +3680,6 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "condition": "ok",
       "dependsOn": [],
       "why": "Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4193",
-      "rank": 257,
-      "size": "S",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "EINTR from @parcel/watcher poll() trips the PAN-3915 breaker, so conversation search stops indexing; resubscribe on EINTR instead",
-      "rationale": "New issue (2026-09-25). The root cause is traced to upstream @parcel/watcher throwing on EINTR, and the fix is small and scoped to two watcher services with a clear sanity cap. It sits next to PAN-3771 because both leave conversation search silently broken for the operator.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12042,13 +12028,6 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
     {
       "from": "PAN-4191",
       "to": "PAN-1852",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4193",
-      "to": "PAN-3771",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
