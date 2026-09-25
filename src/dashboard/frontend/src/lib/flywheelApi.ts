@@ -89,6 +89,15 @@ export function useFlywheelAction(action: FlywheelAction) {
   });
 }
 
+/** A span, for the header's elapsed run time: `42m`, `2h 0m`, `3d 4h`. */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+}
+
 /** Relative age for tick/journal timestamps: `42s ago`, `7m ago`, `3h ago`. */
 export function formatAge(iso: string, nowMs: number): string {
   const ms = nowMs - Date.parse(iso);

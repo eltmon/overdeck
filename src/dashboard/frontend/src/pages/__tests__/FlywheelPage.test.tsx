@@ -53,6 +53,7 @@ function setup(status: FlywheelDerivedStatus | 'unreachable') {
 describe('FlywheelPage (PAN-3964 FR-8)', () => {
   // The reveal flag is module state: clear it so one test cannot steer the next.
   beforeEach(() => { consumePendingReveal(); });
+  afterEach(() => vi.useRealTimers());
   afterEach(() => { vi.unstubAllGlobals(); consumePendingReveal(); });
 
   it('mounts the UAT batches card in the left rail even when idle (PAN-4199 ac3)', async () => {
@@ -129,6 +130,22 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     }));
     renderWithQuery(<FlywheelPage />);
     expect(await screen.findByTestId('flywheel-inflight-count')).toHaveTextContent('3 feature workspaces');
+  });
+
+  it('shows how long the run has been up, and only while it runs (PAN-4199 ac2, ac3)', async () => {
+    const now = Date.parse('2026-09-23T10:00:00.000Z');
+    vi.setSystemTime(now);
+    const base = flywheelStatus();
+    setup(flywheelStatus({ conversation: { ...base.conversation!, createdAt: '2026-09-23T08:00:00.000Z' } }));
+    const { unmount } = renderWithQuery(<FlywheelPage />);
+    expect(await screen.findByTestId('flywheel-elapsed')).toHaveTextContent('running 2h 0m');
+    unmount();
+
+    setup(flywheelStatus({ run: 'paused' }));
+    renderWithQuery(<FlywheelPage />);
+    await screen.findByTestId('flywheel-run-chip');
+    expect(screen.queryByTestId('flywheel-elapsed')).toBeNull();
+    vi.useRealTimers();
   });
 
   it('a pending reveal selects the Status tab (PAN-4199 ac4)', async () => {

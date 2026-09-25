@@ -49,6 +49,24 @@ describe('FlywheelConversationPane (PAN-3964 FR-13)', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it('names the live harness and model from the derived status (PAN-4199 ac1)', async () => {
+    setup('running');
+    renderWithQuery(<FlywheelConversationPane />);
+    expect(await screen.findByTestId('flywheel-live-conversation')).toHaveTextContent('claude-code · claude-opus-5-5');
+  });
+
+  it('shows no live conversation line when the flywheel is idle', async () => {
+    stubFetch((url) => {
+      if (url === '/api/flywheel/status') return Response.json(flywheelStatus({ run: 'idle', conversation: null }));
+      if (url === '/api/conversations/conv-flywheel') return Response.json({ error: 'not found' }, { status: 404 });
+      if (url === '/api/settings') return Response.json({ roles: {} });
+      return undefined;
+    });
+    renderWithQuery(<FlywheelConversationPane />);
+    await screen.findByRole('button', { name: 'Start' });
+    expect(screen.queryByTestId('flywheel-live-conversation')).toBeNull();
+  });
+
   describe('an orphaned session offers Start fresh (PAN-4199 D9)', () => {
     /** Idle, with POST /api/flywheel/start answering `failure` instead of success. */
     function setupFailingStart(failure: { status: number; body: Record<string, unknown> }) {

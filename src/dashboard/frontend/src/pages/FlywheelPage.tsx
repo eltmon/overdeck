@@ -19,7 +19,7 @@ import { FlywheelStatusPane, FreshnessBadge, inFlightCountLabel } from '../compo
 import { FlywheelUatBatchesCard } from '../components/flywheel/FlywheelUatBatchesCard';
 import { PendingAutoMergesCard } from '../components/flywheel/PendingAutoMergesCard';
 import { RailCard, StatusBadge, ToggleSwitch } from '../components/flywheel/primitives';
-import { useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
+import { formatDuration, useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
 import { consumePendingReveal, subscribeRevealNeedsYou } from '../lib/flywheelReveal';
 
 type RailTab = 'status' | 'state' | 'report' | 'stats';
@@ -135,6 +135,12 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
         {runChip}
         {status?.run === 'running' && status.freshness && status.lastTick && (
           <FreshnessBadge freshness={status.freshness} at={status.lastTick.at} nowMs={nowMs} />
+        )}
+        {/* How long this run has been up — the conversation's own age. */}
+        {status?.run === 'running' && status.conversation && (
+          <span className="text-[11px] text-muted-foreground" data-testid="flywheel-elapsed" title={status.conversation.createdAt}>
+            running {formatDuration(nowMs - Date.parse(status.conversation.createdAt))}
+          </span>
         )}
         {status && (
           <span className="text-[11px] text-muted-foreground" data-testid="flywheel-inflight-count">

@@ -3,7 +3,20 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FlywheelInFlightRow } from '@overdeck/contracts';
 
 import { FlywheelStatusPane, freshnessLabel } from '../FlywheelStatusPane';
+import { formatDuration } from '../../../lib/flywheelApi';
 import { NOW, flywheelStatus } from './fixtures';
+
+describe('formatDuration (PAN-4199 WI-11)', () => {
+  it.each([
+    [0, '0m'],
+    [42 * 60_000, '42m'],
+    [2 * 3_600_000, '2h 0m'],
+    [25 * 3_600_000, '1d 1h'],
+    [-5_000, '0m'],
+  ])('%d ms reads %s', (ms, expected) => {
+    expect(formatDuration(ms)).toBe(expected);
+  });
+});
 
 describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
   it('renders the last tick, its freshness, and no needs-you callout when null', () => {

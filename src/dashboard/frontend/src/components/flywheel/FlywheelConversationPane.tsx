@@ -101,6 +101,10 @@ export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: 
   const busy = start.pending || pause.pending || resume.pending || report.pending || stop.pending || abort.pending;
 
   const run = statusQuery.data?.run;
+  // What is actually running, from the derived status — not the role config in
+  // the footer, which says what the next start would use.
+  const derivedConv = statusQuery.data?.conversation;
+  const liveConversation = derivedConv ? `${derivedConv.harness ?? '—'} · ${derivedConv.model ?? '—'}` : null;
 
   // Once the flywheel is running or paused there is nothing orphaned to clear.
   useEffect(() => {
@@ -157,6 +161,11 @@ export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: 
             },
           ]}
         />
+        {liveConversation && (
+          <span className="truncate font-mono text-[11px] text-muted-foreground" data-testid="flywheel-live-conversation">
+            {liveConversation}
+          </span>
+        )}
         {(statusQuery.isLoading || busy) && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" aria-label="Working" />}
         <div className="ml-auto flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Flywheel controls">
           {run === 'idle' && (
