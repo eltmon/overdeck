@@ -43,8 +43,10 @@ decision. `postReviewVerdict` therefore tries two identities, in order:
 
 1. **The GitHub App.** When `~/.overdeck/github-app/` holds credentials, the
    `gh pr review` call runs with an installation token in `GH_TOKEN`, so the
-   review is authored by `panopticon-agent[bot]`, which is never the PR author
-   and whose review GitHub accepts.
+   review is authored by the App's bot (`<app-slug>[bot]`, e.g.
+   `overdeck-agent[bot]`), which is never the PR author and whose review
+   GitHub accepts. The merge gate trusts that review only from an author
+   GitHub types `Bot` with the installed App's slug (#4066 review).
 2. **A marker comment.** If the forge still refuses a self-review (no app
    installed, or the bot opened the PR), the verdict is posted as a PR comment
    whose first line is a machine marker:
