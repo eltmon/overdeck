@@ -19,6 +19,9 @@ export const MEMBERSHIP_UNAVAILABLE_REASONS = [
   "repo_unavailable",
   "default_branch_unresolved",
   "forge_unavailable",
+  // PAN-3527: the forge did not answer (rate limit, 5xx, timeout, network),
+  // as opposed to `forge_unavailable`, where it answered "no". Ask again later.
+  "forge_transient",
   "tracker_unconfigured",
   "gather_failed",
 ] as const
