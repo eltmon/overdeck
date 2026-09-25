@@ -15,6 +15,7 @@ import {
   PIPELINE_PROJECT_CONCURRENCY,
   listIssueStatesBatched,
   listMergedPullRequestHeadsBatched,
+  isTransientForgeFailure,
   PipelineMembershipUnavailableError,
   projectRepositories,
   projectTrackerIssueRows,
@@ -79,6 +80,7 @@ describe('pipeline membership unavailability contract', () => {
       'repo_unavailable',
       'default_branch_unresolved',
       'forge_unavailable',
+      'forge_transient',
       'tracker_unconfigured',
       'gather_failed',
     ];
@@ -737,6 +739,54 @@ describe('gatherProjectLensSignals', () => {
       reason: 'forge_unavailable',
       message: 'Resolved github tracker for overdeck: HTTP 404',
     });
+  });
+
+  it('PAN-3527: classifies a forge that did not answer as forge_transient', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockRejectedValue(new Error(
+      'GitHub API GET /repos/eltmon/overdeck/issues?state=open failed: 403 {"message":"API rate limit exceeded for installation ID 1"}',
+    ));
+
+    await expect(gatherProjectLensSignals(project, mocked)).rejects.toMatchObject({
+      reason: 'forge_transient',
+      message: expect.stringContaining('API rate limit exceeded'),
+    });
+  });
+
+  it('PAN-3527: keeps a forge that answered "no" as forge_unavailable', async () => {
+    const mocked = deps();
+    mocked.listOpenPullRequests = vi.fn().mockRejectedValue(new Error(
+      'GitHub API GET /repos/eltmon/overdeck/pulls failed: 404 {"message":"Not Found"}',
+    ));
+
+    await expect(gatherProjectLensSignals(project, mocked)).rejects.toMatchObject({
+      reason: 'forge_unavailable',
+    });
+  });
+
+  it('PAN-3527: separates transient forge failures from settled ones', () => {
+    const timeout = new Error('GitHub API GET /repos/o/r/pulls timed out after 30000ms');
+    timeout.name = 'GitHubRequestTimeoutError';
+    const transient = [
+      timeout,
+      new TypeError('fetch failed', { cause: new Error('connect ECONNRESET 140.82.112.6:443') }),
+      new Error('GitHub API GET /repos/o/r/issues failed: 502 Bad Gateway'),
+      new Error('Failed to generate installation token: 503 Service Unavailable'),
+      new Error('GitHub API GET /repos/o/r/issues failed: 429 Too Many Requests'),
+      new Error('GitHub API GET /repos/o/r/issues failed: 403 You have exceeded a secondary rate limit'),
+      new Error('gh api graphql failed (timeout, attempt 2): no stderr'),
+      new Error('getaddrinfo EAI_AGAIN api.github.com'),
+    ];
+    const settled = [
+      new Error('GitHub App not configured. Run: node scripts/create-github-app.mjs'),
+      new Error('Failed to generate installation token: 404 {"message":"Not Found"}'),
+      new Error('GitHub API GET /repos/o/r/issues failed: 403 Resource not accessible by integration'),
+      new Error('GitHub API GET /repos/o/r/issues failed: 401 Bad credentials'),
+      new Error('HTTP 404'),
+    ];
+
+    expect(transient.filter((error) => !isTransientForgeFailure(error))).toEqual([]);
+    expect(settled.filter((error) => isTransientForgeFailure(error))).toEqual([]);
   });
 
   it('classifies spec lens failures as gather_failed', async () => {
