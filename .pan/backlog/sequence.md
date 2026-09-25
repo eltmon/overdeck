@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:27:53.034587Z · model: claude-opus-5-5 · open: 801_
+_Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 802_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -207,6 +207,7 @@ _Last sequenced: 2026-09-25T05:27:53.034587Z · model: claude-opus-5-5 · open: 
 | 254 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
+| 257 | PAN-4197 | XL | high | ok |  |  | Agents page shows finished strikes as running (not liveness-derived) and buries live work; operator asks live-first, resizable, recolor. |
 | 258 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
 | 259 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
 | 260 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
@@ -1116,10 +1117,10 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:27:53.034587Z",
+  "generatedAt": "2026-09-25T05:33:25.500737Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 801,
+  "openCount": 802,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11021,6 +11022,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "rationale": "New issue (2026-09-25). The dependency tree carries a critical tar decompression-DoS advisory and 91 high-severity findings, so it sits beside the PAN-3605 supply-chain fix. Scope is bounded to in-range updates and overrides with mechanical verification (audit counts, build, Node 22 PTY smoke); the node-pty bump touches the dashboard terminal path, which is why the PTY smoke test matters.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4197",
+      "rank": 257,
+      "size": "XL",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agents page shows finished strikes as running (not liveness-derived) and buries live work; operator asks live-first, resizable, recolor.",
+      "rationale": "New operator request. It ranks high rather than medium because problem 1 is a correctness bug: agent cards read stale stored status instead of the liveness door in src/lib/agents/liveness.ts, so the page misreports 119 finished strikes as running. The rest is a large UX redesign (live-first default, resizable panes, explained windows and counts, new state color tokens) that needs an interactive mockup first, so it sits with the other high-value dashboard UX items rather than in the substrate tier.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12031,6 +12045,20 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-3706",
+      "to": "PAN-4197",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-3862",
+      "to": "PAN-4197",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
