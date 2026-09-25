@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4199",
+  "created": "2026-09-25T06:46:14.958Z",
+  "updated": "2026-09-25T06:46:14.958Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-tracker-facts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4199",
+      "claimedAt": "2026-09-25T06:46:14.958Z"
+    }
+  }
+}
