@@ -18,7 +18,7 @@
   icons (being replaced by brand SVGs for providers/harnesses).
 - **Desktop app:** `apps/desktop` — Electron 40 (exact pin; ABI 143), main and
   preload bundled to CJS by tsdown, packaged by electron-builder
-  (`dist:linux|mac|win`; Linux AppImage x64, mac arm64 dmg+zip, win NSIS).
+  (`dist:linux|mac|win`; Linux AppImage x64, mac arm64 dmg, win NSIS).
   `prepare-server-resources.mjs` stages the embedded server and rebuilds
   node-pty for Electron's ABI; macOS notarization runs in the `afterSign`
   hook `scripts/notarize.cjs` with `mac.notarize: false`. See `docs/BUILD.md`.

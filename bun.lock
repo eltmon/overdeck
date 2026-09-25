@@ -159,7 +159,7 @@
         "@lexical/react": "^0.41.0",
         "@monaco-editor/react": "^4.7.0",
         "@overdeck/contracts": "workspace:*",
-        "@pierre/diffs": "^1.1.0",
+        "@pierre/diffs": "1.1.22",
         "@radix-ui/react-context-menu": "^2.3.7",
         "@radix-ui/react-tooltip": "^1.2.16",
         "@tailwindcss/typography": "^0.5.20",
@@ -241,7 +241,6 @@
   ],
   "overrides": {
     "@effect/platform-node-shared": "4.0.0-beta.73",
-    "@pierre/diffs": "1.1.22",
     "dompurify": "^3.4.13",
     "lodash-es": "^4.18.0",
     "nanoid": "^3.3.18",
