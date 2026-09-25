@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4199",
   "created": "2026-09-25T06:46:14.958Z",
-  "updated": "2026-09-25T07:39:29.377Z",
+  "updated": "2026-09-25T07:39:33.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4199",
       "claimedAt": "2026-09-25T07:25:48.301Z",
       "doneAt": "2026-09-25T07:39:29.377Z"
+    },
+    "wi12-ui-uat-batches": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4199",
+      "claimedAt": "2026-09-25T07:39:33.874Z"
     }
   }
 }
