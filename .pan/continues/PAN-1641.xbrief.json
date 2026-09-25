@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-09-25T07:33:07.326Z",
+  "updated": "2026-09-25T07:33:27.730Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -394,6 +394,11 @@
       "claimedBy": "agent-pan-1641",
       "claimedAt": "2026-09-25T07:25:21.506Z",
       "doneAt": "2026-09-25T07:33:07.325Z"
+    },
+    "ollama-doctor-check": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1641",
+      "claimedAt": "2026-09-25T07:33:27.729Z"
     }
   }
 }
