@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4197",
   "created": "2026-09-25T06:40:33.339Z",
-  "updated": "2026-09-25T08:11:33.230Z",
+  "updated": "2026-09-25T08:11:44.232Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -85,6 +85,10 @@
     "state-tokens.ac4": {
       "status": "completed",
       "doneAt": "2026-09-25T08:11:33.230Z"
+    },
+    "directory-pause-facts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T08:11:44.231Z"
     }
   }
 }
