@@ -66,14 +66,17 @@ verdict says otherwise.
 
 **Approval for a merge is bound to the head commit (#3983).** Every GitHub
 merge door (the Merge button, the merge queue, the auto-merge scheduler,
-schedule door and executor) accepts exactly two proofs: a GitHub `APPROVED`
-review whose `commit.oid` is the PR head (`forgeApprovalAtHead`), or a trusted
-`APPROVED` marker whose `sha=` is the PR head (`approvedAtHead`). A marker
-without `sha=`, or one naming another commit, never approves a merge, however
-recent the comment. See [PIPELINE-GATES.md](PIPELINE-GATES.md).
+schedule door and executor) accepts exactly two proofs: a trusted reviewer's
+standing GitHub `APPROVED` review whose `commit.oid` is the PR head
+(`forgeApprovalAtHead`; trusted is the marker rule, and each reviewer's latest
+review stands, so a later "Request changes" withdraws the approval), or a
+trusted `APPROVED` marker whose `sha=` is the PR head (`approvedAtHead`). A
+marker without `sha=`, or one naming another commit, never approves a merge,
+however recent the comment. See [PIPELINE-GATES.md](PIPELINE-GATES.md).
 
-GitLab is unchanged: approval is `glab mr approve`, a rejection is an MR note,
-and there is no marker.
+GitLab: approval is `glab mr approve`, which the gate reads as a named approver
+in `approved_by` (#4066 review; a green, conflict-free MR nobody approved is
+not approved). A rejection is an MR note, and there is no marker.
 
 ---
 

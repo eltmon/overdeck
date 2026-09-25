@@ -59,17 +59,23 @@ When the toggle is `false`, the dashboard schedules auto-merge for any issue
 that satisfies the eligibility predicate. No flywheel run is needed: every
 60 seconds, on the UAT batch-train reconciler tick, the primary dashboard walks
 each project whose merge train is on and takes its open PRs with green checks
-on the branches the merge gate links to an issue (`feature/<id>`,
-`strike/<id>`). For each one it checks, in order:
+on a `feature/<id>` branch. A strike PR (`strike/<id>`) is never scheduled: the
+operator merges it (PAN-3973). For each one it checks, in order:
 
 1. the issue is open in the tracker (the cached tracker row) and opted in to
    auto-merge: its `auto-merge` / `hold-for-uat` label, then the project
    default, then this toggle (no forge read);
 2. the merge gate (`evaluateIssueMergeGate`) says the PR is ready. Approval is
-   a GitHub review approving the exact PR head commit, or a trusted
-   `overdeck-verdict` marker comment whose `sha=` is the PR head, so a repo
-   without branch protection still qualifies. An approval of an older commit,
-   or a marker without `sha=`, never does;
+   a trusted `overdeck-verdict` marker comment whose `sha=` is the PR head, or
+   a trusted reviewer's standing GitHub review approving that exact commit, so
+   a repo without branch protection still qualifies. "Trusted" is the marker
+   rule: `OWNER`, `MEMBER` or `COLLABORATOR`, or the identity Overdeck posts
+   as. A review from any other account never counts, and each reviewer's
+   latest review stands: a later "Request changes" or a dismissal withdraws an
+   approval. An approval of an older commit, or a marker without `sha=`, never
+   counts. A GitLab MR needs a named approver in `approved_by` (what
+   `glab mr approve` records); a green, conflict-free MR nobody approved is not
+   approved, even where the project requires zero approvals;
 3. the issue's latest auto-merge entry allows a new one.
 
 It schedules through the same door as `POST /api/merge-train/auto-merge/schedule`.
@@ -88,10 +94,25 @@ re-checks the latest entry, so a cancel that lands while the scheduler is
 reading the forge sticks.
 
 When the cooldown ends, the executor reads the tracker live and blocks the
-entry if the issue was closed, and blocks it if the PR head moved. The merge
-itself is pinned (`gh pr merge --match-head-commit`) to the commit the server
-verified: the scheduled head, or the server's own rebase of it. A push after
-that fails the merge instead of landing code nobody approved.
+entry if the issue was closed, and blocks it if the PR head moved. An entry
+with no recorded head is blocked, never merged unpinned. The merge is bound to
+the approved head and to the PR the gate judged:
+
+- the final gate check reads the `feature/<id>` PR fresh (no facts cache), and
+  the merge refuses when the PR it would land is not that PR;
+- a clean PR merges directly only when its live head is the approved head,
+  pinned to it (`gh pr merge --match-head-commit`, the App merge's `sha`,
+  `glab mr merge --sha`);
+- a PR that needs a rebase is rebased by the server only, and only when the
+  worktree and `origin/feature/<id>` are both at the approved head. The server
+  rebases exactly that commit, pushes the result by sha with a lease on the
+  approved head, and pins the merge to the result. It never hands the rebase
+  to the work agent, whose push would merge unreviewed;
+- polyrepo merge sets and branches that track `.planning/` files are left to
+  the operator.
+
+A commit made or pushed after the approval therefore fails the merge instead
+of landing code nobody approved.
 
 ## Per-project default
 
@@ -145,9 +166,10 @@ facts each time it is checked (`isAutoMergeEligible` in
 only when **all** of these are true:
 
 - The PR is open (not closed, not a draft, not already merged)
-- The PR is approved on its exact head commit (a GitHub review of that commit,
-  or a verdict marker whose `sha=` names it; a GitLab MR's own approval), and
-  its latest review does not request changes
+- The PR is approved on its exact head commit (a trusted reviewer's standing
+  GitHub review of that commit, or a trusted verdict marker whose `sha=` names
+  it; on GitLab, a named approver in `approved_by`), and no review or marker
+  requests changes
 - The forge reports CI checks on the PR head, and all of them passed. Pending
   checks, failing checks, and no reported checks each make the PR ineligible.
   When the project runs `verification.tests: ci`, the CI test job must also
@@ -194,7 +216,8 @@ Three ways to cancel an in-flight auto-merge during its cooldown:
    ```
 
    This calls the DELETE endpoint, removes the entry from the pending list,
-   and emits an `auto-merge cancelled for PAN-123` TTS announcement so the
+   drops any waiting entry for the issue from the project merge queue, and
+   emits an `auto-merge cancelled for PAN-123` TTS announcement so the
    operator knows the abort took effect.
 
 Cancellation only succeeds during the cooldown window, before the executor
@@ -204,11 +227,13 @@ as clicking MERGE.
 
 ## Queue interaction
 
-The dashboard runs at most one merge at a time per project. If two
-auto-merges become due at the same instant, the second is requeued with a
-short backoff (`scheduledMergeAt` bumped by 60 seconds, status reverted to
-`pending`) so the next executor tick re-evaluates eligibility and tries
-again. Stale `merging` rows are prevented by this requeue path; the executor
+The dashboard runs at most one merge at a time per project. An automatic
+merge never joins the project merge queue: when another merge holds the slot,
+`triggerMerge()` defers it, and the entry is requeued with a short backoff
+(`scheduledMergeAt` bumped by 60 seconds, status reverted to `pending`) without
+using its retry budget. The next executor tick re-runs every check (the gate,
+the head, the labels, the tracker) and tries again. A queued merge would start
+later with none of them. Stale `merging` rows are prevented by this requeue path; the executor
 never leaves a row stuck mid-flight when `triggerMerge()` returns a
 non-terminal status.
 

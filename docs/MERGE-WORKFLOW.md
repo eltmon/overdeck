@@ -56,9 +56,11 @@ verdict, every time it's asked.
    Verification (typecheck, lint, tests) runs as check runs on the PR.
    "Ready" is derived, not stored: approved on the head, checks green, forge
    reports `mergeable: true`. Approval for a merge is bound to the exact head
-   commit (#3983): a GitHub review approving that commit, or a trusted
-   verdict marker whose `sha=` names it; a marker without `sha=`, or one for
-   an older head, never approves a merge. Two more conditions come from the forge too
+   commit (#3983): a trusted reviewer's standing GitHub review approving that
+   commit, or a trusted verdict marker whose `sha=` names it; a marker without
+   `sha=`, one for an older head, or a review from an account the marker rule
+   does not trust, never approves a merge. A GitLab MR needs a named approver
+   in `approved_by`. Two more conditions come from the forge too
    (`cloister/merge-gate.ts`, see
    [PIPELINE-GATES.md](PIPELINE-GATES.md#the-merge-gate-4016-4021-4036)): in a
    `verification.tests: ci` project the CI `test` job must have concluded
@@ -75,8 +77,14 @@ verdict, every time it's asked.
    `triggerMerge`, which re-reads readiness from the merge gate alone and
    refuses with the first failing condition (`Cannot merge: …`); the derived
    issue state refuses only an issue already merged. The board shows the
-   button on the derived state (`reviewDecision`, checks, mergeability), so
-   the CI test job and UAT conditions show up as that refusal. Otherwise it:
+   button on the derived state, whose `ready` applies the gate's own approval
+   rule from the gate's cached answer for the PR head (#4066 review), so the
+   CI test job and UAT conditions show up as that refusal. The gate is bound
+   to the `feature/<issue>` PR the merge lands, and a merge of any other PR is
+   refused. An automatic merge merges only its approved head: directly when
+   the PR is clean and still at it, otherwise through a server rebase of
+   exactly that commit, pinned to the result, never through the work agent
+   (see [auto-merge](../configuration/auto-merge.mdx)). Otherwise it:
    - Merges a GitHub-clean PR directly when its head already contains the
      required base and checks are complete.
    - Otherwise runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)`
