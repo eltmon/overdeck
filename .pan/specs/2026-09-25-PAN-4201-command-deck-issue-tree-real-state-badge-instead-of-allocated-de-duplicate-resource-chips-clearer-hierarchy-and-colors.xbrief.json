@@ -4,17 +4,17 @@
     "created": "2026-09-25T06:03:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4201: Command Deck issue tree: real state badge instead of 'Allocated', de-duplicate resource chips, clearer hierarchy and colors",
-    "updated": "2026-09-25T06:07:50.200Z"
+    "updated": "2026-09-25T06:42:15.498Z"
   },
   "plan": {
     "id": "pan-4201",
     "title": "Command Deck issue tree: real state badge instead of 'Allocated', de-duplicate resource chips, clearer hierarchy and colors",
-    "status": "proposed",
+    "status": "running",
     "uid": "c1b1ca3f-e038-4574-b3c2-17c40cf14b2f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-25T06:03:04Z",
-    "updated": "2026-09-25T06:07:50.200Z",
+    "updated": "2026-09-25T06:42:15.498Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4201",
