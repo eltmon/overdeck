@@ -63,6 +63,12 @@ This will:
   (`overdeck-herdr.service` on systemd hosts), and the pilot integrations
   (`pi`, `omp`, `kimi`, `opencode`) for harnesses that are installed
 - Guide you through platform-specific setup
+- Detect Ollama, for running agents on a local GPU model. `pan install` never
+  runs an installer for you: if Ollama is missing it prints the command for
+  your platform. If Ollama is present and you are on an interactive terminal,
+  it offers to pull the recommended `gemma4:12b` model (about 8 GB, defaults
+  to No); without a terminal it prints `ollama pull gemma4:12b` instead. A
+  missing binary or a failed pull is a warning, never a failed install.
 
 Options:
 
@@ -75,6 +81,7 @@ Options:
 | `--skip-moonshine` | Skip the Moonshine voice sidecar build |
 | `--skip-tts-daemon` | Skip the Qwen TTS daemon venv install |
 | `--skip-herdr` | Skip Herdr terminal backend install/verify (tmux-only hosts) |
+| `--skip-ollama` | Skip Ollama local-model detection and the optional `gemma4:12b` pull |
 
 Herdr setup is also skipped under `CI`, under Vitest, and when the terminal
 backend is explicitly tmux (`terminal.backend: tmux` in
