@@ -156,6 +156,30 @@ describe('rebaseFeatureBranch with an approved head (#4066 review)', () => {
     expect(git(remote, 'rev-parse', BRANCH)).toBe(pushed);
   });
 
+  it('moves the worktree back to the approved head when the push is rejected', async () => {
+    // The approved head is still the PR branch when the server checks, but a
+    // push lands between the rebase and the server's push, so the lease fails.
+    const other = join(root, 'other');
+    git(root, 'clone', '-q', '-b', BRANCH, remote, other);
+    commit(other, 'pushed.txt', 'push during the rebase');
+    const hook = join(work, '.git', 'hooks', 'post-rewrite');
+    writeFileSync(hook, [
+      '#!/bin/sh',
+      'unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX',
+      `cd '${other}' && git push -q origin ${BRANCH}`,
+      'exit 0',
+      '',
+    ].join('\n'));
+    chmodSync(hook, 0o755);
+
+    const result = await run(approved);
+    expect(result.ok).toBe(false);
+    expect(git(remote, 'rev-parse', BRANCH)).toBe(git(other, 'rev-parse', 'HEAD'));
+    // Not left at the unpushed rebase, which the next attempt would refuse.
+    expect(git(work, 'rev-parse', 'HEAD')).toBe(approved);
+    expect(git(work, 'worktree', 'list', '--porcelain').split('\n').filter((line) => line.startsWith('worktree '))).toHaveLength(1);
+  });
+
   it('without an approved head, keeps rebasing whatever the worktree holds (manual merges)', async () => {
     commit(work, 'local.txt', 'local commit');
     const result = await run();

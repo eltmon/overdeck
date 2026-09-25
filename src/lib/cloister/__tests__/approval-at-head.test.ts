@@ -106,4 +106,32 @@ describe('onApprovalAtHeadChanged', () => {
     recordApprovalAtHead(facts());
     expect(listener.mock.calls).toEqual([['PAN-1'], ['PAN-1'], ['PAN-1']]);
   });
+
+  it('fires when the same answer replaces an expired one', () => {
+    vi.useFakeTimers();
+    const listener = vi.fn();
+    const unsubscribe = onApprovalAtHeadChanged(listener);
+    recordApprovalAtHead(facts());
+    vi.advanceTimersByTime(5 * 60_000 + 1);
+    // The expired answer read as unknown; the same answer restores it.
+    recordApprovalAtHead(facts());
+    unsubscribe();
+    expect(listener.mock.calls).toEqual([['PAN-1'], ['PAN-1']]);
+    expect(cachedApprovalAtHead('PAN-1', HEAD)).toBe(true);
+  });
+
+  it("fires when a read's proof is added or replaces an expired one, not on a repeat or a refusal", () => {
+    vi.useFakeTimers();
+    const listener = vi.fn();
+    const unsubscribe = onApprovalAtHeadChanged(listener);
+    recordReadApprovalAtHead(facts({ approvedAtHead: undefined }));
+    expect(listener).not.toHaveBeenCalled();
+    recordReadApprovalAtHead(facts());
+    recordReadApprovalAtHead(facts());
+    vi.advanceTimersByTime(60_000 + 1);
+    recordReadApprovalAtHead(facts());
+    recordReadApprovalAtHead(facts({ headSha: OTHER }));
+    unsubscribe();
+    expect(listener.mock.calls).toEqual([['PAN-1'], ['PAN-1'], ['PAN-1']]);
+  });
 });

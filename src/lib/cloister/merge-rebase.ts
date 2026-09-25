@@ -62,7 +62,8 @@ function sameSha(a: string, b: string): boolean {
  * The work agent's worktree is then moved to the rebased commit
  * (`git reset --keep`), because the merge's local verification runs there.
  * That happens only while it is still at the approved head and before the
- * push; a worktree that moved is refused and nothing is pushed. The temporary
+ * push; a worktree that moved is refused and nothing is pushed. If the push
+ * fails, the worktree is moved back to the approved head. The temporary
  * worktree is removed whatever happens.
  */
 async function rebaseApprovedHead(
@@ -141,10 +142,25 @@ async function rebaseApprovedHead(
     await execAsync(`git reset --keep ${rebased}`, inWorkspace);
 
     console.log(`${logPrefix} Pushing rebased approved head ${rebased.slice(0, 8)}...`);
-    await execAsync(
-      `git push --force-with-lease=refs/heads/${featureBranch}:${expectedHead} origin ${rebased}:refs/heads/${featureBranch}`,
-      inTemp,
-    );
+    try {
+      await execAsync(
+        `git push --force-with-lease=refs/heads/${featureBranch}:${expectedHead} origin ${rebased}:refs/heads/${featureBranch}`,
+        inTemp,
+      );
+    } catch (pushErr: any) {
+      // A failed push (network, or a lease a concurrent push broke) must not
+      // leave the worktree at a commit that was never pushed: the next attempt
+      // would refuse it. Move it back to the approved head, but only from the
+      // commit this rebase put it on.
+      try {
+        if (sameSha(await workspaceHead(), rebased)) {
+          await execAsync(`git reset --keep ${expectedHead}`, inWorkspace);
+        }
+      } catch (resetErr: any) {
+        console.error(`${logPrefix} could not move the worktree back to ${expectedHead.slice(0, 12)}: ${resetErr.message?.slice(0, 200) || 'unknown'}`);
+      }
+      throw pushErr;
+    }
     return { success: true, newHead: rebased };
   } catch (err: any) {
     const reason = `Rebase error: ${err.message?.slice(0, 300) || 'unknown'}`;

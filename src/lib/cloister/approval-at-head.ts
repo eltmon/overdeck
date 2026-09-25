@@ -72,26 +72,43 @@ function answerFor(facts: RecordedFacts): { issueId: string; answer: Answer } | 
   };
 }
 
+function notify(issueId: string): void {
+  for (const listener of listeners) {
+    try {
+      listener(issueId);
+    } catch {
+      // A listener's failure never fails the gate or read that recorded the answer.
+    }
+  }
+}
+
+/** Whether `previous` still stands (unexpired) for the same head with the same answer. */
+function unchanged(previous: Answer | undefined, next: Answer, ttlMs: number): boolean {
+  return previous !== undefined
+    && next.at - previous.at < ttlMs
+    && previous.head === next.head
+    && previous.approved === next.approved;
+}
+
 /** Record the merge gate's answer for the facts' issue at their head. */
 export function recordApprovalAtHead(facts: RecordedFacts): void {
   const recorded = answerFor(facts);
   if (!recorded) return;
   const previous = gateAnswers.get(recorded.issueId);
   gateAnswers.set(recorded.issueId, recorded.answer);
-  if (previous && previous.head === recorded.answer.head && previous.approved === recorded.answer.approved) return;
-  for (const listener of listeners) {
-    try {
-      listener(recorded.issueId);
-    } catch {
-      // A listener's failure never fails the gate that recorded the answer.
-    }
-  }
+  // An expired answer already reads as unknown, so replacing it is a change.
+  if (unchanged(previous, recorded.answer, GATE_ANSWER_TTL_MS)) return;
+  notify(recorded.issueId);
 }
 
 /** Record a PR-facts read that proves the approval at its head (a marker naming it). */
 export function recordReadApprovalAtHead(facts: RecordedFacts): void {
   const recorded = answerFor(facts);
-  if (recorded?.answer.approved) readProofs.set(recorded.issueId, recorded.answer);
+  if (!recorded?.answer.approved) return;
+  const previous = readProofs.get(recorded.issueId);
+  readProofs.set(recorded.issueId, recorded.answer);
+  if (unchanged(previous, recorded.answer, READ_PROOF_TTL_MS)) return;
+  notify(recorded.issueId);
 }
 
 /**
@@ -110,7 +127,11 @@ export function cachedApprovalAtHead(issueId: string, headSha: string | null | u
   return undefined;
 }
 
-/** Called with the issue whenever the gate's answer for it changes. Returns an unsubscribe. */
+/**
+ * Called with the issue whenever its answer changes: a gate answer or a read's
+ * proof that is new, replaces an expired one, or differs in head or value.
+ * Returns an unsubscribe.
+ */
 export function onApprovalAtHeadChanged(listener: (issueId: string) => void): () => void {
   listeners.add(listener);
   return () => {
