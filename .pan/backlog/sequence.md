@@ -1,11 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T07:56:09.802688Z · model: claude-opus-5-5 · open: 812_
+_Last sequenced: 2026-09-25T08:06:18.961601Z · model: claude-opus-5-5 · open: 811_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
 | 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
 | 21 | PAN-4210 | M | critical | ok |  |  | Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start |
 | 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
@@ -51,7 +50,7 @@ _Last sequenced: 2026-09-25T07:56:09.802688Z · model: claude-opus-5-5 · open: 
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
-| 82 | PAN-4213 | M | high | ok |  | PAN-3983 | Merge-train follow-ups from #4066 reviews: stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
+| 82 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
 | 83 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 84 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 85 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -820,10 +819,6 @@ _Last sequenced: 2026-09-25T07:56:09.802688Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-3983 (rank 19)
-
-New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
-
 ### PAN-4212 (rank 20)
 
 New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.
@@ -1006,7 +1001,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 ### PAN-4213 (rank 82)
 
-New issue (2026-09-25). Seven non-blocking follow-ups from four security review rounds on PR #4066, the merge-train restoration that fixes PAN-3983. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined. It ranks beside the other merge-path correctness fixes and after PAN-3983, because it hardens code that PR #4066 introduces.
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
 ### PAN-3096 (rank 83)
 
@@ -1120,6 +1115,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 
 codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
 
+### PAN-2331 (rank 116)
+
+Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1127,24 +1126,11 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T07:56:09.802688Z",
+  "generatedAt": "2026-09-25T08:06:18.961601Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 812,
+  "openCount": 811,
   "nodes": [
-    {
-      "issue": "PAN-3983",
-      "rank": 19,
-      "size": "S",
-      "importance": "critical",
-      "score": 91,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick",
-      "rationale": "New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-4212",
       "rank": 20,
@@ -1737,11 +1723,9 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "importance": "high",
       "score": 80,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-3983"
-      ],
-      "why": "Merge-train follow-ups from #4066 reviews: stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests",
-      "rationale": "New issue (2026-09-25). Seven non-blocking follow-ups from four security review rounds on PR #4066, the merge-train restoration that fixes PAN-3983. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined. It ranks beside the other merge-path correctness fixes and after PAN-3983, because it hardens code that PR #4066 introduces.",
+      "dependsOn": [],
+      "why": "Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests",
+      "rationale": "Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12275,13 +12259,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-3983",
-      "to": "PAN-4213",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
     }
   ]
 }
