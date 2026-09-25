@@ -25,6 +25,7 @@ import {
   type PrFacts,
   type PrFactsOptions,
   type ReadGitHubReviews,
+  recordApprovalAtHead,
   withForgeApprovalAtHead,
 } from './pr-facts.js';
 import { issueRunsTestsOnCi } from './verification-tests-mode.js';
@@ -100,6 +101,8 @@ export async function evaluateIssueMergeGate(
     ? await deps.getFacts(issueId, options)
     : await getPrFacts(issueId, {}, options);
   const facts = await withForgeApprovalAtHead(read, deps.readReviews, deps.overdeckLogins);
+  // #4066 review: the board's derived `ready` reads this answer (no forge read).
+  recordApprovalAtHead(facts);
   const ciTestsRequired = facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId);
   let uatRequired = false;
   if (facts.uatVerdict?.status === 'failed') {

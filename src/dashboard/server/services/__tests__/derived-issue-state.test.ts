@@ -95,11 +95,40 @@ describe('deriveIssueState — the nine FR-6 rows', () => {
     expect(state.state).toBe('changes-requested');
   });
 
-  it('ready: PR approved, checks green, mergeable true', () => {
+  it('ready: the merge gate proved the approval at the head, checks green, mergeable true', () => {
     const state = deriveIssueState(facts({
       pr: { url: 'u', number: 12, reviewState: 'approved', checks: 'green', mergeable: true },
+      prApprovedAtHead: true,
     }));
     expect(state.state).toBe('ready');
+  });
+
+  // #4066 review: `ready` is the merge gate's approval rule, not the forge's
+  // reviewDecision, so the Merge button and the door agree both ways.
+  it('ready for a marker-approved PR whose forge reviewDecision is empty', () => {
+    const state = deriveIssueState(facts({
+      pr: { url: 'u', number: 12, reviewState: 'none', checks: 'green', mergeable: true },
+      prApprovedAtHead: true,
+    }));
+    expect(state.state).toBe('ready');
+  });
+
+  it('not ready on a stale reviewDecision APPROVED the gate has not proven at this head', () => {
+    for (const prApprovedAtHead of [false, undefined]) {
+      const state = deriveIssueState(facts({
+        pr: { url: 'u', number: 12, reviewState: 'approved', checks: 'green', mergeable: true },
+        ...(prApprovedAtHead === undefined ? {} : { prApprovedAtHead }),
+      }));
+      expect(state.state).toBe('in-review');
+    }
+  });
+
+  it('not ready while the forge says changes were requested', () => {
+    const state = deriveIssueState(facts({
+      pr: { url: 'u', number: 12, reviewState: 'changes-requested', checks: 'green', mergeable: true },
+      prApprovedAtHead: true,
+    }));
+    expect(state.state).toBe('changes-requested');
   });
 
   it('ready needs all three: approved with red checks is not ready', () => {
@@ -188,7 +217,7 @@ describe('deriveIssueState — payload', () => {
   it('carries the PR and branch facts through unchanged', () => {
     const pr = { url: 'https://github.com/o/r/pull/12', number: 12, reviewState: 'approved' as const, checks: 'green' as const, mergeable: true };
     const branch = { name: 'feature/pan-3917', aheadOfMain: 4, pushed: true };
-    const state = deriveIssueState(facts({ pr, branch }));
+    const state = deriveIssueState(facts({ pr, branch, prApprovedAtHead: true }));
     expect(state).toEqual({ issueId: 'PAN-3917', state: 'ready', pr, branch });
   });
 });
@@ -244,7 +273,7 @@ describe('forge shape translation — GitLab', () => {
       detailed_merge_status: 'mergeable', approved: true, head_pipeline: { status: 'success' },
     })).toEqual({
       url: 'https://gitlab.com/g/r/-/merge_requests/7', number: 7,
-      reviewState: 'approved', checks: 'green', mergeable: true, merged: false,
+      reviewState: 'approved', checks: 'green', mergeable: true, merged: false, headSha: null,
     });
     expect(mrFromGlabRow({ iid: 7, state: 'opened', has_conflicts: true })?.mergeable).toBe(false);
     expect(mrFromGlabRow({ iid: 7, state: 'merged' })?.merged).toBe(true);

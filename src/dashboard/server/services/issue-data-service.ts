@@ -973,7 +973,7 @@ export class IssueDataService {
    * Grouped by project so each repo costs one cached forge listing and one
    * backend-inventory read, never one `gh` invocation per issue.
    */
-  private scheduleDerivedStateRefreshForIssues(issues: any[]): void {
+  scheduleDerivedStateRefreshForIssues(issues: any[]): void {
     for (const issue of issues) {
       const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
       if (identifier) this.derivedRefreshIssueIds.add(identifier);

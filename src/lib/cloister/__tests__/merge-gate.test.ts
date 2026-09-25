@@ -6,7 +6,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { defaultUatRequired, evaluateIssueMergeGate } from '../merge-gate.js';
 import { getMergeReadyIssues } from '../merge-ready-set.js';
-import { emptyPrFacts, getPrFacts, resetPrFactsCache, type GitHubReviewsAtHead, type PrFacts } from '../pr-facts.js';
+import {
+  cachedApprovalAtHead,
+  emptyPrFacts,
+  getPrFacts,
+  resetApprovalAtHeadCache,
+  resetPrFactsCache,
+  type GitHubReviewsAtHead,
+  type PrFacts,
+} from '../pr-facts.js';
 import type { IssuePullRequestData } from '../../overdeck/pull-requests.js';
 
 const HEAD = 'dddd444400000000000000000000000000000000';
@@ -209,6 +217,16 @@ describe('evaluateIssueMergeGate — approval bound to the PR head (#3983)', () 
     const { result, readReviews } = gate(pr({ comments: [marker(HEAD)] }));
     await expect(result).resolves.toEqual(expect.objectContaining({ ready: true }));
     expect(readReviews).not.toHaveBeenCalled();
+  });
+
+  // #4066 review: the board's derived `ready` reads the gate's answer per head.
+  it("records its approval answer for the head it judged, for the board's Merge button", async () => {
+    resetApprovalAtHeadCache();
+    await gate(pr({ comments: [marker(HEAD)] })).result;
+    expect(cachedApprovalAtHead('PAN-3983', HEAD)).toBe(true);
+    await gate(pr({ comments: [marker(OLD)] })).result;
+    expect(cachedApprovalAtHead('PAN-3983', HEAD)).toBe(false);
+    expect(cachedApprovalAtHead('PAN-3983', OLD)).toBeUndefined();
   });
 
   it('refuses a marker naming an older head, however recent the comment', async () => {

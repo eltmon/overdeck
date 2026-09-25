@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssue, type ResolvedProjectRepo } from '../project-repos.js';
+import { approvalProvenAtHead, recordReadApprovalAtHead } from './approval-at-head.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestCheckName } from './verification-tests-mode.js';
 
@@ -92,6 +93,13 @@ export interface PrFacts {
 }
 
 export { formatUatMarker, parseUatVerdict } from './uat-verdict-marker.js';
+export {
+  approvalProvenAtHead,
+  cachedApprovalAtHead,
+  onApprovalAtHeadChanged,
+  recordApprovalAtHead,
+  resetApprovalAtHeadCache,
+} from './approval-at-head.js';
 
 /** A browser-UAT verdict read back from a PR comment (#4036). */
 export interface UatVerdict {
@@ -570,7 +578,12 @@ export async function getPrFacts(
   }
   const facts = await readPrFacts(issueId, deps, options);
   // An error is a lookup failure, not an answer — never cache it.
-  if (cacheable && !facts.error) prFactsCache.set(key, { at: Date.now(), facts });
+  if (cacheable && !facts.error) {
+    prFactsCache.set(key, { at: Date.now(), facts });
+    // #4066 review: a trusted marker naming the head, read here by any
+    // caller, also answers the board's `ready` for that head.
+    recordReadApprovalAtHead(facts);
+  }
   return facts;
 }
 
@@ -876,13 +889,13 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
   if (policy.requireApprovalAtHead && facts.forge === 'github') {
-    if (facts.approvedAtHead !== true) {
+    if (!approvalProvenAtHead(facts)) {
       return {
         ready: false,
         reason: `PR is not approved at PR HEAD ${head} (needs a GitHub approval of that commit or a verdict marker naming it)`,
       };
     }
-  } else if (!facts.approved) {
+  } else if (policy.requireApprovalAtHead ? !approvalProvenAtHead(facts) : !facts.approved) {
     return { ready: false, reason: 'PR is not approved' };
   }
   // FR-9 is a positive test on both: `none` (no checks reported for the head
