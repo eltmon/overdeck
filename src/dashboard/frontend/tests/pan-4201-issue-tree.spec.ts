@@ -1,6 +1,14 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
 const DASHBOARD_URL = process.env['DASHBOARD_URL'] ?? 'http://localhost:3450';
+
+// Resolved from repo root, not cwd — `npx playwright test` is documented to run
+// from `src/dashboard/frontend`, and a cwd-relative path would write a stray
+// `src/dashboard/frontend/docs/` tree instead of the real docs/screenshots/.
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+const SCREENSHOTS_DIR = path.join(REPO_ROOT, 'docs', 'screenshots', 'pan-4201');
 
 interface MockSession {
   type: string;
@@ -199,7 +207,7 @@ for (const theme of ['light', 'dark'] as const) {
 
       await expect(page.getByText('branch local 1')).toHaveCount(0);
 
-      await page.screenshot({ path: `docs/screenshots/pan-4201/${theme}-collapsed.png`, fullPage: true });
+      await page.screenshot({ path: `${SCREENSHOTS_DIR}/${theme}-collapsed.png`, fullPage: true });
     });
 
     test(`expanded working row and live-agent clip (${theme})`, async ({ page }) => {
@@ -209,8 +217,8 @@ for (const theme of ['light', 'dark'] as const) {
       await workingRow.getByRole('button', { name: 'Expand sessions' }).click();
       await expect(workingRow.locator('[class*="sessionList"]')).toBeVisible();
 
-      await page.screenshot({ path: `docs/screenshots/pan-4201/${theme}-expanded.png`, fullPage: true });
-      await workingRow.screenshot({ path: `docs/screenshots/pan-4201/${theme}-live-agent.png` });
+      await page.screenshot({ path: `${SCREENSHOTS_DIR}/${theme}-expanded.png`, fullPage: true });
+      await workingRow.screenshot({ path: `${SCREENSHOTS_DIR}/${theme}-live-agent.png` });
     });
   });
 }

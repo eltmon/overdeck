@@ -284,7 +284,14 @@ test.describe('Command Deck resource strip', () => {
     await expectResourceChip('tasks: present');
     const prChip = await expectResourceChip('PR: #862 (open) · #863 (open, draft)');
     await expect(prChip.getByText('#862', { exact: true })).toBeVisible();
-    await expectResourceChip('docker: 1 container');
+    // PAN-4201 WI-7: PAN-862 is expanded by default (stateLabel 'In Progress')
+    // and has a docker container, so the expanded Containers group renders it
+    // and the cluster omits its own docker icon — each fact appears once.
+    await expect(pan862Item.getByTitle('docker: 1 container')).toHaveCount(0);
+    await expect(pan862Item.getByText('Containers', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('1 container', { exact: true })).toBeVisible();
+    await pan862Item.getByRole('button', { name: 'Expand resources' }).click();
+    await expect(pan862Item.getByTitle('pan-862-db')).toBeVisible();
     await expect(pan862Item.getByText('workspace', { exact: true })).toHaveCount(0);
     await expect(pan862Item.getByText('branch local 1 · remote 1', { exact: true })).toHaveCount(0);
     await workspaceIcon.hover();
@@ -299,6 +306,12 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan862Item.getByText('PR: #862 PAN-862 main PR (open)', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('PR: #863 PAN-862 draft PR (open, draft)', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('docker: pan-862-db', { exact: true })).toBeVisible();
+
+    // Close PAN-862's popover before touching PAN-777 — it renders upward
+    // (`bottom: calc(100% + 4px)`) and the now-expanded Containers group
+    // pushed the row taller, so an open popover can overlap the next row.
+    await page.mouse.move(0, 0);
+    await expect(pan862Item.locator('[class*="featureResourcePopover"]')).toHaveCount(0);
 
     const closedWorkspaceIcon = pan777Item.getByTitle('workspace: allocated');
     await expect(closedWorkspaceIcon.locator('svg')).toBeVisible();
