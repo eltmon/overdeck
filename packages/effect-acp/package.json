@@ -43,7 +43,7 @@
   "devDependencies": {
     "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
-    "@types/node": "^20.10.0",
+    "@types/node": "^20.19.43",
     "typescript": "catalog:"
   }
 }
