@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
-import { ChevronRight, MoreHorizontal, X } from 'lucide-react';
+import { ChevronRight, MoreHorizontal } from 'lucide-react';
 import { useMenuOpen } from '../../lib/menuOpenState';
 
 import { AgentTellForm } from '../AgentTellForm';
@@ -23,6 +23,7 @@ import {
   type IssueActionMenuPrimitives,
   type NonIssueActionInvocation,
 } from './IssueActionGroupedBody';
+import { ActionDialogFrame } from './ActionDialogFrame';
 import { IssueOpenInDialog } from './IssueOpenInDialog';
 import { RestartAgentDialog } from './RestartAgentDialog';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
@@ -314,34 +315,6 @@ function OverflowButton({
     </div>
   );
 }
-
-export type ActionDialogFrameProps = {
-  label: string;
-  onClose: () => void;
-  children: ReactNode;
-};
-
-export function ActionDialogFrame({ label, onClose, children }: ActionDialogFrameProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-label={label}
-        className="w-full max-w-md rounded-lg border border-border bg-popover p-4 text-sm text-popover-foreground shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="font-medium">{label}</h3>
-          <button type="button" aria-label="Close" className="text-muted-foreground hover:text-foreground" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 
 function NewOrderBookDialog({ actions, onClose }: { actions: UseIssueActionsResult; onClose: () => void }) {
   const [name, setName] = useState('');

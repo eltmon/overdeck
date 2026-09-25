@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { hasLiveAgent, type IssueActionEntry } from '../../lib/issueActions';
-import { ActionDialogFrame } from './IssueActionMenu';
+import { ActionDialogFrame } from './ActionDialogFrame';
 import type { UseIssueActionsResult } from './useIssueActions';
 
 /**
