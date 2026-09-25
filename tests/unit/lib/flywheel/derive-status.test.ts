@@ -157,9 +157,10 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
         pr: derived.pr,
         trackerUnknown: true,
         liveAgents: 0,
+        inTick: false,
         lastJournal: { at: '2026-09-23T09:58:00.000Z', type: 'review.dispatched', source: 'pan-done' },
       },
-      { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, lastJournal: null },
+      { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, inTick: false, lastJournal: null },
     ]);
   });
 
@@ -242,7 +243,7 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
         }),
       });
       expect(status.inFlight).toEqual([
-        { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, lastJournal: null },
+        { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, inTick: false, lastJournal: null },
       ]);
     });
 
@@ -370,6 +371,79 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
       });
       expect(status.agents.map((agent) => `${agent.issueId}/${agent.role}`))
         .toEqual(['PAN-1/work', 'PAN-2/review', 'PAN-2/work']);
+    });
+  });
+
+  describe('the tick in-flight list (PAN-4199 FR-6)', () => {
+    /** A transcript whose newest marker names `ids` as in flight. */
+    function tickOver(...ids: readonly string[]) {
+      const list = ids.length ? ids.join(',') : 'none';
+      return async () => [marker(4, '2026-09-23T09:59:30.000Z', `pick=${ids[0] ?? 'none'} phase=watch in-flight=${list} needs-you=none`)];
+    }
+
+    it('adds a tick id that has no workspace of its own (ac1)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: tickOver('PAN-5'),
+          listWorkspaces: () => [],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-5', { issueId: 'PAN-5', state: 'working' }]]),
+        }),
+      });
+      expect(status.inFlight).toEqual([
+        expect.objectContaining({ issueId: 'PAN-5', inTick: true, lastJournal: null }),
+      ]);
+    });
+
+    it('marks a census workspace the tick did not name as inTick false (ac2)', async () => {
+      const lastJournal = vi.fn(() => null);
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: tickOver('PAN-5'),
+          listWorkspaces: () => [{ issueId: 'PAN-6', workspacePath: '/ws/feature-pan-6' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([
+            ['PAN-5', { issueId: 'PAN-5', state: 'working' }],
+            ['PAN-6', { issueId: 'PAN-6', state: 'working' }],
+          ]),
+          lastJournal,
+        }),
+      });
+      expect(status.inFlight.map((row) => [row.issueId, row.inTick])).toEqual([['PAN-6', false], ['PAN-5', true]]);
+      // The tick-only id has no workspace, so no journal is read for it.
+      expect(lastJournal).toHaveBeenCalledExactlyOnceWith('/ws/feature-pan-6');
+    });
+
+    it('reports inFlightSource census without a tick and tick with one (ac3)', async () => {
+      const census = await deriveFlywheelStatus({ deps: baseDeps({ getConversation: () => null }) });
+      expect(census.inFlightSource).toBe('census');
+
+      const noTick = await deriveFlywheelStatus({ deps: baseDeps() });
+      expect(noTick.inFlightSource).toBe('census');
+
+      const ticked = await deriveFlywheelStatus({ deps: baseDeps({ readTranscript: tickOver('PAN-5') }) });
+      expect(ticked.inFlightSource).toBe('tick');
+    });
+
+    it('drops a tick id whose derived state is closed (ac4)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: tickOver('PAN-5'),
+          listWorkspaces: () => [],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-5', { issueId: 'PAN-5', state: 'closed' }]]),
+        }),
+      });
+      expect(status.inFlight).toEqual([]);
+    });
+
+    it('does not duplicate an id that is both a workspace and a tick entry', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: tickOver('PAN-6'),
+          listWorkspaces: () => [{ issueId: 'PAN-6', workspacePath: '/ws/feature-pan-6' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-6', { issueId: 'PAN-6', state: 'working' }]]),
+        }),
+      });
+      expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-6']);
+      expect(status.inFlight[0]?.inTick).toBe(true);
     });
   });
 

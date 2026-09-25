@@ -259,18 +259,36 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
   const panDir = join(planHome, '.pan');
 
   const workspaces = await (deps.listWorkspaces ?? defaultListWorkspaces)(projectRoot);
-  const issueIds = workspaces.map((ws) => ws.issueId);
+  // The board is the union of the workspace census and the ids the loop named
+  // in its own newest tick: an issue the loop is driving without a workspace
+  // of its own is still in flight, and a workspace the loop has not picked up
+  // is still real. Census order first, then the tick-only ids.
+  const candidates: Array<{ issueId: string; workspacePath: string | null; inTick: boolean }> = [];
+  const seen = new Set<string>();
+  const tickIds = new Set((lastTick?.inFlight ?? []).map((id) => id.toUpperCase()));
+  for (const ws of workspaces) {
+    const id = ws.issueId.toUpperCase();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    candidates.push({ issueId: ws.issueId, workspacePath: ws.workspacePath, inTick: tickIds.has(id) });
+  }
+  for (const id of tickIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    candidates.push({ issueId: id, workspacePath: null, inTick: true });
+  }
+  const issueIds = candidates.map((c) => c.issueId);
   // The tracker read comes first: `loadIssueStatesForProject` treats a missing
   // entry as unknown, so passing it through is what makes `closed` reachable.
   // One inventory read for the whole status: the rows count live agents from
   // it and `loadStates` derives pane-driven attention from the same snapshot.
-  const [issues, panes] = workspaces.length
+  const [issues, panes] = candidates.length
     ? await Promise.all([
         (deps.readTrackerIssues ?? defaultReadTrackerIssues)(issueIds),
         (deps.listPanes ?? defaultListPanes)(),
       ])
     : [{} as Readonly<Record<string, TrackerIssueFacts | null>>, [] as readonly BackendPane[]];
-  const states = workspaces.length
+  const states = candidates.length
     ? await (deps.loadStates ?? defaultLoadStates)(projectRoot, issueIds, { issues, panes })
     : new Map<string, DerivedIssueState>();
   const livePanesByIssue = new Map<string, BackendPane[]>();
@@ -281,19 +299,21 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     if (list) list.push(pane); else livePanesByIssue.set(id, [pane]);
   }
   const lastJournal = deps.lastJournal ?? defaultLastJournal;
-  const rows: FlywheelInFlightRow[] = await Promise.all(workspaces.map(async (ws) => {
-    const id = ws.issueId.toUpperCase();
+  const rows: FlywheelInFlightRow[] = await Promise.all(candidates.map(async (candidate) => {
+    const id = candidate.issueId.toUpperCase();
     const derived = states.get(id);
     const issue = issues[id] ?? null;
-    const entry = await lastJournal(ws.workspacePath);
+    // A tick-only id has no workspace, so it has no journal of its own.
+    const entry = candidate.workspacePath ? await lastJournal(candidate.workspacePath) : null;
     return {
-      issueId: ws.issueId,
+      issueId: candidate.issueId,
       title: issue?.title ?? null,
       state: derived?.state ?? 'backlog',
       ...(derived?.attention ? { attention: derived.attention } : {}),
       ...(derived?.pr ? { pr: derived.pr } : {}),
       ...(issue ? {} : { trackerUnknown: true as const }),
       liveAgents: livePanesByIssue.get(id)?.length ?? 0,
+      inTick: candidate.inTick,
       lastJournal: entry ? { at: entry.at, type: entry.type, ...(entry.source ? { source: entry.source } : {}) } : null,
     };
   }));
@@ -327,6 +347,9 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     policies,
     inFlight,
     agents,
+    // A running loop's own tick list is the authority on what it is driving;
+    // with no conversation or no tick, the workspace census is all there is.
+    inFlightSource: conv && lastTick ? 'tick' : 'census',
     orderBook,
     projectRoot,
     generatedAt: new Date(now).toISOString(),

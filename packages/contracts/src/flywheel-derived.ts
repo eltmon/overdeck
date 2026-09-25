@@ -102,6 +102,8 @@ export const FlywheelInFlightRow = Schema.Struct({
   trackerUnknown: Schema.optional(Schema.Literal(true)),
   /** Live agent panes on this issue. `working` with 0 means nobody is driving it. */
   liveAgents: Schema.Number,
+  /** The loop named this id in its newest tick marker's in-flight list. */
+  inTick: Schema.Boolean,
   lastJournal: Schema.NullOr(FlywheelJournalSummary),
 })
 export type FlywheelInFlightRow = typeof FlywheelInFlightRow.Type
@@ -124,6 +126,11 @@ export const FlywheelDerivedStatus = Schema.Struct({
   inFlight: Schema.Array(FlywheelInFlightRow),
   /** Every live agent on an in-flight issue, by issue then role. */
   agents: Schema.Array(FlywheelAgentSummary),
+  /**
+   * Which list the header counts: `tick` when a running loop named its own
+   * in-flight ids, `census` when the rows are just the feature workspaces.
+   */
+  inFlightSource: Schema.Literals(["tick", "census"]),
   orderBook: Schema.NullOr(FlywheelOrderBookSummary),
   projectRoot: Schema.String,
   generatedAt: Schema.String,
