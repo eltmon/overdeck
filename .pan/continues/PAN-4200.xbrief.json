@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4200",
+  "created": "2026-09-25T06:42:27.234Z",
+  "updated": "2026-09-25T06:42:27.234Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-electron-builder-26": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4200",
+      "claimedAt": "2026-09-25T06:42:27.234Z"
+    }
+  }
+}
