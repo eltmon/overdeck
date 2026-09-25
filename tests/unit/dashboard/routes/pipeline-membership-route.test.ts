@@ -106,6 +106,27 @@ describe('pipeline membership routes', () => {
     expect(response.headers['retry-after']).toBe('5');
   });
 
+  it('PAN-3527: returns HTTP 503 with Retry-After when the forge did not answer on a cold GET', async () => {
+    routeMocks.readPipelineMembershipSnapshotsForProjects.mockReturnValue([{
+      project,
+      error: new Error('Pipeline membership refresh failed: GitHub API rate limit exceeded'),
+      unavailableReason: 'forge_transient',
+    }]);
+
+    await expect(requestMembershipRoute('/api/pipeline/membership?project=route-project')).resolves.toEqual({
+      status: 503,
+      body: {
+        status: 'unavailable',
+        reason: 'forge_transient',
+        message: 'Pipeline membership refresh failed: GitHub API rate limit exceeded',
+        error: 'Pipeline membership refresh failed: GitHub API rate limit exceeded',
+        projectKey: 'route-project',
+      },
+    });
+    const response = await runMembershipRoute('/api/pipeline/membership?project=route-project');
+    expect(response.headers['retry-after']).toBe('30');
+  });
+
   it('returns a typed unavailable body with HTTP 200 after a failed POST refresh', async () => {
     routeMocks.readPipelineMembershipSnapshotsForProjects.mockReturnValue([{
       project,
