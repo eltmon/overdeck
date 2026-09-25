@@ -1,11 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T06:45:42.580491Z · model: claude-opus-5-5 · open: 808_
+_Last sequenced: 2026-09-25T06:48:06.046715Z · model: claude-opus-5-5 · open: 811_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
+| 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
+| 21 | PAN-4210 | M | critical | ok |  |  | Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start |
+| 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -820,6 +823,18 @@ _Last sequenced: 2026-09-25T06:45:42.580491Z · model: claude-opus-5-5 · open: 
 
 New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
 
+### PAN-4212 (rank 20)
+
+New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.
+
+### PAN-4210 (rank 21)
+
+New in-pipeline bug. Deferred handoff retries are in-memory timers, so any dashboard restart strands planned issues until an operator runs pan start by hand (five issues on 2026-09-25). The fix re-derives pending handoffs from the pipeline journal at boot, which keeps the pipeline self-driving across reloads.
+
+### PAN-4211 (rank 22)
+
+New in-pipeline bug. A stale troubled flag blocks pan start, and the error names a command the Cut deleted, so the operator must hand-edit state.json. It needs a real clearing door (restored verb or --force/--fresh) plus corrected messages; high because it blocks restarts of affected issues such as PAN-1641.
+
 ### PAN-3566 (rank 26)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
@@ -1104,18 +1119,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 
 Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
 
-### PAN-2333 (rank 117)
-
-Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
-
-### PAN-4184 (rank 118)
-
-New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
-
-### PAN-2511 (rank 119)
-
-Work agents burn 20+ min on false test failures — sandbox denies spawnSync git (EPERM); a per-issue cycle-time sink.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1123,10 +1126,10 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T06:45:42.580491Z",
+  "generatedAt": "2026-09-25T06:48:06.046715Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 808,
+  "openCount": 811,
   "nodes": [
     {
       "issue": "PAN-3983",
@@ -11123,6 +11126,45 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4212",
+      "rank": 20,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files",
+      "rationale": "New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4210",
+      "rank": 21,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start",
+      "rationale": "New in-pipeline bug. Deferred handoff retries are in-memory timers, so any dashboard restart strands planned issues until an operator runs pan start by hand (five issues on 2026-09-25). The fix re-derives pending handoffs from the pipeline journal at boot, which keeps the pipeline self-driving across reloads.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4211",
+      "rank": 22,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state",
+      "rationale": "New in-pipeline bug. A stale troubled flag blocks pan start, and the error names a command the Cut deleted, so the operator must hand-edit state.json. It needs a real clearing door (restored verb or --force/--fresh) plus corrected messages; high because it blocks restarts of affected issues such as PAN-1641.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12189,6 +12231,34 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-4212",
+      "to": "PAN-4199",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4212",
+      "to": "PAN-1641",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4211",
+      "to": "PAN-1641",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3237",
+      "to": "PAN-4210",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
