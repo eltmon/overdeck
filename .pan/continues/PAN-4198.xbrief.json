@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4198",
   "created": "2026-09-25T06:47:47.581Z",
-  "updated": "2026-09-25T09:04:18.151Z",
+  "updated": "2026-09-25T09:04:29.196Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "wi-3-enabled-only-render.ac4": {
       "status": "completed",
       "doneAt": "2026-09-25T09:04:18.150Z"
+    },
+    "wi-4-restart-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T09:04:29.196Z"
     }
   }
 }
