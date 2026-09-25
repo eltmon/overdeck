@@ -24,6 +24,7 @@ import { IssuePeek } from '../../issue-detail/IssuePeek';
 import { useConvoDock } from '../../../lib/convoDock';
 import { useDerivedIssueState } from '../../../lib/store';
 import { resolveFeatureStateBadge } from './featureStateBadge';
+import { StatusDot } from '../StatusDot';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -938,21 +939,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     ? computeDominantStatus(feature.sessions)
     : null;
 
-  // PAN-1779 redesign: the wrapper edge bar is the row's one colored signal.
-  // Priority: error (red) > paused/ready (amber human gates) > done (emerald)
-  // > working (blue machine activity).
-  const isDoneState = feature.stateLabel.toLowerCase().includes('done');
+  // PAN-4201: the state badge is the row's one colored status signal; the
+  // wrapper edge bar keeps only the error variant (red = broken).
   const hasErrorSession = aggregateSessions.some(isErrorSession);
-  const hasRunningSession = aggregateSessions.some(isRunningSession);
-  const edgeClass = (hasErrorSession
-    ? styles.featureItemWrapperError
-    : isReady
-        ? styles.featureItemWrapperReady
-        : isDoneState
-          ? styles.featureItemWrapperMerged
-          : hasRunningSession
-            ? styles.featureItemWrapperWorking
-            : '') ?? '';
+  const edgeClass = hasErrorSession ? styles.featureItemWrapperError : '';
 
   const pipeline = useMemo(
     () => derivePipeline(feature, feature.sessions ?? [], isReady),
@@ -1056,12 +1046,15 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           {/* PAN-2975: the resume affordance lives INSIDE the row's meta line
               as a badge-like chip — never a detached block above the card. */}
           <StartAgentCta issueId={feature.issueId} density="rail" surface="chip" />
+          {dominantStatus && ['active', 'thinking', 'waiting'].includes(dominantStatus) && (
+            <StatusDot status={dominantStatus} title={activitySummary} />
+          )}
           {!feature.isRally && aggregateBadges.length > 0 && (
             <span data-section="Badges" className={styles.featureBadgeGroup}>
               {aggregateBadges.map((badge) => (
                 <span
                   key={badge.key}
-                  className={`${styles.featureBadge} ${styles[`featureBadge_${badge.tone}` as keyof typeof styles]}`}
+                  className={`${styles.featureBadge} ${styles[`featureBadge_${badge.tone === 'running' ? 'stopped' : badge.tone}` as keyof typeof styles]}`}
                   title={getAggregateBadgeTitle(badge, aggregateSessions)}
                 >
                   {badge.label}

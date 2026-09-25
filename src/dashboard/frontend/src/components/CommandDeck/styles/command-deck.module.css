@@ -627,13 +627,9 @@
   position: relative;
 }
 
-/* PAN-1779: paused issues carry an unmissable amber edge bar (the row's one
- * colored signal — amber = a human must act). */
-.featureItemWrapperWorking::before,
-.featureItemWrapperError::before,
-.featureItemWrapperMerged::before,
-.featureItemWrapperReady::before,
-.featureItemWrapperPaused::before {
+/* PAN-4201: the state badge is the row's one colored status signal; the edge
+ * bar keeps only the error variant (red = broken). */
+.featureItemWrapperError::before {
   content: "";
   position: absolute;
   left: 0;
@@ -641,14 +637,8 @@
   bottom: 4px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--warning);
+  background: var(--destructive);
 }
-
-.featureItemWrapperWorking::before { background: var(--info); }
-.featureItemWrapperError::before { background: var(--destructive); }
-.featureItemWrapperMerged::before { background: var(--success); }
-/* ready-for-merge is a human gate — amber, same as paused */
-.featureItemWrapperReady::before { background: var(--warning); }
 
 .unpauseBtn {
   display: inline-flex;

@@ -97,7 +97,7 @@ vi.mock('../styles/command-deck.module.css', () => ({
     spinning: 'spinning',
     featureItemWrapper: 'featureItemWrapper',
     featureItemWrapperSelected: 'featureItemWrapperSelected',
-    featureItemWrapperPaused: 'featureItemWrapperPaused',
+    featureItemWrapperError: 'featureItemWrapperError',
     featureBadge_paused: 'featureBadge_paused',
     unpauseBtn: 'unpauseBtn',
     featureItemRow: 'featureItemRow',
@@ -559,8 +559,9 @@ describe('FeatureItem', () => {
       />,
     );
     // Redesign (PAN-1779): the aggregate activity tooltip lives on the issue
-    // id — the row status dot was replaced by the wrapper edge bar.
-    expect(screen.getByTitle('1 work agent running 38m, 1 review error, 1 reviewer stopped')).toBeInTheDocument();
+    // id. PAN-4201 reintroduces the row status dot with the same summary.
+    expect(screen.getByText('PAN-821')).toHaveAttribute('title', '1 work agent running 38m, 1 review error, 1 reviewer stopped');
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('title', '1 work agent running 38m, 1 review error, 1 reviewer stopped');
   });
 
   it('shows work and review badges on the parent row', () => {
@@ -579,6 +580,38 @@ describe('FeatureItem', () => {
     );
     expect(screen.getByText('▸ work')).toHaveAttribute('title', 'Work agent sessions for this issue: 1 total. 1 running.');
     expect(screen.getByText('●●● 2')).toHaveAttribute('title', 'Review pipeline sessions for this issue: 2 total. 1 active, 0 queued or starting, 1 stopped. Roles present: correctness and security.');
+    // PAN-4201: aggregate badges go neutral — the state badge is the row's
+    // one colored status signal.
+    expect(screen.getByText('▸ work')).not.toHaveClass('featureBadge_running');
+    expect(screen.getByText('▸ work')).toHaveClass('featureBadge_stopped');
+  });
+
+  it('shows exactly one status dot for a row with an active work session', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ sessionId: 'work-1', type: 'work', status: 'running', presence: 'active' })],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    const dots = screen.getAllByTestId('status-dot');
+    expect(dots).toHaveLength(1);
+    expect(dots[0]).toHaveAttribute('data-status', 'active');
+  });
+
+  it('shows no status dot for a row with only ended sessions', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ sessionId: 'work-1', type: 'work', status: 'stopped', presence: 'ended' })],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('status-dot')).toBeNull();
   });
 
   it('shows a review error badge when a review session failed', () => {
