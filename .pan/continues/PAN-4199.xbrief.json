@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4199",
   "created": "2026-09-25T06:46:14.958Z",
-  "updated": "2026-09-25T07:47:37.259Z",
+  "updated": "2026-09-25T07:49:44.678Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,9 +82,10 @@
       "doneAt": "2026-09-25T07:47:32.054Z"
     },
     "wi16-ui-needs-you": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4199",
-      "claimedAt": "2026-09-25T07:47:37.258Z"
+      "claimedAt": "2026-09-25T07:47:37.258Z",
+      "doneAt": "2026-09-25T07:49:44.677Z"
     }
   }
 }
