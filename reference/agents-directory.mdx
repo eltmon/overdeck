@@ -1,24 +1,84 @@
 ---
-title: Agents Directory
-description: Find every agent, conversation and subagent at /agents, see who spawned it, and read its transcript beside its issue and PR
+title: Agents page
+description: See what is running, what needs you and what is waiting at /agents; browse finished agents in History
 ---
 
-# Agents Directory
+# Agents page
 
-Open `/agents` to see every agent Overdeck knows about in one place: work,
-review, plan and strike agents, workers, `pan spawn` panes, your conversations,
-the subagents they started, and external agents that other tools launched (for
-example Codex-plugin jobs). The page has three panes. Pick a place on the left,
-pick an agent in the middle, and read it on the right.
+Open `/agents` to see what your agents are doing right now. The **Live** view
+lists only work that is running or waiting: what is running and making
+progress, what needs you, and what is waiting in the pipeline. Finished work is
+in **History**, one link away in the top bar.
 
 The Agents page is an experimental surface. Turn on **Settings → Experimental
 features** to see it in the navigation.
 
-## The three panes
+## Live
+
+The top bar counts the rows: `2 live · 1 need you · 3 waiting`. The list has
+three sections, in this order:
+
+| Section | What is in it |
+| --- | --- |
+| **Needs you** | Something only you can move: a question, a permission prompt, a plan to approve, an agent you paused, a broken agent, or a PR ready to merge. The oldest wait is first. |
+| **Live** | Agents running a turn now. The most recent activity is first. When nothing runs, the section says **Nothing running right now.** |
+| **Waiting** | Work waiting on the pipeline or idle: in review, changes requested, CI running or failed, held by Overdeck, idle, or stopped after its PR opened. The most recent activity is first. |
+
+Each row says in words why it is where it is:
+
+| Reason | Meaning |
+| --- | --- |
+| **question waiting** | The agent asked you a question. The question shows under the row. |
+| **permission prompt** | The agent waits for you to allow a tool. |
+| **plan approval** | The agent waits for you to approve its plan. |
+| **paused by you** | You paused it. Your reason shows under the row. |
+| **API error or usage limit** | The provider, not the agent, is failing. |
+| **stuck · idle `<age>`** | The issue's work agent sat idle with unpushed commits past the stuck threshold. |
+| **ready to merge** | The PR is approved with green checks and waits for you to merge. |
+| **running `<tool>`**, **thinking**, **working** | The agent is running a turn. The second line is its last output line and how long ago it wrote it; **quiet `<age>`** appears after five silent minutes. |
+| **running on Fly** | The agent runs on a Fly machine, whose terminal is there. |
+| **held by Overdeck** | Overdeck paused it (a scheduler yield or another machine pause). |
+| **CI failed** | The PR's checks failed. The work agent gets the failure, not you. |
+| **changes requested**, **in review**, **CI running** | The PR is in the review pipeline. |
+| **idle — no known blocker** | The agent is alive but idle and nothing known is blocking it. |
+| **agent stopped** | The agent's pane is gone and its issue still waits in the pipeline. |
+
+A subagent shows as a `↳` line under the agent that started it.
+
+Click a row to preview it: the right pane shows its header, its issue and PR,
+and its live transcript, and the list stays in view. Use `↑` / `↓` to move the
+selection. **Open**, `Enter` or a double-click goes to the agent's live pane
+(its issue view) or to the conversation. Drag the divider to resize the panes;
+the sizes are remembered. **Hide preview** collapses the preview pane, and
+**Show preview** brings it back.
+
+## What the colors mean
+
+Each row has one color, the same on both views:
+
+| Color | State |
+| --- | --- |
+| Blue | **Live**: a machine is running a turn. Running is blue, never green. |
+| Amber | **Needs you**: waiting for you to answer, approve, unpause or merge. |
+| Red | **Stuck or broken**: stuck, an API error, or CI failed. |
+| Grey | **Waiting**: idle, held, in review or stopped. In History, remote agents are grey too. |
+| Emerald | **Done**: a subagent, worker or external agent finished. |
+
+## History
+
+**History** (`/agents?view=history`) lists every agent Overdeck knows about,
+finished ones included: work, review, plan and strike agents, workers,
+`pan spawn` panes, your conversations, the subagents they started, and
+external agents that other tools launched (for example Codex-plugin jobs). The
+page has three panes. Pick a place on the left, pick an agent in the middle,
+and read it on the right. Drag the dividers to resize the panes, and drag the
+left pane closed to hide it. **Live** in the top bar goes back.
+
+### The three panes
 
 | Pane | What it shows |
 | --- | --- |
-| **Locations** (left) | **Local** and, when an agent runs on Fly, **Remote (Fly)**. Under each: your projects, then each issue (newest number first) and one **Conversations** group for work that has no issue. The numbers on the right are live / total. |
+| **Locations** (left) | **Local** and, when an agent runs on Fly, **Remote (Fly)**. Under each: your projects, then each issue (newest number first) and one **Conversations** group for work that has no issue. The numbers on the right are live agents of all shown (hover for the words). |
 | **Agents** (middle) | Every entry under the selected place. A subagent or worker sits indented under the agent or conversation that spawned it. When its parent lives somewhere else, the row says **spawned by** that parent instead. Each row shows the id, role, harness and model, last activity and age. |
 | **Detail** (right) | The entry's header (id, harness, model, state, when it started and was last active, cost when known, and a **Spawned by** link), the issue's state, PR, checks and branch with the issue's actions, and the transcript. |
 
@@ -27,29 +87,17 @@ is read-only: it has no input channel of its own. So is an external agent's:
 its row says **external**, and the detail pane says which tool launched it.
 See [Workers — Externally spawned agents](/reference/workers#externally-spawned-agents).
 
-## What the colors mean
-
-The state badge at the start of each row is the only color in it.
-
-| Badge | State |
-| --- | --- |
-| Blue | **working** — a machine is running a turn |
-| Amber | **blocked** — it is waiting for you (a question or an approval) |
-| Red | **stuck · Nh** — the issue's work agent has sat idle with unpushed commits past the stuck threshold, N hours since it last did anything; **API error** — the provider, not the agent, is failing |
-| Emerald | **done** — a subagent, worker or external agent finished |
-| Grey | **idle**, **stopped**, or **remote** (an agent on a Fly machine, whose terminal runs there) |
-
 Agents and issue nodes show the issue's title after its id (`work · PAN-3920 · Agents
 page as a directory`). Hover any truncated id, model, branch or title to see it in full.
 
-## The time window
+### The time window
 
-The directory always lists everything that is live. Stopped and finished
+History always lists everything that is live. Stopped and finished
 entries stay for **24h** by default; switch the toggle above the tree to **7d**
-to look back a week. An agent that spawned something still in the window stays
+to look back a week. The note under the toggle says which window is on. An agent that spawned something still in the window stays
 listed so you can see where the child came from.
 
-## Keyboard
+### Keyboard
 
 | Key | Action |
 | --- | --- |
@@ -60,9 +108,3 @@ listed so you can see where the child came from.
 
 The selection is kept in the address bar (`?node=…&entry=…&window=168`), so a
 link opens the same view.
-
-## The card grid
-
-The previous card grid, with its metric strip and phase, project and model
-filters, is still there: choose **grid** in the top bar, or open
-`/agents?view=grid`.
