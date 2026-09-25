@@ -34,6 +34,14 @@ describe('NeedsYouIndicator (PAN-4199 WI-16)', () => {
     await waitFor(() => expect(screen.queryByTestId('flywheel-needs-you-indicator')).toBeNull());
   });
 
+  it('survives a 200 whose body has no inFlight, rather than taking the app down', async () => {
+    // It renders in AppChrome on every page: a throw here reaches the root
+    // error boundary and blanks the whole dashboard (caught by tests/e2e).
+    stubFetch((url) => (url === '/api/flywheel/status' ? Response.json({}) : undefined));
+    renderWithQuery(<NeedsYouIndicator />);
+    await waitFor(() => expect(screen.queryByTestId('flywheel-needs-you-indicator')).toBeNull());
+  });
+
   it('counts the tick line and every needs-you row (ac2)', async () => {
     const base = quiet();
     setup(flywheelStatus({

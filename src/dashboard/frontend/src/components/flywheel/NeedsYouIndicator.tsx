@@ -15,10 +15,12 @@ export function NeedsYouIndicator({ onActivate }: { onActivate?: () => void }) {
   // The header is on every page, so it polls at the sidebar's slow cadence;
   // the Flywheel page's own 5 s observer takes over while that page is open.
   const { data } = useFlywheelStatus({ refetchInterval: 30_000 });
-  if (!data) return null;
-
-  const count = (data.lastTick?.needsYou ? 1 : 0)
-    + data.inFlight.filter((row) => row.attention === 'needs-you').length;
+  // This renders in the app header on every page, so a throw here takes the
+  // whole dashboard down through the root error boundary. A 200 carrying a
+  // body without `inFlight` must read as "nothing needs you", never a crash.
+  const rows = Array.isArray(data?.inFlight) ? data.inFlight : [];
+  const count = (data?.lastTick?.needsYou ? 1 : 0)
+    + rows.filter((row) => row.attention === 'needs-you').length;
   if (count === 0) return null;
 
   return (
