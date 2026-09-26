@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T08:25:02.805747Z · model: claude-opus-5-5 · open: 771_
+_Last sequenced: 2026-09-26T08:31:05.217849Z · model: claude-opus-5-5 · open: 771_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1086,7 +1086,7 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T08:25:02.805747Z",
+  "generatedAt": "2026-09-26T08:31:05.217849Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 771,
