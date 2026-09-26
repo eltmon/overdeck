@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4222",
   "created": "2026-09-26T00:48:25.214Z",
-  "updated": "2026-09-26T02:08:34.352Z",
+  "updated": "2026-09-26T02:08:44.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4222",
       "claimedAt": "2026-09-26T00:48:25.214Z",
       "doneAt": "2026-09-26T02:08:34.351Z"
+    },
+    "runtime-tool-description": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4222",
+      "claimedAt": "2026-09-26T02:08:44.131Z"
     }
   }
 }
