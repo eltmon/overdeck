@@ -215,7 +215,8 @@ async function newContext(): Promise<BrowserContext> {
       // flag so the route renders its FleetAgentsView instead of redirecting
       // to /home. See src/lib/experimentalFeatures.ts (EXPERIMENTAL_TAB_IDS).
       if (path === '/api/settings') return json({ tts: { enabled: false }, experimental: { experimentalFeatures: true } });
-      // PAN-3920: the Agents Directory is the default /agents view.
+      // PAN-4197: /agents opens the Live view (?scope=live); History is the
+      // PAN-3920 Agents Directory. Both read this fixture.
       if (path === '/api/agent-directory') return json({
         generatedAt: new Date().toISOString(),
         windowHours: 24,
@@ -431,12 +432,11 @@ describe('styleguide rendered surface conformance', () => {
     await expect.poll(() => commandDeck.page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await commandDeck.context.close();
 
-    const agents = await openRoute('/agents?view=grid');
-    await expect.poll(() => agents.page.locator('[data-component="agent-card"][data-agent-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
-    await expect.poll(() => agents.page.locator('[data-component="verb-badge"]').count(), renderPoll).toBeGreaterThan(0);
+    const agents = await openRoute('/agents');
+    await expect.poll(() => agents.page.locator('[data-component="agents-live-row"][data-entry-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
     await agents.context.close();
 
-    const directory = await openRoute('/agents');
+    const directory = await openRoute('/agents?view=history');
     await expect.poll(() => directory.page.locator('[data-component="directory-row"][data-entry-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
     await directory.context.close();
 
@@ -452,53 +452,21 @@ describe('styleguide rendered surface conformance', () => {
     await drawer.context.close();
   }, 45_000);
 
-  it('agents page TopBar segmented control switches views and Start agent navigates to board', async () => {
+  it('agents page opens Live, links to History and back, and Start agent navigates to board', async () => {
     const { context, page } = await openRoute('/agents');
 
-    await expect.poll(() => page.locator('[data-component="top-bar-segmented-control"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => page.locator('[data-component="agents-live"]').count(), renderPoll).toBe(1);
+
+    await page.getByRole('link', { name: 'History' }).click();
+    await expect.poll(() => page.url(), renderPoll).toContain('view=history');
     await expect.poll(() => page.locator('[data-component="agents-directory"]').count(), renderPoll).toBe(1);
 
-    await page.getByRole('button', { name: 'grid' }).click();
-    await expect.poll(() => page.url(), renderPoll).toContain('view=grid');
-    await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(1);
-
-    await page.getByRole('button', { name: 'table' }).click();
-    await expect.poll(() => page.url(), renderPoll).toContain('view=table');
-    await expect.poll(() => page.locator('[data-component="agents-coming-soon"]').count(), renderPoll).toBe(1);
-    await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(0);
-
-    await page.getByRole('button', { name: 'timeline' }).click();
-    await expect.poll(() => page.url(), renderPoll).toContain('view=timeline');
-    await expect.poll(() => page.locator('[data-component="agents-coming-soon"]').count(), renderPoll).toBe(1);
-
-    await page.getByRole('button', { name: 'directory' }).click();
+    await page.getByRole('link', { name: 'Live' }).click();
     await expect.poll(() => page.url(), renderPoll).not.toContain('view=');
-    await expect.poll(() => page.locator('[data-component="agents-directory"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => page.locator('[data-component="agents-live"]').count(), renderPoll).toBe(1);
 
     await page.getByRole('button', { name: 'Start agent' }).click();
     await expect.poll(() => page.url(), renderPoll).toBe(`${baseUrl}/board`);
-
-    await context.close();
-  }, 45_000);
-
-  it('agents page Open issue scrolls drawer to active-agent section', async () => {
-    const { context, page } = await openRoute('/agents?view=grid');
-
-    await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(1);
-    await page.getByText('Open issue').click();
-
-    await expect.poll(() => page.locator('[data-testid="issue-drawer"]').count(), renderPoll).toBe(1);
-    await expect.poll(() => page.locator('#active-agent').count(), renderPoll).toBe(1);
-
-    const activeAgent = page.locator('#active-agent');
-    const isInViewport = await activeAgent.evaluate((node) => {
-      const rect = node.getBoundingClientRect();
-      const parent = node.closest('[class*="overflow-auto"]');
-      if (!parent) return false;
-      const parentRect = parent.getBoundingClientRect();
-      return rect.top >= parentRect.top && rect.bottom <= parentRect.bottom;
-    });
-    expect(isInViewport).toBe(true);
 
     await context.close();
   }, 45_000);

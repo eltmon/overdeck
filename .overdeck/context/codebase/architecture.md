@@ -1,7 +1,8 @@
 # Architecture
 
 Overdeck is a multi-agent orchestrator for AI coding work: a CLI (`pan`), a
-dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
+dashboard server, a React frontend, and a fleet of coding agents hosted on a
+terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 
 ## Top-level layout
 
@@ -60,8 +61,11 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 
 Issue → `pan plan` (xBRIEF plan + item checklist) → `pan start` (work agent in a git worktree
 `workspaces/feature-<issue>/`) → verification gate → review convoy → test/UAT →
-server-side rebase/merge → close-out. Spawned agents live in tmux sessions
-(`tmux -L overdeck`), with state in `~/.overdeck/agents/<id>/state.json`.
+server-side rebase/merge → close-out. Spawned agents live in terminal-backend
+panes (Herdr default; legacy tmux on `tmux -L overdeck`), with state in
+`~/.overdeck/agents/<id>/state.json`. Liveness is answered only by
+`src/lib/agents/liveness.ts`; the dashboard's live pane list is
+`services/backend-inventory.ts` (`backendPanesById` in the read model).
 
 ## Spawn sites (harness decision points)
 
@@ -106,6 +110,14 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 + aggregate status, PAN-1676) and session-row synthesis in
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
+
+## Dashboard Agents page (`/agents`)
+
+`components/Agents/FleetAgentsView.tsx` hosts it. Data is
+`GET /api/agent-directory` (`services/agent-directory.ts`, derived on read,
+memoized 3 s); entry `state` comes from the pane inventory, never stored
+status. PAN-4197 makes the Live view (`?scope=live`) the default and keeps the
+Directory as `?view=history`.
 
 ## Flywheel (PAN-3964, derived view)
 
