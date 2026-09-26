@@ -49,8 +49,8 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
   API pricing is $4/M input and $20/M output; subscription availability depends
   on the Anthropic account.
 - Proxied models use a dedicated Claude Code context policy rather than copying
-  every value from the generic model registry. GPT-6 Astra and GPT-5.6 Sol,
-  Terra, and Luna default to a `272000`-token pin for both
+  every value from the generic model registry. GPT-6 Astra, Sol, and Luna and
+  GPT-5.6 Sol, Terra, and Luna default to a `272000`-token pin for both
   `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and
   `CLAUDE_CODE_AUTO_COMPACT_WINDOW` — OpenAI bills prompts with more than 272K
   input tokens at 2x input / 1.5x output for the full request, so the default
@@ -58,8 +58,9 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
   and `gpt-5.6-luna[372k]` picker variants opt into a `372000`-token pin for
   long-research sessions that accept the surcharge; the `[372k]` suffix is
   Overdeck-side only and is stripped before the model id reaches the API.
-  `gpt-6-astra` has no `[372k]` variant — the 372K pin was measured on
-  `gpt-5.6-sol` and has not been re-measured for astra.
+  The GPT-6 models (`gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`) have no `[372k]`
+  variant — the 372K pin was measured on `gpt-5.6-sol` and has not been
+  re-measured for GPT-6.
   The maximum tells Claude Code the route's capacity; the auto-compact window is
   the capacity used by Claude Code's normal proactive compaction calculation,
   not an instruction to compact at exactly that token count. GPT-5.5 keeps its
@@ -125,11 +126,16 @@ internal configuration records are excluded from the chat feed.
 
 ### OpenAI Codex CLI (alternative)
 
-- First-party OpenAI agent loop for the GPT model family (GPT-6 Astra,
+- First-party OpenAI agent loop for the GPT model family (GPT-6 Astra/Sol/Luna,
   GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with
   ChatGPT-subscription or API-key auth.
 - `gpt-5.6-sol` is the default OpenAI model surfaced by this harness. `gpt-6-astra`
   is the newest and most capable OpenAI model but is opt-in — pick it explicitly.
+  `gpt-6-sol` and `gpt-6-luna` (September 2026) are the GPT-6 successors to
+  GPT-5.6 Sol and Luna at half their API price; they are opt-in too and need
+  Codex CLI `0.156.0` or newer. Early rollout reports show `gpt-6-luna` refused
+  on some ChatGPT sign-in accounts
+  ([openai/codex#47784](https://github.com/openai/codex/issues/47784)).
 - Work agents use a persistent `codex app-server` child by default. Overdeck
   talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
   readiness, and interruption are structured protocol events rather than TUI
