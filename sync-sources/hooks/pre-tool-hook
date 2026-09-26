@@ -21,14 +21,15 @@ TOOL_NAME="unknown"
 if command -v jq >/dev/null 2>&1; then
   TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"' 2>/dev/null || echo "unknown")
 fi
+TOOL_DESCRIPTION=$(pan_tool_description "$TOOL_INFO")
 
 TS=$(date -Iseconds)
 # jq -n produces correctly-escaped JSON even if TOOL_NAME contains quotes.
 if command -v jq >/dev/null 2>&1; then
-  BODY=$(jq -n --arg tool "$TOOL_NAME" --arg ts "$TS" \
-    '{kind: "activity", activity: "working", tool: $tool, hookName: "PreToolUse", timestamp: $ts}')
+  BODY=$(jq -n --arg tool "$TOOL_NAME" --arg ts "$TS" --arg desc "$TOOL_DESCRIPTION" \
+    '{kind: "activity", activity: "working", tool: $tool, toolDescription: $desc, hookName: "PreToolUse", timestamp: $ts}')
 else
-  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"hookName\":\"PreToolUse\",\"timestamp\":\"$TS\"}"
+  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"toolDescription\":\"$TOOL_DESCRIPTION\",\"hookName\":\"PreToolUse\",\"timestamp\":\"$TS\"}"
 fi
 
 pan_emit_event "$AGENT_ID" "$BODY"
