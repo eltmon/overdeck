@@ -187,7 +187,7 @@ export function LiveAgentsView({ onCountsChange, onShowHistory, previewHidden: p
   };
 
   const historyLink = (
-    <a href={LIVE_HISTORY_HREF} onClick={onHistoryClick} className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">History</a>
+    <a href={LIVE_HISTORY_HREF} onClick={onHistoryClick} className="text-muted-foreground underline underline-offset-2 hover:text-foreground">History</a>
   );
   const renderRows = (sectionRows: readonly LiveRow[]) => sectionRows.map((row) => (
     <LiveAgentRow
@@ -200,8 +200,45 @@ export function LiveAgentsView({ onCountsChange, onShowHistory, previewHidden: p
     />
   ));
 
-  const nothing = entries.length === 0;
   const status = isLoading ? 'Loading agents…' : isError ? 'The live agents could not be loaded.' : null;
+  const showEmpty = rows.length === 0;
+
+  const idleFooter = sections.idle.length > 0 && (
+    <div role="rowgroup" data-component="agents-live-section" data-section="idle">
+      <div role="row" className="flex h-8 items-center gap-1.5 border-b border-border px-3 text-[12px] text-muted-foreground">
+        <span role="rowheader" className="contents">
+          <button
+            type="button"
+            data-testid="agents-live-idle-toggle"
+            aria-expanded={idleExpanded}
+            onClick={toggleIdle}
+            className="hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <span aria-hidden="true">{idleExpanded ? '▾' : '▸'}</span>{' '}
+            <span className="font-mono-ui tabular-nums">{sections.idle.length}</span> idle {sections.idle.length === 1 ? 'session' : 'sessions'}
+          </button>
+          <span aria-hidden="true">·</span>
+          {historyLink}
+        </span>
+      </div>
+      {idleExpanded && renderRows(sections.idle)}
+    </div>
+  );
+
+  if (showEmpty) {
+    return (
+      <div data-component="agents-live" className="flex h-full min-h-0 w-full flex-col overflow-y-auto">
+        {status ? (
+          <div className="px-4 py-8 text-center text-[12px] text-muted-foreground">{status}</div>
+        ) : (
+          <div data-component="agents-live-empty" className="px-4 py-8 text-center text-[12px] text-muted-foreground">
+            Nothing is running or waiting. Finished work is in {historyLink}.
+          </div>
+        )}
+        {idleFooter}
+      </div>
+    );
+  }
 
   return (
     <div data-component="agents-live" className="flex h-full min-h-0 w-full flex-col">
@@ -221,56 +258,26 @@ export function LiveAgentsView({ onCountsChange, onShowHistory, previewHidden: p
             onKeyDown={onListKeyDown}
             className="min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
           >
-            {status && nothing ? (
-              <div className="px-4 py-8 text-center text-[12px] text-muted-foreground">{status}</div>
-            ) : nothing ? (
-              <div data-component="agents-live-empty" className="px-4 py-8 text-center text-[12px] text-muted-foreground">
-                Nothing is running or waiting. Finished work is in {historyLink}.
-              </div>
-            ) : (
-              <>
-                {SECTIONS.map(({ key, id, label }) => {
-                  const sectionRows = sections[key];
-                  if (sectionRows.length === 0 && id !== 'live') return null;
-                  return (
-                    <div key={id} role="rowgroup" data-component="agents-live-section" data-section={id}>
-                      <div role="row" className="sticky top-0 z-10 flex h-8 items-center gap-2 border-b border-border bg-card px-3">
-                        <span role="rowheader" className="eyebrow text-foreground">{label}</span>
-                        <span data-component="agents-live-count" className="font-mono-ui text-[11px] tabular-nums text-muted-foreground">
-                          {sectionRows.length}
-                        </span>
-                      </div>
-                      {sectionRows.length === 0 ? (
-                        <div role="row" className="px-4 py-3 text-[12px] text-muted-foreground">
-                          <span role="gridcell">Nothing running right now.</span>
-                        </div>
-                      ) : renderRows(sectionRows)}
-                    </div>
-                  );
-                })}
-                {sections.idle.length > 0 && (
-                  <div role="rowgroup" data-component="agents-live-section" data-section="idle">
-                    <div role="row" className="flex h-8 items-center gap-1.5 border-b border-border px-3 text-[12px] text-muted-foreground">
-                      <span role="rowheader" className="contents">
-                        <button
-                          type="button"
-                          data-testid="agents-live-idle-toggle"
-                          aria-expanded={idleExpanded}
-                          onClick={toggleIdle}
-                          className="hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
-                          <span aria-hidden="true">{idleExpanded ? '▾' : '▸'}</span>{' '}
-                          <span className="font-mono-ui tabular-nums">{sections.idle.length}</span> idle {sections.idle.length === 1 ? 'session' : 'sessions'}
-                        </button>
-                        <span aria-hidden="true">·</span>
-                        {historyLink}
-                      </span>
-                    </div>
-                    {idleExpanded && renderRows(sections.idle)}
+            {SECTIONS.map(({ key, id, label }) => {
+              const sectionRows = sections[key];
+              if (sectionRows.length === 0 && id !== 'live') return null;
+              return (
+                <div key={id} role="rowgroup" data-component="agents-live-section" data-section={id}>
+                  <div role="row" className="sticky top-0 z-10 flex h-8 items-center gap-2 border-b border-border bg-card px-3">
+                    <span role="rowheader" className="eyebrow text-foreground">{label}</span>
+                    <span data-component="agents-live-count" className="font-mono-ui text-[11px] tabular-nums text-muted-foreground">
+                      {sectionRows.length}
+                    </span>
                   </div>
-                )}
-              </>
-            )}
+                  {sectionRows.length === 0 ? (
+                    <div role="row" className="px-4 py-3 text-[12px] text-muted-foreground">
+                      <span role="gridcell">Nothing running right now.</span>
+                    </div>
+                  ) : renderRows(sectionRows)}
+                </div>
+              );
+            })}
+            {idleFooter}
           </div>
         </Panel>
         <Separator className={PANEL_SEPARATOR_CLASS} />

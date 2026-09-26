@@ -272,13 +272,27 @@ describe('LiveAgentsView', () => {
     expect(part('agent-pan-2', 'agents-live-subagent-more')).toHaveTextContent('↳ +2 more');
   });
 
-  it('shows the empty state with a History link when nothing is live', async () => {
+  it('shows one empty state with a History link when nothing is live, with no preview region (PAN-4222 ac1)', async () => {
     response = { ...response, entries: [] };
     renderView();
     await flush();
     const empty = document.querySelector('[data-component="agents-live-empty"]') as HTMLElement;
     expect(empty).toHaveTextContent('Nothing is running or waiting. Finished work is in History.');
-    expect(within(empty).getByRole('link', { name: 'History' })).toHaveAttribute('href', '/agents?view=history');
+    const historyLink = within(empty).getByRole('link', { name: 'History' });
+    expect(historyLink).toHaveAttribute('href', '/agents?view=history');
+    expect(historyLink).toHaveClass('underline');
+    expect(screen.queryByRole('region', { name: 'Agent preview' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Select an agent to see its transcript.')).not.toBeInTheDocument();
+  });
+
+  it('shows the single empty message and the idle toggle, with no preview, when only idle entries are collapsed (PAN-4222 ac2)', async () => {
+    response = { ...response, entries: [entry({ id: 'agent-pan-9', issueId: 'PAN-9', label: 'work · PAN-9', state: 'idle' })] };
+    renderView();
+    await flush();
+    expect(document.querySelector('[data-component="agents-live-empty"]')).not.toBeNull();
+    expect(screen.getByTestId('agents-live-idle-toggle')).toHaveTextContent('▸ 1 idle session');
+    expect(row('agent-pan-9')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Agent preview' })).not.toBeInTheDocument();
   });
 
   it('collapses and expands the preview panel when the header toggles previewHidden', async () => {
