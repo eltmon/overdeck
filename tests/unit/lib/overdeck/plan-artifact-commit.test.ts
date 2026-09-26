@@ -4,7 +4,7 @@
  * above this helper turn a failure into a non-zero exit.
  */
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -106,6 +106,12 @@ describe('pushPlanArtifacts', () => {
     writeFileSync(path, content, 'utf8');
     at(cwd, 'add', '--', rel);
     at(cwd, 'commit', '-q', '-m', message);
+  }
+
+  function writeUntracked(cwd: string, rel: string, content: string): void {
+    const path = join(cwd, rel);
+    mkdirSync(join(path, '..'), { recursive: true });
+    writeFileSync(path, content, 'utf8');
   }
 
   function clone(name: string): string {
@@ -288,5 +294,79 @@ describe('pushPlanArtifacts', () => {
     expect(result).toMatchObject({ pushed: false, skipped: false });
     expect(!result.pushed && result.reason).toContain('merge commits');
     expect(originMain()).toBe(before);
+  });
+
+  /**
+   * PAN-4224: `reset --keep` refuses to move onto a tip that would newly
+   * track a path already sitting untracked in the working tree — e.g. a
+   * planning-promotion draft origin gained through a merge the checkout
+   * never staged. When the untracked bytes already match what's now
+   * tracked, the collision is just cleared out of the way.
+   */
+  it('clears an identical untracked collision before moving onto the pushed tip', async () => {
+    const content = '{"issue":"PAN-1"}\n';
+    commitFile(other, '.pan/continues/PAN-1.xbrief.json', content, 'chore(workspace): continue PAN-1');
+    at(other, 'push', '-q', 'origin', 'main');
+
+    commitFile(home, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence');
+    writeUntracked(home, '.pan/continues/PAN-1.xbrief.json', content);
+
+    const result = await pushPlanArtifacts(home);
+
+    expect(result).toMatchObject({ pushed: true, rebased: true });
+    expect(result.pushed && result.backedUp).toBeFalsy();
+    const tip = originMain();
+    expect(at(home, 'rev-parse', 'HEAD')).toBe(tip);
+    expect(at(home, 'ls-files', '--', '.pan/continues/PAN-1.xbrief.json')).toContain('PAN-1.xbrief.json');
+    expect(at(home, 'status', '--porcelain', '--', '.pan/continues/PAN-1.xbrief.json')).toBe('');
+    const backupsDir = join(home, '.overdeck', 'plan-artifact-backups');
+    if (existsSync(backupsDir)) {
+      expect(readdirSync(backupsDir).filter((entry) => entry !== '.gitignore')).toEqual([]);
+    }
+  });
+
+  it('backs up a differing untracked collision and reports it', async () => {
+    const originContent = '{"issue":"PAN-1","from":"origin"}\n';
+    const localContent = '{"issue":"PAN-1","from":"local"}\n';
+    commitFile(other, '.pan/continues/PAN-1.xbrief.json', originContent, 'chore(workspace): continue PAN-1');
+    at(other, 'push', '-q', 'origin', 'main');
+
+    commitFile(home, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence');
+    writeUntracked(home, '.pan/continues/PAN-1.xbrief.json', localContent);
+
+    const result = await pushPlanArtifacts(home);
+
+    expect(result).toMatchObject({ pushed: true, rebased: true });
+    const backedUp = result.pushed ? result.backedUp : undefined;
+    expect(backedUp).toHaveLength(1);
+    expect(backedUp?.[0]?.path).toBe('.pan/continues/PAN-1.xbrief.json');
+    expect(readFileSync(backedUp![0].backup, 'utf8')).toBe(localContent);
+    expect(at(home, 'rev-parse', 'HEAD')).toBe(originMain());
+    expect(at(home, 'status', '--porcelain')).not.toContain('plan-artifact-backups');
+  });
+
+  it('restores the untracked collision unchanged when the move fails', async () => {
+    commitFile(home, '.pan/state.md', 'v0\n', 'chore(workspace): state');
+    at(home, 'push', '-q', 'origin', 'main');
+    at(other, 'pull', '-q', 'origin', 'main');
+
+    const content = '{"issue":"PAN-1"}\n';
+    commitFile(other, '.pan/state.md', 'v1-remote\n', 'chore(workspace): state update');
+    commitFile(other, '.pan/continues/PAN-1.xbrief.json', content, 'chore(workspace): continue PAN-1');
+    at(other, 'push', '-q', 'origin', 'main');
+
+    writeFileSync(join(home, '.pan', 'state.md'), 'v1-local\n', 'utf8');
+    writeUntracked(home, '.pan/continues/PAN-1.xbrief.json', content);
+    commitFile(home, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence');
+    const head = at(home, 'rev-parse', 'HEAD');
+
+    const result = await pushPlanArtifacts(home);
+
+    expect(result).toMatchObject({ pushed: true, rebased: true });
+    expect(result.pushed && result.warning).toContain('could not move');
+    expect(at(home, 'rev-parse', 'HEAD')).toBe(head);
+    expect(readFileSync(join(home, '.pan', 'continues', 'PAN-1.xbrief.json'), 'utf8')).toBe(content);
+    expect(at(home, 'status', '--porcelain', '--', '.pan/continues/PAN-1.xbrief.json')).toContain('??');
+    expect(readFileSync(join(home, '.pan', 'state.md'), 'utf8')).toBe('v1-local\n');
   });
 });
