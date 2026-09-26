@@ -38,6 +38,11 @@ to Overdeck, and nothing can steer or stop it.
 Do not use a worker for the issue's own implementation lifecycle: never tell a worker to run
 `pan done`, `pan review`, or `pan task done`.
 
+**Workers or lanes?** A worker is for issue-linked delegation inside the managed pipeline. For
+gauntlet fan-out outside it, use a lane (`pan lane start`, the `pan-lane` skill): a lane is a
+conversation, so it runs any harness, nests under its orchestrator on the Command Deck, and has a
+transcript view and a composer.
+
 ## Commands
 
 ```bash
