@@ -12,8 +12,11 @@
  *   2. ohmypi running an Anthropic model under Anthropic *subscription* auth is
  *      blocked (Claude Code subscription terms forbid using the Anthropic
  *      subscription with non-Anthropic harnesses). (Formerly applied to 'pi'.)
- *   3. A harness with no explicit rule below is denied, never allowed by
- *      default, so a new RuntimeName cannot bypass rule 2 silently.
+ *   3. prime-agent running an Anthropic model under Anthropic *subscription*
+ *      auth is blocked for the same Terms-of-Service reason as rule 2
+ *      (PAN-3668). Every other prime-agent cell follows the model-level rules.
+ *   4. A harness with no explicit rule below is denied, never allowed by
+ *      default, so a new RuntimeName cannot bypass rules 2 and 3 silently.
  *
  * Allowed cells:
  *   - claude-code + any provider + any authMode -> allowed (modulo rule 1)
@@ -48,6 +51,7 @@ export const POLICY_RUNTIME_NAMES = Object.keys({
   'kimi-code': true,
   opencode: true,
   muse: true,
+  'prime-agent': true,
 } satisfies Record<RuntimeName, true>) as RuntimeName[]
 
 const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
@@ -59,6 +63,16 @@ const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
 
 /** Canonical reason returned for the blocked cell (exposed for tests + UI). */
 export const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
+
+const PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
+  allowed: false,
+  reason:
+    'Claude Code subscription Terms of Service restrict Anthropic models to the Claude Code harness — Prime Agent cannot run Anthropic models under subscription auth. ' +
+    'To proceed, switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for Prime Agent.',
+}
+
+/** Canonical reason returned for the blocked prime-agent cell (exposed for tests + UI). */
+export const PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
 
 const ACP_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
   allowed: false,
@@ -163,6 +177,13 @@ export function canUseHarness(
   // that slips through gets the ohmypi rules, never a free pass.
   if ((harness as string) === 'pi') {
     return canUseHarness('ohmypi', model, authMode)
+  }
+
+  if (harness === 'prime-agent') {
+    if (getProviderForModel(model).name === 'anthropic' && authMode === 'subscription') {
+      return PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK
+    }
+    return ALLOWED
   }
 
   // Every RuntimeName is handled above. A harness that reaches this point has

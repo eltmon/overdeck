@@ -6,6 +6,7 @@ import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 import { loadConfigSync } from './config-yaml.js';
+import { getHarnessBehavior } from './runtimes/behavior.js';
 import type { RuntimeName } from './runtimes/types.js';
 
 const execFileAsync = promisify(execFile);
@@ -68,6 +69,7 @@ const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   opencode: 'opencode',
   'kimi-code': 'kimi',
   muse: 'muse',
+  'prime-agent': 'prime-agent',
 };
 
 export type ExecutableCommandRunner = (command: string, args: string[]) => Promise<string>;
@@ -279,9 +281,9 @@ export async function requireHarnessBinary(
       ? 'OhMyPi'
       : harness === 'codex'
         ? 'Codex CLI'
-        : harness === 'kimi-code'
-          ? 'Kimi Code CLI'
-          : 'Kimi Code CLI'; // acp drives the native Kimi Code CLI binary too
+        : harness === 'kimi-code' || harness === 'acp'
+          ? 'Kimi Code CLI' // acp drives the native Kimi Code CLI binary too
+          : getHarnessBehavior(harness).displayName; // "OpenCode", "Muse Code", "Prime Agent"
   if (windowsInterop.length > 0) {
     // The only usable-looking candidate is the Windows install reached through
     // WSL interop. Launching it "works" — the pane shows a live TUI — but its

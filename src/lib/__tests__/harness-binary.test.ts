@@ -265,6 +265,26 @@ describe('prepareHarnessLaunch', () => {
     expect((error as Error).message).not.toContain('execvp');
   });
 
+  it('names Prime Agent when its binary is missing (PAN-3668 FR-3)', async () => {
+    let error: unknown;
+    try {
+      await prepareHarnessLaunch('prime-agent', {
+        pathValue: '/usr/bin',
+        home: '/home/test',
+        accessExecutable: executableAccess([]),
+        runCommand: vi.fn(async () => { throw new Error('execvp(3) failed: No such file or directory'); }),
+        allowLoginShell: false,
+      });
+    } catch (cause) {
+      error = cause;
+    }
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('Prime Agent executable "prime-agent" was not found');
+    expect((error as Error).message).toContain('Install Prime Agent or add its installation directory to PATH');
+    expect((error as Error).message).toContain('No terminal session was created');
+  });
+
   it('tells the operator to install inside WSL when only the Windows harness is reachable', async () => {
     const windowsClaude = '/mnt/c/Users/test/AppData/Roaming/npm/claude';
     let error: unknown;

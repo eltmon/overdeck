@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canUseHarness, POLICY_RUNTIME_NAMES } from '../harness-policy.js'
+import { canUseHarness, POLICY_RUNTIME_NAMES, PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON } from '../harness-policy.js'
 import type { RuntimeName } from '../runtimes/types.js'
 import type { AuthMode } from '../subscription-types.js'
 
@@ -230,6 +230,30 @@ describe('canUseHarness', () => {
     }
   })
 
+  it('AC-2(PAN-3668): blocks prime-agent + Anthropic + subscription with the Terms-of-Service reason', () => {
+    const decision = canUseHarness('prime-agent', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toBe(PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON)
+    expect(decision.reason).toContain('Terms of Service')
+    expect(decision.reason).toContain('Prime Agent')
+    expect(decision.reason!.toLowerCase()).toContain('api-key')
+  })
+
+  it('AC-2(PAN-3668): allows prime-agent + Anthropic + api-key and non-Anthropic providers under any auth', () => {
+    expect(canUseHarness('prime-agent', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarness('prime-agent', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
+    for (const authMode of AUTH_MODES) {
+      expect(canUseHarness('prime-agent', MODEL_BY_PROVIDER.openai, authMode)).toEqual({ allowed: true })
+      expect(canUseHarness('prime-agent', MODEL_BY_PROVIDER.google, authMode)).toEqual({ allowed: true })
+    }
+  })
+
+  it('keeps the model-level opencode, muse and kimi-code/* rules for prime-agent', () => {
+    expect(canUseHarness('prime-agent', 'opencode/big-pickle', 'api-key').allowed).toBe(false)
+    expect(canUseHarness('prime-agent', 'muse-spark-1.3', 'api-key').allowed).toBe(false)
+    expect(canUseHarness('prime-agent', 'kimi-code/k3', 'api-key').allowed).toBe(false)
+  })
+
   it('applies the ohmypi ToS block to a raw legacy "pi" harness', () => {
     expect(canUseHarness('pi' as RuntimeName, 'claude-sonnet-4-6', 'subscription')).toEqual(
       canUseHarness('ohmypi', 'claude-sonnet-4-6', 'subscription'),
@@ -239,7 +263,7 @@ describe('canUseHarness', () => {
 
   it('gives every RuntimeName an explicit policy decision', () => {
     expect([...POLICY_RUNTIME_NAMES].sort()).toEqual(
-      ['acp', 'claude-code', 'codex', 'kimi-code', 'muse', 'ohmypi', 'opencode'],
+      ['acp', 'claude-code', 'codex', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'prime-agent'],
     )
     for (const harness of POLICY_RUNTIME_NAMES) {
       for (const authMode of AUTH_MODES) {
