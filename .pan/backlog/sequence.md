@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T06:28:28.165507Z · model: claude-opus-5-5 · open: 778_
+_Last sequenced: 2026-09-26T06:29:37.638942Z · model: claude-opus-5-5 · open: 770_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -168,7 +168,6 @@ _Last sequenced: 2026-09-26T06:28:28.165507Z · model: claude-opus-5-5 · open: 
 | 206 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
 | 207 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
 | 208 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
-| 209 | PAN-3280 | S | high | needs-refinement |  |  | One issue's agent sessions vanished four times in a run while every peer stayed up; specimen-specific — re-confirm the mechanism. |
 | 210 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 211 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
 | 212 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
@@ -212,11 +211,9 @@ _Last sequenced: 2026-09-26T06:28:28.165507Z · model: claude-opus-5-5 · open: 
 | 260 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
 | 261 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
 | 262 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 263 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
 | 264 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
 | 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
 | 266 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
-| 267 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
 | 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
@@ -268,7 +265,6 @@ _Last sequenced: 2026-09-26T06:28:28.165507Z · model: claude-opus-5-5 · open: 
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 325 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -384,7 +380,6 @@ _Last sequenced: 2026-09-26T06:28:28.165507Z · model: claude-opus-5-5 · open: 
 | 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 447 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 449 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
 | 451 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 452 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 453 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
@@ -556,7 +551,6 @@ _Last sequenced: 2026-09-26T06:28:28.165507Z · model: claude-opus-5-5 · open: 
 | 629 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
 | 630 | PAN-2941 | M | low | ok |  |  | OKF v3 |
 | 631 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 632 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
 | 633 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
 | 634 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
 | 635 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
@@ -603,7 +597,6 @@ _Last sequenced: 2026-09-26T06:28:28.165507Z · model: claude-opus-5-5 · open: 
 | 679 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
 | 680 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
 | 681 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 682 | PAN-1980 | M | low | needs-refinement |  |  | Session rotation on resume is gone with compaction state; the "one pipeline-membership view" half may still apply to pipeline-membership.ts |
 | 683 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
 | 685 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 686 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
@@ -654,7 +647,6 @@ _Last sequenced: 2026-09-26T06:28:28.165507Z · model: claude-opus-5-5 · open: 
 | 732 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
 | 733 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
 | 735 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 736 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
 | 737 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
 | 738 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
 | 739 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
@@ -1093,10 +1085,10 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T06:28:28.165507Z",
+  "generatedAt": "2026-09-26T06:29:37.638942Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 778,
+  "openCount": 770,
   "nodes": [
     {
       "issue": "PAN-4224",
@@ -3189,18 +3181,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "planning": "auto"
     },
     {
-      "issue": "PAN-3280",
-      "rank": 209,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "One issue's agent sessions vanished four times in a run while every peer stayed up; specimen-specific — re-confirm the mechanism.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3196",
       "rank": 210,
       "size": "S",
@@ -3733,19 +3713,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "planning": "auto"
     },
     {
-      "issue": "PAN-2188",
-      "rank": 263,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate",
-      "rationale": "Triage: flywheel is now a loop skill; verify the sequencer/tenets-gate machinery still exists in the described form. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2190",
       "rank": 264,
       "size": "L",
@@ -3781,18 +3748,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "dependsOn": [],
       "why": "Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557.",
       "rationale": "Rank changed from 400 to 266: the 2026-09-26 rescope comment relocates both halves to the merge-train cooldown queue (auto-merge-scheduler.ts) and postMergeLifecycle in merge-agent.ts, which gives a concrete goal, so condition moves to ok; the substrate-improvement label sets a high-importance floor.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1325",
-      "rank": 267,
-      "size": "M",
-      "importance": "high",
-      "score": 75,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Artifact storage model is unsafe for polyrepo projects",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4425,18 +4380,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "why": "PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048)",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-1454",
-      "rank": 325,
-      "size": "M",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "[META] 9 systemic failure patterns surfaced by 80-issue audit",
-      "gate": "auto",
-      "planning": "interactive"
     },
     {
       "issue": "PAN-1553",
@@ -5834,18 +5777,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "condition": "ok",
       "dependsOn": [],
       "why": "CLI cannot address planning-*/specialist-* sessions",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1244",
-      "rank": 449,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7934,18 +7865,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "planning": "auto"
     },
     {
-      "issue": "PAN-2922",
-      "rank": 632,
-      "size": "M",
-      "importance": "low",
-      "score": 29,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Reduce accidental orchestration complexity after performance stabilization",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2868",
       "rank": 633,
       "size": "M",
@@ -8516,19 +8435,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "why": "Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy)",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-1980",
-      "rank": 682,
-      "size": "M",
-      "importance": "low",
-      "score": 24,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Session rotation on resume is gone with compaction state; the \"one pipeline-membership view\" half may still apply to pipeline-membership.ts",
-      "rationale": "Triage: the rotation half is gone; the membership-view half may still be valid. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1958",
@@ -9136,18 +9042,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "why": "Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-793",
-      "rank": 736,
-      "size": "XS",
-      "importance": "low",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-791",
