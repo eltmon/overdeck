@@ -47,6 +47,17 @@ describe('reconcilePiCostEventsForRunningAgents', () => {
     expect(mocks.reconcile).toHaveBeenCalledWith({ source: 'ohmypi' });
   });
 
+  it('reconciles prime-agent costs when a running agent has harness prime-agent (PAN-3668)', async () => {
+    mocks.getAgentState.mockReturnValue({ harness: 'prime-agent' });
+
+    await reconcilePiCostEventsForRunningAgents([
+      { id: 'agent-pan-1', tmuxActive: true } as never,
+    ]);
+
+    expect(mocks.reconcile).toHaveBeenCalledWith({ source: 'prime-agent' });
+    expect(mocks.reconcile).toHaveBeenCalledTimes(1);
+  });
+
   it('skips reconcile when no running agent uses ohmypi or codex', async () => {
     mocks.getAgentState.mockReturnValue({ harness: 'claude-code' });
 

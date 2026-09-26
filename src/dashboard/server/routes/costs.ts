@@ -303,7 +303,7 @@ const postCostsSyncWalRoute = HttpRouter.add(
   })),
 );
 
-type OverdeckReconcileSource = 'ohmypi' | 'codex';
+type OverdeckReconcileSource = 'ohmypi' | 'codex' | 'prime-agent';
 type ReconcileSourceRunner = (source: OverdeckReconcileSource) => Promise<CostReconcileSummary>;
 type ClaudeReconcileRunner = () => Promise<ClaudeReconcileResult>;
 
@@ -320,13 +320,14 @@ const runClaudeTranscriptReconcile: ClaudeReconcileRunner = () =>
 export async function runCostReconcileSources(
   runSource: ReconcileSourceRunner = runOverdeckCostReconcileSource,
   runClaude: ClaudeReconcileRunner = runClaudeTranscriptReconcile,
-): Promise<{ claude: ClaudeReconcileResult; ohmypi: CostReconcileSummary; codex: CostReconcileSummary }> {
-  const [claude, ohmypi, codex] = await Promise.all([
+): Promise<{ claude: ClaudeReconcileResult; ohmypi: CostReconcileSummary; codex: CostReconcileSummary; 'prime-agent': CostReconcileSummary }> {
+  const [claude, ohmypi, codex, primeAgent] = await Promise.all([
     runClaude(),
     runSource('ohmypi'),
     runSource('codex'),
+    runSource('prime-agent'),
   ]);
-  return { claude, ohmypi, codex };
+  return { claude, ohmypi, codex, 'prime-agent': primeAgent };
 }
 
 type CostReconcileSourcesResult = Awaited<ReturnType<typeof runCostReconcileSources>>;
@@ -338,14 +339,17 @@ export function buildCostReconcileResponse(overdeck: CostReconcileSourcesResult)
     claude: overdeck.claude,
     ohmypi: overdeck.ohmypi,
     codex: overdeck.codex,
+    'prime-agent': overdeck['prime-agent'],
     overdeck,
     skipped: {
       ohmypi: overdeck.ohmypi.skipped,
       codex: overdeck.codex.skipped,
+      'prime-agent': overdeck['prime-agent'].skipped,
     },
     warnings: {
       ohmypi: overdeck.ohmypi.warnings,
       codex: overdeck.codex.warnings,
+      'prime-agent': overdeck['prime-agent'].warnings,
     },
   };
 }
@@ -360,7 +364,7 @@ const postCostsReconcileRoute = HttpRouter.add(
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     console.log(
-      `[reconciler] Sweep complete: claude=${overdeck.claude.eventsImported} imported, ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported`,
+      `[reconciler] Sweep complete: claude=${overdeck.claude.eventsImported} imported, ohmypi=${overdeck.ohmypi.eventsImported} imported, codex=${overdeck.codex.eventsImported} imported, prime-agent=${overdeck['prime-agent'].eventsImported} imported`,
     );
     return jsonResponse(buildCostReconcileResponse(overdeck));
   })),

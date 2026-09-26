@@ -15,7 +15,7 @@
  * rebuilt anywhere else.
  */
 import { createHash } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { getOverdeckHome } from '../../paths.js';
@@ -80,6 +80,24 @@ export async function readPrimeAgentSessionFile(agentId: string, agentsRoot?: st
   if (!sessionFile) return null;
   const info = await stat(sessionFile).catch(() => null);
   return info?.isFile() ? sessionFile : null;
+}
+
+/** Every Prime session JSONL under every agent's prime-sessions/ directory. */
+export async function listPrimeAgentSessionFiles(agentsRoot = join(getOverdeckHome(), 'agents')): Promise<Array<{ agentId: string; file: string }>> {
+  const agents = await readdir(agentsRoot, { withFileTypes: true }).catch(() => []);
+  const perAgent = await Promise.all(agents.filter((entry) => entry.isDirectory()).map(async (entry) => {
+    let dir: string;
+    try {
+      dir = primeAgentSessionDir(entry.name, agentsRoot);
+    } catch {
+      return [];
+    }
+    const files = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    return files
+      .filter((file) => file.isFile() && file.name.endsWith('.jsonl'))
+      .map((file) => ({ agentId: entry.name, file: join(dir, file.name) }));
+  }));
+  return perAgent.flat();
 }
 
 /**
