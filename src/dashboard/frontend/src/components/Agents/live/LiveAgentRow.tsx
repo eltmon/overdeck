@@ -146,19 +146,37 @@ function RowName({ entry }: { entry: DirectoryEntry }) {
   );
 }
 
-/** One lane child line: `↳ <glyph> <key> i<n> · <state> [REPORT]` (PAN-4223 FR-19). */
+/** D28: WOWED and PASS use the done token; every other verdict is neutral. */
+function verdictTone(value: string): string {
+  return value === 'WOWED' || value === 'PASS'
+    ? 'badge-bg-state-done badge-border-state-done text-state-done'
+    : 'bg-transparent border-muted-foreground/40 text-muted-foreground';
+}
+
+/**
+ * One lane child line: `↳ <glyph> <key> i<n> · <state> [REPORT]` (PAN-4223
+ * FR-19). A critic line sits one indent deeper, under its builder, with its
+ * verdict badge (`PENDING` without one; D27, D28).
+ */
 function LaneLine({ lane: child }: { lane: DirectoryEntry }) {
   const lane = child.lane!;
+  const critic = lane.criticOf !== undefined;
+  const verdict = lane.verdict && lane.verdict !== 'pending' ? lane.verdict : 'PENDING';
   return (
     <div
       data-component="agents-live-lane"
       data-entry-id={child.id}
-      className="mt-0.5 flex min-w-0 items-baseline gap-1.5 font-mono-ui text-[11px] text-muted-foreground"
+      className={cn('mt-0.5 flex min-w-0 items-baseline gap-1.5 font-mono-ui text-[11px] text-muted-foreground', critic && 'pl-4')}
       title={child.label}
     >
       <span aria-hidden="true">↳</span>
       <span className="min-w-0 truncate">{`${LANE_GLYPH[lane.role] ?? '?'} ${lane.key} i${lane.iteration} · ${child.state}`}</span>
-      {lane.reportStatus && (
+      {critic && (
+        <span data-component="agents-live-verdict" className={cn('shrink-0 border px-1 text-[9px] leading-[14px] tracking-wide', verdictTone(verdict))}>
+          {verdict}
+        </span>
+      )}
+      {!critic && lane.reportStatus && (
         <span className={cn('shrink-0 border px-1 text-[9px] leading-[14px] tracking-wide', LANE_REPORT_TONE[lane.reportStatus])}>
           {lane.reportStatus.toUpperCase()}
         </span>

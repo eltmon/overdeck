@@ -139,3 +139,16 @@ describe('entriesForNode — lanes and successors (PAN-4223 WI-11)', () => {
     expect(rows.map((row) => row.flattenedFrom)).toEqual([null, null, null, 'c']);
   });
 });
+
+describe('entriesForNode — critics under builders (PAN-4223 WI-23)', () => {
+  it('nests root → builder → critic at depths 0, 1, 2', () => {
+    const conv = (id: string, overrides: Partial<DirectoryEntry> = {}) =>
+      entry({ id, kind: 'conversation', label: id, role: null, source: 'conversation', ...overrides });
+    const rows = entriesForNode([
+      conv('conv:root'),
+      conv('conv:builder', { parentId: 'conv:root', lane: { run: 'hotel', key: '663', role: 'builder', iteration: 1, reportStatus: null } }),
+      conv('conv:critic', { parentId: 'conv:builder', lane: { run: 'hotel', key: '663', role: 'critic', iteration: 1, reportStatus: null, criticOf: 2, verdict: 'NOT_YET' } }),
+    ], 'convs:local:overdeck');
+    expect(rows.map((row) => [row.entry.id, row.depth])).toEqual([['conv:root', 0], ['conv:builder', 1], ['conv:critic', 2]]);
+  });
+});

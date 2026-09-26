@@ -205,6 +205,23 @@ function attachLanes(entries: readonly DirectoryEntry[], rows: Map<string, LiveR
     if (own.reason.section !== 'needs-you') moved.push(entry.id);
   }
   for (const id of moved) rows.delete(id);
+  for (const row of rows.values()) row.children = criticsAfterBuilders(row.children);
+}
+
+/**
+ * PAN-4223 D27: a critic child line sits directly after the builder it judges
+ * (after that builder's earlier critics) when both are children of one row.
+ */
+function criticsAfterBuilders(children: DirectoryEntry[]): DirectoryEntry[] {
+  const ids = new Set(children.map((child) => child.id));
+  const isPlacedCritic = (child: DirectoryEntry) => child.lane?.criticOf !== undefined && child.parentId !== null && ids.has(child.parentId);
+  const ordered: DirectoryEntry[] = [];
+  const place = (entry: DirectoryEntry) => {
+    ordered.push(entry);
+    for (const critic of children) if (isPlacedCritic(critic) && critic.parentId === entry.id) place(critic);
+  };
+  for (const child of children) if (!isPlacedCritic(child)) place(child);
+  return ordered;
 }
 
 export function buildLiveSections(

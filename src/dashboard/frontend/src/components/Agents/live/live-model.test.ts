@@ -230,3 +230,29 @@ describe('buildLiveSections — gauntlet lanes and successors (PAN-4223 FR-19, F
     expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:orch', 'conv:b1']);
   });
 });
+
+describe('buildLiveSections — critics under builders (PAN-4223 WI-23)', () => {
+  const conversation = (id: string, overrides: Partial<DirectoryEntry> = {}) =>
+    entry({ id, kind: 'conversation', label: id, issueId: null, role: null, source: 'conversation', state: 'working', ...overrides });
+  const laneOf = (role: string, extra: Record<string, unknown> = {}) => ({ run: 'hotel', key: '663', role, iteration: 1, reportStatus: null, ...extra });
+
+  it('follows a builder child line with its critic inside the orchestrator row', () => {
+    const sections = buildLiveSections([
+      conversation('conv:orch'),
+      conversation('conv:critic', { parentId: 'conv:b1', lane: laneOf('critic', { criticOf: 2, verdict: 'NOT_YET' }) }),
+      conversation('conv:b2', { parentId: 'conv:orch', lane: laneOf('builder', { key: '664' }) }),
+      conversation('conv:b1', { parentId: 'conv:orch', lane: laneOf('builder') }),
+    ], () => ({}), NOW);
+    expect(sections.live.map((row) => row.entry.id)).toEqual(['conv:orch']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:b2', 'conv:b1', 'conv:critic']);
+  });
+
+  it('makes a critic of a builder with its own row that row\'s child line', () => {
+    const sections = buildLiveSections([
+      conversation('conv:b1', { parentId: 'conv:gone', lane: laneOf('builder') }),
+      conversation('conv:critic', { parentId: 'conv:b1', lane: laneOf('critic', { criticOf: 2 }) }),
+    ], () => ({}), NOW);
+    expect(sections.live.map((row) => row.entry.id)).toEqual(['conv:b1']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:critic']);
+  });
+});
