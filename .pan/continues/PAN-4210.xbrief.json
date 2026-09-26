@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4210",
   "created": "2026-09-26T01:39:06.772Z",
-  "updated": "2026-09-26T03:54:39.530Z",
+  "updated": "2026-09-26T03:54:50.197Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4210",
       "claimedAt": "2026-09-26T02:54:53.944Z",
       "doneAt": "2026-09-26T03:54:39.529Z"
+    },
+    "cli-reports-freeze": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4210",
+      "claimedAt": "2026-09-26T03:54:50.197Z"
     }
   }
 }
