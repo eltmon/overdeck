@@ -96,6 +96,14 @@ export interface DirectoryConversationRow {
   readonly isWorking: boolean;
   readonly pendingInputCount: number;
   readonly totalCost: number | null;
+  /** PAN-4223: the parent link and lane facts; absent on rows from older enrichments. */
+  readonly parentConversationId?: number | null;
+  readonly parentConversationName?: string | null;
+  readonly gauntletRun?: string | null;
+  readonly laneKey?: string | null;
+  readonly laneRole?: string | null;
+  readonly laneIteration?: number | null;
+  readonly laneReport?: { readonly status: 'done' | 'blocked' | 'failed' } | null;
 }
 
 /** One subagent as a directory source reports it. */
@@ -394,14 +402,25 @@ export async function buildLiveAgentDirectory(deps: AgentDirectoryDeps = {}): Pr
   return { generatedAt: new Date(now).toISOString(), windowHours: 0, scope: 'live', entries: keepWithAncestors(all, kept) };
 }
 
-/** Re-adds every ancestor of a kept entry, then sorts: live first, last activity descending, then id. */
+/** A successor's edge to its predecessor (PAN-4223 D23): a conversation entry with a parent and no lane. */
+function isSuccessionEdge(entry: DirectoryEntry | undefined): boolean {
+  return entry?.kind === 'conversation' && !entry.lane && entry.parentId !== null;
+}
+
+/**
+ * Re-adds every ancestor of a kept entry, then sorts: live first, last activity
+ * descending, then id. The walk never climbs a succession edge (D23): a live
+ * successor keeps its own row and does not pull its ended predecessor in.
+ */
 function keepWithAncestors(all: readonly DirectoryEntry[], kept: Set<string>): DirectoryEntry[] {
   const byId = new Map(all.map((entry) => [entry.id, entry]));
   for (const id of [...kept]) {
-    let parentId = byId.get(id)?.parentId ?? null;
+    let current = byId.get(id);
+    let parentId = isSuccessionEdge(current) ? null : (current?.parentId ?? null);
     while (parentId && byId.has(parentId) && !kept.has(parentId)) {
       kept.add(parentId);
-      parentId = byId.get(parentId)?.parentId ?? null;
+      current = byId.get(parentId);
+      parentId = isSuccessionEdge(current) ? null : (current?.parentId ?? null);
     }
   }
   return all.filter((entry) => kept.has(entry.id)).sort((a, b) =>
@@ -530,7 +549,8 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
       projectKey: UNASSIGNED_PROJECT,
       issueId: row.issueId ? row.issueId.toUpperCase() : null,
       issueTitle: null,
-      parentId: null,
+      // PAN-4223: nest by the parent link, lanes and successors alike.
+      parentId: row.parentConversationName ? `conv:${row.parentConversationName}` : null,
       role: null,
       harness: row.harness ?? 'unknown',
       model: row.model ?? 'unknown',
@@ -540,6 +560,10 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
       costUsd: typeof row.totalCost === 'number' ? row.totalCost : null,
       source: 'conversation',
       transcript: { route: 'conversation', conversationName: row.name },
+      ...(row.laneKey
+        ? { lane: { run: row.gauntletRun ?? '', key: row.laneKey, role: row.laneRole ?? 'builder', iteration: row.laneIteration ?? 1, reportStatus: row.laneReport?.status ?? null } }
+        : {}),
+      ...(!row.laneKey && row.parentConversationId != null ? { continuesFrom: row.parentConversationId } : {}),
     };
     candidates.push({ entry, cwd: row.cwd || null, explicitProjectKey: row.projectKey });
     if (entry.state !== 'stopped') conversationParents.push({ entry, row });
