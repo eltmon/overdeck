@@ -1,8 +1,5 @@
 import type { Command } from 'commander';
-import { abortReviewCommand } from './abort-review.js';
-import { requestReviewCommand } from './request-review.js';
-import { reviewRestartCommand } from './review-restart.js';
-import { reviewSpawnReviewerCommand } from './review-spawn-reviewer.js';
+import { lazyAction } from '../lazy-action.js';
 
 export function registerReviewCommands(program: Command): void {
   const review = program
@@ -13,19 +10,19 @@ export function registerReviewCommands(program: Command): void {
     .command('request <id>')
     .description('Request re-review after fixing feedback')
     .option('-m, --message <text>', 'Message describing the fixes applied')
-    .action(requestReviewCommand);
+    .action(lazyAction(() => import('./request-review.js'), 'requestReviewCommand'));
 
   review
     .command('abort <id>')
     .description('Kill all running reviewer sessions and leave the worker idle')
-    .action(abortReviewCommand);
+    .action(lazyAction(() => import('./abort-review.js'), 'abortReviewCommand'));
 
   review
     .command('restart <id>')
     .description('Resume review and re-dispatch reviewers missing a report')
     .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-5)')
     .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
-    .action(reviewRestartCommand);
+    .action(lazyAction(() => import('./review-restart.js'), 'reviewRestartCommand'));
 
   // PAN-1048 R5: `pan review run` was removed. Review now runs as the role
   // primitive; this hidden command is only for convoy sub-role dispatch.
@@ -38,5 +35,5 @@ export function registerReviewCommands(program: Command): void {
     .option('--output <path>', 'Reviewer output path')
     .option('--context <path>', 'Context manifest path')
     .option('--model <model>', 'Override reviewer model')
-    .action(reviewSpawnReviewerCommand);
+    .action(lazyAction(() => import('./review-spawn-reviewer.js'), 'reviewSpawnReviewerCommand'));
 }

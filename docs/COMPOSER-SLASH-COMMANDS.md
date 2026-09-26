@@ -5,7 +5,7 @@ The dashboard composer derives its `pan` command suggestions from the same Comma
 ## Generation pipeline
 
 ```text
-Commander registrations in src/cli/index.ts and src/cli/commands/**
+Commander registrations in src/cli/index.ts, src/cli/command-groups.ts and src/cli/commands/**
   → pan admin commands --json
   → scripts/generate-slash-commands.mjs
        + scripts/slash-commands-curation.json

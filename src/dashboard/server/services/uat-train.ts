@@ -55,6 +55,7 @@ import {
   type UatGenerationRepo,
 } from '../../../lib/overdeck/merge-sync.js';
 import { getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
+import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPath, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
@@ -480,18 +481,36 @@ export async function runUatTrainReconcileAllProjects(
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
 
-export function startUatTrainReconciler(): boolean {
+export interface UatTrainReconcilerOptions {
+  /**
+   * #3983: extra work for the same tick, run at start and every interval. The
+   * dashboard passes the auto-merge scheduler here (nothing else writes a
+   * pending auto-merge since the flywheel loop was cut). It runs independently
+   * of the batch reconcile, so one failing never skips the other.
+   */
+  onTick?: () => Promise<unknown>;
+}
+
+export function startUatTrainReconciler(options: UatTrainReconcilerOptions = {}): boolean {
   if (!canStartUatTrainReconciler()) return false;
   if (reconcilerTimer) return true;
+  const runOnTick = (label: string) => {
+    if (!options.onTick) return;
+    void options.onTick().catch((err) => {
+      console.warn(`[uat-train] ${label} tick hook failed:`, err instanceof Error ? err.message : err);
+    });
+  };
   reconcilerTimer = setInterval(() => {
     void runUatTrainReconcileAllProjects().catch((err) => {
       console.warn('[uat-train] reconcile tick failed:', err instanceof Error ? err.message : err);
     });
+    runOnTick('interval');
   }, RECONCILE_INTERVAL_MS);
   reconcilerTimer.unref?.();
   void runUatTrainReconcileAllProjects().catch((err) => {
     console.warn('[uat-train] initial reconcile failed:', err instanceof Error ? err.message : err);
   });
+  runOnTick('initial');
   return true;
 }
 
@@ -760,6 +779,11 @@ export async function postUatGenerationPromotePayload(
   await Promise.all((getUatGeneration(name)?.members ?? []).map(async (member) => {
     const issueId = member.issueId.toUpperCase();
     try {
+      // #4066 review: derived `ready` applies the merge gate's approval answer
+      // for the member's head. The auto-merge scheduler never gates a member
+      // held for UAT, so run the gate here (the operator's promote click) to
+      // record a fresh answer before deriving.
+      await evaluateIssueMergeGate(issueId);
       const derived = await getDerivedIssueState(issueId);
       memberStates.set(issueId, derived.state === 'ready'
         ? { eligible: true }

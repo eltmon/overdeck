@@ -55,8 +55,80 @@ keys in the body, and each value must be a boolean.
 The same toggle is exposed in the dashboard's Flywheel header as a checkbox.
 The default is `true` (auto-merge OFF — operator UAT required before merge).
 
-When the toggle is `false`, the Flywheel orchestrator may schedule auto-merge
-for any issue that satisfies the eligibility predicate.
+When the toggle is `false`, the dashboard schedules auto-merge for any issue
+that satisfies the eligibility predicate. No flywheel run is needed: every
+60 seconds, on the UAT batch-train reconciler tick, the primary dashboard walks
+each project whose merge train is on and takes its open PRs with green checks
+on a `feature/<id>` branch. A strike PR (`strike/<id>`) is never scheduled: the
+operator merges it (PAN-3973). For each one it checks, in order:
+
+1. the issue is open in the tracker (the cached tracker row) and opted in to
+   auto-merge: its `auto-merge` / `hold-for-uat` label, then the project
+   default, then this toggle (no forge read);
+2. the merge gate (`evaluateIssueMergeGate`) says the PR is ready. Approval is
+   a trusted `overdeck-verdict` marker comment whose `sha=` is the PR head, or
+   a trusted reviewer's standing GitHub review approving that exact commit, so
+   a repo without branch protection still qualifies. "Trusted" is the marker
+   rule: `OWNER`, `MEMBER` or `COLLABORATOR`, or the identity Overdeck posts
+   as. The App's bot is the installed App's own (`<slug>[bot]`, from the
+   `app-slug` file beside its credentials in `~/.overdeck/github-app/`, else
+   `GET /app`), matched as a GitHub `Bot` account, never by login alone. Its
+   reviews arrive as `CONTRIBUTOR` and count through that match. With the
+   GitHub App configured, an approving marker counts only from the App's bot:
+   agents hold the operator's `gh` credentials and could post one as the
+   owner. If the App's slug cannot be read, no bot approval counts. A review from any other account never counts, and each reviewer's
+   latest review stands: a later "Request changes" or a dismissal withdraws an
+   approval. An approval of an older commit, or a marker without `sha=`, never
+   counts. A GitLab MR needs a named approver in `approved_by` (what
+   `glab mr approve` records); a green, conflict-free MR nobody approved is not
+   approved, even where the project requires zero approvals;
+3. the issue's latest auto-merge entry allows a new one.
+
+It schedules through the same door as `POST /api/merge-train/auto-merge/schedule`.
+GitLab projects are skipped, with one log line. `OVERDECK_DISABLE_AUTO_MERGE=1`
+stops the scheduler as well as the executor.
+
+Each entry records the PR head it was scheduled for. A pending or merging entry
+is left alone. A cancelled entry stops the issue for good, whatever it is
+pushed next: only re-scheduling it through the endpoint starts it again. A
+failed entry (the merge was attempted, including the retry circuit breaker)
+holds for that PR head only: a new push re-arms the issue. A blocked entry (the
+executor refused it before merging, for example because checks went red or the
+head moved during the cooldown) re-arms as soon as the merge gate passes again.
+An entry written before heads were recorded never re-arms by itself. The insert
+re-checks the latest entry, so a cancel that lands while the scheduler is
+reading the forge sticks.
+
+When the cooldown ends, the executor reads the tracker live and blocks the
+entry if the issue was closed, and blocks it if the PR head moved. An entry
+with no recorded head is blocked, never merged unpinned. The merge is bound to
+the approved head and to the PR the gate judged:
+
+- the final gate check reads the `feature/<id>` PR fresh (no facts cache), and
+  the merge refuses when the PR it would land is not that PR;
+- a clean PR merges directly only when its live head is the approved head,
+  pinned to it (`gh pr merge --match-head-commit`, the App merge's `sha`,
+  `glab mr merge --sha`);
+- a PR that needs a rebase is rebased by the server only, and only when the
+  worktree and `origin/feature/<id>` are both at the approved head. The server
+  rebases exactly that commit in its own detached worktree, created at the
+  approved head under a temporary path the work agent never uses and removed
+  afterwards, so nothing the agent commits in its worktree meanwhile can
+  become the rebased head. It moves the work agent's worktree to the result
+  for local verification (only while that worktree is still at the approved
+  head), pushes the result by sha with a lease on the approved head, and pins
+  the merge to it. It never hands the rebase to the work agent, whose push
+  would merge unreviewed. The pushed head is new, so if verification or the
+  merge then fails, the PR needs a fresh review before it can merge
+  automatically again;
+- polyrepo merge sets and branches that track `.planning/` files are left to
+  the operator: an automatic merge refuses them;
+- a git read that fails while checking where the merge may start (a `fetch`
+  or `rev-parse` failure) is retried within the merge retry budget instead of
+  failing that head for good. A head that was read and differs fails it.
+
+A commit made or pushed after the approval therefore fails the merge instead
+of landing code nobody approved.
 
 ## Per-project default
 
@@ -110,7 +182,10 @@ facts each time it is checked (`isAutoMergeEligible` in
 only when **all** of these are true:
 
 - The PR is open (not closed, not a draft, not already merged)
-- The PR is approved, and its latest review does not request changes
+- The PR is approved on its exact head commit (a trusted reviewer's standing
+  GitHub review of that commit, or a trusted verdict marker whose `sha=` names
+  it, posted by the GitHub App's bot when the App is configured; on GitLab, a named approver in `approved_by`), and no review or marker
+  requests changes
 - The forge reports CI checks on the PR head, and all of them passed. Pending
   checks, failing checks, and no reported checks each make the PR ineligible.
   When the project runs `verification.tests: ci`, the CI test job must also
@@ -133,7 +208,7 @@ merged.
 ## Cooldown
 
 Cooldown is fixed at **5 minutes** of wall-clock time from when the
-orchestrator schedules the merge to when the executor fires. The countdown is
+scheduler schedules the merge to when the executor fires. The countdown is
 persisted in SQLite, so it survives dashboard restarts — if the dashboard
 sleeps through the deadline, the executor still picks the entry up on the
 next tick and re-validates eligibility before firing.
@@ -157,7 +232,8 @@ Three ways to cancel an in-flight auto-merge during its cooldown:
    ```
 
    This calls the DELETE endpoint, removes the entry from the pending list,
-   and emits an `auto-merge cancelled for PAN-123` TTS announcement so the
+   drops any waiting entry for the issue from the project merge queue, and
+   emits an `auto-merge cancelled for PAN-123` TTS announcement so the
    operator knows the abort took effect.
 
 Cancellation only succeeds during the cooldown window, before the executor
@@ -167,11 +243,13 @@ as clicking MERGE.
 
 ## Queue interaction
 
-The dashboard runs at most one merge at a time per project. If two
-auto-merges become due at the same instant, the second is requeued with a
-short backoff (`scheduledMergeAt` bumped by 60 seconds, status reverted to
-`pending`) so the next executor tick re-evaluates eligibility and tries
-again. Stale `merging` rows are prevented by this requeue path; the executor
+The dashboard runs at most one merge at a time per project. An automatic
+merge never joins the project merge queue: when another merge holds the slot,
+`triggerMerge()` defers it, and the entry is requeued with a short backoff
+(`scheduledMergeAt` bumped by 60 seconds, status reverted to `pending`) without
+using its retry budget. The next executor tick re-runs every check (the gate,
+the head, the labels, the tracker) and tries again. A queued merge would start
+later with none of them. Stale `merging` rows are prevented by this requeue path; the executor
 never leaves a row stuck mid-flight when `triggerMerge()` returns a
 non-terminal status.
 

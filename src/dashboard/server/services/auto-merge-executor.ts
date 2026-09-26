@@ -4,7 +4,7 @@ import {
   markBlocked,
   markFailed,
   markMerged,
-  markMergingBlocked,
+  markMergeRetriesExhausted,
   requeueToPending,
   transitionToMerging,
   type PendingAutoMerge,
@@ -12,7 +12,8 @@ import {
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 import { isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
-import { getDerivedIssueState } from './derived-issue-state.js';
+import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
+import type { MergeReadiness, PrFacts } from '../../../lib/cloister/pr-facts.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
 
@@ -62,15 +63,23 @@ export interface AutoMergeExecutorDeps {
   /** The merge train must be on for auto-merge to act. */
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
-  derivedState?: (issueId: string) => ReturnType<typeof getDerivedIssueState>;
+  /** The one merge gate (#4040); `evaluateIssueMergeGate` by default. */
+  mergeGate?: (issueId: string) => Promise<MergeReadiness & { facts: Pick<PrFacts, 'headSha'> }>;
   hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
-  markMergingBlocked?: (id: number, reason: string) => boolean;
+  markMergeRetriesExhausted?: (id: number, reason: string) => boolean;
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
-  mergeIssue?: (issueId: string) => Promise<MergeResult>;
+  mergeIssue?: (issueId: string, headSha: string) => Promise<MergeResult>;
+  /**
+   * #3983: the tracker's live answer for the issue; null when no tracker
+   * answered. `readIssueFromTracker` by default.
+   */
+  readTrackerIssue?: (issueId: string) => Promise<{ open: boolean } | null>;
+  /** The cached tracker row, consulted when the live read gets no answer. */
+  cachedTrackerIssue?: (issueId: string) => Promise<{ open: boolean } | null> | { open: boolean } | null;
   getMergeRetryCount?: (issueId: string) => number;
   setMergeRetryCount?: (issueId: string, count: number) => void;
   announceFailure?: (issueId: string, reason: string) => void;
@@ -82,6 +91,43 @@ const REQUEUE_BACKOFF_MS = 60_000;
 let timer: ReturnType<typeof setInterval> | null = null;
 let activeTick: Promise<void> | null = null;
 
+/** True when two SHAs (full or abbreviated) name the same commit. */
+function sameCommit(a: string, b: string): boolean {
+  const x = a.toLowerCase();
+  const y = b.toLowerCase();
+  return x.startsWith(y) || y.startsWith(x);
+}
+
+async function defaultReadTrackerIssue(issueId: string): Promise<{ open: boolean } | null> {
+  const { readIssueFromTracker } = await import('./derived-issue-state.js');
+  return readIssueFromTracker(issueId);
+}
+
+async function defaultCachedTrackerIssue(issueId: string): Promise<{ open: boolean } | null> {
+  try {
+    const { getSharedIssueService } = await import('./issue-service-singleton.js');
+    return getSharedIssueService().getTrackerIssue(issueId);
+  } catch {
+    return null;
+  }
+}
+
+/** True when the tracker (live, else cached) says the issue is closed. */
+async function trackerIssueClosed(
+  issueId: string,
+  deps: AutoMergeExecutorDeps,
+  log: (message: string) => void,
+): Promise<boolean> {
+  let live: { open: boolean } | null = null;
+  try {
+    live = await (deps.readTrackerIssue ?? defaultReadTrackerIssue)(issueId);
+  } catch (error) {
+    log(`[auto-merge] live tracker read for ${issueId} failed: ${errorMessage(error)}`);
+  }
+  if (live) return !live.open;
+  return (await (deps.cachedTrackerIssue ?? defaultCachedTrackerIssue)(issueId))?.open === false;
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return String(error);
@@ -91,9 +137,10 @@ function failureReason(result: MergeResult): string {
   return result.error ?? result.message ?? `merge returned status ${result.statusCode ?? 'unknown'}`;
 }
 
-async function defaultMergeIssue(issueId: string): Promise<MergeResult> {
+async function defaultMergeIssue(issueId: string, headSha: string): Promise<MergeResult> {
   const { triggerMerge } = await import('../routes/workspaces/merge-ops.js');
-  return triggerMerge(issueId);
+  // #3983: pin the merge to the head this row was scheduled for.
+  return triggerMerge(issueId, { kind: 'normal', expectedHeadSha: headSha });
 }
 
 function defaultAnnounceFailure(issueId: string, reason: string): void {
@@ -136,6 +183,16 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
       return;
     }
 
+    // #4066 review: an automatic merge is bound to the head it was scheduled
+    // for. A row without one (written before heads were recorded) cannot be
+    // pinned, so it never merges; the operator re-schedules it.
+    if (!entry.headSha) {
+      if (!(deps.markBlocked ?? markBlocked)(entry.id, `${entry.issueId} auto-merge has no scheduled PR head to pin; re-schedule it`)) {
+        log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+      }
+      continue;
+    }
+
     const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);
     if (!eligibility.eligible) {
       if (!(deps.markBlocked ?? markBlocked)(entry.id, eligibility.reason)) {
@@ -144,14 +201,29 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
       continue;
     }
 
-    // FR-9/D3: the merge gate is the forge — approvals, green checks, and
-    // mergeability — which is exactly `ready`. Re-read on every tick, because
-    // a push or a failing check between scheduling and the cooldown expiring
-    // must stop the merge.
-    const derived = await (deps.derivedState ?? getDerivedIssueState)(entry.issueId);
-    if (derived.state !== 'ready') {
-      const reason = `${entry.issueId} is ${derived.state}, not ready to merge`;
+    // FR-9/D3: the merge gate is the forge — approvals (a forge review or a
+    // trusted verdict marker), green checks, and mergeability (#4040, #3983).
+    // Re-read on every tick, because a push or a failing check between
+    // scheduling and the cooldown expiring must stop the merge.
+    const gate = await (deps.mergeGate ?? ((id: string) => evaluateIssueMergeGate(id)))(entry.issueId);
+    // #3983: the cooldown covered the head that was scheduled. A new head gets
+    // its own cooldown: blocking this row lets the scheduler re-arm it.
+    const liveHead = gate.facts.headSha;
+    const headMoved = Boolean(entry.headSha && liveHead && !sameCommit(entry.headSha, liveHead));
+    if (!gate.ready || headMoved) {
+      const reason = headMoved
+        ? `${entry.issueId} PR head moved from ${entry.headSha!.slice(0, 12)} to ${liveHead!.slice(0, 12)} since the auto-merge was scheduled`
+        : `${entry.issueId} is not ready to merge: ${gate.reason ?? 'the merge gate refused it'}`;
       if (!(deps.markBlocked ?? markBlocked)(entry.id, reason)) {
+        log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+      }
+      continue;
+    }
+
+    // #3983: the merge gate never reads the tracker. A closed issue is not
+    // merged: ask the tracker itself, falling back to the cached row.
+    if (await trackerIssueClosed(entry.issueId, deps, log)) {
+      if (!(deps.markBlocked ?? markBlocked)(entry.id, `${entry.issueId} is closed in the tracker`)) {
         log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
       }
       continue;
@@ -163,7 +235,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     }
 
     try {
-      const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId);
+      const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId, entry.headSha);
       if (result.success) {
         if (result.outcome === 'merged') {
           (deps.markMerged ?? markMerged)(entry.id);
@@ -197,7 +269,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
         const retryCount = (deps.getMergeRetryCount ?? readMergeRetryCount)(entry.issueId);
         if (retryCount >= FAILED_MERGE_MAX_RETRIES) {
           const blockedReason = `Auto-merge for ${entry.issueId} blocked: ${reason} (retried ${retryCount} times — fix the underlying cause and re-schedule)`;
-          const blocked = (deps.markMergingBlocked ?? markMergingBlocked)(entry.id, blockedReason);
+          const blocked = (deps.markMergeRetriesExhausted ?? markMergeRetriesExhausted)(entry.id, blockedReason);
           if (blocked) {
             (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, blockedReason);
           } else {

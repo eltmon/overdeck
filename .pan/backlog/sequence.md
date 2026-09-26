@@ -1,11 +1,20 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 802_
+_Last sequenced: 2026-09-26T02:01:07.132592Z · model: claude-opus-5-5 · open: 818_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 19 | PAN-3983 | S | critical | ok |  |  | Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick |
+| 16 | PAN-4224 | M | critical | ok |  |  | Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write |
+| 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
+| 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
+| 19 | PAN-4221 | S | critical | ok |  |  | A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train |
+| 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
+| 21 | PAN-4210 | M | critical | ok |  |  | Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start |
+| 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
+| 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
+| 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
+| 25 | PAN-4225 | M | critical | ok |  |  | Feedback/continue/spec writers dirty the primary checkout and never commit, so main cannot fast-forward (split from PAN-4224) |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -37,7 +46,6 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 70 | PAN-4196 | M | high | ok |  |  | bun audit: 218 advisories (1 critical tar DoS, 91 high); in-range updates + overrides + node-pty beta.15 with PTY smoke test |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -49,6 +57,7 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
 | 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
 | 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
+| 82 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
 | 83 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
 | 84 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
 | 85 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
@@ -181,6 +190,8 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
+| 228 | PAN-4200 | S | high | ok |  |  | bun audit critical: tar 6.2.1 via electron-builder 25; bump to builder 26 + notarize 3 + electron 40.10.6 to clear it. |
+| 229 | PAN-4199 | L | high | ok |  |  | Restored Flywheel page shows closed issues as working, drops titles, and lost ~12 old affordances; derive each on read. |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -197,6 +208,7 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 | 243 | PAN-3308 | XS | high | ok |  |  | The file-size guard prints a paste-ready ratchet-up line, so 2 of 3 agents raised the ceiling instead of shrinking the file. |
 | 244 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
 | 245 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
+| 246 | PAN-4198 | L | high | ok |  |  | Right-click menu has 39 overlapping, jargon actions; trim per state, add Replan (archive branch, fresh plan) + pan replan CLI. |
 | 247 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
 | 248 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
 | 249 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
@@ -242,6 +254,7 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 | 289 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
 | 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
 | 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 292 | PAN-4201 | M | medium | ok |  |  | Command Deck issue rows show a useless 'Allocated' chip and duplicate chips; show derived state, resources once, clearer hierarchy. |
 | 293 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
 | 294 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
 | 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
@@ -256,6 +269,7 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
 | 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 307 | PAN-4203 | L | high | ok |  | PAN-4198 | Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main. |
 | 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
 | 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
 | 310 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
@@ -268,6 +282,7 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 | 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
+| 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
 | 322 | PAN-1209 | S | low | stale |  |  | bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
@@ -342,6 +357,7 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 | 392 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
+| 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -810,9 +826,45 @@ _Last sequenced: 2026-09-25T05:33:25.500737Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-3983 (rank 19)
+### PAN-4224 (rank 16)
 
-New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.
+New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.
+
+### PAN-4223 (rank 17)
+
+New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.
+
+### PAN-4222 (rank 18)
+
+New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.
+
+### PAN-4221 (rank 19)
+
+New in-pipeline bug. The post-pass review dispatch lives in an in-process callback that dies on every deploy, and deacon-lite skips verification.* tails, so four PRs sat green for 15 hours with no train forming. It stalls the pipeline after every reload, so it ranks critical in the top tier next to PAN-4210, which is the same lost-on-reload class.
+
+### PAN-4212 (rank 20)
+
+New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.
+
+### PAN-4210 (rank 21)
+
+New in-pipeline bug. Deferred handoff retries are in-memory timers, so any dashboard restart strands planned issues until an operator runs pan start by hand (five issues on 2026-09-25). The fix re-derives pending handoffs from the pipeline journal at boot, which keeps the pipeline self-driving across reloads.
+
+### PAN-4211 (rank 22)
+
+New in-pipeline bug. A stale troubled flag blocks pan start, and the error names a command the Cut deleted, so the operator must hand-edit state.json. It needs a real clearing door (restored verb or --force/--fresh) plus corrected messages; high because it blocks restarts of affected issues such as PAN-1641.
+
+### PAN-4217 (rank 23)
+
+New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
+
+### PAN-4219 (rank 24)
+
+New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
+
+### PAN-4225 (rank 25)
+
+New issue split out of PAN-4224. Review dispatch, verification, close-out and start transitions write per-issue continue and spec files into the primary checkout and never commit them, which blocks the primary checkout from fast-forwarding when the PR merges and lets per-issue state diverge from the branch copy. It is a pipeline-substrate bug with verified evidence, so it ranks critical right behind the in-pipeline PAN-4224 fix and the related PAN-3935 / PAN-3085 plan-home bugs.
 
 ### PAN-3566 (rank 26)
 
@@ -938,10 +990,6 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-4196 (rank 70)
-
-New issue (2026-09-25). The dependency tree carries a critical tar decompression-DoS advisory and 91 high-severity findings, so it sits beside the PAN-3605 supply-chain fix. Scope is bounded to in-range updates and overrides with mechanical verification (audit counts, build, Node 22 PTY smoke); the node-pty bump touches the dashboard terminal path, which is why the PTY smoke test matters.
-
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -985,6 +1033,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 ### PAN-3100 (rank 81)
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
+### PAN-4213 (rank 82)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
 
 ### PAN-3096 (rank 83)
 
@@ -1078,38 +1130,6 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
 
 Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.
 
-### PAN-1618 (rank 111)
-
-Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
-
-### PAN-3916 (rank 112)
-
-Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
-
-### PAN-3900 (rank 113)
-
-patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
-
-### PAN-3793 (rank 114)
-
-New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
-
-### PAN-2639 (rank 115)
-
-codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
-
-### PAN-2331 (rank 116)
-
-Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
-
-### PAN-2333 (rank 117)
-
-Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
-
-### PAN-4184 (rank 118)
-
-New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1117,21 +1137,47 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-25T05:33:25.500737Z",
+  "generatedAt": "2026-09-26T02:01:07.132592Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 802,
+  "openCount": 818,
   "nodes": [
     {
-      "issue": "PAN-3983",
-      "rank": 19,
+      "issue": "PAN-4212",
+      "rank": 20,
       "size": "S",
       "importance": "critical",
-      "score": 91,
+      "score": 88,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Nothing calls /api/merge-train/auto-merge/schedule after the cut: approved green PRs never merge; wire the UAT-train reconciler tick",
-      "rationale": "New issue (2026-09-21). The cut deleted the flywheel loop that scheduled auto-merges and wired no replacement, so every approved, green, mergeable PR sits unmerged until an operator intervenes. That blocks landing for the whole pipeline, which is the critical clause. Fix is small (reuse the per-project reconciler tick) with mechanical AC.",
+      "why": "Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files",
+      "rationale": "New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4210",
+      "rank": 21,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start",
+      "rationale": "New in-pipeline bug. Deferred handoff retries are in-memory timers, so any dashboard restart strands planned issues until an operator runs pan start by hand (five issues on 2026-09-25). The fix re-derives pending handoffs from the pipeline journal at boot, which keeps the pipeline self-driving across reloads.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4211",
+      "rank": 22,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state",
+      "rationale": "New in-pipeline bug. A stale troubled flag blocks pan start, and the error names a command the Cut deleted, so the operator must hand-edit state.json. It needs a real clearing door (restored verb or --force/--fresh) plus corrected messages; high because it blocks restarts of affected issues such as PAN-1641.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1680,6 +1726,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "rationale": "New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4213",
+      "rank": 82,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests",
+      "rationale": "Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-3096",
@@ -3355,6 +3414,32 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "planning": "auto"
     },
     {
+      "issue": "PAN-4200",
+      "rank": 228,
+      "size": "S",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "bun audit critical: tar 6.2.1 via electron-builder 25; bump to builder 26 + notarize 3 + electron 40.10.6 to clear it.",
+      "rationale": "New dependency-triage issue, already in the pipeline, so it takes a free slot by merit. It ranks high because it clears the only critical advisory in bun audit plus the high-severity AppImage advisory on an artifact we ship. The change is small, but the notarize 3 ESM-only hook and the desktop packaging invariants (ABI-143 rebuild, hardlink-free tarball) need a real packaging build to verify.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4199",
+      "rank": 229,
+      "size": "L",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Restored Flywheel page shows closed issues as working, drops titles, and lost ~12 old affordances; derive each on read.",
+      "rationale": "New operator report, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high because the Flywheel page is the operator view of the pickup loop, and the default server path misreports closed issues as in flight, which is a correctness bug rather than polish. The remaining work restores lost affordances (merge-train rail, headline stats, report viewer, needs-you indicator) from sources that already exist, with mechanical per-item acceptance tests.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3510",
       "rank": 230,
       "size": "S",
@@ -3547,6 +3632,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "planning": "auto"
     },
     {
+      "issue": "PAN-4198",
+      "rank": 246,
+      "size": "L",
+      "importance": "high",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Right-click menu has 39 overlapping, jargon actions; trim per state, add Replan (archive branch, fresh plan) + pan replan CLI.",
+      "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks high rather than medium because the Replan action turns a manual recovery procedure (archive a stale branch, wipe, re-plan from main) into one door, which the post-cut conflict wave on PAN-3668 and PAN-1641 showed is needed. The menu trim is a large but self-contained UX change with mechanical, per-state acceptance tests.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3789",
       "rank": 247,
       "size": "L",
@@ -3668,6 +3766,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "condition": "ok",
       "dependsOn": [],
       "why": "Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4197",
+      "rank": 257,
+      "size": "XL",
+      "importance": "high",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agents page shows finished strikes as running (not liveness-derived) and buries live work; operator asks live-first, resizable, recolor.",
+      "rationale": "New operator request. It ranks high rather than medium because problem 1 is a correctness bug: agent cards read stale stored status instead of the liveness door in src/lib/agents/liveness.ts, so the page misreports 119 finished strikes as running. The rest is a large UX redesign (live-first default, resizable panes, explained windows and counts, new state color tokens) that needs an interactive mockup first, so it sits with the other high-value dashboard UX items rather than in the substrate tier.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4092,6 +4203,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "planning": "auto"
     },
     {
+      "issue": "PAN-4201",
+      "rank": 292,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Command Deck issue rows show a useless 'Allocated' chip and duplicate chips; show derived state, resources once, clearer hierarchy.",
+      "rationale": "New operator request, already in the pipeline, so it takes a free slot by merit and is not re-ranked later. It ranks medium, just below its sibling dashboard items PAN-4197 through PAN-4200, because it is visual polish on a working view rather than a correctness bug; the only data change is reading the derived issue state instead of a constant chip. It must reuse the shared semantic tokens that PAN-4197 is redefining, so it is advisory-linked to that issue to avoid forking a second palette.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1558",
       "rank": 293,
       "size": "M",
@@ -4260,6 +4384,21 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "planning": "interactive"
     },
     {
+      "issue": "PAN-4203",
+      "rank": 307,
+      "size": "L",
+      "importance": "high",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4198"
+      ],
+      "why": "Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main.",
+      "rationale": "New issue (2026-09-25), split from PAN-4198 by its planner to meet the plan-size gate. The Cut left several in-flight branches (PAN-3668, PAN-1641) unsyncable, and replanning them is currently a manual, error-prone procedure; this gives one core for CLI and dashboard with a fixture-proven archive-before-delete guarantee. Body is well-specified with verified file:line starting points. The menu entry needs PAN-4198 to land first, so it ranks behind that in-pipeline parent.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1246",
       "rank": 308,
       "size": "M",
@@ -4409,6 +4548,21 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "rationale": "Labelled substrate-improvement, so the label floor makes it at least high. Blocker PAN-2077 closed and parent epic PAN-2075 closed. Triage: boot reconciliation, the epic's first producer, is deleted, but the general Inbox-spine idea may still be worth pursuing for other producers (pending AUQ, cost alerts). Lifted from the stale tail; needs a re-scope before pickup. Blocker PAN-2077 closed since the prior run; dependsOn pruned.",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4204",
+      "rank": 320,
+      "size": "S",
+      "importance": "medium",
+      "score": 55,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4203"
+      ],
+      "why": "Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts.",
+      "rationale": "New issue split from PAN-4198 (part 4). It depends explicitly on PAN-4203 because its main button calls the Replan endpoint, so it sits in the first free slot after PAN-4203. Scope is small and fully located (server message, route payload, two frontend callers, CLI hint), so condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-1219",
@@ -4748,6 +4902,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "condition": "ok",
       "dependsOn": [],
       "why": "Strike merge door can report fetch failure after merge and land the same head twice",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4195",
+      "rank": 349,
+      "size": "M",
+      "importance": "medium",
+      "score": 63,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms",
+      "rationale": "New issue (2026-09-25). Agents and hooks invoke pan constantly, so a 0.5 s, 230 MB floor per call adds latency to every agent turn and memory pressure on the host. The fix (lazy action imports, bundle/compile-cache tuning, a startup regression check) is well scoped with a measurable target, so condition is ok; placed in a free slot among score-63 medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5293,6 +5460,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "dependsOn": [],
       "why": "Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard",
       "rationale": "The root-cause fix is on main with a regression test; what is left are two optional hardening follow-ups. Needs a re-scope to those.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4208",
+      "rank": 395,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "#4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets",
+      "rationale": "New issue (2026-09-25), filed from the #4205 review. #4205 cut pan --version from 560 to 180 ms but missed the PAN-4195 target of under 100 ms; item 1 closes that gap by keeping effect out of the telemetry config read. Item 2 adds CI coverage that lazy loading removed, so a broken import in tell/start/done fails CI instead of at run time. Scope is concrete with three numbered tasks, so condition is ok; placed just below PAN-4195 in a free slot among score-58 medium work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10998,41 +11178,93 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "planning": "auto"
     },
     {
-      "issue": "PAN-4195",
-      "rank": 349,
-      "size": "M",
-      "importance": "medium",
-      "score": 63,
+      "issue": "PAN-4217",
+      "rank": 23,
+      "size": "S",
+      "importance": "critical",
+      "score": 87,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms",
-      "rationale": "New issue (2026-09-25). Agents and hooks invoke pan constantly, so a 0.5 s, 230 MB floor per call adds latency to every agent turn and memory pressure on the host. The fix (lazy action imports, bundle/compile-cache tuning, a startup regression check) is well scoped with a measurable target, so condition is ok; placed in a free slot among score-63 medium work.",
+      "why": "vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it",
+      "rationale": "New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4196",
-      "rank": 70,
+      "issue": "PAN-4219",
+      "rank": 24,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix.",
+      "rationale": "New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4221",
+      "rank": 19,
+      "size": "S",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train",
+      "rationale": "New in-pipeline bug. The post-pass review dispatch lives in an in-process callback that dies on every deploy, and deacon-lite skips verification.* tails, so four PRs sat green for 15 hours with no train forming. It stalls the pipeline after every reload, so it ranks critical in the top tier next to PAN-4210, which is the same lost-on-reload class.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4222",
+      "rank": 18,
       "size": "M",
       "importance": "high",
       "score": 80,
       "condition": "ok",
       "dependsOn": [],
-      "why": "bun audit: 218 advisories (1 critical tar DoS, 91 high); in-range updates + overrides + node-pty beta.15 with PTY smoke test",
-      "rationale": "New issue (2026-09-25). The dependency tree carries a critical tar decompression-DoS advisory and 91 high-severity findings, so it sits beside the PAN-3605 supply-chain fix. Scope is bounded to in-range updates and overrides with mechanical verification (audit counts, build, Node 22 PTY smoke); the node-pty bump touches the dashboard terminal path, which is why the PTY smoke test matters.",
+      "why": "Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors",
+      "rationale": "New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4197",
-      "rank": 257,
-      "size": "XL",
+      "issue": "PAN-4223",
+      "rank": 17,
+      "size": "L",
       "importance": "high",
-      "score": 66,
+      "score": 74,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Agents page shows finished strikes as running (not liveness-derived) and buries live work; operator asks live-first, resizable, recolor.",
-      "rationale": "New operator request. It ranks high rather than medium because problem 1 is a correctness bug: agent cards read stale stored status instead of the liveness door in src/lib/agents/liveness.ts, so the page misreports 119 finished strikes as running. The rest is a large UX redesign (live-first default, resizable panes, explained windows and counts, new state color tokens) that needs an interactive mockup first, so it sits with the other high-value dashboard UX items rather than in the substrate tier.",
+      "why": "In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator",
+      "rationale": "New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4224",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write",
+      "rationale": "New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4225",
+      "rank": 25,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Feedback/continue/spec writers dirty the primary checkout and never commit, so main cannot fast-forward (split from PAN-4224)",
+      "rationale": "New issue split out of PAN-4224. Review dispatch, verification, close-out and start transitions write per-issue continue and spec files into the primary checkout and never commit them, which blocks the primary checkout from fast-forwarding when the PR merges and lets per-issue state diverge from the branch copy. It is a pipeline-substrate bug with verified evidence, so it ranks critical right behind the in-pipeline PAN-4224 fix and the related PAN-3935 / PAN-3085 plan-home bugs.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -12059,6 +12291,160 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4198",
+      "to": "PAN-1668",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4197",
+      "to": "PAN-4201",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4198",
+      "to": "PAN-4203",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4203",
+      "to": "PAN-4204",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4198",
+      "to": "PAN-4204",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4208",
+      "to": "PAN-4195",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4212",
+      "to": "PAN-4199",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4212",
+      "to": "PAN-1641",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4211",
+      "to": "PAN-1641",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3237",
+      "to": "PAN-4210",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4199",
+      "to": "PAN-4217",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4217",
+      "to": "PAN-4199",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4201",
+      "to": "PAN-4219",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4217",
+      "to": "PAN-4219",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4221",
+      "to": "PAN-4210",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4197",
+      "to": "PAN-4222",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4223",
+      "to": "PAN-3536",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-4166",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-3935",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3935",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3085",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

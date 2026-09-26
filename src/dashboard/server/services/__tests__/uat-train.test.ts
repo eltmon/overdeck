@@ -10,6 +10,8 @@ import {
   postUatGenerationPromotePayload,
   resolveUatProjectRoot,
   runUatTrainReconcile,
+  startUatTrainReconciler,
+  stopUatTrainReconciler,
 } from '../uat-train.js';
 import type { UatReconcilerDeps } from '../../../../lib/cloister/uat-reconciler.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
@@ -36,6 +38,14 @@ const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   resolveProjectReposFromResolvedIssue: vi.fn(),
   hasUncleanedTerminalUatGeneration: vi.fn(),
+  runAutoMergeSchedulerTick: vi.fn(),
+  evaluateIssueMergeGate: vi.fn(),
+  getDerivedIssueState: vi.fn(),
+}));
+
+vi.mock('../../../../lib/cloister/merge-gate.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../lib/cloister/merge-gate.js')>(),
+  evaluateIssueMergeGate: (...args: unknown[]) => mocks.evaluateIssueMergeGate(...args),
 }));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
@@ -117,6 +127,7 @@ vi.mock('../derived-issue-state.js', async (importOriginal) => {
   return {
     ...original,
     listReadyIssuesForProject: async () => mocks.listReadyIssuesForProject(),
+    getDerivedIssueState: (...args: unknown[]) => mocks.getDerivedIssueState(...args),
   };
 });
 
@@ -427,6 +438,32 @@ describe('UAT train project root and startup gate', () => {
     mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'peer' });
     expect(canStartUatTrainReconciler()).toBe(false);
   });
+
+  it('runs its tick hook at start and on every reconciler tick (#3983)', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.findProjectByPath.mockReturnValue({ path: '/repo' });
+      mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
+      mocks.runAutoMergeSchedulerTick.mockResolvedValue([]);
+
+      expect(startUatTrainReconciler({ onTick: mocks.runAutoMergeSchedulerTick })).toBe(true);
+      expect(mocks.runAutoMergeSchedulerTick).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(mocks.runAutoMergeSchedulerTick).toHaveBeenCalledTimes(2);
+    } finally {
+      stopUatTrainReconciler();
+      vi.useRealTimers();
+    }
+  });
+
+  it('runs no tick hook from a peer dashboard (#3983)', () => {
+    mocks.findProjectByPath.mockReturnValue({ path: '/repo' });
+    mocks.getDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'peer' });
+
+    expect(startUatTrainReconciler({ onTick: mocks.runAutoMergeSchedulerTick })).toBe(false);
+    expect(mocks.runAutoMergeSchedulerTick).not.toHaveBeenCalled();
+  });
 });
 
 describe('postUatGenerationPromotePayload', () => {
@@ -461,6 +498,31 @@ describe('postUatGenerationPromotePayload', () => {
 
     await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(success);
     await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(failure);
+  });
+
+  // #4066 review: a member's `ready` applies the merge gate's approval answer
+  // for its head. A member held for UAT is never gated by the scheduler, so
+  // the promote click runs the gate first, then derives.
+  it('runs the merge gate for each member before reading its derived state', async () => {
+    const order: string[] = [];
+    mocks.getUatGeneration.mockReturnValue({ members: [{ issueId: 'pan-1' }, { issueId: 'PAN-2' }] });
+    mocks.evaluateIssueMergeGate.mockImplementation(async (issueId: string) => { order.push(`gate:${issueId}`); return { ready: true }; });
+    mocks.getDerivedIssueState.mockImplementation(async (issueId: string) => {
+      order.push(`derive:${issueId}`);
+      return { issueId, state: issueId === 'PAN-1' ? 'ready' : 'in-review' };
+    });
+    let eligibility: ((issueId: string) => { eligible: boolean; reason?: string }) | undefined;
+    mocks.promoteUatGeneration.mockImplementation(async (_name: string, _root: string, deps: { memberEligibility: typeof eligibility }) => {
+      eligibility = deps.memberEligibility;
+      return { success: false, reason: 'member-not-ready', message: 'x' };
+    });
+
+    await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
+
+    expect(order).toEqual(expect.arrayContaining(['gate:PAN-1', 'derive:PAN-1', 'gate:PAN-2', 'derive:PAN-2']));
+    expect(order.indexOf('gate:PAN-1')).toBeLessThan(order.indexOf('derive:PAN-1'));
+    expect(eligibility?.('PAN-1')).toEqual({ eligible: true });
+    expect(eligibility?.('PAN-2')).toEqual({ eligible: false, reason: 'is in-review, not ready to merge' });
   });
 
 });

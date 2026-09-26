@@ -690,6 +690,12 @@ export const ReadModelServiceLive = Layer.effect(
             emitDerivedEvent({ type: 'issue_state.changed', payload: { issueState } });
           }
         });
+        // #4066 review: a merge-gate evaluation (the auto-merge scheduler's,
+        // every tick) that changes an issue's approval answer at its head
+        // re-derives that issue, so the board's Merge button follows the gate
+        // through issue_state.changed. No forge read and no frontend polling.
+        const { onApprovalAtHeadChanged } = yield* Effect.promise(() => import('../../lib/cloister/approval-at-head.js'));
+        onApprovalAtHeadChanged((issueId) => issueService.scheduleDerivedStateRefreshForIssues([{ identifier: issueId }]));
       } catch {
         console.warn('[ReadModel] IssueDataService not available at bootstrap, starting with empty issues');
       }

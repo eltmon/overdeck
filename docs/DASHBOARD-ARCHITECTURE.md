@@ -353,12 +353,87 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
-## Agents Directory (PAN-3920)
+## Agents page: Live and History (PAN-3920, PAN-4197)
 
-`/agents` opens the Agents Directory by default: a tree (location → project → issue, plus one
+`/agents` opens the **Live view** (`components/Agents/live/`): what is running and progressing,
+what needs the operator, and what waits in the pipeline, with nothing finished. Rows fall into
+three sections, **Needs you**, **Live** and **Waiting**, each row with one reason (table below).
+Rows with nothing nameable to wait on (idle with no blocker, or stopped) are not Waiting: they
+fold into a collapsed **Idle** footer (`▸ N idle sessions · History`, the choice kept in
+localStorage) that the header does not count. A list pane (at least 360px) and a collapsible
+preview pane sit in `react-resizable-panels`, saved in localStorage under the layout id
+`agents-live`. The preview is `DirectoryDetail` (header, issue context, live transcript), dated
+from the runtime snapshot like the row. A click selects and previews (`?entry=`, replaceState);
+**Open** (neutral, shown on hover or selection), Enter or a double-click goes to the live thing:
+a conversation's `/conv/<name>`, or the agent's session pane in its project's Command Deck (the
+`agent` pane the rail tree opens, then `/command-deck/<project>`); an agent with no registered
+project falls back to `/issues/<id>`. The header shows the counts in the glyph vocabulary
+(`● 6 live  ◐ 1 need you  ○ 3 waiting`; zero counts dimmed, a nonzero need-you in its tone and
+clickable to scroll to the section), the preview toggle, and one **History** link. `?view=history` (and the old `?view=directory`) opens the Agents Directory,
+described below as History; any other `view` opens Live. The Grid, Table and Timeline views are
+gone: the Grid showed every non-dead strike as running. The page is still behind the
+experimental-features gate.
+
+**Live scope.** The Live view reads `GET /api/agent-directory?scope=live`
+(`buildLiveAgentDirectory`), which has no time window. It answers
+`{ generatedAt, windowHours: 0, scope: 'live', entries }` and keeps an entry when:
+
+1. its state is live (`working`, `idle`, `blocked`, `unknown`);
+2. it is a native agent with a pause gate (`pause`, below) and its issue's derived state is not
+   `merged` or `closed` (an agent with no issue is kept);
+3. it is the newest (by `startedAt`, then id) `work`/`strike` agent of an issue whose derived
+   state is `in-review`, `changes-requested` or `ready`.
+
+Every ancestor of a kept entry is re-added, and the sort is the window answer's. In both scopes a
+native agent whose id is a conversation's tmux session is that conversation's own pane and is
+listed once, as the conversation. The derived
+states come from `getSharedIssueService().listDerivedStates()` on the server, so the client never
+receives the full history to filter. The answer is memoized 3 s in its own cache; a `scope` other
+than `live` answers 400, and `windowHours` is ignored with `scope=live`. The window answer carries
+`scope: 'window'`. Every native agent entry whose `state.json` has `paused: true` carries
+`pause: { by, reason, since }` in both scopes: `by` is `operator` for `isOperatorPause()`,
+`scheduler` for `yieldedByScheduler`, else `machine`; `reason` is `pausedReason`; `since` is
+`pausedAt`, else `yieldedAt`.
+
+**Reasons.** `live-model.ts` classifies each row on the client from the entry plus real-time store
+facts: the issue's derived state, the agent snapshot's pending inputs, and the runtime snapshot.
+The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `work` or `strike`.
+
+| # | Condition | Reason | Section | Tone |
+| --- | --- | --- | --- | --- |
+| 1 | `blocked` | question waiting / permission prompt / plan approval | Needs you | needs-you |
+| 2 | operator pause | paused by you | Needs you | needs-you |
+| 3 | issue agent, attention `api-error` | API error or usage limit | Needs you | stuck |
+| 4 | issue agent, attention `stuck`, `idle` | stuck · idle `<age>` | Needs you | stuck |
+| 5 | issue agent, issue `ready` | ready to merge | Needs you | needs-you |
+| 6 | `working` | running `<tool>` / thinking / working | Live | live |
+| 7 | remote and `unknown` | running on Fly | Live | live |
+| 8 | scheduler or machine pause | held by Overdeck | Waiting | waiting |
+| 9 | issue agent, PR checks red | CI failed | Waiting | stuck |
+| 10 | issue agent, issue `changes-requested` | changes requested | Waiting | waiting |
+| 11 | issue agent, issue `in-review` | in review | Waiting | waiting |
+| 12 | issue agent, PR checks pending | CI running | Waiting | waiting |
+| 13 | `idle` | idle — no known blocker | Idle | waiting |
+| 14 | otherwise | agent stopped | Idle | waiting |
+
+Needs you sorts oldest wait first. Live sorts by start time so rows never reshuffle under the
+pointer as agents write output; Waiting and Idle sort most recent activity first. A subagent
+nests under its parent row (at most three lines, then `+N more`, each with its state glyph). A
+row's first line is the issue id and title (the role only when it is not `work`); its second
+line is the reason, then what it is doing or waiting on, then the age. For a live agent that is
+its last output line, streamed through `useAgentOutputSubscription` while the row is mounted,
+and `quiet <age>` in the stuck tone past five minutes. Tones are the `--state-*` tokens in `index.css` (live blue and
+never green, needs-you amber, stuck red, waiting warm neutral, done emerald); see the style
+guide's "State Tokens". The same tokens tone the History row badge.
+
+### History: the Agents Directory
+
+`/agents?view=history` opens the Agents Directory: a tree (location → project → issue, plus one
 "Conversations" group per project), a list of the selected node's entries, and a detail pane
-with the entry's transcript and issue context. The card grid, table and timeline stay behind
-`?view=grid|table|timeline`. The page is still behind the experimental-features gate.
+with the entry's transcript and issue context. The three panes are `react-resizable-panels`,
+saved under the layout id `agents-directory`, and the tree pane collapses. Under the 24h/7d
+toggle the tree says `Live agents always show. Finished ones show if active in the last 24 hours.`
+(or 7 days), and each node's `live/total` count has the title `<n> live of <m> shown`.
 
 **Derived on read; stores nothing.** `GET /api/agent-directory?windowHours=<1..168>` (default
 24) recomputes the entries from `~/.overdeck/agents/*/state.json`, the backend pane inventory,

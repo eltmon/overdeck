@@ -151,3 +151,41 @@ describe('the batched branch read', () => {
     expect(states.get('PAN-2')?.branch).toBeUndefined();
   });
 });
+
+// #4066 review: the board's `ready` is the merge gate's approval answer for
+// the PR's current head, read from its per-head cache: no forge read of its
+// own, and never the forge's reviewDecision alone.
+describe('the batch door reads ready from the merge gate', () => {
+  const HEAD = sha('a');
+  const rows = (reviewDecision: string) => async () => [{
+    number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', headRefName: 'feature/pan-7', headRefOid: HEAD,
+    mergeable: 'MERGEABLE', reviewDecision, statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }],
+  }];
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-ready-'));
+    git.handler = () => '';
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  const load = (reviewDecision: string, approvalAtHead: (issueId: string, head: string | null | undefined) => boolean | undefined) =>
+    loadIssueStatesForProject(projectPath, ['PAN-7'], {
+      panes: [], issues: openIssues(['PAN-7']), listPullRequests: rows(reviewDecision), approvalAtHead,
+    });
+
+  it('shows ready for a marker-approved PR whose reviewDecision is empty', async () => {
+    const approvalAtHead = vi.fn((_issueId: string, head: string | null | undefined) => (head === HEAD ? true : undefined));
+    const states = await load('', approvalAtHead);
+    expect(states.get('PAN-7')?.state).toBe('ready');
+    expect(approvalAtHead).toHaveBeenCalledWith('PAN-7', HEAD);
+  });
+
+  it('hides ready for a reviewDecision APPROVED the gate refused or never judged at this head', async () => {
+    expect((await load('APPROVED', () => false)).get('PAN-7')?.state).toBe('in-review');
+    expect((await load('APPROVED', () => undefined)).get('PAN-7')?.state).toBe('in-review');
+  });
+});

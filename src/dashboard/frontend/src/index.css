@@ -201,6 +201,17 @@
   --signal-review-foreground: #7e22ce;
   --signal-cost: #06b6d4;
   --signal-cost-foreground: #0e7490;
+  /* PAN-4197: agent state colors — one per state, running is never green. */
+  --state-live: #2563eb;
+  --state-live-foreground: #1d4ed8;
+  --state-needs-you: #d97706;
+  --state-needs-you-foreground: #92400e;
+  --state-stuck: #dc2626;
+  --state-stuck-foreground: #b91c1c;
+  --state-waiting: #78716c;
+  --state-waiting-foreground: #57534e;
+  --state-done: #059669;
+  --state-done-foreground: #047857;
 
   /* Legacy dashboard aliases still used by a few surfaces. Keep them mapped to
      semantic tokens so light mode does not fall back to invalid CSS values. */
@@ -278,6 +289,17 @@
   --signal-review-foreground: #c084fc;
   --signal-cost: #06b6d4;
   --signal-cost-foreground: #22d3ee;
+  /* PAN-4197: agent state colors — one per state, running is never green. */
+  --state-live: #3b82f6;
+  --state-live-foreground: #60a5fa;
+  --state-needs-you: #f59e0b;
+  --state-needs-you-foreground: #fbbf24;
+  --state-stuck: #ef4444;
+  --state-stuck-foreground: #f87171;
+  --state-waiting: #78716c;
+  --state-waiting-foreground: #a8a29e;
+  --state-done: #10b981;
+  --state-done-foreground: #34d399;
 
   --color-bg: var(--background);
   --color-fg: var(--foreground);
@@ -953,6 +975,68 @@ body::after {
   }
   .badge-border-info {
     border-color: color-mix(in srgb, var(--info) 32%, transparent);
+  }
+
+  /* PAN-4197: agent state tones (8%/32% badge tint, text, solid rail/dot). */
+  .badge-bg-state-live {
+    background: color-mix(in srgb, var(--state-live) 8%, transparent);
+  }
+  .badge-border-state-live {
+    border-color: color-mix(in srgb, var(--state-live) 32%, transparent);
+  }
+  .text-state-live {
+    color: var(--state-live-foreground);
+  }
+  .bg-state-live {
+    background: var(--state-live);
+  }
+  .badge-bg-state-needs-you {
+    background: color-mix(in srgb, var(--state-needs-you) 8%, transparent);
+  }
+  .badge-border-state-needs-you {
+    border-color: color-mix(in srgb, var(--state-needs-you) 32%, transparent);
+  }
+  .text-state-needs-you {
+    color: var(--state-needs-you-foreground);
+  }
+  .bg-state-needs-you {
+    background: var(--state-needs-you);
+  }
+  .badge-bg-state-stuck {
+    background: color-mix(in srgb, var(--state-stuck) 8%, transparent);
+  }
+  .badge-border-state-stuck {
+    border-color: color-mix(in srgb, var(--state-stuck) 32%, transparent);
+  }
+  .text-state-stuck {
+    color: var(--state-stuck-foreground);
+  }
+  .bg-state-stuck {
+    background: var(--state-stuck);
+  }
+  .badge-bg-state-waiting {
+    background: color-mix(in srgb, var(--state-waiting) 8%, transparent);
+  }
+  .badge-border-state-waiting {
+    border-color: color-mix(in srgb, var(--state-waiting) 32%, transparent);
+  }
+  .text-state-waiting {
+    color: var(--state-waiting-foreground);
+  }
+  .bg-state-waiting {
+    background: var(--state-waiting);
+  }
+  .badge-bg-state-done {
+    background: color-mix(in srgb, var(--state-done) 8%, transparent);
+  }
+  .badge-border-state-done {
+    border-color: color-mix(in srgb, var(--state-done) 32%, transparent);
+  }
+  .text-state-done {
+    color: var(--state-done-foreground);
+  }
+  .bg-state-done {
+    background: var(--state-done);
   }
 
   /* Broadsheet badge radius (PAN-3410 D-11) — the one deliberate radius

@@ -30,7 +30,7 @@ import type { StreamdownProps } from 'streamdown';
 import { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
-import type { Components } from 'react-markdown';
+import type { Components, ExtraProps } from 'react-markdown';
 import type { DiffsThemeNames } from '@pierre/diffs';
 import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks, type MarkdownFileLinkMeta } from '../../markdown-links';
 import { MarkdownFileLink } from './MarkdownFileLink';
@@ -382,7 +382,7 @@ function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
 
 function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: string | null | undefined): Components & StreamdownComponents {
   return {
-    pre({ children }) {
+    pre({ children }: React.JSX.IntrinsicElements['pre'] & ExtraProps) {
       // Extract code block contents
       const child = React.Children.toArray(children)[0];
       if (!React.isValidElement(child)) {
@@ -408,7 +408,7 @@ function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: 
         </ChatMarkdownErrorBoundary>
       );
     },
-    a({ href, children }) {
+    a({ href, children }: React.JSX.IntrinsicElements['a'] & ExtraProps) {
       const fileLinkMeta = resolveMarkdownFileLinkMeta(href, cwd);
       if (fileLinkMeta) {
         return (

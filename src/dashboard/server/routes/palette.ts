@@ -30,7 +30,8 @@ import { validateOrigin } from './origin-validation.js';
 //
 // Curated subset of top-level `pan <verb>` commands surfaced in the palette.
 // Keep entries short; the palette filters by name/description/keywords. When
-// adding/removing a top-level command in src/cli/index.ts, update this list.
+// adding/removing a top-level command (src/cli/index.ts or
+// src/cli/command-groups.ts), update this list.
 
 interface PanCommandEntry {
   name: string;

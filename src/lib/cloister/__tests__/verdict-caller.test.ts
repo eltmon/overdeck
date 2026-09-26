@@ -13,11 +13,15 @@ import {
   forgeApprovalAtHead,
   getPrFacts,
   resetPrFactsCache,
+  type GitHubReviewRecord,
+  type GitLabMrApprovals,
   type GitLabMrView,
   type PrFactsDeps,
 } from '../pr-facts.js';
 import {
+  UNIDENTIFIED_PANE_AGENT_ID,
   isIssueReviewSession,
+  readAncestorAgentIds,
   reviewVerdictRefusal,
   verdictCallerFromEnv,
 } from '../verdict-caller.js';
@@ -28,20 +32,48 @@ const OLDER = '1c36f7db9148c7dd9da6d43cf9884d959e433307';
 const HEAD_AT = '2026-09-16T19:00:00Z';
 
 describe('verdictCallerFromEnv', () => {
+  const noAncestors = () => [];
+
   it('reads a shell without OVERDECK_AGENT_ID as an operator', () => {
-    expect(verdictCallerFromEnv({})).toEqual({ kind: 'operator', id: null });
-    expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: '  ' })).toEqual({ kind: 'operator', id: null });
+    expect(verdictCallerFromEnv({}, noAncestors)).toEqual({ kind: 'operator', id: null });
+    expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: '  ' }, noAncestors)).toEqual({ kind: 'operator', id: null });
   });
 
   it('reads a conv-* conversation as an operator', () => {
-    expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: 'conv-20260916-2706' }))
+    expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: 'conv-20260916-2706' }, () => ['conv-20260916-2706']))
       .toEqual({ kind: 'operator', id: 'conv-20260916-2706' });
   });
 
   it('reads every other managed session as an agent', () => {
     for (const id of ['agent-pan-3836-review', 'agent-pan-3836', 'flywheel-overdeck', 'planning-pan-3836']) {
-      expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: id })).toEqual({ kind: 'agent', id });
+      expect(verdictCallerFromEnv({ OVERDECK_AGENT_ID: id }, noAncestors)).toEqual({ kind: 'agent', id });
     }
+  });
+
+  // #4066 review: an agent holds the operator's shell and can rewrite its own
+  // environment, but not the environment its harness process started with.
+  it("names the nearest agent ancestor, whatever the caller's own environment says", () => {
+    const ancestors = () => ['agent-pan-3836', 'conv-20260916-2706'];
+    for (const env of [{}, { OVERDECK_AGENT_ID: 'conv-20260916-2706' }, { OVERDECK_AGENT_ID: 'agent-pan-3836-review' }]) {
+      expect(verdictCallerFromEnv(env, ancestors)).toEqual({ kind: 'agent', id: 'agent-pan-3836' });
+    }
+    expect(verdictCallerFromEnv({}, () => ['conv-1', 'agent-pan-1-review'])).toEqual({ kind: 'agent', id: 'agent-pan-1-review' });
+  });
+
+  it('reads a pane that unset its agent id but kept its issue or session type as an agent', () => {
+    expect(verdictCallerFromEnv({ OVERDECK_ISSUE_ID: 'PAN-3836' }, noAncestors))
+      .toEqual({ kind: 'agent', id: UNIDENTIFIED_PANE_AGENT_ID });
+    expect(verdictCallerFromEnv({ OVERDECK_SESSION_TYPE: 'work' }, noAncestors))
+      .toEqual({ kind: 'agent', id: UNIDENTIFIED_PANE_AGENT_ID });
+  });
+
+  it('falls back to the environment when the ancestors cannot be read', () => {
+    expect(verdictCallerFromEnv({}, () => { throw new Error('no /proc'); })).toEqual({ kind: 'operator', id: null });
+  });
+
+  it('reads the real process tree: this test runner has no agent ancestor it did not inherit', () => {
+    // Sanity only: the reader walks /proc and returns ids, never throws.
+    expect(Array.isArray(readAncestorAgentIds())).toBe(true);
   });
 });
 
@@ -201,7 +233,10 @@ describe('getPrFacts — approvedAtHead (GitHub)', () => {
 describe('getPrFacts — approvedAtHead (GitLab)', () => {
   const WEB_URL = 'https://gitlab.com/mind-your-now/frontend/-/merge_requests/77';
 
-  function deps(view: GitLabMrView): PrFactsDeps {
+  function deps(
+    view: GitLabMrView,
+    approvals: GitLabMrApprovals = { approved: true, approvals_required: 0, approved_by: [] },
+  ): PrFactsDeps {
     return {
       fetchGitHubPr: async (issueId) => ({ issueId, pr: null }),
       resolveRepos: () => [{
@@ -209,6 +244,7 @@ describe('getPrFacts — approvedAtHead (GitLab)', () => {
       }] as never,
       listGitLabMrs: async () => [{ iid: 77, source_branch: 'feature/min-77', web_url: WEB_URL, state: 'opened' }] as never,
       viewGitLabMr: async () => view,
+      readGitLabApprovals: async () => approvals,
     };
   }
 
@@ -218,8 +254,8 @@ describe('getPrFacts — approvedAtHead (GitLab)', () => {
       iid: 77, state: 'opened', web_url: WEB_URL, sha: 'f00d', source_branch: 'feature/min-77',
       detailed_merge_status: 'mergeable',
     }));
-    // Merge readiness still reads the MR as it did.
-    expect(facts.approved).toBe(true);
+    // #4066 review: a mergeable MR with nobody in `approved_by` is not approved.
+    expect(facts.approved).toBe(false);
     expect(facts.mergeable).toBe(true);
     expect(facts.approvedAtHead).toBeUndefined();
     expect(await forgeApprovalAtHead(facts, async () => { throw new Error('not GitHub'); })).toBeUndefined();
@@ -232,8 +268,9 @@ describe('getPrFacts — approvedAtHead (GitLab)', () => {
     resetPrFactsCache();
     const facts = await getPrFacts('MIN-77', deps({
       iid: 77, state: 'opened', web_url: WEB_URL, sha: 'f00d', source_branch: 'feature/min-77',
-      detailed_merge_status: 'mergeable', approved: true,
-    }));
+      detailed_merge_status: 'mergeable',
+    }, { approved: true, approvals_required: 0, approved_by: [{ user: { username: 'eltmon' } }] }));
+    expect(facts.approved).toBe(true);
     expect(facts.approvedAtHead).toBeUndefined();
   });
 });
@@ -245,8 +282,14 @@ describe('forgeApprovalAtHead', () => {
     number: 3979,
     headSha: HEAD,
   };
-  const atHead = (reviews: Array<{ state: string; commit: { oid: string } }>) =>
-    async () => ({ headRefOid: HEAD, reviews });
+  // A trusted reviewer unless the fixture says otherwise (#4066 review).
+  type Review = GitHubReviewRecord & { state: string; commit: { oid: string } };
+  const atHead = (reviews: Review[]) =>
+    async () => ({
+      headRefOid: HEAD,
+      reviews: reviews.map((review) => ({ author: { login: 'eltmon' }, authorAssociation: 'OWNER', ...review })),
+    });
+  const noLogins = async () => [] as string[];
 
   it('is true only for an APPROVED review whose commit is the head', async () => {
     const read = vi.fn(atHead([
@@ -268,6 +311,73 @@ describe('forgeApprovalAtHead', () => {
     expect(await forgeApprovalAtHead(facts, atHead([]))).toBe(false);
     expect(await forgeApprovalAtHead(facts, async () => ({ headRefOid: HEAD, reviews: null }))).toBe(false);
     expect(await forgeApprovalAtHead(facts, atHead([{ state: 'APPROVED', commit: { oid: '' } }]))).toBe(false);
+  });
+
+  // #4066 review: the repo is public; any GitHub account can submit a review.
+  it('ignores an APPROVED review of the head from an untrusted author', async () => {
+    const overdeckLogins = vi.fn(async () => ['eltmon', 'overdeck-app[bot]']);
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, author: { login: 'drive-by' }, authorAssociation: 'NONE' },
+    ]), overdeckLogins)).toBe(false);
+    expect(overdeckLogins).toHaveBeenCalled();
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, author: { login: 'coderabbitai' }, authorAssociation: 'CONTRIBUTOR' },
+    ]), overdeckLogins)).toBe(false);
+  });
+
+  // #4066 review (R3-2): the review agent's verdict as PR 3976 carries it live,
+  // an App review by `overdeck-agent` with association CONTRIBUTOR.
+  const botApproval = (__typename?: string): Review => ({
+    state: 'APPROVED',
+    submittedAt: '2026-09-21T00:38:46Z',
+    authorAssociation: 'CONTRIBUTOR',
+    author: { login: 'overdeck-agent', ...(__typename ? { __typename } : {}) },
+    commit: { oid: HEAD },
+  });
+  const liveLogins = async () => ['eltmon', 'overdeck-agent[bot]'];
+
+  it('counts an APPROVED review of the head from the identity Overdeck posts as', async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([botApproval('Bot')]), liveLogins)).toBe(true);
+  });
+
+  it("ignores an APPROVED review from a User account named after the App's slug (#4066 review, R3-2)", async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([botApproval('User')]), liveLogins)).toBe(false);
+    // An author whose account type is unknown is no one's identity.
+    expect(await forgeApprovalAtHead(facts, atHead([botApproval()]), liveLogins)).toBe(false);
+  });
+
+  it('ignores a review with no author login: it cannot be attributed', async () => {
+    expect(await forgeApprovalAtHead(facts, async () => ({
+      headRefOid: HEAD,
+      reviews: [{ state: 'APPROVED', authorAssociation: 'OWNER', commit: { oid: HEAD } }],
+    }), noLogins)).toBe(false);
+  });
+
+  it("takes each author's latest verdict: a later CHANGES_REQUESTED on the head withdraws the approval", async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },
+      { state: 'CHANGES_REQUESTED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:05:00Z' },
+    ]), noLogins)).toBe(false);
+  });
+
+  it('a later dismissal withdraws the approval; a later COMMENTED review does not', async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'DISMISSED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },
+    ]), noLogins)).toBe(false);
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },
+      { state: 'COMMENTED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:05:00Z' },
+    ]), noLogins)).toBe(true);
+  });
+
+  it("another trusted author's standing CHANGES_REQUESTED leaves the head unapproved", async () => {
+    expect(await forgeApprovalAtHead(facts, atHead([
+      { state: 'APPROVED', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:05:00Z' },
+      {
+        state: 'CHANGES_REQUESTED', commit: { oid: OLDER }, submittedAt: '2026-09-24T09:00:00Z',
+        author: { login: 'teammate' }, authorAssociation: 'MEMBER',
+      },
+    ]), noLogins)).toBe(false);
   });
 
   it('is undefined when the head moved between the PR read and the review read', async () => {

@@ -122,7 +122,7 @@ Jobs launched through the Codex plugin for Claude Code (`codex:codex-rescue` and
 not subagents: they are separate `codex` processes with their own rollouts, outside the
 conversation's transcript. Overdeck records them as **external agents** (`~/.overdeck/agents/ext-*`)
 and lists them in the Agents Directory under the conversation that launched them. See
-`reference/workers.mdx` "Externally spawned agents" and DASHBOARD-ARCHITECTURE.md "Agents Directory".
+`reference/workers.mdx` "Externally spawned agents" and DASHBOARD-ARCHITECTURE.md "Agents page: Live and History".
 
 ### Child activity
 

@@ -24,6 +24,9 @@ import {
   type MergeReadiness,
   type PrFacts,
   type PrFactsOptions,
+  type ReadGitHubReviews,
+  recordApprovalAtHead,
+  withForgeApprovalAtHead,
 } from './pr-facts.js';
 import { issueRunsTestsOnCi } from './verification-tests-mode.js';
 
@@ -33,6 +36,10 @@ export interface MergeGateDeps {
   ciTestsRequired?: (issueId: string) => boolean;
   /** True when UAT is required for the issue (the `issueHoldsForUat` tiers). */
   uatRequired?: (issueId: string) => Promise<boolean>;
+  /** The GitHub reviews read that proves an approval of the head (`forgeApprovalAtHead`). */
+  readReviews?: ReadGitHubReviews;
+  /** The logins Overdeck posts as, for a review whose association alone is not trusted. */
+  overdeckLogins?: () => Promise<readonly string[]>;
 }
 
 export interface MergeGateResult extends MergeReadiness {
@@ -78,15 +85,24 @@ export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps 
  *
  * The UAT requirement is resolved only when a failed UAT verdict applies to the
  * head, so the common case costs no tracker label read.
+ *
+ * #3983: on GitHub the approval must be proven on the exact head: a trusted
+ * verdict marker whose `sha=` is the head, or a GitHub review approving that
+ * commit. `reviewDecision` alone, a marker without `sha=`, or a marker naming
+ * another commit never approves a merge. The reviews are read only when no
+ * marker already proves it and the PR is otherwise green and mergeable.
  */
 export async function evaluateIssueMergeGate(
   issueId: string,
   deps: MergeGateDeps = {},
   options: PrFactsOptions = {},
 ): Promise<MergeGateResult> {
-  const facts = deps.getFacts
+  const read = deps.getFacts
     ? await deps.getFacts(issueId, options)
     : await getPrFacts(issueId, {}, options);
+  const facts = await withForgeApprovalAtHead(read, deps.readReviews, deps.overdeckLogins);
+  // #4066 review: the board's derived `ready` reads this answer (no forge read).
+  recordApprovalAtHead(facts);
   const ciTestsRequired = facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId);
   let uatRequired = false;
   if (facts.uatVerdict?.status === 'failed') {
@@ -97,5 +113,8 @@ export async function evaluateIssueMergeGate(
       uatRequired = true;
     }
   }
-  return { ...evaluateMergeReadiness(facts, { ciTestsRequired, uatRequired }), facts };
+  return {
+    ...evaluateMergeReadiness(facts, { ciTestsRequired, uatRequired, requireApprovalAtHead: true }),
+    facts,
+  };
 }

@@ -1,15 +1,11 @@
 import { useState, useCallback, useMemo } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { ContainerNode, type ContainerNodeProps } from './ContainerNode';
-import { BranchNode, type BranchNodeProps } from './BranchNode';
-import { PrNode, type PrNodeProps } from './PrNode';
 import styles from '../styles/command-deck.module.css';
 
 export interface ResourcesGroupProps {
   issueId: string;
   containers: ContainerNodeProps[];
-  branches: BranchNodeProps[];
-  prs: PrNodeProps[];
   defaultExpanded?: boolean;
   onContainerAction?: (action: string, containerName: string) => void;
 }
@@ -43,8 +39,6 @@ function countLabel(count: number, singular: string, plural: string): string {
 export function ResourcesGroup({
   issueId,
   containers,
-  branches,
-  prs,
   defaultExpanded = false,
   onContainerAction,
 }: ResourcesGroupProps) {
@@ -59,33 +53,14 @@ export function ResourcesGroup({
     writeExpanded(issueId, next);
   }, [expanded, issueId]);
 
-  const summary = useMemo(() => {
-    const parts: string[] = [];
-    if (containers.length > 0) parts.push(countLabel(containers.length, 'container', 'containers'));
-    if (prs.length > 0) parts.push(countLabel(prs.length, 'PR', 'PRs'));
-    if (branches.length > 0) parts.push(countLabel(branches.length, 'branch', 'branches'));
-    return parts.join(' · ');
-  }, [containers.length, prs.length, branches.length]);
+  const summary = useMemo(() => countLabel(containers.length, 'container', 'containers'), [containers.length]);
 
   const sortedContainers = useMemo(
     () => [...containers].sort((a, b) => a.serviceName.localeCompare(b.serviceName)),
     [containers],
   );
 
-  const sortedPrs = useMemo(
-    () => [...prs].sort((a, b) => a.number - b.number),
-    [prs],
-  );
-
-  const sortedBranches = useMemo(
-    () => [...branches].sort((a, b) => {
-      if (a.isLocal !== b.isLocal) return a.isLocal ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    }),
-    [branches],
-  );
-
-  if (containers.length === 0 && prs.length === 0 && branches.length === 0) {
+  if (containers.length === 0) {
     return null;
   }
 
@@ -98,7 +73,7 @@ export function ResourcesGroup({
         title={expanded ? 'Collapse resources' : 'Expand resources'}
       >
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <span>Resources</span>
+        <span>Containers</span>
         <span className={styles.resourcesGroupSummary}>{summary}</span>
       </button>
 
@@ -114,12 +89,6 @@ export function ResourcesGroup({
               onStart={onContainerAction ? (name) => onContainerAction('start', name) : undefined}
               onInspect={onContainerAction ? (name) => onContainerAction('inspect', name) : undefined}
             />
-          ))}
-          {sortedPrs.map((pr) => (
-            <PrNode key={pr.number} {...pr} />
-          ))}
-          {sortedBranches.map((branch) => (
-            <BranchNode key={branch.name} {...branch} />
           ))}
         </div>
       )}

@@ -57,11 +57,17 @@ function prFixture(head: string, headAt: string, comments: Comment[]): IssuePull
   };
 }
 
-async function factsFor(pr: IssuePullRequestData, logins: readonly string[] = []): Promise<PrFacts> {
+async function factsFor(
+  pr: IssuePullRequestData,
+  logins: readonly string[] = [],
+  kinds: Record<string, { login: string; __typename: string }> = {},
+): Promise<PrFacts> {
   resetPrFactsCache();
   return getPrFacts('PAN-4036', {
     fetchGitHubPr: async () => ({ issueId: 'PAN-4036', pr }),
     overdeckLogins: async () => logins,
+    // GitHub's account type of each comment author, by comment node id.
+    readAuthorKinds: async (ids) => new Map(ids.filter((id) => kinds[id]).map((id) => [id, kinds[id]!])),
   });
 }
 
@@ -70,7 +76,7 @@ function uatComment(
   status: 'passed' | 'failed',
   sha: string | null,
   createdAt: string,
-  author: Pick<Comment, 'author' | 'authorAssociation'> = { author: { login: 'eltmon' }, authorAssociation: 'OWNER' },
+  author: Pick<Comment, 'id' | 'author' | 'authorAssociation'> = { author: { login: 'eltmon' }, authorAssociation: 'OWNER' },
 ): Comment {
   return {
     ...author,
@@ -198,8 +204,8 @@ describe('only trusted authors declare a UAT verdict (#4040 review)', () => {
 
   it("honors a verdict posted as Overdeck's own login", async () => {
     const facts = await factsFor(prFixture(OLD_HEAD, '2026-09-23T10:00:00Z', [
-      uatComment('failed', OLD_HEAD, '2026-09-23T10:30:00Z', { author: { login: 'Overdeck-Bot' }, authorAssociation: 'NONE' }),
-    ]), ['overdeck-bot']);
+      uatComment('failed', OLD_HEAD, '2026-09-23T10:30:00Z', { id: 'IC_1', author: { login: 'Overdeck-Bot' }, authorAssociation: 'NONE' }),
+    ]), ['overdeck-bot'], { IC_1: { login: 'Overdeck-Bot', __typename: 'User' } });
     expect(facts.uatVerdict?.status).toBe('failed');
   });
 

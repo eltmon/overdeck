@@ -193,6 +193,20 @@ property cascades by DOM proximity and doesn't. Full mechanics: guide §4a.
 Mnemonic: **amber = human, blue = machine, emerald = outcome, red = broken,
 purple = specialist verb, cyan = money, neutral = everything else.**
 
+**State tokens (PAN-4197).** Agent-state UI (Agents page badges, Live view rows, glyphs, left
+rails) uses `--state-*`; every other signal use stays on `--info`/`--warning`/`--destructive`/`--success`.
+Each has a `-foreground` text variant (≥ 4.5:1 on every surface, enforced by
+`state-tokens-contrast.test.ts`). Classes: `badge-bg-state-<s>`, `badge-border-state-<s>`,
+`text-state-<s>`, `bg-state-<s>`.
+
+| Token | Always means | Never |
+|---|---|---|
+| `--state-live` (blue) | A machine is working now | green, ever — **live is blue, never green** |
+| `--state-needs-you` (amber) | The operator must act — blocked input, operator pause, ready to merge | machine waits |
+| `--state-stuck` (red) | Stuck or broken — stale, API error, CI failed | idle agents |
+| `--state-waiting` (warm neutral) | Waiting on the pipeline or idle | anything a human must answer |
+| `--state-done` (emerald) | Finished | running agents |
+
 ### Color restraint (data-dense views: kanban, trees, lists)
 
 - **Maximum ONE colored signal per card/row.** When everything is colored,
