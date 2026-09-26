@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4210",
   "created": "2026-09-26T01:39:06.772Z",
-  "updated": "2026-09-26T04:10:46.463Z",
+  "updated": "2026-09-26T04:16:57.144Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-26T04:10:34.827Z"
     },
     "show-freeze-hold": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4210",
-      "claimedAt": "2026-09-26T04:10:46.463Z"
+      "claimedAt": "2026-09-26T04:10:46.463Z",
+      "doneAt": "2026-09-26T04:16:57.144Z"
     }
   }
 }
