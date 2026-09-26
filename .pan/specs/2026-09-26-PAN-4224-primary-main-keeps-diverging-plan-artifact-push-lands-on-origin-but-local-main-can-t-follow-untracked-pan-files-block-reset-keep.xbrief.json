@@ -4,17 +4,17 @@
     "created": "2026-09-26T01:41:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4224: Primary main keeps diverging: plan-artifact push lands on origin but local main can't follow (untracked .pan files block reset --keep)",
-    "updated": "2026-09-26T01:48:40.443Z"
+    "updated": "2026-09-26T04:24:10.036Z"
   },
   "plan": {
     "id": "pan-4224",
     "title": "Primary main keeps diverging: plan-artifact push lands on origin but local main can't follow (untracked .pan files block reset --keep)",
-    "status": "proposed",
+    "status": "running",
     "uid": "7202803d-3d7d-45f8-94e4-8dd58c85a89d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-26T01:41:43Z",
-    "updated": "2026-09-26T01:48:40.443Z",
+    "updated": "2026-09-26T04:24:10.036Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4224",
