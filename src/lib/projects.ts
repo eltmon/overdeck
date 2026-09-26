@@ -73,7 +73,6 @@ import {
 } from './projects-config-write.js';
 import { extractPrefix, parseIssueId } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
-import type { LaneRole } from './overdeck/conversations.js';
 import { findContainingProject, findContainingProjectAsync } from './projects/path-containment.js';
 import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 
@@ -355,8 +354,13 @@ export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationRe
     : { ok: true, config: raw as VersionSyncConfig };
 }
 
-/** Gauntlet lane roles a project may configure (PAN-4223). Mirrors LANE_ROLES without importing the DB module. */
-export const GAUNTLET_ROLE_KEYS = ['builder', 'critic', 'verifier', 'play', 'orchestrator'] as const satisfies readonly LaneRole[];
+/**
+ * Gauntlet lane roles a project may configure (PAN-4223). Mirrors LANE_ROLES
+ * in overdeck/conversations.ts; importing it here would close an import cycle
+ * (conversations → event-store → infra → projects), so lanes/config.ts checks
+ * that the two lists agree.
+ */
+export const GAUNTLET_ROLE_KEYS = ['builder', 'critic', 'verifier', 'play', 'orchestrator'] as const;
 
 export interface GauntletRoleConfig {
   model?: string;

@@ -6,8 +6,12 @@
 import { basename, dirname, join } from 'node:path';
 
 import type { LaneRole } from '../overdeck/conversations.js';
-import { listProjectsAsync, validateGauntletConfig, type GauntletRoleConfig, type ProjectConfig } from '../projects.js';
+import { listProjectsAsync, validateGauntletConfig, type GAUNTLET_ROLE_KEYS, type GauntletRoleConfig, type ProjectConfig } from '../projects.js';
 import { LaneLaunchError } from './types.js';
+
+/** Compile-time check: the configurable role keys are exactly the lane roles. */
+type SameMembers<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+export const GAUNTLET_ROLES_MATCH_LANE_ROLES: SameMembers<(typeof GAUNTLET_ROLE_KEYS)[number], LaneRole> = true;
 
 export interface LaneConfig {
   projectKey: string;
