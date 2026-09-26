@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4212",
   "created": "2026-09-26T01:34:15.993Z",
-  "updated": "2026-09-26T03:47:16.985Z",
+  "updated": "2026-09-26T03:47:29.280Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "head-deletion-probe.ac5": {
       "status": "completed",
       "doneAt": "2026-09-26T03:47:16.984Z"
+    },
+    "temporal-drift-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T03:47:29.280Z"
     }
   }
 }
