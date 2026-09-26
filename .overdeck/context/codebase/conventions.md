@@ -5,7 +5,9 @@
   branch `feature/<issue-lowercase>`. Never `git checkout` inside a workspace; never
   `git stash` (commit, discard, or surface instead).
 - Conventional-commit subjects, lower-case start, ≤100 chars.
-- Quality gates before `pan done`: `npm run typecheck`, `npm run lint`, `npm test`.
+- Quality gates before `pan done`: `npm run typecheck`, `npm run lint`, and
+  `npx vitest run <the test files you touched>`. Never run the full `npm test` on
+  the host: it runs once, on CI, against the PR head (PAN-3965).
 - `bun install` per worktree (never symlink node_modules); rebuild
   `packages/contracts` if touched.
 
@@ -46,4 +48,4 @@
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
 - Frontend tests co-located under `components/**/__tests__/`.
 
-<!-- last-verified: 2026-09-24 -->
+<!-- last-verified: 2026-09-25 -->
