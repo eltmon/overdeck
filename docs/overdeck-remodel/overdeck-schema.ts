@@ -113,7 +113,17 @@ export const conversations = sqliteTable("conversations", {
   handoffDocPath: text("handoff_doc_path"),                      // → ~/.overdeck/handoffs/ (not git)
   handoffTargetConvId: text("handoff_target_conv_id").references((): AnySQLiteColumn => conversations.id),
   clearedToConvId: text("cleared_to_conv_id").references((): AnySQLiteColumn => conversations.id),
-}, (t) => [index("conversations_issue_idx").on(t.issueId)]);
+  // gauntlet lanes (PAN-4223) — launch-time facts written once by the lane door
+  // (parent link + three lane columns) or the fork door (parent link only):
+  parentConversationId: text("parent_conversation_id").references((): AnySQLiteColumn => conversations.id),
+  gauntletRun: text("gauntlet_run"),                             // run key; a run is `WHERE gauntlet_run = ?`, no run table
+  laneKey: text("lane_key"),                                     // null = not a lane (a root or a handoff/fork successor)
+  laneRole: text("lane_role"),                                   // builder | critic | verifier | play | orchestrator
+}, (t) => [
+  index("conversations_issue_idx").on(t.issueId),
+  index("conversations_parent_idx").on(t.parentConversationId),
+  index("conversations_gauntlet_run_idx").on(t.gauntletRun),
+]);
 
 /* conversation_files — the POINTERS to the sacred backing session files. A
  * conversation may span >1 file across harness switches; old files are always

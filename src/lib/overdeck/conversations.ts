@@ -229,6 +229,10 @@ export interface ForkRequest {
   title?: string;
 }
 
+/** Gauntlet lane roles (PAN-4223 glossary). Stored verbatim in `conversations.lane_role`. */
+export const LANE_ROLES = ['builder', 'critic', 'verifier', 'play', 'orchestrator'] as const;
+export type LaneRole = (typeof LANE_ROLES)[number];
+
 export interface LegacyConversation {
   id: number;
   name: string;
@@ -266,6 +270,17 @@ export interface LegacyConversation {
   bareContext: boolean;
   /** PAN-4185: Claude Code skips native CLAUDE.md and auto-memory loading (CLAUDE_CODE_DISABLE_CLAUDE_MDS). */
   skipClaudeMd: boolean;
+  /** PAN-4223: legacy rowid of the launching conversation (lane door) or the
+   * handoff/fork source (successor). Write-once launch-time fact; null = root. */
+  parentConversationId: number | null;
+  /** PAN-4223: the parent's name, joined at read time. */
+  parentConversationName: string | null;
+  /** PAN-4223: run key; a run is the set of rows sharing it. Null unless the row is a lane. */
+  gauntletRun: string | null;
+  /** PAN-4223: the lane's short name inside its run. Null = not a lane (root or successor). */
+  laneKey: string | null;
+  /** PAN-4223: the lane's role. Null unless the row is a lane. */
+  laneRole: LaneRole | null;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -357,6 +372,12 @@ interface LegacyConversationRow {
   project_key: string | null;
   bare_context: number | null;
   skip_claude_md: number | null;
+  parent_conversation_id: string | null;
+  parent_legacy_id: number | null;
+  parent_name: string | null;
+  gauntlet_run: string | null;
+  lane_key: string | null;
+  lane_role: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -394,6 +415,12 @@ const LEGACY_CONVERSATION_SELECT = `
     c.project_key,
     c.bare_context,
     c.skip_claude_md,
+    c.parent_conversation_id,
+    p.rowid AS parent_legacy_id,
+    p.name AS parent_name,
+    c.gauntlet_run,
+    c.lane_key,
+    c.lane_role,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -402,6 +429,7 @@ const LEGACY_CONVERSATION_SELECT = `
       LIMIT 1
     ) AS claude_session_id
   FROM conversations c
+  LEFT JOIN conversations p ON p.id = c.parent_conversation_id
 `;
 
 const AGENT_CONVERSATION_PREFIXES = ['agent-', 'planning-', 'specialist-'];
@@ -509,6 +537,11 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     projectKey: row.project_key ?? null,
     bareContext: row.bare_context === 1,
     skipClaudeMd: row.skip_claude_md === 1,
+    parentConversationId: row.parent_legacy_id ?? null,
+    parentConversationName: row.parent_name ?? null,
+    gauntletRun: row.gauntlet_run ?? null,
+    laneKey: row.lane_key ?? null,
+    laneRole: (row.lane_role as LaneRole | null) ?? null,
   };
 }
 
@@ -633,6 +666,51 @@ export function listArchivedConversations(): LegacyConversation[] {
       ORDER BY c.archived_at DESC, c.created_at DESC`)
     .all() as LegacyConversationRow[];
   return rows.map(rowToLegacyConversation);
+}
+
+/**
+ * PAN-4223: lane rows (lane_key set), archived or not, oldest first. A run's
+ * ledger stays complete after reap archives its lanes (D14), and successors of
+ * a lane are never lanes themselves (D21), so they never appear here.
+ */
+export function listLaneConversations(filter: {
+  run?: string;
+  parentName?: string;
+  key?: string;
+  role?: LaneRole;
+}): LegacyConversation[] {
+  const conditions = ['c.lane_key IS NOT NULL'];
+  const params: string[] = [];
+  if (filter.run !== undefined) { conditions.push('c.gauntlet_run = ?'); params.push(filter.run); }
+  if (filter.parentName !== undefined) { conditions.push('p.name = ?'); params.push(filter.parentName); }
+  if (filter.key !== undefined) { conditions.push('c.lane_key = ?'); params.push(filter.key); }
+  if (filter.role !== undefined) { conditions.push('c.lane_role = ?'); params.push(filter.role); }
+  const rows = overdeckDb()
+    .prepare(`${LEGACY_CONVERSATION_SELECT}
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY c.created_at ASC, c.rowid ASC`)
+    .all(...params) as LegacyConversationRow[];
+  return rows.map(rowToLegacyConversation);
+}
+
+/**
+ * PAN-4223 D21: the row whose standing the lane door judges. Follows parent
+ * links while the current row is a successor (no lane_key, parent set) and
+ * stops at a lane, at a root, or at an already-visited id. Null for an
+ * unknown name.
+ */
+export function resolveEffectiveLauncher(name: string): LegacyConversation | null {
+  let current = getConversationByName(name);
+  if (!current) return null;
+  const visited = new Set<number>([current.id]);
+  while (current.laneKey === null && current.parentConversationId !== null) {
+    if (visited.has(current.parentConversationId)) break;
+    const parent = getConversationById(current.parentConversationId);
+    if (!parent) break;
+    visited.add(parent.id);
+    current = parent;
+  }
+  return current;
 }
 
 export function listArchivedConversationsWithEnrichment(options: ArchivedConversationListOptions = {}): ArchivedConversationWithEnrichment[] {
@@ -813,6 +891,10 @@ export function createConversation(opts: {
   bareContext?: boolean;
   /** PAN-4185: see LegacyConversation.skipClaudeMd. */
   skipClaudeMd?: boolean;
+  /** PAN-4223: name of the launching (lane) or source (successor) conversation. Must exist. */
+  parentName?: string;
+  /** PAN-4223: lane facts; requires parentName. Omitted = a root or a successor. */
+  lane?: { run: string; key: string; role: LaneRole };
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
@@ -820,6 +902,14 @@ export function createConversation(opts: {
   const workspaceId = opts.workspaceId !== undefined
     ? opts.workspaceId
     : (resolveWorkspaceForCwd(opts.cwd)?.id ?? null);
+  // Validate the parent link before the transaction so a bad parent inserts
+  // nothing (and never deletes a same-name row).
+  if (opts.lane && !opts.parentName) throw new Error('a lane needs a parent');
+  let parentId: string | null = null;
+  if (opts.parentName) {
+    parentId = getConversationUuidByName(opts.parentName);
+    if (!parentId) throw new Error(`parent conversation ${opts.parentName} not found`);
+  }
 
   db.transaction(() => {
     db.prepare(`DELETE FROM conversation_files WHERE conversation_id IN (SELECT id FROM conversations WHERE name = ?)`).run(opts.name);
@@ -828,8 +918,8 @@ export function createConversation(opts: {
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
          tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key,
-         bare_context, skip_claude_md)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?)
+         bare_context, skip_claude_md, parent_conversation_id, gauntlet_run, lane_key, lane_role)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -849,6 +939,10 @@ export function createConversation(opts: {
       opts.projectKey ?? null,
       opts.bareContext ? 1 : 0,
       opts.skipClaudeMd ? 1 : 0,
+      parentId,
+      opts.lane?.run ?? null,
+      opts.lane?.key ?? null,
+      opts.lane?.role ?? null,
     );
     if (opts.claudeSessionId) {
       db.prepare(`
