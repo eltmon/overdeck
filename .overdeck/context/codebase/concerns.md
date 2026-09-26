@@ -135,4 +135,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
-<!-- last-verified: 2026-09-20 -->
+- **`git log --all` is not "the repository's history" here.** Overdeck keeps
+  tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and
+  work sessions snapshot their trees there). `--all` walks them, so any file a
+  session ever drafted reads as "tracked", and the walk is slow. Ask history
+  questions of `HEAD` (or a named branch) instead — PAN-4212.
+
+<!-- last-verified: 2026-09-25 -->

@@ -1,0 +1,308 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-25T06:53:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4212: Plan-freshness preflight refuses plans that create new files (false 'references files that no longer exist')",
+    "updated": "2026-09-26T01:33:09.212Z"
+  },
+  "plan": {
+    "id": "pan-4212",
+    "title": "Plan-freshness preflight refuses plans that create new files (false 'references files that no longer exist')",
+    "status": "running",
+    "uid": "7b21977b-0f36-47d3-b13f-2fab8ad373ee",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 3,
+    "created": "2026-09-25T06:53:43Z",
+    "updated": "2026-09-26T01:33:09.212Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4212",
+        "label": "PAN-4212",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4212.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cli",
+      "pan-start",
+      "xbrief",
+      "freshness",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "pan start refuses plans that create files, printing 'references files that no longer exist'. The preflight's isNewFile predicate asks `git log --all -- <path>`, which walks ~30k refs/pan/turn/* checkpoint refs, so any file a session ever drafted counts as tracked (PAN-1641's new files). It also has no time comparison, so a file deleted before the plan was written and deliberately restored reads as drift (PAN-4199's flywheelReveal.ts, deleted 2026-09-18, plan created 2026-09-25). Both needed --skip-freshness; on the auto-start path the refusal lands only in spawn.log.",
+      "Proposal": "A missing files_scope path is drift only when a commit on the workspace HEAD history deleted it after plan.created. Probe with `git log -1 --no-renames --diff-filter=D --format=%ct HEAD -- <path>` in a new CLI-boundary module src/cli/commands/start-freshness.ts; keep the rule pure in src/lib/xbrief/freshness.ts (isDriftedPath, planCreatedEpoch); wire it into pan start replacing everTracked; document the preflight in docs/PIPELINE-GATES.md and reference/troubleshooting.mdx. Verified against the real PAN-4199 and PAN-1641 plans: current rule flags 1 and 4 paths, new rule flags 0; a post-plan deletion is still flagged.",
+      "NonGoals": "- Surfacing pan start refusals in the dashboard UI on the auto-start path (still spawn.log only)\n- Changing --skip-freshness behavior, the formatPlanFreshnessRefusal text, or glob skipping\n- Adding a new-file marker or any new field to the xBRIEF schema or planner prompts\n- A parent-directory-exists heuristic\n- Following renames to suggest a moved file's new path\n- Checking files_scope against branches or refs other than the workspace HEAD"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a temporal git rule (deleted on HEAD after plan.created = drift) instead of a new-file metadata marker or a parent-directory heuristic",
+        "rationale": "The issue offered three mechanisms without naming a default. Parent-dir-exists masks real drift because deleted files' directories usually survive; a metadata marker changes the schema and every planner prompt and does not fix existing plans. The temporal rule fixes both reported plans with no schema change, verified empirically."
+      },
+      {
+        "summary": "Baseline is plan.created, not plan.updated; absent/unparseable created means any HEAD deletion is drift",
+        "rationale": "plan.updated is bumped by later plan writes (lifecycle-io.ts:225) and would hide post-planning drift; auto-synthesized plans stamp created, so the conservative fallback rarely triggers."
+      },
+      {
+        "summary": "Put the git probe in a new CLI sibling module src/cli/commands/start-freshness.ts",
+        "rationale": "Keeps execFileSync out of src/lib (sync-child-process and façade rules), makes the probe testable with a real temp repo, and shrinks start.ts, which sits exactly at its 1265-line file-size allowlist row."
+      },
+      {
+        "summary": "Git failure makes the probe return null (path treated as a creation)",
+        "rationale": "Matches today's behavior, where a failing git log also counts the path as new; the preflight is advisory protection and must not block spawns on environment errors."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-25-PAN-4212-plan-freshness-preflight-refuses-plans-that-create-new-files-false-references-files-that-no-longer-exist.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "head-deletion-probe",
+        "title": "Add HEAD-only git deletion-time probe for the freshness preflight",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:53:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4212",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start-freshness.ts",
+            "src/cli/commands/__tests__/start-freshness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/start-freshness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "start-freshness.test.ts reports all cases passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/start-freshness.ts exporting headDeletionEpoch(workspace), which returns a probe (scope) => number | null running `git log -1 --no-renames --diff-filter=D --format=%ct HEAD -- <scope>` via execFileSync in the workspace; empty output or any git error returns null. Never pass --all. Add src/cli/commands/__tests__/start-freshness.test.ts using a real temp git repo with GIT_COMMITTER_DATE/GIT_AUTHOR_DATE pinned, covering the six cases in PRD WI-1 (never deleted, never existed, deleted at pinned time, renamed away via git mv, path only in a refs/pan/turn/x/y commit made with git commit-tree + git update-ref, non-repo dir). Exact code is in .pan/drafts/pan-4212.md WI-1."
+        },
+        "items": [
+          {
+            "id": "head-deletion-probe.ac1",
+            "title": "Given a temp repo where a.ts was deleted in a commit dated @1790000000, headDeletionEpoch(dir)('a.ts') returns 1790000000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-deletion-probe.ac2",
+            "title": "Given a path renamed away with git mv, the probe returns the rename commit's epoch seconds for the old path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-deletion-probe.ac3",
+            "title": "Given a path that exists only in a commit reachable from refs/pan/turn/x/y and never on HEAD, the probe returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-deletion-probe.ac4",
+            "title": "Given a never-deleted path or a directory that is not a git repo, the probe returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-deletion-probe.ac5",
+            "title": "`grep -F -- \"'--all'\" src/cli/commands/start-freshness.ts` produces no output, so the probe consults HEAD only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "temporal-drift-rule",
+        "title": "Flag only paths HEAD deleted after plan.created and wire the probe into pan start",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:53:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4212",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/freshness.ts",
+            "tests/unit/lib/xbrief/freshness.test.ts",
+            "src/cli/commands/start.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/xbrief/freshness.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "freshness.test.ts reports all cases passed, including the pre-existing three-argument cases",
+            "typecheck completes without errors",
+            "lint exits 0 including lint:file-size"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/xbrief/freshness.ts replace the isNewFile parameter with an optional deletedAtEpoch?: (scope) => number | null probe, export isDriftedPath(deletedAt, baseline) = deletedAt !== null && (baseline === null || deletedAt > baseline) and planCreatedEpoch(plan) (Date.parse(plan.plan.created) floored to seconds, null when absent or unparseable). A missing path is reported when no probe is passed, or when isDriftedPath(probe(scope), baseline) is true; existing paths never call the probe. Update the module header to state the temporal rule. In src/cli/commands/start.ts replace the everTracked block (lines 1159-1165) with a single checkPlanFreshness(plan, workspace, existsSync, headDeletionEpoch(workspace)) call, import headDeletionEpoch from ./start-freshness.js, and drop execFileSync from the child_process import (its only use was everTracked). start.ts must stay at or below 1265 lines (scripts/file-size-allowlist.txt). Extend tests/unit/lib/xbrief/freshness.test.ts with the seven cases in PRD WI-2 without changing existing tests. Before/after code is in .pan/drafts/pan-4212.md WI-2."
+        },
+        "items": [
+          {
+            "id": "temporal-drift-rule.ac1",
+            "title": "isDriftedPath returns false for (null,100), (50,100) and (100,100), and returns true for (150,100) and (150,null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "temporal-drift-rule.ac2",
+            "title": "Given a plan created 2026-09-20T00:00:00Z, checkPlanFreshness reports a missing path deleted at a later epoch and does not report one deleted earlier or never deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "temporal-drift-rule.ac3",
+            "title": "Given a plan with no created field, checkPlanFreshness reports a missing path the probe returns a deletion epoch for",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "temporal-drift-rule.ac4",
+            "title": "When called with three arguments, checkPlanFreshness preserves the old default and reports every missing path; the pre-existing freshness tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "temporal-drift-rule.ac5",
+            "title": "`grep -n \"everTracked\" src/cli/commands/start.ts` produces no output, start.ts imports headDeletionEpoch from ./start-freshness.js, and npm run lint exits 0 with lint:file-size passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "freshness-docs",
+        "title": "Document the plan-freshness preflight drift rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:53:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4212",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "reference/troubleshooting.mdx",
+            "src/cli/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Plan-freshness preflight' docs/PIPELINE-GATES.md",
+            "grep -n 'references files that no longer exist' reference/troubleshooting.mdx",
+            "grep -n 'deleted since it was written' src/cli/index.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "each grep prints a matching line",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a `## Plan-freshness preflight (PAN-3917, PAN-4212)` section to docs/PIPELINE-GATES.md directly before `## Agent Auto-Resume Gates`, covering the points listed in PRD WI-3 item 1 (HEAD-only history, drift = deleted after plan.created, creations and restores pass, refusal text, pan plan <ID> fix, --skip-freshness, spawn.log on the dashboard path). Add a `## pan start refuses: \"references files that no longer exist\"` section to reference/troubleshooting.mdx directly after the `## PR stuck with stale failed checks after main recovers` section. Change the --skip-freshness help text at src/cli/index.ts line 468 to 'Bypass the plan-freshness preflight and spawn even if the plan names files deleted since it was written'."
+        },
+        "items": [
+          {
+            "id": "freshness-docs.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a `## Plan-freshness preflight` section stating that pan start refuses a path only when a commit on HEAD deleted it after plan.created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "freshness-docs.ac2",
+            "title": "The PIPELINE-GATES.md section contains the reason history comes from HEAD only (refs/pan/turn/* checkpoint refs hold every drafted file) and names --skip-freshness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "freshness-docs.ac3",
+            "title": "reference/troubleshooting.mdx contains a section whose heading includes `references files that no longer exist` and that tells the reader to re-plan with pan plan <ID>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "freshness-docs.ac4",
+            "title": "`pan start --help` prints the --skip-freshness description 'spawn even if the plan names files deleted since it was written'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "head-deletion-probe",
+        "to": "temporal-drift-rule",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

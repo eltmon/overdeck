@@ -40,6 +40,17 @@ gh run rerun <run-id> --failed
 After GitHub reports the new result, the existing merge-blocker reconciliation
 poll clears the stale blocker within about 10 minutes.
 
+## pan start refuses: "references files that no longer exist"
+
+`pan start` runs a plan-freshness preflight right before it spawns a work
+agent: it refuses a missing `files_scope` path only when a commit on the
+workspace's `HEAD` deleted that path *after* the plan was created. If the
+listed files really did move or get deleted since planning, re-plan against
+the current tree with `pan plan <ID>`. If the files are ones the plan
+legitimately creates or restores, the preflight should already let it
+through — `--skip-freshness` spawns the agent anyway without waiting for a
+re-plan.
+
 ## WSL2 Stability Issues (Windows Users)
 
 WSL2 can experience crashes and networking issues, especially under heavy AI agent workloads. Here are recommended `.wslconfig` settings to improve stability.
