@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T08:15:48.149Z",
+  "updated": "2026-09-26T08:16:00.088Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -560,6 +560,10 @@
     "critic-link-column.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T08:15:48.148Z"
+    },
+    "lane-verdict-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:16:00.087Z"
     }
   }
 }
