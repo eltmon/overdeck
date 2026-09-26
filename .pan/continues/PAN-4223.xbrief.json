@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T05:15:26.813Z",
+  "updated": "2026-09-26T05:15:32.662Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
       "claimedBy": "agent-pan-4223",
       "claimedAt": "2026-09-26T05:11:56.870Z",
       "doneAt": "2026-09-26T05:15:26.813Z"
+    },
+    "lane-cli": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:15:32.662Z"
     }
   }
 }
