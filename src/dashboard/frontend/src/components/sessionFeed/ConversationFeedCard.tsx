@@ -25,6 +25,7 @@ const AGENT_LABELS: Record<string, string> = {
   codex: 'Codex',
   kimi_code: 'Kimi Code',
   acp: 'Kimi',
+  prime_agent: 'Prime Agent',
   unknown: 'Unknown',
 };
 
@@ -78,6 +79,7 @@ function harnessForFeedAgent(agent: string): Harness {
   if (agent === 'codex') return 'codex';
   if (agent === 'acp') return 'acp';
   if (agent === 'kimi_code' || agent === 'kimi-code') return 'kimi-code';
+  if (agent === 'prime_agent' || agent === 'prime-agent') return 'prime-agent';
   return 'claude-code';
 }
 

@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react';
+import { Cpu, Sparkles } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 import type { Harness, Provider } from '../../Settings/types';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
@@ -129,6 +129,7 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   ohmypi: { id: 'ohmypi', label: 'oh-my-pi', color: '#7c3aed', Icon: PiHarnessIcon },
   acp: { id: 'acp', label: 'ACP', color: '#475569', Icon: AcpHarnessIcon },
   'kimi-code': { id: 'kimi-code', label: 'Kimi Code', color: PROVIDER_BRANDS.kimi.color, Icon: KimiIcon },
+  'prime-agent': { id: 'prime-agent', label: 'Prime Agent', color: '#475569', Icon: Cpu },
 };
 
 export const PROVIDER_COLORS: Record<Provider, string> = Object.fromEntries(

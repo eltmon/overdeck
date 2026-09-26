@@ -29,6 +29,7 @@ const HARNESS_ROW_LABELS = {
   'kimi-code': 'Kimi Code CLI',
   muse: 'Muse Code',
   acp: 'ACP (Kimi Code)',
+  'prime-agent': 'Prime Agent',
 } as const;
 
 type RowBase = {

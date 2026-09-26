@@ -5,7 +5,7 @@ import type { ConfigurableProvider } from '../../../../../lib/configurable-provi
 export type Provider = ConfigurableProvider;
 
 export type ModelId = string;
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode' | 'prime-agent';
 export type HarnessOverride = Harness | '';
 export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 export type XBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';

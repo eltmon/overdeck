@@ -131,6 +131,7 @@ describe('chat ModelPicker live harness labels', () => {
     expect(within(screen.getByRole('button', { name: /^ACP/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^Kimi Code/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^Muse Code/i })).getByText('Experimental')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /^Prime Agent/i })).getByText('Experimental')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
@@ -138,6 +139,7 @@ describe('chat ModelPicker live harness labels', () => {
     expect(screen.getByLabelText('Kimi Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('OpenCode logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Muse Code logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Prime Agent logo')).toBeInTheDocument();
     // Every harness row except the current one (claude-code) carries the
     // experimental warning — derive the count so a new harness option does
     // not silently break this assertion.
