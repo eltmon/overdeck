@@ -562,6 +562,19 @@ Auto-resume is intentionally suppressible:
   `memoryWarnGb`/`memoryBlockGb` thresholds with no hysteresis. This is
   separate from `--no-resume`, which suppresses resume outright regardless
   of memory.
+- **Operator-started exemption (PAN-1812, PAN-3634):** when
+  `exempt_operator_started` is on, the emergency brake
+  (`concurrency.ts:emergencyBrake`) and the memory governor's shed
+  (`memory-governor.ts:selectAgentToPause`) reap only agents whose
+  `startedBy` starts with `flywheel:` (`isFlywheelStartedBy` in
+  `agents/provenance.js`) — never on a stale `flywheelRunId` field, which is
+  inert legacy data. The Flywheel conversation mints `flywheel:conv-flywheel`
+  from `OVERDECK_CONVERSATION`; the planning auto-handoff and its deferred
+  retry copy that token only when the planning session it hands off from was
+  itself Flywheel-started, and send `planning-auto-handoff` (an operator
+  origin) otherwise. Every other origin — an operator's `pan start`, a
+  worker, a reconciler — is exempt, which is what lets a deliberate operator
+  spawn survive the cap.
 - **Deferred planning hand-off (PAN-4155):** when planning finalizes with
   auto-start, the first POST `/api/agents` acknowledges tight RAM and a high
   agent count only (PAN-3977). If a guardrail still refuses it (the agent
