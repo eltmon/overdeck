@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4224",
   "created": "2026-09-26T04:24:30.327Z",
-  "updated": "2026-09-26T05:18:53.299Z",
+  "updated": "2026-09-26T05:19:05.341Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "draft-promote-workspace.ac2": {
       "status": "completed",
       "doneAt": "2026-09-26T05:18:53.298Z"
+    },
+    "draft-promote-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:19:05.341Z"
     }
   }
 }
