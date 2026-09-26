@@ -102,7 +102,9 @@ export function classifyEntry(entry: DirectoryEntry, facts: LiveFacts, now: Date
     return reason('question', 'needs-you', 'needs-you', 'question waiting', facts.pendingQuestionPrompt || null);
   }
   if (entry.pause?.by === 'operator') return reason('paused', 'needs-you', 'needs-you', 'paused by you', entry.pause.reason);
-  if (derived?.attention === 'api-error') return reason('api-error', 'needs-you', 'stuck', 'API error or usage limit');
+  if (derived?.attention === 'api-error' || entry.providerError) {
+    return reason('api-error', 'needs-you', 'stuck', 'API error or usage limit', entry.providerError?.message ?? null);
+  }
   if (derived?.attention === 'stuck' && entry.state === 'idle') {
     const age = idleAge(entry.lastActivityAt, now);
     return reason('stuck', 'needs-you', 'stuck', age === null ? 'stuck' : `stuck · idle ${age}`);
@@ -123,6 +125,7 @@ export function classifyEntry(entry: DirectoryEntry, facts: LiveFacts, now: Date
 }
 
 function sinceOf(entry: DirectoryEntry, why: LiveReason, facts: LiveFacts): string | null {
+  if (why.kind === 'api-error' && entry.providerError) return entry.providerError.at;
   if (why.kind === 'paused' || why.kind === 'held') return entry.pause?.since ?? entry.lastActivityAt;
   if (why.section === 'live') return facts.runtime?.lastActivity ?? entry.lastActivityAt;
   return entry.lastActivityAt;

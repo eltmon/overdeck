@@ -112,6 +112,33 @@ describe('classifyEntry — precedence conflicts', () => {
   });
 });
 
+describe('classifyEntry — conversation provider error (PAN-4222)', () => {
+  it('ac2: an idle conversation with providerError classifies into Needs you, since the error time', () => {
+    const subject = entry({
+      id: 'conv:a', kind: 'conversation', role: null, state: 'idle',
+      providerError: { message: 'Your account has insufficient credits.', at: '2026-09-25T11:55:00.000Z' },
+    });
+    expect(classifyEntry(subject, {}, NOW)).toMatchObject({
+      section: 'needs-you', kind: 'api-error', tone: 'stuck', detail: 'Your account has insufficient credits.',
+    });
+    const sections = buildLiveSections([subject], () => ({}), NOW);
+    expect(sections.needsYou[0]!.since).toBe('2026-09-25T11:55:00.000Z');
+  });
+
+  it('ac3: the same entry without providerError classifies into idle', () => {
+    const subject = entry({ id: 'conv:a', kind: 'conversation', role: null, state: 'idle' });
+    expect(classifyEntry(subject, {}, NOW).section).toBe('idle');
+  });
+
+  it('ac4: a blocked conversation with providerError still reads question waiting', () => {
+    const subject = entry({
+      id: 'conv:a', kind: 'conversation', role: null, state: 'blocked',
+      providerError: { message: 'Your account has insufficient credits.', at: '2026-09-25T11:55:00.000Z' },
+    });
+    expect(classifyEntry(subject, {}, NOW)).toMatchObject({ kind: 'question', label: 'question waiting' });
+  });
+});
+
 describe('buildLiveSections', () => {
   it('nests a subagent under its parent row and drops one whose parent is absent', () => {
     const sections = buildLiveSections([
