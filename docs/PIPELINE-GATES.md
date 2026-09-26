@@ -533,6 +533,13 @@ Auto-resume is intentionally suppressible:
     owed. Stalled-review recovery re-requests it (see below), which covers an
     unpause whose re-request failed, an unpause while the dashboard was down,
     `pan start --force`, and dashboard Start with `clearGates`.
+- **Troubled gate (PAN-4211):** `applyAgentFailure` sets `troubled` (plus
+  `troubledAt` and the failure-tracking fields) after three consecutive
+  resume/start failures within ten minutes. It blocks `pan start`, `pan
+  resume`, dashboard Start and MERGE until cleared. `pan untroubled <id>`
+  clears the flag and the failure counters without spawning. `pan start
+  <id> --force` (and dashboard Start with `clearGates`) clears it and starts
+  in one step. Both doors record an `untroubled` operator intervention.
 - **Operator-stop gate:** `stoppedByUser` blocks autonomous re-drive when no
   completed handoff exists and emits one durable needs-you trip. Only an
   operator-initiated stop sets the flag (PAN-3324) — `pan kill`, `pan

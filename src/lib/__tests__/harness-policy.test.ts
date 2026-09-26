@@ -175,6 +175,16 @@ describe('canUseHarness', () => {
     },
   )
 
+  // GPT-6 Sol/Luna publish API pricing and report supported_in_api true in the
+  // Codex catalog, so (like gpt-6-astra) they are NOT subscription-only.
+  it.each(['gpt-6-sol', 'gpt-6-luna'] as const)(
+    'allows %s + api-key on the codex harness (published API model)',
+    (model) => {
+      expect(canUseHarness('codex', model, 'api-key')).toEqual({ allowed: true })
+      expect(canUseHarness('codex', model, 'subscription')).toEqual({ allowed: true })
+    },
+  )
+
   it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
     'allows %s + subscription on every supported non-ACP harness',
     (model) => {

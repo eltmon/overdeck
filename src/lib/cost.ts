@@ -114,6 +114,9 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // OpenAI — prices per developers.openai.com/api/docs/pricing (May 2026);
   // gpt-6-astra per developers.openai.com/api/docs/models/gpt-6-astra (Sept 2026)
   { provider: 'openai', model: 'gpt-6-astra', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.001, currency: 'USD' },
+  // gpt-6-sol / gpt-6-luna per developers.openai.com/api/docs/models/gpt-6-sol and /gpt-6-luna (2026-09-22)
+  { provider: 'openai', model: 'gpt-6-sol', inputPer1k: 0.002, outputPer1k: 0.010, cacheReadPer1k: 0.0002, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-6-luna', inputPer1k: 0.0001, outputPer1k: 0.0005, cacheReadPer1k: 0.00001, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.6-sol', inputPer1k: 0.005, outputPer1k: 0.030, cacheReadPer1k: 0.0005, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.6-terra', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
   { provider: 'openai', model: 'gpt-5.6-luna', inputPer1k: 0.001, outputPer1k: 0.006, cacheReadPer1k: 0.0001, currency: 'USD' },

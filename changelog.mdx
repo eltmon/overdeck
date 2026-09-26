@@ -1,0 +1,131 @@
+---
+title: "Changelog"
+description: "What changed in each Overdeck release, starting with v0.60.0."
+rss: true
+---
+
+Overdeck ships to npm as [`@overdeck/core`](https://www.npmjs.com/package/@overdeck/core). Install or upgrade with `npm install -g @overdeck/core@latest`, then run `pan install` so the terminal backend and synced skills match the new version.
+
+This page starts at v0.60.0, the release that removed Overdeck's state layer. Older releases are listed on [GitHub Releases](https://github.com/eltmon/overdeck/releases).
+
+{/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". */}
+
+<Update label="v0.62.0" description="2026-09-26">
+  #### New
+
+  - **GPT-6 Sol and GPT-6 Luna:** OpenAI's new `gpt-6-sol` and `gpt-6-luna` are in the OpenAI provider, the model pickers and the cost tables, with the Codex 272K context limit applied. Defaults and routing are unchanged; pick them per role. ([#4234](https://github.com/eltmon/overdeck/pull/4234))
+  - The Agents page opens on a **Live** view: running and in-pipeline agents are grouped into Needs you, Live and Waiting, each with one reason, in resizable panes with a collapsible preview and a new set of agent state colors. ([#4216](https://github.com/eltmon/overdeck/pull/4216))
+  - Start a **bare conversation** from the Command Deck with the "No context" checkbox: no Overdeck-injected context and a faster spawn. ([#4187](https://github.com/eltmon/overdeck/pull/4187))
+  - Pull requests are linked to conversations by branch, so a conversation shows the PR it produced. ([#4067](https://github.com/eltmon/overdeck/pull/4067))
+  - Subagents take direct input from their own composer and show a live working indicator. ([#3788](https://github.com/eltmon/overdeck/pull/3788))
+  - A project row shows the progress of a `pan reload` deploy while it builds and restarts. ([#4094](https://github.com/eltmon/overdeck/pull/4094))
+  - Conversations and `pan handoff` run through the terminal backend, so they live in Herdr panes like every other agent. ([#4104](https://github.com/eltmon/overdeck/pull/4104))
+
+  #### Improved
+
+  - **Merge train restored:** approved, green, mergeable PRs that opted into auto-merge are scheduled and merged on the merge-train tick again, and `pan merge cancel` uses the merge-train routes. ([#4066](https://github.com/eltmon/overdeck/pull/4066), [#4111](https://github.com/eltmon/overdeck/pull/4111))
+  - **Faster CLI startup:** `pan` loads each command's code only when that command runs, so `pan --version` drops from about 560 ms to 180 ms. ([#4205](https://github.com/eltmon/overdeck/pull/4205))
+  - The Command Deck issue tree shows a real state badge instead of "Allocated", one status signal per row, and each resource once as an icon cluster. ([#4218](https://github.com/eltmon/overdeck/pull/4218))
+  - Board routes no longer wait on `gh pr list` or per-agent derivation, so the parked and auto-merge views load quickly. ([#4091](https://github.com/eltmon/overdeck/pull/4091))
+  - An issue that was closed out renders as shipped, with its history, instead of as never started. ([#4078](https://github.com/eltmon/overdeck/pull/4078))
+  - The status-bar emergency stop shows what it stopped. ([#4125](https://github.com/eltmon/overdeck/pull/4125))
+  - The conversation feed shows ACP agents' thinking, prompt failures and stalled turns as their own rows. ([#4142](https://github.com/eltmon/overdeck/pull/4142), [#4141](https://github.com/eltmon/overdeck/pull/4141), [#4152](https://github.com/eltmon/overdeck/pull/4152))
+  - Skills, CLI docs and agent-facing messages name only `pan` verbs that exist after the Cut. ([#4143](https://github.com/eltmon/overdeck/pull/4143), [#4158](https://github.com/eltmon/overdeck/pull/4158))
+  - `pan doctor` flags a stale `pan sync` source checkout, and `pan sync` prunes git hooks that were deleted upstream. ([#4148](https://github.com/eltmon/overdeck/pull/4148), [#4161](https://github.com/eltmon/overdeck/pull/4161))
+  - **Dependency security updates:** an in-range refresh with security overrides clears most `bun audit` advisories, the desktop build moves to electron-builder 26 to clear a critical `tar` advisory, and the pinned CLIProxyAPI moves to v7.3.16. ([#4202](https://github.com/eltmon/overdeck/pull/4202), [#4214](https://github.com/eltmon/overdeck/pull/4214), [#4159](https://github.com/eltmon/overdeck/pull/4159))
+  - Internal cleanup: the remaining hardcoded model fallbacks are gone (an unset model now resolves through role routing), and dead sub-roles, stores and `pan inspect` leftovers are removed. ([#4164](https://github.com/eltmon/overdeck/pull/4164), [#4170](https://github.com/eltmon/overdeck/pull/4170), [#4080](https://github.com/eltmon/overdeck/pull/4080))
+
+  #### Fixed
+
+  - **Planning hand-off guardrails:** a planning auto-handoff acknowledges advisory guardrails, and a hand-off the guardrails refuse is retried instead of dropped. ([#4135](https://github.com/eltmon/overdeck/pull/4135), [#4177](https://github.com/eltmon/overdeck/pull/4177))
+  - A "troubled" agent can be cleared again: `pan untroubled <id>` is back, and `pan start --force` also clears the gate. ([#4228](https://github.com/eltmon/overdeck/pull/4228))
+  - Herdr agents show up everywhere: `pan status`, the agent output API, god view liveness, skills and attach hints now read the Herdr backend, and Herdr issue workspaces are found again after a restore. ([#4103](https://github.com/eltmon/overdeck/pull/4103), [#4089](https://github.com/eltmon/overdeck/pull/4089), [#4093](https://github.com/eltmon/overdeck/pull/4093), [#4072](https://github.com/eltmon/overdeck/pull/4072), [#4099](https://github.com/eltmon/overdeck/pull/4099))
+  - Stopping an agent or reaping an idle one closes its Herdr panes, and finished review and one-shot role runs are reaped on Herdr. ([#4076](https://github.com/eltmon/overdeck/pull/4076), [#4162](https://github.com/eltmon/overdeck/pull/4162), [#4175](https://github.com/eltmon/overdeck/pull/4175))
+  - Only Overdeck's own agent panes count toward the work-agent limit. ([#4207](https://github.com/eltmon/overdeck/pull/4207))
+  - Review synthesis is re-dispatched when every lane reported but the parent died, and pausing an issue also holds its review convoy. ([#4153](https://github.com/eltmon/overdeck/pull/4153), [#4150](https://github.com/eltmon/overdeck/pull/4150))
+  - The Request review menu's Full, Quick and None choice applies to the run it starts. ([#4120](https://github.com/eltmon/overdeck/pull/4120))
+  - Repeated identical UAT failures escalate once instead of looping. ([#4063](https://github.com/eltmon/overdeck/pull/4063))
+  - An idle agent resumes after "Connection lost mid-response". ([#4178](https://github.com/eltmon/overdeck/pull/4178))
+  - An unfinished workspace setup resumes instead of starting the agent inside it, and every Claude Code launch is pre-trusted before it starts. ([#4176](https://github.com/eltmon/overdeck/pull/4176), [#4163](https://github.com/eltmon/overdeck/pull/4163), [#4144](https://github.com/eltmon/overdeck/pull/4144))
+  - Workspace teardown removes its Docker Compose networks, and orphaned workspace networks are swept. ([#4181](https://github.com/eltmon/overdeck/pull/4181))
+  - `pan reload` carries the running dashboard's boot gates. ([#4179](https://github.com/eltmon/overdeck/pull/4179))
+  - The "Reconnecting" banner clears after a restart, and the sidebar refetches projects and conversations on reconnect. ([#4075](https://github.com/eltmon/overdeck/pull/4075), [#4082](https://github.com/eltmon/overdeck/pull/4082))
+  - Conversation search skips deleted transcripts, recovers from watcher errors, and opens hits from unregistered and subagent conversations. ([#4157](https://github.com/eltmon/overdeck/pull/4157), [#4194](https://github.com/eltmon/overdeck/pull/4194), [#4087](https://github.com/eltmon/overdeck/pull/4087))
+  - A transient pipeline-membership failure is retried instead of latching an error banner. ([#4092](https://github.com/eltmon/overdeck/pull/4092), [#4190](https://github.com/eltmon/overdeck/pull/4190))
+  - Keystrokes typed on `/projects/new` before the backend settles are kept. ([#4147](https://github.com/eltmon/overdeck/pull/4147))
+  - Merged strikes clean up their pane, worktree and branch. ([#4070](https://github.com/eltmon/overdeck/pull/4070))
+  - Every GitHub App API request has a timeout. ([#4060](https://github.com/eltmon/overdeck/pull/4060))
+  - JSONL transcripts outside vendor cleanup roots are preserved. ([#3817](https://github.com/eltmon/overdeck/pull/3817))
+
+  [Compare v0.61.0...v0.62.0](https://github.com/eltmon/overdeck/compare/v0.61.0...v0.62.0)
+</Update>
+
+<Update label="v0.61.0" description="2026-09-24">
+  #### New
+
+  - **Agents directory** at `/agents`: a tree of local, remote and project agents with a list and a conversation, issue and PR context pane. Agents launched by other tools appear there too. ([#4022](https://github.com/eltmon/overdeck/pull/4022), [#4038](https://github.com/eltmon/overdeck/pull/4038))
+  - `pan worker run | wait | report | list`: delegate work to a registered, issue-linked worker agent that reports back. ([#4027](https://github.com/eltmon/overdeck/pull/4027))
+  - Attach the native Codex or OpenCode terminal UI to a running conversation. ([#4028](https://github.com/eltmon/overdeck/pull/4028), [#4025](https://github.com/eltmon/overdeck/pull/4025))
+  - The **Flywheel** page is back, derived from live data instead of a stored run record. ([#3999](https://github.com/eltmon/overdeck/pull/3999))
+
+  #### Improved
+
+  - **One merge gate.** Every merge path (the merge-ready set, the dashboard Merge button, auto-merge, the merge train and the per-project queue) asks the same question. A CI-mode project needs its CI test job to succeed on the PR head, and a failed UAT verdict for the current head blocks merge until a later pass. ([#4040](https://github.com/eltmon/overdeck/pull/4040))
+  - Review and UAT verdict markers in PR comments count only from the repository's owners, members and collaborators, or from Overdeck's own identity. ([#4040](https://github.com/eltmon/overdeck/pull/4040))
+  - `pan handoff`, the memory governor, `pan start --fresh` and stuck-agent force kill stop agents through the terminal backend, closing their Herdr panes. ([#4048](https://github.com/eltmon/overdeck/pull/4048))
+  - Approving a merge after `origin/main` moved returns a clear 409 with both SHAs and recovery steps. ([#4041](https://github.com/eltmon/overdeck/pull/4041))
+  - Internal cleanup: the Effect façade layer was cut back to plain Promise and synchronous functions. Some `@overdeck/core` exports were removed or renamed; the full list is in [CHANGELOG.md](https://github.com/eltmon/overdeck/blob/main/CHANGELOG.md). ([#4006](https://github.com/eltmon/overdeck/pull/4006), [#4057](https://github.com/eltmon/overdeck/pull/4057))
+
+  #### Fixed
+
+  - A failed UAT is relayed to the work agent again. ([#4033](https://github.com/eltmon/overdeck/pull/4033))
+  - The stuck pause holds, and repeated verdict feedback is sent once. ([#4039](https://github.com/eltmon/overdeck/pull/4039))
+  - Background subagents keep running until they finish. ([#4054](https://github.com/eltmon/overdeck/pull/4054))
+  - The question dialog resets its answer for each new question. ([#4058](https://github.com/eltmon/overdeck/pull/4058))
+  - Conversation lifecycle events are attributed to the right launch and row. ([#4005](https://github.com/eltmon/overdeck/pull/4005))
+  - Planning, resume and recovery relaunches close the review gaps left by the Herdr move. ([#4018](https://github.com/eltmon/overdeck/pull/4018))
+  - Flywheel's in-flight list excludes merged and closed issues. ([#4004](https://github.com/eltmon/overdeck/pull/4004))
+  - Plan homes with a legacy `.pan/` gitignore rule are repaired. ([#3998](https://github.com/eltmon/overdeck/pull/3998))
+  - Desktop builds ship again. ([#3997](https://github.com/eltmon/overdeck/pull/3997))
+
+  [Compare v0.60.0...v0.61.0](https://github.com/eltmon/overdeck/compare/v0.60.0...v0.61.0)
+</Update>
+
+<Update label="v0.60.0" description="2026-09-23">
+  ## The Cut
+
+  Overdeck no longer keeps its own copy of pipeline state. Where an issue stands is read live from git, the issue tracker, the pull request and the terminal backend, so the dashboard can no longer drift from reality. Every feature stays; only the state layer is gone. [docs/THE-CUT.md](https://github.com/eltmon/overdeck/blob/main/docs/THE-CUT.md) maps each removed piece to its new home. ([#3917](https://github.com/eltmon/overdeck/issues/3917))
+
+  What this changes for you:
+
+  - **Herdr is the default terminal backend.** `pan install`, `pan sync`, `pan up` and `pan doctor` install and check Herdr for you. tmux is still supported through `terminal.backend: tmux`. See [Terminal backend](/configuration/terminal-backend). ([#3995](https://github.com/eltmon/overdeck/pull/3995))
+  - **Planning artifacts live in your repo.** Drafts, specs, continues, orders and the backlog sequence are committed under `.pan/` in the project (or its plan home), not in a separate state worktree. `pan admin migrate-plan-home <project>` copies open issues' artifacts across.
+  - **Merge readiness comes from the PR.** It is PR approvals, green checks and forge mergeability. Review verdicts are PR reviews, posted by the GitHub App.
+  - **Retired commands.** `pan approve` becomes `gh pr review --approve` or the dashboard Merge button, `pan review pending` becomes `gh pr list`, and `pan inspect`, `pan reset-to-planned`, `pan unstick`, `pan review resync/reset` and `pan copy-config` are gone because there is no stored state left for them to act on.
+  - **Simpler background supervisor.** The patrol loop is now four routines: nudge stuck work, nudge on API errors, reconcile liveness, and reap closed issues.
+
+  #### New
+
+  - Each issue keeps an append-only pipeline journal that `pan show` prints, and the work agent is told when verification passes instead of polling. ([a4fb7a4](https://github.com/eltmon/overdeck/commit/a4fb7a46abe))
+  - Tests run once per push on CI, plus the touched tests locally, instead of the full suite on the host. ([#3993](https://github.com/eltmon/overdeck/pull/3993))
+  - Claude Opus 5.5 support across launch, routing, model pickers and cost reporting. ([#3985](https://github.com/eltmon/overdeck/pull/3985))
+  - A Conversations scope in the Ctrl-K command palette. ([#3933](https://github.com/eltmon/overdeck/pull/3933))
+  - The `pan-open-threads` skill collects your unfinished threads across conversations into one checkable page. ([d35b93e](https://github.com/eltmon/overdeck/commit/d35b93ea3dd))
+
+  #### Improved
+
+  - Dashboard menus and popovers share one style, keyboard navigation, positioning and focus handling. ([#3945](https://github.com/eltmon/overdeck/pull/3945))
+  - The backlog page is one ordered list without the Now, Next, Later and Someday bands, and it loads in a fraction of the time. ([7110e02](https://github.com/eltmon/overdeck/commit/7110e02356e), [#3978](https://github.com/eltmon/overdeck/pull/3978))
+  - Transcripts stay findable: each session records its transcript path when it starts, and closing an issue keeps agent state and transcripts. ([#3976](https://github.com/eltmon/overdeck/pull/3976), [#3951](https://github.com/eltmon/overdeck/pull/3951), [#3979](https://github.com/eltmon/overdeck/pull/3979))
+  - Strikes open a PR for you to merge. ([#3987](https://github.com/eltmon/overdeck/pull/3987))
+
+  #### Fixed
+
+  - Stopping an agent closes its Herdr pane. ([#3989](https://github.com/eltmon/overdeck/pull/3989))
+  - OpenCode conversations show their saved history, start and resume on Herdr, and recover from stalled permission prompts. ([#3986](https://github.com/eltmon/overdeck/pull/3986), [#3991](https://github.com/eltmon/overdeck/pull/3991), [#3970](https://github.com/eltmon/overdeck/pull/3970))
+  - Merge-train batches assemble again, fail loudly, and stop after three consecutive failures. ([#3972](https://github.com/eltmon/overdeck/pull/3972))
+  - The command palette shows a search error instead of "No results" when the request fails. ([#3980](https://github.com/eltmon/overdeck/pull/3980))
+  - A handed-off agent can resume its saved session. ([e35d03e](https://github.com/eltmon/overdeck/commit/e35d03e1a51))
+
+  [Compare v0.51.0...v0.60.0](https://github.com/eltmon/overdeck/compare/v0.51.0...v0.60.0)
+</Update>

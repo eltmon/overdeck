@@ -4,7 +4,7 @@ Picker context labels describe the configured session budget. They are not a cla
 
 | Models | Configured tokens | Evidence and constraints |
 | --- | ---: | --- |
-| GPT-6 Astra; GPT-5.6 Sol, Terra, Luna | 272,000 | Installed Codex catalog default; explicit managed `model_context_window` pin. |
+| GPT-6 Astra, Sol, Luna; GPT-5.6 Sol, Terra, Luna | 272,000 | Installed Codex catalog default (GPT-6 Sol/Luna: Codex 0.157.1 catalog, 272,000 default / 872,000 max); explicit managed `model_context_window` pin. |
 | GPT-5.6 `[372k]` choices | 372,000 | Explicit opt-in; launch strips the Overdeck suffix while retaining the larger configuration. |
 | Fable 5.1, Fable 5, Opus 5.5/5/4.8/4.7, Sonnet 5 | 1,000,000 | Native 1M models. Claude account restrictions or a disabled-1M setting can reduce this. |
 | Opus 4.6, Sonnet 4.6, Haiku 4.5 | 200,000 | Conservative managed budget; older extended-context entitlements vary by plan. |
@@ -43,6 +43,8 @@ Kimi's bare Overdeck `k3` historically denotes the smaller window. It now transl
 ## Sources
 
 - [OpenAI Astra API model](https://developers.openai.com/api/docs/models/gpt-6-astra)
+- [OpenAI GPT-6 Sol API model](https://developers.openai.com/api/docs/models/gpt-6-sol): `gpt-6-sol`, 1.05M context, 128K maximum output, $2/M input, $0.20/M cached input, $10/M output; >272K input bills 2x input / 1.5x output.
+- [OpenAI GPT-6 Luna API model](https://developers.openai.com/api/docs/models/gpt-6-luna): `gpt-6-luna`, 1.05M context, 128K maximum output, $0.10/M input, $0.01/M cached input, $0.50/M output; same long-input tier.
 - [Codex configuration reference](https://developers.openai.com/codex/config-reference)
 - [Claude Code model, effort, and context configuration](https://code.claude.com/docs/en/model-config): Fable 5.1 requires Claude Code 2.1.255 or newer. Availability depends on the account.
 - [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview): `claude-opus-5-5`, 1M context, 128K maximum output, $4/M input, $20/M output, and $0.20/M cache reads.

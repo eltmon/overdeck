@@ -1,10 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 815_
+_Last sequenced: 2026-09-26T08:23:05.530794Z · model: claude-opus-5-5 · open: 771_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 16 | PAN-4224 | M | critical | ok |  |  | Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write |
+| 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4221 | S | critical | ok |  |  | A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train |
 | 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
@@ -12,9 +14,11 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
-| 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
-| 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
-| 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
+| 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
+| 26 | PAN-4225 | M | critical | ok |  |  | Feedback/continue/spec writers dirty the primary checkout and never commit, so main cannot fast-forward (split from PAN-4224) |
+| 27 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
+| 28 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
+| 29 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
 | 30 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
 | 31 | PAN-4166 | S | critical | ok |  |  | write-sequence replays every superseded sequence commit and dies on an old one, so the ranked order never reaches origin/main |
 | 32 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
@@ -37,9 +41,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 57 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
 | 58 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
 | 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 60 | PAN-2700 | S | high | needs-refinement |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
-| 61 | PAN-1560 | XS | high | needs-refinement |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
-| 66 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -48,7 +49,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 74 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 75 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 76 | PAN-3237 | S | critical | needs-refinement |  |  | A capacity 409 on planning→work handoff is classified as 'guardrails' and marked terminally stuck; three issues stranded at once. |
 | 77 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 78 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
@@ -71,16 +71,13 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 96 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
 | 97 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
 | 98 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
-| 99 | PAN-3899 | S | high | ok |  |  | pan reload drops the Deacon/resume boot gates chosen at the last restart, so every deploy relaunches with the Deacon off |
 | 100 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
 | 101 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
 | 102 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
 | 103 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
 | 104 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
 | 105 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
-| 106 | PAN-3104 | S | critical | needs-refinement |  |  | A stale .pan/test/result.json is re-applied with no freshness check against HEAD, re-failing an issue long after the fix landed. |
 | 107 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
-| 108 | PAN-3044 | XS | critical | needs-refinement |  |  | Feedback delivery has no terminal-issue guard: it dispatched review and raised needs-you on issues closed 12 days earlier. |
 | 109 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
 | 110 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
 | 111 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
@@ -115,7 +112,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 142 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
 | 143 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
 | 144 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
-| 145 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
 | 146 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
 | 147 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
 | 148 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
@@ -129,10 +125,8 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 156 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
 | 157 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
 | 159 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
-| 160 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
 | 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
 | 162 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
-| 163 | PAN-3077 | XS | high | ok |  |  | Inspect and review-supervisor spawns omit --effort and inherit the harness xhigh default — recurring overspend, once per xBRIEF item. |
 | 164 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
 | 165 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
 | 166 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
@@ -141,7 +135,7 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 174 | PAN-3022 | S | high | needs-refinement |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
+| 174 | PAN-3022 | S | high | ok |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 176 | PAN-3668 | L | medium | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
@@ -165,7 +159,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 195 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
 | 196 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
 | 197 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
-| 198 | PAN-3190 | XS | high | ok |  |  | pan merge cancel has a 0% success rate: Commander binds its options object into the injectable fetchImpl parameter. |
 | 199 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
 | 200 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 202 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
@@ -175,10 +168,9 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 206 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
 | 207 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
 | 208 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
-| 209 | PAN-3280 | S | high | needs-refinement |  |  | One issue's agent sessions vanished four times in a run while every peer stayed up; specimen-specific — re-confirm the mechanism. |
 | 210 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
 | 211 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
-| 212 | PAN-3185 | XS | high | ok |  |  | TOCTOU between the duplicate-session guard and session creation makes pan start report a hard failure over a successful spawn. |
+| 212 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
 | 213 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
 | 214 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
 | 215 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
@@ -192,7 +184,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
-| 233 | PAN-3245 | XS | high | ok |  |  | The pan done gate flags workspace .pan/drafts as uncommitted despite its own .pan exclusion, training agents to reach for --force. |
 | 234 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
 | 235 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
 | 236 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
@@ -212,8 +203,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 250 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
 | 251 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
 | 252 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 253 | PAN-3295 | M | high | ok |  |  | Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability. |
-| 254 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
 | 257 | PAN-4197 | XL | high | ok |  |  | Agents page shows finished strikes as running (not liveness-derived) and buries live work; operator asks live-first, resizable, recolor. |
@@ -222,25 +211,18 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 260 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
 | 261 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
 | 262 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 263 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
 | 264 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
 | 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 266 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
-| 267 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 268 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
+| 266 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
 | 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
 | 272 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
 | 273 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 274 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
 | 275 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
 | 276 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 277 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
-| 278 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
-| 279 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
-| 280 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
-| 281 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
+| 280 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
+| 281 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
 | 282 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
 | 283 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
 | 284 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
@@ -276,15 +258,13 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
 | 316 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
-| 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
+| 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic: PRD now on main (.pan/drafts/pan-2350.md) but data-plane stale post-Cut; re-check phases against PAN-3762 federation. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 322 | PAN-1209 | S | low | stale |  |  | bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 325 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
 | 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
@@ -292,10 +272,10 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
 | 331 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
-| 333 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
+| 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
 | 335 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 336 | PAN-2308 | M | high | needs-refinement |  |  | Compose-file port migration off 3011 still valid; the deacon-quarantine half references the deleted patrol loop — verify an equivalent guard |
+| 336 | PAN-1728 | S | high | ok |  |  | Verification gate must reject work-agent diffs that change .pan/specs/ beyond status fields; spec immutability guard missing. |
 | 337 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
 | 338 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
 | 339 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
@@ -316,9 +296,8 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 354 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
 | 355 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
 | 356 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
-| 357 | PAN-2696 | XS | medium | needs-refinement |  |  | Task views still speak beads vocabulary |
+| 357 | PAN-4236 | S | medium | ok |  |  | GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test |
 | 358 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
-| 359 | PAN-2686 | XS | medium | needs-refinement |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
 | 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
 | 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
 | 362 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
@@ -333,7 +312,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 371 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
 | 372 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
 | 373 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
-| 374 | PAN-3504 | XS | high | needs-refinement |  |  | Duplicate of PAN-3499 (parked.ts ProjectConfig.projectPath typecheck red on main); confirm landed and close one of the pair. |
 | 375 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
 | 376 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
 | 377 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
@@ -344,7 +322,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 382 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
 | 383 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
 | 384 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
-| 385 | PAN-2408 | S | medium | needs-refinement |  |  | pan start --auto commits the spec to main AFTER creating the worktree |
 | 386 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
 | 387 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
 | 388 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
@@ -358,7 +335,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 400 | PAN-2186 | S | medium | needs-refinement |  |  | post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck |
 | 401 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
 | 402 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
 | 403 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
@@ -377,7 +353,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 419 | PAN-1740 | XS | medium | needs-refinement |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
 | 420 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
@@ -394,28 +369,24 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 433 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
 | 434 | PAN-1449 | S | medium | ok |  |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
 | 435 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 436 | PAN-1936 | M | medium | needs-refinement |  |  | Read consolidation is substantially advanced by the cut (derived-issue-state.ts); remaining work is tracked in PAN-3909 |
 | 437 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 438 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 439 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
 | 440 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
 | 441 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
 | 442 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 443 | PAN-1440 | S | low | stale |  |  | bd export / dolt are gone; only a "never overwrite non-empty tracked state" concern would survive, now against .pan/ files |
+| 443 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
 | 444 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
 | 445 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
 | 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
 | 447 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
 | 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 449 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
-| 450 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
 | 451 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
 | 452 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
 | 453 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
 | 454 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 455 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 456 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 457 | PAN-3864 | M | medium | needs-refinement |  |  | /agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building |
 | 458 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 459 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 460 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -437,6 +408,7 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 476 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
 | 477 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
 | 478 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 479 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
 | 480 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
 | 482 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
 | 483 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
@@ -482,7 +454,7 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 524 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
 | 525 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
 | 526 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 527 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew cost panel |
+| 527 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
 | 528 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
 | 529 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
 | 530 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
@@ -516,8 +488,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 560 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
 | 561 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
 | 562 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 563 | PAN-3837 | S | medium | needs-refinement |  |  | Stale starting placeholder can no longer occur; remaining half = per-issue fs-lock contention kills auto-handoff spawn with no retry |
-| 564 | PAN-3499 | XS | medium | needs-refinement |  |  | Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate. |
 | 565 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
 | 567 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 568 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
@@ -553,7 +523,7 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 598 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
 | 599 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
 | 600 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 601 | PAN-3157 | XS | medium | needs-refinement |  |  | Flywheel is now a plain conversation; re-scope as conversation-labeling UX so the Awareness feed names it instead of "No messages yet" |
+| 601 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
 | 603 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
 | 604 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
 | 605 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
@@ -582,7 +552,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 629 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
 | 630 | PAN-2941 | M | low | ok |  |  | OKF v3 |
 | 631 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 632 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
 | 633 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
 | 634 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
 | 635 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
@@ -599,13 +568,12 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 648 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
 | 649 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
 | 650 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 651 | PAN-2507 | M | low | stale |  |  | Patrol-deferred reserve-capacity dispatch model this preempts is gone; re-target deacon-lite dispatch if the need survives |
 | 652 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
 | 653 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
 | 654 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
 | 655 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
 | 656 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 657 | PAN-2406 | M | low | needs-refinement |  |  | Bug 1 (record-only deltas) is moot post-cut; bugs 2-3 (slot/suffixed worktree teardown ordering) still need verifying |
+| 657 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 658 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
 | 659 | PAN-2356 | M | low | needs-refinement |  |  | Overdeck Anywhere P3: relay service |
 | 660 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
@@ -630,9 +598,7 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 679 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
 | 680 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
 | 681 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 682 | PAN-1980 | M | low | needs-refinement |  |  | Session rotation on resume is gone with compaction state; the "one pipeline-membership view" half may still apply to pipeline-membership.ts |
 | 683 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 684 | PAN-1949 | M | low | needs-refinement |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
 | 685 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 686 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 687 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -653,7 +619,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 702 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
 | 703 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
 | 704 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 705 | PAN-2667 | M | low | stale |  |  | beads-rollup admission signal is gone from resource discovery; if still wanted, source it from xBRIEF item completion instead |
 | 706 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
 | 707 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
 | 708 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
@@ -682,9 +647,7 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 731 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
 | 732 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
 | 733 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 734 | PAN-810 | XS | low | needs-refinement |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
 | 735 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 736 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
 | 737 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
 | 738 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
 | 739 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
@@ -734,10 +697,10 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 784 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
 | 785 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
 | 786 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 787 | PAN-2346 | XS | low | needs-refinement |  |  | docs: refresh AGENT_TYPES_INDEX.md — flywheel is a loop skill, inspect is per-item verification; update to the post-cut tree |
-| 788 | PAN-2345 | XS | low | needs-refinement |  |  | docs: refresh pan-done.md — drop the boot-reconciliation reference; describe the current pan done flow |
-| 789 | PAN-2344 | XS | low | needs-refinement |  |  | docs: refresh KANBAN-MODEL.md for derived issue state + PR-based review (boot reconciliation and inspect gates are gone) |
-| 790 | PAN-2343 | XS | low | ok |  |  | docs: refresh MISSION-CONTROL.md |
+| 787 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
+| 788 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
+| 789 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
+| 790 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
 | 791 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
 | 792 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
 | 793 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
@@ -757,7 +720,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 807 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
 | 808 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
 | 809 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 810 | PAN-178 | M | low | stale |  |  | Per-task checkpointing is covered by Item: commit trailers + xBRIEF item status; the .planning/checkpoints proposal predates the cut |
 | 811 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
 | 812 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
 | 813 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
@@ -771,16 +733,11 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 821 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
 | 822 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
 | 823 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 824 | PAN-3564 | M | low | needs-refinement |  |  | Global state-git lock is gone; verify whether the per-issue fs-lock convoy (100% duty cycle, reviewer spawns die) can still occur |
-| 825 | PAN-3571 | S | low | stale |  |  | Stale: targets work-agent-stop-hook (7b953449633) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 828 | PAN-3078 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; verify whether the surviving inspect-agent specialist still never delivers its verdict |
 | 829 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 830 | PAN-2960 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; re-diagnose whether the surviving inspect-agent specialist has a self-termination gap |
-| 831 | PAN-3634 | S | low | stale |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 831 | PAN-3634 | S | high | ok |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 833 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 835 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
 | 836 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
@@ -804,7 +761,6 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 854 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
 | 855 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
 | 856 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
-| 857 | PAN-47 | M | low | stale |  |  | PRDs already live under .pan/ on the feature branch; the docs/prds/active merge-blocking flow no longer exists |
 | 858 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
 | 859 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
 | 860 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
@@ -822,6 +778,14 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 | 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 
 ## Rationale detail
+
+### PAN-4224 (rank 16)
+
+New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.
+
+### PAN-4223 (rank 17)
+
+New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.
 
 ### PAN-4222 (rank 18)
 
@@ -851,15 +815,23 @@ New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
 
-### PAN-3566 (rank 26)
+### PAN-4229 (rank 25)
+
+New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.
+
+### PAN-4225 (rank 26)
+
+New issue split out of PAN-4224. Review dispatch, verification, close-out and start transitions write per-issue continue and spec files into the primary checkout and never commit them, which blocks the primary checkout from fast-forwarding when the PR merges and lets per-issue state diverge from the branch copy. It is a pipeline-substrate bug with verified evidence, so it ranks critical right behind the in-pipeline PAN-4224 fix and the related PAN-3935 / PAN-3085 plan-home bugs.
+
+### PAN-3566 (rank 27)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
 
-### PAN-3952 (rank 27)
+### PAN-3952 (rank 28)
 
 On the default backend the harness TUI renders into a one-line terminal until an operator opens it, so stuck detection, readiness scans, health capture, AUQ/permission detection and screenshots all see nothing. Deterministic pane sizing in the Herdr adapter is a small change with fleet-wide effect.
 
-### PAN-3285 (rank 28)
+### PAN-3285 (rank 29)
 
 New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.
 
@@ -951,18 +923,6 @@ Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as 
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-2700 (rank 60)
-
-Triage: the stored reviewStatus flip is gone; the stale-artifact freshness concern may still apply to whatever recovers test verdicts. Rank held.
-
-### PAN-1560 (rank 61)
-
-Triage: review_status is gone but verification still writes a check run to the PR; the re-post-on-head-move concern may still apply to that flow (PAN-3946 covers the approval-on-old-commit side). Rank held.
-
-### PAN-2806 (rank 66)
-
-Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.
-
 ### PAN-2940 (rank 67)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
@@ -994,10 +954,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 ### PAN-3278 (rank 75)
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
-
-### PAN-3237 (rank 76)
-
-Triage: markWorkspaceStuck is gone but the root cause (409 capacity refusal mapped to guardrails) lives in the handoff path; verify against current planning-to-work handoff. Rank held.
 
 ### PAN-3234 (rank 77)
 
@@ -1087,10 +1043,6 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
 
 Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.
 
-### PAN-3899 (rank 99)
-
-Rank held at 99. resolveBootGates is only called from restart.ts; reload and the post-merge deploy path relaunch with no OVERDECK_* gate env, so deacon-lite is silently off after most deploys. The related PAN-3898 closed as obsolete after the cut, so that cross-reference is dropped; nothing in the boot-gate defect depended on it.
-
 ### PAN-3811 (rank 100)
 
 New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts shelling straight to docker builder prune --all --force, with no BuildKit bytes in the canonical inventory, no candidate through the resource reclaim door and no age or size floor. The partial strike is a fine urgent backstop, but closing PAN-3809 on it would quietly drop requirements 1-3. Ranked directly behind its parent so the completion work is not forgotten once the emergency lands. Dropped dependsOn PAN-3809 (closed since the prior run).
@@ -1107,14 +1059,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 
 Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boots.
 
-### PAN-3104 (rank 106)
-
-Triage: same as PAN-2700 — verify stale-artifact freshness against whatever recovers test verdicts today. Rank held.
-
-### PAN-3044 (rank 108)
-
-Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.
-
 ### PAN-1618 (rank 111)
 
 Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
@@ -1123,6 +1067,18 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 
 Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
 
+### PAN-3900 (rank 113)
+
+patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
+
+### PAN-3793 (rank 114)
+
+New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
+
+### PAN-2639 (rank 115)
+
+codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1130,11 +1086,63 @@ Every path that starts a new Claude session for an existing agent must repoint s
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T00:47:38.945520Z",
+  "generatedAt": "2026-09-26T08:23:05.530794Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 815,
+  "openCount": 771,
   "nodes": [
+    {
+      "issue": "PAN-4224",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write",
+      "rationale": "New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4223",
+      "rank": 17,
+      "size": "L",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator",
+      "rationale": "New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4222",
+      "rank": 18,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors",
+      "rationale": "New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4221",
+      "rank": 19,
+      "size": "S",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train",
+      "rationale": "New in-pipeline bug. The post-pass review dispatch lives in an in-process callback that dies on every deploy, and deacon-lite skips verification.* tails, so four PRs sat green for 15 hours with no train forming. It stalls the pipeline after every reload, so it ranks critical in the top tier next to PAN-4210, which is the same lost-on-reload class.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-4212",
       "rank": 20,
@@ -1175,8 +1183,62 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3566",
+      "issue": "PAN-4217",
+      "rank": 23,
+      "size": "S",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it",
+      "rationale": "New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4219",
+      "rank": 24,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix.",
+      "rationale": "New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4229",
+      "rank": 25,
+      "size": "S",
+      "importance": "critical",
+      "score": 82,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4217"
+      ],
+      "why": "pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix.",
+      "rationale": "New bug filed from PAN-4222: after all eleven top-level items were closed through pan task done, pan done refused on 39 pending acceptance-criterion children that pan task next never surfaced, and the agent had to make 39 empty trailer commits to get through. It blocks completion of every issue planned with nested ACs, the default planner shape, so it ranks critical beside PAN-4217 and PAN-4219. It is marked needs-refinement because it describes the same missing AC-status writer as PAN-4217 and PAN-4219; the three should be fixed by one change and the extras closed as duplicates.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4225",
       "rank": 26,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Feedback/continue/spec writers dirty the primary checkout and never commit, so main cannot fast-forward (split from PAN-4224)",
+      "rationale": "New issue split out of PAN-4224. Review dispatch, verification, close-out and start transitions write per-issue continue and spec files into the primary checkout and never commit them, which blocks the primary checkout from fast-forwarding when the PR merges and lets per-issue state diverge from the branch copy. It is a pipeline-substrate bug with verified evidence, so it ranks critical right behind the in-pipeline PAN-4224 fix and the related PAN-3935 / PAN-3085 plan-home bugs.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3566",
+      "rank": 27,
       "size": "XS",
       "importance": "critical",
       "score": 92,
@@ -1189,7 +1251,7 @@ Every path that starts a new Claude session for an existing agent must repoint s
     },
     {
       "issue": "PAN-3952",
-      "rank": 27,
+      "rank": 28,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1202,7 +1264,7 @@ Every path that starts a new Claude session for an existing agent must repoint s
     },
     {
       "issue": "PAN-3285",
-      "rank": 28,
+      "rank": 29,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -1500,45 +1562,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2700",
-      "rank": 60,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Test artifact recovery consumes a stale .pan/test/result.json",
-      "rationale": "Triage: the stored reviewStatus flip is gone; the stale-artifact freshness concern may still apply to whatever recovers test verdicts. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1560",
-      "rank": 61,
-      "size": "XS",
-      "importance": "high",
-      "score": 84,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED",
-      "rationale": "Triage: review_status is gone but verification still writes a check run to the PR; the re-post-on-head-move concern may still apply to that flow (PAN-3946 covers the approval-on-old-commit side). Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2806",
-      "rank": 66,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "strike merge trigger registry splits across dashboard chunks",
-      "rationale": "Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2940",
       "rank": 67,
       "size": "M",
@@ -1639,19 +1662,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "dependsOn": [],
       "why": "A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts.",
       "rationale": "Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3237",
-      "rank": 76,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "A capacity 409 on planning→work handoff is classified as 'guardrails' and marked terminally stuck; three issues stranded at once.",
-      "rationale": "Triage: markWorkspaceStuck is gone but the root cause (409 capacity refusal mapped to guardrails) lives in the handoff path; verify against current planning-to-work handoff. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1948,19 +1958,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3899",
-      "rank": 99,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan reload drops the Deacon/resume boot gates chosen at the last restart, so every deploy relaunches with the Deacon off",
-      "rationale": "Rank held at 99. resolveBootGates is only called from restart.ts; reload and the post-merge deploy path relaunch with no OVERDECK_* gate env, so deacon-lite is silently off after most deploys. The related PAN-3898 closed as obsolete after the cut, so that cross-reference is dropped; nothing in the boot-gate defect depended on it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3811",
       "rank": 100,
       "size": "M",
@@ -2037,19 +2034,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3104",
-      "rank": 106,
-      "size": "S",
-      "importance": "critical",
-      "score": 82,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "A stale .pan/test/result.json is re-applied with no freshness check against HEAD, re-failing an issue long after the fix landed.",
-      "rationale": "Triage: same as PAN-2700 — verify stale-artifact freshness against whatever recovers test verdicts today. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3099",
       "rank": 107,
       "size": "XS",
@@ -2060,19 +2044,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "why": "--health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening.",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-3044",
-      "rank": 108,
-      "size": "XS",
-      "importance": "critical",
-      "score": 82,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Feedback delivery has no terminal-issue guard: it dispatched review and raised needs-you on issues closed 12 days earlier.",
-      "rationale": "Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-3040",
@@ -2513,19 +2484,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2656",
-      "rank": 145,
-      "size": "S",
-      "importance": "high",
-      "score": 79,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "deacon-swarm unit tests read live ~/.overdeck/config.yaml",
-      "rationale": "deacon-swarm unit tests read live ~/.overdeck/config.yaml — 6 tests fail whenever swarm.mjs differs.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-2080",
       "rank": 146,
       "size": "M",
@@ -2685,18 +2643,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3188",
-      "rank": 160,
-      "size": "XS",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3129",
       "rank": 161,
       "size": "M",
@@ -2719,18 +2665,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "why": "A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-3077",
-      "rank": 163,
-      "size": "XS",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Inspect and review-supervisor spawns omit --effort and inherit the harness xhigh default — recurring overspend, once per xBRIEF item.",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-3062",
@@ -2840,7 +2774,7 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "size": "S",
       "importance": "high",
       "score": 78,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override.",
       "rationale": "Triage: verify the workModel-override clobber against the current spawn.ts model resolution; the record it clobbered no longer exists in that form. Rank held.",
@@ -3140,18 +3074,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3190",
-      "rank": 198,
-      "size": "XS",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan merge cancel has a 0% success rate: Commander binds its options object into the injectable fetchImpl parameter.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-3174",
       "rank": 199,
       "size": "S",
@@ -3260,18 +3182,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3280",
-      "rank": 209,
-      "size": "S",
-      "importance": "high",
-      "score": 74,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "One issue's agent sessions vanished four times in a run while every peer stayed up; specimen-specific — re-confirm the mechanism.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3196",
       "rank": 210,
       "size": "S",
@@ -3300,10 +3210,11 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "rank": 212,
       "size": "XS",
       "importance": "high",
-      "score": 74,
+      "score": 70,
       "condition": "ok",
       "dependsOn": [],
-      "why": "TOCTOU between the duplicate-session guard and session creation makes pan start report a hard failure over a successful spawn.",
+      "why": "Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail.",
+      "rationale": "Rank held at 212: the rescope comment confirms the TOCTOU gap is still in spawn.ts even though the named racer was cut; the remaining spawner (retryDeferredHandoffs) makes it rarer, so score drops slightly.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3467,18 +3378,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "why": "A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-3245",
-      "rank": 233,
-      "size": "XS",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "The pan done gate flags workspace .pan/drafts as uncommitted despite its own .pan exclusion, training agents to reach for --force.",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-3218",
@@ -3714,31 +3613,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3295",
-      "rank": 253,
-      "size": "M",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3236",
-      "rank": 254,
-      "size": "XS",
-      "importance": "high",
-      "score": 68,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify.",
-      "rationale": "Triage: the stuck field is gone; the ECONNREFUSED misclassification is a delivery-layer bug — verify against current delivery path. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3013",
       "rank": 255,
       "size": "XS",
@@ -3840,19 +3714,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2188",
-      "rank": 263,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate",
-      "rationale": "Triage: flywheel is now a loop skill; verify the sequencer/tenets-gate machinery still exists in the described form. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2190",
       "rank": 264,
       "size": "L",
@@ -3879,42 +3740,15 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "skip"
     },
     {
-      "issue": "PAN-2008",
+      "issue": "PAN-2186",
       "rank": 266,
-      "size": "XS",
+      "size": "S",
       "importance": "high",
-      "score": 76,
-      "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-1936"
-      ],
-      "why": "store-access guard",
-      "rationale": "Triage: a store-access guard already ships as scripts/guard-no-state-layer.sh; verify remaining scope (non-agent domains) against it rather than building anew. Rank held.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-1325",
-      "rank": 267,
-      "size": "M",
-      "importance": "high",
-      "score": 75,
+      "score": 68,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Artifact storage model is unsafe for polyrepo projects",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1728",
-      "rank": 268,
-      "size": "S",
-      "importance": "medium",
-      "score": 40,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify…",
-      "rationale": "Triage: specs are no longer workspace-local-vs-main-immutable; the violation may not be meaningful under the .pan/ model. Demoted from high to medium.",
+      "why": "Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557.",
+      "rationale": "Rank changed from 400 to 266: the 2026-09-26 rescope comment relocates both halves to the merge-train cooldown queue (auto-merge-scheduler.ts) and postMergeLifecycle in merge-agent.ts, which gives a concrete goal, so condition moves to ok; the substrate-improvement label sets a high-importance floor.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3979,19 +3813,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2195",
-      "rank": 274,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan",
-      "rationale": "Triage: bd-process-lock and beads are gone; the re-plan churn concern needs re-verification against pan plan finalize + xBRIEF. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2237",
       "rank": 275,
       "size": "S",
@@ -4016,42 +3837,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2469",
-      "rank": 277,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "issue-level assembly owner",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-2212",
-      "rank": 278,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm slot dispatch has no reserved budget",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2213",
-      "rank": 279,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2211",
       "rank": 280,
       "size": "M",
@@ -4059,7 +3844,8 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "score": 74,
       "condition": "ok",
       "dependsOn": [],
-      "why": "PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready",
+      "why": "writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11).",
+      "rationale": "Rank held at 280; triage sharpened the fix to one missing caller; siblings PAN-2212/2213 closed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4071,7 +3857,8 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "score": 74,
       "condition": "ok",
       "dependsOn": [],
-      "why": "PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline",
+      "why": "Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only.",
+      "rationale": "Rank held at 281; triage confirms the risk is sharper post-Cut because pan done has no slot branch at all.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4511,8 +4298,8 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "score": 69,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation.",
-      "rationale": "Rank shifted from 307 to 306: the prior run collided it with the in-pipeline pin PAN-3787 at rank 307; moved into the adjacent vacant slot.",
+      "why": "Epic: PRD now on main (.pan/drafts/pan-2350.md) but data-plane stale post-Cut; re-check phases against PAN-3762 federation.",
+      "rationale": "Rank held; the PRD was found on main, but its phase plan must be re-checked against PAN-3762, so it stays needs-refinement and operator-blocked.",
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
@@ -4571,19 +4358,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-1209",
-      "rank": 322,
-      "size": "S",
-      "importance": "low",
-      "score": 15,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state",
-      "rationale": "Triage: bd predates the cut and was removed as the task engine; demoted to stale pending a re-scope.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1451",
       "rank": 323,
       "size": "M",
@@ -4607,18 +4381,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "why": "PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048)",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-1454",
-      "rank": 325,
-      "size": "M",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "[META] 9 systemic failure patterns surfaced by 80-issue audit",
-      "gate": "auto",
-      "planning": "interactive"
     },
     {
       "issue": "PAN-1553",
@@ -4707,12 +4469,13 @@ Every path that starts a new Claude session for an existing agent must repoint s
     {
       "issue": "PAN-2650",
       "rank": 333,
-      "size": "L",
+      "size": "S",
       "importance": "high",
       "score": 67,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it",
+      "why": "Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot.",
+      "rationale": "Rank held at 333 under the substrate-improvement floor; triage cut the scope to one recovery command, so size drops from L to S.",
       "gate": "auto",
       "planning": "interactive"
     },
@@ -4741,17 +4504,17 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2308",
+      "issue": "PAN-1728",
       "rank": 336,
-      "size": "M",
+      "size": "S",
       "importance": "high",
-      "score": 67,
-      "condition": "needs-refinement",
+      "score": 66,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Compose-file port migration off 3011 still valid; the deacon-quarantine half references the deleted patrol loop — verify an equivalent guard",
-      "rationale": "Triage: the quarantine half references the deleted patrol loop; the compose-file port migration is independent and still valid. Rank held.",
+      "why": "Verification gate must reject work-agent diffs that change .pan/specs/ beyond status fields; spec immutability guard missing.",
+      "rationale": "New to the sequence: triage confirmed the xBRIEF spec-immutability invariant holds and the guard is still missing; takes the slot vacated by closed PAN-2308.",
       "gate": "auto",
-      "planning": "interactive"
+      "planning": "auto"
     },
     {
       "issue": "PAN-2193",
@@ -4996,19 +4759,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2696",
-      "rank": 357,
-      "size": "XS",
-      "importance": "medium",
-      "score": 62,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Task views still speak beads vocabulary",
-      "rationale": "Triage: beads are fully gone (xBRIEF is the item format); verify the phantom \"not synced\" label against current TasksRail/getIssueTasks. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2691",
       "rank": 358,
       "size": "S",
@@ -5017,19 +4767,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "condition": "ok",
       "dependsOn": [],
       "why": "Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2686",
-      "rank": 359,
-      "size": "XS",
-      "importance": "medium",
-      "score": 62,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Policy strip \"restart pending\" badge never clears after restart-fresh with a new model (record.model is sticky)",
-      "rationale": "Triage: record.model as a sticky field is gone; verify the restart-pending badge against the current staffing implementation. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5202,18 +4939,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3504",
-      "rank": 374,
-      "size": "XS",
-      "importance": "high",
-      "score": 60,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Duplicate of PAN-3499 (parked.ts ProjectConfig.projectPath typecheck red on main); confirm landed and close one of the pair.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-3003",
       "rank": 375,
       "size": "XS",
@@ -5331,19 +5056,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "condition": "ok",
       "dependsOn": [],
       "why": "codex agents can wedge on the Codex CLI first-run/consent screen",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2408",
-      "rank": 385,
-      "size": "S",
-      "importance": "medium",
-      "score": 58,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "pan start --auto commits the spec to main AFTER creating the worktree",
-      "rationale": "Triage: specs are no longer committed to main first; verify whether the wrong-workspace failure mode survives the .pan/-on-feature-branch flow. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5503,19 +5215,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "condition": "ok",
       "dependsOn": [],
       "why": "work agents skip `pan done` (manual push instead)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2186",
-      "rank": 400,
-      "size": "S",
-      "importance": "medium",
-      "score": 57,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck",
-      "rationale": "Triage: the stored post-merge lock is gone, but post-merge label/status drift can still occur; verify against the current post-merge path. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5739,19 +5438,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-1740",
-      "rank": 419,
-      "size": "XS",
-      "importance": "medium",
-      "score": 55,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Deacon mislabels SIGTERM workspace container restarts as crashes",
-      "rationale": "Triage: container crash-loop classification is not one of deacon-lite's five routines; verify whether this class of check exists at all post-cut. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1674",
       "rank": 420,
       "size": "S",
@@ -5948,19 +5634,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-1936",
-      "rank": 436,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Read consolidation is substantially advanced by the cut (derived-issue-state.ts); remaining work is tracked in PAN-3909",
-      "rationale": "Triage: the consolidation goal is substantially advanced by the cut; remaining read-consolidation work is tracked concretely in PAN-3909 (PAN-3903 closed). Demoted from high to medium as a mostly-superseded umbrella.",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
       "issue": "PAN-1445",
       "rank": 437,
       "size": "S",
@@ -6033,17 +5706,17 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-1440",
+      "issue": "PAN-2469",
       "rank": 443,
       "size": "S",
-      "importance": "low",
-      "score": 15,
-      "condition": "stale",
+      "importance": "medium",
+      "score": 53,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "bd export / dolt are gone; only a \"never overwrite non-empty tracked state\" concern would survive, now against .pan/ files",
-      "rationale": "Triage: bd/dolt predate the cut and are gone; demoted to stale.",
+      "why": "Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant.",
+      "rationale": "Demoted from 277 to 443: most of the assembly owner landed and pan swarm is dormant post-Cut (foreman is the default parallel path), leaving only a safety-net alarm.",
       "gate": "auto",
-      "planning": "auto"
+      "planning": "interactive"
     },
     {
       "issue": "PAN-1433",
@@ -6107,31 +5780,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "why": "CLI cannot address planning-*/specialist-* sessions",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-1244",
-      "rank": 449,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1227",
-      "rank": 450,
-      "size": "S",
-      "importance": "medium",
-      "score": 52,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Substrate: bead can be closed without delivering the work",
-      "rationale": "Triage: beads are gone; the \"closed without delivering\" concern maps to xBRIEF item completion via pan task + Item: trailers — check for an equivalent per-item delivery check. Rank held.",
-      "gate": "auto",
-      "planning": "interactive"
     },
     {
       "issue": "PAN-1226",
@@ -6202,19 +5850,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "condition": "ok",
       "dependsOn": [],
       "why": "The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3864",
-      "rank": 457,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "/agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building",
-      "rationale": "Triage: verify the stale-strike filtering (FleetAgentsView isFleetAgent) against the current liveness source. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6470,6 +6105,19 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "dependsOn": [],
       "why": "One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains",
       "rationale": "Triage: the agents SQLite table is gone but read-model.ts agentsById may still be a second door beside AgentsResolver; verify before treating as resolved. Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-2659",
+      "rank": 479,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed.",
+      "rationale": "Rank changed from 833 to 479: the rescope comment shows fs-lock.ts was not deleted and still guards auto-spawn-consent, so the crash-orphan hazard is live and the stale verdict is reversed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7039,8 +6687,8 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "score": 44,
       "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Standing Crew cost panel",
-      "rationale": "Triage: standing-tiers.ts is gone; verify Standing Crew tiering is still a live feature before building a cost panel. Rank held.",
+      "why": "Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source.",
+      "rationale": "Rank held; triage confirmed the tier feature is live but the verdict/escalation data sources were cut, so it still needs refinement.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7438,31 +7086,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
-      "issue": "PAN-3837",
-      "rank": 563,
-      "size": "S",
-      "importance": "medium",
-      "score": 44,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Stale starting placeholder can no longer occur; remaining half = per-issue fs-lock contention kills auto-handoff spawn with no retry",
-      "rationale": "Triage: the stale \"starting\" placeholder is structurally gone, but the per-issue record lock (fs-lock.ts) contention that killed the auto-handoff spawn still exists. Raised from the tail to medium because a handoff spawn dying on first contention with no retry is a live pipeline gap.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3499",
-      "rank": 564,
-      "size": "XS",
-      "importance": "medium",
-      "score": 40,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -7897,11 +7520,11 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "rank": 601,
       "size": "XS",
       "importance": "medium",
-      "score": 40,
-      "condition": "needs-refinement",
+      "score": 42,
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Flywheel is now a plain conversation; re-scope as conversation-labeling UX so the Awareness feed names it instead of \"No messages yet\"",
-      "rationale": "Triage reversed the prior stale verdict: with no run-record API the desire for a distinguishing feed treatment is stronger, not resolved. Re-scoped as a plain conversation-labeling UX ask and lifted from the stale tail to medium.",
+      "why": "Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel.",
+      "rationale": "Rank held at 601: the rescope comment names the concrete data source (deriveFlywheelStatus/findLastTick) and target route, so condition moves from needs-refinement to ok.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8243,18 +7866,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2922",
-      "rank": 632,
-      "size": "M",
-      "importance": "low",
-      "score": 29,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Reduce accidental orchestration complexity after performance stabilization",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2868",
       "rank": 633,
       "size": "M",
@@ -8448,19 +8059,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "skip"
     },
     {
-      "issue": "PAN-2507",
-      "rank": 651,
-      "size": "M",
-      "importance": "low",
-      "score": 27,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Patrol-deferred reserve-capacity dispatch model this preempts is gone; re-target deacon-lite dispatch if the need survives",
-      "rationale": "Triage: the dispatch model this proposes preempting is gone. Held at the tail as stale.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-2505",
       "rank": 652,
       "size": "M",
@@ -8527,13 +8125,13 @@ Every path that starts a new Claude session for an existing agent must repoint s
     {
       "issue": "PAN-2406",
       "rank": 657,
-      "size": "M",
+      "size": "S",
       "importance": "low",
       "score": 26,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
-      "why": "Bug 1 (record-only deltas) is moot post-cut; bugs 2-3 (slot/suffixed worktree teardown ordering) still need verifying",
-      "rationale": "Triage: bug 1 is moot since .pan/records is no longer written; worktree teardown ordering bugs are independent. Rank held.",
+      "why": "Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot.",
+      "rationale": "Rank held at 657; triage narrowed the scope to one enumeration gap, so condition moves to ok and size to S.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8840,19 +8438,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "skip"
     },
     {
-      "issue": "PAN-1980",
-      "rank": 682,
-      "size": "M",
-      "importance": "low",
-      "score": 24,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Session rotation on resume is gone with compaction state; the \"one pipeline-membership view\" half may still apply to pipeline-membership.ts",
-      "rationale": "Triage: the rotation half is gone; the membership-view half may still be valid. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1958",
       "rank": 683,
       "size": "M",
@@ -8861,19 +8446,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "condition": "ok",
       "dependsOn": [],
       "why": "Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1949",
-      "rank": 684,
-      "size": "M",
-      "importance": "low",
-      "score": 24,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts",
-      "rationale": "Triage: the bead-level inspect gate is gone; the surviving per-item inspect-agent sessions are already surfaced by AgentDetailView — verify tree-level surfacing is still wanted. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9114,19 +8686,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "condition": "ok",
       "dependsOn": [],
       "why": "Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container'",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2667",
-      "rank": 705,
-      "size": "M",
-      "importance": "low",
-      "score": 22,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "beads-rollup admission signal is gone from resource discovery; if still wanted, source it from xBRIEF item completion instead",
-      "rationale": "Triage: beads-rollup predates and is gone from resource-discovery.ts; an equivalent signal would be rebuilt from xBRIEF item state. Demoted from high to low pending a re-scope.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9474,19 +9033,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-810",
-      "rank": 734,
-      "size": "XS",
-      "importance": "low",
-      "score": 18,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Inspector: diagnostic UI when pipeline phase is unknown",
-      "rationale": "Triage: pipeline phase is derived via derived-issue-state.ts; an unknown-phase diagnostic would target that resolver. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-797",
       "rank": 735,
       "size": "M",
@@ -9497,18 +9043,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "why": "Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-793",
-      "rank": 736,
-      "size": "XS",
-      "importance": "low",
-      "score": 18,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-791",
@@ -10111,10 +9645,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "size": "XS",
       "importance": "low",
       "score": 10,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
-      "why": "docs: refresh AGENT_TYPES_INDEX.md — flywheel is a loop skill, inspect is per-item verification; update to the post-cut tree",
-      "rationale": "Triage: flywheel/sequencer-runner framing is stale and inspect is now per-item verification; refresh target updated. Rank held.",
+      "why": "docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role).",
+      "rationale": "Rank held; triage gave a concrete refresh target, so condition moves to ok.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -10124,10 +9658,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "size": "XS",
       "importance": "low",
       "score": 10,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
-      "why": "docs: refresh pan-done.md — drop the boot-reconciliation reference; describe the current pan done flow",
-      "rationale": "Triage: boot reconciliation reference is stale; refresh target updated. Rank held.",
+      "why": "docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md.",
+      "rationale": "Rank held; triage gave concrete source files and link targets, so condition moves to ok.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -10137,10 +9671,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "size": "XS",
       "importance": "low",
       "score": 10,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
-      "why": "docs: refresh KANBAN-MODEL.md for derived issue state + PR-based review (boot reconciliation and inspect gates are gone)",
-      "rationale": "Triage: much of the content this asks to refresh was rewritten or dropped; retarget at derived-issue-state + PR-based review. Rank held.",
+      "why": "docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads.",
+      "rationale": "Rank held; triage gave concrete source files for the rewrite, so condition moves to ok.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -10152,7 +9686,8 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "score": 10,
       "condition": "ok",
       "dependsOn": [],
-      "why": "docs: refresh MISSION-CONTROL.md",
+      "why": "docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone.",
+      "rationale": "Rank held; triage named the current label sources the rewrite must describe.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -10387,19 +9922,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-178",
-      "rank": 810,
-      "size": "M",
-      "importance": "low",
-      "score": 15,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Per-task checkpointing is covered by Item: commit trailers + xBRIEF item status; the .planning/checkpoints proposal predates the cut",
-      "rationale": "Triage: granular progress is already covered by Item: trailers and xBRIEF item status; demoted to stale.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-113",
       "rank": 811,
       "size": "S",
@@ -10556,32 +10078,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3564",
-      "rank": 824,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Global state-git lock is gone; verify whether the per-issue fs-lock convoy (100% duty cycle, reviewer spawns die) can still occur",
-      "rationale": "Triage: the global state-git lock half is gone; fs-lock.ts still has the per-issue lock. Verify whether the convoy can still occur. Rank held at the tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3571",
-      "rank": 825,
-      "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Stale: targets work-agent-stop-hook (7b953449633) deleted by the PAN-3917 cut (ca15def); re-triage or close",
-      "rationale": "Demoted from rank 32: the component this issue targets (work-agent-stop-hook (7b953449633)) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3248",
       "rank": 826,
       "size": "XS",
@@ -10608,19 +10104,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3078",
-      "rank": 828,
-      "size": "S",
-      "importance": "low",
-      "score": 18,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "review_status.inspect_status is gone; verify whether the surviving inspect-agent specialist still never delivers its verdict",
-      "rationale": "Triage: the stored field is gone; only the surviving inspect-agent specialist could carry an equivalent deadlock. Rank held at the tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2775",
       "rank": 829,
       "size": "S",
@@ -10634,25 +10117,12 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-2960",
-      "rank": 830,
-      "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "review_status.inspect_status is gone; re-diagnose whether the surviving inspect-agent specialist has a self-termination gap",
-      "rationale": "Triage: the reported field is gone; only the surviving inspect-agent specialist could carry a similar gap. Rank held at the tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3634",
       "rank": 831,
       "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "stale",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
       "dependsOn": [],
       "why": "Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close",
       "rationale": "Demoted from rank 162: the component this issue targets (flywheelRunId stamping) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
@@ -10669,19 +10139,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "dependsOn": [],
       "why": "Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close",
       "rationale": "Triage: flywheelRunId and the main-push guard both still exist; verify the allowlist bug against current logic. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2659",
-      "rank": 833,
-      "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close",
-      "rationale": "Demoted from rank 398: the component this issue targets (pan-dir/record-lock.ts) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10965,19 +10422,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-47",
-      "rank": 857,
-      "size": "M",
-      "importance": "low",
-      "score": 11,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "PRDs already live under .pan/ on the feature branch; the docs/prds/active merge-blocking flow no longer exists",
-      "rationale": "Triage: the flow this describes no longer exists. Stale at the tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-44",
       "rank": 858,
       "size": "M",
@@ -11171,54 +10615,15 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-4217",
-      "rank": 23,
+      "issue": "PAN-4236",
+      "rank": 357,
       "size": "S",
-      "importance": "critical",
-      "score": 87,
+      "importance": "medium",
+      "score": 62,
       "condition": "ok",
       "dependsOn": [],
-      "why": "vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it",
-      "rationale": "New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4219",
-      "rank": 24,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix.",
-      "rationale": "New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4221",
-      "rank": 19,
-      "size": "S",
-      "importance": "critical",
-      "score": 89,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train",
-      "rationale": "New in-pipeline bug. The post-pass review dispatch lives in an in-process callback that dies on every deploy, and deacon-lite skips verification.* tails, so four PRs sat green for 15 hours with no train forming. It stalls the pipeline after every reload, so it ranks critical in the top tier next to PAN-4210, which is the same lost-on-reload class.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4222",
-      "rank": 18,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors",
-      "rationale": "New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.",
+      "why": "GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test",
+      "rationale": "New bug: wrong GPT-5.6 price rows misstate spend for codex agents; small, well-scoped fix with a parity test, ranked with nearby cost-accuracy work.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -11302,13 +10707,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 0.95
     },
     {
-      "from": "PAN-1936",
-      "to": "PAN-2008",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
-    },
-    {
       "from": "PAN-2259",
       "to": "PAN-2880",
       "type": "unblocks",
@@ -11358,13 +10756,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 0.85
     },
     {
-      "from": "PAN-3564",
-      "to": "PAN-3565",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
       "from": "PAN-3541",
       "to": "PAN-3543",
       "type": "informs",
@@ -11377,13 +10768,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-3499",
-      "to": "PAN-3504",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.95
     },
     {
       "from": "PAN-3532",
@@ -11484,13 +10868,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 0.75
     },
     {
-      "from": "PAN-3236",
-      "to": "PAN-3257",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
       "from": "PAN-3113",
       "to": "PAN-3234",
       "type": "informs",
@@ -11503,20 +10880,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.85
-    },
-    {
-      "from": "PAN-3100",
-      "to": "PAN-3104",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-2700",
-      "to": "PAN-3104",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.8
     },
     {
       "from": "PAN-3107",
@@ -11841,34 +11204,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 0.7
     },
     {
-      "from": "PAN-3862",
-      "to": "PAN-3864",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3863",
-      "to": "PAN-3864",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3899",
-      "to": "PAN-3902",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-3909",
-      "to": "PAN-3864",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-3830",
       "to": "PAN-3831",
       "type": "informs",
@@ -11897,20 +11232,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 1
     },
     {
-      "from": "PAN-3864",
-      "to": "PAN-3862",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3864",
-      "to": "PAN-3762",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3862",
       "to": "PAN-3762",
       "type": "informs",
@@ -11920,20 +11241,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
     {
       "from": "PAN-3862",
       "to": "PAN-2351",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3564",
-      "to": "PAN-3560",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3564",
-      "to": "PAN-3563",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
@@ -11967,20 +11274,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 1
     },
     {
-      "from": "PAN-3104",
-      "to": "PAN-3100",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3084",
-      "to": "PAN-3078",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-2775",
       "to": "PAN-2758",
       "type": "informs",
@@ -11995,29 +11288,8 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 1
     },
     {
-      "from": "PAN-2696",
-      "to": "PAN-2695",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-2350",
       "to": "PAN-3862",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2308",
-      "to": "PAN-1740",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-2008",
-      "to": "PAN-1936",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
@@ -12065,13 +11337,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 1
     },
     {
-      "from": "PAN-3946",
-      "to": "PAN-1560",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-3935",
       "to": "PAN-3048",
       "type": "informs",
@@ -12084,13 +11349,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-3909",
-      "to": "PAN-1936",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
     },
     {
       "from": "PAN-2566",
@@ -12219,13 +11477,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 1
     },
     {
-      "from": "PAN-3899",
-      "to": "PAN-4184",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
-    },
-    {
       "from": "PAN-4191",
       "to": "PAN-1852",
       "type": "informs",
@@ -12310,13 +11561,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 0.6
     },
     {
-      "from": "PAN-3237",
-      "to": "PAN-4210",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4199",
       "to": "PAN-4217",
       "type": "informs",
@@ -12357,6 +11601,83 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4223",
+      "to": "PAN-3536",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-4166",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-3935",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3935",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3085",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-4217",
+      "to": "PAN-4229",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-4222",
+      "to": "PAN-4229",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3557",
+      "to": "PAN-2186",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-2211",
+      "to": "PAN-2210",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3502",
+      "to": "PAN-4236",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }

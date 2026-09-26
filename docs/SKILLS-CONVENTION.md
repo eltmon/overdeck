@@ -43,7 +43,7 @@ Wrapping every CLI verb in a skill is a tax, not a feature. A skill exists to ad
 - Compose with other commands the agent should know about.
 - Have failure modes that need specific recovery advice.
 
-`pan pause` and `pan unpause` are intentionally wrapped because their persistent gate semantics and interaction with `pan start` / `pan kill` need more guidance than `--help` can provide.
+`pan pause`, `pan unpause` and `pan untroubled` are intentionally wrapped because their persistent gate semantics and interaction with `pan start` / `pan kill` need more guidance than `--help` can provide.
 
 Verbs that **don't** get wrapped (current exclusion list, with rationale):
 
