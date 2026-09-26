@@ -128,6 +128,8 @@ function parseSeconds(raw: string | undefined, deps: LaneCliDeps): number | null
 
 export interface LaneStartOptions {
   key?: string;
+  /** Critic (required) and verifier (optional): the builder lane key judged. */
+  for?: string;
   role?: string;
   brief?: string;
   prompt?: string;
@@ -160,8 +162,8 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
     deps.stderr(MISSING_LANE_PARENT_MESSAGE);
     return WORKER_EXIT.usage;
   }
-  if (!options.key || !options.role) {
-    deps.stderr('--key and --role are required.');
+  if (!options.role || (!options.key && !options.for)) {
+    deps.stderr('--role and --key are required (a critic or verifier may pass --for instead of --key).');
     return WORKER_EXIT.usage;
   }
   if (Boolean(options.brief) === Boolean(options.prompt)) {
@@ -180,7 +182,8 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
 
   const request = {
     parent,
-    key: options.key,
+    ...(options.key ? { key: options.key } : {}),
+    ...(options.for ? { for: options.for } : {}),
     role: options.role,
     brief,
     ...(options.brief ? { briefSource: options.brief } : {}),
@@ -235,9 +238,15 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
   return WORKER_EXIT.done;
 }
 
+function verdictCell(verdict: { verdict?: string; value?: string; defects: number | null } | null | undefined): string {
+  if (!verdict) return '';
+  const value = verdict.value ?? verdict.verdict ?? '';
+  return verdict.defects != null ? `${value} ${verdict.defects}` : value;
+}
+
 function laneTable(lanes: LaneView[]): string[] {
   const rows = [
-    ['ID', 'RUN/KEY', 'ROLE', 'ITER', 'ACTIVITY', 'REPORT', 'BRANCH@SHA', 'AHEAD', 'DIRTY', 'MODEL', 'COST'],
+    ['ID', 'RUN/KEY', 'ROLE', 'ITER', 'ACTIVITY', 'REPORT', 'FOR', 'VERDICT', 'BRANCH@SHA', 'AHEAD', 'DIRTY', 'MODEL', 'COST'],
     ...lanes.map((lane) => [
       String(lane.id),
       `${lane.run}/${lane.key}`,
@@ -245,6 +254,8 @@ function laneTable(lanes: LaneView[]): string[] {
       String(lane.iteration),
       lane.archived ? 'archived' : lane.activity,
       lane.report ? `#${lane.report.seq} ${lane.report.status}` : '-',
+      lane.criticOf ? `${lane.criticOf.key} i${lane.criticOf.iteration}` : '',
+      lane.role === 'builder' ? verdictCell(lane.latestVerdict) : verdictCell(lane.verdict),
       lane.git ? `${lane.git.branch ?? 'detached'}@${(lane.git.head ?? '').slice(0, 7)}` : '-',
       lane.git?.ahead != null ? String(lane.git.ahead) : '-',
       lane.git ? (lane.git.dirty ? 'yes' : 'no') : '-',
@@ -360,10 +371,17 @@ export async function laneWaitCommand(
   return outcome.report.status === 'done' ? WORKER_EXIT.done : WORKER_EXIT.blocked;
 }
 
-export async function laneReportCommand(
-  options: { file?: string; stdin?: boolean; status?: string; allowUnpushed?: boolean },
-  deps: LaneCliDeps,
-): Promise<number> {
+export interface LaneReportOptions {
+  file?: string;
+  stdin?: boolean;
+  status?: string;
+  allowUnpushed?: boolean;
+  verdict?: string;
+  defects?: string;
+  verdictFile?: string;
+}
+
+export async function laneReportCommand(options: LaneReportOptions, deps: LaneCliDeps): Promise<number> {
   if (Boolean(options.file) === Boolean(options.stdin)) {
     deps.stderr('Pass exactly one of --file <path> or --stdin.');
     return WORKER_EXIT.usage;
@@ -384,8 +402,23 @@ export async function laneReportCommand(
     deps.stderr('The report is empty.');
     return WORKER_EXIT.usage;
   }
+  let defects: number | undefined;
+  if (options.defects !== undefined) {
+    defects = Number(options.defects);
+    if (!Number.isInteger(defects) || defects < 0) {
+      deps.stderr(`--defects must be a non-negative integer; got ${options.defects}.`);
+      return WORKER_EXIT.usage;
+    }
+  }
   try {
-    deps.stderr(await deps.reportLane({ body, status, allowUnpushed: options.allowUnpushed === true }, deps.env));
+    deps.stderr(await deps.reportLane({
+      body,
+      status,
+      allowUnpushed: options.allowUnpushed === true,
+      ...(options.verdict !== undefined ? { verdict: options.verdict } : {}),
+      ...(defects !== undefined ? { defects } : {}),
+      ...(options.verdictFile !== undefined ? { verdictFile: options.verdictFile } : {}),
+    }, deps.env));
     return WORKER_EXIT.done;
   } catch (error) {
     deps.stderr(error instanceof Error ? error.message : String(error));
@@ -454,7 +487,8 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
   lane
     .command('start')
     .description('Launch a lane conversation under the calling conversation (any harness)')
-    .option('--key <key>', 'Lane key inside the run (required)')
+    .option('--key <key>', 'Lane key inside the run (required unless --for)')
+    .option('--for <builder-key>', 'Critic (required) or verifier: the builder lane judged; --key defaults to it')
     .option('--role <role>', 'builder | critic | verifier | play | orchestrator (required)')
     .option('--brief <file>', 'The brief, from a file')
     .option('--prompt <text>', 'The brief, inline')
@@ -467,7 +501,7 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
     .option('--title <title>', 'Conversation title (default: <run> <key> · <role>)')
     .option('--branch <branch>', 'Builder branch (default: <run>/<key>, <run>/<key>-i<n> after)')
     .option('--from <ref>', 'Base ref for a new builder branch')
-    .option('--at <ref>', 'Commit a critic or verifier judges (required for them)')
+    .option('--at <ref>', 'Commit a critic or verifier judges (default with --for: the builder\'s newest done head)')
     .option('--reuse', 'Continue in the directory of the latest earlier lane with the same run, key and role')
     .option('--replace', 'Stop the live lane with the same run, key and role first')
     .option('--no-wait', 'Return without waiting for the lane to start')
@@ -499,7 +533,10 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
     .option('--stdin', 'Read the Markdown report from stdin')
     .option('--status <status>', 'done | blocked | failed (default: done)')
     .option('--allow-unpushed', 'Let a builder report done with commits not on its upstream')
-    .action(async (options: { file?: string; stdin?: boolean; status?: string; allowUnpushed?: boolean }) =>
+    .option('--verdict <value>', 'Critic or verifier done report: WOWED | IMPRESSED | NOT_YET | PASS | DEFECTS')
+    .option('--defects <n>', 'Defect count (default: the verdict file\'s defects array length)')
+    .option('--verdict-file <path>', 'The verdict JSON the lane wrote')
+    .action(async (options: LaneReportOptions) =>
       exitCli(await laneReportCommand(options, deps())));
 
   lane

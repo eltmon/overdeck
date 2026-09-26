@@ -163,7 +163,7 @@ describe('pan lane reap and list', () => {
     const { deps, fetchMock, out } = harness();
     fetchMock.mockResolvedValue(json(200, { generatedAt: 'now', lanes: [lane] }));
     expect(await laneListCommand({ run: 'hotel' }, deps)).toBe(0);
-    expect(out[0]).toMatch(/^ID\s+RUN\/KEY\s+ROLE\s+ITER\s+ACTIVITY\s+REPORT\s+BRANCH@SHA\s+AHEAD\s+DIRTY\s+MODEL\s+COST$/);
+    expect(out[0]).toMatch(/^ID\s+RUN\/KEY\s+ROLE\s+ITER\s+ACTIVITY\s+REPORT\s+FOR\s+VERDICT\s+BRANCH@SHA\s+AHEAD\s+DIRTY\s+MODEL\s+COST$/);
     expect(out[1]).toMatch(/^42\s+hotel\/663\s+builder\s+2\s+archived\s+#1 done\s+-\s+-\s+-\s+claude-opus-5-5\s+\$1\.50$/);
   });
 });
