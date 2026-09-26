@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4210",
   "created": "2026-09-26T01:39:06.772Z",
-  "updated": "2026-09-26T04:29:30.945Z",
+  "updated": "2026-09-26T04:29:43.888Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "docs-freeze-hold.ac1": {
       "status": "completed",
       "doneAt": "2026-09-26T04:29:30.945Z"
+    },
+    "docs-freeze-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:29:43.888Z"
     }
   }
 }
