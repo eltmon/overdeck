@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4210",
   "created": "2026-09-26T01:39:06.772Z",
-  "updated": "2026-09-26T04:25:22.827Z",
+  "updated": "2026-09-26T04:25:38.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "stand-down-facts.ac2": {
       "status": "completed",
       "doneAt": "2026-09-26T04:25:22.826Z"
+    },
+    "stand-down-facts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:25:38.437Z"
     }
   }
 }
