@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4211",
   "created": "2026-09-26T01:35:27.740Z",
-  "updated": "2026-09-26T04:40:40.823Z",
+  "updated": "2026-09-26T04:41:03.417Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,10 @@
     "untroubled-verb.ac1": {
       "status": "completed",
       "doneAt": "2026-09-26T04:40:40.823Z"
+    },
+    "untroubled-verb.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:41:03.417Z"
     }
   }
 }
