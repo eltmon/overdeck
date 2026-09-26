@@ -111,13 +111,20 @@ function firstLine(cause: unknown): string {
  * committed on `main` in the operator's checkout; unpushed, local main drifts
  * ahead of origin and the next release needs a rebase.
  *
- * It pushes only when every commit the branch has over its upstream touches
- * `.pan/` alone, so an unrelated local commit never rides along. When origin
- * has moved, it replays those commits onto the fetched upstream with git
- * plumbing (the operator's checkout is usually dirty, so a working-tree rebase
- * would refuse), pushes the replayed tip, and moves the branch onto it with
- * `reset --keep`, which carries uncommitted work across. It never forces,
- * never skips hooks, and reports a reason instead of throwing.
+ * It refuses outright when the branch holds a merge commit over its upstream.
+ * Otherwise it only ever replays the commits upstream actually lacks: a
+ * cherry-pick-equivalence check drops any local commit whose patch already
+ * landed on upstream under a different sha (a squash merge of a prior push),
+ * so replaying never produces an empty duplicate. It pushes only when every
+ * remaining commit touches `.pan/` alone, so an unrelated local commit never
+ * rides along. When origin has moved, it replays the remaining commits onto
+ * the fetched upstream with git plumbing (the operator's checkout is usually
+ * dirty, so a working-tree rebase would refuse), pushes the replayed tip, and
+ * moves the branch onto it with `reset --keep`, which carries uncommitted
+ * work across. If every local commit already landed, or the replay turns out
+ * to be a no-op, it self-heals by moving the branch onto upstream without
+ * pushing. It never forces, never skips hooks, and reports a reason instead
+ * of throwing.
  */
 export async function pushPlanArtifacts(cwdInput: string): Promise<PushPlanArtifactsResult> {
   const cwd = resolve(cwdInput);
@@ -142,16 +149,45 @@ export async function pushPlanArtifacts(cwdInput: string): Promise<PushPlanArtif
     return { pushed: false, skipped: false, reason: `could not fetch ${remote}: ${firstLine(cause)}` };
   }
 
+  const selfHeal = async (onto: string): Promise<PushPlanArtifactsResult> => {
+    try {
+      await git(cwd, ['reset', '--quiet', '--keep', onto]);
+    } catch (cause) {
+      return {
+        pushed: false,
+        skipped: false,
+        reason: `could not move ${branch} onto ${upstream} (${firstLine(cause)}); run git pull --rebase in ${cwd}`,
+      };
+    }
+    return { pushed: false, skipped: true, reason: `${branch} was already on ${upstream}; moved ${branch} onto it` };
+  };
+
   let head: string;
   let onto: string;
-  let local: string[];
+  let pending: string[];
   try {
     head = await git(cwd, ['rev-parse', 'HEAD']);
     onto = await git(cwd, ['rev-parse', upstream]);
-    local = (await git(cwd, ['rev-list', '--reverse', `${onto}..${head}`])).split('\n').filter(Boolean);
+    const local = (await git(cwd, ['rev-list', '--reverse', `${onto}..${head}`])).split('\n').filter(Boolean);
     if (local.length === 0) return { pushed: false, skipped: true, reason: `${branch} is not ahead of ${upstream}` };
 
-    const touched = (await git(cwd, ['log', '--format=', '--name-only', `${onto}..${head}`])).split('\n').filter(Boolean);
+    const merges = (await git(cwd, ['rev-list', '--merges', `${onto}..${head}`])).split('\n').filter(Boolean);
+    if (merges.length > 0) {
+      return {
+        pushed: false,
+        skipped: false,
+        reason: `${branch} has merge commits over ${upstream}; not replaying them, push ${branch} by hand`,
+      };
+    }
+
+    pending = (
+      await git(cwd, ['rev-list', '--reverse', '--cherry-pick', '--right-only', '--no-merges', `${onto}...${head}`])
+    )
+      .split('\n')
+      .filter(Boolean);
+    if (pending.length === 0) return await selfHeal(onto);
+
+    const touched = (await git(cwd, ['log', '--no-walk', '--format=', '--name-only', ...pending])).split('\n').filter(Boolean);
     const unrelated = [...new Set(touched.filter((path) => !path.startsWith('.pan/')))];
     if (unrelated.length > 0) {
       const sample = unrelated.slice(0, 3).join(', ') + (unrelated.length > 3 ? ', …' : '');
@@ -170,11 +206,12 @@ export async function pushPlanArtifacts(cwdInput: string): Promise<PushPlanArtif
     return { pushed: false, skipped: false, reason: `could not push to ${upstream}: ${firstLine(cause)}` };
   }
 
-  // Origin moved: replay the plan-artifact commits onto it without touching
-  // the working tree, then push the replayed tip.
+  // Origin moved: replay the plan-artifact commits it lacks onto it without
+  // touching the working tree, then push the replayed tip.
   let tip = onto;
+  let replayed = false;
   try {
-    for (const commit of local) {
+    for (const commit of pending) {
       let tree: string;
       try {
         tree = (await git(cwd, ['merge-tree', '--write-tree', `--merge-base=${commit}^`, tip, commit])).split('\n')[0];
@@ -185,13 +222,18 @@ export async function pushPlanArtifacts(cwdInput: string): Promise<PushPlanArtif
           reason: `${commit.slice(0, 10)} conflicts with ${upstream}; rebase ${branch} onto it by hand`,
         };
       }
+      // The patch already landed under a different sha (e.g. a squash merge):
+      // replaying it here would produce an empty, duplicate commit.
+      if (tree === (await git(cwd, ['rev-parse', `${tip}^{tree}`]))) continue;
       const [name, email, date, ...body] = (await git(cwd, ['log', '-1', '--format=%an%n%ae%n%aI%n%B', commit])).split('\n');
       tip = await git(cwd, ['commit-tree', tree, '-p', tip, '-m', body.join('\n')], {
         GIT_AUTHOR_NAME: name,
         GIT_AUTHOR_EMAIL: email,
         GIT_AUTHOR_DATE: date,
       });
+      replayed = true;
     }
+    if (!replayed) return await selfHeal(onto);
     await git(cwd, ['push', '--quiet', remote, `${tip}:${target}`]);
   } catch (cause) {
     return { pushed: false, skipped: false, reason: `could not push to ${upstream}: ${firstLine(cause)}` };

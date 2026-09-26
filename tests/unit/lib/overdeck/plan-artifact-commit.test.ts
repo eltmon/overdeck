@@ -233,4 +233,60 @@ describe('pushPlanArtifacts', () => {
 
     expect(result).toEqual({ pushed: false, skipped: true, reason: 'local-only has no upstream' });
   });
+
+  /**
+   * PAN-4224: a plan-artifact commit can land on origin under a different sha
+   * (another checkout's push replayed the same patch, or a PR squash-merged
+   * it) while this checkout still holds its own copy plus a genuinely new
+   * commit. Replaying blindly by two-dot range would duplicate the landed
+   * patch; cherry-pick equivalence must drop it and replay only the new one.
+   */
+  it('replays only the commit origin lacks when an earlier commit already landed under a different sha', async () => {
+    commitFile(other, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence (squashed)');
+    at(other, 'push', '-q', 'origin', 'main');
+    const landed = originMain();
+
+    commitFile(home, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence');
+    commitFile(home, '.pan/backlog/sequence.md', 'pass 2\n', 'chore(workspace): backlog sequence');
+
+    const result = await pushPlanArtifacts(home);
+
+    expect(result).toMatchObject({ pushed: true, rebased: true });
+    const tip = originMain();
+    expect(at(origin, 'rev-list', '--count', `${landed}..${tip}`)).toBe('1');
+    expect(at(origin, 'show', '--name-only', '--format=', tip)).toContain('.pan/backlog/sequence.md');
+    expect(at(origin, 'show', `${tip}:.pan/backlog/sequence.md`)).toBe('pass 2');
+    expect(at(home, 'rev-parse', 'HEAD')).toBe(tip);
+  });
+
+  it('self-heals when every local commit already landed on origin under a different sha', async () => {
+    commitFile(other, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence (squashed)');
+    at(other, 'push', '-q', 'origin', 'main');
+    const landed = originMain();
+
+    commitFile(home, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence');
+
+    const result = await pushPlanArtifacts(home);
+
+    expect(result).toMatchObject({ pushed: false, skipped: true });
+    expect(!result.pushed && result.reason).toContain('already on');
+    expect(originMain()).toBe(landed);
+    expect(at(home, 'rev-parse', 'HEAD')).toBe(landed);
+  });
+
+  it('refuses when local main holds a merge commit over origin', async () => {
+    commitFile(other, '.pan/notes/note.md', 'from other\n', 'chore(workspace): note');
+    at(other, 'push', '-q', 'origin', 'main');
+    const before = originMain();
+
+    commitFile(home, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence');
+    at(home, 'fetch', '-q', 'origin');
+    at(home, 'merge', '-q', 'origin/main', '--no-edit');
+
+    const result = await pushPlanArtifacts(home);
+
+    expect(result).toMatchObject({ pushed: false, skipped: false });
+    expect(!result.pushed && result.reason).toContain('merge commits');
+    expect(originMain()).toBe(before);
+  });
 });
