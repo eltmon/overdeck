@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T07:47:11.407119Z · model: claude-opus-5-5 · open: 770_
+_Last sequenced: 2026-09-26T07:47:55.844089Z · model: claude-opus-5-5 · open: 771_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -296,6 +296,7 @@ _Last sequenced: 2026-09-26T07:47:11.407119Z · model: claude-opus-5-5 · open: 
 | 354 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
 | 355 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
 | 356 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
+| 357 | PAN-4236 | S | medium | ok |  |  | GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test |
 | 358 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
 | 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
 | 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
@@ -1085,10 +1086,10 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T07:47:11.407119Z",
+  "generatedAt": "2026-09-26T07:47:55.844089Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 770,
+  "openCount": 771,
   "nodes": [
     {
       "issue": "PAN-4224",
@@ -10612,6 +10613,19 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4236",
+      "rank": 357,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test",
+      "rationale": "New bug: wrong GPT-5.6 price rows misstate spend for codex agents; small, well-scoped fix with a parity test, ranked with nearby cost-accuracy work.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11654,6 +11668,13 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
     {
       "from": "PAN-2211",
       "to": "PAN-2210",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3502",
+      "to": "PAN-4236",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
