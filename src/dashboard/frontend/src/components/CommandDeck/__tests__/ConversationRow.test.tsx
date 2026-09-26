@@ -287,3 +287,42 @@ describe('ConversationRow lanes and successors (PAN-4223 WI-10)', () => {
     expect(screen.getByText('lane of #99 · hotel')).toBeInTheDocument();
   });
 });
+
+describe('ConversationRow verdict badges (PAN-4223 WI-22)', () => {
+  function renderVerdict(overrides: Partial<Conversation>, props: { variant?: 'flat' | 'nested'; flattenedFrom?: number | null; criticOf?: number | null } = {}) {
+    render(
+      <ConversationRow
+        conv={{ ...conversation, parentConversationId: 1, gauntletRun: 'hotel', laneKey: '663', laneIteration: 1, ...overrides }}
+        isSelected={false}
+        onSelect={vi.fn()}
+        mutations={mutations}
+        {...props}
+      />,
+    );
+  }
+
+  it('shows a critic verdict with its defect count, neutral for NOT_YET', () => {
+    renderVerdict({ laneRole: 'critic', laneVerdict: { value: 'NOT_YET', defects: 7 }, laneReport: { seq: 1, at: 'x', status: 'done' } }, { variant: 'nested' });
+    const badge = screen.getByText('NOT_YET 7');
+    expect(badge.className).not.toContain('badge-bg-state');
+    expect(screen.queryByText('DONE')).not.toBeInTheDocument();
+  });
+
+  it('shows PENDING for a critic without a verdict yet', () => {
+    renderVerdict({ laneRole: 'verifier', laneVerdict: { value: 'pending', defects: null } }, { variant: 'nested' });
+    expect(screen.getByText('PENDING')).toBeInTheDocument();
+  });
+
+  it('links a builder\'s latest verdict to its critic, in the done tone for WOWED', () => {
+    renderVerdict({ laneRole: 'builder', laneLatestVerdict: { value: 'WOWED', defects: null, criticId: 42 } }, { variant: 'nested' });
+    const link = screen.getByRole('link', { name: 'open critic #42' });
+    expect(link).toHaveAttribute('href', '/conv/42');
+    expect(link).toHaveTextContent('WOWED');
+    expect(link.className).toContain('badge-bg-state-done');
+  });
+
+  it('marks a flattened critic as the critic of its builder', () => {
+    renderVerdict({ laneRole: 'critic', criticOfConversationId: 9 }, { variant: 'nested', flattenedFrom: 9, criticOf: 9 });
+    expect(screen.getByText('critic of #9 · hotel')).toBeInTheDocument();
+  });
+});

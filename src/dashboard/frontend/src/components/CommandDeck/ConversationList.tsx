@@ -446,6 +446,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
                         mutations={mutations}
                         registeredProjects={registeredProjects}
                         flattenedFrom={child.flattenedFrom}
+                        criticOf={child.criticOf}
                       />
                     </div>
                   ))}

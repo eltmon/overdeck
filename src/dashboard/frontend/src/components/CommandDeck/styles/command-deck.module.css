@@ -6389,3 +6389,12 @@
   color: var(--foreground);
   text-decoration: underline;
 }
+
+/* PAN-4223 WI-22: a builder's verdict badge links to its critic. */
+.laneVerdictLink {
+  text-decoration: none;
+}
+
+.laneVerdictLink:hover {
+  text-decoration: underline;
+}
