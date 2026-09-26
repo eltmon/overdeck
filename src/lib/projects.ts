@@ -354,12 +354,7 @@ export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationRe
     : { ok: true, config: raw as VersionSyncConfig };
 }
 
-/**
- * Gauntlet lane roles a project may configure (PAN-4223). Mirrors LANE_ROLES
- * in overdeck/conversations.ts; importing it here would close an import cycle
- * (conversations → event-store → infra → projects), so lanes/config.ts checks
- * that the two lists agree.
- */
+/** Gauntlet lane roles (PAN-4223): mirrors LANE_ROLES without importing it (an import cycle); lanes/config.ts checks they agree. */
 export const GAUNTLET_ROLE_KEYS = ['builder', 'critic', 'verifier', 'play', 'orchestrator'] as const;
 
 export interface GauntletRoleConfig {
