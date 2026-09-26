@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3022",
   "created": "2026-09-26T06:16:24.731Z",
-  "updated": "2026-09-26T08:20:30.923Z",
+  "updated": "2026-09-26T08:20:41.840Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "route-forwards-consent-model.ac1": {
       "status": "completed",
       "doneAt": "2026-09-26T08:20:30.923Z"
+    },
+    "route-forwards-consent-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:41.839Z"
     }
   }
 }
