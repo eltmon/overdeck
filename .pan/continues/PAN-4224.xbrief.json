@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4224",
   "created": "2026-09-26T04:24:30.327Z",
-  "updated": "2026-09-26T04:58:20.262Z",
+  "updated": "2026-09-26T04:58:27.218Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4224",
       "claimedAt": "2026-09-26T04:50:23.560Z",
       "doneAt": "2026-09-26T04:58:20.262Z"
+    },
+    "draft-promote-workspace": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4224",
+      "claimedAt": "2026-09-26T04:58:27.218Z"
     }
   }
 }
