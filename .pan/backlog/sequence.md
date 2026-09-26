@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T00:28:34.616214Z · model: claude-opus-5-5 · open: 814_
+_Last sequenced: 2026-09-26T00:29:56.367406Z · model: claude-opus-5-5 · open: 815_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4221 | S | critical | ok |  |  | A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train |
 | 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
 | 21 | PAN-4210 | M | critical | ok |  |  | Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start |
@@ -822,6 +823,10 @@ _Last sequenced: 2026-09-26T00:28:34.616214Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-4222 (rank 18)
+
+New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.
+
 ### PAN-4221 (rank 19)
 
 New in-pipeline bug. The post-pass review dispatch lives in an in-process callback that dies on every deploy, and deacon-lite skips verification.* tails, so four PRs sat green for 15 hours with no train forming. It stalls the pipeline after every reload, so it ranks critical in the top tier next to PAN-4210, which is the same lost-on-reload class.
@@ -1118,10 +1123,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 
 Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
 
-### PAN-3900 (rank 113)
-
-patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1129,10 +1130,10 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T00:28:34.616214Z",
+  "generatedAt": "2026-09-26T00:29:56.367406Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 814,
+  "openCount": 815,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -11207,6 +11208,19 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "rationale": "New in-pipeline bug. The post-pass review dispatch lives in an in-process callback that dies on every deploy, and deacon-lite skips verification.* tails, so four PRs sat green for 15 hours with no train forming. It stalls the pipeline after every reload, so it ranks critical in the top tier next to PAN-4210, which is the same lost-on-reload class.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4222",
+      "rank": 18,
+      "size": "M",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors",
+      "rationale": "New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12336,6 +12350,13 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4197",
+      "to": "PAN-4222",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.9
     }
   ]
 }
