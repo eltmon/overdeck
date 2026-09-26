@@ -1,4 +1,6 @@
 import { createMuseRuntime } from './muse.js';
+import { createPrimeAgentRuntime } from './prime-agent.js';
+export { PrimeAgentRuntimeSync, createPrimeAgentRuntime } from './prime-agent.js';
 export { MuseRuntimeSync, createMuseRuntime } from './muse.js';
 /**
  * Cloister Runtime Abstraction
@@ -106,6 +108,7 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
       return this.get('acp') ?? null;
     }
     if (harness === 'muse') return this.get('muse') ?? null;
+    if (harness === 'prime-agent') return this.get('prime-agent') ?? null;
     if (harness === 'kimi-code') {
       return this.get('kimi-code') ?? null;
     }
@@ -139,6 +142,7 @@ export function getGlobalRegistry(): RuntimeRegistry {
     globalRegistry.register(createAcpRuntime({ name: 'opencode', provider: 'opencode' }));
     globalRegistry.register(createKimiCodeRuntime());
     globalRegistry.register(createMuseRuntime());
+    globalRegistry.register(createPrimeAgentRuntime());
   }
   return globalRegistry;
 }
