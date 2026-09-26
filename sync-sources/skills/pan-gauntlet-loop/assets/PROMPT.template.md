@@ -45,8 +45,10 @@ conflict, the paragraphs win.
 
 ### Setup state (the orchestrator has already done this)
 
-- All work on branch `<BRANCH>` in worktree `<WORKTREE PATH>` — never the
-  primary checkout.
+- Gauntlet run `<RUN>`. Every builder works in its own lane worktree on its
+  own lane branch (`pan lane start --run <RUN> …`); the primary checkout is
+  the orchestrator's merge desk only.<DEADLINE — "Hard stop at <time>: stop
+  launching, let live lanes report, close out." Delete when unset.>
 - `refs/STYLE.md` is the committed direction; `refs/REFERENCE-BAR.md` is the
   critic's judging contract; `refs/press/` holds the fetched reference
   evidence the blind comparisons run against.
@@ -58,8 +60,13 @@ conflict, the paragraphs win.
 
 ### Ground rules
 
-- The orchestrator reviews and commits per area with path-scoped `git add`;
-  agents do not commit.
+- Builders commit and push their own lane branch as they go; the
+  orchestrator audits each diff and merges with path-scoped `git add`. A
+  branch that reported `done` is frozen; rework goes on a new iteration
+  branch. Critics never edit, commit or push.
+- A lane reports with `pan lane report`; a blocked report's first line is
+  `RULING`, `SPEND`, `ONE-WAY` or `BLOCKED` (see the skill's
+  `references/lanes.md`).
 - Scope: <IN — the only surfaces this pass touches>. Deferred: <OUT —
   explicit exclusions>.
 - Model routing: design-heavy areas and ALL critics → frontier-tier;
