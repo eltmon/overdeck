@@ -165,7 +165,7 @@ describe('launchLane (PAN-4223 WI-3)', () => {
     expect(fromLane.status).toBe(400);
     expect(fromLane.message).toContain('root conversation');
 
-    const critic = await launchLane(request(parent, { role: 'critic', key: 'crit-1', at: 'abc1234' }), deps);
+    const critic = await launchLane(request(parent, { role: 'critic', key: 'crit-1', for: 'crit-1', at: 'abc1234' }), deps);
     const target = join(LANES_ROOT, 'hotel-crit-1-critic-i1');
     expect(critic).toMatchObject({ cwd: target, branch: null, iteration: 1 });
     expect(git.addDetachedWorktree).toHaveBeenCalledWith(PROJECT_PATH, target, 'abc1234');
@@ -191,7 +191,7 @@ describe('launchLane (PAN-4223 WI-3)', () => {
 
     const rootSuccessor = 'succ-of-root';
     createConversation({ name: rootSuccessor, tmuxSession: `conv-${rootSuccessor}`, cwd: PROJECT_PATH, workspaceId: null, projectKey: 'lexerra', parentName: parent });
-    const rootCritic = await launchLane(request(rootSuccessor, { run: 'succ', role: 'critic', key: 'n1', at: 'abc1234' }), deps);
+    const rootCritic = await launchLane(request(rootSuccessor, { run: 'succ', role: 'critic', key: 'n1', for: 'n1', at: 'abc1234' }), deps);
     expect(rootCritic.conversation).toMatchObject({ laneRole: 'critic', parentConversationName: rootSuccessor });
   });
 

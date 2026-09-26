@@ -7,8 +7,11 @@ export interface LaneLaunchRequest {
   /** Launching conversation: numeric id, name or `conv-<name>`. */
   parent: string;
   run?: string;
-  key: string;
+  /** Required, except for a critic or verifier with `for` (it defaults to `for`). */
+  key?: string;
   role: LaneRole;
+  /** Critic (required) and verifier (optional): the builder lane key judged (FR-31, D29). */
+  for?: string;
   /** Default: the parent's projectKey. */
   project?: string;
   model?: string;

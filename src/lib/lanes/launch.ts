@@ -46,8 +46,9 @@ import {
 } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveLaneConfig, type LaneConfig } from './config.js';
-import { laneContract } from './contract.js';
-import { distinctLaneCwds } from './iteration.js';
+import { laneContract, type LaneAnswering } from './contract.js';
+import { distinctLaneCwds, laneIterations } from './iteration.js';
+import { pairBuilder, type PairingRow } from './pairing.js';
 import { LaneLaunchError, type LaneLaunchRequest, type LaneLaunchResult } from './types.js';
 import { addBranchWorktree, addDetachedWorktree, applySparse, fetchBase, laneDirName } from './worktree.js';
 
@@ -203,15 +204,87 @@ function validateRequest(request: LaneLaunchRequest): void {
   if (!(LANE_ROLES as readonly string[]).includes(request.role)) {
     throw new LaneLaunchError(400, `unknown role ${String(request.role)}: expected one of ${LANE_ROLES.join(', ')}`);
   }
-  if (!KEY_PATTERN.test(request.key)) throw new LaneLaunchError(400, `lane key ${request.key} must match ${KEY_PATTERN.source}`);
   if (request.run !== undefined && !RUN_PATTERN.test(request.run)) {
     throw new LaneLaunchError(400, `run key ${request.run} must match ${RUN_PATTERN.source}`);
   }
   if (!request.brief.trim()) throw new LaneLaunchError(400, 'a lane needs a brief: pass --brief <file> or --prompt <text>');
-  if ((request.role === 'critic' || request.role === 'verifier') && !request.at) {
-    throw new LaneLaunchError(400, `a ${request.role} lane needs --at <commit> to judge`);
-  }
   if (request.branch !== undefined && request.role !== 'builder') throw new LaneLaunchError(400, '--branch applies to builder lanes only');
+}
+
+/**
+ * WI-19: resolves the lane key and, for a critic or verifier with `for`, the
+ * judged builder row (the newest builder row of that key in the run) and the
+ * default `--at` (the head of the newest done report of that builder
+ * iteration). Nothing from the builder row but that SHA reaches the critic
+ * (FR-38).
+ */
+async function resolveCriticLink(
+  request: LaneLaunchRequest,
+  run: string,
+  latestReport: (id: string) => Promise<WorkerReport | null>,
+): Promise<{ key: string; criticOf: LegacyConversation | null; judgedAt: string | null }> {
+  const judge = request.role === 'critic' || request.role === 'verifier';
+  if (request.for !== undefined && !judge) throw new LaneLaunchError(400, '--for is for critic and verifier lanes');
+  if (request.role === 'critic' && !request.for) throw new LaneLaunchError(400, 'a critic needs --for <builder key>');
+  if (!request.for) {
+    if (!request.key || !KEY_PATTERN.test(request.key)) {
+      throw new LaneLaunchError(400, `lane key ${request.key ?? '(missing)'} must match ${KEY_PATTERN.source}`);
+    }
+    if (judge && !request.at) throw new LaneLaunchError(400, `a ${request.role} lane needs --at <commit> or --for <builder key>`);
+    return { key: request.key, criticOf: null, judgedAt: null };
+  }
+  const builderKey = request.for;
+  if (request.key !== undefined && request.key !== builderKey) {
+    throw new LaneLaunchError(400, `a critic's --key is its builder's key (${builderKey})`);
+  }
+  if (!KEY_PATTERN.test(builderKey)) throw new LaneLaunchError(400, `lane key ${builderKey} must match ${KEY_PATTERN.source}`);
+  const builders = listLaneConversations({ run, key: builderKey, role: 'builder' });
+  const target = builders.at(-1);
+  if (!target) throw new LaneLaunchError(400, `no builder lane ${builderKey} in run ${run}`);
+  if (request.at) return { key: builderKey, criticOf: target, judgedAt: null };
+
+  const iterations = laneIterations(builders);
+  const iteration = iterations.get(target.name) ?? 1;
+  let newest: WorkerReport | null = null;
+  for (const row of builders.filter((candidate) => iterations.get(candidate.name) === iteration)) {
+    const report = await latestReport(`conv-${row.name}`);
+    if (report?.status === 'done' && report.git?.head && (!newest || Date.parse(report.at) > Date.parse(newest.at))) newest = report;
+  }
+  if (!newest?.git) throw new LaneLaunchError(400, `builder ${builderKey} i${iteration} has no done report; pass --at <sha>`);
+  return { key: builderKey, criticOf: target, judgedAt: newest.git.head };
+}
+
+/** FR-38: the critic verdict builder iteration `iteration` answers, from the pairing module. */
+async function answeredVerdict(
+  run: string,
+  key: string,
+  iteration: number,
+  nowMs: number,
+  latestReport: (id: string) => Promise<WorkerReport | null>,
+): Promise<LaneAnswering | null> {
+  const rows = listLaneConversations({ run, key });
+  const iterations = laneIterations(rows);
+  const pairingRows: PairingRow[] = [];
+  for (const row of rows) {
+    const report = await latestReport(`conv-${row.name}`);
+    pairingRows.push({
+      id: row.id,
+      name: row.name,
+      run,
+      key,
+      role: row.laneRole ?? 'builder',
+      iteration: iterations.get(row.name) ?? 1,
+      createdAt: row.createdAt,
+      criticOfId: row.criticOfConversationId,
+      activity: row.status === 'active' ? 'active' : 'stopped',
+      report: report ? { status: report.status, ...(report.verdict ? { verdict: report.verdict } : {}) } : null,
+    });
+  }
+  const provisional: PairingRow = {
+    id: -1, name: '', run, key, role: 'builder', iteration, createdAt: new Date(nowMs).toISOString(), criticOfId: null, activity: 'starting', report: null,
+  };
+  const answer = pairBuilder(provisional, [...pairingRows, provisional]).answering;
+  return answer ? { criticId: answer.id, role: answer.role, iteration: answer.iteration, verdict: answer.verdict, file: answer.file } : null;
 }
 
 function gitFailure(error: unknown): LaneLaunchError {
@@ -235,7 +308,7 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
 
   validateRequest(request);
-  const { role, key } = request;
+  const { role } = request;
 
   // 1-2. Parent (D5), effective launcher (D21) and its D8 standing, run (D4).
   const parent = resolveParent(request.parent);
@@ -243,6 +316,10 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
   const launcher = resolveEffectiveLauncher(parent.name) ?? parent;
   checkLauncher(role, launcher);
   const run = resolveRun(request.run, launcher);
+
+  // The critic link (WI-19, FR-31, FR-32, D29): key, judged builder row and default --at.
+  const { key, criticOf, judgedAt } = await resolveCriticLink(request, run, latestReport);
+  const requestAt = request.at ?? judgedAt ?? undefined;
 
   // 3. Project and its lane config.
   const project = request.project ?? parent.projectKey;
@@ -326,7 +403,7 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
 
     // 9. Working directory (FR-4, FR-5).
     let branch: string | null = null;
-    const at = role === 'orchestrator' ? (request.at ?? config.baseRef) : (request.at ?? null);
+    const at = role === 'orchestrator' ? (requestAt ?? config.baseRef) : (requestAt ?? null);
     if (role === 'builder') {
       branch = request.reuse
         ? await iterationBranch(rows, target, run, key, iteration, latestReport)
@@ -382,12 +459,14 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
       projectKey: config.projectKey,
       ...launchContext,
       parentName: parent.name,
-      lane: { run, key, role },
+      lane: { run, key, role, ...(criticOf ? { criticOfName: criticOf.name } : {}) },
     });
     emitCreated(name);
 
     // 13. Start the runtime with the lane contract as the first message.
-    const message = laneContract({ role, run, key, iteration, briefPath, cwd: target, branch, at, answering: null });
+    // FR-38: a builder of iteration n ≥ 2 is told which verdict it answers.
+    const answering = role === 'builder' && iteration >= 2 ? await answeredVerdict(run, key, iteration, now(), latestReport) : null;
+    const message = laneContract({ role, run, key, iteration, briefPath, cwd: target, branch, at, answering });
     void start({ conv: conversation, tmuxSession, cwd: target, claudeSessionId, model, effort, harness, launchContext, message })
       .catch((error: unknown) => {
         console.error(`[lanes] runtime start failed for ${name}:`, error instanceof Error ? error.message : String(error));

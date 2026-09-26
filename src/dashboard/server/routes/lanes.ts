@@ -22,7 +22,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { conversationArchiveDependencies } from './conversations.js';
 import { validateOrigin } from './origin-validation.js';
 
-const STRING_FIELDS = ['parent', 'run', 'key', 'role', 'project', 'model', 'harness', 'effort', 'brief', 'briefSource', 'title', 'branch', 'from', 'at'] as const;
+const STRING_FIELDS = ['parent', 'run', 'key', 'for', 'role', 'project', 'model', 'harness', 'effort', 'brief', 'briefSource', 'title', 'branch', 'from', 'at'] as const;
 const BOOLEAN_FIELDS = ['reuse', 'replace'] as const;
 
 /** Validate a POST /api/lanes body into a launch request; the core validates values. */
@@ -35,8 +35,12 @@ export function parseLaneLaunchBody(body: unknown): { ok: true; request: LaneLau
   for (const field of BOOLEAN_FIELDS) {
     if (raw[field] !== undefined && typeof raw[field] !== 'boolean') return { ok: false, error: `${field} must be a boolean` };
   }
-  for (const field of ['parent', 'key', 'role', 'brief'] as const) {
+  for (const field of ['parent', 'role', 'brief'] as const) {
     if (typeof raw[field] !== 'string' || raw[field] === '') return { ok: false, error: `${field} is required` };
+  }
+  // A critic or verifier with `for` takes its builder's key (WI-19).
+  if ((typeof raw.key !== 'string' || raw.key === '') && (typeof raw.for !== 'string' || raw.for === '')) {
+    return { ok: false, error: 'key is required (or for, for a critic or verifier)' };
   }
   return { ok: true, request: raw as unknown as LaneLaunchRequest };
 }
