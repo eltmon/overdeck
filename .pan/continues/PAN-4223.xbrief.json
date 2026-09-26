@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T08:10:56.688Z",
+  "updated": "2026-09-26T08:11:15.097Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -480,6 +480,10 @@
     "deck-render.ac4": {
       "status": "completed",
       "doneAt": "2026-09-26T08:10:56.688Z"
+    },
+    "agents-dir-server.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:11:15.096Z"
     }
   }
 }
