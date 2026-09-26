@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3022",
   "created": "2026-09-26T06:16:24.731Z",
-  "updated": "2026-09-26T08:15:57.910Z",
+  "updated": "2026-09-26T08:18:31.628Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-3022",
       "claimedAt": "2026-09-26T08:04:16.152Z",
       "doneAt": "2026-09-26T08:15:57.909Z"
+    },
+    "consent-work-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:18:31.627Z"
     }
   }
 }
