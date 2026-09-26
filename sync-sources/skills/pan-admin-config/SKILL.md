@@ -26,13 +26,19 @@ pan admin config shadow --status
 pan admin config shadow --enable
 pan admin config shadow --disable
 pan admin config shadow --tracker github --enable
+pan admin config tiers
 ```
 
 ## What It Does
 
-Manages the legacy TOML-backed shadow-mode CLI settings.
+`shadow` manages the legacy TOML-backed shadow-mode CLI settings.
 
-This command does **not** currently expose general-purpose `show`, `edit`, `get`, or `set`
+`tiers` prints `roles.work`'s effective model and every `tiered_execution` tier with its
+declared model (`workhorse:<slot>` refs resolved, e.g. `workhorse:mid → claude-opus-5-5`).
+Tiers marked `[overrides roles.work]` launch a different model than `roles.work` for planned
+issues while tiered execution is on.
+
+This command does **not** expose general-purpose `show`, `edit`, `get`, or `set`
 subcommands for the YAML router config. For model routing and provider settings, use the
 Settings page or edit `~/.overdeck/config.yaml` directly.
 

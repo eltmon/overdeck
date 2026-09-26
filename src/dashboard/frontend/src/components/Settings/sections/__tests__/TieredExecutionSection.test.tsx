@@ -968,3 +968,62 @@ describe('fitness badge keys', () => {
     expect(titles.some((title) => title.includes('gpt-5.6-luna'))).toBe(true);
   });
 });
+
+// PAN-4191: a tier backed by a workhorse ref shows the model it resolves to,
+// is flagged when it overrides roles.work, and saves the ref, not the model.
+describe('TieredExecutionSection workhorse refs (PAN-4191)', () => {
+  function workhorseSettings(): SettingsConfig {
+    return baseSettings({
+      workhorses: { expensive: 'claude-opus-5-5', mid: 'claude-opus-5-5', cheap: 'claude-haiku-4-5' },
+      roles: { work: { model: 'workhorse:mid' } },
+      tiered_execution: {
+        enabled: true,
+        tiers: {
+          trivial: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'] },
+          'simple-medium-complex-expert': {
+            model: 'claude-opus-5-5',
+            modelRef: 'workhorse:mid',
+            harness: 'claude-code',
+            difficulties: ['simple', 'medium', 'complex', 'expert'],
+          },
+        },
+        by_kind: {},
+        supervisor: { model: 'claude-opus-5-5', modelRef: 'workhorse:expensive', harness: 'claude-code', subscribe: 'flagged' },
+        replay_threshold: 0.5,
+      },
+    });
+  }
+
+  it('shows each crew\'s effective model and flags only the crews that override roles.work', () => {
+    render(<TieredExecutionSection formData={workhorseSettings()} onSettingsChange={vi.fn()} />);
+
+    expect(screen.getAllByText('workhorse:mid → Claude Opus 5.5 (1M context)').length).toBeGreaterThan(0);
+    const overrides = screen.getAllByTestId('crew-overrides-work');
+    expect(overrides).toHaveLength(1);
+    expect(overrides[0]!.textContent).toBe('overrides roles.work (claude-opus-5-5)');
+    expect(screen.getByText(/workhorse:expensive → Claude Opus 5\.5/)).toBeTruthy();
+  });
+
+  it('flags no crew while tiered execution is off', () => {
+    const settings = workhorseSettings();
+    settings.tiered_execution!.enabled = false;
+    render(<TieredExecutionSection formData={settings} onSettingsChange={vi.fn()} />);
+    expect(screen.queryAllByTestId('crew-overrides-work')).toHaveLength(0);
+  });
+
+  it('writes the workhorse ref back on an edit, never the dereffed model', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={workhorseSettings()} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Standing reviewer/ }));
+    fireEvent.change(screen.getByLabelText('Subscribe'), { target: { value: 'all' } });
+
+    const saved = onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution;
+    expect(saved.supervisor).toEqual({ model: 'workhorse:expensive', harness: 'claude-code', subscribe: 'all' });
+    expect(saved.tiers['simple-medium-complex-expert']).toEqual({
+      model: 'workhorse:mid',
+      harness: 'claude-code',
+      difficulties: ['simple', 'medium', 'complex', 'expert'],
+    });
+  });
+});

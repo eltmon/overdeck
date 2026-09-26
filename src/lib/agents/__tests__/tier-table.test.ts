@@ -224,7 +224,7 @@ describe('tiered execution tier table', () => {
     }));
 
     expect(result.supervisor).toEqual({ model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'all' });
-    expect(tieredExecutionConfigForSave(result, undefined)?.supervisor).not.toHaveProperty('owns_inspection');
+    expect(tieredExecutionConfigForSave(result, {})?.supervisor).not.toHaveProperty('owns_inspection');
   });
 
   it('validates by_kind item kinds and tier references', () => {
@@ -398,5 +398,103 @@ describe('distribution validation is idempotent across save/load round-trips (PA
         },
       },
     } as never)).toThrow(/not both/);
+  });
+});
+
+// PAN-4191: tier models accept the same `workhorse:<slot>` refs roles.* do,
+// dereffed through derefWorkhorse, so re-pointing a slot re-points the tiers.
+describe('workhorse refs in the tier table (PAN-4191)', () => {
+  function workhorseTiered(): TieredExecutionConfig {
+    return validConfig({
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'] },
+        mid: { model: 'workhorse:mid', harness: 'claude-code', difficulties: ['simple', 'medium'] },
+        expensive: {
+          difficulties: ['complex', 'expert'],
+          distribution: [
+            { model: 'workhorse:expensive', harness: 'claude-code', weight: 70 },
+            { model: 'claude-sonnet-5', harness: 'claude-code', weight: 30 },
+          ],
+        } as never,
+      },
+      supervisor: { model: 'workhorse:expensive', harness: 'claude-code', subscribe: 'flagged' },
+    });
+  }
+
+  it('resolves tier, distribution and supervisor refs through the workhorse slots', () => {
+    const result = validateTieredExecutionConfig(workhorseTiered(), {
+      workhorses: { mid: 'claude-sonnet-5', expensive: 'claude-opus-5-5' },
+    });
+
+    expect(result.tiers.mid).toMatchObject({ model: 'claude-sonnet-5', modelRef: 'workhorse:mid' });
+    expect(result.tiers.expensive).toMatchObject({ model: 'claude-opus-5-5', modelRef: 'workhorse:expensive' });
+    expect(result.tiers.expensive!.distribution![0]).toMatchObject({ model: 'claude-opus-5-5', modelRef: 'workhorse:expensive' });
+    expect(result.tiers.expensive!.distribution![1]).not.toHaveProperty('modelRef');
+    expect(result.tiers.cheap).not.toHaveProperty('modelRef');
+    expect(result.supervisor).toMatchObject({ model: 'claude-opus-5-5', modelRef: 'workhorse:expensive' });
+  });
+
+  it('re-points a tier when its workhorse slot changes (config load end to end)', () => {
+    const load = (mid: string) => mergeConfigs({
+      workhorses: { mid, expensive: 'claude-opus-5-5' },
+      tiered_execution: workhorseTiered(),
+    }).config;
+
+    expect(load('claude-sonnet-5').tieredExecution.tiers.mid!.model).toBe('claude-sonnet-5');
+    expect(load('claude-opus-5-5').tieredExecution.tiers.mid!.model).toBe('claude-opus-5-5');
+    expect(load('claude-opus-5-5').tieredExecutionInvalid).toBeUndefined();
+  });
+
+  it('rejects an unknown workhorse slot loudly', () => {
+    const config = validConfig({
+      tiers: {
+        all: { model: 'workhorse:nope', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] },
+      },
+    });
+
+    expect(() => validateTieredExecutionConfig(config, { workhorses: { mid: 'claude-sonnet-5' } }))
+      .toThrow(TieredExecutionConfigError);
+    expect(() => validateTieredExecutionConfig(config, { workhorses: { mid: 'claude-sonnet-5' } }))
+      .toThrow(/tiered_execution\.tiers\.all\.model references workhorse:nope but workhorses\.nope is not defined/);
+  });
+
+  it('rejects the parent sentinel and unknown literal models', () => {
+    const withModel = (model: string) => validConfig({
+      tiers: { all: { model, harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] } },
+    });
+    expect(() => validateTieredExecutionConfig(withModel('parent'), {})).toThrow(TieredExecutionConfigError);
+    expect(() => validateTieredExecutionConfig(withModel('not-a-model'), {})).toThrow(/'not-a-model' is unknown/);
+  });
+
+  it('degrades on config load instead of throwing for an undefined slot ref', () => {
+    const { config } = mergeConfigs({
+      tiered_execution: validConfig({
+        tiers: { all: { model: 'workhorse:nope', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] } },
+      }),
+    });
+    expect(config.tieredExecution.enabled).toBe(false);
+    expect(config.tieredExecutionInvalid?.reason).toContain('workhorse:nope');
+  });
+
+  it('a settings save writes the workhorse ref back, never the slot\'s current model', () => {
+    const context = { workhorses: { mid: 'claude-sonnet-5', expensive: 'claude-opus-5-5' } };
+    const validated = validateTieredExecutionConfig(workhorseTiered(), context);
+    const saved = tieredExecutionConfigForSave(validated, context)!;
+
+    expect(saved.tiers!.mid).toEqual({ model: 'workhorse:mid', harness: 'claude-code', difficulties: ['simple', 'medium'] });
+    expect(saved.tiers!.expensive!.model).toBe('workhorse:expensive');
+    expect(saved.tiers!.expensive!.distribution![0]).toEqual({ model: 'workhorse:expensive', harness: 'claude-code', weight: 70 });
+    expect(saved.supervisor).toMatchObject({ model: 'workhorse:expensive' });
+    expect(saved.supervisor).not.toHaveProperty('modelRef');
+  });
+
+  it('a Settings edit that picks a literal model replaces the workhorse ref', () => {
+    const context = { workhorses: { mid: 'claude-sonnet-5', expensive: 'claude-opus-5-5' } };
+    const validated = validateTieredExecutionConfig(workhorseTiered(), context);
+    const { modelRef: _dropped, ...midWithoutRef } = validated.tiers.mid!;
+    const edited = { ...validated, tiers: { ...validated.tiers, mid: { ...midWithoutRef, model: 'claude-haiku-4-5' } } };
+
+    const saved = tieredExecutionConfigForSave(edited, context)!;
+    expect(saved.tiers!.mid!.model).toBe('claude-haiku-4-5');
   });
 });

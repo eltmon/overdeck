@@ -1046,7 +1046,10 @@ async function saveSettingsApiPromiseUnlocked(
       ? { permissionMode: settings.codex.permissionMode }
       : undefined,
     remote: settings.remote,
-    tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, currentConfig.providerAuth),
+    tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, {
+      providerAuth: currentConfig.providerAuth,
+      workhorses: { ...currentConfig.workhorses, ...(settings.workhorses ?? {}) },
+    }),
   };
 
   await writeYamlConfigPreservingComments(yamlConfig);
@@ -1324,7 +1327,12 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   }
 
   if (settings.tiered_execution !== undefined) {
-    const tieredExecutionError = validateTieredExecutionSettings(settings.tiered_execution, loadConfigSync().config.providerAuth);
+    const { config: currentConfig } = loadConfigSync();
+    const tieredExecutionError = validateTieredExecutionSettings(settings.tiered_execution, {
+      providerAuth: currentConfig.providerAuth,
+      // PAN-4191: tier refs deref through the slots this same save writes.
+      workhorses: { ...currentConfig.workhorses, ...(isRecord(settings.workhorses) ? settings.workhorses : {}) },
+    });
     if (tieredExecutionError) errors.push(tieredExecutionError);
   }
 

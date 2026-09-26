@@ -190,6 +190,27 @@ Parallel review lanes are spawned by the review-agent and resolve their models t
 
 Subagents (`explore`, `plan`, `bash`, `general-purpose`) are spawned via the Agent tool and resolve their models through the work-type router using their `subagent:*` work type ID.
 
+### Tiered execution and `roles.work`
+
+With `tiered_execution.enabled`, a planned issue's work agent takes the model of the tier its plan difficulty maps to, not `roles.work.model`. `roles.work` still staffs unplanned issues and any item the tier table cannot place (`resolveStaffing` in `src/lib/agents/staffing.ts`).
+
+A tier `model`, a `distribution[].model` entry, and `supervisor.model` accept the same `workhorse:<slot>` refs as `roles.*`. They resolve through `derefWorkhorse` (`src/lib/config-yaml/roles.ts`), so re-pointing a workhorse slot re-points every tier that uses it:
+
+```yaml
+workhorses: { expensive: claude-opus-5-5, mid: claude-sonnet-5, cheap: claude-haiku-4-5 }
+tiered_execution:
+  enabled: true
+  tiers:
+    trivial:       { model: workhorse:cheap,     harness: claude-code, difficulties: [trivial] }
+    simple-medium: { model: workhorse:mid,       harness: claude-code, difficulties: [simple, medium] }
+    complex:       { model: workhorse:expensive, harness: claude-code, difficulties: [complex, expert] }
+  supervisor: { model: workhorse:expensive, harness: claude-code, subscribe: flagged }
+```
+
+A ref to an undefined slot, or the `parent` sentinel, is invalid. The Settings save refuses it. On config load it disables tiered staffing and reports the reason through `pan doctor`. A Settings save writes the ref back to `config.yaml`, never the model the slot currently holds.
+
+To see the effective model per tier, run `pan admin config tiers`. It prints `roles.work`'s model and each tier's declared ref with its resolved model (`workhorse:mid → claude-sonnet-5`), and marks each tier that `[overrides roles.work]` while tiered execution is on. Settings › Tiered Execution shows the same information: crew labels show the resolved model, and a crew is tagged `overrides roles.work (<model>)` when it launches a different model than `roles.work`.
+
 ## Capability classes
 
 Separately from per-skill capability matching, every catalog model also carries a coarse **capability class** — `frontier`, `workhorse`, or `small` — that answers "how strong is this model overall". The class table in `src/lib/model-capability-class.ts` (`MODEL_CAPABILITY_CLASSES`) is the only place model ids are classified; nothing else in the routing stack hardcodes a model's strength. `capabilityClassOf` rates the id that actually launches: literal row first, `MODEL_DEPRECATIONS` hop only for an id with no row of its own, so a still-launchable retired id is judged on its own capability rather than its replacement's. Tiered execution's fitness check reads it to warn when a tier's staffed class does not fit the difficulties the tier owns.
