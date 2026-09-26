@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4222",
   "created": "2026-09-26T00:48:25.214Z",
-  "updated": "2026-09-26T05:16:35.727Z",
+  "updated": "2026-09-26T05:16:47.110Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "live-single-empty-state.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T05:16:35.727Z"
+    },
+    "conversation-provider-error.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:16:47.110Z"
     }
   }
 }
