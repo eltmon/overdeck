@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4211",
   "created": "2026-09-26T01:35:27.740Z",
-  "updated": "2026-09-26T04:15:44.650Z",
+  "updated": "2026-09-26T04:15:54.551Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4211",
       "claimedAt": "2026-09-26T03:09:18.718Z",
       "doneAt": "2026-09-26T04:15:44.650Z"
+    },
+    "gate-message-registry-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4211",
+      "claimedAt": "2026-09-26T04:15:54.551Z"
     }
   }
 }
