@@ -5,9 +5,10 @@ import { resolveEffectivePullRequest } from '@overdeck/contracts';
 
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
-import { latestWorkerReport } from '../agents/worker/report.js';
+import { latestWorkerReport, type WorkerReport } from '../agents/worker/report.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { laneIterations } from '../lanes/iteration.js';
+import { pairBuilder, type PairingRow, type VerdictState } from '../lanes/pairing.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { conversationHarnessAlive, listLiveConversationSessions } from './conversation-liveness.js';
 import { resolveConversationGitInfo } from '../../dashboard/server/services/git-info.js';
@@ -21,6 +22,7 @@ import {
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { listPullRequestLinksForConversations } from './conversation-pull-requests.js';
 import {
+  type LegacyConversation,
   listConversations,
   listFavoritedIds,
   listLaneConversations,
@@ -74,6 +76,57 @@ export function invalidateConversationListEnrichmentCache(): void {
   listEnrichmentInFlight.clear();
 }
 
+/**
+ * PAN-4223 WI-5, WI-20: a lane row's newest report, D7 iteration and critic
+ * pairing. One lane query per run on the page (archived lanes count); no git
+ * work. Non-lane rows get nothing.
+ */
+async function laneEnrichment(conversations: readonly LegacyConversation[]): Promise<Map<string, Record<string, unknown>>> {
+  const enrichment = new Map<string, Record<string, unknown>>();
+  const runs = [...new Set(conversations.filter((conv) => conv.laneKey && conv.gauntletRun).map((conv) => conv.gauntletRun as string))];
+  if (runs.length === 0) return enrichment;
+  const context = runs.flatMap((run) => listLaneConversations({ run }));
+  const iterations = laneIterations(context);
+  const reports = new Map<string, WorkerReport | null>();
+  await withConcurrencyLimit(context.map((row) => async () => {
+    reports.set(row.name, await latestWorkerReport(`conv-${row.name}`));
+  }), CONVERSATION_LIST_ENRICHMENT_CONCURRENCY);
+  const pairingRows = context.map((row): PairingRow => {
+    const report = reports.get(row.name) ?? null;
+    return {
+      id: row.id,
+      name: row.name,
+      run: row.gauntletRun ?? '',
+      key: row.laneKey ?? '',
+      role: row.laneRole ?? 'builder',
+      iteration: iterations.get(row.name) ?? 1,
+      createdAt: row.createdAt,
+      criticOfId: row.criticOfConversationId,
+      activity: row.status,
+      report: report ? { status: report.status, ...(report.verdict ? { verdict: report.verdict } : {}) } : null,
+    };
+  });
+  const pairingByName = new Map(pairingRows.map((row) => [row.name, row]));
+  for (const conv of conversations) {
+    const pairing = pairingByName.get(conv.name);
+    if (!conv.laneKey || !pairing) continue;
+    const report = reports.get(conv.name) ?? null;
+    const fields: Record<string, unknown> = {
+      laneReport: report ? { seq: report.seq, at: report.at, status: report.status, verdict: report.verdict?.value ?? null } : null,
+      laneIteration: pairing.iteration,
+    };
+    if (conv.laneRole === 'critic' || conv.laneRole === 'verifier') {
+      const verdict = report?.status === 'done' ? report.verdict : undefined;
+      fields.laneVerdict = { value: (verdict?.value ?? 'pending') as VerdictState, defects: verdict?.defects ?? null };
+    } else if (conv.laneRole === 'builder') {
+      const latest = pairBuilder(pairing, pairingRows).latestVerdict;
+      fields.laneLatestVerdict = latest ? { value: latest.verdict, defects: latest.defects, criticId: latest.id } : null;
+    }
+    enrichment.set(conv.name, fields);
+  }
+  return enrichment;
+}
+
 export function getEnrichedConversationList(limit: number, offset: number): Promise<readonly unknown[]> {
   const key = `${limit}:${offset}`;
   const now = Date.now();
@@ -108,10 +161,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   const ledgerCosts = new Map(ledgerEntries);
   // PAN-3822: one query for the whole page's PR links, never one per row.
   const pullRequestLinks = listPullRequestLinksForConversations(conversations.map((conv) => conv.name));
-  // PAN-4223 D7: lane iterations count every row of a (run, key, role), archived included.
-  const laneIterationByName = conversations.some((conv) => conv.laneKey)
-    ? laneIterations(listLaneConversations({}))
-    : new Map<string, number>();
+  const lanes = await laneEnrichment(conversations);
   return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
@@ -202,8 +252,6 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         }
       }
       const ledger = ledgerCosts.get(String(row.id));
-      // PAN-4223 WI-5: a lane's newest report and iteration; no git work here.
-      const laneReport = row.laneKey ? await latestWorkerReport(`conv-${row.name}`) : null;
       return {
         ...row,
         totalCost: ledger ? ledger.cost : row.totalCost,
@@ -225,10 +273,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         pendingAskUserQuestion,
         transcriptMissing: conversationTranscriptMissing(row, sessionAlive, convSf),
         needsTerminal: await conversationNeedsTerminal(row, sessionAlive, convSf),
-        ...(row.laneKey ? {
-          laneReport: laneReport ? { seq: laneReport.seq, at: laneReport.at, status: laneReport.status } : null,
-          laneIteration: laneIterationByName.get(row.name) ?? 1,
-        } : {}),
+        ...(lanes.get(row.name) ?? {}),
       };
     }),
     CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
