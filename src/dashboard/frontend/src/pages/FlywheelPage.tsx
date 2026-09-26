@@ -11,15 +11,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 
 import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
+import { FlywheelHeadlineStrip } from '../components/flywheel/FlywheelHeadlineStrip';
 import { FlywheelOrderBookCard } from '../components/flywheel/FlywheelOrderBookCard';
-import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
+import { FlywheelReportPane, FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
-import { FlywheelStatusPane, FreshnessBadge } from '../components/flywheel/FlywheelStatusPane';
+import { FlywheelStatusPane, FreshnessBadge, inFlightCountLabel } from '../components/flywheel/FlywheelStatusPane';
+import { FlywheelUatBatchesCard } from '../components/flywheel/FlywheelUatBatchesCard';
 import { PendingAutoMergesCard } from '../components/flywheel/PendingAutoMergesCard';
 import { RailCard, StatusBadge, ToggleSwitch } from '../components/flywheel/primitives';
-import { useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
+import { formatDuration, useFlywheelStatus, useMergeTrainConfig, useMergeTrainConfigMutation } from '../lib/flywheelApi';
+import { consumePendingReveal, subscribeRevealNeedsYou } from '../lib/flywheelReveal';
 
-type RailTab = 'status' | 'state' | 'stats';
+type RailTab = 'status' | 'state' | 'report' | 'stats';
+const RAIL_TABS = ['status', 'state', 'report', 'stats'] as const;
 
 export const FLYWHEEL_SPLIT_STORAGE_KEY = 'overdeck.ui.flywheelSplitWidth';
 const SPLIT_MIN_LEFT = 360;
@@ -60,6 +64,24 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
   useEffect(() => {
     const interval = window.setInterval(() => setNowMs(Date.now()), 5_000);
     return () => window.clearInterval(interval);
+  }, []);
+
+  // The header's needs-you indicator navigates here and asks for the block.
+  // Consume on mount too: the indicator's request usually lands before this
+  // page exists, so the subscription alone would miss it.
+  useEffect(() => {
+    const reveal = () => {
+      if (!consumePendingReveal()) return;
+      setTab('status');
+      // The tab's content mounts on the next paint, so the scroll waits for it.
+      window.requestAnimationFrame(() => {
+        const target = document.querySelector('[data-testid="flywheel-needs-you"]')
+          ?? document.querySelector('[data-attention="needs-you"]');
+        target?.scrollIntoView({ block: 'center' });
+      });
+    };
+    reveal();
+    return subscribeRevealNeedsYou(reveal);
   }, []);
 
   const setLeftWidthClamped = useCallback((next: number) => {
@@ -114,9 +136,15 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
         {status?.run === 'running' && status.freshness && status.lastTick && (
           <FreshnessBadge freshness={status.freshness} at={status.lastTick.at} nowMs={nowMs} />
         )}
+        {/* How long this run has been up — the conversation's own age. */}
+        {status?.run === 'running' && status.conversation && (
+          <span className="text-[11px] text-muted-foreground" data-testid="flywheel-elapsed" title={status.conversation.createdAt}>
+            running {formatDuration(nowMs - Date.parse(status.conversation.createdAt))}
+          </span>
+        )}
         {status && (
           <span className="text-[11px] text-muted-foreground" data-testid="flywheel-inflight-count">
-            <span className="font-mono text-foreground">{status.inFlight.length}</span> in flight
+            {inFlightCountLabel(status)}
           </span>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-4">
@@ -155,13 +183,14 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
           aria-label="Flywheel control rail"
         >
           <PendingAutoMergesCard onNavigateIssue={onNavigateIssue} />
+          <FlywheelUatBatchesCard onNavigateIssue={onNavigateIssue} />
           <FlywheelOrderBookCard bookId={status?.orderBook?.id ?? null} />
           <RailCard
             label="Flywheel"
             ariaLabel="Flywheel run status"
             actions={(
               <div className="flex rounded-md border border-border p-0.5 text-[11px]" role="tablist" aria-label="Flywheel rail tabs">
-                {(['status', 'state', 'stats'] as const).map((id) => (
+                {RAIL_TABS.map((id) => (
                   <button
                     key={id}
                     type="button"
@@ -178,9 +207,13 @@ export function FlywheelPage({ onOpenSettings, onNavigateIssue }: FlywheelPagePr
           >
             <div role="tabpanel" aria-label={`Flywheel ${tab}`}>
               {tab === 'status' && (
-                <FlywheelStatusPane status={status} unreachable={unreachable} nowMs={nowMs} onNavigateIssue={onNavigateIssue} />
+                <div className="space-y-4">
+                  <FlywheelHeadlineStrip orderBook={status?.orderBook ?? null} />
+                  <FlywheelStatusPane status={status} unreachable={unreachable} nowMs={nowMs} onNavigateIssue={onNavigateIssue} />
+                </div>
               )}
               {tab === 'state' && <FlywheelStatePane />}
+              {tab === 'report' && <FlywheelReportPane />}
               {tab === 'stats' && <FlywheelStatsPanel />}
             </div>
           </RailCard>

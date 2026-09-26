@@ -1,8 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { DerivedIssueState } from '@overdeck/contracts';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { BackendPane, DerivedIssueState } from '@overdeck/contracts';
 
 import { deriveFlywheelStatus, freshnessFor, type DeriveFlywheelStatusDeps } from '../../../../src/lib/flywheel/derive-status.js';
 import type { LegacyConversation } from '../../../../src/lib/overdeck/conversations.js';
+import { listPanesWithBackend, loadIssueStatesForProject, readIssueFromTracker } from '../../../../src/lib/overdeck/derived-issue-state.js';
+
+// The deriver's defaults import this module lazily; the two names below are
+// everything it takes from it, so replacing the module wholesale is safe and
+// keeps the default `loadStates` / `readTrackerIssues` paths offline.
+vi.mock('../../../../src/lib/overdeck/derived-issue-state.js', () => ({
+  listPanesWithBackend: vi.fn(async () => []),
+  loadIssueStatesForProject: vi.fn(async () => new Map()),
+  readIssueFromTracker: vi.fn(async () => null),
+}));
 
 const NOW = Date.parse('2026-09-23T10:00:00.000Z');
 
@@ -13,6 +23,7 @@ function conversation(overrides: Partial<LegacyConversation> = {}): LegacyConver
     tmuxSession: 'conv-flywheel',
     status: 'active',
     cwd: '/repos/overdeck',
+    createdAt: '2026-09-23T08:00:00.000Z',
     title: 'Flywheel',
     model: 'claude-opus-5-5',
     harness: 'claude-code',
@@ -33,6 +44,8 @@ function baseDeps(overrides: DeriveFlywheelStatusDeps = {}): DeriveFlywheelStatu
     resolveProjectPath: (dir) => dir,
     resolvePlanHome: (root) => root,
     listWorkspaces: () => [],
+    readTrackerIssues: async () => ({}),
+    listPanes: () => [],
     loadStates: async () => new Map(),
     lastJournal: () => null,
     policies: () => ({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false }),
@@ -135,16 +148,20 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
           : null),
       }),
     });
-    expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1', 'PAN-2']);
+    expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1', 'PAN-2'], { issues: {}, panes: [] });
     expect(status.inFlight).toEqual([
       {
         issueId: 'PAN-1',
+        title: null,
         state: 'in-review',
         attention: 'needs-you',
         pr: derived.pr,
+        trackerUnknown: true,
+        liveAgents: 0,
+        inTick: false,
         lastJournal: { at: '2026-09-23T09:58:00.000Z', type: 'review.dispatched', source: 'pan-done' },
       },
-      { issueId: 'PAN-2', state: 'backlog', lastJournal: null },
+      { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, inTick: false, lastJournal: null },
     ]);
   });
 
@@ -183,6 +200,259 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     expect(status.orderBook).toEqual({ id: 'book-1', name: 'Sept', status: 'running', landed: 1, total: 4 });
     expect(status.policies).toEqual({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false });
     expect(status.generatedAt).toBe('2026-09-23T10:00:00.000Z');
+  });
+
+  describe('tracker facts (PAN-4199 FR-2, FR-3)', () => {
+    const loadStatesMock = vi.mocked(loadIssueStatesForProject);
+    const readIssueMock = vi.mocked(readIssueFromTracker);
+
+    function workspaces(...ids: readonly string[]) {
+      return ids.map((issueId) => ({ issueId, workspacePath: `/ws/feature-${issueId.toLowerCase()}` }));
+    }
+
+    beforeEach(() => {
+      loadStatesMock.mockReset();
+      loadStatesMock.mockResolvedValue(new Map());
+      readIssueMock.mockReset();
+      readIssueMock.mockResolvedValue(null);
+    });
+
+    it('passes the tracker rows to the lib loader so a closed issue drops out (ac1)', async () => {
+      loadStatesMock.mockResolvedValue(new Map<string, DerivedIssueState>([
+        ['PAN-1', { issueId: 'PAN-1', state: 'closed' }],
+      ]));
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => workspaces('PAN-1'),
+          readTrackerIssues: async () => ({ 'PAN-1': { open: false, labels: [] } }),
+          // Left at the default so the real lazy `loadIssueStatesForProject` runs.
+          loadStates: undefined,
+        }),
+      });
+      expect(loadStatesMock).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1'], {
+        issues: { 'PAN-1': { open: false, labels: [] } },
+        panes: [],
+      });
+      expect(status.inFlight).toEqual([]);
+    });
+
+    it('marks a row whose tracker did not answer as unknown with a null title (ac2)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => workspaces('PAN-2'),
+          readTrackerIssues: async () => ({ 'PAN-2': null }),
+        }),
+      });
+      expect(status.inFlight).toEqual([
+        { issueId: 'PAN-2', title: null, state: 'backlog', trackerUnknown: true, liveAgents: 0, inTick: false, lastJournal: null },
+      ]);
+    });
+
+    it('copies the tracker title onto the row (ac3)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => workspaces('PAN-3'),
+          readTrackerIssues: async () => ({ 'PAN-3': { open: true, labels: [], title: 'Fix the thing' } }),
+        }),
+      });
+      expect(status.inFlight[0]).toMatchObject({ issueId: 'PAN-3', title: 'Fix the thing' });
+      expect(status.inFlight[0]).not.toHaveProperty('trackerUnknown');
+    });
+
+    it('reads every id once through the tracker, at most four at a time (ac4)', async () => {
+      const ids = Array.from({ length: 10 }, (_, i) => `PAN-${i + 1}`);
+      let inFlightReads = 0;
+      let peak = 0;
+      readIssueMock.mockImplementation(async (id: string) => {
+        inFlightReads++;
+        peak = Math.max(peak, inFlightReads);
+        // Two microtask turns, so the limiter has to refill the window.
+        await Promise.resolve();
+        await Promise.resolve();
+        inFlightReads--;
+        return { open: true, labels: [], title: `title ${id}` };
+      });
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => workspaces(...ids),
+          // Left at the default so the real lazy `readIssueFromTracker` fan-out runs.
+          readTrackerIssues: undefined,
+        }),
+      });
+      expect(readIssueMock).toHaveBeenCalledTimes(10);
+      expect(new Set(readIssueMock.mock.calls.map(([id]) => id))).toEqual(new Set(ids));
+      expect(peak).toBeLessThanOrEqual(4);
+      expect(status.inFlight.map((row) => row.title)).toEqual(ids.map((id) => `title ${id}`));
+    });
+
+    it('upper-cases the ids it hands the tracker', async () => {
+      await deriveFlywheelStatus({
+        deps: baseDeps({ listWorkspaces: () => workspaces('pan-9'), readTrackerIssues: undefined }),
+      });
+      expect(readIssueMock).toHaveBeenCalledWith('PAN-9');
+    });
+  });
+
+  describe('live agents (PAN-4199 FR-5)', () => {
+    const listPanesMock = vi.mocked(listPanesWithBackend);
+
+    function pane(issue: string, state: BackendPane['state'], role: BackendPane['role'] = 'work'): BackendPane {
+      return { id: `${issue}-${role}`, issue, role, harness: 'claude-code', model: 'claude-opus-5-5', state };
+    }
+
+    beforeEach(() => {
+      listPanesMock.mockReset();
+      listPanesMock.mockResolvedValue([]);
+      vi.mocked(loadIssueStatesForProject).mockReset();
+      vi.mocked(loadIssueStatesForProject).mockResolvedValue(new Map());
+    });
+
+    it('reports liveAgents 0 when no pane belongs to the issue (ac1)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [],
+        }),
+      });
+      expect(status.inFlight[0]?.liveAgents).toBe(0);
+      expect(status.agents).toEqual([]);
+    });
+
+    it('counts only live panes of in-flight issues (ac2)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]),
+          listPanes: () => [pane('PAN-1', 'working'), pane('PAN-1', 'exited', 'review'), pane('PAN-9', 'working')],
+        }),
+      });
+      expect(status.inFlight[0]?.liveAgents).toBe(1);
+      expect(status.agents).toEqual([
+        { issueId: 'PAN-1', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'working' },
+      ]);
+    });
+
+    it('reads the inventory once and hands the same panes to loadStates (ac3)', async () => {
+      const panes = [pane('PAN-1', 'working')];
+      listPanesMock.mockResolvedValue(panes);
+      const loadStates = vi.fn(async () => new Map<string, DerivedIssueState>([['PAN-1', { issueId: 'PAN-1', state: 'working' }]]));
+      await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }],
+          loadStates,
+          // Left at the default so the real lazy `listPanesWithBackend` runs.
+          listPanes: undefined,
+        }),
+      });
+      expect(listPanesMock).toHaveBeenCalledTimes(1);
+      expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-1'], { issues: {}, panes });
+    });
+
+    it('sorts agents by issue then role and drops a merged issue entirely', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [
+            { issueId: 'PAN-2', workspacePath: '/ws/feature-pan-2' },
+            { issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' },
+            { issueId: 'PAN-3', workspacePath: '/ws/feature-pan-3' },
+          ],
+          loadStates: async () => new Map<string, DerivedIssueState>([
+            ['PAN-1', { issueId: 'PAN-1', state: 'working' }],
+            ['PAN-2', { issueId: 'PAN-2', state: 'working' }],
+            ['PAN-3', { issueId: 'PAN-3', state: 'merged' }],
+          ]),
+          listPanes: () => [
+            pane('PAN-2', 'working', 'review'),
+            pane('PAN-1', 'working', 'work'),
+            pane('PAN-2', 'working', 'work'),
+            pane('PAN-3', 'working', 'work'),
+          ],
+        }),
+      });
+      expect(status.agents.map((agent) => `${agent.issueId}/${agent.role}`))
+        .toEqual(['PAN-1/work', 'PAN-2/review', 'PAN-2/work']);
+    });
+  });
+
+  describe('the tick in-flight list (PAN-4199 FR-6)', () => {
+    /** A transcript whose newest marker names `ids` as in flight. */
+    function tickOver(...ids: readonly string[]) {
+      const list = ids.length ? ids.join(',') : 'none';
+      return async () => [marker(4, '2026-09-23T09:59:30.000Z', `pick=${ids[0] ?? 'none'} phase=watch in-flight=${list} needs-you=none`)];
+    }
+
+    it('adds a tick id that has no workspace of its own (ac1)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: tickOver('PAN-5'),
+          listWorkspaces: () => [],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-5', { issueId: 'PAN-5', state: 'working' }]]),
+        }),
+      });
+      expect(status.inFlight).toEqual([
+        expect.objectContaining({ issueId: 'PAN-5', inTick: true, lastJournal: null }),
+      ]);
+    });
+
+    it('marks a census workspace the tick did not name as inTick false (ac2)', async () => {
+      const lastJournal = vi.fn(() => null);
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: tickOver('PAN-5'),
+          listWorkspaces: () => [{ issueId: 'PAN-6', workspacePath: '/ws/feature-pan-6' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([
+            ['PAN-5', { issueId: 'PAN-5', state: 'working' }],
+            ['PAN-6', { issueId: 'PAN-6', state: 'working' }],
+          ]),
+          lastJournal,
+        }),
+      });
+      expect(status.inFlight.map((row) => [row.issueId, row.inTick])).toEqual([['PAN-6', false], ['PAN-5', true]]);
+      // The tick-only id has no workspace, so no journal is read for it.
+      expect(lastJournal).toHaveBeenCalledExactlyOnceWith('/ws/feature-pan-6');
+    });
+
+    it('reports inFlightSource census without a tick and tick with one (ac3)', async () => {
+      const census = await deriveFlywheelStatus({ deps: baseDeps({ getConversation: () => null }) });
+      expect(census.inFlightSource).toBe('census');
+
+      const noTick = await deriveFlywheelStatus({ deps: baseDeps() });
+      expect(noTick.inFlightSource).toBe('census');
+
+      const ticked = await deriveFlywheelStatus({ deps: baseDeps({ readTranscript: tickOver('PAN-5') }) });
+      expect(ticked.inFlightSource).toBe('tick');
+    });
+
+    it('drops a tick id whose derived state is closed (ac4)', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: tickOver('PAN-5'),
+          listWorkspaces: () => [],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-5', { issueId: 'PAN-5', state: 'closed' }]]),
+        }),
+      });
+      expect(status.inFlight).toEqual([]);
+    });
+
+    it('does not duplicate an id that is both a workspace and a tick entry', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: tickOver('PAN-6'),
+          listWorkspaces: () => [{ issueId: 'PAN-6', workspacePath: '/ws/feature-pan-6' }],
+          loadStates: async () => new Map<string, DerivedIssueState>([['PAN-6', { issueId: 'PAN-6', state: 'working' }]]),
+        }),
+      });
+      expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-6']);
+      expect(status.inFlight[0]?.inTick).toBe(true);
+    });
+  });
+
+  it('carries the conversation creation time so the page can show elapsed run time (ac1)', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({ getConversation: () => conversation({ createdAt: '2026-09-23T08:00:00.000Z' }) }),
+    });
+    expect(status.conversation?.createdAt).toBe('2026-09-23T08:00:00.000Z');
   });
 
   it('never writes: every dependency it calls is a read', async () => {

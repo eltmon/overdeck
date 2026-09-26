@@ -1021,12 +1021,12 @@ export class IssueDataService {
   }
 
   /** The cached tracker row the FR-6 derivation reads; null = no tracker has it (unknown, never "open"). */
-  getTrackerIssue(identifier: string): { open: boolean; labels: readonly string[] } | null {
+  getTrackerIssue(identifier: string): { open: boolean; labels: readonly string[]; title?: string } | null {
     const issue = this.findIssueByIdentifier(identifier.toUpperCase());
     if (!issue) return null;
     const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
     const raw: any[] = Array.isArray(issue.labels) ? issue.labels : [];
-    return { open: canonical !== 'done' && canonical !== 'canceled', labels: raw.map((l) => (typeof l === 'string' ? l : l?.name)).filter(Boolean) };
+    return { open: canonical !== 'done' && canonical !== 'canceled', labels: raw.map((l) => (typeof l === 'string' ? l : l?.name)).filter(Boolean), ...(typeof issue.title === 'string' && issue.title ? { title: issue.title } : {}) };
   }
 
   /** The cached tracker row for an identifier, across every tracker. */

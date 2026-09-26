@@ -146,6 +146,10 @@ function relativeAge(iso: string, nowMs: number): string {
   return `${Math.round(minutes / 60)}h ago`;
 }
 
+function truncate(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+}
+
 export function formatFlywheelStatus(status: FlywheelDerivedStatus, nowMs = Date.now()): string {
   const lines: string[] = [];
   const conv = status.conversation;
@@ -166,11 +170,18 @@ export function formatFlywheelStatus(status: FlywheelDerivedStatus, nowMs = Date
     lines.push(`  order book ${b.name} (${b.id}) · ${b.landed}/${b.total} landed`);
   }
   if (status.inFlight.length) {
-    lines.push(`  in flight  ${status.inFlight.length}`);
+    // The loop's own tick list is the count that matters while it runs; with
+    // no tick, the header says plainly that this is the workspace census.
+    lines.push(status.inFlightSource === 'tick'
+      ? `  in flight (loop) ${status.inFlight.filter((row) => row.inTick).length}`
+      : `  feature workspaces ${status.inFlight.length}`);
     for (const row of status.inFlight) {
       const pr = row.pr ? `PR #${row.pr.number} ${row.pr.reviewState}/${row.pr.checks}` : 'no PR';
       const journal = row.lastJournal ? `${row.lastJournal.type} ${relativeAge(row.lastJournal.at, nowMs)}` : '—';
-      lines.push(`    ${row.issueId.padEnd(10)} ${row.state.padEnd(18)} ${(row.attention ?? '').padEnd(10)} ${pr.padEnd(32)} ${journal}`);
+      // `working` with no live pane is the shape a stalled issue takes.
+      const state = row.state === 'working' && row.liveAgents === 0 ? `${row.state} · no agent` : row.state;
+      const title = row.trackerUnknown ? '(tracker unknown)' : truncate(row.title ?? '', 48);
+      lines.push(`    ${`${row.issueId}${row.inTick ? '*' : ''}`.padEnd(11)} ${state.padEnd(28)} ${(row.attention ?? '').padEnd(10)} ${title.padEnd(48)} ${pr.padEnd(32)} ${journal}`);
     }
   } else {
     lines.push(chalk.dim('  in flight  none'));

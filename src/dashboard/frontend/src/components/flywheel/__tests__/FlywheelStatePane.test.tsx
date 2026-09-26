@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { FlywheelStatePane } from '../FlywheelStatePane';
+import { FlywheelReportPane, FlywheelStatePane } from '../FlywheelStatePane';
 import { renderWithQuery, stubFetch } from './fixtures';
 
 describe('FlywheelStatePane (PAN-3964 FR-10)', () => {
@@ -30,5 +30,41 @@ describe('FlywheelStatePane (PAN-3964 FR-10)', () => {
     stubFetch((url) => (url === '/api/flywheel/state' ? new Response('{}', { status: 500 }) : undefined));
     renderWithQuery(<FlywheelStatePane />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load flywheel state');
+  });
+});
+
+describe('FlywheelReportPane (PAN-4199 WI-15)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('renders .pan/flywheel/report.md as markdown (ac1)', async () => {
+    stubFetch((url) => (url === '/api/flywheel/report'
+      ? Response.json({ exists: true, path: '.pan/flywheel/report.md', content: '# Run report\n\nTwo issues landed.', lastModified: '2026-09-23T09:00:00.000Z' })
+      : undefined));
+    renderWithQuery(<FlywheelReportPane />);
+    expect(await screen.findByRole('heading', { name: 'Run report' })).toBeInTheDocument();
+    expect(screen.getByText('.pan/flywheel/report.md')).toBeInTheDocument();
+    expect(screen.getByTestId('flywheel-report-markdown')).toBeInTheDocument();
+  });
+
+  it('says No report yet when the loop has not written one (ac2)', async () => {
+    stubFetch((url) => (url === '/api/flywheel/report'
+      ? Response.json({ exists: false, path: '.pan/flywheel/report.md', content: null, lastModified: null })
+      : undefined));
+    renderWithQuery(<FlywheelReportPane />);
+    expect(await screen.findByText('No report yet')).toBeInTheDocument();
+  });
+
+  it('reads its own endpoint, not the state one', async () => {
+    const fetchMock = stubFetch(() => Response.json({ exists: false, path: '.pan/flywheel/report.md', content: null, lastModified: null }));
+    renderWithQuery(<FlywheelReportPane />);
+    await screen.findByText('No report yet');
+    expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/report');
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/flywheel/state');
+  });
+
+  it('shows a read failure', async () => {
+    stubFetch((url) => (url === '/api/flywheel/report' ? new Response('{}', { status: 500 }) : undefined));
+    renderWithQuery(<FlywheelReportPane />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load flywheel report');
   });
 });

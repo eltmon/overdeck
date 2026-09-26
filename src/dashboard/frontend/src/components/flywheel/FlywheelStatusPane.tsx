@@ -33,6 +33,20 @@ export function FreshnessBadge({ freshness, at, nowMs }: { freshness: FlywheelFr
 
 const ATTENTION_TONE: Record<string, Tone> = { 'needs-you': 'warning', stuck: 'destructive', 'api-error': 'destructive' };
 
+/** A pane state is the machine's, not the operator's: only `blocked` is on them. */
+const PANE_STATE_TONE: Record<string, Tone> = { working: 'info', blocked: 'warning' };
+
+/**
+ * What the board is counting. A running loop's own tick list is the authority
+ * on what it picked up; with no tick, the rows are just the workspace census
+ * and the heading says so rather than implying the loop chose them.
+ */
+export function inFlightCountLabel(status: FlywheelDerivedStatus): string {
+  return status.inFlightSource === 'tick'
+    ? `${status.inFlight.filter((row) => row.inTick).length} in flight (loop)`
+    : `${status.inFlight.length} feature workspaces`;
+}
+
 interface FlywheelStatusPaneProps {
   status: FlywheelDerivedStatus | undefined;
   unreachable: boolean;
@@ -80,7 +94,7 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
 
       {status.run === 'idle' ? (
         <EmptyState
-          title={<>No flywheel running — <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs">pan flywheel start</code> or Start below</>}
+          title={<>No flywheel running — Start it from the conversation pane&apos;s toolbar, or run <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs">pan flywheel start</code></>}
           detail="Nothing is stored between runs: this pane fills in from the loop's tick markers once it starts."
         />
       ) : status.run === 'paused' ? (
@@ -112,7 +126,7 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
 
       <section aria-label="In-flight issues">
         <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          In flight · {status.inFlight.length}
+          {inFlightCountLabel(status)}
         </h3>
         {status.inFlight.length === 0 ? (
           <p className="text-xs text-muted-foreground">No feature workspaces in this project.</p>
@@ -128,7 +142,12 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
             </thead>
             <tbody>
               {status.inFlight.map((row) => (
-                <tr key={row.issueId} className="border-t border-border/60 align-top" data-testid={`flywheel-inflight-${row.issueId}`}>
+                <tr
+                  key={row.issueId}
+                  className="border-t border-border/60 align-top"
+                  data-testid={`flywheel-inflight-${row.issueId}`}
+                  data-attention={row.attention}
+                >
                   <td className="py-1.5 pr-2">
                     <button
                       type="button"
@@ -137,11 +156,32 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
                     >
                       {row.issueId}
                     </button>
+                    {row.title && (
+                      <span
+                        className="block max-w-[18rem] truncate text-muted-foreground"
+                        title={row.title}
+                        data-testid={`flywheel-title-${row.issueId}`}
+                      >
+                        {row.title}
+                      </span>
+                    )}
+                    {row.trackerUnknown && (
+                      <span className="mt-0.5 block">
+                        <StatusBadge tone="neutral" testId={`flywheel-tracker-unknown-${row.issueId}`}>tracker unknown</StatusBadge>
+                      </span>
+                    )}
                   </td>
                   <td className="py-1.5 pr-2">
                     <span className="text-muted-foreground">{row.state}</span>
                     {row.attention && (
                       <span className="ml-1.5"><StatusBadge tone={ATTENTION_TONE[row.attention] ?? 'neutral'}>{row.attention}</StatusBadge></span>
+                    )}
+                    {/* `working` with no live pane is what a stalled issue looks like. */}
+                    {row.state === 'working' && row.liveAgents === 0 && (
+                      <span className="ml-1.5"><StatusBadge tone="neutral" testId={`flywheel-no-agent-${row.issueId}`}>no agent</StatusBadge></span>
+                    )}
+                    {row.inTick && (
+                      <span className="ml-1.5"><StatusBadge tone="info" testId={`flywheel-in-tick-${row.issueId}`}>flywheel</StatusBadge></span>
                     )}
                   </td>
                   <td className="py-1.5 pr-2 text-muted-foreground">
@@ -162,6 +202,36 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
               ))}
             </tbody>
           </table>
+        )}
+      </section>
+
+      <section aria-label="Live agents">
+        <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Agents · {status.agents.length}
+        </h3>
+        {status.agents.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No agent panes are live for these issues.</p>
+        ) : (
+          <ul className="space-y-1 text-xs">
+            {status.agents.map((agent) => (
+              <li
+                key={`${agent.issueId}-${agent.role}-${agent.agentId ?? ''}`}
+                className="flex items-baseline gap-2"
+                data-testid={`flywheel-agent-${agent.issueId}-${agent.role}`}
+              >
+                <button
+                  type="button"
+                  className="whitespace-nowrap font-mono text-foreground hover:underline"
+                  onClick={() => onNavigateIssue?.(agent.issueId)}
+                >
+                  {agent.issueId}
+                </button>
+                <span className="text-muted-foreground">{agent.role}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground">{agent.model}</span>
+                <StatusBadge tone={PANE_STATE_TONE[agent.state] ?? 'neutral'}>{agent.state}</StatusBadge>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>

@@ -119,4 +119,15 @@ memoized 3 s); entry `state` comes from the pane inventory, never stored
 status. PAN-4197 makes the Live view (`?scope=live`) the default and keeps the
 Directory as `?view=history`.
 
+## Flywheel (PAN-3964, derived view)
+
+The flywheel is the `/pan-flywheel` skill running in conversation `conv-flywheel`; it has
+no run record. `src/lib/flywheel/derive-status.ts` `deriveFlywheelStatus()` computes the
+status on read for `pan flywheel status`, `GET /api/flywheel/status`
+(`dashboard/server/routes/flywheel.ts`), and the `/flywheel` page
+(`frontend/src/pages/FlywheelPage.tsx`, `components/flywheel/`). Every source is an
+injectable dep: the lib defaults serve the CLI; the route must inject the server's cached
+facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
+imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
+
 <!-- last-verified: 2026-09-25 -->
