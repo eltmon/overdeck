@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4212",
   "created": "2026-09-26T01:34:15.993Z",
-  "updated": "2026-09-26T03:48:20.431Z",
+  "updated": "2026-09-26T03:48:38.096Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "temporal-drift-rule.ac4": {
       "status": "completed",
       "doneAt": "2026-09-26T03:48:20.430Z"
+    },
+    "temporal-drift-rule.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T03:48:38.096Z"
     }
   }
 }
