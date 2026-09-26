@@ -105,8 +105,8 @@ const readJsonBody = Effect.gen(function* () {
 
 /** Model ID to API model ID mapping */
 export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
-  // OpenAI models — gpt-5.x are real OpenAI model IDs (identity map).
-  // Codex sign-in routes through CLIProxy; API key routes direct.
+  // OpenAI models: real OpenAI ids (identity map). Codex sign-in routes through CLIProxy; API key direct.
+  'gpt-6-sol': { apiModel: 'gpt-6-sol' }, 'gpt-6-luna': { apiModel: 'gpt-6-luna' },
   'gpt-5.6-sol': { apiModel: 'gpt-5.6-sol' },
   'gpt-5.6-terra': { apiModel: 'gpt-5.6-terra' },
   'gpt-5.6-luna': { apiModel: 'gpt-5.6-luna' },
