@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T08:12:38.095Z",
+  "updated": "2026-09-26T08:12:50.152Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -500,6 +500,10 @@
     "agents-live.ac2": {
       "status": "completed",
       "doneAt": "2026-09-26T08:12:38.095Z"
+    },
+    "agents-history.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:12:50.151Z"
     }
   }
 }
