@@ -74,7 +74,7 @@ export function readVerificationWorkerState(issueId: string): WorkerState | null
   try {
     const parsed = JSON.parse(readFileSync(statePath(issueId), 'utf8')) as Partial<WorkerState>;
     if (
-      parsed.issueId !== issueId
+      typeof parsed.issueId !== 'string' || parsed.issueId.toUpperCase() !== issueId.toUpperCase()
       || !Number.isInteger(parsed.pid)
       || typeof parsed.runId !== 'string'
       || typeof parsed.workspacePath !== 'string'

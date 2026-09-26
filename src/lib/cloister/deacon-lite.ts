@@ -3,8 +3,9 @@
  *
  * Replaces the 3,400-line `deacon.ts` (~60 awaited patrol routines writing to
  * the record plane) with a handful of routines that only observe and
- * nudge/notify — never reconcile a stored copy. Two of them recover from the
- * pipeline journal: `recoverStalledReviews` and `retryDeferredHandoffs`
+ * nudge/notify — never reconcile a stored copy. Three of them recover from
+ * the pipeline journal: `recoverStalledReviews`, `recoverUndispatchedReviews`
+ * (PAN-4221, in undispatched-review-recovery.ts) and `retryDeferredHandoffs`
  * (PAN-4155, in deferred-handoff.ts). See docs/PIPELINE-GATES.md and the PAN-3917
  * PRD ("The patrol loop", FR-11, D1/D4/D5/D6/D7).
  *
@@ -29,8 +30,9 @@ import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { appendPipelineEntry, lastPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
 import { retryDeferredHandoffs } from './deferred-handoff.js';
+import { recoverUndispatchedReviews } from './undispatched-review-recovery.js';
 
-export { checkApiErrorAgents, retryDeferredHandoffs };
+export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews };
 
 // ============================================================================
 // checkStuckWorkAgents (FR-11): a work agent idle for N minutes whose feature
@@ -184,13 +186,16 @@ export const reapClosedIssueAgents = reconcileClosedIssueAgents;
 //     later, when that case is worth the code.
 //   - A quick-mode review writes no `review.dispatched` entry (there is no
 //     convoy), so a dead quick reviewer is not recovered here either.
-//   - Any issue whose LAST entry is `verification.*` is skipped, and that is
-//     wider than it sounds: a `verification.passed` with nothing after it means
-//     the review was never dispatched (the runner died while pushing, or the
-//     review spawn came back gated) — the PAN-3705 shape itself. It stays
-//     unrecovered on purpose: the same skip is what stops this routine from
-//     re-running verification every hour for an agent that owes rework, and
-//     the runner may still legitimately be mid-push when the tick fires.
+//   - Any issue whose LAST entry is `verification.*` is skipped here, and that
+//     is wider than it sounds: a `verification.passed` with nothing after it
+//     means the review was never dispatched (the runner died while pushing, or
+//     the review spawn came back gated) — the PAN-3705 shape itself. It stays
+//     unrecovered by THIS routine on purpose: the same skip is what stops it
+//     from re-running verification every hour for an agent that owes rework,
+//     and the runner may still legitimately be mid-push when the tick fires.
+//     A `request-review` `verification.passed` tail — a dashboard restart
+//     killed the push-and-dispatch continuation, not an agent owing rework —
+//     is recovered by `recoverUndispatchedReviews` below (PAN-4221).
 // ============================================================================
 
 const STALLED_REVIEW_MIN_AGE_MS = 15 * 60_000;
@@ -500,6 +505,7 @@ export async function runDeaconLite(): Promise<void> {
   await reconcileAgentLiveness();
   await reapClosedIssueAgents();
   await recoverStalledReviews();
+  await recoverUndispatchedReviews();
   // PAN-4155: re-send a planning hand-off a spawn guardrail refused.
   await retryDeferredHandoffs();
 }

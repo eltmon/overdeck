@@ -1,0 +1,93 @@
+{
+  "version": "1",
+  "issueId": "PAN-4221",
+  "created": "2026-09-26T00:40:53.942Z",
+  "updated": "2026-09-26T06:13:17.630Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "verified-head": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4221",
+      "claimedAt": "2026-09-26T00:40:53.942Z",
+      "doneAt": "2026-09-26T05:44:03.631Z"
+    },
+    "worker-state-case": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4221",
+      "claimedAt": "2026-09-26T05:44:10.622Z",
+      "doneAt": "2026-09-26T05:47:30.151Z"
+    },
+    "undispatched-recovery": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4221",
+      "claimedAt": "2026-09-26T05:47:35.027Z",
+      "doneAt": "2026-09-26T06:04:20.007Z"
+    },
+    "pipeline-gates-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4221",
+      "claimedAt": "2026-09-26T06:04:24.961Z",
+      "doneAt": "2026-09-26T06:06:20.615Z"
+    },
+    "verified-head.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:10:51.095Z"
+    },
+    "verified-head.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:11:14.205Z"
+    },
+    "verified-head.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:11:25.742Z"
+    },
+    "worker-state-case.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:11:37.687Z"
+    },
+    "worker-state-case.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:11:48.791Z"
+    },
+    "worker-state-case.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:11:58.118Z"
+    },
+    "undispatched-recovery.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:12:07.739Z"
+    },
+    "undispatched-recovery.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:12:18.154Z"
+    },
+    "undispatched-recovery.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:12:28.134Z"
+    },
+    "undispatched-recovery.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:12:37.841Z"
+    },
+    "undispatched-recovery.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:12:47.168Z"
+    },
+    "pipeline-gates-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:12:56.650Z"
+    },
+    "pipeline-gates-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:13:07.367Z"
+    },
+    "pipeline-gates-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:13:17.630Z"
+    }
+  }
+}
