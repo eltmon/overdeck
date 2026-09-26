@@ -125,6 +125,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `lane_role` text');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_parent_idx` ON `conversations` (`parent_conversation_id`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_gauntlet_run_idx` ON `conversations` (`gauntlet_run`)');
+  // The critic link: the builder row a critic or verifier lane judges (D26).
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `critic_of_conversation_id` text REFERENCES `conversations`(`id`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_critic_of_idx` ON `conversations` (`critic_of_conversation_id`)');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

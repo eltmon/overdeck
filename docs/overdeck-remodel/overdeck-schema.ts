@@ -119,10 +119,12 @@ export const conversations = sqliteTable("conversations", {
   gauntletRun: text("gauntlet_run"),                             // run key; a run is `WHERE gauntlet_run = ?`, no run table
   laneKey: text("lane_key"),                                     // null = not a lane (a root or a handoff/fork successor)
   laneRole: text("lane_role"),                                   // builder | critic | verifier | play | orchestrator
+  criticOfConversationId: text("critic_of_conversation_id").references((): AnySQLiteColumn => conversations.id), // critic/verifier lanes: the builder row judged (write-once)
 }, (t) => [
   index("conversations_issue_idx").on(t.issueId),
   index("conversations_parent_idx").on(t.parentConversationId),
   index("conversations_gauntlet_run_idx").on(t.gauntletRun),
+  index("conversations_critic_of_idx").on(t.criticOfConversationId),
 ]);
 
 /* conversation_files — the POINTERS to the sacred backing session files. A

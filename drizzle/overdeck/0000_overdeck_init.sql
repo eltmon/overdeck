@@ -117,15 +117,18 @@ CREATE TABLE `conversations` (
 	`gauntlet_run` text,
 	`lane_key` text,
 	`lane_role` text,
+	`critic_of_conversation_id` text,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`parent_conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`parent_conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`critic_of_conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `conversations_name_unique` ON `conversations` (`name`);--> statement-breakpoint
 CREATE INDEX `conversations_issue_idx` ON `conversations` (`issue_id`);--> statement-breakpoint
 CREATE INDEX `conversations_parent_idx` ON `conversations` (`parent_conversation_id`);--> statement-breakpoint
 CREATE INDEX `conversations_gauntlet_run_idx` ON `conversations` (`gauntlet_run`);--> statement-breakpoint
+CREATE INDEX `conversations_critic_of_idx` ON `conversations` (`critic_of_conversation_id`);--> statement-breakpoint
 CREATE TABLE `cost_events` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`ts` integer NOT NULL,

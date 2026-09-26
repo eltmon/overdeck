@@ -281,6 +281,9 @@ export interface LegacyConversation {
   laneKey: string | null;
   /** PAN-4223: the lane's role. Null unless the row is a lane. */
   laneRole: LaneRole | null;
+  /** PAN-4223 D26: legacy rowid of the builder row a critic or verifier judges. */
+  criticOfConversationId: number | null;
+  criticOfConversationName: string | null;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -378,6 +381,8 @@ interface LegacyConversationRow {
   gauntlet_run: string | null;
   lane_key: string | null;
   lane_role: string | null;
+  critic_of_legacy_id: number | null;
+  critic_of_name: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -421,6 +426,8 @@ const LEGACY_CONVERSATION_SELECT = `
     c.gauntlet_run,
     c.lane_key,
     c.lane_role,
+    b.rowid AS critic_of_legacy_id,
+    b.name AS critic_of_name,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -430,6 +437,7 @@ const LEGACY_CONVERSATION_SELECT = `
     ) AS claude_session_id
   FROM conversations c
   LEFT JOIN conversations p ON p.id = c.parent_conversation_id
+  LEFT JOIN conversations b ON b.id = c.critic_of_conversation_id
 `;
 
 const AGENT_CONVERSATION_PREFIXES = ['agent-', 'planning-', 'specialist-'];
@@ -542,6 +550,8 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     gauntletRun: row.gauntlet_run ?? null,
     laneKey: row.lane_key ?? null,
     laneRole: (row.lane_role as LaneRole | null) ?? null,
+    criticOfConversationId: row.critic_of_legacy_id ?? null,
+    criticOfConversationName: row.critic_of_name ?? null,
   };
 }
 
@@ -894,7 +904,7 @@ export function createConversation(opts: {
   /** PAN-4223: name of the launching (lane) or source (successor) conversation. Must exist. */
   parentName?: string;
   /** PAN-4223: lane facts; requires parentName. Omitted = a root or a successor. */
-  lane?: { run: string; key: string; role: LaneRole };
+  lane?: { run: string; key: string; role: LaneRole; criticOfName?: string };
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
@@ -910,6 +920,12 @@ export function createConversation(opts: {
     parentId = getConversationUuidByName(opts.parentName);
     if (!parentId) throw new Error(`parent conversation ${opts.parentName} not found`);
   }
+  let criticOfId: string | null = null;
+  if (opts.lane?.criticOfName) {
+    if (opts.lane.role !== 'critic' && opts.lane.role !== 'verifier') throw new Error('only critic and verifier lanes link a builder');
+    criticOfId = getConversationUuidByName(opts.lane.criticOfName);
+    if (!criticOfId) throw new Error(`critic target ${opts.lane.criticOfName} not found`);
+  }
 
   db.transaction(() => {
     db.prepare(`DELETE FROM conversation_files WHERE conversation_id IN (SELECT id FROM conversations WHERE name = ?)`).run(opts.name);
@@ -918,8 +934,8 @@ export function createConversation(opts: {
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
          tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key,
-         bare_context, skip_claude_md, parent_conversation_id, gauntlet_run, lane_key, lane_role)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         bare_context, skip_claude_md, parent_conversation_id, gauntlet_run, lane_key, lane_role, critic_of_conversation_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -943,6 +959,7 @@ export function createConversation(opts: {
       opts.lane?.run ?? null,
       opts.lane?.key ?? null,
       opts.lane?.role ?? null,
+      criticOfId,
     );
     if (opts.claudeSessionId) {
       db.prepare(`
