@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4210",
   "created": "2026-09-26T01:39:06.772Z",
-  "updated": "2026-09-26T04:27:16.771Z",
+  "updated": "2026-09-26T04:27:27.155Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "deferral-reports-freeze.ac2": {
       "status": "completed",
       "doneAt": "2026-09-26T04:27:16.771Z"
+    },
+    "deferral-reports-freeze.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:27:27.155Z"
     }
   }
 }
