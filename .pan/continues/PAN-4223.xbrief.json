@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T07:59:00.421Z",
+  "updated": "2026-09-26T07:59:22.326Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -364,6 +364,10 @@
     "lane-views.ac4": {
       "status": "completed",
       "doneAt": "2026-09-26T07:59:00.421Z"
+    },
+    "lane-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:59:22.325Z"
     }
   }
 }
