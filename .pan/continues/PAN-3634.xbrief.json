@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3634",
   "created": "2026-09-26T06:15:47.084Z",
-  "updated": "2026-09-26T08:26:09.149Z",
+  "updated": "2026-09-26T08:26:23.567Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "retire-run-id-spawn.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T08:26:09.149Z"
+    },
+    "retire-run-id-spawn.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:26:23.567Z"
     }
   }
 }
