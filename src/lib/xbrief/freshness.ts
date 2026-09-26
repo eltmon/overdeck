@@ -7,6 +7,11 @@
  * paths that no longer exist. `checkPlanFreshness` is pure so it can be
  * tested without a filesystem; `pan start` calls it with real `existsSync`
  * right before spawning.
+ *
+ * A missing path is drift only when a commit on the workspace `HEAD`
+ * deleted it after `plan.created`; a path that never existed on `HEAD`, or
+ * that `HEAD` deleted before the plan was written, is a creation or a
+ * restore and is not flagged (PAN-4212).
  */
 
 import { join } from 'node:path';
@@ -23,17 +28,34 @@ export interface PlanFreshnessResult {
 const GLOB_CHARS = /[*?{]/;
 
 /**
+ * A missing path is drift only when history deleted it after the plan was
+ * written. Never deleted ⇒ the plan creates it; deleted before the plan ⇒
+ * the plan restores it. With no plan baseline, any deletion counts as drift.
+ */
+export function isDriftedPath(deletedAtEpoch: number | null, planCreatedEpoch: number | null): boolean {
+  if (deletedAtEpoch === null) return false;
+  return planCreatedEpoch === null || deletedAtEpoch > planCreatedEpoch;
+}
+
+/** `plan.created` as epoch seconds, or null when absent or unparseable. */
+export function planCreatedEpoch(plan: XBriefDocument): number | null {
+  const ms = plan.plan.created ? Date.parse(plan.plan.created) : Number.NaN;
+  return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
+}
+
+/**
  * A plan's `files_scope` names both files an item edits and files it will
- * create. A path that is absent AND was never part of the repository is a
- * file the plan intends to create, not evidence of drift, so callers pass
- * `isNewFile` (typically "no git history for this path") to exclude it.
+ * create. Callers pass `deletedAtEpoch` (the last deletion of a path on HEAD,
+ * in epoch seconds, or null) so only drift is reported. Without it, every
+ * missing path is reported.
  */
 export function checkPlanFreshness(
   plan: XBriefDocument,
   workspaceRoot: string,
   existsFn: (path: string) => boolean,
-  isNewFile: (scope: string) => boolean = () => false,
+  deletedAtEpoch?: (scope: string) => number | null,
 ): PlanFreshnessResult {
+  const baseline = planCreatedEpoch(plan);
   const seen = new Set<string>();
   const missing: string[] = [];
   let checked = 0;
@@ -43,7 +65,8 @@ export function checkPlanFreshness(
       if (GLOB_CHARS.test(scope) || seen.has(scope)) continue;
       seen.add(scope);
       checked += 1;
-      if (!existsFn(join(workspaceRoot, scope)) && !isNewFile(scope)) {
+      if (existsFn(join(workspaceRoot, scope))) continue;
+      if (!deletedAtEpoch || isDriftedPath(deletedAtEpoch(scope), baseline)) {
         missing.push(scope);
       }
     }
