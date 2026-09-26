@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3022",
   "created": "2026-09-26T06:16:24.731Z",
-  "updated": "2026-09-26T08:00:21.201Z",
+  "updated": "2026-09-26T08:00:25.575Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-3022",
       "claimedAt": "2026-09-26T07:46:48.069Z",
       "doneAt": "2026-09-26T08:00:21.201Z"
+    },
+    "delete-resolve-issue-work-model": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3022",
+      "claimedAt": "2026-09-26T08:00:25.575Z"
     }
   }
 }
