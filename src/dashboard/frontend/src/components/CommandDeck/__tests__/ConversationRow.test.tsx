@@ -240,3 +240,50 @@ describe('ConversationRow pull request badge (PAN-3822)', () => {
     expect(mutations.unlinkPullRequest).toHaveBeenCalledWith({ name: 'test-conversation', ref: 'https://github.com/eltmon/overdeck/pull/42' });
   });
 });
+
+describe('ConversationRow lanes and successors (PAN-4223 WI-10)', () => {
+  function renderLineage(overrides: Partial<Conversation>, props: { variant?: 'flat' | 'nested'; orphanOf?: number | null; flattenedFrom?: number | null } = {}) {
+    render(
+      <ConversationRow
+        conv={{ ...conversation, ...overrides }}
+        isSelected={false}
+        onSelect={vi.fn()}
+        mutations={mutations}
+        {...props}
+      />,
+    );
+  }
+
+  it('labels a nested critic lane and shows its DONE report badge', () => {
+    renderLineage(
+      { parentConversationId: 7, gauntletRun: 'hotel', laneKey: '663', laneRole: 'critic', laneIteration: 1, laneReport: { seq: 1, at: 'x', status: 'done' } },
+      { variant: 'nested' },
+    );
+    expect(screen.getByText('C 663 i1')).toBeInTheDocument();
+    const badge = screen.getByText('DONE');
+    expect(badge.className).toContain('badge-bg-state-done');
+    expect(screen.queryByText(/continues ←/)).not.toBeInTheDocument();
+  });
+
+  it('links a successor back to its predecessor', () => {
+    renderLineage({ parentConversationId: 42 });
+    const link = screen.getByRole('link', { name: 'continues ← #42' });
+    expect(link).toHaveAttribute('href', '/conv/42');
+  });
+
+  it('marks a flattened successor and a flattened lane with their real parent', () => {
+    renderLineage({ parentConversationId: 9 }, { variant: 'nested', flattenedFrom: 9 });
+    expect(screen.getByRole('link', { name: '↳ continued from #9' })).toHaveAttribute('href', '/conv/9');
+    expect(screen.queryByText(/continues ←/)).not.toBeInTheDocument();
+  });
+
+  it('marks a flattened lane and an orphan lane as lanes of their parent', () => {
+    renderLineage({ parentConversationId: 15, gauntletRun: 'hotel', laneKey: 'n1', laneRole: 'builder' }, { variant: 'nested', flattenedFrom: 15 });
+    expect(screen.getByText('lane of #15 · hotel')).toBeInTheDocument();
+  });
+
+  it('marks an orphan lane rendered at top level', () => {
+    renderLineage({ parentConversationId: 99, gauntletRun: 'hotel', laneKey: 'lost', laneRole: 'builder' }, { orphanOf: 99 });
+    expect(screen.getByText('lane of #99 · hotel')).toBeInTheDocument();
+  });
+});

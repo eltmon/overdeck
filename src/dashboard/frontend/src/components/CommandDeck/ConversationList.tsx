@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ForkModal } from './ForkModal';
 import { ConversationRow } from './ConversationRow';
+import { buildConversationTree, groupSummary, isConversationActive, type ConversationTreeNode } from './conversation-tree';
 import { useConversationMutations } from './useConversationMutations';
 import { useDashboardStore } from '../../lib/store';
 import type { ContextUsage } from '../chat/chat-types';
@@ -209,6 +210,38 @@ interface ConversationListProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/** PAN-4223 D18: localStorage key holding the top-level names the viewer collapsed. */
+export const GROUPS_COLLAPSED_STORAGE_KEY = 'commandDeck.groups.collapsed';
+
+function readCollapsedGroups(): Set<string> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(GROUPS_COLLAPSED_STORAGE_KEY) ?? '[]');
+    return new Set(Array.isArray(parsed) ? parsed.filter((name): name is string => typeof name === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeCollapsedGroups(names: ReadonlySet<string>): void {
+  try {
+    localStorage.setItem(GROUPS_COLLAPSED_STORAGE_KEY, JSON.stringify([...names]));
+  } catch {
+    // Storage unavailable (private window, blocked site data): collapse still works for this view.
+  }
+}
+
+/** The non-zero group counts, in the order the PRD fixes (WI-10 step 3). */
+function groupSummaryText(node: ConversationTreeNode): string {
+  const summary = groupSummary(node);
+  const parts: string[] = [];
+  if (summary.successors > 0) parts.push(`${summary.successors} ${summary.successors === 1 ? 'successor' : 'successors'}`);
+  if (summary.lanes > 0) parts.push(`${summary.lanes} ${summary.lanes === 1 ? 'lane' : 'lanes'}`);
+  if (summary.working > 0) parts.push(`${summary.working} working`);
+  if (summary.needsYou > 0) parts.push(`${summary.needsYou} needs you`);
+  if (summary.reported > 0) parts.push(`${summary.reported} reported`);
+  return parts.join(' · ');
+}
+
 export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds }: ConversationListProps) {
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
@@ -282,8 +315,35 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       sort,
     );
 
-    return [...active, ...inactive];
+    return buildConversationTree([...active, ...inactive]);
   }, [conversations, sort, tab, excludeIds, includeIds]);
+
+  // PAN-4223 D18: per-viewer group collapse. Persisted: names the viewer
+  // collapsed. Session-only: names the viewer expanded against the default.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(readCollapsedGroups);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const isGroupCollapsed = useCallback((node: ConversationTreeNode) => {
+    if (collapsedGroups.has(node.conv.name)) return true;
+    if (expandedGroups.has(node.conv.name)) return false;
+    return !node.descendants.some((child) => isConversationActive(child.conv));
+  }, [collapsedGroups, expandedGroups]);
+  const toggleGroup = useCallback((node: ConversationTreeNode) => {
+    const name = node.conv.name;
+    const collapse = !isGroupCollapsed(node);
+    setCollapsedGroups((previous) => {
+      const next = new Set(previous);
+      if (collapse) next.add(name);
+      else next.delete(name);
+      writeCollapsedGroups(next);
+      return next;
+    });
+    setExpandedGroups((previous) => {
+      const next = new Set(previous);
+      if (collapse) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, [isGroupCollapsed]);
 
   if (isLoading) {
     return (
@@ -338,24 +398,54 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       ) : (
         <div className={styles.conversationList}>
           <AnimatePresence initial={false}>
-            {displayConversations.map((conv) => (
-              <motion.div
-                key={conv.id}
-                layout
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15, ease: 'easeOut' }}
-              >
-                <ConversationRow
-                  conv={conv}
-                  isSelected={selectedConversation === conv.name}
-                  onSelect={(name) => onSelectConversation(name)}
-                  mutations={mutations}
-                  registeredProjects={registeredProjects}
-                />
-              </motion.div>
-            ))}
+            {displayConversations.map((node) => {
+              const collapsed = node.descendants.length > 0 && isGroupCollapsed(node);
+              return (
+                <motion.div
+                  key={node.conv.id}
+                  layout
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                >
+                  <ConversationRow
+                    conv={node.conv}
+                    isSelected={selectedConversation === node.conv.name}
+                    onSelect={(name) => onSelectConversation(name)}
+                    mutations={mutations}
+                    registeredProjects={registeredProjects}
+                    orphanOf={node.orphanOf}
+                  />
+                  {node.descendants.length > 0 && (
+                    <button
+                      type="button"
+                      className={styles.convGroupToggle}
+                      aria-expanded={!collapsed}
+                      onClick={() => toggleGroup(node)}
+                    >
+                      {`${collapsed ? '▸' : '▾'} ${groupSummaryText(node)}`}
+                    </button>
+                  )}
+                  {!collapsed && node.descendants.map((child) => (
+                    <div
+                      key={child.conv.id}
+                      className={child.depth === 2 ? styles.convTreeDepth2 : styles.convTreeDepth1}
+                    >
+                      <ConversationRow
+                        conv={child.conv}
+                        variant="nested"
+                        isSelected={selectedConversation === child.conv.name}
+                        onSelect={(name) => onSelectConversation(name)}
+                        mutations={mutations}
+                        registeredProjects={registeredProjects}
+                        flattenedFrom={child.flattenedFrom}
+                      />
+                    </div>
+                  ))}
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
