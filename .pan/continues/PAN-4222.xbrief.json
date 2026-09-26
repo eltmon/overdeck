@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4222",
   "created": "2026-09-26T00:48:25.214Z",
-  "updated": "2026-09-26T05:19:28.340Z",
+  "updated": "2026-09-26T05:19:41.758Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,10 @@
     "evidence-screenshots.ac2": {
       "status": "completed",
       "doneAt": "2026-09-26T05:19:28.340Z"
+    },
+    "evidence-screenshots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:19:41.757Z"
     }
   }
 }
