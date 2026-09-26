@@ -131,7 +131,9 @@ REFERENCE is the load-bearing slot. Before accepting it, verify it is:
 `ACCEPTED` is the orchestrator's call after a WOWED verdict, never derived.
 `critic` names the real spawned session: the critic lane's conversation id,
 which `pan lane show --run <run> --key <key>` proves is paired with the
-builder.
+builder. The critic reports its verdict with `--verdict` and names its full
+`critique-<area>-iter<n>.json` with `--verdict-file`. The critic link is
+metadata: a critic brief still names no builder.
 
 ## Phase 2 — The loop (per area, areas in waves)
 

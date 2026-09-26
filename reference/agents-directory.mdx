@@ -59,7 +59,9 @@ A gauntlet [lane](/reference/lanes) shows as a `↳` line under the
 conversation that launched it: `↳ <role letter> <lane key> i<n> · <state>`,
 with its report badge (`DONE`, `BLOCKED` or `FAILED`), under a lanes toggle on
 that row. Every lane line shows; the three-line cap applies to subagents only.
-A lane that needs you also gets its own row in **Needs you**. A lane whose
+A critic or verifier lane shows one indent deeper, directly under the builder
+it judges, with its verdict badge (`PENDING` until it files one). A lane that
+needs you also gets its own row in **Needs you**. A lane whose
 launcher is not on the page keeps its own row. A handoff or fork successor
 always keeps its own row, with a `continues ← #<id>` link to the conversation
 it continues, so a live successor never hides under an ended predecessor.
@@ -105,7 +107,9 @@ left pane closed to hide it. **Live** in the top bar goes back.
 Lanes nest under the conversation that launched them, and handoff and fork
 successors nest under their predecessor; a lane shows `<role letter> <lane key>
 i<n>` before its label and a successor shows a `continues ← #<id>` link.
-History shows at most two levels of nesting. A deeper row keeps its place
+A critic or verifier lane nests under the builder it judges, not under the
+conversation that launched it, and carries its verdict. History shows at most
+two levels of nesting. A deeper row keeps its place
 under its real parent's group but renders at the second level, with the
 marker `↳ continued from <parent>` naming its real parent.
 

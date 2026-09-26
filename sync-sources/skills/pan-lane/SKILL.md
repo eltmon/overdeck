@@ -38,6 +38,13 @@ pan lane start --run hotel --key 663 --role builder --brief briefs/663.md --mode
 pan lane start --run hotel --key 663 --role builder --reuse --brief briefs/663-resume.md
 pan lane start --run hotel --key 663 --role builder --replace --brief briefs/663.md
 
+# critics: a fresh lane per iteration, launched by a root conversation; --for names the builder
+pan lane start --run hotel --role critic --for 663 --brief briefs/663-critic.md --model claude-opus-5-5
+#   (no --at: the door checks the critic out at the builder's newest done head)
+#   the critic ends with one verdict:
+#   pan lane report --file r.md --verdict NOT_YET --verdict-file gauntlet/notes/critique-663-iter1.json
+pan lane show --run hotel --key 663                     # i1 built → critic c1: NOT_YET (7 defects) → …
+
 # cold play-tester: an empty directory, no Overdeck context, no CLAUDE.md
 pan lane start --run hotel --key cold-1 --role play --brief briefs/play.md
 
@@ -71,8 +78,11 @@ none there, the launch is refused. `--effort` takes `low`, `medium` or `high`.
 - Iteration n ≥ 2 of a builder gets a new branch `<run>/<key>-i<n>` cut from the previous
   iteration's branch; a branch that reported done is frozen.
 - A builder reports `done` only from a clean, pushed tree (`--allow-unpushed` waives the push).
-- `pan tell` refuses a critic or verifier lane that already filed its done report: launch a fresh
-  one instead.
+- A critic needs `--for <builder key>`; a critic or verifier files exactly one verdict
+  (`--verdict`, with `--verdict-file` naming its JSON). `pan tell` refuses a critic or verifier lane
+  that already filed its done report: launch a fresh one instead.
+- A critic's brief names no builder; the door links the builder row and tells the critic only the
+  commit it judges.
 - `pan lane reap` never kills a process and never discards work: it refuses while a process runs in
   the lane directory, and refuses a dirty tree unless `--park`.
 

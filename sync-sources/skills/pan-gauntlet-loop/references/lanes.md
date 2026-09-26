@@ -85,6 +85,11 @@ The verdict is binary per the reference bar (`WOWED` / `NOT_YET`, or `PASS`
 to the length of the verdict file's `defects` array. A second done report
 from the same critic is refused; the next iteration gets a fresh critic.
 
+The critic link is metadata: the door records which builder row a critic
+judges (`--for`) and checks the critic out at that builder's reported head,
+but the critic brief still names no builder. The board's `critic` field is
+the critic lane's conversation id.
+
 The orchestrator reads reports with `pan lane wait --run <key>`, which
 returns them oldest first and prints the next command with its cursor, and
 proves each builder ↔ critic pairing with

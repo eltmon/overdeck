@@ -34,13 +34,15 @@ and critics.
 ## Commands
 
 ```text
-pan lane start --key <key> --role <role> (--brief <file> | --prompt <text>)
+pan lane start (--key <key> | --for <builder key>) --role <role> (--brief <file> | --prompt <text>)
                [--run <key>] [--parent <conv>] [--project <key>] [--model <m>] [--harness <h>] [--effort <e>]
                [--title <t>] [--branch <b>] [--from <ref>] [--at <ref>] [--reuse] [--replace] [--no-wait] [--json]
 pan lane list  [--run <key>] [--parent <conv>] [--json]
+pan lane show  (<lane> | --run <key> --key <key>) [--json]
 pan lane wait  <lane> [--after <seq>] [--timeout <s>]
 pan lane wait  (--run <key> | --parent <conv>) [--after <cursor>] [--timeout <s>]
 pan lane report (--file <path> | --stdin) [--status done|blocked|failed] [--allow-unpushed]
+               [--verdict <value>] [--defects <n>] [--verdict-file <path>]
 pan lane stop  <lane>
 pan lane reap  <lane> [--park] [--keep]
 ```
@@ -50,7 +52,8 @@ pan lane reap  <lane> [--park] [--keep]
 | Command | What it does |
 |---------|--------------|
 | `start` | Creates the lane's directory, writes the brief once to `~/.overdeck/agents/conv-<name>/lane-brief.md`, creates the conversation with the lane contract as its first message, and waits up to 180 s until it has started (`--no-wait` returns at once). Prints `Lane <run>/<key> <role> i<n>: conv <id> (<name>) in <cwd>`. |
-| `list` | Every lane with `ID`, `RUN/KEY`, `ROLE`, `ITER`, `ACTIVITY`, `REPORT`, `BRANCH@SHA`, `AHEAD`, `DIRTY`, `MODEL` and `COST`. An archived lane reads `archived` in `ACTIVITY`. |
+| `list` | Every lane with `ID`, `RUN/KEY`, `ROLE`, `ITER`, `ACTIVITY`, `REPORT`, `FOR`, `VERDICT`, `BRANCH@SHA`, `AHEAD`, `DIRTY`, `MODEL` and `COST`. An archived lane reads `archived` in `ACTIVITY`. |
+| `show` | The builder → critic chain of one run and key, then one line per lane. See [Critics and builders](#critics-and-builders). |
 | `wait <lane>` | Waits for the lane's next report, with `pan worker wait` semantics. |
 | `wait --run` / `--parent` | Waits for the next report of any lane in the set after a cursor `<atMs>.<name>.<seq>`, oldest first. Prints the report body on stdout and the next command, with the new cursor, on stderr. |
 | `report` | Run inside a lane: records its report in the worker report store keyed `conv-<name>`, with the head SHA and branch for git-backed lanes. |
@@ -168,6 +171,48 @@ A refused reap archives nothing. The brief, the reports and any parked patch in
 `pan lane list` and `GET /api/lanes` with `activity: stopped`, so a run's
 ledger stays complete. Reap builders before the orchestrator lane that launched
 them: an archived orchestrator lane leaves its unreaped builders as orphans.
+
+## Critics and builders
+
+A critic or verifier lane records the builder row it judges, once, at launch.
+
+- `--for <builder key>` names the builder. It is **required for a critic** and
+  optional for a verifier (a verifier sometimes judges a whole run rather than
+  one builder). `--key` defaults to `--for`; a different `--key` is refused, as
+  is a `--for` with no builder of that key in the run.
+- Without `--at`, the critic is checked out at the head of the newest `done`
+  report of the judged builder iteration. When that iteration has no done
+  report, the launch is refused: `builder <key> i<n> has no done report; pass --at <sha>`.
+- A critic or verifier files **exactly one verdict**, with its done report:
+
+  ```bash
+  pan lane report --file r.md --verdict NOT_YET --verdict-file gauntlet/notes/critique-663-iter1.json [--defects 7]
+  ```
+
+  The verdict is `WOWED`, `IMPRESSED`, `NOT_YET`, `PASS` or `DEFECTS`. The
+  defect count defaults to the length of the verdict file's `defects` array.
+  A done report without a verdict, `--verdict` on another role or on a
+  blocked report, and a second done report from the same critic are refused.
+- **Pairing is by iteration.** The critics of builder iteration n are the
+  critic and verifier lanes of the same run and key whose judged row has
+  iteration n, so a `--reuse` respawn shares them. A builder of iteration
+  n ≥ 2 is told the verdict it answers: the newest critic of iteration n − 1
+  created before it, named by conversation id, verdict and verdict file.
+- `pan lane show --run hotel --key 663` prints the chain, for example
+  `i1 built → critic c1: NOT_YET (7 defects) → i2 built → critic c2: WOWED`,
+  then one line per lane: `#<id> <role> i<n> <activity> <verdict> <verdict file>`.
+  `pan lane show <lane>` finds the run and key from any lane of the chain.
+- `pan lane list` shows `FOR` (`<key> i<n>`, the judged builder iteration) and
+  `VERDICT` (a critic's verdict, or a builder's newest critic verdict, with
+  the defect count, as in `NOT_YET 7`).
+- **Blindness is preserved.** The link changes nothing a critic is told: its
+  lane contract and brief contain neither the builder's conversation name nor
+  any text of a builder report. Only the commit it judges comes from the
+  builder.
+
+On the Command Deck and the Agents page a critic nests under the builder it
+judges, with a verdict badge; a builder shows its newest critic verdict as a
+link to that critic.
 
 ## Handoffs and succession
 
