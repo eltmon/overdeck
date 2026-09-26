@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3634",
   "created": "2026-09-26T06:15:47.084Z",
-  "updated": "2026-09-26T07:45:35.644Z",
+  "updated": "2026-09-26T07:45:42.666Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-3634",
       "claimedAt": "2026-09-26T07:26:38.592Z",
       "doneAt": "2026-09-26T07:45:35.644Z"
+    },
+    "exemption-reads-startedby": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T07:45:42.666Z"
     }
   }
 }
