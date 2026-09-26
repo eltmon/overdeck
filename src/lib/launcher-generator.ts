@@ -100,7 +100,7 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
     binaryPath: string;
     provider: string;
     workspace: string;
-    contextFile: string;
+    contextFile?: string;
     thinking?: string;
     resumeSessionFile?: string;
   };
@@ -916,8 +916,8 @@ function buildPrimeAgentCommand(config: LauncherConfig, useExec: boolean): strin
     '--workspace', shellQuote(prime.workspace),
     '--provider', shellQuote(prime.provider),
     '--model', shellQuoteModelId(config.model),
-    '--context-file', shellQuote(prime.contextFile),
   ];
+  if (prime.contextFile) tokens.push('--context-file', shellQuote(prime.contextFile));
   if (prime.thinking) tokens.push('--thinking', shellQuote(prime.thinking));
   if (prime.resumeSessionFile) tokens.push('--resume', shellQuote(prime.resumeSessionFile));
 

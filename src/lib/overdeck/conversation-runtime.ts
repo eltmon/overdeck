@@ -56,6 +56,10 @@ import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { waitForClaudeReady } from './claude-readiness.js';
 import { claudeSystemPromptFiles, getAcpLauncherFields, waitForHostReady, waitForPromptReady } from '../agents/runtime-command.js';
+import { reapPrimeAgentDaemon } from '../prime-agent/daemon.js';
+import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
+import { hostTransportFor } from '../runtimes/host-transport.js';
+import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
@@ -176,6 +180,12 @@ export async function stopConversationRuntime(conv: Conversation, name: string):
   if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) return;
   await closeCompanionTerminalForOwner(conv.tmuxSession); // PAN-3974: the companion goes with its runtime
   await closeConversationPane(conv.tmuxSession);
+  // D3: a pane close can kill the Prime host before it reaps its private daemon.
+  if (conv.harness === 'prime-agent') {
+    await reapPrimeAgentDaemon(conv.tmuxSession).catch((error: unknown) => {
+      console.warn(`[conversations] failed to reap the Prime Agent daemon for ${name}: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
   try {
     await killConversationRuntimeProcesses(conv);
   } catch (error: unknown) {
@@ -318,8 +328,10 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
     if (!await waitForPromptReady(tmuxSession, harness, 60)) throw new Error('Muse Code did not become interactive within 60 seconds');
     return;
   }
-  if (harness === 'acp' || harness === 'opencode') {
-    await waitForHostReady(tmuxSession, 'acp', 30, { sessionExists: tmuxSessionExists }); // the conversation liveness door, not the agent oracle
+  const hostTransport = hostTransportFor(harness);
+  if (hostTransport) {
+    // The conversation liveness door, not the agent oracle.
+    await waitForHostReady(tmuxSession, hostTransport, hostTransport === 'acp' ? 30 : 60, { sessionExists: tmuxSessionExists });
     return;
   }
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;
@@ -585,6 +597,7 @@ export async function spawnConversationSession(
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
+  let primeLaunch: Awaited<ReturnType<typeof getPrimeAgentLauncherFields>> | undefined;
   const museSavedSession = harness === 'muse' && resume ? await resolveMuseSessionPath(tmuxSession) : null;
   const museFields = harness === 'muse' ? {
     harness: 'muse' as const,
@@ -609,6 +622,17 @@ export async function spawnConversationSession(
       resumeSessionId,
     };
     runtimeCommand = 'acp-host';
+  } else if (behavior.launchCommandKind === 'prime-agent-host') {
+    if (!model) throw new Error('Prime Agent conversation requires a model');
+    if (!SAFE_MODEL_PATTERN.test(model)) throw new Error('Invalid model name');
+    // Unlike acp-session-id, the pointer and the recorded id stay: the host
+    // verifies the resumed session against both (D7).
+    primeLaunch = await getPrimeAgentLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, {
+      effort,
+      resumeSessionFile: resume ? await requirePrimeAgentSessionFile(tmuxSession) : undefined,
+      withContext: !bareContext,
+    });
+    runtimeCommand = 'prime-agent-host';
   } else if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
@@ -720,6 +744,7 @@ export async function spawnConversationSession(
     !piFields &&
     !codexFields &&
     !acpFields &&
+    !primeLaunch &&
     !kimiCodeFields &&
     !museFields &&
     !plainFork &&
@@ -771,7 +796,7 @@ export async function spawnConversationSession(
         unsetProviderEnv: true,
         managedStateKey: tmuxSession,
         // Hooks attribute by OVERDECK_AGENT_ID when there is no $TMUX to read (Herdr).
-        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor || backend.name !== 'tmux') ? { agentId: tmuxSession } : {}) },
+        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || primeLaunch || useSupervisor || backend.name !== 'tmux') ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [
           harnessLaunch.pathExport,
           `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
@@ -789,17 +814,17 @@ export async function spawnConversationSession(
           ? await piConversationSystemPromptFiles(cwd)
           : codexFields
             ? await codexConversationSystemPromptFiles(cwd)
-            : acpFields || museFields
+            : acpFields || museFields || primeLaunch
               ? []
               : kimiCodeFields
                 ? await claudeSystemPromptFiles(cwd, 'kimi-code')
               : await claudeConversationSystemPromptFiles(cwd),
         model: launcherModel,
-        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? museFields ?? {
+        ...(piFields ?? codexFields ?? acpFields ?? primeLaunch?.fields ?? kimiCodeFields ?? museFields ?? {
           resumeSessionId: resume ? claudeSessionId : undefined,
           sessionId: resume ? undefined : claudeSessionId,
         }),
-        extraArgs: !piFields && !acpFields && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
+        extraArgs: !piFields && !acpFields && !primeLaunch && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
         keepAlive: backend.name === 'tmux', // a sleep loop in a Herdr pane reads as a live harness (#3992)
         execConversationHarness: backend.name !== 'tmux',
         fileMode: 0o700,
@@ -824,6 +849,7 @@ export async function spawnConversationSession(
         argv: ['bash', launcherScript],
         env: {
           ...BLANKED_PROVIDER_ENV,
+          ...(primeLaunch?.paneEnv ?? {}),
           TERM: 'xterm-256color',
         },
         tokens: {
@@ -987,7 +1013,7 @@ export async function handleConversationCreate(
                 { kimiContext: { workspace: cwd } },
               )
             : await deliverAgentMessage(tmuxSession, message, 'conversation-message', method);
-          if ((harness === 'acp' || harness === 'opencode' || harness === 'kimi-code') && !delivery.ok) {
+          if ((harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'prime-agent') && !delivery.ok) {
             throw new Error(`${getHarnessBehavior(harness).displayName} initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
           }
         }
@@ -997,7 +1023,7 @@ export async function handleConversationCreate(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with
         // no owned native identity presented as a healthy conversation.
-        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
+        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') await stopConversationRuntime(conv, name);
         updateSpawnError(name, msg);
         getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
       }
@@ -1102,7 +1128,7 @@ export async function handleConversationResume(
       // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
       // acp — a failed capture must not leave a running tmux session with no
       // owned native identity presented as a healthy conversation.
-      if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
+      if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') await stopConversationRuntime(conv, name);
       throw error;
     } finally {
       respawn.done();
@@ -1153,7 +1179,7 @@ export async function handleConversationRestartAll(
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness, false, conversationLaunchContext(conv));
-        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') {
+        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
         }
         if (harness === 'kimi-code' && !conv.bareContext) {
@@ -1170,7 +1196,7 @@ export async function handleConversationRestartAll(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with no
         // owned native identity presented as a healthy conversation.
-        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode' || attemptedHarness === 'muse') await stopConversationRuntime(conv, conv.name);
+        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode' || attemptedHarness === 'muse' || attemptedHarness === 'prime-agent') await stopConversationRuntime(conv, conv.name);
         results.push({ name: conv.name, model: conv.model, status: 'failed' });
       } finally {
         respawn.done();

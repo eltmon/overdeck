@@ -23,7 +23,8 @@ export interface PrimeAgentLauncherFields {
     binaryPath: string;
     provider: string;
     workspace: string;
-    contextFile: string;
+    /** Absent for a bare-context conversation. */
+    contextFile?: string;
     thinking?: string;
     resumeSessionFile?: string;
   };
@@ -38,11 +39,13 @@ export async function getPrimeAgentLauncherFields(
   model: string,
   workspace: string,
   binaryPath: string,
-  options: { effort?: string; resumeSessionFile?: string } = {},
+  options: { effort?: string; resumeSessionFile?: string; withContext?: boolean } = {},
 ): Promise<{ fields: PrimeAgentLauncherFields; paneEnv: Record<string, string> }> {
   const credential = await resolvePrimeAgentCredential(model, await getProviderAuthMode(model));
   primeAgentDaemonSocketPath(agentId);
-  const contextFile = materializeManagedLaunchContext(join(getAgentDir(agentId), PRIME_AGENT_CONTEXT_FILE), workspace, 'prime-agent');
+  const contextFile = options.withContext === false
+    ? undefined
+    : materializeManagedLaunchContext(join(getAgentDir(agentId), PRIME_AGENT_CONTEXT_FILE), workspace, 'prime-agent');
   const thinking = options.effort && (PRIME_AGENT_THINKING_LEVELS as readonly string[]).includes(options.effort) ? options.effort : undefined;
   return {
     fields: {
@@ -52,7 +55,7 @@ export async function getPrimeAgentLauncherFields(
         binaryPath,
         provider: credential.provider,
         workspace,
-        contextFile,
+        ...(contextFile ? { contextFile } : {}),
         ...(thinking ? { thinking } : {}),
         ...(options.resumeSessionFile ? { resumeSessionFile: options.resumeSessionFile } : {}),
       },
