@@ -2,6 +2,8 @@
 
 The Flywheel is the `/pan-flywheel` loop skill running in one operator conversation, `conv-flywheel`. It ticks the backlog and order books, launches work with `pan start`, watches each PR to landing, and parks what it cannot decide. There is no daemon and no run record.
 
+Every agent the loop starts carries provenance `startedBy: 'flywheel:conv-flywheel'` (PAN-3634), resolved by `resolveCliStartedBy()` from `OVERDECK_CONVERSATION=conv-flywheel` on the shell the conversation runs in — there is no run id to stamp or read anymore. The planning auto-handoff and its deferred retry carry that same token to the work agent only when the planning session they hand off from was itself Flywheel-started (`planningHandoffStartedBy()`); otherwise they send `planning-auto-handoff`, an operator origin. This is what the emergency brake and the memory governor's shed key their operator-started exemption on: only a `flywheel:`-prefixed `startedBy` is ever reaped automatically.
+
 PAN-3917 cut the Flywheel page and its `pause`/`resume`/`abort`/`report`/`stats` verbs along with the stored run records. PAN-3964 brought the page and the verbs back as a **derived view**: every status the page shows is computed when it is read, from sources that already exist. Nothing new is stored in SQLite. The only files are the loop's own `.pan/flywheel/state.md` and `.pan/flywheel/report.md`.
 
 `pan flywheel status`, `GET /api/flywheel/status`, and the page all call the same function, `deriveFlywheelStatus()` in `src/lib/flywheel/derive-status.ts`, so the CLI and the page show the same answer.

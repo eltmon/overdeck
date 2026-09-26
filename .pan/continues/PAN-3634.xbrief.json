@@ -1,0 +1,155 @@
+{
+  "version": "1",
+  "issueId": "PAN-3634",
+  "created": "2026-09-26T06:15:47.084Z",
+  "updated": "2026-09-26T08:31:09.553Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "provenance-flywheel-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T06:15:47.084Z",
+      "doneAt": "2026-09-26T06:19:37.008Z"
+    },
+    "retire-run-id-spawn": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T06:19:45.763Z",
+      "doneAt": "2026-09-26T07:26:29.447Z"
+    },
+    "validator-accepts-flywheel-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T07:26:38.592Z",
+      "doneAt": "2026-09-26T07:45:35.644Z"
+    },
+    "exemption-reads-startedby": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T07:45:42.666Z",
+      "doneAt": "2026-09-26T07:59:43.497Z"
+    },
+    "handoff-complete-planning": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T07:59:53.410Z",
+      "doneAt": "2026-09-26T08:15:46.794Z"
+    },
+    "handoff-deferred-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T08:15:50.297Z",
+      "doneAt": "2026-09-26T08:19:21.260Z"
+    },
+    "docs-flywheel-provenance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T08:19:25.347Z",
+      "doneAt": "2026-09-26T08:20:24.047Z"
+    },
+    "provenance-flywheel-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:23:50.340Z"
+    },
+    "provenance-flywheel-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:24:31.666Z"
+    },
+    "provenance-flywheel-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:24:43.956Z"
+    },
+    "provenance-flywheel-token.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:24:55.737Z"
+    },
+    "provenance-flywheel-token.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:25:13.667Z"
+    },
+    "retire-run-id-spawn.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:25:33.195Z"
+    },
+    "retire-run-id-spawn.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:25:51.614Z"
+    },
+    "retire-run-id-spawn.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:26:09.149Z"
+    },
+    "retire-run-id-spawn.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:26:23.567Z"
+    },
+    "validator-accepts-flywheel-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:26:43.695Z"
+    },
+    "validator-accepts-flywheel-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:27:04.713Z"
+    },
+    "validator-accepts-flywheel-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:27:22.633Z"
+    },
+    "validator-accepts-flywheel-token.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:27:36.399Z"
+    },
+    "exemption-reads-startedby.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:27:55.554Z"
+    },
+    "exemption-reads-startedby.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:28:19.999Z"
+    },
+    "exemption-reads-startedby.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:28:42.125Z"
+    },
+    "exemption-reads-startedby.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:29:00.126Z"
+    },
+    "handoff-complete-planning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:29:12.657Z"
+    },
+    "handoff-complete-planning.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:29:26.058Z"
+    },
+    "handoff-complete-planning.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:29:44.114Z"
+    },
+    "handoff-complete-planning.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:30:00.495Z"
+    },
+    "handoff-deferred-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:30:20.274Z"
+    },
+    "handoff-deferred-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:30:37.171Z"
+    },
+    "docs-flywheel-provenance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:30:54.081Z"
+    },
+    "docs-flywheel-provenance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:31:09.553Z"
+    }
+  }
+}

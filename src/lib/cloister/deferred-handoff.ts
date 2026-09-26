@@ -24,6 +24,7 @@ import type { DomainEvent } from '@overdeck/contracts';
 
 import { emitActivityEntry } from '../activity-logger.js';
 import { getAgentState } from '../agents/agent-state-read.js';
+import { planningHandoffStartedBy } from '../agents/provenance.js';
 import { readAutoSpawnOnFinalizeFlagAsync } from '../planning/auto-spawn-consent.js';
 import { liveAgentInventory } from '../terminal-backends/inventory.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
@@ -121,16 +122,16 @@ export interface RetryDeferredHandoffsDeps {
   liveAgentInventory?: typeof liveAgentInventory;
   getAgentState?: typeof getAgentState;
   readConsent?: (issueId: string) => Promise<boolean>;
-  spawn?: (issueId: string) => Promise<SpawnWorkAgentResult>;
+  spawn?: (issueId: string, startedBy: string) => Promise<SpawnWorkAgentResult>;
   emitActivity?: typeof emitActivityEntry;
 }
 
 const inFlight = new Set<string>();
 
-function defaultSpawn(issueId: string): Promise<SpawnWorkAgentResult> {
+function defaultSpawn(issueId: string, startedBy: string): Promise<SpawnWorkAgentResult> {
   // No acknowledgement: `spawnWorkAgentThroughAgentsEndpoint` sends none, so
   // every guardrail warning still refuses the retry.
-  return spawnWorkAgentThroughAgentsEndpoint(issueId, undefined, true, 'planning-auto-handoff');
+  return spawnWorkAgentThroughAgentsEndpoint(issueId, undefined, true, startedBy);
 }
 
 /** Skip reasons that end the retries without calling it a failure: the operator or the tracker decided. */
@@ -215,9 +216,12 @@ async function retryOne(input: {
   if (now < Date.parse(schedule.nextRetryAt)) return null;
 
   const attempt = schedule.attempt + 1;
+  const startedBy = planningHandoffStartedBy(
+    input.readAgentState(`planning-${issueId.toLowerCase()}`)?.startedBy,
+  );
   let result: SpawnWorkAgentResult;
   try {
-    result = await (deps.spawn ?? defaultSpawn)(issueId);
+    result = await (deps.spawn ?? defaultSpawn)(issueId, startedBy);
   } catch (err) {
     result = { spawned: false, skippedReason: 'unreachable', error: err instanceof Error ? err.message : String(err) };
   }

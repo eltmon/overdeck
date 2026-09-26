@@ -22,7 +22,6 @@ let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
 let stopAgentMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
-let activeFlywheelRunId: string | null;
 const HEAVY_HOOK_TIMEOUT_MS = 20_000;
 
 function baseState(partial: Partial<AgentState> = {}): AgentState {
@@ -203,14 +202,6 @@ function mockSpawnDependencies(): void {
   vi.doMock('../provider-health.js', () => ({
     validateProviderHealth: vi.fn(async () => undefined),
   }));
-  // agents.ts now imports getFlywheelActiveRunId from overdeck/control-settings (not database/app-settings)
-  vi.doMock('../overdeck/control-settings.js', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../overdeck/control-settings.js')>();
-    return {
-      ...actual,
-      getFlywheelActiveRunId: () => activeFlywheelRunId,
-    };
-  });
   vi.doMock('../projects.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../projects.js')),
     findProjectByPath: vi.fn(() => null),
@@ -233,7 +224,6 @@ beforeEach(() => {
   process.env.OVERDECK_AGENT_STARTED_BY = 'test:agents-spawn-supervisor';
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
-  activeFlywheelRunId = null;
   delete process.env.PAN_DOCKER;
   delete process.env.OVERDECK_DOCKER_WORKSPACE;
   mockSpawnDependencies();
@@ -563,9 +553,8 @@ describe('spawnAgent PTY supervisor wiring', () => {
     })).resolves.toMatchObject({ role: 'review' });
   });
 
-  it('threads active flywheel provenance env into spawnRun work agents', async () => {
+  it('never threads legacy flywheel run-id env into spawnRun work agents', async () => {
     const supervisorScriptPath = writeSupervisorArtifact();
-    activeFlywheelRunId = 'RUN-777';
     const { spawnRun } = await import('../agents.js');
 
     await spawnRun('PAN-1405', 'work', {
@@ -576,19 +565,11 @@ describe('spawnAgent PTY supervisor wiring', () => {
     const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
     const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
     expect(launcher).toContain(`exec node '${supervisorScriptPath}' claude`);
-    expect(launcher).toContain('export OVERDECK_FLYWHEEL_RUN_ID=RUN-777');
-    expect(launcher).toContain('export OVERDECK_FLYWHEEL_AGENT_ROLE=work');
-    expect(createSessionMock).toHaveBeenCalledWith(
-      'agent-pan-1405',
-      workspace,
-      `bash ${join(agentDir, 'launcher.sh')}`,
-      expect.objectContaining({
-        env: expect.objectContaining({
-          OVERDECK_FLYWHEEL_RUN_ID: 'RUN-777',
-          OVERDECK_FLYWHEEL_AGENT_ROLE: 'work',
-        }),
-      }),
-    );
+    expect(launcher).not.toContain('OVERDECK_FLYWHEEL_RUN_ID');
+    expect(launcher).not.toContain('OVERDECK_FLYWHEEL_AGENT_ROLE');
+    const sessionOptions = createSessionMock.mock.calls[0][3] as { env: Record<string, string> };
+    expect(sessionOptions.env.OVERDECK_FLYWHEEL_RUN_ID).toBeUndefined();
+    expect(sessionOptions.env.OVERDECK_FLYWHEEL_AGENT_ROLE).toBeUndefined();
   });
 
   it('records the role run\'s backend pane in its state, as spawnAgent does (PAN-3923)', async () => {
@@ -790,49 +771,22 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(modelSetCall?.[1]).not.toHaveProperty('sessionHarness');
   });
 
-  it('threads flywheel orchestrator provenance env into launcher and tmux session', async () => {
+  it('never threads legacy flywheel run-id env into the flywheel orchestrator launch', async () => {
     const { spawnRun } = await import('../agents.js');
 
     await spawnRun('RUN-777', 'flywheel', {
       agentId: 'flywheel-orchestrator',
       workspace,
       model: 'claude-opus-4-7',
-      flywheelRunId: 'RUN-777',
       allowHost: true,
+      startedBy: 'flywheel:conv-flywheel',
     });
 
     const agentDir = join(tmpHome, 'agents', 'flywheel-orchestrator');
     const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
-    expect(launcher).toContain('export OVERDECK_FLYWHEEL_RUN_ID=RUN-777');
-    expect(launcher).toContain('export OVERDECK_FLYWHEEL_AGENT_ROLE=flywheel');
-    expect(createSessionMock).toHaveBeenCalledWith(
-      'flywheel-orchestrator',
-      workspace,
-      `bash ${join(agentDir, 'launcher.sh')}`,
-      expect.objectContaining({
-        env: expect.objectContaining({
-          OVERDECK_FLYWHEEL_RUN_ID: 'RUN-777',
-          OVERDECK_FLYWHEEL_AGENT_ROLE: 'flywheel',
-        }),
-      }),
-    );
-  });
-
-  it('omits flywheel provenance env when no canonical run is active', async () => {
-    writeSupervisorArtifact();
-    activeFlywheelRunId = 'not-a-run-id';
-    const { spawnRun } = await import('../agents.js');
-
-    await spawnRun('PAN-1405', 'work', {
-      workspace,
-      model: 'claude-sonnet-4-6',
-    });
-
-    const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
-    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
-    const sessionOptions = createSessionMock.mock.calls[0][3] as { env: Record<string, string> };
     expect(launcher).not.toContain('OVERDECK_FLYWHEEL_RUN_ID');
     expect(launcher).not.toContain('OVERDECK_FLYWHEEL_AGENT_ROLE');
+    const sessionOptions = createSessionMock.mock.calls[0][3] as { env: Record<string, string> };
     expect(sessionOptions.env.OVERDECK_FLYWHEEL_RUN_ID).toBeUndefined();
     expect(sessionOptions.env.OVERDECK_FLYWHEEL_AGENT_ROLE).toBeUndefined();
   });

@@ -31,6 +31,7 @@ import { readPipelineJournal } from '../../../../lib/cloister/pipeline-journal.j
 import { readAutoSpawnOnFinalizeFlagAsync, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
+import type { AgentState } from '../../../../lib/agents/agent-state-read.js';
 
 // PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
 // it transitively (config-yaml → tier-table → record, workspaces/resolver →
@@ -434,6 +435,70 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1146',
+    });
+  });
+
+  // PAN-3634: the auto-handoff copies Flywheel provenance only when the
+  // planning session it hands off from was itself Flywheel-started.
+  it('sends planning-auto-handoff when the planning session was operator-started', async () => {
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        startedBy: 'planning-auto-handoff',
+        autoSpawnConsentRequired: true,
+      });
+      return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-3634a' }), { status: 200 });
+    };
+
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-3634a',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl,
+      readAgentState: () => ({ startedBy: 'operator:cli:pan-start' }) as AgentState,
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-3634a',
+    });
+  });
+
+  it('sends planning-auto-handoff when no planning session state exists', async () => {
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        startedBy: 'planning-auto-handoff',
+      });
+      return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-3634b' }), { status: 200 });
+    };
+
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-3634b',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl,
+      readAgentState: () => null,
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-3634b',
+    });
+  });
+
+  it('carries flywheel:conv-flywheel when the planning session was Flywheel-started', async () => {
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        startedBy: 'flywheel:conv-flywheel',
+        autoSpawnConsentRequired: true,
+      });
+      return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-3634c' }), { status: 200 });
+    };
+
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-3634c',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl,
+      readAgentState: () => ({ startedBy: 'flywheel:conv-flywheel' }) as AgentState,
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-3634c',
     });
   });
 

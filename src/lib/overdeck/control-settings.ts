@@ -239,16 +239,3 @@ export function setMergeTrainEnabled(enabled: boolean): void {
   setSetting(MERGE_TRAIN_ENABLED_KEY, enabled ? 'true' : 'false');
 }
 
-// ── Sync bridge — used by lib/agents.ts (sync context) ──────────────────────
-
-/**
- * Returns the currently-active flywheel run ID from overdeck.db, or null.
- * Sync version of SettingsResolver.getFlywheelRuntime().activeRunId.
- */
-export function getFlywheelActiveRunId(): string | null {
-  const db = getOverdeckDatabase(undefined, { readOnly: true });
-  const row = db
-    .prepare(`SELECT value FROM app_settings WHERE key = 'flywheel.active_run_id'`)
-    .get() as { value: string | null } | undefined;
-  return (row?.value as string | null | undefined) ?? null;
-}

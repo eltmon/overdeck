@@ -8,6 +8,7 @@ import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
 import { listRunningAgents } from '../agents/queries.js';
+import { isFlywheelStartedBy } from '../agents/provenance.js';
 import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
 import { setAgentPaused, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
@@ -324,7 +325,7 @@ export interface ShedResult {
 interface ShedCandidateAgent {
   id: string;
   issueId: string;
-  flywheelRunId?: string | null;
+  startedBy?: string | null;
 }
 
 export interface ShedAgentLike {
@@ -365,9 +366,10 @@ export function selectStackShedCandidates(
 
 /**
  * Pure core: the next idle work agent to pause, exempting operator-started
- * agents (PAN-1812, mirrors emergencyBrake's exemption in concurrency.ts —
- * duplicated rather than imported to avoid a memory-governor <-> concurrency
- * circular import) and any agent not in an 'idle' runtime state.
+ * agents (PAN-1812/PAN-3634: eligible iff startedBy is 'flywheel:'-provenanced;
+ * mirrors emergencyBrake's exemption in concurrency.ts — duplicated rather
+ * than imported to avoid a memory-governor <-> concurrency circular import)
+ * and any agent not in an 'idle' runtime state.
  */
 export function selectAgentToPause(
   candidates: readonly ShedCandidateAgent[],
@@ -375,7 +377,7 @@ export function selectAgentToPause(
   exemptOperatorStarted: boolean,
 ): ShedCandidateAgent | null {
   const eligible = exemptOperatorStarted
-    ? candidates.filter((a) => a.flywheelRunId !== undefined && a.flywheelRunId !== null && a.flywheelRunId !== '')
+    ? candidates.filter((a) => isFlywheelStartedBy(a.startedBy))
     : candidates;
   return eligible.find((a) => isIdle(a.id)) ?? null;
 }
@@ -465,7 +467,7 @@ export async function shed(): Promise<ShedResult> {
   const exemptOperatorStarted = loadCloisterConfigSync().concurrency?.exempt_operator_started;
   const workAgents: ShedCandidateAgent[] = runningAgents
     .filter((a) => a.role === 'work')
-    .map((a) => ({ id: a.id, issueId: a.issueId, flywheelRunId: a.flywheelRunId }));
+    .map((a) => ({ id: a.id, issueId: a.issueId, startedBy: a.startedBy }));
   const paused = new Set<string>();
 
   while (verdict.band === 'hard') {

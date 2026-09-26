@@ -44,7 +44,7 @@ import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapsh
 import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
 import { capturePane } from '../../../../lib/tmux.js';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
-import { normalizeFlywheelRunId } from '../../../../lib/agents/provenance.js';
+import { FLYWHEEL_STARTED_BY, normalizeFlywheelRunId } from '../../../../lib/agents/provenance.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -89,6 +89,7 @@ const INTERNAL_STARTED_BY_TOKENS = new Set([
   'orphan-proposed-reconciler',
   'workspace-rebuild-recovery',
   'resume-agent',
+  FLYWHEEL_STARTED_BY,
 ]);
 
 export function resolveRequestedStartedBy(value: unknown, internalRequest = false): string {
