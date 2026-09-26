@@ -178,3 +178,55 @@ describe('lastOutputLine', () => {
     expect(lastOutputLine(['', ''])).toBeNull();
   });
 });
+
+describe('buildLiveSections — gauntlet lanes and successors (PAN-4223 FR-19, FR-29)', () => {
+  const conversation = (id: string, overrides: Partial<DirectoryEntry> = {}) =>
+    entry({ id, kind: 'conversation', label: id, issueId: null, role: null, source: 'conversation', state: 'working', ...overrides });
+  const laneFacts = { run: 'hotel', key: '663', role: 'builder', iteration: 1, reportStatus: null } as const;
+  const noFacts = () => ({});
+  const factsFor = (asking: string) => (e: DirectoryEntry): LiveFacts => (e.id === asking ? { pendingInputKinds: ['askUserQuestion'] } : {});
+  const rowIds = (sections: ReturnType<typeof buildLiveSections>) =>
+    [...sections.needsYou, ...sections.live, ...sections.waiting, ...sections.idle].map((row) => row.entry.id);
+
+  it('nests a working lane under its parent row and gives it no row of its own', () => {
+    const sections = buildLiveSections([
+      conversation('conv:root'),
+      conversation('conv:lane', { parentId: 'conv:root', lane: laneFacts }),
+    ], noFacts, NOW);
+    expect(rowIds(sections)).toEqual(['conv:root']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:lane']);
+  });
+
+  it('shows a needs-you lane both in Needs you and under its parent', () => {
+    const sections = buildLiveSections([
+      conversation('conv:root'),
+      conversation('conv:lane', { parentId: 'conv:root', lane: laneFacts, state: 'blocked' }),
+    ], factsFor('conv:lane'), NOW);
+    expect(sections.needsYou.map((row) => row.entry.id)).toEqual(['conv:lane']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:lane']);
+  });
+
+  it('keeps a lane whose parent is absent as a top-level row', () => {
+    const sections = buildLiveSections([conversation('conv:lane', { parentId: 'conv:gone', lane: laneFacts })], noFacts, NOW);
+    expect(rowIds(sections)).toEqual(['conv:lane']);
+  });
+
+  it('keeps a successor as its own row, not a child of its predecessor', () => {
+    const sections = buildLiveSections([
+      conversation('conv:root'),
+      conversation('conv:next', { parentId: 'conv:root', continuesFrom: 10 }),
+    ], noFacts, NOW);
+    expect(rowIds(sections).sort()).toEqual(['conv:next', 'conv:root']);
+    expect(sections.live.find((row) => row.entry.id === 'conv:root')?.children).toEqual([]);
+  });
+
+  it('hosts an orchestrator lane\'s builders on the root row, one level deep', () => {
+    const sections = buildLiveSections([
+      conversation('conv:root'),
+      conversation('conv:orch', { parentId: 'conv:root', lane: { ...laneFacts, role: 'orchestrator' } }),
+      conversation('conv:b1', { parentId: 'conv:orch', lane: laneFacts }),
+    ], noFacts, NOW);
+    expect(rowIds(sections)).toEqual(['conv:root']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:orch', 'conv:b1']);
+  });
+});
