@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4222",
   "created": "2026-09-26T00:48:25.214Z",
-  "updated": "2026-09-26T05:17:33.327Z",
+  "updated": "2026-09-26T05:17:46.229Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "conversation-provider-error.ac5": {
       "status": "completed",
       "doneAt": "2026-09-26T05:17:33.327Z"
+    },
+    "provider-error-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:17:46.229Z"
     }
   }
 }
