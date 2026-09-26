@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4211",
   "created": "2026-09-26T01:35:27.740Z",
-  "updated": "2026-09-26T04:15:54.551Z",
+  "updated": "2026-09-26T04:25:52.042Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-26T04:15:44.650Z"
     },
     "gate-message-registry-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4211",
-      "claimedAt": "2026-09-26T04:15:54.551Z"
+      "claimedAt": "2026-09-26T04:15:54.551Z",
+      "doneAt": "2026-09-26T04:25:52.042Z"
     }
   }
 }
