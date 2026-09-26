@@ -428,10 +428,11 @@
       "doneAt": "2026-09-26T04:10:40.743Z"
     },
     "planning-launch": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3668",
-      "claimedAt": "2026-09-26T04:10:46.973Z"
+      "claimedAt": "2026-09-26T04:10:46.973Z",
+      "doneAt": "2026-09-26T04:12:37.678Z"
     }
   },
-  "updated": "2026-09-26T04:10:46.973Z"
+  "updated": "2026-09-26T04:12:37.678Z"
 }
