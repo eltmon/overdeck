@@ -38,6 +38,28 @@ export function getIssueDraftPath(projectRoot: string, issueId: string): string 
   return join(draftsDir, lowerFile)
 }
 
+/**
+ * The PRD draft path a planning prompt or PRD-gate message should point an
+ * agent at: the workspace's own copy when it exists, else the primary
+ * checkout's copy (a draft an earlier run promoted there, or one an operator
+ * authored directly), else `null` when neither has one. Checked in that
+ * order because the workspace is where the running agent's own draft lands
+ * (PAN-4224 — promotion now targets the workspace, not the primary).
+ */
+export function resolvePlanningDraftPath(
+  workspacePath: string,
+  primaryRoot: string | null,
+  issueId: string,
+): string | null {
+  const workspaceDraft = getIssueDraftPath(workspacePath, issueId)
+  if (existsSync(workspaceDraft)) return workspaceDraft
+  if (primaryRoot) {
+    const primaryDraft = getIssueDraftPath(primaryRoot, issueId)
+    if (existsSync(primaryDraft)) return primaryDraft
+  }
+  return null
+}
+
 export function hasIssueDraft(
   projectRoot: string,
   issueId: string,
