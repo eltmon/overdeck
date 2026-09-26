@@ -58,6 +58,8 @@ export function recordHandoffDeferred(options: {
   error: string;
   httpStatus?: number;
   now?: number;
+  /** True when the Deacon was frozen at the moment of the deferral (PAN-4210): the retry is journaled but held until it thaws. */
+  deaconPaused?: boolean;
 }): PipelineJournalEntry {
   const now = options.now ?? Date.now();
   const schedule: DeferredHandoffSchedule = {
@@ -74,6 +76,7 @@ export function recordHandoffDeferred(options: {
       reason: 'guardrails',
       error: options.error,
       ...(options.httpStatus !== undefined ? { httpStatus: options.httpStatus } : {}),
+      ...(options.deaconPaused === true ? { deaconPaused: true } : {}),
     },
   });
 }
