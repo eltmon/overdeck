@@ -98,6 +98,15 @@ export interface Conversation {
   /** True when the live session is parked on a boot-blocking TUI screen (Claude
    *  first-run onboarding, trust dialog) that only the terminal can answer. */
   needsTerminal?: boolean;
+  /** PAN-4223: legacy id of the launching (lane) or source (successor) conversation. Null = root. */
+  parentConversationId?: number | null;
+  parentConversationName?: string | null;
+  /** PAN-4223: gauntlet lane facts; null unless the row is a lane. */
+  gauntletRun?: string | null;
+  laneKey?: string | null;
+  laneRole?: 'builder' | 'critic' | 'verifier' | 'play' | 'orchestrator' | null;
+  laneIteration?: number | null;
+  laneReport?: { seq: number; at: string; status: 'done' | 'blocked' | 'failed' } | null;
   /** PAN-1990: the projects/workspaces registry row this conversation belongs to. Null for pre-migration rows. */
   workspaceId?: string | null;
   /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
