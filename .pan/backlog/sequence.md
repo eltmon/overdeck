@@ -1,10 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T00:42:41.566945Z · model: claude-opus-5-5 · open: 815_
+_Last sequenced: 2026-09-26T05:07:19.410548Z · model: claude-opus-5-5 · open: 818_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 16 | PAN-4224 | M | critical | ok |  |  | Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write |
+| 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4221 | S | critical | ok |  |  | A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train |
 | 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
@@ -12,6 +14,7 @@ _Last sequenced: 2026-09-26T00:42:41.566945Z · model: claude-opus-5-5 · open: 
 | 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
+| 25 | PAN-4225 | M | critical | ok |  |  | Feedback/continue/spec writers dirty the primary checkout and never commit, so main cannot fast-forward (split from PAN-4224) |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -823,6 +826,14 @@ _Last sequenced: 2026-09-26T00:42:41.566945Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-4224 (rank 16)
+
+New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.
+
+### PAN-4223 (rank 17)
+
+New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.
+
 ### PAN-4222 (rank 18)
 
 New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.
@@ -850,6 +861,10 @@ New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done
 ### PAN-4219 (rank 24)
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
+
+### PAN-4225 (rank 25)
+
+New issue split out of PAN-4224. Review dispatch, verification, close-out and start transitions write per-issue continue and spec files into the primary checkout and never commit them, which blocks the primary checkout from fast-forwarding when the PR merges and lets per-issue state diverge from the branch copy. It is a pipeline-substrate bug with verified evidence, so it ranks critical right behind the in-pipeline PAN-4224 fix and the related PAN-3935 / PAN-3085 plan-home bugs.
 
 ### PAN-3566 (rank 26)
 
@@ -1115,14 +1130,6 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
 
 Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.
 
-### PAN-1618 (rank 111)
-
-Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
-
-### PAN-3916 (rank 112)
-
-Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1130,10 +1137,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T00:42:41.566945Z",
+  "generatedAt": "2026-09-26T05:07:19.410548Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 815,
+  "openCount": 818,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -11221,6 +11228,45 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "rationale": "New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4223",
+      "rank": 17,
+      "size": "L",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator",
+      "rationale": "New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4224",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write",
+      "rationale": "New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4225",
+      "rank": 25,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Feedback/continue/spec writers dirty the primary checkout and never commit, so main cannot fast-forward (split from PAN-4224)",
+      "rationale": "New issue split out of PAN-4224. Review dispatch, verification, close-out and start transitions write per-issue continue and spec files into the primary checkout and never commit them, which blocks the primary checkout from fast-forwarding when the PR merges and lets per-issue state diverge from the branch copy. It is a pipeline-substrate bug with verified evidence, so it ranks critical right behind the in-pipeline PAN-4224 fix and the related PAN-3935 / PAN-3085 plan-home bugs.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12355,8 +12401,50 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "from": "PAN-4197",
       "to": "PAN-4222",
       "type": "informs",
-      "source": "ai-inferred",
+      "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4223",
+      "to": "PAN-3536",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-4166",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-3935",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3935",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3085",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

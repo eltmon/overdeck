@@ -74,6 +74,8 @@ policy, and it never changes the work agent's model (`--model`).
 
 If an agent is paused, `pan start <id>` refuses to spawn until you run `pan unpause <id>`.
 Use `--force` only when you intentionally want to clear that pause gate and start anyway.
+If an agent is troubled (three failures in ten minutes), `pan start <id>` refuses until you
+run `pan untroubled <id>`; `--force` clears the troubled gate and starts anyway.
 
 For projects with workspace Docker configured, `pan start` checks stack health before
 spawning. Use `--host` only as an explicit break-glass override; interactive shells always
