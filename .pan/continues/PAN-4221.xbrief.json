@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4221",
   "created": "2026-09-26T00:40:53.942Z",
-  "updated": "2026-09-26T06:12:28.135Z",
+  "updated": "2026-09-26T06:12:37.841Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "undispatched-recovery.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T06:12:28.134Z"
+    },
+    "undispatched-recovery.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T06:12:37.841Z"
     }
   }
 }
