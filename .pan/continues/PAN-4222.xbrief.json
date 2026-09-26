@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4222",
   "created": "2026-09-26T00:48:25.214Z",
-  "updated": "2026-09-26T05:15:45.701Z",
+  "updated": "2026-09-26T05:15:55.914Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "preview-rail-collapsed.ac1": {
       "status": "completed",
       "doneAt": "2026-09-26T05:15:45.701Z"
+    },
+    "preview-rail-collapsed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:15:55.914Z"
     }
   }
 }
