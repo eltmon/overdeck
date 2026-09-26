@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T06:02:53.117226Z · model: claude-opus-5-5 · open: 783_
+_Last sequenced: 2026-09-26T06:04:17.118473Z · model: claude-opus-5-5 · open: 779_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -49,7 +49,6 @@ _Last sequenced: 2026-09-26T06:02:53.117226Z · model: claude-opus-5-5 · open: 
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
 | 74 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
 | 75 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 76 | PAN-3237 | S | critical | needs-refinement |  |  | A capacity 409 on planning→work handoff is classified as 'guardrails' and marked terminally stuck; three issues stranded at once. |
 | 77 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
 | 78 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
 | 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
@@ -160,7 +159,6 @@ _Last sequenced: 2026-09-26T06:02:53.117226Z · model: claude-opus-5-5 · open: 
 | 195 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
 | 196 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
 | 197 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
-| 198 | PAN-3190 | XS | high | ok |  |  | pan merge cancel has a 0% success rate: Commander binds its options object into the injectable fetchImpl parameter. |
 | 199 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
 | 200 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
 | 202 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
@@ -187,7 +185,6 @@ _Last sequenced: 2026-09-26T06:02:53.117226Z · model: claude-opus-5-5 · open: 
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
-| 233 | PAN-3245 | XS | high | ok |  |  | The pan done gate flags workspace .pan/drafts as uncommitted despite its own .pan exclusion, training agents to reach for --force. |
 | 234 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
 | 235 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
 | 236 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
@@ -207,7 +204,6 @@ _Last sequenced: 2026-09-26T06:02:53.117226Z · model: claude-opus-5-5 · open: 
 | 250 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
 | 251 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
 | 252 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 254 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
 | 257 | PAN-4197 | XL | high | ok |  |  | Agents page shows finished strikes as running (not liveness-derived) and buries live work; operator asks live-first, resizable, recolor. |
@@ -967,10 +963,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-3237 (rank 76)
-
-Triage: markWorkspaceStuck is gone but the root cause (409 capacity refusal mapped to guardrails) lives in the handoff path; verify against current planning-to-work handoff. Rank held.
-
 ### PAN-3234 (rank 77)
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
@@ -1091,6 +1083,10 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 
 New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
 
+### PAN-2639 (rank 115)
+
+codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1098,10 +1094,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T06:02:53.117226Z",
+  "generatedAt": "2026-09-26T06:04:17.118473Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 783,
+  "openCount": 779,
   "nodes": [
     {
       "issue": "PAN-4224",
@@ -1674,19 +1670,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "dependsOn": [],
       "why": "A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts.",
       "rationale": "Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3237",
-      "rank": 76,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "A capacity 409 on planning→work handoff is classified as 'guardrails' and marked terminally stuck; three issues stranded at once.",
-      "rationale": "Triage: markWorkspaceStuck is gone but the root cause (409 capacity refusal mapped to guardrails) lives in the handoff path; verify against current planning-to-work handoff. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3099,18 +3082,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "planning": "auto"
     },
     {
-      "issue": "PAN-3190",
-      "rank": 198,
-      "size": "XS",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan merge cancel has a 0% success rate: Commander binds its options object into the injectable fetchImpl parameter.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-3174",
       "rank": 199,
       "size": "S",
@@ -3429,18 +3400,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "planning": "auto"
     },
     {
-      "issue": "PAN-3245",
-      "rank": 233,
-      "size": "XS",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "The pan done gate flags workspace .pan/drafts as uncommitted despite its own .pan exclusion, training agents to reach for --force.",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-3218",
       "rank": 234,
       "size": "S",
@@ -3670,19 +3629,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "condition": "ok",
       "dependsOn": [],
       "why": "A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3236",
-      "rank": 254,
-      "size": "XS",
-      "importance": "high",
-      "score": 68,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify.",
-      "rationale": "Triage: the stuck field is gone; the ECONNREFUSED misclassification is a delivery-layer bug — verify against current delivery path. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11028,13 +10974,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "confidence": 0.75
     },
     {
-      "from": "PAN-3236",
-      "to": "PAN-3257",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
       "from": "PAN-3113",
       "to": "PAN-3234",
       "type": "informs",
@@ -11759,13 +11698,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "from": "PAN-4211",
       "to": "PAN-1641",
       "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-3237",
-      "to": "PAN-4210",
-      "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
     },
