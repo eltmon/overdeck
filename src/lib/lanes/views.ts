@@ -17,6 +17,7 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { getEnrichedConversationList } from '../overdeck/conversation-list.js';
 import { listLaneConversations, type LaneRole, type LegacyConversation } from '../overdeck/conversations.js';
 import { laneIterations } from './iteration.js';
+import { judgedIteration, pairBuilder, type CriticSummary, type PairingRow, type VerdictState } from './pairing.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -58,6 +59,14 @@ export interface LaneView {
   createdAt: string;
   lastActivityAt: string | null;
   archived: boolean;
+  /** Critic and verifier lanes with a link: the builder row judged (WI-20). */
+  criticOf: { id: number; name: string; key: string; iteration: number } | null;
+  /** Critic and verifier lanes only. */
+  verdict: { value: VerdictState; defects: number | null; file: string | null } | null;
+  /** Builder lanes only; [] otherwise. */
+  critics: CriticSummary[];
+  latestVerdict: CriticSummary | null;
+  answering: CriticSummary | null;
 }
 
 export interface LaneViewFilter {
@@ -117,16 +126,27 @@ function activityOf(row: LegacyConversation, live: EnrichedLiveness | undefined,
   return 'stopped';
 }
 
-/** D7 iterations for the groups of `rows`, counted over every row of each group (archived included). */
-function iterationsFor(rows: readonly LegacyConversation[]): Map<string, number> {
-  const groups = new Map<string, { run: string; key: string; role: LaneRole }>();
+/**
+ * Every lane of each (run, key) the rows belong to, archived included: D7
+ * counts over the whole group, and a critic pairs with a builder another
+ * conversation may have launched (WI-20).
+ */
+function laneGroupsOf(rows: readonly LegacyConversation[]): LegacyConversation[] {
+  const groups = new Map<string, { run: string; key: string }>();
   for (const row of rows) {
-    if (row.gauntletRun && row.laneKey && row.laneRole) {
-      groups.set(`${row.gauntletRun}\u0000${row.laneKey}\u0000${row.laneRole}`, { run: row.gauntletRun, key: row.laneKey, role: row.laneRole });
+    if (row.gauntletRun && row.laneKey) groups.set(`${row.gauntletRun}\u0000${row.laneKey}`, { run: row.gauntletRun, key: row.laneKey });
+  }
+  const seen = new Set<number>();
+  const context: LegacyConversation[] = [];
+  for (const group of groups.values()) {
+    for (const row of listLaneConversations(group)) {
+      if (!seen.has(row.id)) {
+        seen.add(row.id);
+        context.push(row);
+      }
     }
   }
-  const groupRows = [...groups.values()].flatMap((group) => listLaneConversations(group));
-  return laneIterations(groupRows);
+  return context;
 }
 
 async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: number): Promise<LaneView[]> {
@@ -135,16 +155,43 @@ async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: n
   const enriched = await (deps.enrichedList ?? (() => getEnrichedConversationList(500, 0)))();
   const liveness = new Map<string, EnrichedLiveness>();
   for (const entry of enriched as EnrichedLiveness[]) liveness.set(entry.name, entry);
-  const iterations = iterationsFor(rows);
+  const context = laneGroupsOf(rows);
+  const iterations = laneIterations(context);
   const latestReport = deps.latestReport ?? latestWorkerReport;
   const gitFacts = deps.gitFacts ?? readLaneGitFacts;
+  const reports = new Map<string, WorkerReport | null>();
+  await withConcurrencyLimit(context.map((row) => async () => {
+    reports.set(row.name, await latestReport(`conv-${row.name}`));
+  }), GIT_CONCURRENCY);
+  const pairingRows = context.map((row): PairingRow => {
+    const report = reports.get(row.name) ?? null;
+    return {
+      id: row.id,
+      name: row.name,
+      run: row.gauntletRun ?? '',
+      key: row.laneKey ?? '',
+      role: row.laneRole ?? 'builder',
+      iteration: iterations.get(row.name) ?? 1,
+      createdAt: row.createdAt,
+      criticOfId: row.criticOfConversationId,
+      activity: activityOf(row, row.archivedAt === null ? liveness.get(row.name) : undefined, now),
+      report: report ? { status: report.status, ...(report.verdict ? { verdict: report.verdict } : {}) } : null,
+    };
+  });
+  const pairingById = new Map(pairingRows.map((row) => [row.id, row]));
 
   return withConcurrencyLimit(rows.map((row) => async (): Promise<LaneView> => {
     const archived = row.archivedAt !== null;
     const live = archived ? undefined : liveness.get(row.name);
     const role = row.laneRole as LaneRole;
-    const report = await latestReport(`conv-${row.name}`);
+    const report = reports.get(row.name) ?? null;
     const git = !archived && GIT_BACKED_ROLES.has(role) ? await gitFacts(row.cwd) : null;
+    const pairing = pairingById.get(row.id);
+    const judge = role === 'critic' || role === 'verifier';
+    const judged = judge && pairing ? pairingById.get(pairing.criticOfId ?? -1) : undefined;
+    const judgedAt = judge && pairing ? judgedIteration(pairing, pairingById) : null;
+    const verdict = report?.status === 'done' ? report.verdict : undefined;
+    const builderPairing = role === 'builder' && pairing ? pairBuilder(pairing, pairingRows) : null;
     return {
       id: row.id,
       name: row.name,
@@ -169,6 +216,11 @@ async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: n
       createdAt: row.createdAt,
       lastActivityAt: live?.lastActivityAt ?? null,
       archived,
+      criticOf: judged && judgedAt !== null ? { id: judged.id, name: judged.name, key: judged.key, iteration: judgedAt } : null,
+      verdict: judge ? { value: verdict?.value ?? 'pending', defects: verdict?.defects ?? null, file: verdict?.file ?? null } : null,
+      critics: builderPairing?.critics ?? [],
+      latestVerdict: builderPairing?.latestVerdict ?? null,
+      answering: builderPairing?.answering ?? null,
     };
   }), GIT_CONCURRENCY);
 }
