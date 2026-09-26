@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3022",
   "created": "2026-09-26T06:16:24.731Z",
-  "updated": "2026-09-26T07:42:02.037Z",
+  "updated": "2026-09-26T07:46:41.273Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-26T07:41:57.931Z"
     },
     "route-forwards-consent-model": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3022",
-      "claimedAt": "2026-09-26T07:42:02.037Z"
+      "claimedAt": "2026-09-26T07:42:02.037Z",
+      "doneAt": "2026-09-26T07:46:41.272Z"
     }
   }
 }
