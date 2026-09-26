@@ -41,7 +41,6 @@ let tieredFixture: unknown;
 let warnLines: string[];
 let warnSpy: ReturnType<typeof vi.spyOn>;
 let channelsMcpEnabled: boolean;
-let activeFlywheelRunId: string | null;
 const HEAVY_HOOK_TIMEOUT_MS = 20_000;
 
 
@@ -261,14 +260,6 @@ function mockSpawnDependencies(): void {
   vi.doMock('../provider-health.js', () => ({
     validateProviderHealth: vi.fn(async () => undefined),
   }));
-  // agents.ts now imports getFlywheelActiveRunId from overdeck/control-settings (not database/app-settings)
-  vi.doMock('../overdeck/control-settings.js', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../overdeck/control-settings.js')>();
-    return {
-      ...actual,
-      getFlywheelActiveRunId: () => activeFlywheelRunId,
-    };
-  });
   vi.doMock('../projects.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../projects.js')),
     findProjectByPath: vi.fn(() => null),
@@ -294,7 +285,6 @@ beforeEach(() => {
     warnLines.push(args.map(String).join(' '));
   });
   channelsMcpEnabled = false;
-  activeFlywheelRunId = null;
   delete process.env.PAN_DOCKER;
   delete process.env.OVERDECK_DOCKER_WORKSPACE;
   mockSpawnDependencies();

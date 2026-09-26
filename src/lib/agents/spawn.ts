@@ -58,14 +58,12 @@ import {
 import {
   buildAgentLaunchConfig,
   defaultRunWorkspace,
-  flywheelEnvExports,
   resolveAgentStartedBy,
   resolveRegisteredSlotSpawn,
   resolveSlotTierSpawnParams,
   resolveSlotSpawnFitness,
   logTierFitnessAtSpawn,
   resolveSingleWorkTierSpawnParams,
-  resolveFlywheelSpawnEnv,
   runAgentId,
   transitionIssueToInProgress,
   withSpawnTimeMemoryContext,
@@ -104,8 +102,7 @@ const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
 
-  const flywheelRunId = resolveFlywheelSpawnEnv(role, options.flywheelRunId).OVERDECK_FLYWHEEL_RUN_ID;
-  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelRunId);
+  const startedBy = resolveAgentStartedBy(options.startedBy);
   const resolvedOptions = { ...options, startedBy };
   if (isOperatorStartedBy(startedBy) || options.autoSpawnConsentRequired !== true) {
     return spawnRunWithoutConsentClaim(issueId, role, resolvedOptions);
@@ -162,7 +159,6 @@ async function spawnRunWithoutConsentClaim(
       prompt,
       role: 'work',
       allowHost: options.allowHost,
-      flywheelRunId: options.flywheelRunId,
       startedBy: options.startedBy,
       autoSpawnConsentRequired: options.autoSpawnConsentRequired,
       effort: options.effort,
@@ -171,8 +167,7 @@ async function spawnRunWithoutConsentClaim(
     }, acceptConsent);
   }
 
-  const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
-  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID);
+  const startedBy = resolveAgentStartedBy(options.startedBy);
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
   if (await agentPaneExists(agentId)) {
     // PAN-2579 (warm-by-default lifecycle): a session alive at dispatch time may
@@ -228,7 +223,6 @@ async function spawnRunWithoutConsentClaim(
     hostOverride: options.allowHost || undefined,
     slotIndex: options.slotIndex,
     slotItemId: options.slotItemId,
-    flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
     startedBy,
     ...(role === 'review' && options.subRole ? { reviewSubRole: options.subRole } : {}),
     reviewRunId: options.reviewRunId,
@@ -376,7 +370,7 @@ async function spawnRunWithoutConsentClaim(
   // PAN-1557: interactive convoy wiring is already present in the initial
   // AgentState saved before launch, so the Stop-hook can always deliver
   // REVIEWER_READY even if a later running-state cache write is contended.
-  const extraEnvExports = [harnessLaunch.pathExport, ...flywheelEnvExports(flywheelEnv), ...(options.extraEnvExports ?? [])];
+  const extraEnvExports = [harnessLaunch.pathExport, ...(options.extraEnvExports ?? [])];
   if (role === 'knowledge' && !extraEnvExports.includes('export PATH="$HOME/.overdeck/bin:$PATH"')) {
     extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
   }
@@ -433,7 +427,6 @@ async function spawnRunWithoutConsentClaim(
       OVERDECK_AGENT_STARTED_BY: startedBy,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       GIT_SEQUENCE_EDITOR: 'false',
-      ...flywheelEnv,
       ...providerEnv,
     },
     tokens: {
@@ -596,8 +589,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
   if (role !== 'work') return spawnAgentWithoutConsentClaim(options);
 
-  const flywheelRunId = resolveFlywheelSpawnEnv(role, options.flywheelRunId).OVERDECK_FLYWHEEL_RUN_ID;
-  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelRunId);
+  const startedBy = resolveAgentStartedBy(options.startedBy);
   const resolvedOptions = { ...options, startedBy };
   if (isOperatorStartedBy(startedBy) || options.autoSpawnConsentRequired !== true) {
     return spawnAgentWithoutConsentClaim(resolvedOptions);
@@ -671,8 +663,7 @@ async function spawnAgentWithoutConsentClaim(
   // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
-  const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
-  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID);
+  const startedBy = resolveAgentStartedBy(options.startedBy);
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
@@ -686,7 +677,6 @@ async function spawnAgentWithoutConsentClaim(
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
     sessionId: createFreshSessionIdentity(agentId, resolvedHarness, selectedModel),
-    flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
     startedBy,
   };
   // PAN-3917 W12: one backend answer for both the supervisor decision and the
@@ -803,7 +793,7 @@ async function spawnAgentWithoutConsentClaim(
     harness: state.harness ?? 'claude-code',
     harnessBinaryPath: harnessLaunch.binaryPath,
     sessionId: state.sessionId,
-    extraEnvExports: [harnessLaunch.pathExport, ...flywheelEnvExports(flywheelEnv)],
+    extraEnvExports: [harnessLaunch.pathExport],
     effort: options.effort,
   });
 
@@ -851,7 +841,6 @@ async function spawnAgentWithoutConsentClaim(
       OVERDECK_AGENT_STARTED_BY: startedBy,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
-      ...flywheelEnv,
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     },
     tokens: {
