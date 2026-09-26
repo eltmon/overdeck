@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4210",
   "created": "2026-09-26T01:39:06.772Z",
-  "updated": "2026-09-26T02:54:35.879Z",
+  "updated": "2026-09-26T02:54:53.945Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4210",
       "claimedAt": "2026-09-26T02:15:06.754Z",
       "doneAt": "2026-09-26T02:54:35.879Z"
+    },
+    "deferral-reports-freeze": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4210",
+      "claimedAt": "2026-09-26T02:54:53.944Z"
     }
   }
 }
