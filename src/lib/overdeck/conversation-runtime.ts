@@ -188,7 +188,7 @@ export async function stopConversationRuntime(conv: Conversation, name: string):
 // pattern once rejected (PAN-2979). Shell safety comes from single-quote
 // wrapping at the launcher, not from this character set.
 const SAFE_MODEL_PATTERN = MODEL_ID_PATTERN;
-const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+export const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/; // shared with the lane door (PAN-4223 D20)
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 const PI_CONVERSATION_SOURCE_CONTRACT = [
   'Pi conversation source contract:',
@@ -276,7 +276,7 @@ export function conversationNeedsRunningRepair(
   return conv.status === 'ended' && !conv.forkStatus && tmuxSessionAlive && harnessProcessAlive;
 }
 /** Generate a default conversation name, e.g. 20260404-1234 */
-function generateConversationName(): string {
+export function generateConversationName(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   return `${date}-${Math.floor(Math.random() * 9000 + 1000)}`;
 }
