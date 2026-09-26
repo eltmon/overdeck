@@ -4,17 +4,17 @@
     "created": "2026-09-26T01:08:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4223: Official gauntlet loop support: pan lane (launch/list/wait/report/reap), lanes nested under their orchestrator, any-harness orchestrators",
-    "updated": "2026-09-26T01:47:15.304Z"
+    "updated": "2026-09-26T04:24:01.464Z"
   },
   "plan": {
     "id": "pan-4223",
     "title": "Official gauntlet loop support: pan lane (launch/list/wait/report/reap), lanes nested under their orchestrator, any-harness orchestrators",
-    "status": "proposed",
+    "status": "running",
     "uid": "7a7bf8ac-163c-445b-85b1-042ead16c643",
     "author": "agent:claude-opus-5-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-09-26T01:08:08Z",
-    "updated": "2026-09-26T01:47:15.304Z",
+    "updated": "2026-09-26T04:24:01.464Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4223",
