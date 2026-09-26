@@ -95,7 +95,7 @@ describe('retryDeferredHandoffs', () => {
 
     await tick(1); // T0+2: first retry, refused
     expect(spawn).toHaveBeenCalledTimes(1);
-    expect(spawn).toHaveBeenCalledWith(ISSUE);
+    expect(spawn).toHaveBeenCalledWith(ISSUE, 'planning-auto-handoff');
     const retried = handoffEntries().at(-1)!;
     expect(retried).toMatchObject({ type: 'handoff.retried', source: 'deacon-lite', data: { attempt: 1, skipReason: 'guardrails' } });
     expect(Date.parse(String(retried.data!['nextRetryAt']))).toBe(T0 + 6 * MINUTE);
@@ -183,6 +183,19 @@ describe('retryDeferredHandoffs', () => {
 
     expect(spawn).not.toHaveBeenCalled();
     expect(handoffEntries().map((entry) => entry.type)).toEqual(['handoff.deferred']);
+  });
+
+  // PAN-3634: the retry carries the planning chain's own provenance, not a
+  // hardcoded literal — Flywheel-started planning hands off as flywheel:conv-flywheel.
+  it('re-sends the spawn with the planning session\'s Flywheel provenance when it was Flywheel-started', async () => {
+    getAgentState.mockImplementation((id: string) => (
+      id === 'planning-pan-4155' ? { id, startedBy: 'flywheel:conv-flywheel' } : null
+    ));
+
+    await tick(2); // T0+2: first retry, refused
+
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(spawn).toHaveBeenCalledWith(ISSUE, 'flywheel:conv-flywheel');
   });
 
   it('re-sends the spawn with no guardrail acknowledgement', async () => {
