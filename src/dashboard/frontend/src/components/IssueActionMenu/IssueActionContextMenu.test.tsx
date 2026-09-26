@@ -18,7 +18,8 @@ import {
 } from './IssueActionGroupedBody';
 import type { IssueActionView } from './useIssueActions';
 
-const NON_DANGER_GROUPS = ['communicate', 'lifecycle', 'recover', 'inspect', 'navigation'] as const;
+// PAN-4198: four groups — 'recover' folded into lifecycle, 'navigation' into inspect.
+const NON_DANGER_GROUPS = ['communicate', 'lifecycle', 'inspect'] as const;
 
 const invokes = new Map<IssueActionKey, ReturnType<typeof vi.fn>>();
 
@@ -110,43 +111,53 @@ afterEach(() => {
 });
 
 describe('IssueActionContextMenu', () => {
-  it('renders the binding WORK_RUNNING structure, counts, and repeated phase-primary actions', () => {
+  it('renders the binding WORK_RUNNING structure with each primary exactly once', () => {
     const sessionExtra = vi.fn();
     const menu = renderMenu({
       phase: 'WORK_RUNNING',
       primaryKeys: ['tell', 'doneWork'],
-      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'wipe'],
+      // syncMain is enabled but lands in Actions; resetIssue is the Danger row.
+      enabledKeys: ['tell', 'doneWork', 'syncMain', 'resetIssue'],
       nonIssueActions: [sessionArtifactInvocation(sessionExtra)],
     });
 
     expect(screen.getByText('Work running')).toBeInTheDocument();
-    expect(screen.getByText(`4 available now · ${ISSUE_ACTIONS.length - 4} gated`)).toBeInTheDocument();
-    expect(screen.getAllByText('Tell agent')).toHaveLength(2);
-    expect(screen.getAllByText('Done — mark work complete & start review')).toHaveLength(2);
+    // PAN-4198 (FR-1): no "N available · M gated" line — a gated action is not
+    // rendered at all, so there is nothing to count.
+    expect(screen.queryByText(/available now/)).not.toBeInTheDocument();
+    // FR-3: a primary appears under "Next step" and nowhere else.
+    expect(screen.getAllByText('Message agent')).toHaveLength(1);
+    expect(screen.getAllByText('Finish work and start review')).toHaveLength(1);
+    const phaseSection = menu.querySelector('[data-issue-action-section="phase"]') as HTMLElement;
+    expect(within(phaseSection).getByText('Message agent')).toBeInTheDocument();
+    expect(within(menu.querySelector('[data-issue-action-section="lifecycle"]') as HTMLElement)
+      .queryByText('Message agent')).not.toBeInTheDocument();
+    // communicate held only `tell`, which is a primary here, so it renders no section.
+    expect(menu.querySelector('[data-issue-action-section="communicate"]')).toBeNull();
 
-    const sectionLabels = [
-      screen.getByText('For this phase'),
-      ...NON_DANGER_GROUPS.map((group) => {
-        const section = menu.querySelector(`[data-issue-action-section="${group}"]`);
-        expect(section).not.toBeNull();
-        return within(section as HTMLElement).getByText(GROUP_LABELS[group]);
-      }),
-      screen.getByText('This session'),
-      screen.getByRole('menuitem', { name: 'Danger (1 available)' }),
-    ];
-    expectInDocumentOrder(sectionLabels);
+    expectInDocumentOrder([
+      screen.getByText('Next step'),
+      within(menu.querySelector('[data-issue-action-section="lifecycle"]') as HTMLElement).getByText(GROUP_LABELS.lifecycle),
+      screen.getByRole('menuitem', { name: 'Debug' }),
+      screen.getByRole('menuitem', { name: 'Danger' }),
+    ]);
 
-    expect(screen.queryByText('Wipe')).not.toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Danger (1 available)' })).toHaveAttribute('aria-expanded', 'false');
+    // Both disclosures start collapsed.
+    expect(screen.queryByText('Reset to Todo')).not.toBeInTheDocument();
+    expect(screen.queryByText('Open State Dir')).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Danger' })).toHaveAttribute('aria-expanded', 'false');
     expect(menu).toHaveClass('max-h-[70vh]', 'overflow-y-auto');
 
+    // D13: session utilities live under Debug.
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Debug' }));
+    expect(menu.querySelector('[data-issue-action-section="session"]')).not.toBeNull();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
     expect(sessionExtra).toHaveBeenCalledOnce();
   });
 
   it('renders the complete grouped body inside a plain non-Radix menu host', () => {
     const sessionExtra = vi.fn();
-    const all = actionViews(['plan', 'wipe'], ['plan', 'tell', 'wipe']);
+    const all = actionViews(['plan', 'resetIssue'], ['plan', 'tell', 'resetIssue']);
     const plan = all.find((view) => view.action.key === 'plan');
     expect(plan).toBeDefined();
 
@@ -161,43 +172,52 @@ describe('IssueActionContextMenu', () => {
     );
 
     expect(screen.getByTestId('plain-menu-host')).toBeInTheDocument();
-    for (const section of ['phase', 'lifecycle', 'communicate', 'session']) {
+    // `plan` is the primary and `resetIssue` is Danger, so lifecycle has no
+    // remaining row; `tell` is gated, so communicate renders nothing (FR-1).
+    for (const section of ['phase']) {
       expect(container.querySelector(`[data-issue-action-section="${section}"]`)).toBeInTheDocument();
     }
+    expect(container.querySelector('[data-issue-action-section="communicate"]')).not.toBeInTheDocument();
     expect(container.querySelector('[data-issue-action-section="danger"]')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-issue-action-section="session"]')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-resetIssue')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger (1 available)' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
     expect(container.querySelector('[data-issue-action-section="danger"]')).toBeInTheDocument();
-    expect(screen.getByTestId('issue-action-wipe')).toBeInTheDocument();
+    expect(screen.getByTestId('issue-action-resetIssue')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Debug' }));
+    expect(container.querySelector('[data-issue-action-section="session"]')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('issue-action-explain-toggle'));
     expect(localStorage.getItem('overdeck.issueActions.explain')).toBe('true');
-    expect(screen.getAllByTestId(/^issue-action-description-/)).toHaveLength(4);
+    // Two enabled rows: the Plan… primary and the Reset to Todo Danger row.
+    expect(screen.getAllByTestId(/^issue-action-description-/)).toHaveLength(2);
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
     expect(sessionExtra).toHaveBeenCalledOnce();
   });
 
-  it('leads a STUCK phase with Recover agent then Tell agent and preserves arrow-key focus', () => {
+  it('leads a STUCK phase with Restart agent then Message agent and preserves arrow-key focus', () => {
     const menu = renderMenu({
       phase: 'STUCK',
-      primaryKeys: ['recoverAgent', 'tell'],
-      enabledKeys: ['recoverAgent', 'tell'],
+      primaryKeys: ['restartAgent', 'tell'],
+      enabledKeys: ['restartAgent', 'tell'],
     });
 
     expect(screen.getByText('Stuck')).toBeInTheDocument();
-    const recoverRows = screen.getAllByText('Recover agent');
-    const tellRows = screen.getAllByText('Tell agent');
-    expect(recoverRows).toHaveLength(2);
-    expect(tellRows).toHaveLength(2);
-    expectInDocumentOrder([recoverRows[0], tellRows[0]]);
+    const restartRows = screen.getAllByText('Restart agent…');
+    const tellRows = screen.getAllByText('Message agent');
+    // FR-3: once each, in the "Next step" section, in the order the phase map declares.
+    expect(restartRows).toHaveLength(1);
+    expect(tellRows).toHaveLength(1);
+    expectInDocumentOrder([restartRows[0], tellRows[0]]);
 
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
-    expect(recoverRows[0].closest('[role="menuitem"]')).toHaveFocus();
+    expect(restartRows[0].closest('[role="menuitem"]')).toHaveFocus();
   });
 
-  it('keeps disabled actions visible with their reason and never invokes them', () => {
+  it('omits gated actions entirely instead of showing them with a reason (PAN-4198 FR-1)', () => {
     renderMenu({
       phase: 'WORK_RUNNING',
       primaryKeys: ['tell', 'doneWork'],
@@ -209,18 +229,35 @@ describe('IssueActionContextMenu', () => {
       ISSUE_ACTIONS.find((action) => action.key === 'tell')?.description,
     );
 
-    const wrapper = screen.getByTestId('issue-action-disabled-plan');
+    // A gated action leaves no row, no tooltip, and nothing to click.
+    expect(screen.queryByTestId('issue-action-disabled-plan')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-plan')).not.toBeInTheDocument();
+    expect(screen.queryByText('Plan…')).not.toBeInTheDocument();
+    expect(invokes.get('plan')).not.toHaveBeenCalled();
+
+    // Contextual entries are not listed either, however their state reads.
+    for (const key of ['pause', 'recoverAgent', 'rebuildAndStart', 'createWorkspace']) {
+      expect(screen.queryByTestId(`issue-action-${key}`), key).not.toBeInTheDocument();
+    }
+  });
+
+  it('marks a pending action disabled with its own row (the one surviving disabled case)', () => {
+    const all = actionViews(['tell'], ['tell']).map((view) => ({ ...view, isPending: true }));
+    render(
+      <div role="menu" data-testid="plain-menu-host">
+        <IssueActionGroupedBody
+          actions={{ all, primary: [], phase: 'WORK_RUNNING' }}
+          primitives={plainMenuPrimitives}
+        />
+      </div>,
+    );
+
+    const wrapper = screen.getByTestId('issue-action-disabled-tell');
     const reasonId = wrapper.getAttribute('aria-describedby');
     expect(wrapper).toHaveClass('block');
-    expect(wrapper).toHaveAttribute('title', 'Plan is gated for this test.');
     expect(reasonId).toBeTruthy();
-    expect(document.getElementById(reasonId!)).toHaveTextContent('Plan is gated for this test.');
-    const disabledItem = within(wrapper).getByRole('menuitem');
-    expect(disabledItem).toHaveAttribute('data-disabled');
-    expect(disabledItem).toHaveAttribute('aria-describedby', reasonId);
-
-    fireEvent.click(disabledItem);
-    expect(invokes.get('plan')).not.toHaveBeenCalled();
+    expect(within(wrapper).getByRole('menuitem')).toBeDisabled();
+    expect(screen.getByText('Message agent…')).toBeInTheDocument();
   });
 
   it('shows only enabled phase-primary rows and hides empty groups', () => {
@@ -232,14 +269,15 @@ describe('IssueActionContextMenu', () => {
     });
 
     const phaseSection = document.querySelector('[data-issue-action-section="phase"]') as HTMLElement;
-    expect(within(phaseSection).queryByText('Plan')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Tell agent')).toHaveLength(2);
-    expect(document.querySelector('[data-issue-action-section="lifecycle"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-issue-action-section="communicate"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-issue-action-section="recover"]')).not.toBeInTheDocument();
+    expect(within(phaseSection).queryByText('Plan…')).not.toBeInTheDocument();
+    // `tell` is the only enabled row and it is a primary, so it renders once in
+    // the phase section and every group section is empty.
+    expect(screen.getAllByText('Message agent')).toHaveLength(1);
+    expect(document.querySelector('[data-issue-action-section="lifecycle"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-issue-action-section="communicate"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-issue-action-section="inspect"]')).not.toBeInTheDocument();
-    expect(document.querySelector('[data-issue-action-section="navigation"]')).not.toBeInTheDocument();
-    expect(screen.queryByText('This session')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Danger' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Debug' })).not.toBeInTheDocument();
   });
 
   it('starts with explanations off and keeps the footer toggle visible', () => {
@@ -263,14 +301,17 @@ describe('IssueActionContextMenu', () => {
       enabledKeys: ISSUE_ACTIONS.map((action) => action.key),
     });
 
+    const menuPlaced = ISSUE_ACTIONS.filter((action) => action.placement === 'menu');
+
     fireEvent.click(screen.getByTestId('issue-action-explain-toggle'));
-    fireEvent.click(screen.getByRole('menuitem', { name: `Danger (${ISSUE_ACTIONS.filter((action) => action.group === 'danger').length} available)` }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
 
     expect(localStorage.getItem('overdeck.issueActions.explain')).toBe('true');
     expect(screen.getByTestId('issue-action-explain-toggle')).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getAllByTestId(/^issue-action-description-/)).toHaveLength(ISSUE_ACTIONS.length);
+    // Only menu-placed entries render, so only they carry copy (FR-1).
+    expect(screen.getAllByTestId(/^issue-action-description-/)).toHaveLength(menuPlaced.length);
     expect(screen.getAllByTestId(/^issue-action-verb-/)).toHaveLength(
-      ISSUE_ACTIONS.filter((action) => action.panVerb !== null).length,
+      menuPlaced.filter((action) => action.panVerb !== null).length,
     );
     expect(screen.getByTestId('issue-action-verb-plan')).toHaveTextContent('pan plan');
     expect(screen.queryByTestId('issue-action-verb-watchPlanning')).not.toBeInTheDocument();
@@ -297,22 +338,22 @@ describe('IssueActionContextMenu', () => {
     renderMenu({
       phase: 'WORK_RUNNING',
       primaryKeys: ['tell', 'doneWork'],
-      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'wipe'],
+      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'resetIssue'],
     });
 
-    const disclosure = screen.getByRole('menuitem', { name: 'Danger (1 available)' });
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    const disclosure = screen.getByRole('menuitem', { name: 'Danger' });
+    expect(screen.queryByTestId('issue-action-resetIssue')).not.toBeInTheDocument();
 
     fireEvent.click(disclosure);
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('issue-action-wipe')).toHaveClass('text-destructive');
+    expect(screen.getByTestId('issue-action-resetIssue')).toHaveClass('text-destructive');
 
     fireEvent.keyDown(disclosure, { key: 'Enter' });
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-resetIssue')).not.toBeInTheDocument();
 
     fireEvent.keyDown(disclosure, { key: ' ' });
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('issue-action-wipe')).toBeInTheDocument();
+    expect(screen.getByTestId('issue-action-resetIssue')).toBeInTheDocument();
   });
 });

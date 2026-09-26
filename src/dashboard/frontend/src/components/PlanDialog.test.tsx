@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue } from '../types';
 import { PlanDialog } from './PlanDialog';
@@ -108,7 +108,7 @@ function makeFetchMock(sessionName = 'planning-pan-503', active = true, harness?
   });
 }
 
-function renderPlanDialog(isOpen = true, issue: Issue = MOCK_ISSUE, autoStart = false) {
+function renderPlanDialog(isOpen = true, issue: Issue = MOCK_ISSUE) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -119,10 +119,25 @@ function renderPlanDialog(isOpen = true, issue: Issue = MOCK_ISSUE, autoStart = 
         isOpen={isOpen}
         onClose={vi.fn()}
         onComplete={vi.fn()}
-        autoStart={autoStart}
       />
     </QueryClientProvider>
   );
+}
+
+/**
+ * PAN-4198 (D8): the dialog no longer takes an `autoStart` prop that clicked a
+ * button for the operator. Automatic planning is the operator pressing
+ * "Plan automatically".
+ */
+async function clickPlanAutomatically() {
+  const button = await screen.findByRole('button', { name: /Plan automatically/ });
+  fireEvent.click(button);
+}
+
+function startPlanningBody(fetchMock: ReturnType<typeof makeFetchMock>) {
+  const startCall = fetchMock.mock.calls.find(([url]) => url.toString().includes('/start-planning'));
+  expect(startCall).toBeTruthy();
+  return JSON.parse((startCall?.[1] as RequestInit).body as string) as Record<string, unknown>;
 }
 
 describe('PlanDialog — XTerminal rendering', () => {
@@ -157,28 +172,56 @@ describe('PlanDialog — XTerminal rendering', () => {
     expect(screen.queryByTestId('activity-view')).not.toBeInTheDocument();
   });
 
-  it('sends auto=true when opened for auto-planning', async () => {
+  it('offers both start buttons in plain language (PAN-4198 D12)', async () => {
+    global.fetch = makeFetchMock('planning-pan-503', false) as unknown as typeof fetch;
+
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' });
+
+    expect(await screen.findByRole('button', { name: /Plan with me/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Plan automatically/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Auto-plan$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Start Planning$/ })).not.toBeInTheDocument();
+  });
+
+  it('sends auto=true when the operator chooses Plan automatically', async () => {
     const fetchMock = makeFetchMock('planning-pan-503', false);
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' }, true);
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' });
+    await clickPlanAutomatically();
 
-    await waitFor(() => {
-      const startCall = fetchMock.mock.calls.find(([url]) => url.toString().includes('/start-planning'));
-      expect(startCall).toBeTruthy();
-      expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
-    });
+    await waitFor(() => expect(startPlanningBody(fetchMock)).toMatchObject({ auto: true }));
+  });
+
+  it('leaves autoStart false until the start-after-planning box is checked (PAN-4198 FR-7)', async () => {
+    const fetchMock = makeFetchMock('planning-pan-503', false);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' });
+    await clickPlanAutomatically();
+
+    await waitFor(() => expect(startPlanningBody(fetchMock)).toMatchObject({ autoStart: false }));
+  });
+
+  it('sends autoStart=true when start-after-planning is checked', async () => {
+    const fetchMock = makeFetchMock('planning-pan-503', false);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' });
+    fireEvent.click(await screen.findByLabelText(/Start work as soon as the plan is ready/));
+    await clickPlanAutomatically();
+
+    await waitFor(() => expect(startPlanningBody(fetchMock)).toMatchObject({ auto: true, autoStart: true }));
   });
 
   it.each(['muse', 'kimi-code'])('uses the configured %s planning harness', async harness => {
     const fetchMock = makeFetchMock('planning-pan-503', false, harness);
     global.fetch = fetchMock as unknown as typeof fetch;
-    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' }, true);
-    await waitFor(() => {
-      const startCall = fetchMock.mock.calls.find(([url]) => url.toString().includes('/start-planning'));
-      expect(startCall).toBeTruthy();
-      expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ harness });
-    });
+
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' });
+    await clickPlanAutomatically();
+
+    await waitFor(() => expect(startPlanningBody(fetchMock)).toMatchObject({ harness }));
   });
 
   it('shows the plan role model from settings as the default model', async () => {

@@ -406,7 +406,11 @@ describe('FeatureItem', () => {
     expect(screen.getByText(longTitle)).toHaveAttribute('title', longTitle);
   });
 
-  it('renders the grouped issue menu and routes the single Wipe action through typed confirmation', async () => {
+  // PAN-4198 D6: the registry's `wipe` entry is retired (RETIREMENT_AUDIT row
+  // "wipe" → resetIssue). Cancel issue now carries what this case checks: a
+  // Danger row appears once, and it goes through the typed-confirmation dialog
+  // rather than the legacy window.confirm / onDeepWipe path.
+  it('renders the grouped issue menu and routes a Danger action through typed confirmation', async () => {
     const onDeepWipe = vi.fn();
     const windowConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderFeature(
@@ -423,23 +427,26 @@ describe('FeatureItem', () => {
     expect(menu).toHaveAttribute('data-section', 'FeatureContextMenu (issue-row right-click)');
     expect(screen.getByText('Issue actions')).toBeInTheDocument();
     expect(screen.getByText('Queued for plan')).toBeInTheDocument();
-    expect(screen.getByText('For this phase')).toBeInTheDocument();
-    for (const section of ['Communicate', 'Lifecycle', 'Recover', 'Inspect', 'Navigate']) {
-      expect(within(menu).getByText(section)).toBeInTheDocument();
+    expect(screen.getByText('Next step')).toBeInTheDocument();
+    // PAN-4198 (FR-1/FR-4): only sections with an enabled row render. A queued
+    // issue with no workspace offers Plan… as its Next step and Cancel issue in
+    // Danger, so every semantic group section is empty.
+    for (const section of ['Communicate', 'Actions', 'Inspect']) {
+      expect(within(menu).queryByText(section), section).not.toBeInTheDocument();
     }
 
-    const danger = screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ });
+    const danger = screen.getByRole('menuitem', { name: 'Danger' });
     expect(danger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-cancel')).not.toBeInTheDocument();
 
     fireEvent.click(danger);
     expect(danger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getAllByRole('menuitem', { name: 'Wipe' })).toHaveLength(1);
+    expect(screen.getAllByRole('menuitem', { name: 'Cancel issue' })).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Wipe' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cancel issue' }));
     expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByLabelText('Confirmation text')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Wipe' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel issue' })).toBeDisabled();
     expect(windowConfirm).not.toHaveBeenCalled();
     expect(onDeepWipe).not.toHaveBeenCalled();
   });
@@ -459,13 +466,16 @@ describe('FeatureItem', () => {
     );
 
     openFeatureContextMenu();
-    expect(screen.getByText('This session')).toBeInTheDocument();
+    // PAN-4198 (D13): session utilities live behind a collapsed Debug disclosure.
+    expect(screen.queryByTestId('non-issue-action-openStateDir')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Debug' }));
     expect(screen.getByTestId('non-issue-action-openStateDir')).toBeInTheDocument();
     expect(screen.getByTestId('non-issue-action-viewJsonl')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
     expect(onOpenStateDir).toHaveBeenCalledWith('agent-pan-821');
 
     openFeatureContextMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Debug' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'View JSONL' }));
     expect(onViewJsonl).toHaveBeenCalledWith('agent-pan-821');
 
@@ -481,6 +491,7 @@ describe('FeatureItem', () => {
       />,
     );
     openFeatureContextMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Debug' }));
     expect(screen.getByTestId('non-issue-action-openStateDir')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Open State Dir' })).toBeInTheDocument();
     expect(screen.queryByTestId('non-issue-action-viewJsonl')).not.toBeInTheDocument();
@@ -498,7 +509,7 @@ describe('FeatureItem', () => {
       />,
     );
     openFeatureContextMenu();
-    expect(screen.queryByText('This session')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Debug' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('non-issue-action-openStateDir')).not.toBeInTheDocument();
     expect(screen.queryByTestId('non-issue-action-viewJsonl')).not.toBeInTheDocument();
   });
