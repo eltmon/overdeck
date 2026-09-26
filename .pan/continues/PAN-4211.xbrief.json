@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4211",
   "created": "2026-09-26T01:35:27.740Z",
-  "updated": "2026-09-26T04:41:47.851Z",
+  "updated": "2026-09-26T04:42:03.097Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "untroubled-verb.ac5": {
       "status": "completed",
       "doneAt": "2026-09-26T04:41:47.851Z"
+    },
+    "start-force-clears-troubled.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:42:03.097Z"
     }
   }
 }
