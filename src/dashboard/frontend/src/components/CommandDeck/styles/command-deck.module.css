@@ -348,14 +348,17 @@
   align-items: baseline;
   gap: 6px;
   min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .featureMetaLine {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex-wrap: wrap;
   min-width: 0;
+  min-height: 18px;
+  padding-left: 0;
 }
 
 /* pipeline mini-strip: neutral fills, only the live segment is colored */
@@ -386,7 +389,7 @@
 }
 
 .featureItemSelected {
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  background: transparent;
 }
 
 .featureStatus {
@@ -401,14 +404,15 @@
 .featureLabel {
   flex: 1;
   min-width: 0;
-  /* titles wrap to two lines — never clipped mid-word (style guide v1.2) */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  /* PAN-4201: one line with an ellipsis; the full title is in the title
+     attribute and the IssuePeek hover card. Supersedes the v1.2 2-line clamp. */
   overflow: hidden;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   line-height: 1.35;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--foreground);
 }
 
 .featureLabelUntitled {
@@ -428,7 +432,7 @@
   align-items: center;
   gap: 3px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--badge-radius, var(--radius-sm));
   font-size: 10px;
   line-height: 1.2;
   white-space: nowrap;
@@ -476,24 +480,19 @@
 .featureResourceChip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 4px;
+  gap: 2px;
+  height: 16px;
+  padding: 0 2px;
   font-size: 10px;
   color: var(--muted-foreground);
-  background: color-mix(in srgb, var(--foreground) 3%, transparent);
-  border: 1px solid var(--border);
+  background: none;
+  border: none;
   font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   white-space: nowrap;
 }
 
-.featureResourceLine {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  padding: 0 6px 5px 27px;
+.featureResourceChip:hover {
+  color: var(--foreground);
 }
 
 .featureResourceStrip {
@@ -565,58 +564,55 @@
 
 /* Feature ID — technical identifier, mono per PAN-698 policy */
 .featureId_sidebar {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
   font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   flex-shrink: 0;
-  min-width: 56px;
+  min-width: 0;
 }
 
-.featureState {
-  font-size: 10px;
-  color: var(--muted-foreground);
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--accent);
+.featureStateBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
   white-space: nowrap;
+  flex-shrink: 0;
   border: 1px solid transparent;
+  border-radius: var(--badge-radius, var(--radius-sm));
 }
 
-.featureState_done {
-  background: color-mix(in srgb, var(--success) 14%, transparent);
-  color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 32%, transparent);
-}
-
-.featureState_progress {
-  background: color-mix(in srgb, var(--primary) 16%, transparent);
-  color: var(--primary);
-  border-color: color-mix(in srgb, var(--primary) 36%, transparent);
-}
-
-.featureState_review {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
-  color: var(--warning);
-  border-color: color-mix(in srgb, var(--warning) 36%, transparent);
-}
-
-.featureState_context {
-  background: color-mix(in srgb, #14b8a6 16%, transparent);
-  color: #0f766e;
-  border-color: color-mix(in srgb, #14b8a6 36%, transparent);
-}
-
-.featureState_planning {
-  background: color-mix(in srgb, #8b5cf6 16%, transparent);
-  color: #7c3aed;
-  border-color: color-mix(in srgb, #8b5cf6 36%, transparent);
-}
-
-.featureState_todo {
-  background: var(--accent);
+.featureStateBadge_rest {
   color: var(--muted-foreground);
-  border-color: color-mix(in srgb, var(--muted-foreground) 16%, transparent);
+  background: color-mix(in srgb, var(--muted-foreground) 8%, transparent);
+  border-color: color-mix(in srgb, var(--muted-foreground) 32%, transparent);
+}
+
+.featureStateBadge_machine {
+  color: var(--info-foreground);
+  background: color-mix(in srgb, var(--info) 8%, transparent);
+  border-color: color-mix(in srgb, var(--info) 32%, transparent);
+}
+
+.featureStateBadge_specialist {
+  color: var(--signal-review-foreground);
+  background: color-mix(in srgb, var(--signal-review) 8%, transparent);
+  border-color: color-mix(in srgb, var(--signal-review) 32%, transparent);
+}
+
+.featureStateBadge_human {
+  color: var(--warning-foreground);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+}
+
+.featureStateBadge_outcome {
+  color: var(--success-foreground);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
 }
 
 /* Feature Item Wrapper (expandable) */
@@ -626,13 +622,9 @@
   position: relative;
 }
 
-/* PAN-1779: paused issues carry an unmissable amber edge bar (the row's one
- * colored signal — amber = a human must act). */
-.featureItemWrapperWorking::before,
-.featureItemWrapperError::before,
-.featureItemWrapperMerged::before,
-.featureItemWrapperReady::before,
-.featureItemWrapperPaused::before {
+/* PAN-4201: the state badge is the row's one colored status signal; the edge
+ * bar keeps only the error variant (red = broken). */
+.featureItemWrapperError::before {
   content: "";
   position: absolute;
   left: 0;
@@ -640,14 +632,8 @@
   bottom: 4px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--warning);
+  background: var(--destructive);
 }
-
-.featureItemWrapperWorking::before { background: var(--info); }
-.featureItemWrapperError::before { background: var(--destructive); }
-.featureItemWrapperMerged::before { background: var(--success); }
-/* ready-for-merge is a human gate — amber, same as paused */
-.featureItemWrapperReady::before { background: var(--warning); }
 
 .unpauseBtn {
   display: inline-flex;
@@ -697,12 +683,13 @@
 }
 
 .featureItemWrapperSelected {
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 14%, transparent);
 }
 
 .featureItemRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   padding-left: 8px;
 }
 
@@ -711,8 +698,9 @@
   align-items: center;
   justify-content: center;
   width: 16px;
+  height: 22px;
   flex-shrink: 0;
-  padding: 4px 0;
+  padding: 0;
   cursor: pointer;
   background: none;
   border: none;
@@ -733,6 +721,14 @@
 .sessionList {
   display: flex;
   flex-direction: column;
+  margin: 2px 0 4px 20px;
+  border-left: 1px solid var(--border);
+}
+
+.sessionList .sessionNode {
+  padding-left: 12px;
+  font-size: 11.5px;
+  color: var(--body-foreground, var(--muted-foreground));
 }
 
 .treeFilterRow {
@@ -1136,7 +1132,7 @@
 }
 
 .sessionNodeSelected {
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  background: var(--muted);
 }
 
 .sessionToggleSlot,
@@ -6317,50 +6313,6 @@
   color: var(--muted-foreground);
   min-width: 36px;
   text-align: right;
-}
-
-.branchNode {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px 2px 40px;
-  font-size: 11px;
-  color: var(--muted-foreground);
-}
-
-.branchBadge {
-  font-size: 9px;
-  color: var(--muted-foreground);
-}
-
-.prNode {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px 2px 40px;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.prNode:hover {
-  background: var(--accent);
-  text-decoration: underline;
-}
-
-.prNumber {
-  font-family: var(--font-mono, 'SF Mono', monospace);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.prTitle {
-  font-size: 11px;
-  color: var(--muted-foreground);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 200px;
 }
 
 /* PAN-4185: context opt-outs for new conversations, under the deck header row. */

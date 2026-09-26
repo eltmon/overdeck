@@ -237,6 +237,20 @@ Each `dist:*` command also stamps the generated `latest*.yml`/`beta*.yml` manife
 - **`deps.neverBundle: ["electron"]`** — Electron is provided by the runtime, never bundled
 - **`deps.alwaysBundle`**: `@overdeck/*` workspace packages (contracts etc.)
 
+### macOS Signing and Notarization
+
+Packaging uses electron-builder 26, with Electron exact-pinned to `40.10.6` in `apps/desktop/package.json` (an exact version, not a range, because `bun update` does not move exact pins — bumping Electron requires editing the pin by hand).
+
+`build.mac` sets `notarize: false`, which disables electron-builder's built-in notarization. Notarization instead runs in the `afterSign` hook (`apps/desktop/scripts/notarize.cjs`), and only when all three App Store Connect API-key environment variables are present:
+
+- `APPLE_API_KEY` — path to the API key `.p8` file
+- `APPLE_API_KEY_ID` — the key's Key ID
+- `APPLE_API_ISSUER` — the API key Issuer ID
+
+These are set by the macOS runner in `.github/workflows/release.yml`. Without them the hook logs a skip and the app still ships, signed but not notarized (downloaders see a Gatekeeper warning).
+
+`@electron/notarize` is pinned to the 3.x line, which is ESM-only; the `.cjs` hook loads it with a plain `require("@electron/notarize")`, which works via Node's `require(esm)` support on Node >= 22.12 (verified under 22.22 — no `await import()` fallback is needed). `notarize()` staples the ticket itself; the hook's extra `xcrun stapler staple` call afterward is redundant but harmless.
+
 ### Native Addon Rebuild
 
 After packaging, `scripts/afterPack.cjs` runs `electron-rebuild` to recompile `node-pty` against the Electron Node.js version. This is required because the addon is compiled for the system Node.js version during `bun install`, which differs from Electron's embedded Node.js ABI.
