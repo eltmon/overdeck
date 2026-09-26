@@ -261,7 +261,19 @@ api_keys:
             openai: { enabled: true, harness: 'bad' as never },
           },
         },
-      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse');
+      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or prime-agent');
+    });
+
+    it('accepts prime-agent as a provider default harness (PAN-3668)', () => {
+      const { config } = mergeConfigs({
+        models: {
+          providers: {
+            openai: { enabled: true, harness: 'prime-agent' },
+          },
+        },
+      });
+
+      expect(config.providerHarnesses.openai).toBe('prime-agent');
     });
 
     it('normalizes legacy DashScope API keys without re-enabling an explicitly disabled provider', () => {

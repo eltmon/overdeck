@@ -16,7 +16,7 @@ import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
 
 export interface LauncherConfig extends CodexNativeEndpointOption {
   role: Role;

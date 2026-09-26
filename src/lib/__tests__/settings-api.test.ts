@@ -967,10 +967,27 @@ describe('validateSettingsApi', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, null, or empty string');
+    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, null, or empty string');
     expect(result.errors).toContain('roles.flywheel.effort must be one of low, medium, high, xhigh, max');
     expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
     expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');
+  });
+
+  it('accepts prime-agent as a provider harness and a role harness (PAN-3668)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      models: {
+        ...validSettings.models,
+        provider_harnesses: { openai: 'prime-agent' },
+      },
+      roles: {
+        ...validSettings.roles,
+        flywheel: { model: 'claude-opus-4-7', harness: 'prime-agent' },
+      },
+    });
+
+    expect(result.errors.filter((error) => error.includes('harness'))).toEqual([]);
   });
 
   it('accepts null and empty string role harness clear sentinels', async () => {

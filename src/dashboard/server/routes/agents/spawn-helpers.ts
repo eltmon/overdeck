@@ -230,7 +230,7 @@ export function handleContainerOrchestration(input: {
   devScript: string;
   agentSessionName: string;
   role: Role;
-  effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null;
+  effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | null;
   startedBy: string;
   allowHost: boolean;
   /** Explicit operator-chosen model only — forwarded to `pan start` as

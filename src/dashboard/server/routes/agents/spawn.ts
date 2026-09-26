@@ -750,9 +750,9 @@ export const postAgentsRoute = HttpRouter.add(
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null =
-      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' || bodyHarness === 'acp' || bodyHarness === 'kimi-code' || bodyHarness === 'opencode' || bodyHarness === 'muse' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null = null;
+    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | null =
+      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' || bodyHarness === 'acp' || bodyHarness === 'kimi-code' || bodyHarness === 'opencode' || bodyHarness === 'muse' || bodyHarness === 'prime-agent' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarness(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))

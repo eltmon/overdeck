@@ -198,7 +198,7 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
 export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse'
+    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse' || requested === 'prime-agent'
       ? requested
       : undefined;
   return resolveHarness({ model, explicit });
@@ -359,7 +359,7 @@ export async function handleConversationSwitchModel(
   const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
   const requestedHarness = body['harness'];
   let harness: RuntimeName = currentHarness;
-  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode' || requestedHarness === 'muse') {
+  if (requestedHarness === 'ohmypi' || requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex' || requestedHarness === 'acp' || requestedHarness === 'kimi-code' || requestedHarness === 'opencode' || requestedHarness === 'muse' || requestedHarness === 'prime-agent') {
     const requestedRuntime: RuntimeName = requestedHarness === 'pi' ? 'ohmypi' : requestedHarness;
     if (requestedRuntime !== currentHarness) {
       const policyModel = model ?? conv.model ?? '';

@@ -385,7 +385,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /**

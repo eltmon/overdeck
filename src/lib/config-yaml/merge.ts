@@ -52,8 +52,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or prime-agent`);
   }
 }
 
