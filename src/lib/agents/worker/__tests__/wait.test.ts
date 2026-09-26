@@ -118,6 +118,17 @@ describe('waitForWorkerReport', () => {
     });
   });
 
+  it('awaits an async idleAgeMs dependency (PAN-4223 lanes)', async () => {
+    const { deps } = harness({ idleAgeMs: vi.fn(async () => 601_000) });
+    const promise = waitForWorkerReport(ID, { afterSeq: 0 }, deps);
+    expect(await settle(promise, 30_000)).toBe('pending');
+    expect(await settle(promise, 32_000)).toEqual({
+      kind: 'idle-without-report',
+      lastAssistantMessage: 'last words',
+      transcriptPath: null,
+    });
+  });
+
   it('times out at the deadline', async () => {
     const { deps } = harness();
     const promise = waitForWorkerReport(ID, { afterSeq: 0, timeoutMs: 5_000 }, deps);

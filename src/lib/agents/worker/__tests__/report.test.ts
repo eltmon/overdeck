@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -52,6 +52,26 @@ describe('worker reports (PAN-3920 D15)', () => {
   it('rejects a body over 1 MiB', async () => {
     await expect(writeWorkerReport(ID, { body: 'x'.repeat(2 * MAX_WORKER_REPORT_BYTES) })).rejects.toThrow('larger than');
     expect(await listWorkerReports(ID)).toEqual([]);
+  });
+
+  it('round-trips the git facts a lane records (PAN-4223)', async () => {
+    await writeWorkerReport(ID, { body: '# lane', git: { head: 'abc1234', branch: 'hotel/663' } });
+    await writeWorkerReport(ID, { body: '# critic', git: { head: 'def5678', branch: null } });
+    const reports = await listWorkerReports(ID);
+    expect(reports.map((report) => report.git)).toEqual([
+      { head: 'abc1234', branch: 'hotel/663' },
+      { head: 'def5678', branch: null },
+    ]);
+  });
+
+  it('parses a stored report without git and drops a malformed git field', async () => {
+    mkdirSync(reportsDir(ID), { recursive: true });
+    const base = { at: '2026-09-23T12:00:00.000Z', status: 'done', body: 'old' };
+    writeFileSync(join(reportsDir(ID), '0001.json'), JSON.stringify({ seq: 1, ...base }));
+    writeFileSync(join(reportsDir(ID), '0002.json'), JSON.stringify({ seq: 2, ...base, git: { head: 7 } }));
+    const reports = await listWorkerReports(ID);
+    expect(reports).toHaveLength(2);
+    expect(reports.map((report) => 'git' in report)).toEqual([false, false]);
   });
 
   it('has no latest report for a worker that never reported', async () => {

@@ -27,6 +27,19 @@ export interface WorkerReport {
   readonly at: string;
   readonly status: WorkerReportStatus;
   readonly body: string;
+  /** Git facts a gauntlet lane records with its report (PAN-4223 WI-6); absent on worker reports. */
+  readonly git?: WorkerReportGit;
+}
+
+export interface WorkerReportGit {
+  readonly head: string;
+  readonly branch: string | null;
+}
+
+function isWorkerReportGit(value: unknown): value is WorkerReportGit {
+  if (typeof value !== 'object' || value === null) return false;
+  const git = value as Record<string, unknown>;
+  return typeof git.head === 'string' && (git.branch === null || typeof git.branch === 'string');
 }
 
 export function isWorkerReportStatus(value: unknown): value is WorkerReportStatus {
@@ -51,7 +64,15 @@ function parseReport(raw: string): WorkerReport | null {
   try {
     const parsed = JSON.parse(raw) as Partial<WorkerReport>;
     if (typeof parsed.seq !== 'number' || typeof parsed.body !== 'string' || typeof parsed.at !== 'string') return null;
-    return { seq: parsed.seq, at: parsed.at, status: isWorkerReportStatus(parsed.status) ? parsed.status : 'done', body: parsed.body };
+    const report: WorkerReport = {
+      seq: parsed.seq,
+      at: parsed.at,
+      status: isWorkerReportStatus(parsed.status) ? parsed.status : 'done',
+      body: parsed.body,
+    };
+    return isWorkerReportGit(parsed.git)
+      ? { ...report, git: { head: parsed.git.head, branch: parsed.git.branch } }
+      : report;
   } catch {
     return null;
   }
@@ -64,7 +85,7 @@ function parseReport(raw: string): WorkerReport | null {
  */
 export async function writeWorkerReport(
   id: string,
-  report: { body: string; status?: WorkerReportStatus },
+  report: { body: string; status?: WorkerReportStatus; git?: WorkerReportGit },
   now: () => Date = () => new Date(),
 ): Promise<number> {
   if (Buffer.byteLength(report.body, 'utf8') > MAX_WORKER_REPORT_BYTES) {
@@ -88,7 +109,13 @@ export async function writeWorkerReport(
       throw error;
     }
     const temp = `${target}.${process.pid}.tmp`;
-    const record: WorkerReport = { seq, at: now().toISOString(), status, body: report.body };
+    const record: WorkerReport = {
+      seq,
+      at: now().toISOString(),
+      status,
+      body: report.body,
+      ...(report.git ? { git: { head: report.git.head, branch: report.git.branch } } : {}),
+    };
     await writeFile(temp, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
     await rename(temp, target);
     return seq;
