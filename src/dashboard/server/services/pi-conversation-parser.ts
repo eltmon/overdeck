@@ -77,7 +77,40 @@ interface PiMessageEntry extends PiEntry {
     toolName?: string;
     /** toolResult only: true when the tool call failed. */
     isError?: boolean;
+    /** assistant only (Prime Agent): why the turn ended. */
+    stopReason?: string;
+    /** assistant only (Prime Agent): set when stopReason is 'error' or 'aborted'. */
+    errorMessage?: string;
   };
+}
+
+/**
+ * Transcript dialects of the pi v3 session format. Prime Agent (PAN-3668) writes the
+ * same entries as pi, plus a `compaction` entry, assistant `stopReason`/`errorMessage`,
+ * and `child_usage_attributed` entries whose `aggregateUsage` replaces the target
+ * assistant message's usage (D16).
+ */
+export type PiTranscriptDialect = 'pi' | 'prime-agent';
+
+export interface PiParseOptions {
+  dialect?: PiTranscriptDialect;
+}
+
+/** `child_usage_attributed.aggregateUsage` by target assistant entry id (last one wins). */
+function primeAggregateUsage(lines: readonly string[]): Map<string, PiUsage> {
+  const aggregates = new Map<string, PiUsage>();
+  for (const line of lines) {
+    if (!line.includes('"child_usage_attributed"')) continue;
+    try {
+      const entry = JSON.parse(line) as { type?: string; targetId?: unknown; aggregateUsage?: unknown };
+      if (entry.type === 'child_usage_attributed' && typeof entry.targetId === 'string' && entry.aggregateUsage && typeof entry.aggregateUsage === 'object') {
+        aggregates.set(entry.targetId, entry.aggregateUsage as PiUsage);
+      }
+    } catch {
+      // A malformed line is skipped here exactly as the main pass skips it.
+    }
+  }
+  return aggregates;
 }
 
 interface PiEntry {
@@ -160,16 +193,33 @@ const STREAMING_RECENT_MS = 5_000;
  * return for a Claude session, with empty stubs for features Pi doesn't
  * surface yet (compact boundaries, file-edit grouping, plan-tool tracking).
  */
-export async function parsePiConversationMessages(sessionFile: string): Promise<ParseResult> {
+export async function parsePiConversationMessages(sessionFile: string, options: PiParseOptions = {}): Promise<ParseResult> {
   const fileStats = await stat(sessionFile);
   const raw = await readFile(sessionFile, 'utf-8');
 
   const lines = raw.split('\n').filter((line) => line.trim().length > 0);
+  const prime = options.dialect === 'prime-agent';
+  const aggregateUsage = prime ? primeAggregateUsage(lines) : new Map<string, PiUsage>();
+  // Prime only: the last assistant turn that ended (stopReason other than toolUse),
+  // cleared by the next user message. Pi keeps its mtime-only streaming heuristic.
+  let lastTurnCompletedAt: string | undefined;
+  let totalCost = 0;
+  let totalTokens = 0;
+  // Inline cost accounting — Pi reports its own per-call cost; token throughput
+  // prefers Pi's own total, else sums the categories.
+  const addUsage = (entry: PiMessageEntry): void => {
+    const u = (prime && entry.id ? aggregateUsage.get(entry.id) : undefined) ?? entry.message.usage;
+    const total = u?.cost?.total;
+    if (typeof total === 'number' && Number.isFinite(total)) totalCost += total;
+    if (u) {
+      totalTokens += typeof u.totalTokens === 'number'
+        ? u.totalTokens
+        : (u.input ?? 0) + (u.output ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
+    }
+  };
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
   const compactBoundaries: CompactBoundary[] = [];
-  let totalCost = 0;
-  let totalTokens = 0;
   let sequence = 0;
   // toolCallId → {name, arguments}. Populated from assistant `toolCall`
   // blocks and joined into the later `toolResult` work-log entry so the UI
@@ -185,7 +235,7 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
     }
     if (!entry || typeof entry !== 'object') continue;
 
-    if (entry.type === 'compaction_start' || entry.type === 'session_before_compact' || entry.type === 'session_compact') {
+    if (entry.type === 'compaction_start' || entry.type === 'session_before_compact' || entry.type === 'session_compact' || (prime && entry.type === 'compaction')) {
       compactBoundaries.push({
         id: typeof entry.id === 'string' ? entry.id : `compact-${compactBoundaries.length}`,
         timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : new Date().toISOString(),
@@ -231,6 +281,26 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
       continue;
     }
 
+    if (prime && role === 'user') lastTurnCompletedAt = undefined;
+    if (prime && role === 'assistant' && entry.message.stopReason && entry.message.stopReason !== 'toolUse') {
+      lastTurnCompletedAt = createdAt;
+    }
+    if (prime && role === 'assistant' && (entry.message.stopReason === 'error' || entry.message.stopReason === 'aborted')) {
+      const aborted = entry.message.stopReason === 'aborted';
+      const detail = entry.message.errorMessage?.trim() || (aborted ? 'The turn was aborted.' : 'The turn failed.');
+      sequence += 1;
+      workLog.push({
+        id: `${entry.id ?? 'prime'}:error:${sequence}`,
+        createdAt,
+        label: aborted ? 'Turn aborted' : 'Turn failed',
+        toolTitle: aborted ? 'Turn aborted' : 'Turn failed',
+        tone: 'error',
+        sequence,
+        detail,
+        result: detail,
+      });
+    }
+
     if (role === 'user' || role === 'assistant') {
       // Thinking blocks (if any) precede the message text in the work log so
       // the chat panel can show them as collapsed reasoning under that turn.
@@ -256,6 +326,11 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
         }
       }
 
+      // Prime counts every assistant message's usage (tool-only turns included,
+      // with an RLM child's aggregate replacing the message's own usage, D16).
+      // Pi keeps counting only the messages it renders.
+      if (prime && role === 'assistant') addUsage(entry);
+
       if (!text) {
         // Skip empty assistant turns (e.g. pure-thinking responses). The
         // thinking is already in the work log.
@@ -272,19 +347,7 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
         sequence,
       });
 
-      // Inline cost accounting — Pi reports its own per-call cost.
-      const total = entry.message.usage?.cost?.total;
-      if (typeof total === 'number' && Number.isFinite(total)) {
-        totalCost += total;
-      }
-
-      // Token throughput — prefer Pi's own total, else sum the categories.
-      const u = entry.message.usage;
-      if (u) {
-        totalTokens += typeof u.totalTokens === 'number'
-          ? u.totalTokens
-          : (u.input ?? 0) + (u.output ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
-      }
+      if (!prime) addUsage(entry);
     }
   }
 
@@ -318,6 +381,7 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
     workLog,
     byteOffset: fileStats.size,
     streaming,
+    ...(prime ? { lastTurnCompletedAt } : {}),
     totalCost,
     totalTokens,
     latestAssistantUsage: null,

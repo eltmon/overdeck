@@ -11,9 +11,10 @@
  *   `turn_aborted` event (`codexThreadStatus`).
  * - kimi (wire.jsonl): the newest `turn.prompt`, `step.begin` or `step.end`;
  *   finished only on a `step.end` whose `finishReason` is `end_turn`.
- * - pi / ohmypi (session JSONL): the newest `message` record; finished only on
- *   an assistant message with `stopReason` `stop` or `aborted`. `error` is not
- *   finished: Pi retries some provider errors itself.
+ * - pi / ohmypi / prime-agent (session JSONL): the newest `message` record;
+ *   finished only on an assistant message with `stopReason` `stop` or `aborted`.
+ *   `error` is not finished: Pi, and Prime Agent built on it, retry some
+ *   provider errors themselves.
  * - acp (ACP host transcript, also OpenCode): the newest lifecycle entry;
  *   finished on `turn_completed` or `prompt_failed` (the host never retries a
  *   failed prompt), not finished on a user prompt or a `prompt_queued`.
@@ -99,7 +100,7 @@ export async function transcriptTurnFinished(kind: TranscriptCandidateKind, path
   try {
     if (kind === 'codex') return (await codexThreadStatus(path)) === 'done';
     if (kind === 'kimi') return kimiTurnFinished(await readTailRecordsNewestFirst(path));
-    if (kind === 'pi' || kind === 'ohmypi') return piTurnFinished(await readTailRecordsNewestFirst(path));
+    if (kind === 'pi' || kind === 'ohmypi' || kind === 'prime-agent') return piTurnFinished(await readTailRecordsNewestFirst(path));
     if (kind === 'acp') return acpTurnFinished(await readTailRecordsNewestFirst(path));
   } catch {
     return false;

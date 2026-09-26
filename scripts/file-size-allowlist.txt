@@ -127,3 +127,4 @@
 1128 src/lib/agents/spawn-prep.ts # PAN-3668
 1089 src/lib/agents/spawn.ts # PAN-3668
 1212 src/lib/overdeck/conversation-runtime.ts # PAN-3668
+1219 src/dashboard/server/ws-rpc.ts # PAN-3668

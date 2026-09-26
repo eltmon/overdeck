@@ -23,6 +23,7 @@ import {
   museSessionsRoot,
   resolveMuseSessionPath,
 } from '../runtimes/storage/muse.js';
+import { primeAgentSessionDir, readPrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { findPiTranscriptPath, piSessionsRoot } from '../runtimes/storage/pi.js';
 import {
   latestSessionResetTime,
@@ -220,6 +221,7 @@ export async function listAgentTranscriptWatchRoots(
   if (kind === 'pi' || kind === 'ohmypi') return [piSessionsRoot(agentDir)];
   if (kind === 'muse') return [museSessionsRoot(agentId, root)];
   if (kind === 'acp') return [dirname(acpTranscriptPath(agentId, root))];
+  if (kind === 'prime-agent') return [primeAgentSessionDir(agentId, root)];
   return [];
 }
 
@@ -284,6 +286,9 @@ export async function listAgentTranscriptCandidates(
       : currentKind === 'acp' ? await resolveAcpTranscriptPath(agentId, opts)
       : currentKind === 'kimi' ? await resolveKimiWirePath(agentId, opts)
       : currentKind === 'muse' ? await resolveMuseSessionPath(agentId, opts.agentsDirOverride)
+      // Prime (PAN-3668): the host records the path in sessions.json; the pointer
+      // file is the fallback when that entry is missing.
+      : currentKind === 'prime-agent' ? await readPrimeAgentSessionFile(agentId, root)
       : null;
     if (path) {
       const mtime = await stat(path).then(value => value.mtimeMs, () => null);

@@ -2,6 +2,7 @@ import { getCostsByIssueSnapshot } from './dashboard-cost-snapshot.js';
 import { getAgentCostStats } from '../../../lib/overdeck/cost-sync.js';
 import { getConversationSearchStats } from '../../../lib/overdeck/conversations-search.js';
 import { parseMuseConversationMessages } from './muse-conversation-parser.js';
+import { parsePrimeAgentConversationMessages } from './prime-agent-conversation-parser.js';
 import { parentPort } from 'node:worker_threads';
 import {
   aggregateDiscoveredSessionCost,
@@ -60,7 +61,7 @@ type DashboardDbOperation =
   | 'parseTranscriptSnapshot'
   | 'costReconcileSweep';
 
-type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'claude-initial';
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'prime-agent' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
 
 const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
@@ -70,6 +71,7 @@ const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
   acp: parseAcpConversationMessages,
   kimi: parseKimiConversationMessages,
   muse: parseMuseConversationMessages,
+  'prime-agent': parsePrimeAgentConversationMessages,
   'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
 };
 

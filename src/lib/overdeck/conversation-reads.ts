@@ -8,6 +8,8 @@
  */
 import { isMuseSessionPath, resolveMuseSessionPath } from '../runtimes/storage/muse.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
+import { isPrimeAgentSessionPath, readPrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
+import { parsePrimeAgentConversationMessages } from '../../dashboard/server/services/prime-agent-conversation-parser.js';
 import { existsSync } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
 import { basename } from 'node:path';
@@ -114,6 +116,7 @@ async function resolveUnregisteredClaudeSessionFile(name: string): Promise<strin
 
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   if (conv.harness === 'muse') return resolveMuseSessionPath(conv.tmuxSession);
+  if (conv.harness === 'prime-agent') return readPrimeAgentSessionFile(conv.tmuxSession);
   // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
   // conversations use sessions/. The shared resolver checks both and skips sidecars.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
@@ -266,6 +269,8 @@ export async function getCachedMessages(
     parsed = await parseCodexConversationMessages(sessionFile);
   } else if (isAcpSessionFile(sessionFile)) {
     parsed = await parseAcpConversationMessages(sessionFile);
+  } else if (isPrimeAgentSessionPath(sessionFile)) {
+    parsed = await parsePrimeAgentConversationMessages(sessionFile);
   } else if (isOhmypiSessionFile(sessionFile)) {
     parsed = await parseOhmypiConversationMessages(sessionFile);
   } else if (isMuseSessionPath(sessionFile)) {
