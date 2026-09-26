@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T01:04:21.392367Z · model: claude-opus-5-5 · open: 816_
+_Last sequenced: 2026-09-26T01:14:22.838982Z · model: claude-opus-5-5 · open: 817_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 16 | PAN-4224 | M | critical | ok |  |  | Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write |
 | 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4221 | S | critical | ok |  |  | A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train |
@@ -824,6 +825,10 @@ _Last sequenced: 2026-09-26T01:04:21.392367Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-4224 (rank 16)
+
+New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.
+
 ### PAN-4223 (rank 17)
 
 New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.
@@ -1120,10 +1125,6 @@ Triage: same as PAN-2700 — verify stale-artifact freshness against whatever re
 
 Triage: maps to the new closed-issue-reap routine, a different mechanism; verify the 12-day recurrence is actually caught. Rank held.
 
-### PAN-1618 (rank 111)
-
-Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1131,10 +1132,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T01:04:21.392367Z",
+  "generatedAt": "2026-09-26T01:14:22.838982Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 816,
+  "openCount": 817,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -11235,6 +11236,19 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "rationale": "New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4224",
+      "rank": 16,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write",
+      "rationale": "New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12378,6 +12392,20 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-4166",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-3935",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
