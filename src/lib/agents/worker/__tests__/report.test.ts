@@ -74,6 +74,23 @@ describe('worker reports (PAN-3920 D15)', () => {
     expect(reports.map((report) => 'git' in report)).toEqual([false, false]);
   });
 
+  it('round-trips a critic verdict and drops a malformed one (PAN-4223 WI-16)', async () => {
+    await writeWorkerReport(ID, { body: '# verdict', verdict: { value: 'NOT_YET', defects: 3, file: '/x/v.json' } });
+    expect((await listWorkerReports(ID))[0]?.verdict).toEqual({ value: 'NOT_YET', defects: 3, file: '/x/v.json' });
+
+    const base = { at: '2026-09-23T12:00:00.000Z', status: 'done', body: 'old' };
+    writeFileSync(join(reportsDir(ID), '0002.json'), JSON.stringify({ seq: 2, ...base }));
+    writeFileSync(join(reportsDir(ID), '0003.json'), JSON.stringify({ seq: 3, ...base, verdict: { value: 'MAYBE', defects: null, file: null } }));
+    writeFileSync(join(reportsDir(ID), '0004.json'), JSON.stringify({ seq: 4, ...base, verdict: { value: 'PASS', defects: -1, file: null } }));
+    const reports = await listWorkerReports(ID);
+    expect(reports.map((report) => [report.seq, report.body, report.verdict])).toEqual([
+      [1, '# verdict', { value: 'NOT_YET', defects: 3, file: '/x/v.json' }],
+      [2, 'old', undefined],
+      [3, 'old', undefined],
+      [4, 'old', undefined],
+    ]);
+  });
+
   it('has no latest report for a worker that never reported', async () => {
     expect(await latestWorkerReport(ID)).toBeNull();
     expect(await latestWorkerReportAt(ID)).toBeNull();

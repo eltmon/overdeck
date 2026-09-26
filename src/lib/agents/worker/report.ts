@@ -29,6 +29,28 @@ export interface WorkerReport {
   readonly body: string;
   /** Git facts a gauntlet lane records with its report (PAN-4223 WI-6); absent on worker reports. */
   readonly git?: WorkerReportGit;
+  /** A critic or verifier lane's verdict (PAN-4223 D24); absent on every other report. */
+  readonly verdict?: WorkerReportVerdict;
+}
+
+export const LANE_VERDICTS = ['WOWED', 'IMPRESSED', 'NOT_YET', 'PASS', 'DEFECTS'] as const;
+export type LaneVerdict = (typeof LANE_VERDICTS)[number];
+
+export interface WorkerReportVerdict {
+  readonly value: LaneVerdict;
+  readonly defects: number | null;
+  readonly file: string | null;
+}
+
+export function isLaneVerdict(value: unknown): value is LaneVerdict {
+  return typeof value === 'string' && (LANE_VERDICTS as readonly string[]).includes(value);
+}
+
+function isWorkerReportVerdict(value: unknown): value is WorkerReportVerdict {
+  if (typeof value !== 'object' || value === null) return false;
+  const verdict = value as Record<string, unknown>;
+  const defectsOk = verdict.defects === null || (Number.isInteger(verdict.defects) && (verdict.defects as number) >= 0);
+  return isLaneVerdict(verdict.value) && defectsOk && (verdict.file === null || typeof verdict.file === 'string');
 }
 
 export interface WorkerReportGit {
@@ -70,9 +92,13 @@ function parseReport(raw: string): WorkerReport | null {
       status: isWorkerReportStatus(parsed.status) ? parsed.status : 'done',
       body: parsed.body,
     };
-    return isWorkerReportGit(parsed.git)
-      ? { ...report, git: { head: parsed.git.head, branch: parsed.git.branch } }
-      : report;
+    return {
+      ...report,
+      ...(isWorkerReportGit(parsed.git) ? { git: { head: parsed.git.head, branch: parsed.git.branch } } : {}),
+      ...(isWorkerReportVerdict(parsed.verdict)
+        ? { verdict: { value: parsed.verdict.value, defects: parsed.verdict.defects, file: parsed.verdict.file } }
+        : {}),
+    };
   } catch {
     return null;
   }
@@ -85,7 +111,7 @@ function parseReport(raw: string): WorkerReport | null {
  */
 export async function writeWorkerReport(
   id: string,
-  report: { body: string; status?: WorkerReportStatus; git?: WorkerReportGit },
+  report: { body: string; status?: WorkerReportStatus; git?: WorkerReportGit; verdict?: WorkerReportVerdict },
   now: () => Date = () => new Date(),
 ): Promise<number> {
   if (Buffer.byteLength(report.body, 'utf8') > MAX_WORKER_REPORT_BYTES) {
@@ -115,6 +141,7 @@ export async function writeWorkerReport(
       status,
       body: report.body,
       ...(report.git ? { git: { head: report.git.head, branch: report.git.branch } } : {}),
+      ...(report.verdict ? { verdict: { value: report.verdict.value, defects: report.verdict.defects, file: report.verdict.file } } : {}),
     };
     await writeFile(temp, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
     await rename(temp, target);
