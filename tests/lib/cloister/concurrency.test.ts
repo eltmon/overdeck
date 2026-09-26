@@ -205,7 +205,7 @@ describe('concurrency governor — config + counting', () => {
     mockLiveAgents(['agent-fly-a', 'agent-op-b', 'agent-op-c']);
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
-        { id: 'agent-fly-a', role: 'work', status: 'running', tmuxActive: true, flywheelRunId: 'RUN-1', lastActivity: '2026-01-01T00:00:00Z' },
+        { id: 'agent-fly-a', role: 'work', status: 'running', tmuxActive: true, startedBy: 'flywheel:conv-flywheel', lastActivity: '2026-01-01T00:00:00Z' },
         { id: 'agent-op-b', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' },
         { id: 'agent-op-c', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' },
       ],
@@ -221,6 +221,63 @@ describe('concurrency governor — config + counting', () => {
     expect(result.before).toBe(3);
     expect(result.stopped).toEqual(['agent-fly-a']);
     expect(result.remaining).toBe(2);
+  });
+
+  it('emergency brake reaps only flywheel:-provenanced agents, not a legacy flywheelRunId field on a planning-auto-handoff agent (PAN-3634)', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 1, reserved_advancing_slots: 1, exempt_operator_started: true } }),
+    }));
+    const states: Record<string, { id: string; stoppedByUser?: boolean }> = {
+      'agent-planning-handoff': { id: 'agent-planning-handoff' },
+      'agent-flywheel': { id: 'agent-flywheel' },
+    };
+    mockLiveAgents(['agent-planning-handoff', 'agent-flywheel']);
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        {
+          id: 'agent-planning-handoff', role: 'work', status: 'running', tmuxActive: true,
+          startedBy: 'planning-auto-handoff', flywheelRunId: 'RUN-92', lastActivity: '2026-01-01T00:00:00Z',
+        },
+        { id: 'agent-flywheel', role: 'work', status: 'running', tmuxActive: true, startedBy: 'flywheel:conv-flywheel', lastActivity: '2026-01-02T00:00:00Z' },
+      ],
+      stopAgent: (id: string) => Effect.sync(() => { states[id].stoppedByUser = true; }),
+      getAgentState: (id: string) => states[id],
+      saveAgentStateSync: (s: { id: string }) => { states[s.id] = states[s.id]; },
+      getAgentRuntimeStateSync: () => ({ state: 'active' }),
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+
+    const result = await emergencyBrake();
+
+    expect(result.stopped).toEqual(['agent-flywheel']);
+  });
+
+  it('emergency brake still stops an agent with the legacy flywheel:RUN-<n> startedBy token (PAN-3634)', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 1, reserved_advancing_slots: 1, exempt_operator_started: true } }),
+    }));
+    const states: Record<string, { id: string; stoppedByUser?: boolean }> = {
+      'agent-legacy-flywheel': { id: 'agent-legacy-flywheel' },
+      'agent-operator': { id: 'agent-operator' },
+    };
+    mockLiveAgents(['agent-legacy-flywheel', 'agent-operator']);
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-legacy-flywheel', role: 'work', status: 'running', tmuxActive: true, startedBy: 'flywheel:RUN-84', lastActivity: '2026-01-01T00:00:00Z' },
+        { id: 'agent-operator', role: 'work', status: 'running', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' },
+      ],
+      stopAgent: (id: string) => Effect.sync(() => { states[id].stoppedByUser = true; }),
+      getAgentState: (id: string) => states[id],
+      saveAgentStateSync: (s: { id: string }) => { states[s.id] = states[s.id]; },
+      getAgentRuntimeStateSync: () => ({ state: 'active' }),
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+
+    const result = await emergencyBrake();
+
+    expect(result.stopped).toEqual(['agent-legacy-flywheel']);
   });
 
   it('emergency brake sees Herdr work agents (no tmux session) through the backend inventory (PAN-3926)', async () => {

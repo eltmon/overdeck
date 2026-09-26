@@ -597,11 +597,11 @@ describe('selectStackShedCandidates (PAN-2500 tiered-eviction)', () => {
 
 describe('selectAgentToPause (PAN-2500 tiered-eviction)', () => {
   const agents = [
-    { id: 'agent-pan-1', issueId: 'PAN-1', flywheelRunId: 'run-1' },
-    { id: 'agent-pan-2', issueId: 'PAN-2', flywheelRunId: undefined }, // operator-started
+    { id: 'agent-pan-1', issueId: 'PAN-1', startedBy: 'flywheel:conv-flywheel' },
+    { id: 'agent-pan-2', issueId: 'PAN-2', startedBy: undefined }, // operator-started
   ];
 
-  it('never selects an operator-attached (no flywheelRunId) agent when exemptOperatorStarted is true', () => {
+  it('never selects an operator-attached (startedBy not flywheel:-provenanced) agent when exemptOperatorStarted is true', () => {
     const result = selectAgentToPause(agents, () => true, true);
     expect(result?.id).toBe('agent-pan-1');
   });
@@ -615,6 +615,24 @@ describe('selectAgentToPause (PAN-2500 tiered-eviction)', () => {
   it('considers all candidates when exemptOperatorStarted is false', () => {
     const result = selectAgentToPause(agents, (id) => id === 'agent-pan-2', false);
     expect(result?.id).toBe('agent-pan-2');
+  });
+
+  it('exempts a planning-auto-handoff agent even carrying a legacy flywheelRunId field (PAN-3634)', () => {
+    const result = selectAgentToPause(
+      [{ id: 'agent-planning-handoff', issueId: 'PAN-92', startedBy: 'planning-auto-handoff', flywheelRunId: 'RUN-92' } as never],
+      () => true,
+      true,
+    );
+    expect(result).toBeNull();
+  });
+
+  it('selects an idle agent with startedBy flywheel:conv-flywheel (PAN-3634)', () => {
+    const result = selectAgentToPause(
+      [{ id: 'agent-flywheel', issueId: 'PAN-93', startedBy: 'flywheel:conv-flywheel' }],
+      () => true,
+      true,
+    );
+    expect(result?.id).toBe('agent-flywheel');
   });
 });
 
@@ -638,7 +656,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
 
     listRunningAgentsMock.mockReturnValue([
-      { id: 'agent-pan-3', issueId: 'PAN-3', role: 'work', tmuxActive: true, flywheelRunId: 'run-1' },
+      { id: 'agent-pan-3', issueId: 'PAN-3', role: 'work', tmuxActive: true, startedBy: 'flywheel:conv-flywheel' },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
     // First assess (after stacks): still hard. Second (after pausing the agent): clears to ok.
@@ -655,10 +673,10 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-3');
   });
 
-  it('never sheds an operator-attached (no flywheelRunId) agent even under sustained HARD pressure', async () => {
+  it('never sheds an operator-attached (startedBy not flywheel:-provenanced) agent even under sustained HARD pressure', async () => {
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue([]);
     listRunningAgentsMock.mockReturnValue([
-      { id: 'agent-operator', issueId: 'PAN-4', role: 'work', tmuxActive: true, flywheelRunId: undefined },
+      { id: 'agent-operator', issueId: 'PAN-4', role: 'work', tmuxActive: true, startedBy: undefined },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
     readProcMemoryMock.mockResolvedValue(procMemory(1 * GIB)); // stays hard forever
@@ -674,7 +692,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
     listLiveAgentIdsMock.mockResolvedValue(new Set(['agent-pan-5']));
     listRunningAgentsMock.mockReturnValue([
-      { id: 'agent-pan-5', issueId: 'PAN-5', role: 'work', tmuxActive: false, flywheelRunId: 'run-5' },
+      { id: 'agent-pan-5', issueId: 'PAN-5', role: 'work', tmuxActive: false, startedBy: 'flywheel:conv-flywheel' },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
     readProcMemoryMock.mockResolvedValueOnce(procMemory(1 * GIB)).mockResolvedValue(procMemory(20 * GIB));
@@ -692,8 +710,8 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
     listLiveAgentIdsMock.mockResolvedValue(null);
     listRunningAgentsMock.mockReturnValue([
-      { id: 'agent-pan-7', issueId: 'PAN-7', role: 'work', status: 'running', tmuxActive: true, flywheelRunId: 'run-7' },
-      { id: 'agent-pan-8', issueId: 'PAN-8', role: 'work', status: 'stopped', tmuxActive: false, flywheelRunId: 'run-8' },
+      { id: 'agent-pan-7', issueId: 'PAN-7', role: 'work', status: 'running', tmuxActive: true, startedBy: 'flywheel:conv-flywheel' },
+      { id: 'agent-pan-8', issueId: 'PAN-8', role: 'work', status: 'stopped', tmuxActive: false, startedBy: 'flywheel:conv-flywheel' },
     ]);
     getAgentRuntimeStateSyncMock.mockReturnValue({ state: 'idle' });
     readProcMemoryMock.mockResolvedValue(procMemory(1 * GIB)); // stays hard
@@ -712,7 +730,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
     vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
     listLiveAgentIdsMock.mockResolvedValue(new Set());
     listRunningAgentsMock.mockReturnValue([
-      { id: 'agent-pan-9', issueId: 'PAN-9', role: 'work', status: 'running', tmuxActive: true, flywheelRunId: 'run-9' },
+      { id: 'agent-pan-9', issueId: 'PAN-9', role: 'work', status: 'running', tmuxActive: true, startedBy: 'flywheel:conv-flywheel' },
     ]);
     readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
 

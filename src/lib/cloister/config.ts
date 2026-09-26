@@ -94,9 +94,10 @@ export interface ConcurrencyConfig {
    */
   reserved_swarm_slots: number;
   /**
-   * When true, operator-started work agents (no flywheelRunId) are exempt from
-   * the emergency brake/governor reaping so the operator's deliberate spawns are
-   * not trimmed to satisfy the cap. Defaults to true (PAN-1812).
+   * When true, operator-started work agents (startedBy not 'flywheel:'-
+   * provenanced) are exempt from the emergency brake/governor reaping so the
+   * operator's deliberate spawns are not trimmed to satisfy the cap. Defaults
+   * to true (PAN-1812/PAN-3634).
    */
   exempt_operator_started?: boolean;
   /**
