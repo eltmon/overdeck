@@ -1,0 +1,580 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-26T06:10:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3634: Planning auto-handoff stamps the ambient flywheelRunId on operator-started work agents, stripping their reaping exemption",
+    "updated": "2026-09-26T06:14:38.327Z"
+  },
+  "plan": {
+    "id": "pan-3634",
+    "title": "Planning auto-handoff stamps the ambient flywheelRunId on operator-started work agents, stripping their reaping exemption",
+    "status": "proposed",
+    "uid": "3d558b77-f7ed-4b25-bfc8-8ae74d114e6a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-26T06:10:43Z",
+    "updated": "2026-09-26T06:14:38.327Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3634",
+        "label": "PAN-3634",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3634.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "provenance",
+      "flywheel",
+      "cloister",
+      "governor",
+      "planning-handoff"
+    ],
+    "narratives": {
+      "Problem": "Every spawn stamps flywheelRunId from getFlywheelActiveRunId(), which reads the dead flywheel.active_run_id setting (stale RUN-92 on the operator's host). The emergency brake and the governor shed treat any flywheelRunId as Flywheel-dispatched, so the operator-started exemption exempts nobody. The Flywheel's own pan start calls resolve operator:cli:pan-start, and the planning auto-handoff always sends planning-auto-handoff, so no correct Flywheel provenance exists today.",
+      "Proposal": "Make startedBy the one provenance signal. The conv-flywheel shell mints flywheel:conv-flywheel (resolveCliStartedBy reads OVERDECK_CONVERSATION after any inherited OVERDECK_AGENT_STARTED_BY). Delete the run-id spawn plumbing and getFlywheelActiveRunId. The reaping filters stop only agents whose startedBy starts with flywheel:. The planning auto-handoff and its deferred retry send flywheel:conv-flywheel only when the planning session was Flywheel-started, otherwise the unchanged planning-auto-handoff (keeps the consent claim). The dashboard validator accepts the new token. Docs state the rule.",
+      "NonGoals": "- Removing flywheelRunId from packages/contracts, event reducers, agent-state-read.ts or the agents table\n- Removing activeRunId from the FlywheelRuntime resolver interface or deleting flywheel.active_run_id rows from existing databases\n- Adding an originStartedBy / chain-origin field to agent state\n- Changing the consent claim, spawn guardrails, isOperatorStartedBy, or which non-Flywheel origins the exemption covers\n- Exporting OVERDECK_AGENT_STARTED_BY from the conversation launcher or changing how conv-flywheel is spawned\n- Migrating or rewriting startedBy on agent state already on disk\n- Changing the /pan-flywheel skill or the pan start launch path"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Flywheel provenance is the 'flywheel:' prefix on startedBy; the conv-flywheel shell mints 'flywheel:conv-flywheel'.",
+        "rationale": "The issue author's 2026-09-26 comment says to derive provenance from startedBy or the conv-flywheel spawner; run ids no longer exist, and OVERDECK_CONVERSATION=conv-flywheel is already exported into the Flywheel's shell."
+      },
+      {
+        "summary": "The exemption rule is 'reapable iff isFlywheelStartedBy(startedBy)', not 'exempt iff isOperatorStartedBy'.",
+        "rationale": "Preserves PAN-1812 intent (everything the Flywheel did not dispatch is exempt) and keeps planning-auto-handoff children of operator chains exempt, which is the bug being fixed."
+      },
+      {
+        "summary": "The auto-handoff sends the Flywheel token only for Flywheel chains and keeps 'planning-auto-handoff' otherwise, instead of copying the planning session's startedBy verbatim.",
+        "rationale": "Copying 'operator:cli:pan-start' would make isOperatorStartedBy true and skip the auto-spawn consent claim, violating the issue's AC3 (auto-handoff behavior otherwise unchanged)."
+      },
+      {
+        "summary": "Issue AC2 ('keeps its flywheelRunId on both halves') is restated as 'carries flywheel: provenance in both planning and work state and is reapable'.",
+        "rationale": "The author's later comment retires run ids; the comment is the tiebreaker between the body and the comment."
+      },
+      {
+        "summary": "The persisted flywheelRunId field and the FlywheelRuntime.activeRunId interface member stay as inert legacy data.",
+        "rationale": "Historical events carry the field and the no-loss audit tests enumerate it; removing it is a contracts change outside this issue's scope."
+      },
+      {
+        "summary": "resolveCliStartedBy precedence is inherited OVERDECK_AGENT_STARTED_BY, then OVERDECK_CONVERSATION=conv-flywheel, then the default.",
+        "rationale": "Every server-side detached pan start sets OVERDECK_AGENT_STARTED_BY, so a server that inherits OVERDECK_CONVERSATION cannot mislabel its spawns."
+      },
+      {
+        "summary": "The dashboard validator keeps accepting legacy 'flywheel:RUN-<n>' tokens.",
+        "rationale": "Panes launched before this change may still carry that token in OVERDECK_AGENT_STARTED_BY."
+      }
+    ],
+    "items": [
+      {
+        "id": "provenance-flywheel-token",
+        "title": "Add Flywheel provenance token and predicates to provenance.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T06:10:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3634",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/provenance.ts",
+            "src/lib/__tests__/spawn-provenance-contract.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/spawn-provenance-contract.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn-provenance-contract.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ],
+          "foundationFor": [
+            "validator-accepts-flywheel-token",
+            "exemption-reads-startedby",
+            "handoff-complete-planning",
+            "handoff-deferred-retry"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/agents/provenance.ts import FLYWHEEL_CONVERSATION_SESSION from ../flywheel/constants.js; export FLYWHEEL_STARTED_BY = `flywheel:${FLYWHEEL_CONVERSATION_SESSION}` and PLANNING_AUTO_HANDOFF_STARTED_BY = 'planning-auto-handoff'; add isFlywheelStartedBy(startedBy) (trimmed value starts with 'flywheel:') and planningHandoffStartedBy(planningStartedBy) (Flywheel -> FLYWHEEL_STARTED_BY, anything else -> 'planning-auto-handoff'). In resolveCliStartedBy replace the OVERDECK_FLYWHEEL_RUN_ID branch: inherited OVERDECK_AGENT_STARTED_BY first, then OVERDECK_CONVERSATION (trimmed) === 'conv-flywheel' -> FLYWHEEL_STARTED_BY, else defaultOrigin. Keep normalizeFlywheelRunId exported. Update/add the tests listed in PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "provenance-flywheel-token.ac1",
+            "title": "Given OVERDECK_AGENT_STARTED_BY is blank and OVERDECK_CONVERSATION is 'conv-flywheel', when resolveCliStartedBy('operator:cli:pan-start', env) runs, then it returns 'flywheel:conv-flywheel'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-flywheel-token.ac2",
+            "title": "Given OVERDECK_AGENT_STARTED_BY='planning-auto-handoff' and OVERDECK_CONVERSATION='conv-flywheel', resolveCliStartedBy returns 'planning-auto-handoff' (inherited token wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-flywheel-token.ac3",
+            "title": "Given only OVERDECK_FLYWHEEL_RUN_ID='RUN-42' is set, resolveCliStartedBy returns the default origin because the run-id env var is no longer read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-flywheel-token.ac4",
+            "title": "isFlywheelStartedBy returns true for 'flywheel:conv-flywheel' and 'flywheel:RUN-84' and false for 'operator:cli:pan-start', 'planning-auto-handoff', '' and undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provenance-flywheel-token.ac5",
+            "title": "planningHandoffStartedBy returns 'planning-auto-handoff' for 'operator:cli:pan-start' and undefined, and returns 'flywheel:conv-flywheel' for 'flywheel:conv-flywheel' and 'flywheel:RUN-84'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retire-run-id-spawn",
+        "title": "Retire run-id spawn plumbing and getFlywheelActiveRunId",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T06:10:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/overdeck/control-settings.ts",
+            "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+            "src/lib/__tests__/agents-spawn-tier-fitness.test.ts",
+            "src/lib/__tests__/spawn-provenance-contract.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/lib/__tests__/agents-spawn-supervisor.test.ts src/lib/__tests__/agents-spawn-tier-fitness.test.ts src/lib/__tests__/spawn-provenance-contract.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "the three named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Delete FlywheelSpawnEnv, resolveFlywheelSpawnEnv, flywheelEnvExports and the getFlywheelActiveRunId/normalizeFlywheelRunId imports from spawn-prep.ts; delete flywheelRunId from SpawnOptions and SpawnRunOptions; make resolveAgentStartedBy(explicit, environmentToken) drop the run-id parameter. In spawn.ts replace every resolveFlywheelSpawnEnv + resolveAgentStartedBy pair with resolveAgentStartedBy(options.startedBy), delete the flywheelRunId state fields and the flywheelEnv spreads in extraEnvExports and session env. Delete getFlywheelActiveRunId from control-settings.ts. Update the tests exactly as PRD WI-2 step 5 lists (typecheck skips *.test.ts, so run the named vitest files)."
+        },
+        "items": [
+          {
+            "id": "retire-run-id-spawn.ac1",
+            "title": "Given a work agent is spawned through spawnRun, the written launcher contains no OVERDECK_FLYWHEEL_RUN_ID or OVERDECK_FLYWHEEL_AGENT_ROLE export and the session env has neither key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-run-id-spawn.ac2",
+            "title": "Given a work agent is spawned, getAgentState('agent-<issue>').flywheelRunId returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-run-id-spawn.ac3",
+            "title": "git grep -n 'getFlywheelActiveRunId\\|resolveFlywheelSpawnEnv\\|flywheelEnvExports' -- src returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-run-id-spawn.ac4",
+            "title": "resolveAgentStartedBy(undefined, '') throws 'Agent spawn provenance is required' and resolveAgentStartedBy(' operator:cli:pan-start ', '') returns 'operator:cli:pan-start'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validator-accepts-flywheel-token",
+        "title": "Dashboard accepts flywheel:conv-flywheel as internal startedBy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T06:10:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/__tests__/agents-started-by.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-started-by.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agents-started-by.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Import FLYWHEEL_STARTED_BY from '../../../../lib/agents/provenance.js' in shared.ts and add it to INTERNAL_STARTED_BY_TOKENS. Leave the legacy flywheel:RUN-<n> branch of resolveRequestedStartedBy unchanged. Add the four tests listed in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "validator-accepts-flywheel-token.ac1",
+            "title": "Given an internal request, resolveRequestedStartedBy('flywheel:conv-flywheel', true) returns 'flywheel:conv-flywheel'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validator-accepts-flywheel-token.ac2",
+            "title": "Given an internal request, resolveRequestedStartedBy('flywheel:RUN-42', true) still returns 'flywheel:RUN-42'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validator-accepts-flywheel-token.ac3",
+            "title": "Given an internal request, resolveRequestedStartedBy('flywheel:bogus', true) rejects with 'Invalid internal startedBy provenance token.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validator-accepts-flywheel-token.ac4",
+            "title": "Given a non-internal request, resolveRequestedStartedBy('flywheel:conv-flywheel', false) returns 'operator:dashboard'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "exemption-reads-startedby",
+        "title": "Emergency brake and governor shed reap only flywheel:-provenanced agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T06:10:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/concurrency.ts",
+            "src/lib/cloister/memory-governor.ts",
+            "src/lib/cloister/config.ts",
+            "tests/lib/cloister/concurrency.test.ts",
+            "tests/unit/lib/cloister/memory-governor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cloister/concurrency.test.ts tests/unit/lib/cloister/memory-governor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both named test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In emergencyBrake (concurrency.ts) and selectAgentToPause (memory-governor.ts) replace the flywheelRunId non-empty filter with isFlywheelStartedBy(a.startedBy) imported from ../agents/provenance.js. ShedCandidateAgent carries startedBy instead of flywheelRunId and shed() maps a.startedBy. Update the selectAgentToPause doc comment and the exempt_operator_started comment in config.ts. Convert test fixtures and add the PAN-3634 cases from PRD WI-4."
+        },
+        "items": [
+          {
+            "id": "exemption-reads-startedby.ac1",
+            "title": "Given exempt_operator_started is true and the fleet is one over cap with a 'planning-auto-handoff' agent carrying flywheelRunId 'RUN-92' and a 'flywheel:conv-flywheel' agent, when emergencyBrake runs, then stopped equals only the flywheel agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "exemption-reads-startedby.ac2",
+            "title": "Given exempt_operator_started is true, emergencyBrake stops an agent whose startedBy is legacy 'flywheel:RUN-84'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "exemption-reads-startedby.ac3",
+            "title": "Given exempt_operator_started is true and the only idle agent has startedBy 'planning-auto-handoff' and flywheelRunId 'RUN-92', selectAgentToPause returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "exemption-reads-startedby.ac4",
+            "title": "Given exempt_operator_started is true and an idle agent has startedBy 'flywheel:conv-flywheel', selectAgentToPause returns that agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-complete-planning",
+        "title": "Planning auto-handoff sends Flywheel provenance only for Flywheel chains",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T06:10:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "complete-planning.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add readAgentState?: typeof getAgentState to completePlanningAutoSpawn options; after the autoSpawn early return compute handoffStartedBy = planningHandoffStartedBy((options.readAgentState ?? getAgentState)(`planning-${issueId.toLowerCase()}`)?.startedBy); replace both 'planning-auto-handoff' literals (the /api/agents body and the rebuild-and-start body) with handoffStartedBy. Nothing else in either body changes. Add the tests listed in PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "handoff-complete-planning.ac1",
+            "title": "Given the planning-<issue> state has startedBy 'operator:cli:pan-start', completePlanningAutoSpawn posts /api/agents with startedBy 'planning-auto-handoff', autoSpawnConsentRequired true and the unchanged guardrailAcknowledgedWarnings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-complete-planning.ac2",
+            "title": "Given no planning-<issue> state exists, completePlanningAutoSpawn posts startedBy 'planning-auto-handoff'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-complete-planning.ac3",
+            "title": "Given the planning-<issue> state has startedBy 'flywheel:conv-flywheel', completePlanningAutoSpawn posts /api/agents with startedBy 'flywheel:conv-flywheel' and autoSpawnConsentRequired true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-complete-planning.ac4",
+            "title": "Given a Flywheel-started planning state and a stack-unhealthy refusal, the rebuild-and-start recovery POST carries startedBy 'flywheel:conv-flywheel'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-deferred-retry",
+        "title": "Deferred hand-off retry re-sends the chain's provenance",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T06:10:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deferred-handoff.ts",
+            "src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-lite-retry-deferred-handoff.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "Two behaviors (operator/absent origin unchanged, Flywheel origin inherited) fully cover this one call-site change."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Change the spawn dep to (issueId, startedBy); defaultSpawn passes startedBy as the fourth argument of spawnWorkAgentThroughAgentsEndpoint; at the retry call site pass planningHandoffStartedBy(input.readAgentState(`planning-${issueId.toLowerCase()}`)?.startedBy). Keep fake timers in the test file. Add the Flywheel-origin test from PRD WI-6."
+        },
+        "items": [
+          {
+            "id": "handoff-deferred-retry.ac1",
+            "title": "Given a deferred hand-off whose planning state has startedBy 'operator:cli:pan-start' or no planning state, the retried /api/agents body carries startedBy 'planning-auto-handoff' and autoSpawnConsentRequired true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-deferred-retry.ac2",
+            "title": "Given a deferred hand-off whose planning state has startedBy 'flywheel:conv-flywheel', the retried /api/agents body carries startedBy 'flywheel:conv-flywheel'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-flywheel-provenance",
+        "title": "Document Flywheel provenance and the exemption predicate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T06:10:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Operator-started exemption (PAN-1812, PAN-3634)' docs/PIPELINE-GATES.md",
+            "grep -n 'flywheel:conv-flywheel' docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new PIPELINE-GATES.md bullet",
+            "grep prints the new FLYWHEEL.md paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "acJustification": "Docs-only item: one criterion per doc file."
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add the 'Operator-started exemption (PAN-1812, PAN-3634)' bullet after the Memory gate bullet in docs/PIPELINE-GATES.md '## Agent Auto-Resume Gates', and the provenance paragraph after line 3 of docs/FLYWHEEL.md, with the content PRD WI-7 specifies."
+        },
+        "items": [
+          {
+            "id": "docs-flywheel-provenance.ac1",
+            "title": "docs/PIPELINE-GATES.md renders a bullet headed 'Operator-started exemption (PAN-1812, PAN-3634)' under '## Agent Auto-Resume Gates' stating that only agents whose startedBy starts with 'flywheel:' are reapable when exempt_operator_started is on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-flywheel-provenance.ac2",
+            "title": "Given docs/FLYWHEEL.md is opened, when a reader reaches the paragraph after the opening, then it renders the statement that agents the loop starts carry startedBy 'flywheel:conv-flywheel', resolved from OVERDECK_CONVERSATION=conv-flywheel, and that the planning auto-handoff carries it to the work agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "provenance-flywheel-token",
+        "to": "retire-run-id-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "provenance-flywheel-token",
+        "to": "validator-accepts-flywheel-token",
+        "type": "blocks"
+      },
+      {
+        "from": "provenance-flywheel-token",
+        "to": "exemption-reads-startedby",
+        "type": "blocks"
+      },
+      {
+        "from": "provenance-flywheel-token",
+        "to": "handoff-complete-planning",
+        "type": "blocks"
+      },
+      {
+        "from": "provenance-flywheel-token",
+        "to": "handoff-deferred-retry",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-26-PAN-3634-planning-auto-handoff-stamps-the-ambient-flywheelrunid-on-operator-started-work-agents-stripping-their-reaping-exemption.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
