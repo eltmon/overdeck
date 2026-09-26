@@ -46,7 +46,7 @@ export interface LiveRow {
   reason: LiveReason;
   /** Needs you: when the wait began. Live, Waiting and Idle: the last activity. */
   since: string | null;
-  /** Subagents nested under this row (FR-8). */
+  /** Subagents nested under this row (FR-8), then its gauntlet lanes (PAN-4223 FR-19). */
   children: DirectoryEntry[];
 }
 
@@ -158,11 +158,72 @@ function compareRows(direction: 'asc' | 'desc', timeFor: (row: LiveRow) => strin
   };
 }
 
+/** PAN-4223: the lane role glyph a lane line shows before its key. */
+export const LANE_GLYPH: Readonly<Record<string, string>> = {
+  builder: 'B',
+  critic: 'C',
+  verifier: 'V',
+  play: 'P',
+  orchestrator: 'O',
+};
+
 /**
  * Rows grouped into the sections, sorted (FR-4, FR-7). A subagent nests
  * under its parent row and is not a row of its own; one whose parent is not on
  * the page is dropped (FR-8).
  */
+/**
+ * PAN-4223 FR-19, FR-29, D23: a lane whose parent has a row becomes a child
+ * line of that row and loses its own row, unless it needs you (then it has
+ * both). A lane under a lane that is itself a child line goes to that lane's
+ * host row, so the Live view keeps one level of child lines. A successor (a
+ * conversation with a parent but no lane) always keeps its own row.
+ */
+function attachLanes(entries: readonly DirectoryEntry[], rows: Map<string, LiveRow>): void {
+  const isChildLine = (row: LiveRow): boolean =>
+    row.entry.kind === 'conversation' && Boolean(row.entry.lane) && row.reason.section !== 'needs-you'
+    && row.entry.parentId !== null && rows.has(row.entry.parentId);
+  const hostOf = (entry: DirectoryEntry): LiveRow | undefined => {
+    const seen = new Set<string>([entry.id]);
+    let parentId = entry.parentId;
+    while (parentId && !seen.has(parentId)) {
+      seen.add(parentId);
+      const parent = rows.get(parentId);
+      if (!parent) return undefined;
+      if (!isChildLine(parent)) return parent;
+      parentId = parent.entry.parentId;
+    }
+    return undefined;
+  };
+  const moved: string[] = [];
+  for (const entry of entries) {
+    if (entry.kind !== 'conversation' || !entry.lane || !entry.parentId) continue;
+    const own = rows.get(entry.id);
+    const host = hostOf(entry);
+    if (!own || !host) continue;
+    host.children.push(entry);
+    if (own.reason.section !== 'needs-you') moved.push(entry.id);
+  }
+  for (const id of moved) rows.delete(id);
+  for (const row of rows.values()) row.children = criticsAfterBuilders(row.children);
+}
+
+/**
+ * PAN-4223 D27: a critic child line sits directly after the builder it judges
+ * (after that builder's earlier critics) when both are children of one row.
+ */
+function criticsAfterBuilders(children: DirectoryEntry[]): DirectoryEntry[] {
+  const ids = new Set(children.map((child) => child.id));
+  const isPlacedCritic = (child: DirectoryEntry) => child.lane?.criticOf !== undefined && child.parentId !== null && ids.has(child.parentId);
+  const ordered: DirectoryEntry[] = [];
+  const place = (entry: DirectoryEntry) => {
+    ordered.push(entry);
+    for (const critic of children) if (isPlacedCritic(critic) && critic.parentId === entry.id) place(critic);
+  };
+  for (const child of children) if (!isPlacedCritic(child)) place(child);
+  return ordered;
+}
+
 export function buildLiveSections(
   entries: readonly DirectoryEntry[],
   factsFor: (entry: DirectoryEntry) => LiveFacts,
@@ -179,6 +240,7 @@ export function buildLiveSections(
     if (entry.kind !== 'subagent' || !entry.parentId) continue;
     rows.get(entry.parentId)?.children.push(entry);
   }
+  attachLanes(entries, rows);
 
   const sections: LiveSections = { needsYou: [], live: [], waiting: [], idle: [] };
   for (const row of rows.values()) {

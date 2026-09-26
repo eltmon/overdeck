@@ -1,0 +1,709 @@
+{
+  "version": "1",
+  "issueId": "PAN-4223",
+  "created": "2026-09-26T01:20:43.443Z",
+  "updated": "2026-09-26T08:23:14.742Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "lane-columns": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T01:20:43.443Z",
+      "doneAt": "2026-09-26T02:26:47.046Z"
+    },
+    "runtime-start-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T02:28:56.804Z",
+      "doneAt": "2026-09-26T02:49:32.342Z"
+    },
+    "fork-parent-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T02:49:33.689Z",
+      "doneAt": "2026-09-26T03:21:36.656Z"
+    },
+    "gauntlet-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T03:21:38.321Z",
+      "doneAt": "2026-09-26T04:29:10.125Z"
+    },
+    "lane-worktree": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T04:29:25.198Z",
+      "doneAt": "2026-09-26T04:31:25.190Z"
+    },
+    "lane-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T04:31:32.459Z",
+      "doneAt": "2026-09-26T04:32:53.775Z"
+    },
+    "lane-report-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T04:32:54.927Z",
+      "doneAt": "2026-09-26T04:34:10.978Z"
+    },
+    "lane-launch-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T04:34:17.363Z",
+      "doneAt": "2026-09-26T04:50:33.227Z"
+    },
+    "lane-views": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T04:50:39.049Z",
+      "doneAt": "2026-09-26T04:58:15.288Z"
+    },
+    "lane-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T04:58:26.619Z",
+      "doneAt": "2026-09-26T05:01:21.082Z"
+    },
+    "lane-report-cmd": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:01:22.243Z",
+      "doneAt": "2026-09-26T05:04:20.963Z"
+    },
+    "lane-wait": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:04:22.224Z",
+      "doneAt": "2026-09-26T05:07:47.711Z"
+    },
+    "lane-reap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:07:54.139Z",
+      "doneAt": "2026-09-26T05:11:55.947Z"
+    },
+    "tell-fixes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:11:56.870Z",
+      "doneAt": "2026-09-26T05:15:26.813Z"
+    },
+    "lane-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:15:32.662Z",
+      "doneAt": "2026-09-26T05:22:31.660Z"
+    },
+    "deck-tree": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:22:38.902Z",
+      "doneAt": "2026-09-26T05:26:19.425Z"
+    },
+    "deck-render": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:26:28.190Z",
+      "doneAt": "2026-09-26T05:34:53.068Z"
+    },
+    "agents-dir-server": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:35:01.654Z",
+      "doneAt": "2026-09-26T05:41:55.208Z"
+    },
+    "agents-live": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:42:01.411Z",
+      "doneAt": "2026-09-26T05:44:51.300Z"
+    },
+    "agents-history": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:44:52.494Z",
+      "doneAt": "2026-09-26T05:47:27.529Z"
+    },
+    "critic-link-column": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:47:36.782Z",
+      "doneAt": "2026-09-26T05:52:17.477Z"
+    },
+    "lane-verdict-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:52:18.568Z",
+      "doneAt": "2026-09-26T05:54:48.303Z"
+    },
+    "lane-verdict-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:54:54.683Z",
+      "doneAt": "2026-09-26T05:58:17.069Z"
+    },
+    "critic-pairing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:58:18.107Z",
+      "doneAt": "2026-09-26T06:07:23.397Z"
+    },
+    "critic-launch-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:07:24.398Z",
+      "doneAt": "2026-09-26T06:11:56.203Z"
+    },
+    "critic-pairing-views": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:12:01.779Z",
+      "doneAt": "2026-09-26T06:16:53.900Z"
+    },
+    "critic-list-enrichment": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:16:55.336Z",
+      "doneAt": "2026-09-26T06:20:47.195Z"
+    },
+    "lane-cli-critic-flags": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:20:53.367Z",
+      "doneAt": "2026-09-26T06:59:42.861Z"
+    },
+    "gauntlet-skill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:45:25.120Z",
+      "doneAt": "2026-09-26T06:46:10.980Z"
+    },
+    "docs-reference": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:46:31.449Z",
+      "doneAt": "2026-09-26T06:47:18.535Z"
+    },
+    "docs-skills-rules": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:47:21.977Z",
+      "doneAt": "2026-09-26T06:48:08.336Z"
+    },
+    "docs-dev": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:48:11.814Z",
+      "doneAt": "2026-09-26T06:48:58.547Z"
+    },
+    "lane-show-cmd": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T06:59:44.824Z",
+      "doneAt": "2026-09-26T07:37:10.803Z"
+    },
+    "deck-critic-tree": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T07:30:36.101Z",
+      "doneAt": "2026-09-26T07:31:13.516Z"
+    },
+    "deck-verdict-badges": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T07:31:26.183Z",
+      "doneAt": "2026-09-26T07:36:21.306Z"
+    },
+    "agents-dir-critic": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T07:37:13.606Z",
+      "doneAt": "2026-09-26T07:37:51.223Z"
+    },
+    "agents-live-critic": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T07:38:08.086Z",
+      "doneAt": "2026-09-26T07:38:51.238Z"
+    },
+    "docs-critic-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T07:38:54.207Z",
+      "doneAt": "2026-09-26T07:40:59.193Z"
+    },
+    "lane-columns.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:50:35.848Z"
+    },
+    "lane-columns.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:52:11.407Z"
+    },
+    "lane-columns.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:52:28.515Z"
+    },
+    "lane-columns.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:52:43.017Z"
+    },
+    "lane-columns.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:52:56.691Z"
+    },
+    "fork-parent-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:53:11.675Z"
+    },
+    "fork-parent-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:53:25.204Z"
+    },
+    "fork-parent-link.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:53:36.664Z"
+    },
+    "fork-parent-link.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:53:48.674Z"
+    },
+    "runtime-start-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:54:00.604Z"
+    },
+    "runtime-start-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:54:12.257Z"
+    },
+    "runtime-start-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:54:24.739Z"
+    },
+    "gauntlet-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:54:37.832Z"
+    },
+    "gauntlet-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:54:50.598Z"
+    },
+    "gauntlet-config.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:55:02.810Z"
+    },
+    "lane-worktree.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:55:15.465Z"
+    },
+    "lane-worktree.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:55:27.786Z"
+    },
+    "lane-worktree.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:55:38.813Z"
+    },
+    "lane-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:55:49.115Z"
+    },
+    "lane-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:56:01.188Z"
+    },
+    "lane-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:56:12.454Z"
+    },
+    "lane-report-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:56:22.107Z"
+    },
+    "lane-report-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:56:34.059Z"
+    },
+    "lane-launch-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:56:47.299Z"
+    },
+    "lane-launch-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:57:05.040Z"
+    },
+    "lane-launch-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:57:21.341Z"
+    },
+    "lane-launch-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:57:37.509Z"
+    },
+    "lane-launch-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:57:51.803Z"
+    },
+    "lane-views.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:58:05.769Z"
+    },
+    "lane-views.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:58:18.479Z"
+    },
+    "lane-views.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:58:35.608Z"
+    },
+    "lane-views.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:59:00.421Z"
+    },
+    "lane-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:59:22.325Z"
+    },
+    "lane-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:59:44.681Z"
+    },
+    "lane-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:00:06.282Z"
+    },
+    "lane-report-cmd.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:00:19.817Z"
+    },
+    "lane-report-cmd.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:00:32.405Z"
+    },
+    "lane-report-cmd.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:00:53.770Z"
+    },
+    "lane-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:01:17.124Z"
+    },
+    "lane-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:01:32.062Z"
+    },
+    "lane-wait.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:01:43.509Z"
+    },
+    "lane-reap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:01:57.118Z"
+    },
+    "lane-reap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:02:19.338Z"
+    },
+    "lane-reap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:02:56.061Z"
+    },
+    "lane-reap.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:03:29.944Z"
+    },
+    "lane-reap.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:03:52.441Z"
+    },
+    "tell-fixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:04:21.539Z"
+    },
+    "tell-fixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:05:00.463Z"
+    },
+    "tell-fixes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:05:30.929Z"
+    },
+    "lane-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:05:59.781Z"
+    },
+    "lane-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:06:27.765Z"
+    },
+    "lane-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:06:56.333Z"
+    },
+    "lane-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:07:21.937Z"
+    },
+    "deck-tree.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:07:57.152Z"
+    },
+    "deck-tree.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:08:29.011Z"
+    },
+    "deck-tree.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:09:02.044Z"
+    },
+    "deck-tree.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:09:24.066Z"
+    },
+    "deck-render.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:09:37.177Z"
+    },
+    "deck-render.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:10:02.655Z"
+    },
+    "deck-render.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:10:29.231Z"
+    },
+    "deck-render.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:10:56.688Z"
+    },
+    "agents-dir-server.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:11:15.096Z"
+    },
+    "agents-dir-server.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:11:27.666Z"
+    },
+    "agents-dir-server.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:11:54.110Z"
+    },
+    "agents-live.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:12:23.344Z"
+    },
+    "agents-live.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:12:38.095Z"
+    },
+    "agents-history.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:12:50.151Z"
+    },
+    "agents-history.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:13:02.692Z"
+    },
+    "gauntlet-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:13:14.770Z"
+    },
+    "gauntlet-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:13:25.562Z"
+    },
+    "gauntlet-skill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:13:38.045Z"
+    },
+    "gauntlet-skill.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:13:51.241Z"
+    },
+    "docs-reference.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:14:04.518Z"
+    },
+    "docs-reference.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:14:17.773Z"
+    },
+    "docs-skills-rules.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:14:31.307Z"
+    },
+    "docs-skills-rules.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:14:43.772Z"
+    },
+    "docs-dev.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:14:56.227Z"
+    },
+    "docs-dev.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:15:09.229Z"
+    },
+    "critic-link-column.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:15:22.376Z"
+    },
+    "critic-link-column.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:15:35.395Z"
+    },
+    "critic-link-column.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:15:48.148Z"
+    },
+    "lane-verdict-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:16:00.087Z"
+    },
+    "lane-verdict-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:16:11.246Z"
+    },
+    "lane-verdict-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:16:20.811Z"
+    },
+    "lane-verdict-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:16:32.642Z"
+    },
+    "lane-verdict-report.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:16:43.554Z"
+    },
+    "critic-pairing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:16:55.867Z"
+    },
+    "critic-pairing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:17:07.527Z"
+    },
+    "critic-pairing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:17:20.574Z"
+    },
+    "critic-launch-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:17:34.585Z"
+    },
+    "critic-launch-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:17:50.359Z"
+    },
+    "critic-launch-link.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:18:04.688Z"
+    },
+    "critic-launch-link.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:18:20.592Z"
+    },
+    "critic-pairing-views.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:18:34.497Z"
+    },
+    "critic-pairing-views.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:18:48.758Z"
+    },
+    "critic-pairing-views.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:00.297Z"
+    },
+    "critic-list-enrichment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:11.204Z"
+    },
+    "critic-list-enrichment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:22.295Z"
+    },
+    "lane-cli-critic-flags.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:33.495Z"
+    },
+    "lane-cli-critic-flags.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:45.415Z"
+    },
+    "lane-cli-critic-flags.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:57.748Z"
+    },
+    "lane-show-cmd.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:10.224Z"
+    },
+    "lane-show-cmd.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:23.729Z"
+    },
+    "lane-show-cmd.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:35.630Z"
+    },
+    "deck-critic-tree.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:47.304Z"
+    },
+    "deck-critic-tree.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:59.482Z"
+    },
+    "deck-critic-tree.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:10.912Z"
+    },
+    "deck-verdict-badges.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:23.015Z"
+    },
+    "deck-verdict-badges.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:34.024Z"
+    },
+    "deck-verdict-badges.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:45.094Z"
+    },
+    "agents-dir-critic.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:03.646Z"
+    },
+    "agents-dir-critic.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:14.719Z"
+    },
+    "agents-live-critic.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:26.027Z"
+    },
+    "agents-live-critic.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:36.784Z"
+    },
+    "agents-live-critic.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:48.553Z"
+    },
+    "docs-critic-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:23:00.681Z"
+    },
+    "docs-critic-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:23:14.742Z"
+    }
+  }
+}

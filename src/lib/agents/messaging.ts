@@ -244,7 +244,8 @@ export async function messageAgent(
   if (isConversationTarget && !agentState) {
     try {
       const { getConversationByName } = await import('../overdeck/conversations.js');
-      conversationHarness = getConversationByName(normalizedId)?.harness ?? undefined;
+      // Rows are keyed by the bare name; the target carries the conv- prefix (PAN-4223 FR-17).
+      conversationHarness = getConversationByName(normalizedId.slice('conv-'.length))?.harness ?? undefined;
     } catch {
       // The conversations store may be unavailable in minimal installs or
       // tests — fall through to the agent-state default below.

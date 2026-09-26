@@ -136,6 +136,7 @@
               "reference/god-view",
               "reference/agents-directory",
               "reference/workers",
+              "reference/lanes",
               "reference/state-model",
               "reference/harness-landscape",
               "reference/posthog-agents",

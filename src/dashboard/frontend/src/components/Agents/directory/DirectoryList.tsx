@@ -13,6 +13,7 @@ import { compactModelName } from '../../../lib/model-names';
 import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
 import { cn } from '../../../lib/utils';
+import { LANE_GLYPH } from '../live/live-model';
 import { DirectoryStateBadge } from './DirectoryStateBadge';
 import { displayStateOf, hoursSince, known } from './directory-state';
 import type { DirectoryRow } from './directory-tree';
@@ -85,7 +86,7 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
       >
         {rows.length === 0 ? (
           <div className="px-4 py-8 text-center text-[12px] text-muted-foreground">{empty}</div>
-        ) : rows.map(({ entry, depth, spawnedByLabel }) => {
+        ) : rows.map(({ entry, depth, spawnedByLabel, flattenedFrom }) => {
           const selected = entry.id === selectedEntryId;
           const state = displayStateOf(entry, entry.issueId ? derivedByIssue[entry.issueId]?.attention : undefined);
           const title = rowTitle(entry);
@@ -116,6 +117,11 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
                   className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"
                   title={title ? `${entry.label} · ${title}` : entry.label}
                 >
+                  {entry.lane && (
+                    <span className="mr-1.5 font-mono-ui text-[11px] font-normal text-muted-foreground">
+                      {`${LANE_GLYPH[entry.lane.role] ?? '?'} ${entry.lane.key} i${entry.lane.iteration}`}
+                    </span>
+                  )}
                   {entry.label}
                   {title && <span className="font-normal text-muted-foreground"> · {title}</span>}
                 </span>
@@ -131,6 +137,20 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
                 {runtime && <span className="min-w-0 truncate font-mono-ui" title={runtimeFull}>· {runtime}</span>}
                 {entry.startedAt && <span className="ml-auto shrink-0 font-mono-ui tabular-nums" title={`started ${entry.startedAt}`}>{age(entry.startedAt, now)}</span>}
               </div>
+              {flattenedFrom && (
+                <div className="mt-0.5 truncate text-[11px] text-muted-foreground" title={`continued from ${flattenedFrom}`}>↳ continued from {flattenedFrom}</div>
+              )}
+              {entry.continuesFrom !== undefined && !flattenedFrom && (
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                  <a
+                    href={`/conv/${entry.continuesFrom}`}
+                    onClick={(event) => event.stopPropagation()}
+                    className="hover:text-foreground hover:underline"
+                  >
+                    continues ← #{entry.continuesFrom}
+                  </a>
+                </div>
+              )}
               {spawnedByLabel && (
                 <div className="mt-0.5 truncate text-[11px] text-muted-foreground" title={`spawned by ${spawnedByLabel}`}>spawned by {spawnedByLabel}</div>
               )}

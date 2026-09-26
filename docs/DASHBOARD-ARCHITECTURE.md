@@ -395,6 +395,29 @@ than `live` answers 400, and `windowHours` is ignored with `scope=live`. The win
 `scheduler` for `yieldedByScheduler`, else `machine`; `reason` is `pausedReason`; `since` is
 `pausedAt`, else `yieldedAt`.
 
+**Lanes and successors (PAN-4223).** A conversation entry's `parentId` is `conv:<parent name>`
+whenever its row has a parent link (`parent_conversation_id`), so gauntlet lanes nest under the
+conversation that launched them and handoff/fork successors under their predecessor. A lane entry
+carries `lane: { run, key, role, iteration, reportStatus }`; a successor carries `continuesFrom`
+(the predecessor's legacy conversation id, linked as `/conv/<id>`). `keepWithAncestors` never
+climbs a **succession edge** (a conversation entry with a `parentId` and no `lane`): a live
+successor keeps its own row and does not pull its ended predecessor into the live scope, while a
+live lane still pulls in its ended launcher. In the Live view a lane with its parent on the page is
+a child line of the parent row (a needs-you lane also keeps its own row), and a successor always
+keeps its own row with its `continues ←` link. History nests both by `parentId`, capped at two
+levels; a deeper row renders at the second level with `flattenedFrom` naming its real parent.
+
+**Command Deck conversation groups (PAN-4223).** `conversation-tree.ts` nests every conversation
+whose parent link names a row in the rendered list, lanes and successors alike, in pre-order at
+display depth `min(natural depth, 2)`; a deeper row keeps its pre-order place and shows a marker
+naming its real parent (`↳ continued from #<id>` or `lane of #<id> · <run>`), and a row whose
+parent is not in the list renders at top level with the same kind of marker. A top-level group
+ranks where its best member would sit in the flat active-then-inactive order, so an ended
+predecessor with a live successor ranks with the successor. Only top-level rows carry a collapse
+toggle, which lists the group's non-zero counts. A group defaults to expanded while any descendant
+is active and collapsed otherwise; the viewer's collapsed groups persist in localStorage under
+`commandDeck.groups.collapsed` (a JSON array of top-level conversation names).
+
 **Reasons.** `live-model.ts` classifies each row on the client from the entry plus real-time store
 facts: the issue's derived state, the agent snapshot's pending inputs, and the runtime snapshot.
 The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `work` or `strike`.

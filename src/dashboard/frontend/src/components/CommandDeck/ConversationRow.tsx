@@ -104,6 +104,64 @@ interface ConversationRowProps {
   /** Registered projects for the Move submenu (PAN-1577). Fetched once by the
    * list/container rather than per-row to avoid a duplicate request per row. */
   registeredProjects?: readonly RegisteredProject[];
+  /** PAN-4223 D6: parent id of a row whose parent is not in the list (rendered top level). */
+  orphanOf?: number | null;
+  /** PAN-4223 D22: real parent id of a row flattened to display depth 2. */
+  flattenedFrom?: number | null;
+  /** PAN-4223 D27: the judged builder's id when this critic nests under it. */
+  criticOf?: number | null;
+}
+
+/** D28: WOWED and PASS use the done token; every other verdict is neutral (routine work, not an alarm). */
+function verdictBadgeTone(value: string): string {
+  return value === 'WOWED' || value === 'PASS'
+    ? 'badge-bg-state-done badge-border-state-done text-state-done'
+    : 'bg-transparent border-muted-foreground/40 text-muted-foreground';
+}
+
+function verdictBadgeText(verdict: { value: string; defects: number | null }): string {
+  if (verdict.value === 'pending') return 'PENDING';
+  return verdict.defects !== null ? `${verdict.value} ${verdict.defects}` : verdict.value;
+}
+
+/** PAN-4223 WI-10: the lane role glyph before a nested lane's key. */
+const LANE_GLYPH: Record<NonNullable<Conversation['laneRole']>, string> = {
+  builder: 'B',
+  critic: 'C',
+  verifier: 'V',
+  play: 'P',
+  orchestrator: 'O',
+};
+
+/** Report badge tone by the style guide's badge formula (state tokens, PAN-4197). */
+const LANE_REPORT_TONE: Record<NonNullable<Conversation['laneReport']>['status'], string> = {
+  done: 'badge-bg-state-done badge-border-state-done text-state-done',
+  blocked: 'badge-bg-state-needs-you badge-border-state-needs-you text-state-needs-you',
+  failed: 'badge-bg-state-stuck badge-border-state-stuck text-state-stuck',
+};
+
+/**
+ * The lineage caption a row carries (FR-27, D6, D22): a successor links back to
+ * its predecessor; an orphan or flattened row names its real parent.
+ */
+function lineageCaption(
+  conv: Conversation,
+  orphanOf: number | null,
+  flattenedFrom: number | null,
+  criticOf: number | null,
+): { text: string; href: string | null } | null {
+  const run = conv.gauntletRun ?? '';
+  if (flattenedFrom !== null) {
+    if (criticOf !== null) return { text: `critic of #${flattenedFrom} · ${run}`, href: null };
+    return conv.laneKey
+      ? { text: `lane of #${flattenedFrom} · ${run}`, href: null }
+      : { text: `↳ continued from #${flattenedFrom}`, href: `/conv/${flattenedFrom}` };
+  }
+  const parentId = conv.parentConversationId ?? null;
+  if (parentId === null) return null;
+  if (!conv.laneKey) return { text: `continues ← #${parentId}`, href: `/conv/${parentId}` };
+  if (orphanOf !== null) return { text: `lane of #${orphanOf} · ${run}`, href: null };
+  return null;
 }
 
 export function ConversationRow({
@@ -113,6 +171,9 @@ export function ConversationRow({
   mutations,
   variant = 'flat',
   registeredProjects = [],
+  orphanOf = null,
+  flattenedFrom = null,
+  criticOf = null,
 }: ConversationRowProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -163,6 +224,26 @@ export function ConversationRow({
   const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
 
   const isNested = variant === 'nested';
+  const caption = lineageCaption(conv, orphanOf, flattenedFrom, criticOf);
+  // PAN-4223 WI-22 (D28): a critic shows its verdict; a builder links to its newest critic's verdict.
+  const isJudge = conv.laneRole === 'critic' || conv.laneRole === 'verifier';
+  const latestVerdict = conv.laneRole === 'builder' ? conv.laneLatestVerdict ?? null : null;
+  const verdictBadge = isJudge && conv.laneVerdict ? (
+    <span className={`${styles.laneReportBadge} ${verdictBadgeTone(conv.laneVerdict.value)}`}>{verdictBadgeText(conv.laneVerdict)}</span>
+  ) : latestVerdict ? (
+    <a
+      href={`/conv/${latestVerdict.criticId}`}
+      aria-label={`open critic #${latestVerdict.criticId}`}
+      className={`${styles.laneReportBadge} ${styles.laneVerdictLink} ${verdictBadgeTone(latestVerdict.value)}`}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        window.location.href = `/conv/${latestVerdict.criticId}`;
+      }}
+    >
+      {verdictBadgeText(latestVerdict)}
+    </a>
+  ) : null;
   const iconSize = isNested ? 10 : 11;
   const dotSize = isNested ? 6 : 7;
   const spinnerSize = isNested ? 10 : 12;
@@ -421,7 +502,16 @@ export function ConversationRow({
       ) : isNested ? (
         // Nested project-tree rows stay single-line and ultra-compact.
         <>
+          {conv.laneKey && conv.laneRole && (
+            <span className={styles.laneLabel}>{`${LANE_GLYPH[conv.laneRole]} ${conv.laneKey} i${conv.laneIteration ?? 1}`}</span>
+          )}
           <span className={`${styles.projectConvLabel} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          {conv.laneKey && conv.laneReport && !(isJudge && conv.laneVerdict) && (
+            <span className={`${styles.laneReportBadge} ${LANE_REPORT_TONE[conv.laneReport.status]}`}>
+              {conv.laneReport.status.toUpperCase()}
+            </span>
+          )}
+          {verdictBadge}
           {conv.branch && (
             <span
               className={styles.conversationBranchChip}
@@ -440,6 +530,7 @@ export function ConversationRow({
         <span className={styles.conversationMain}>
           <span className={`${styles.conversationName} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           <span className={styles.conversationMetaLine}>
+            {verdictBadge}
             {conv.branch && (
               <span
                 className={styles.conversationBranchChip}
@@ -527,6 +618,13 @@ export function ConversationRow({
         <Star size={iconSize} style={{ fill: conv.isFavorited ? 'currentColor' : 'none' }} />
       </span>
     </button>
+    {caption && (
+      <div className={styles.lineageCaption}>
+        {caption.href
+          ? <a href={caption.href} className={styles.lineageCaptionLink}>{caption.text}</a>
+          : <span>{caption.text}</span>}
+      </div>
+    )}
 
     {/* Overflow menu — portaled to body so it isn't nested inside the row
         button and doesn't clip against the scrolling conversation list. */}

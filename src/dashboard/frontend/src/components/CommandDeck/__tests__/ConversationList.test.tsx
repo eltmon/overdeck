@@ -574,3 +574,78 @@ describe('ConversationRow drag source (PAN-1577)', () => {
     );
   });
 });
+
+describe('ConversationList nesting (PAN-4223 WI-10)', () => {
+  const parent = { ...mockConversation, id: 10, name: 'orchestrator', tmuxSession: 'conv-orchestrator', title: 'Orchestrator' };
+  function lane(id: number, extra: Record<string, unknown> = {}) {
+    return {
+      ...mockConversation,
+      id,
+      name: `lane-${id}`,
+      tmuxSession: `conv-lane-${id}`,
+      title: `Lane ${id}`,
+      createdAt: `2024-01-01T00:0${id % 10}:00Z`,
+      parentConversationId: 10,
+      gauntletRun: 'hotel',
+      laneKey: `k${id}`,
+      laneRole: 'builder',
+      laneIteration: 1,
+      ...extra,
+    };
+  }
+
+  function renderRows(rows: unknown[]) {
+    const client = makeClient();
+    client.setQueryData(['conversations'], rows);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.removeItem('commandDeck.groups.collapsed');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders one toggle and three nested lanes; the toggle collapses them and persists the choice', () => {
+    renderRows([parent, lane(11, { sessionAlive: true, status: 'active' }), lane(12), lane(13)]);
+    const toggle = screen.getByRole('button', { name: '▾ 3 lanes' });
+    expect(screen.getByText('Lane 11')).toBeInTheDocument();
+    expect(screen.getByText('Lane 12')).toBeInTheDocument();
+    expect(screen.getByText('Lane 13')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText('Lane 12')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '▸ 3 lanes' })).toHaveAttribute('aria-expanded', 'false');
+    expect(JSON.parse(localStorage.getItem('commandDeck.groups.collapsed') ?? '[]')).toEqual(['orchestrator']);
+  });
+
+  it('expands a group with a working successor by default', () => {
+    const successor = { ...mockConversation, id: 20, name: 'successor', tmuxSession: 'conv-successor', title: 'Successor', parentConversationId: 10, sessionAlive: true, status: 'active', isWorking: true };
+    renderRows([parent, successor]);
+    expect(screen.getByRole('button', { name: '▾ 1 successor · 1 working' })).toBeInTheDocument();
+    expect(screen.getByText('Successor')).toBeInTheDocument();
+  });
+
+  it('collapses a group whose descendants have all ended', () => {
+    renderRows([parent, lane(11, { laneReport: { seq: 1, at: 'x', status: 'done' } }), lane(12)]);
+    expect(screen.getByRole('button', { name: '▸ 2 lanes · 1 reported' })).toBeInTheDocument();
+    expect(screen.queryByText('Lane 11')).not.toBeInTheDocument();
+  });
+
+  it('still renders when localStorage throws', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    renderRows([parent, lane(11, { sessionAlive: true, status: 'active' })]);
+    const toggle = screen.getByRole('button', { name: '▾ 1 lane' });
+    fireEvent.click(toggle);
+    expect(screen.queryByText('Lane 11')).not.toBeInTheDocument();
+  });
+});

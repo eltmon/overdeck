@@ -789,7 +789,7 @@ const deleteConversationRoute = HttpRouter.add(
     return yield* Effect.promise(async () => handleConversationDelete(name, { invalidateFavoritesCache: invalidateConversationFavoritesCache }));
   }),
 );
-const conversationArchiveDependencies = {
+export const conversationArchiveDependencies = {
   stopConversationRuntime,
   invalidateFavoritesCache: invalidateConversationFavoritesCache,
   cleanupConversationAttachments,

@@ -1,0 +1,254 @@
+---
+title: Lanes
+description: Launch, watch, report from and reap gauntlet lanes with pan lane, from any harness
+---
+
+# Lanes
+
+A **lane** is an ordinary Overdeck conversation that a gauntlet orchestrator
+launches with `pan lane start`. It runs any harness, model and effort, in its
+own working directory, and it nests under the conversation that launched it on
+the Command Deck and the Agents page. A lane carries four facts on its row,
+written once at launch: its parent conversation, its **run key**, its **lane
+key** and its **role**. A **gauntlet run** is the set of lanes that share a run
+key. There is no run table and no stored lane status: every state below is
+computed when you read it.
+
+Any conversation can launch lanes, whatever its harness, because
+`pan lane start` is a shell command that reads `$OVERDECK_CONVERSATION`. The
+`pan-gauntlet-loop` skill uses lanes to fan out builders
+and critics.
+
+## Glossary
+
+| Term | Meaning |
+|------|---------|
+| Orchestrator | The conversation that runs the loop: it launches lanes, reads their reports, and merges. |
+| Run key | Names one pass of the loop (for example `hotel`). Pattern `^[a-z0-9][a-z0-9-]{0,31}$`. |
+| Lane key | A lane's short name inside its run (for example `663`). Pattern `^[a-z0-9][a-z0-9._-]{0,39}$`. |
+| Role | `builder`, `critic`, `verifier`, `play` or `orchestrator`. |
+| Iteration | The number of distinct working directories among lanes with the same run, key and role, counted in launch order. A `--reuse` respawn keeps its iteration. |
+| Root conversation | A conversation that is not a lane, and is not a successor of a lane. |
+| Successor | A conversation created by `pan handoff` or `pan fork`. It nests under its source but is never a lane. |
+
+## Commands
+
+```text
+pan lane start (--key <key> | --for <builder key>) --role <role> (--brief <file> | --prompt <text>)
+               [--run <key>] [--parent <conv>] [--project <key>] [--model <m>] [--harness <h>] [--effort <e>]
+               [--title <t>] [--branch <b>] [--from <ref>] [--at <ref>] [--reuse] [--replace] [--no-wait] [--json]
+pan lane list  [--run <key>] [--parent <conv>] [--json]
+pan lane show  (<lane> | --run <key> --key <key>) [--json]
+pan lane wait  <lane> [--after <seq>] [--timeout <s>]
+pan lane wait  (--run <key> | --parent <conv>) [--after <cursor>] [--timeout <s>]
+pan lane report (--file <path> | --stdin) [--status done|blocked|failed] [--allow-unpushed]
+               [--verdict <value>] [--defects <n>] [--verdict-file <path>]
+pan lane stop  <lane>
+pan lane reap  <lane> [--park] [--keep]
+```
+
+`<lane>` accepts a conversation id, a conversation name or `conv-<name>`.
+
+| Command | What it does |
+|---------|--------------|
+| `start` | Creates the lane's directory, writes the brief once to `~/.overdeck/agents/conv-<name>/lane-brief.md`, creates the conversation with the lane contract as its first message, and waits up to 180 s until it has started (`--no-wait` returns at once). Prints `Lane <run>/<key> <role> i<n>: conv <id> (<name>) in <cwd>`. |
+| `list` | Every lane with `ID`, `RUN/KEY`, `ROLE`, `ITER`, `ACTIVITY`, `REPORT`, `FOR`, `VERDICT`, `BRANCH@SHA`, `AHEAD`, `DIRTY`, `MODEL` and `COST`. An archived lane reads `archived` in `ACTIVITY`. |
+| `show` | The builder → critic chain of one run and key, then one line per lane. See [Critics and builders](#critics-and-builders). |
+| `wait <lane>` | Waits for the lane's next report, with `pan worker wait` semantics. |
+| `wait --run` / `--parent` | Waits for the next report of any lane in the set after a cursor `<atMs>.<name>.<seq>`, oldest first. Prints the report body on stdout and the next command, with the new cursor, on stderr. |
+| `report` | Run inside a lane: records its report in the worker report store keyed `conv-<name>`, with the head SHA and branch for git-backed lanes. |
+| `stop` | Stops the lane through the conversation stop door. |
+| `reap` | Removes the lane's directory and archives its conversation. See [Reap](#reap). |
+
+Messages to a lane go through `pan tell conv-<name> "<text>"`; there is no lane
+verb for it. `pan tell` refuses a critic or verifier lane that already filed its
+done report, because a critic is never re-tasked (`--force` overrides).
+
+The HTTP API behind the CLI is `POST /api/lanes`, `GET /api/lanes?run=&parent=&key=`,
+`GET /api/lanes/:name` and `POST /api/lanes/:name/reap` with `{ park, keep }`.
+
+### Exit codes
+
+`wait` and `report` use the `pan worker` exit codes:
+
+| Code | Meaning |
+|------|---------|
+| 0 | A report with status `done` |
+| 4 | A report with status `blocked` or `failed` (the body is still printed) |
+| 2 | The lane exited, or sat idle for 10 minutes, without a report |
+| 3 | Timeout: the lane is still running; run the printed `next:` command |
+| 1 | A usage or request error (for example a refused launch) |
+
+`start`, `stop` and `reap` exit 0 on success and 1 on any refusal.
+
+## Who may launch what
+
+The door judges the **effective launcher**: the launching conversation, or,
+when that is a successor, the row reached by following parent links until a
+lane or a root. So a handed-off orchestrator keeps its standing.
+
+| Role | Launched by | Working directory |
+|------|-------------|-------------------|
+| `orchestrator` | a root conversation | detached worktree at `--at` (default: the base ref), `<root>/<run>-<key>-orch` |
+| `builder` | a root or an `orchestrator` lane | worktree on branch `<run>/<key>` (i1) or `<run>/<key>-i<n>`, at `<root>/<run>-<key>` or `<root>/<run>-<key>-i<n>` |
+| `critic` | a root conversation only | detached worktree at `--at`, `<root>/<run>-<key>-critic-i<n>` |
+| `verifier` | a root or an `orchestrator` lane | detached worktree at `--at`, `<root>/<run>-<key>-verify-i<n>` |
+| `play` | a root or an `orchestrator` lane | an empty directory `<root>/<run>-<key>-play-i<n>`, launched without Overdeck context or `CLAUDE.md` |
+
+- `--run` is required from a root; a lane launched by an orchestrator lane
+  inherits that lane's run.
+- A builder, critic or verifier lane launches nothing.
+- A new builder iteration cuts its branch from the previous iteration's branch
+  (the one its newest report recorded); `--from` overrides the base. A branch
+  that reported `done` is frozen.
+- `--reuse` launches a fresh conversation in the directory of the latest
+  earlier lane with the same run, key and role, keeping its iteration; that
+  lane must not be live.
+- One live lane per run, key and role: a second launch is refused unless
+  `--replace`, which stops the live lane first. A lane that is still starting
+  (not ended, created under 3 minutes ago) counts as live.
+- `--effort` accepts `low`, `medium` or `high`.
+- With no `--model`, the door uses the role's model from the project's
+  `gauntlet` config; with none there, the launch is refused. There is no
+  hardcoded model fallback.
+
+## Derived state
+
+`ACTIVITY` in `pan lane list` and `activity` in the API follow this table.
+The first match wins.
+
+| `activity` | Rule |
+|------------|------|
+| `failed-to-start` | The conversation recorded a spawn error |
+| `needs-you` | The harness is alive and waiting on a question, permission or plan approval |
+| `working` | The harness is alive and working |
+| `idle` | The harness is alive |
+| `starting` | Not alive, not ended, created less than 3 minutes ago |
+| `stopped` | Otherwise, and always for an archived lane |
+
+Git facts (branch, head, commits ahead of upstream, dirty) are read for
+git-backed lanes that are not archived.
+
+## Reports
+
+A lane ends its work with `pan lane report --file <markdown>`:
+
+- `--status done` (default): the brief is complete. A **builder** may report
+  `done` only from a clean tree whose branch has an upstream holding every
+  commit; `--allow-unpushed` waives the upstream check, never the clean-tree
+  check.
+- `--status blocked`: the lane needs a decision. Start the report with
+  `RULING`, `SPEND`, `ONE-WAY` or `BLOCKED`.
+- `--status failed`: the brief cannot be done.
+
+`pan lane report` outside a lane (including in a successor of one) fails with
+`not inside a lane`.
+
+## Reap
+
+`pan lane reap <lane>` never kills a process and never discards work:
+
+1. It stops a live lane through the conversation stop door, and refuses if the
+   harness is still alive after 30 s.
+2. It refuses a directory outside the project's lanes root.
+3. It refuses, listing each PID and command line, while any process has its
+   working directory inside the lane directory. Stop those processes through
+   whatever started them.
+4. It refuses a dirty worktree unless `--park`. With `--park` it saves the
+   uncommitted work (tracked changes and untracked files) to
+   `~/.overdeck/agents/conv-<name>/parked-<timestamp>.patch`, verifies that
+   the patch reproduces it, and only then cleans the tree.
+5. It warns about commits not on the upstream; the branch is always kept.
+6. It runs `git worktree remove` (never `--force`) and `git worktree prune`.
+   A `play` directory is removed only when it holds no `.git`.
+7. It **archives the lane's conversation** so a finished run leaves the Command
+   Deck. `--keep` leaves the ended conversation listed instead. If archiving
+   fails, the reap still succeeds and prints
+   `reaped, but archiving failed: <error>; archive conv <id> from the Command Deck`.
+
+A refused reap archives nothing. The brief, the reports and any parked patch in
+`~/.overdeck/agents/conv-<name>/` survive the reap, and archived lanes stay in
+`pan lane list` and `GET /api/lanes` with `activity: stopped`, so a run's
+ledger stays complete. Reap builders before the orchestrator lane that launched
+them: an archived orchestrator lane leaves its unreaped builders as orphans.
+
+## Critics and builders
+
+A critic or verifier lane records the builder row it judges, once, at launch.
+
+- `--for <builder key>` names the builder. It is **required for a critic** and
+  optional for a verifier (a verifier sometimes judges a whole run rather than
+  one builder). `--key` defaults to `--for`; a different `--key` is refused, as
+  is a `--for` with no builder of that key in the run.
+- Without `--at`, the critic is checked out at the head of the newest `done`
+  report of the judged builder iteration. When that iteration has no done
+  report, the launch is refused: `builder <key> i<n> has no done report; pass --at <sha>`.
+- A critic or verifier files **exactly one verdict**, with its done report:
+
+  ```bash
+  pan lane report --file r.md --verdict NOT_YET --verdict-file gauntlet/notes/critique-663-iter1.json [--defects 7]
+  ```
+
+  The verdict is `WOWED`, `IMPRESSED`, `NOT_YET`, `PASS` or `DEFECTS`. The
+  defect count defaults to the length of the verdict file's `defects` array.
+  A done report without a verdict, `--verdict` on another role or on a
+  blocked report, and a second done report from the same critic are refused.
+- **Pairing is by iteration.** The critics of builder iteration n are the
+  critic and verifier lanes of the same run and key whose judged row has
+  iteration n, so a `--reuse` respawn shares them. A builder of iteration
+  n ≥ 2 is told the verdict it answers: the newest critic of iteration n − 1
+  created before it, named by conversation id, verdict and verdict file.
+- `pan lane show --run hotel --key 663` prints the chain, for example
+  `i1 built → critic c1: NOT_YET (7 defects) → i2 built → critic c2: WOWED`,
+  then one line per lane: `#<id> <role> i<n> <activity> <verdict> <verdict file>`.
+  `pan lane show <lane>` finds the run and key from any lane of the chain.
+- `pan lane list` shows `FOR` (`<key> i<n>`, the judged builder iteration) and
+  `VERDICT` (a critic's verdict, or a builder's newest critic verdict, with
+  the defect count, as in `NOT_YET 7`).
+- **Blindness is preserved.** The link changes nothing a critic is told: its
+  lane contract and brief contain neither the builder's conversation name nor
+  any text of a builder report. Only the commit it judges comes from the
+  builder.
+
+On the Command Deck and the Agents page a critic nests under the builder it
+judges, with a verdict badge; a builder shows its newest critic verdict as a
+link to that critic.
+
+## Handoffs and succession
+
+`pan handoff` and `pan fork` record the same parent link on the successor, so a
+handoff chain renders as a tree. When an orchestrator hands itself off, the
+lanes it launched stay nested under it, and the successor nests beside them.
+The successor shows `continues ← #<id>`, keeps launching in the same run with
+the same `--run`, and sees every lane of the run with `pan lane list --run <key>`.
+A successor is never a lane: continuing a lane's own work in a fresh
+conversation is `pan lane start --reuse`, not `pan handoff`.
+
+## Configuration
+
+Per-project defaults live in the optional `gauntlet` block of
+`~/.overdeck/projects.yaml` (see [Projects](/configuration/projects#gauntlet-lane-configuration)):
+
+```yaml
+projects:
+  lexerra:
+    gauntlet:
+      lanes_root: /home/eltmon/Projects/lexerra-lanes
+      sparse_checkout: ['/*', '!/client/assets-src/*', '/client/assets-src/KayKit_Medieval_Hexagon/']
+      roles:
+        builder: { model: stealth/space-bunny-alpha }
+        critic: { model: claude-opus-5-5, effort: high }
+```
+
+The lanes root defaults to a sibling of the project checkout named
+`<project dir>-lanes`. It must be under your home directory, outside `/tmp`,
+and must not contain the project checkout. The base ref defaults to
+`origin/<default branch>`, fetched before each git-backed launch.
+
+## Workers or lanes?
+
+Use [`pan worker run`](/reference/workers) for issue-linked delegation inside
+the managed pipeline: a worker belongs to an issue and reports back to the
+agent that started it. Use `pan lane start` for gauntlet fan-out outside the
+pipeline: a lane is a conversation, so it runs any harness, nests on the
+Command Deck, and has a transcript view and a composer.
