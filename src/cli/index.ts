@@ -341,6 +341,7 @@ planCmd
 program
   .command('tell <id> <message>')
   .description('Send message to running agent')
+  .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
   .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
 program
   .command('answer <id> [option]')
