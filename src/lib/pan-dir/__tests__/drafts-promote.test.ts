@@ -124,4 +124,52 @@ describe('promoteWorkspacePrdDraft', () => {
     expect(result.promoted).toBe(false);
     expect(result.reason).toBe('no-workspace-draft');
   });
+
+  /**
+   * PAN-4224 WI-4: complete-planning now targets the workspace itself
+   * (`projectRoot: workspacePath`), so the PRD lands as a tracked file the
+   * issue's own commits carry instead of an untracked file in the primary
+   * checkout.
+   */
+  it('reports canonical-exists when promoting into the workspace and the workspace already holds the draft', async () => {
+    const wsDrafts = join(workspaceRoot, '.pan', 'drafts');
+    mkdirSync(wsDrafts, { recursive: true });
+    const draft = join(wsDrafts, 'PAN-4224.md');
+    writeFileSync(draft, '# PRD for PAN-4224\n', 'utf-8');
+
+    const result = await Effect.runPromise(
+      promoteWorkspacePrdDraft({ projectRoot: workspaceRoot, workspacePath: workspaceRoot, issueId: 'PAN-4224' }),
+    );
+
+    expect(result.promoted).toBe(false);
+    expect(result.reason).toBe('canonical-exists');
+    expect(existsSync(draft)).toBe(true);
+  });
+
+  it('falls back to the primary root draft when neither the target nor the workspace holds one', async () => {
+    const primaryRoot = mkdtempSync(join(tmpdir(), 'prd-promote-primary-'));
+    try {
+      const primaryDraftsDir = getDraftsDir(primaryRoot);
+      mkdirSync(primaryDraftsDir, { recursive: true });
+      const primaryDraft = join(primaryDraftsDir, 'pan-4224.md');
+      writeFileSync(primaryDraft, '# PRD for PAN-4224\n\nfrom the primary checkout\n', 'utf-8');
+
+      const result = await Effect.runPromise(
+        promoteWorkspacePrdDraft({
+          projectRoot: workspaceRoot,
+          workspacePath: workspaceRoot,
+          issueId: 'PAN-4224',
+          primaryRoot,
+        }),
+      );
+
+      expect(result).toMatchObject({ promoted: true, reason: 'promoted', source: primaryDraft, sourceRemoved: false });
+      const canonical = getIssueDraftPath(workspaceRoot, 'PAN-4224');
+      expect(result.path).toBe(canonical);
+      expect(readFileSync(canonical, 'utf-8')).toBe('# PRD for PAN-4224\n\nfrom the primary checkout\n');
+      expect(existsSync(primaryDraft)).toBe(true);
+    } finally {
+      rmSync(primaryRoot, { recursive: true, force: true });
+    }
+  });
 });

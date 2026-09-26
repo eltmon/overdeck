@@ -249,14 +249,26 @@ export interface PromoteWorkspacePrdDraftResult {
  * tripped the spawn-time dirty-workspace gate, stranding the planning→work
  * auto-handoff with `planning_auto_handoff_failed` (PAN-3042). Removal is
  * best-effort — the spawn gate exempts Overdeck-owned `.pan/` paths anyway.
+ *
+ * `projectRoot` is the promotion target: complete-planning passes the
+ * workspace itself, so the PRD lands as a tracked file on the issue's feature
+ * branch instead of as an untracked file in the primary checkout (PAN-4224 —
+ * the untracked copy is what made the primary checkout's `.pan/reset --keep`
+ * fail after a plan-artifact push). `primaryRoot`, when given, is a read-only
+ * fallback source: when the target has no canonical draft and the workspace
+ * has no draft either, its copy of `.pan/drafts/<ISSUE>.md` — left behind by
+ * an earlier, unfixed promotion into the primary checkout — is copied into
+ * the target. That primary copy is never deleted; it is stray, not owned by
+ * this promotion, and a future release will clean it up separately.
  */
 export function promoteWorkspacePrdDraft(args: {
   projectRoot: string
   workspacePath: string
   issueId: string
+  primaryRoot?: string
 }): Effect.Effect<PromoteWorkspacePrdDraftResult, FsError> {
   return Effect.suspend(() => {
-    const { projectRoot, workspacePath, issueId } = args
+    const { projectRoot, workspacePath, issueId, primaryRoot } = args
     const upperFile = `${issueId.toUpperCase()}.md`
     const lowerFile = `${issueId.toLowerCase()}.md`
     const draftsDir = getDraftsDir(projectRoot)
@@ -272,6 +284,26 @@ export function promoteWorkspacePrdDraft(args: {
     const wsDrafts = join(workspacePath, '.pan', 'drafts')
     const source = [join(wsDrafts, upperFile), join(wsDrafts, lowerFile)].find((p) => existsSync(p))
     if (!source) {
+      const primaryPath = primaryRoot ? getIssueDraftPath(primaryRoot, issueId) : undefined
+      if (primaryPath && existsSync(primaryPath)) {
+        let primaryContent: string
+        try {
+          primaryContent = readFileSync(primaryPath, 'utf-8')
+        } catch (cause) {
+          return Effect.fail(new FsError({ path: primaryPath, operation: 'readFileString', cause }))
+        }
+        return writeIssueDraft(projectRoot, issueId, primaryContent).pipe(
+          Effect.map(
+            (path): PromoteWorkspacePrdDraftResult => ({
+              promoted: true,
+              reason: 'promoted',
+              path,
+              source: primaryPath,
+              sourceRemoved: false,
+            }),
+          ),
+        )
+      }
       return Effect.succeed<PromoteWorkspacePrdDraftResult>({
         promoted: false,
         reason: 'no-workspace-draft',
