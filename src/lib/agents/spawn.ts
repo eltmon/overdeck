@@ -284,8 +284,7 @@ async function spawnRunWithoutConsentClaim(
   const isPrime = resolvedHarness === 'prime-agent';
   const primeLaunch = isPrime
     ? await getPrimeAgentLauncherFields(agentId, selectedModel, workspace, harnessLaunch.binaryPath, {
-        authMode: await getProviderAuthMode(selectedModel),
-        effort: options.effort,
+        authMode: await getProviderAuthMode(selectedModel), effort: options.effort,
         resumeSessionFile: options.resumeSessionId ? await requirePrimeAgentSessionFile(agentId) : undefined,
       })
     : null;
