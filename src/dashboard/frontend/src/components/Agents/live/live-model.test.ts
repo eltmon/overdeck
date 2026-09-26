@@ -6,7 +6,6 @@ import {
   activityLabel,
   buildLiveSections,
   classifyEntry,
-  lastOutputLine,
   type LiveFacts,
 } from './live-model';
 
@@ -53,8 +52,8 @@ describe('classifyEntry — one case per precedence row', () => {
       { kind: 'stuck', section: 'needs-you', tone: 'stuck', label: 'stuck · idle 3h' }],
     ['5 ready to merge', entry({ id: 'a', state: 'stopped' }), { derived: derived({ state: 'ready' }) },
       { kind: 'ready-to-merge', section: 'needs-you', tone: 'needs-you', label: 'ready to merge' }],
-    ['6 working', entry({ id: 'a', state: 'working' }), { runtime: { currentTool: 'Bash' } },
-      { kind: 'working', section: 'live', tone: 'live', label: 'running Bash' }],
+    ['6 working', entry({ id: 'a', state: 'working' }), { runtime: { currentTool: 'Bash', currentToolDescription: 'Commit WI-7' } },
+      { kind: 'working', section: 'live', tone: 'live', label: 'Bash', detail: 'Commit WI-7' }],
     ['7 remote', entry({ id: 'a', state: 'unknown', location: 'remote' }), {},
       { kind: 'remote', section: 'live', tone: 'live', label: 'running on Fly' }],
     ['8 held', entry({ id: 'a', state: 'stopped', pause: { by: 'scheduler', reason: 'yielded', since: null } }), {},
@@ -160,21 +159,9 @@ describe('buildLiveSections', () => {
 });
 
 describe('activityLabel', () => {
-  it('names the running tool, then thinking, else working', () => {
-    expect(activityLabel({ activity: 'working', currentTool: 'Edit' })).toBe('running Edit');
+  it('names the bare tool, then thinking, else working', () => {
+    expect(activityLabel({ activity: 'working', currentTool: 'Edit' })).toBe('Edit');
     expect(activityLabel({ activity: 'thinking' })).toBe('thinking');
     expect(activityLabel(undefined)).toBe('working');
-  });
-});
-
-describe('lastOutputLine', () => {
-  it('returns the last non-empty line without escape codes, truncated to 160 characters', () => {
-    const long = 'x'.repeat(200);
-    const line = lastOutputLine(['first', `\x1b[31m${long}\x1b[0m`, '', '   ']);
-    expect(line).toHaveLength(160);
-    expect(line).toBe(`${'x'.repeat(159)}…`);
-    expect(lastOutputLine(['\x1b[32mdone\x1b[0m', ''])).toBe('done');
-    expect(lastOutputLine(undefined)).toBeNull();
-    expect(lastOutputLine(['', ''])).toBeNull();
   });
 });

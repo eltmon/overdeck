@@ -99,12 +99,19 @@ export function LiveAgentsView({ onCountsChange, onShowHistory, previewHidden: p
   const entriesById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
   const sections = useMemo(() => buildLiveSections(entries, (entry): LiveFacts => {
     const agent = agentsById[entry.id];
-    const runtime = runtimeById?.[entry.id];
+    const runtime = runtimeById?.[entry.runtimeId ?? entry.id];
     return {
       derived: entry.issueId ? derivedByIssue[entry.issueId] : undefined,
       pendingInputKinds: agent?.pendingInputKinds,
       pendingQuestionPrompt: agent?.pendingQuestionPrompt ?? null,
-      runtime: runtime ? { activity: runtime.activity, currentTool: runtime.currentTool, lastActivity: runtime.lastActivity } : undefined,
+      runtime: runtime
+        ? {
+            activity: runtime.activity,
+            currentTool: runtime.currentTool,
+            currentToolDescription: runtime.currentToolDescription,
+            lastActivity: runtime.lastActivity,
+          }
+        : undefined,
     };
   }, now), [entries, agentsById, runtimeById, derivedByIssue, now]);
   const rows = useMemo<LiveRow[]>(
