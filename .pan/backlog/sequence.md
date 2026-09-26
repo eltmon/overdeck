@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 815_
+_Last sequenced: 2026-09-26T01:04:21.392367Z · model: claude-opus-5-5 · open: 816_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4221 | S | critical | ok |  |  | A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train |
 | 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
@@ -823,6 +824,10 @@ _Last sequenced: 2026-09-26T00:47:38.945520Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-4223 (rank 17)
+
+New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.
+
 ### PAN-4222 (rank 18)
 
 New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.
@@ -1119,10 +1124,6 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 
 Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
 
-### PAN-3916 (rank 112)
-
-Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1130,10 +1131,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T00:47:38.945520Z",
+  "generatedAt": "2026-09-26T01:04:21.392367Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 815,
+  "openCount": 816,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -11221,6 +11222,19 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "rationale": "New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4223",
+      "rank": 17,
+      "size": "L",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator",
+      "rationale": "New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12357,6 +12371,13 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4223",
+      "to": "PAN-3536",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
