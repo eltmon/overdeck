@@ -133,6 +133,20 @@ function timeOf(iso: string | null): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/** The newest parseable timestamp among the candidates, or null if none parse. */
+function newestIso(candidates: ReadonlyArray<string | null>): string | null {
+  let best: string | null = null;
+  let bestTime = -Infinity;
+  for (const iso of candidates) {
+    const at = timeOf(iso);
+    if (at !== null && at > bestTime) {
+      bestTime = at;
+      best = iso;
+    }
+  }
+  return best;
+}
+
 /** Orders rows by one timestamp, missing last, ties by id. */
 function compareRows(direction: 'asc' | 'desc', timeFor: (row: LiveRow) => string | null = (row) => row.since) {
   return (a: LiveRow, b: LiveRow): number => {
@@ -167,6 +181,13 @@ export function buildLiveSections(
   for (const entry of entries) {
     if (entry.kind !== 'subagent' || !entry.parentId) continue;
     rows.get(entry.parentId)?.children.push(entry);
+  }
+  // A Live row's quiet age reflects the whole row, subagents included: an
+  // orchestrator with a working subagent is not quiet just because it has
+  // not itself made a tool call (FR-5).
+  for (const row of rows.values()) {
+    if (row.reason.section !== 'live' || row.children.length === 0) continue;
+    row.since = newestIso([row.since, ...row.children.map((child) => child.lastActivityAt)]);
   }
 
   const sections: LiveSections = { needsYou: [], live: [], waiting: [], idle: [] };

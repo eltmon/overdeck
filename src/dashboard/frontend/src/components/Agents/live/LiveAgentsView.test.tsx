@@ -146,6 +146,29 @@ describe('LiveAgentsView', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(6 * 60_000); });
     expect(part('agent-pan-2', 'agents-live-quiet')).toHaveTextContent('quiet 6m');
     expect(part('agent-pan-2', 'agents-live-quiet')).toHaveClass('text-state-stuck');
+    expect(part('agent-pan-2', 'agents-live-age')).toBeNull();
+  });
+
+  it("shows no quiet age when a subagent has been active in the last five minutes (PAN-4222 ac1)", async () => {
+    response = { ...response, entries: [
+      ...ENTRIES,
+      entry({
+        id: 'sub:agent-pan-2:a', kind: 'subagent', parentId: 'agent-pan-2', state: 'working',
+        lastActivityAt: '2026-09-25T11:59:30.000Z',
+      }),
+    ] };
+    useDashboardStore.setState({
+      agentRuntimeById: {
+        'agent-pan-2': {
+          id: 'agent-pan-2', activity: 'working', currentTool: 'Bash', currentToolDescription: 'Commit WI-7',
+          lastActivity: '2026-09-25T11:52:00.000Z',
+        },
+      },
+    } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
+    renderView();
+    await flush();
+    expect(part('agent-pan-2', 'agents-live-quiet')).toBeNull();
+    expect(part('agent-pan-2', 'agents-live-age')).toHaveTextContent('30s');
   });
 
   it("reads a conversation row's runtime facts by its runtimeId, not its directory id (PAN-4222 ac2)", async () => {

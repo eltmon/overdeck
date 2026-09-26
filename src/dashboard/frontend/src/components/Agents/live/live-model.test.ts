@@ -156,6 +156,28 @@ describe('buildLiveSections', () => {
     expect(sections.live[0]!.since).toBe('2026-09-25T11:59:00.000Z');
     expect(sections.waiting[0]!.since).toBe('2026-09-25T07:00:00.000Z');
   });
+
+  it("a Live row's since is the newest of itself and its children, not just its own activity (PAN-4222 ac1)", () => {
+    const sections = buildLiveSections([
+      entry({ id: 'orchestrator', kind: 'conversation', role: null, state: 'working' }),
+      entry({
+        id: 'sub:orchestrator:a', kind: 'subagent', parentId: 'orchestrator', state: 'working',
+        lastActivityAt: '2026-09-25T11:59:30.000Z',
+      }),
+    ], (subject) => (subject.id === 'orchestrator' ? { runtime: { lastActivity: '2026-09-25T11:52:00.000Z' } } : {}), NOW);
+    expect(sections.live[0]!.since).toBe('2026-09-25T11:59:30.000Z');
+  });
+
+  it("a Waiting row's since ignores its children (PAN-4222 ac2)", () => {
+    const sections = buildLiveSections([
+      entry({ id: 'w', state: 'stopped', pause: { by: 'machine', reason: null, since: '2026-09-25T07:00:00.000Z' } }),
+      entry({
+        id: 'sub:w:a', kind: 'subagent', parentId: 'w', state: 'working',
+        lastActivityAt: '2026-09-25T11:59:30.000Z',
+      }),
+    ], () => ({}), NOW);
+    expect(sections.waiting[0]!.since).toBe('2026-09-25T07:00:00.000Z');
+  });
 });
 
 describe('activityLabel', () => {

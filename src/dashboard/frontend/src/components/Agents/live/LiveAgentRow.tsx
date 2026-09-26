@@ -194,8 +194,9 @@ export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgent
             </span>
           )}
           <span className="ml-auto flex shrink-0 items-baseline gap-1.5 pl-2 font-mono-ui tabular-nums" title={row.since ?? undefined}>
-            {age && <span data-component="agents-live-age">{age}</span>}
-            {quiet && <span data-component="agents-live-quiet" className="text-state-stuck">quiet {age}</span>}
+            {quiet
+              ? <span data-component="agents-live-quiet" className="text-state-stuck">quiet {age}</span>
+              : age && <span data-component="agents-live-age">{age}</span>}
           </span>
         </div>
         {children.slice(0, LIVE_SUBAGENT_LINES).map((child) => {
