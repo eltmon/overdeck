@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3634",
   "created": "2026-09-26T06:15:47.084Z",
-  "updated": "2026-09-26T07:59:43.498Z",
+  "updated": "2026-09-26T07:59:53.410Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-3634",
       "claimedAt": "2026-09-26T07:45:42.666Z",
       "doneAt": "2026-09-26T07:59:43.497Z"
+    },
+    "handoff-complete-planning": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T07:59:53.410Z"
     }
   }
 }
