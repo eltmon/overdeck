@@ -366,6 +366,11 @@ program
   .action(lazyAction(() => import('./commands/unpause.js'), 'unpauseCommand'));
 
 program
+  .command('untroubled <id>')
+  .description('Clear an agent troubled gate without spawning it')
+  .action(lazyAction(() => import('./commands/untroubled.js'), 'untroubledCommand'));
+
+program
   .command('fork [conv]')
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
   .option('--model <model>', 'Model for the summary-forked session')
