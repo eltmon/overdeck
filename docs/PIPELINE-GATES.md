@@ -564,7 +564,12 @@ Auto-resume is intentionally suppressible:
   acknowledgement at all, so a machine never waives a health warning on a
   retry. Only a refusal whose response carries a guardrail decision is
   deferred; the start gate and the dirty-tree guard also answer 409 and stay
-  failures. See "Deacon-lite" below for the schedule and stop conditions.
+  failures. A deferral recorded while the Deacon is frozen
+  (`deacon.globally_paused`, the dashboard sidebar's Snowflake toggle) is
+  journaled the same way but held, not retried, until the freeze thaws — the
+  warn activity line, `pan plan finalize`/`pan plan done`'s output, and
+  `pan show` all say so (PAN-4210). See "Deacon-lite" below for the schedule
+  and stop conditions.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -641,6 +646,10 @@ observe and nudge — none reconciles a stored copy of anything:
    are all gone.
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
+
+While the Deacon is frozen (`deacon.globally_paused`), `runDeaconLite()`
+returns before any of the six routines run — none of them fires at all until
+it thaws (PAN-4210).
 
 `recoverStalledReviews` reads the journal and the issue pause gate
 (`getIssuePause`, see "Manual pause" above), with no GitHub call and no tracker
@@ -735,13 +744,23 @@ run 2, 4, 8 and 16 minutes apart, then every 20 minutes. Each one POSTs
 `/api/agents` through `spawnWorkAgentThroughAgentsEndpoint` with
 `autoSpawnConsentRequired: true` and no acknowledgement, so a success spends
 the operator's auto-start consent exactly as the first attempt would have.
+While the Deacon is frozen, `runDeaconLite()` returns before
+`retryDeferredHandoffs` ever runs, so no retry is attempted at all; the
+schedule stays exactly as journaled and resumes on the first tick after the
+freeze lifts. The two-hour window keeps counting the whole time it is frozen,
+so a deferral that was already old enough can give up on that very first
+post-thaw tick.
 
 It stands down (a `handoff.abandoned` entry with `outcome: 'stood-down'` and an
 info activity line, no failure) when the operator already acted: an
-`agent-<issue>` pane is live, the work agent is paused, running or starting,
-it was started or stopped after the deferral, planning was restarted, the
+`agent-<issue>` pane is live, the work agent is paused, it was started or
+stopped after the deferral, planning was restarted (its `startedAt` is later
+than the deferral — the `status` label itself is never read, since PAN-3917
+complete-planning's stop projection appends an event but writes no
+`state.json`, so that label would otherwise read `running` forever), the
 auto-start consent is no longer `granted`, or the retried spawn answers
-`paused`, `troubled` or closed-issue. Two hours after the first refusal, or on
-an `unauthorized` answer, it gives up: a `handoff.abandoned` entry with
-`outcome: 'gave-up'`, a `planning.failed` event with `stage: 'auto-handoff'`,
-and a warn-level activity line that tells the operator to run `pan start`.
+`paused`, `troubled`, `closed-issue` or (PAN-4210) `already-running`. Two
+hours after the first refusal, or on an `unauthorized` answer, it gives up: a
+`handoff.abandoned` entry with `outcome: 'gave-up'`, a `planning.failed` event
+with `stage: 'auto-handoff'`, and a warn-level activity line that tells the
+operator to run `pan start`.
