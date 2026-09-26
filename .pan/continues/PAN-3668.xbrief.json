@@ -480,7 +480,12 @@
       "claimedBy": "agent-pan-3668",
       "claimedAt": "2026-09-26T04:54:50.646Z",
       "doneAt": "2026-09-26T04:57:51.475Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:57:52.559Z"
     }
   },
-  "updated": "2026-09-26T04:57:51.475Z"
+  "updated": "2026-09-26T04:57:52.559Z"
 }
