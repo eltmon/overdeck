@@ -360,7 +360,12 @@
       "claimedBy": "agent-pan-3668",
       "claimedAt": "2026-09-26T02:08:38.708Z",
       "doneAt": "2026-09-26T02:34:54.028Z"
+    },
+    "runtime-name-policy": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T02:35:07.059Z"
     }
   },
-  "updated": "2026-09-26T02:34:54.029Z"
+  "updated": "2026-09-26T02:35:07.059Z"
 }
