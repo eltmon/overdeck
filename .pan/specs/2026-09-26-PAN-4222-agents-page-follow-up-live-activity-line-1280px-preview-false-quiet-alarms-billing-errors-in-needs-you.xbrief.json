@@ -4,17 +4,17 @@
     "created": "2026-09-26T00:39:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4222: Agents page follow-up: live activity line, 1280px preview, false 'quiet' alarms, billing errors in Needs you",
-    "updated": "2026-09-26T00:44:56.264Z"
+    "updated": "2026-09-26T00:46:15.288Z"
   },
   "plan": {
     "id": "pan-4222",
     "title": "Agents page follow-up: live activity line, 1280px preview, false 'quiet' alarms, billing errors in Needs you",
-    "status": "proposed",
+    "status": "running",
     "uid": "03cbddc1-8f6f-4f5a-8631-c01f197923d7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-26T00:39:34Z",
-    "updated": "2026-09-26T00:44:56.264Z",
+    "updated": "2026-09-26T00:46:15.288Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4222",
