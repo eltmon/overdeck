@@ -402,7 +402,12 @@
       "claimedBy": "agent-pan-3668",
       "claimedAt": "2026-09-26T03:27:07.710Z",
       "doneAt": "2026-09-26T03:29:45.105Z"
+    },
+    "host-transport": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:29:55.298Z"
     }
   },
-  "updated": "2026-09-26T03:29:45.106Z"
+  "updated": "2026-09-26T03:29:55.298Z"
 }
