@@ -7,6 +7,8 @@
  *   `sessionFile` from `get_state`. It is a different value from the `sessionId` (D7).
  * - Daemon socket: `$OVERDECK_HOME/sockets/pd-<first 16 hex of sha256(agentId)>.sock`
  *   (passed to `--daemon-socket`). The hash keeps the path under the unix socket limit.
+ * - Prime's own credential store: `~/.prime/agent/auth.json`. Overdeck reads its key
+ *   names only (D12) and never writes under `~/.prime/agent`.
  *
  * Leaf module: imports only `node:*` and `../../paths.js`, so any layer can import it
  * without creating a cycle. `npm run lint:harness-storage` keeps these paths from being
@@ -14,6 +16,7 @@
  */
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { getOverdeckHome } from '../../paths.js';
 
@@ -21,6 +24,11 @@ export const PRIME_AGENT_SESSION_DIR = 'prime-sessions';
 export const PRIME_AGENT_SESSION_FILE_POINTER = 'prime-agent-session-file';
 export const PRIME_AGENT_STATS_FILE = 'prime-agent-stats.json';
 export const PRIME_AGENT_CONTEXT_FILE = 'prime-agent-context.md';
+
+/** Prime Agent's own credential file (key names are read, values never). */
+export function primeAgentAuthFilePath(home = homedir()): string {
+  return join(home, '.prime', 'agent', 'auth.json');
+}
 
 /** Unix socket paths above this many bytes fail to bind on Linux and macOS (NFR-9). */
 export const PRIME_AGENT_SOCKET_PATH_MAX_BYTES = 100;
