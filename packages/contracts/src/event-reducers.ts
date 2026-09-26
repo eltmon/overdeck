@@ -457,6 +457,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               ...prevRuntime,
               activity: 'stopped' as const,
               currentTool: undefined,
+              currentToolDescription: undefined,
               thinking: undefined,
               waiting: undefined,
               channelReply: undefined,
@@ -597,6 +598,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               ...prevRuntime,
               activity: 'stopped' as const,
               currentTool: undefined,
+              currentToolDescription: undefined,
               thinking: undefined,
               waiting: undefined,
               channelReply: undefined,
@@ -1052,13 +1054,14 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'agent.activity_changed': {
-      const { agentId, activity, currentTool } = event.payload
+      const { agentId, activity, currentTool, toolDescription } = event.payload
       const prev = state.agentRuntimeById[agentId]
         ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
       const next: AgentRuntimeSnapshot = {
         ...prev,
         activity,
         currentTool: activity === 'working' ? currentTool : undefined,
+        currentToolDescription: activity === 'working' ? toolDescription : undefined,
         // Clear thinking/waiting on transitions away from those activities.
         thinking: activity === 'thinking' ? prev.thinking : undefined,
         waiting: activity === 'waiting' ? prev.waiting : undefined,
@@ -1082,6 +1085,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...prev,
         activity: 'thinking',
         currentTool: undefined,
+        currentToolDescription: undefined,
         thinking: { since: event.timestamp, lastToolAt },
         waiting: undefined,
         channelReply: undefined,
@@ -1124,6 +1128,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...prev,
         activity: 'waiting',
         currentTool: undefined,
+        currentToolDescription: undefined,
         thinking: undefined,
         waiting: {
           reason,

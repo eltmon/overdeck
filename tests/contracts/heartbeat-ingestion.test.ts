@@ -69,6 +69,39 @@ describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
     expect(decoded._tag).toBe('Success')
   })
 
+  it('activity with toolDescription → decoded payload.toolDescription (PAN-4222 ac1)', () => {
+    const ev = bodyToEvent(AGENT, {
+      kind: 'activity',
+      activity: 'working',
+      tool: 'Bash',
+      toolDescription: 'Commit WI-7',
+      hookName: 'PreToolUse',
+    }, TS)
+    expect((ev?.['payload'] as Record<string, unknown>)['toolDescription']).toBe('Commit WI-7')
+    const decoded = decodeCandidate(ev)!
+    expect(decoded._tag).toBe('Success')
+    if (decoded._tag === 'Success') {
+      const payload = decoded.success.payload as Record<string, unknown>
+      expect(payload['toolDescription']).toBe('Commit WI-7')
+    }
+  })
+
+  it('activity without toolDescription → decodes successfully with the field absent (PAN-4222 ac2)', () => {
+    const ev = bodyToEvent(AGENT, {
+      kind: 'activity',
+      activity: 'working',
+      tool: 'Bash',
+      hookName: 'PreToolUse',
+    }, TS)
+    expect((ev?.['payload'] as Record<string, unknown>)['toolDescription']).toBeUndefined()
+    const decoded = decodeCandidate(ev)!
+    expect(decoded._tag).toBe('Success')
+    if (decoded._tag === 'Success') {
+      const payload = decoded.success.payload as Record<string, unknown>
+      expect(payload['toolDescription']).toBeUndefined()
+    }
+  })
+
   it('hook_fired → agent.hook_fired without changing activity state', () => {
     const ev = bodyToEvent(AGENT, {
       kind: 'hook_fired',

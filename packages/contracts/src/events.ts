@@ -340,6 +340,7 @@ export const AgentActivityChangedEvent = Schema.Struct({
     agentId: AgentId,
     activity: Activity,
     currentTool: Schema.optional(Schema.String),
+    toolDescription: Schema.optional(Schema.String),
     hookName: Schema.optional(Schema.String),
   }),
 })

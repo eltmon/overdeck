@@ -270,6 +270,7 @@ export const AgentRuntimeSnapshot = Schema.Struct({
   activity: Activity,
   lastActivity: Schema.String,                    // ISO timestamp of last event for this agent
   currentTool: Schema.optional(Schema.String),   // set when activity === "working"
+  currentToolDescription: Schema.optional(Schema.String), // set alongside currentTool when activity === "working"
   thinking: Schema.optional(ThinkingState),       // set when activity === "thinking"
   waiting: Schema.optional(WaitingState),         // set when activity === "waiting"
   claudeSessionId: Schema.optional(Schema.String),
