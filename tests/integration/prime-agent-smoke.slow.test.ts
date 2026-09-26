@@ -2,9 +2,10 @@
  * @slow PAN-3668 WI-23 (NFR-7): live Prime Agent smoke test against the installed
  * binary. Excluded from the default run (`*.slow.test.ts`); run it with
  *   VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/prime-agent-smoke.slow.test.ts
- * It skips when `prime-agent` is not installed or no credential resolves for the model
- * (override with PRIME_AGENT_SMOKE_MODEL / PRIME_AGENT_SMOKE_AUTH, default gpt-5.5 on the
- * openai subscription). It spends a few model tokens.
+ * It needs `prime-agent` 0.8.x installed and a credential for the model (override with
+ * PRIME_AGENT_SMOKE_MODEL / PRIME_AGENT_SMOKE_AUTH, default gpt-5.5 on the openai
+ * subscription); without them it fails with a message naming what is missing. It
+ * spends a few model tokens.
  *
  * Flow: launch a host for a throwaway agent in a temp git repo, prompt, steer while the
  * turn is streaming, read stats, stop, check that `prime-agent status --json` has no
@@ -51,7 +52,7 @@ async function status(home: string): Promise<{ isStreaming: boolean; sessionId: 
   return JSON.parse(response.body) as { isStreaming: boolean; sessionId: string };
 }
 
-describe.skipIf(!binary || !credential)('Prime Agent live smoke (PAN-3668 WI-23)', () => {
+describe('Prime Agent live smoke (PAN-3668 WI-23)', () => {
   let home: string;
   let workspace: string;
   let prevHome: string | undefined;
@@ -59,6 +60,8 @@ describe.skipIf(!binary || !credential)('Prime Agent live smoke (PAN-3668 WI-23)
   let host: PrimeAgentHost | undefined;
 
   beforeAll(async () => {
+    if (!binary) throw new Error('prime-agent is not installed; run `npm install -g prime-agent@0.8` before this @slow smoke test');
+    if (!credential) throw new Error(`No Prime Agent credential resolves for ${MODEL} (${AUTH}); sign in with \`prime-agent\` then /login, or set PRIME_AGENT_SMOKE_MODEL/PRIME_AGENT_SMOKE_AUTH`);
     home = mkdtempSync(join(tmpdir(), 'pps-'));
     prevHome = process.env.OVERDECK_HOME;
     prevUserHome = process.env.HOME;
@@ -71,6 +74,7 @@ describe.skipIf(!binary || !credential)('Prime Agent live smoke (PAN-3668 WI-23)
   });
 
   afterAll(async () => {
+    if (!home) return;
     await host?.stop();
     if (prevHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = prevHome;
