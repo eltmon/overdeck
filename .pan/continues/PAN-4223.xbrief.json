@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T07:55:49.116Z",
+  "updated": "2026-09-26T07:56:01.188Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -312,6 +312,10 @@
     "lane-contract.ac1": {
       "status": "completed",
       "doneAt": "2026-09-26T07:55:49.115Z"
+    },
+    "lane-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:56:01.188Z"
     }
   }
 }
