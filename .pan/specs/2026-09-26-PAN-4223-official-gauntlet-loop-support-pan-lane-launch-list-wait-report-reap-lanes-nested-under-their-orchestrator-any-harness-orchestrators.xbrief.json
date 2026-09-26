@@ -1,0 +1,1880 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-26T01:08:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4223: Official gauntlet loop support: pan lane (launch/list/wait/report/reap), lanes nested under their orchestrator, any-harness orchestrators",
+    "updated": "2026-09-26T01:14:36.815Z"
+  },
+  "plan": {
+    "id": "pan-4223",
+    "title": "Official gauntlet loop support: pan lane (launch/list/wait/report/reap), lanes nested under their orchestrator, any-harness orchestrators",
+    "status": "proposed",
+    "uid": "7a7bf8ac-163c-445b-85b1-042ead16c643",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-26T01:08:08Z",
+    "updated": "2026-09-26T01:14:36.815Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4223",
+        "label": "PAN-4223",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/.pan/drafts/pan-4223.md",
+        "label": "PRD draft (.pan/drafts/pan-4223.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "gauntlet",
+      "lanes",
+      "conversations",
+      "cli",
+      "command-deck",
+      "agents-page",
+      "skills"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator filed and decided this as one feature (PRD Q1-Q3: verb, reap-archives, successor nesting), and the parts interlock: the lane door, the parent-link schema, the fork stamp and the two nesting views share one data contract (parent_conversation_id plus three lane columns). The documentation work item alone spans more than 6 lint subsystems (reference/, configuration/, docs/, sync-sources/, CLAUDE.md, docs.json), so no split into sibling issues passes the projected-surface gate cleanly. The plan compensates with 24 small items, an explicit DAG, and two deep-inspected foundation items.",
+      "canonicalFilename": "2026-09-26-PAN-4223-official-gauntlet-loop-support-pan-lane-launch-list-wait-report-reap-lanes-nested-under-their-orchestrator-any-harness-orchestrators.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Gauntlet orchestrators fan out lanes by hand. Claude orchestrators use the Agent tool (Anthropic models only); other models abuse `pan handoff` from a throwaway conversation because handoff ignores --harness. The result is about a dozen flat 'SB lane: …' conversations parented (inside fork_request JSON) to the wrong row, a hand-rolled sentinel.log completion signal, duplicate lanes sharing a worktree, runaway lanes nobody sees, and manual teardown. GPT, Codex and Kimi orchestrators cannot fan out at all.",
+      "Proposal": "Follow .pan/drafts/pan-4223.md. A lane is an ordinary conversation carrying four write-once launch-time columns (parent_conversation_id, gauntlet_run, lane_key, lane_role); lane status is derived on read. One core (launchLane) behind POST /api/lanes and `pan lane start` creates the per-lane worktree under a configurable lanes root, writes the brief, and starts a conversation with any harness/model/effort through the extracted startConversationRuntime. `pan lane list|wait|report|stop|reap` reuse the worker report and wait machinery, the conversation stop door and the archive door (reap archives by default, --keep retains). handleConversationSummaryFork stamps the parent link so handoff/fork successors nest. The Command Deck and the Agents page nest rows by parent link, capped at display depth 2. pan tell resolves a conversation's real harness and refuses to re-task a critic that reported. The pan-gauntlet-loop skill adopts the lane door and the GAUNTLET-LOOP-V3 rules.",
+      "NonGoals": "- Serving the gauntlet progress page from the dashboard; the skill's http.server page stays.\n- Modeling verdicts, board statuses, merges or releases in Overdeck; they stay in the project repo.\n- Machine-level rig limits (browser slots, ports, displays); they stay in the project's run file.\n- Changing pan handoff, pan fork or pan worker behavior beyond the parent link on fork successors and cross-reference docs; a handoff of a lane does not carry lane facts to its successor.\n- A per-run Herdr workspace or a parent pane token.\n- Automatic lane launching or scheduling; the orchestrator decides every launch.\n- Re-parenting or backfilling existing rows (including HOTEL conversations 2899-2910).\n- Parent links on post-/clear siblings, backfilled agent rows, retrospective conversations or POST /api/conversations rows.\n- A stored lane status field or a run table.\n- Accepting effort xhigh at the lane door.\n- Killing any process during reap, or `git worktree remove --force`.\n- A `pan lane tell` verb (messaging stays `pan tell`)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep PAN-4223 as one issue and set plan.metadata.sizeJustification instead of filing sibling issues.",
+        "rationale": "The operator filed and decided the design as one unit; the docs item alone exceeds the 6-subsystem lint limit, so a split cannot pass the gate cleanly; 24 small items with explicit edges keep review granular."
+      },
+      {
+        "summary": "Split PRD work items WI-3, WI-5, WI-6, WI-10, WI-11 and WI-13 into smaller xBRIEF items; move the reap route from WI-5 into the reap item.",
+        "rationale": "The planning rules require the smallest defensible items; the reap route imports reapLane, so it belongs with WI-7."
+      },
+      {
+        "summary": "Run frontend tests through `npm --prefix ./src/dashboard/frontend run test -- <paths>` and corrected AC-10/AC-11 in the PRD.",
+        "rationale": "The root vitest.config.ts excludes src/dashboard/frontend/**, so the PRD's root `npx vitest run` commands for frontend files would run nothing."
+      },
+      {
+        "summary": "Only lane-columns (conversations.ts, at its 1111 cap) and runtime-start-extract (conversation-runtime.ts, at its 1186 cap) own scripts/file-size-allowlist.txt, ordered by an edge; cli/index.ts (cap 1379) and projects.ts (cap 1210) have headroom and the reap change adds no lines to routes/conversations.ts.",
+        "rationale": "scripts/lint-file-size.sh fails a file only above its allowlisted cap; limiting the shared allowlist to the two capped files avoids needless serialization."
+      },
+      {
+        "summary": "The lane door passes `undefined` as the explicit harness when neither --harness nor gauntlet.roles config names one.",
+        "rationale": "concerns.md records that coalescing to 'claude-code' bypasses the provider default in resolveHarness; the PRD's any-harness goal depends on the provider default applying."
+      },
+      {
+        "summary": "The AC-10 live Command Deck screenshot is a test/UAT-role check, not a work-item gate; work items do not run `pan reload`.",
+        "rationale": "The PRD already names the component tests as the gate with the screenshot as a fallback-at-next-reload; only the flywheel deploys."
+      }
+    ],
+    "items": [
+      {
+        "id": "lane-columns",
+        "title": "Add the four launch-time lane columns to conversations (WI-1)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversations.ts",
+            "docs/overdeck-remodel/overdeck-schema.ts",
+            "src/lib/overdeck/__tests__/conversation-lane-columns.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-lane-columns.test.ts",
+            "grep -c parent_conversation_id drizzle/overdeck/0000_overdeck_init.sql src/lib/overdeck/infra.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-lane-columns.test.ts exits 0 with every case green",
+            "grep prints a count of 1 or more for each file",
+            "typecheck completes without errors",
+            "file-size guard exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-24",
+            "FR-30",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "fork-parent-link",
+            "lane-launch-core",
+            "lane-views",
+            "lane-report-cmd",
+            "tell-fixes",
+            "deck-tree",
+            "agents-dir-server"
+          ],
+          "parallelSafeReason": "Touches only the conversations store and schema files; no other item edits them."
+        },
+        "narrative": {
+          "Action": "Implement .pan/drafts/pan-4223.md WI-1 exactly. Add parent_conversation_id, gauntlet_run, lane_key and lane_role to the conversations table in drizzle/overdeck/0000_overdeck_init.sql (plus conversations_parent_idx and conversations_gauntlet_run_idx) and as idempotent runSchemaTopUp calls at the end of ensureRuntimeIndexesSync in src/lib/overdeck/infra.ts. In src/lib/overdeck/conversations.ts export LaneRole and LANE_ROLES; extend LegacyConversationRow, LEGACY_CONVERSATION_SELECT (LEFT JOIN conversations p ON p.id = c.parent_conversation_id; qualify every following WHERE/ORDER BY column with c.), LegacyConversation and rowToLegacyConversation with parentConversationId (legacy rowid), parentConversationName, gauntletRun, laneKey, laneRole. createConversation accepts parentName and lane and writes them in the same INSERT (unknown parent throws 'parent conversation <name> not found'; lane without parentName throws 'a lane needs a parent'). Add listLaneConversations(filter) (archived rows included, lane_key set only, created_at order) and resolveEffectiveLauncher(name) per D21 with a visited-set guard. Mirror the columns in docs/overdeck-remodel/overdeck-schema.ts. Write src/lib/overdeck/__tests__/conversation-lane-columns.test.ts with every case the PRD lists. If conversations.ts grows past its file-size cap, append a '<lines> src/lib/overdeck/conversations.ts # PAN-4223' row to scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "lane-columns.ac1",
+            "title": "Given createConversation is called with parentName and lane { run, key, role }, when the row is read back with getConversationByName, then it returns parentConversationName, parentConversationId (the parent's legacy rowid), gauntletRun, laneKey and laneRole with the stored values.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-columns.ac2",
+            "title": "Given createConversation is called with parentName and no lane, then the row stores the parent link and returns gauntletRun, laneKey and laneRole as null; an unknown parentName throws 'parent conversation <name> not found' and inserts no row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-columns.ac3",
+            "title": "resolveEffectiveLauncher returns the orchestrator lane for a successor→successor→orchestrator-lane chain, returns the root for a successor→successor→root chain, and returns a root unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-columns.ac4",
+            "title": "listLaneConversations({ run }) returns that run's lanes oldest first, includes an archived lane, and excludes a successor of one of the run's lanes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-columns.ac5",
+            "title": "ensureRuntimeIndexesSync adds the four columns to a database created without them, and a second run exits silently; `grep -c parent_conversation_id` reports at least 1 in both 0000_overdeck_init.sql and infra.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-parent-link",
+        "title": "Stamp the parent link on handoff and fork successors (WI-14)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts src/lib/overdeck/__tests__/conversation-forks-handoff-placement.test.ts",
+            "grep -c 'parentName: conv.name' src/lib/overdeck/conversation-forks.ts"
+          ],
+          "expected_outputs": [
+            "both test files exit 0",
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-25",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement .pan/drafts/pan-4223.md WI-14. In src/lib/overdeck/conversation-forks.ts add exactly one property, `parentName: conv.name`, to the createConversation call inside handleConversationSummaryFork (after `...conversationLaunchContext(conv),`, with the comment 'Gauntlet lanes D3: the successor nests under its source. Launch-time fact, written once.'). Change nothing else in the fork path (buildForkRequest, recordConversationHandoff, recoverStuckForks, the CLI and the fork modal stay as they are) and do not stamp rows created in conversation-lifecycle.ts, conversation-retrospective.ts or conversation-runtime.ts. Write src/lib/overdeck/__tests__/conversation-forks-parent-link.test.ts modeled on conversation-forks-handoff-placement.test.ts with the six cases the PRD lists."
+        },
+        "items": [
+          {
+            "id": "fork-parent-link.ac1",
+            "title": "Given a summary-fork request in each forkMode (plain, summary, handoff), the new row returns parentConversationName equal to the source name and parentConversationId equal to the source's legacy id, with gauntletRun, laneKey and laneRole null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-parent-link.ac2",
+            "title": "The stored fork_request JSON still records the source in parentConversationName, and the response body preserves its success and conversation keys.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-parent-link.ac3",
+            "title": "Given the source is a builder lane, the successor's parent link names the lane and listLaneConversations({ run }) does not return the successor.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-parent-link.ac4",
+            "title": "`grep -c 'parentName: conv.name' src/lib/overdeck/conversation-forks.ts` prints exactly 1, and `grep -c parentName` prints 0 for conversation-lifecycle.ts and conversation-retrospective.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-start-extract",
+        "title": "Extract startConversationRuntime from handleConversationCreate (WI-2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-start.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-start.test.ts",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-runtime-start.test.ts exits 0",
+            "existing conversation suites exit 0",
+            "typecheck completes without errors",
+            "file-size guard exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement .pan/drafts/pan-4223.md WI-2 in src/lib/overdeck/conversation-runtime.ts. Add the exported StartConversationRuntimeInput interface and `export async function startConversationRuntime(input)` whose body is the current background `void (async () => { try { spawnConversationSession … waitForConversationRuntimeReady … deliverAgentMessage } catch { … updateSpawnError … } })()` block of handleConversationCreate moved verbatim (including the conversation.created emit on failure); it never throws. handleConversationCreate calls `void startConversationRuntime({ … })` instead; title generation stays in handleConversationCreate and the POST /api/conversations request and response do not change (NFR-5). Add src/lib/overdeck/__tests__/conversation-runtime-start.test.ts with injected or vi.mock'ed spawn and delivery fakes (follow conversation-teardown.test.ts). If the file grows past its cap, append a PAN-4223 row to scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "runtime-start-extract.ac1",
+            "title": "Given spawn and readiness succeed, startConversationRuntime sends the initial message exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-start-extract.ac2",
+            "title": "Given the spawn fails for an opencode conversation, startConversationRuntime records spawn_error on the row, calls the runtime teardown and returns without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-start-extract.ac3",
+            "title": "`grep -c 'startConversationRuntime(' src/lib/overdeck/conversation-runtime.ts` prints 2 or more, and the existing src/lib/overdeck/__tests__/conversation-*.test.ts files exit 0 unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gauntlet-config",
+        "title": "Add the projects.<key>.gauntlet config block (WI-4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects.ts",
+            "src/lib/__tests__/projects-gauntlet-config.test.ts",
+            "configuration/projects.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/projects-gauntlet-config.test.ts",
+            "grep -q 'gauntlet:' configuration/projects.mdx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "projects-gauntlet-config.test.ts exits 0",
+            "grep exits 0",
+            "typecheck completes without errors",
+            "file-size guard exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement .pan/drafts/pan-4223.md WI-4. Add the optional `gauntlet` block (lanes_root, base_ref, sparse_checkout, roles.<builder|critic|verifier|play|orchestrator>.{model,harness,effort}) to ProjectConfig in src/lib/projects.ts and to its validator: lanes_root must be absolute, sparse_checkout must be an array of non-empty strings, and an unknown role key fails with an error naming the key. Document the block with the PRD's lexerra YAML example in configuration/projects.mdx. Write src/lib/__tests__/projects-gauntlet-config.test.ts. The defaults (lanes_root = <dirname(path)>/<basename(path)>-lanes, base_ref = origin/<default branch>) are applied by resolveLaneConfig in the lane-launch-core item, not here. If `bash scripts/lint-file-size.sh` fails because projects.ts grew past its cap (unexpected: it has headroom), append a PAN-4223 row to scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "gauntlet-config.ac1",
+            "title": "Given the PRD's lexerra gauntlet YAML example, the project validator accepts it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-config.ac2",
+            "title": "Given lanes_root is a relative path, the validator rejects it with an error naming lanes_root; given roles.reviewer, the validator rejects it with an error naming the unknown role.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-config.ac3",
+            "title": "configuration/projects.mdx contains a `gauntlet:` example block listing lanes_root, sparse_checkout and roles.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-worktree",
+        "title": "Add the async git worktree helpers for lanes (WI-3 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/worktree.ts",
+            "src/lib/lanes/__tests__/worktree.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/worktree.test.ts"
+          ],
+          "expected_outputs": [
+            "worktree.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/lanes/worktree.ts per .pan/drafts/pan-4223.md WI-3 step 3, using promisified execFile with a 60 s timeout on every git call (never execSync; the module is dashboard-server reachable). Export fetchBase(projectPath) (git fetch origin; a failure returns a warning string and does not throw), addBranchWorktree(projectPath, path, branch, base) (existing local branch → `git worktree add <path> <branch>`, else `git worktree add -b <branch> <path> <base>`), addDetachedWorktree(projectPath, path, ref) (`git worktree add --detach`), applySparse(path, patterns) (`git -C <path> sparse-checkout set --no-cone …`) and a laneDirName validator for `^[a-z0-9][a-z0-9._-]*$`. Module header cites .pan/drafts/pan-4223.md. Test against a real temporary git repo in src/lib/lanes/__tests__/worktree.test.ts."
+        },
+        "items": [
+          {
+            "id": "lane-worktree.ac1",
+            "title": "Given a temp repo, addBranchWorktree creates a worktree on a new branch cut from the base, and a second call for an existing branch creates the worktree on that branch without -b.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-worktree.ac2",
+            "title": "addDetachedWorktree creates a worktree whose HEAD is detached at the requested commit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-worktree.ac3",
+            "title": "Given a fetch failure, fetchBase returns a warning string and does not throw; laneDirName rejects 'Bad/Name' and accepts 'hotel-663-i2'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-contract",
+        "title": "Add the lane contract text builder (WI-3 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/contract.ts",
+            "src/lib/lanes/__tests__/contract.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/contract.test.ts"
+          ],
+          "expected_outputs": [
+            "contract.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/lanes/contract.ts exporting laneContract({ role, run, key, iteration, briefPath, cwd, branch, at }) that returns exactly the text in .pan/drafts/pan-4223.md WI-3 step 5: the common header and rules (including 'pan lane report --file <that file>' and the RULING/SPEND/ONE-WAY/BLOCKED first-line rule) followed by the one role block for builder, critic/verifier, play or orchestrator, with placeholders filled. Module header cites .pan/drafts/pan-4223.md. Write src/lib/lanes/__tests__/contract.test.ts."
+        },
+        "items": [
+          {
+            "id": "lane-contract.ac1",
+            "title": "For each of the five roles, laneContract returns text that contains 'pan lane report --file' and that role's block (critic and verifier share one block).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-contract.ac2",
+            "title": "The builder text contains the branch name passed in, and the critic text contains the `at` commit passed in.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-report-store",
+        "title": "Extend the worker report store and wait loop for lanes (WI-6 parts 1-2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/worker/report.ts",
+            "src/lib/agents/worker/wait.ts",
+            "src/lib/agents/worker/__tests__/report.test.ts",
+            "src/lib/agents/worker/__tests__/wait.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/worker/__tests__/report.test.ts src/lib/agents/worker/__tests__/wait.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement .pan/drafts/pan-4223.md WI-6 steps 1 and 2. In src/lib/agents/worker/report.ts add `readonly git?: { head: string; branch: string | null }` to WorkerReport; writeWorkerReport writes it and parseReport keeps it only when well-formed, so old reports still parse. In src/lib/agents/worker/wait.ts widen WaitDeps.idleAgeMs to return `number | null | Promise<number | null>` and await it. Worker behavior is otherwise unchanged. Extend the existing report.test.ts and wait.test.ts (injected now/sleep, no real timers)."
+        },
+        "items": [
+          {
+            "id": "lane-report-store.ac1",
+            "title": "A report written with git { head, branch } returns the same git field from listWorkerReports, and a stored report without git still parses.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-report-store.ac2",
+            "title": "Given an async idleAgeMs dependency that resolves above the idle threshold, waitForWorkerReport awaits it and returns the idle outcome.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-launch-core",
+        "title": "Implement the lane launch core launchLane (WI-3 core)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/lanes/types.ts",
+            "src/lib/lanes/config.ts",
+            "src/lib/lanes/launch.ts",
+            "src/lib/lanes/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/launch.test.ts",
+            "grep -c startConversationRuntime src/lib/lanes/launch.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launch.test.ts exits 0 including the concurrency and succession cases",
+            "grep prints 1 or more",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-30",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "lane-routes",
+            "lane-cli",
+            "lane-reap"
+          ],
+          "parallelSafeReason": "All files are new under src/lib/lanes/; it only imports the prerequisite items' exports."
+        },
+        "narrative": {
+          "Action": "Create src/lib/lanes/types.ts (LaneLaunchRequest, LaneLaunchResult, LaneLaunchError with status 400|404|409|500), src/lib/lanes/config.ts (resolveLaneConfig(projectKey) applying the glossary defaults: lanes_root <dirname(path)>/<basename(path)>-lanes, base_ref origin/<workspace.default_branch ?? 'main'>) and src/lib/lanes/launch.ts launchLane(request, deps) following .pan/drafts/pan-4223.md WI-3 step 4 items 1-14 in order: parent resolution (D5), effective launcher and D8 role rules (D21, FR-30), run key (D4), project, lanes-root check (FR-3: realpath under homedir, not under /tmp, neither equal to nor an ancestor of the project path), model/harness/effort (FR-8: flags → gauntlet.roles config → 400 'no model for role <role>: …'; pass `undefined` as the explicit harness to resolveAllowedHarness when neither a flag nor role config names one, so the provider default applies; effort must match SAFE_EFFORT_PATTERN, xhigh → 400 'effort must be low, medium or high'), a per-project in-process launch lock (NFR-4), FR-6 idempotency with --replace, D7 iteration and D8 target paths including --reuse, working directory creation through lane-worktree helpers (play: plain empty dir with bareContext and skipClaudeMd forced), brief written write-once to ~/.overdeck/agents/conv-<name>/lane-brief.md with the header comment (see the PRD's implementation checkpoint and its fallback), createConversation with titleSource 'manual', title `<run> <key> · <role>` (with ` i<n>` for n ≥ 2) and parentName = the launching row, then `void startConversationRuntime` with laneContract(...). Never call AI title generation. All git/fs work is async. Module headers cite .pan/drafts/pan-4223.md. Write src/lib/lanes/__tests__/launch.test.ts with every case the PRD lists (injected git runner, liveness, stop door, clock, temp $HOME)."
+        },
+        "items": [
+          {
+            "id": "lane-launch-core.ac1",
+            "title": "Given a builder launch for run hotel key 663 from a root parent, launchLane creates <root>/hotel-663 on branch hotel/663 from origin/main, writes lane-brief.md once, stores the four lane columns, titles the row 'hotel 663 · builder', and calls startConversationRuntime with the builder contract.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-launch-core.ac2",
+            "title": "launchLane rejects with 400 a critic without --at, a critic launched from a lane parent, a successor of an orchestrator lane launching a critic, effort 'xhigh', a lanes root under /tmp or equal to the project path, and a launch with no model anywhere (message names the gauntlet.roles config key).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-launch-core.ac3",
+            "title": "Given a successor of an orchestrator lane launches a builder, the builder inherits the orchestrator lane's run and its parent link names the successor; a successor of a root orchestrator launches a critic with 201.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-launch-core.ac4",
+            "title": "Given a live builder for the same (run, key), launchLane returns 409 naming it; with replace it stops the old lane first and counts a new iteration; two concurrent launches for the same (run, key, role) produce exactly one success and one 409.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-launch-core.ac5",
+            "title": "Given an i1 builder row whose newest report branch is hotel/663, a new builder launch creates <root>/hotel-663-i2 on new branch hotel/663-i2 cut from hotel/663; with reuse no git worktree add runs and the iteration equals the reused row's; a play launch creates a plain directory with bareContext and skipClaudeMd set.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-views",
+        "title": "Derive lane views and enrich the conversation list (WI-5 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/views.ts",
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/lanes/__tests__/views.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/views.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "views.test.ts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "FR-24",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/lanes/views.ts with the LaneView interface and listLaneViews(filter, deps) per .pan/drafts/pan-4223.md WI-5 step 1: rows come from listLaneConversations (archived included), liveness fields (sessionAlive, isWorking, pendingInputCount, lastActivityAt, totalCost) are joined by name from the enriched list, activity follows the D10 table in order, report is the newest report from listWorkerReports('conv-' + name) including git head/branch, iteration follows D7, archived rows get archived: true, activity 'stopped' and git null, and git facts for non-archived git-backed roles run with withConcurrencyLimit(8) and a 10 s timeout per call (NFR-3). Memoize per filter for 3 s using an injected clock. In src/lib/overdeck/conversation-list.ts add laneReport ({ seq, at, status } | null) and laneIteration for rows with laneKey, with no git work. Module header cites .pan/drafts/pan-4223.md. Write src/lib/lanes/__tests__/views.test.ts."
+        },
+        "items": [
+          {
+            "id": "lane-views.ac1",
+            "title": "Given fixture rows for each D10 rule, listLaneViews returns activity failed-to-start, needs-you, working, idle, starting and stopped in the first-match order of the table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-views.ac2",
+            "title": "Given an archived lane, listLaneViews returns it with archived: true, activity 'stopped' and git null, and iteration counts earlier archived rows.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-views.ac3",
+            "title": "A successor row (parent link, no lane key) is not returned, a play lane returns git null, and report is the highest-seq report.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-views.ac4",
+            "title": "Within 3 s of an injected clock, a second call with the same filter returns the same object; `grep -c listLaneConversations src/lib/lanes/views.ts` prints 1 or more.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-routes",
+        "title": "Serve POST /api/lanes and GET /api/lanes routes (WI-5 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/lanes.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/routes/__tests__/lanes-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/lanes-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lanes-route.test.ts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/lanes.ts per .pan/drafts/pan-4223.md WI-5 step 3 and register its route layer in src/dashboard/server/server.ts the way workersRegisterRouteLayer is registered. Every handler calls validateOrigin first. POST /api/lanes → launchLane(body) → 201 with LaneLaunchResult; a LaneLaunchError maps to its status with { error }. GET /api/lanes?run=&parent=&key= → { generatedAt, lanes } from listLaneViews. GET /api/lanes/:name → one LaneView or 404. The reap route is added by the lane-reap item. Write src/dashboard/server/routes/__tests__/lanes-route.test.ts with the core injected (never the live dashboard)."
+        },
+        "items": [
+          {
+            "id": "lane-routes.ac1",
+            "title": "Given a request with a bad Origin, every lanes route returns 403.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-routes.ac2",
+            "title": "Given launchLane throws LaneLaunchError(409, msg), POST /api/lanes returns 409 with { error: msg }; on success it returns 201 with conversation, cwd, branch, iteration and warnings.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-routes.ac3",
+            "title": "GET /api/lanes returns { generatedAt, lanes }, and GET /api/lanes/:name returns 404 for a name that is not a lane.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-report-cmd",
+        "title": "Implement reportLane with the builder clean-and-pushed guard (WI-6 part 3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/report.ts",
+            "src/lib/lanes/__tests__/report.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/report.test.ts"
+          ],
+          "expected_outputs": [
+            "report.test.ts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/lanes/report.ts reportLane({ body, status, allowUnpushed }, env) per .pan/drafts/pan-4223.md WI-6 step 3. The own conversation comes from env.OVERDECK_CONVERSATION with the conv- prefix stripped (D11; not OVERDECK_AGENT_ID) and must be a lane row, else the error 'not inside a lane'. For git-backed roles read head and branch; a builder 'done' report is refused while `git status --porcelain` is non-empty or the branch has commits not on its upstream or has no upstream (FR-12), naming the failing check, unless allowUnpushed. Write through writeWorkerReport('conv-' + name, { body, status, git }) and return the line 'lane <run>/<key> report <seq>: <status>'. Async execFile only. Write src/lib/lanes/__tests__/report.test.ts against a temp git repo."
+        },
+        "items": [
+          {
+            "id": "lane-report-cmd.ac1",
+            "title": "Given OVERDECK_CONVERSATION names a non-lane conversation (including a lane's successor), reportLane rejects with 'not inside a lane'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-report-cmd.ac2",
+            "title": "Given a builder lane with a dirty tree, or with unpushed commits, a done report is refused with a message naming that check and no report file is written.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-report-cmd.ac3",
+            "title": "Given allowUnpushed, the done report is written and the stored report records git.head equal to the lane's HEAD sha.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-wait",
+        "title": "Implement single-lane and lane-set waits (WI-6 part 4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/wait.ts",
+            "src/lib/lanes/__tests__/wait.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/wait.test.ts"
+          ],
+          "expected_outputs": [
+            "wait.test.ts exits 0 with fake time only"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/lanes/wait.ts per .pan/drafts/pan-4223.md WI-6 step 4. waitForLane(name, opts, deps) calls waitForWorkerReport('conv-' + name, …) with isAlive from conversationHarnessAlive, idleAgeMs from the lane view (activity 'working' → 0, else now - lastActivityAt, null when unknown), fetchLastAssistantMessage from GET /api/conversations/:name/messages (see the PRD implementation checkpoint and its null fallback), and resolveTranscriptPath from the conversation's session file. waitForLaneSet({ run | parent }, { after, timeoutMs }) polls every 2 s and returns the first report whose cursor '<atMs>.<name>.<seq>' sorts after `after`, oldest first (ties by name then seq); on timeout it returns the timeout outcome with the next cursor; each poll prints one stderr warning per lane that is stopped with no report since the cursor. Use injected now/sleep in tests (never real timers). Write src/lib/lanes/__tests__/wait.test.ts."
+        },
+        "items": [
+          {
+            "id": "lane-wait.ac1",
+            "title": "Given a lane that writes a done report, waitForLane returns the report outcome; given the harness dies without a report after startup grace, it returns the exited outcome.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-wait.ac2",
+            "title": "Given two lanes with reports, waitForLaneSet returns them oldest first across calls and each result carries the next cursor; a tie on `at` orders by name then seq.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-wait.ac3",
+            "title": "Given no new report before the timeout, waitForLaneSet returns the timeout outcome with a next cursor equal to the input cursor.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-reap",
+        "title": "Implement reapLane and the reap route with archive-by-default (WI-7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/reap.ts",
+            "src/lib/lanes/__tests__/reap.test.ts",
+            "src/dashboard/server/routes/lanes.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "src/dashboard/server/routes/__tests__/lanes-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/reap.test.ts src/dashboard/server/routes/__tests__/lanes-route.test.ts",
+            "grep -c archiveConversationByName src/lib/lanes/reap.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both test files exit 0",
+            "grep prints 1 or more",
+            "typecheck completes without errors",
+            "file-size guard exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-21",
+            "FR-23",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Its only shared file, routes/lanes.ts, is ordered after lane-routes by an edge."
+        },
+        "narrative": {
+          "Action": "Create src/lib/lanes/reap.ts reapLane(name, { park, keep }, deps) following .pan/drafts/pan-4223.md WI-7 steps 1-8 in order: 404 for a non-lane; stop a live harness (stopConversationRuntime + markConversationEnded, 30 s poll, else 409); realpath check under the lanes root (else 400, nothing touched); pidsWithCwdUnder non-empty → 409 listing pid and command line (never kill); dirty git tree without park → 409 'dirty; pass --park'; with park: `git add -A`, write `git diff --cached --binary HEAD` to ~/.overdeck/agents/conv-<name>/parked-<ISO>.patch, verify non-empty and `git apply --cached --check --reverse` (failure → 500, no reset), only then `reset --hard HEAD` and `clean -fd`; warn on unpushed commits; `git worktree remove` WITHOUT --force then `git worktree prune` (play: rm only when under the lanes root and no .git); finally, unless keep, archiveConversationByName(name, deps.archive) (200 or 'already archived' 400 → archived: true; other failure → archived: false plus the D14 warning, still 200). Add POST /api/lanes/:name/reap to src/dashboard/server/routes/lanes.ts passing { park, keep } and the archive deps; export conversationArchiveDependencies from src/dashboard/server/routes/conversations.ts instead of copying it. Write src/lib/lanes/__tests__/reap.test.ts (temp repo with a real worktree; process list and archive injected) and extend lanes-route.test.ts."
+        },
+        "items": [
+          {
+            "id": "lane-reap.ac1",
+            "title": "Given a PID whose cwd is under the lane directory, reapLane returns 409 listing that PID, the worktree still exists, and the archive is never called; the same holds for a dirty tree without park and a cwd outside the lanes root (400).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-reap.ac2",
+            "title": "Given park with one modified tracked file and one untracked file, reapLane writes a patch that applies with `git apply` onto a fresh checkout of HEAD and reproduces both files, then removes the worktree; when the verification step fails no reset or clean runs and the change survives in the worktree.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-reap.ac3",
+            "title": "A default reap calls archiveConversationByName once, after git worktree remove, and returns archived: true; keep never calls it; an 'already archived' 400 returns archived: true; a 500 returns removed: true, archived: false and the D14 warning.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-reap.ac4",
+            "title": "After a default reap, lane-brief.md and the reports under ~/.overdeck/agents/conv-<name>/ still exist, and `grep -n \"'--force'\" src/lib/lanes/reap.ts` prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-reap.ac5",
+            "title": "The reap route passes keep through to reapLane and hands it the exported conversationArchiveDependencies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tell-fixes",
+        "title": "Fix pan tell conversation harness lookup and add the critic guard (WI-9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/cli/commands/tell.ts",
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "src/lib/agents/__tests__/messaging-conversation-harness.test.ts",
+            "src/cli/commands/__tests__/tell-lane-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/messaging-conversation-harness.test.ts src/cli/commands/__tests__/tell-lane-guard.test.ts",
+            "npm run build",
+            "bash scripts/lint-slash-commands.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files exit 0",
+            "build completes",
+            "slash-command lint exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement .pan/drafts/pan-4223.md WI-9. In src/lib/agents/messaging.ts change the conversation lookup to `getConversationByName(normalizedId.slice('conv-'.length))` so a conv-<name> target resolves its real harness (FR-17). In src/cli/commands/tell.ts, before delivery, when the target starts with conv- and the row's laneRole is critic or verifier and latestWorkerReport(target)?.status === 'done' and --force is absent, print 'conv <id> is a <role> lane that already filed its verdict. Launch a fresh one: pan lane start --role <role> --key <key> --at <sha> …' and exit 1 (FR-16). Add --force to `tell` in src/cli/index.ts. Regenerate packages/contracts/src/composer-commands.generated.ts with `npm run build && npm run generate:slash-commands` in the same commit. Write src/lib/agents/__tests__/messaging-conversation-harness.test.ts and src/cli/commands/__tests__/tell-lane-guard.test.ts. If `bash scripts/lint-file-size.sh` fails because src/cli/index.ts grew past its cap (unexpected: it has headroom), append a PAN-4223 row to scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "tell-fixes.ac1",
+            "title": "Given a conv-<name> target whose row has harness codex, messageAgent passes codex as the expected harness instead of claude-code.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tell-fixes.ac2",
+            "title": "Given a critic lane with a done report, pan tell refuses and exits 1 with the 'launch a fresh one' message; with --force it delivers; a builder lane with a done report delivers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tell-fixes.ac3",
+            "title": "bash scripts/lint-slash-commands.sh exits 0 after the --force flag is added.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-cli",
+        "title": "Add the pan lane CLI group (WI-8)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/lane.ts",
+            "src/cli/command-groups.ts",
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "src/cli/commands/__tests__/lane.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/lane.test.ts",
+            "npm run build",
+            "node dist/cli/index.js lane --help",
+            "node dist/cli/index.js lane reap --help",
+            "bash scripts/lint-slash-commands.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lane.test.ts exits 0",
+            "build completes",
+            "help lists the six subcommands",
+            "reap help shows --keep",
+            "slash-command lint exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "FR-14",
+            "FR-15",
+            "FR-23",
+            "FR-24"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/lane.ts with `pan lane start|list|wait|report|stop|reap` exactly as .pan/drafts/pan-4223.md WI-8 specifies (flags, output lines, exit codes from WORKER_EXIT). Register a `lane` group next to `worker` in src/cli/command-groups.ts and `await groups.register('lane');` after 'worker' in src/cli/index.ts. start resolves --parent locally (D5; strip conv- from $OVERDECK_CONVERSATION; neither → exit 1 'pan lane start must run inside a conversation or name --parent'), reads --brief or --prompt (exactly one), POSTs /api/lanes to getDashboardApiUrl(), and unless --no-wait polls GET /api/lanes/:name every 2 s up to 180 s. list prints the PRD columns with ACTIVITY 'archived' for archived lanes. stop POSTs /api/conversations/:name/stop. reap POSTs /api/lanes/:name/reap with { park, keep } and prints the D14 warning when archived is false without --keep. wait and report call lane-wait and lane-report-cmd. Regenerate packages/contracts/src/composer-commands.generated.ts (`npm run build && npm run generate:slash-commands`) in the same commit. Write src/cli/commands/__tests__/lane.test.ts with injected fetch and fake time. If `bash scripts/lint-file-size.sh` fails because src/cli/index.ts grew past its cap (unexpected: it has headroom), append a PAN-4223 row to scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "lane-cli.ac1",
+            "title": "Given no --parent and no $OVERDECK_CONVERSATION, pan lane start exits 1 with the D5 message; given $OVERDECK_CONVERSATION=conv-abc it sends parent 'abc'; given both --brief and --prompt it exits 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cli.ac2",
+            "title": "Given a 409 body from POST /api/lanes, pan lane start prints the error and exits 1; pan lane wait maps done, blocked/failed, exited and timeout outcomes to exit codes 0, 4, 2 and 3.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cli.ac3",
+            "title": "pan lane reap sends { park: false, keep: false } by default and keep: true with --keep; a 200 with archived: false and no --keep prints the archive warning and exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cli.ac4",
+            "title": "After npm run build, `node dist/cli/index.js lane --help` lists start, list, wait, report, stop and reap, and `node dist/cli/index.js lane reap --help` shows --keep and does not show --archive.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-tree",
+        "title": "Build the pure Command Deck conversation tree (WI-10 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/conversation-tree.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/conversation-tree.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/conversation-tree.test.ts",
+            "grep -c parentConversationId src/dashboard/frontend/src/components/CommandDeck/conversation-tree.ts"
+          ],
+          "expected_outputs": [
+            "conversation-tree.test.ts exits 0",
+            "grep prints 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-26",
+            "FR-28"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the lane and parent fields (parentConversationId, parentConversationName, gauntletRun, laneKey, laneRole, laneIteration, laneReport) to the Conversation type in src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx (type only; rendering is the deck-render item). Create src/dashboard/frontend/src/components/CommandDeck/conversation-tree.ts exporting ConversationTreeNode, buildConversationTree(rows) and groupSummary(node) with the rules in .pan/drafts/pan-4223.md WI-10 step 2: nest when parentConversationId names a row in `rows` (lane columns play no part), orphans top level with orphanOf, top-level nodes ordered by the earliest index of any member in `rows` (FR-28), descendants in pre-order with live siblings first then createdAt ascending, display depth min(naturalDepth, 2) with flattenedFrom when naturalDepth > 2 (D22), and a visited-set guard. Write src/dashboard/frontend/src/components/CommandDeck/__tests__/conversation-tree.test.ts with every case the PRD lists, including the exact D22 example order."
+        },
+        "items": [
+          {
+            "id": "deck-tree.ac1",
+            "title": "Given lanes whose parent is in rows, buildConversationTree nests them at depth 1 and an orchestrator lane's builders at depth 2; a lane or successor whose parent is absent returns as a top-level node with orphanOf set.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-tree.ac2",
+            "title": "Given the D22 example (O, L1, L2, O2, M1, O3, N1), buildConversationTree returns O at 0; L1, L2, O2 at 1; M1, O3 at 2; N1 at 2 with flattenedFrom equal to O3's id, in that order.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-tree.ac3",
+            "title": "Given an ended predecessor whose successor is active, the predecessor's group sorts at the successor's index, ahead of an active row that sorts after the successor.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-tree.ac4",
+            "title": "Given a hand-built cycle of parent ids, every row renders exactly once; groupSummary counts lanes, successors, working, needsYou and reported over flattened rows too.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-render",
+        "title": "Render nested lane and successor groups in the Command Deck (WI-10 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationList.test.tsx src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/CommandDeck/__tests__/conversation-tree.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three frontend test files exit 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18",
+            "FR-26",
+            "FR-27",
+            "FR-28",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Touches only Command Deck list/row files; the Agents page items touch different files."
+        },
+        "narrative": {
+          "Action": "Load the pan-style-guide skill first (NFR-6). Implement .pan/drafts/pan-4223.md WI-10 steps 3-5. In ConversationList.tsx replace `return [...active, ...inactive];` with `return buildConversationTree([...active, ...inactive]);` and render top-level nodes: a node with descendants renders its ConversationRow, a toggle line (▸/▾ plus only non-zero counts in the order 'N successor(s) · N lanes · N working · N needs you · N reported'), and when expanded each descendant as ConversationRow variant='nested' indented per display depth. Only top-level nodes toggle; collapse state lives in localStorage key commandDeck.groups.collapsed (JSON array of top-level names) wrapped in try/catch; default expanded while any descendant is active by the list's isActive predicate, collapsed otherwise (D18). In ConversationRow.tsx add the lane label '<B|C|V|P|O> <laneKey> i<n>', square DONE/BLOCKED/FAILED badges per the style guide's badge formula, the successor caption link 'continues ← #<id>' to /conv/<id>, and the orphan/flattened markers ('lane of #<id> · <run>', '↳ continued from #<id>'). Styles go in styles/command-deck.module.css (re-read it first: it changed after the PRD was verified). Extend ConversationList.test.tsx and ConversationRow.test.tsx with the PRD cases."
+        },
+        "items": [
+          {
+            "id": "deck-render.ac1",
+            "title": "Given a parent with three lanes, the list renders one toggle and three nested rows; clicking the toggle collapses them and writes commandDeck.groups.collapsed to localStorage.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-render.ac2",
+            "title": "Given a group whose only descendant is a working successor, the group renders expanded with the toggle text '▾ 1 successor · 1 working'; a group whose descendants are all ended renders collapsed; a throwing localStorage still renders the list.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-render.ac3",
+            "title": "A nested critic lane with a done report renders 'C 663 i1' and a DONE badge; a successor row renders a 'continues ← #<id>' link with href '/conv/<id>'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-render.ac4",
+            "title": "A flattened successor renders '↳ continued from #<id>' and a flattened lane renders 'lane of #<id> · <run>'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-dir-server",
+        "title": "Give lane and successor entries parent links in the agent directory (WI-11 server)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/agent-directory.ts",
+            "src/dashboard/server/services/agent-directory.ts",
+            "src/dashboard/server/services/__tests__/agent-directory-lanes.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-directory-lanes.test.ts src/dashboard/server/services/__tests__/agent-directory.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files exit 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19",
+            "FR-29"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement .pan/drafts/pan-4223.md WI-11 steps 1-4. In packages/contracts/src/agent-directory.ts add optional `lane` ({ run, key, role, iteration, reportStatus }) and `continuesFrom` (number) to DirectoryEntry. In src/dashboard/server/services/agent-directory.ts extend DirectoryConversationRow with the parent and lane fields (isConversationRow still accepts rows without them), set conversation entries' parentId to `conv:<parentConversationName>` when a parent link exists (keyed on the parent link, not laneKey), add `lane` for rows with laneKey and `continuesFrom` for successors, and stop keepWithAncestors from climbing a succession edge (a conversation entry without lane whose parentId is set), while every other edge still climbs (D23). PAN-4197 (open) edits these files: rebase on it if it lands first. Write src/dashboard/server/services/__tests__/agent-directory-lanes.test.ts."
+        },
+        "items": [
+          {
+            "id": "agents-dir-server.ac1",
+            "title": "A lane conversation entry returns parentId 'conv:<parent>' and a lane field; a successor returns parentId 'conv:<predecessor>', continuesFrom equal to the predecessor's legacy id and no lane; a conversation without a parent link keeps parentId null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-dir-server.ac2",
+            "title": "Given the live scope, buildLiveAgentDirectory keeps a live successor whose predecessor is ended without pulling the predecessor in, and still returns the ended launcher of a live lane.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-dir-server.ac3",
+            "title": "`grep -n 'parentId: row.laneKey' src/dashboard/server/services/agent-directory.ts` prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-live",
+        "title": "Nest lanes as child lines in the Agents Live view (WI-11 live)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/live/live-model.ts",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentRow.tsx",
+            "src/dashboard/frontend/src/components/Agents/live/live-model.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Agents/live/live-model.test.ts src/components/Agents/live/LiveAgentsView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files exit 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19",
+            "FR-29",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Load the pan-style-guide skill first (NFR-6). Implement .pan/drafts/pan-4223.md WI-11 steps 5-6. In src/dashboard/frontend/src/components/Agents/live/live-model.ts buildLiveSections, attach a conversation entry with `lane` and a parentId present in rows to the parent's children instead of its own row, unless its classification is needs-you, in which case it gets both; a conversation entry without lane (a successor) always keeps its own row (FR-29). In live/LiveAgentRow.tsx render lane children as '↳ <glyph> <key> i<n> · <state> [DONE|BLOCKED|FAILED]' (all of them; the LIVE_SUBAGENT_LINES cap applies to subagents only) under a collapse toggle on the parent row, and add a 'continues ← #<continuesFrom>' link to /conv/<continuesFrom> for successors. PAN-4197 owns this view; rebase on it if it lands first. Extend live-model.test.ts."
+        },
+        "items": [
+          {
+            "id": "agents-live.ac1",
+            "title": "Given a working lane whose parent is in rows, buildLiveSections attaches it to the parent's children and gives it no row of its own; a needs-you lane appears both in Needs you and under its parent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-live.ac2",
+            "title": "Given a lane whose parent is absent, it stays a top-level row; given a successor whose predecessor is in rows, it keeps its own row and is not in the predecessor's children.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-history",
+        "title": "Cap History nesting depth and label lanes and successors (WI-11 history)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/directory/directory-tree.ts",
+            "src/dashboard/frontend/src/components/Agents/directory/DirectoryList.tsx",
+            "src/dashboard/frontend/src/components/Agents/directory/directory-tree.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Agents/directory/directory-tree.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "directory-tree.test.ts exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-26",
+            "FR-27",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Load the pan-style-guide skill first (NFR-6). Implement .pan/drafts/pan-4223.md WI-11 step 7. In src/dashboard/frontend/src/components/Agents/directory/directory-tree.ts DirectoryRow gains flattenedFrom: string | null, and visit records depth Math.min(depth, 2) and, when depth > 2, flattenedFrom = parentLabel(entry.parentId, byId.get(entry.parentId)). In directory/DirectoryList.tsx show the lane label '<glyph> <key> i<n>', the 'continues ← #<id>' link for entries with continuesFrom, and the '↳ continued from <label>' marker for flattened rows. Extend directory-tree.test.ts."
+        },
+        "items": [
+          {
+            "id": "agents-history.ac1",
+            "title": "Given a lane conversation entry and a successor entry, entriesForNode nests each at depth 1 under its parent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-history.ac2",
+            "title": "Given a four-long succession chain, the rows render at depths 0, 1, 2, 2 and the last row's flattenedFrom names the third entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gauntlet-skill",
+        "title": "Move the pan-gauntlet-loop skill onto the lane door (WI-12)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-gauntlet-loop/SKILL.md",
+            "sync-sources/skills/pan-gauntlet-loop/assets/PROMPT.template.md",
+            "sync-sources/skills/pan-gauntlet-loop/assets/gauntlet-index.html",
+            "sync-sources/skills/pan-gauntlet-loop/references/lanes.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'cannot spawn sub-agents' sync-sources/skills/pan-gauntlet-loop/SKILL.md || true",
+            "grep -c 'pan lane start' sync-sources/skills/pan-gauntlet-loop/SKILL.md",
+            "test -f sync-sources/skills/pan-gauntlet-loop/references/lanes.md",
+            "grep -c 'UNDER CRITIQUE' sync-sources/skills/pan-gauntlet-loop/assets/gauntlet-index.html",
+            "npm run lint:no-state-layer"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing",
+            "count is 2 or more",
+            "test exits 0",
+            "count is 1 or more",
+            "no-state-layer guard exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement .pan/drafts/pan-4223.md WI-12 steps 1-9 in sync-sources/skills/pan-gauntlet-loop/SKILL.md, assets/PROMPT.template.md, assets/gauntlet-index.html and new references/lanes.md: RUN and DEADLINE slots; per-builder worktrees via pan lane start (replace the shared worktree at the old ':66' text); builders commit and push their own branch (replace the old ':134' text); replace the 'Sub-agents, model routing, and tools' section with D19's decision rule and the PRD's lane recipe, deleting 'GPT-routed claude-code sessions cannot spawn sub-agents — run the gauntlet from a Claude session'; add 'What a lane must never do', 'Waiting from any harness' and 'Close-out' sections (reap archives; --keep; reap builders before their orchestrator lane); adopt V3's frozen status vocabulary with optional lane/critic card fields and badge mappings in gauntlet-index.html; references/lanes.md holds the V3 rule table, the COMMON-brief pattern and the report grammar."
+        },
+        "items": [
+          {
+            "id": "gauntlet-skill.ac1",
+            "title": "`grep -n 'cannot spawn sub-agents' sync-sources/skills/pan-gauntlet-loop/SKILL.md` prints nothing, and `grep -c 'pan lane start'` on the same file prints 2 or more.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-skill.ac2",
+            "title": "SKILL.md contains `--keep` in its Close-out section, and sync-sources/skills/pan-gauntlet-loop/references/lanes.md exists and contains the V3 rule table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-skill.ac3",
+            "title": "gauntlet-index.html contains an 'UNDER CRITIQUE' badge mapping.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-reference",
+        "title": "Publish the lanes reference and update Mintlify pages (WI-13 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/lanes.mdx",
+            "docs.json",
+            "reference/agents-directory.mdx",
+            "reference/workers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f reference/lanes.mdx && grep -q -- '--keep' reference/lanes.mdx && grep -q '\"reference/lanes\"' docs.json",
+            "grep -q 'continues ←' reference/agents-directory.mdx && grep -q 'Workers or lanes' reference/workers.mdx"
+          ],
+          "expected_outputs": [
+            "first command exits 0",
+            "second command exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "FR-23",
+            "FR-26"
+          ]
+        },
+        "narrative": {
+          "Action": "Per .pan/drafts/pan-4223.md WI-13: create reference/lanes.mdx (concepts, the six commands with flags and exit codes, the D10 derived-state table, per-role working-directory rules, reap safety and the archive default with --keep, succession per D6/D21, the gauntlet config block); add \"reference/lanes\" after \"reference/workers\" in docs.json; in reference/agents-directory.mdx say lanes nest under their parent in Live and History, successors nest under their predecessor in History and keep their own row with a 'continues ←' link in Live, and History shows at most two levels with deeper rows flattened with a marker; add a 'Workers or lanes?' paragraph stating D1 to reference/workers.mdx. PAN-4197 also edits reference/agents-directory.mdx: rebase on it if it lands first."
+        },
+        "items": [
+          {
+            "id": "docs-reference.ac1",
+            "title": "reference/lanes.mdx exists and contains `--keep`, `pan lane start` and the derived activity values; docs.json contains \"reference/lanes\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-reference.ac2",
+            "title": "reference/agents-directory.mdx contains the text 'continues ←', and reference/workers.mdx contains a 'Workers or lanes?' paragraph.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-skills-rules",
+        "title": "Add the pan-lane skill and cross-reference skills and rules (WI-13 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-lane/SKILL.md",
+            "sync-sources/skills/pan-worker/SKILL.md",
+            "sync-sources/skills/pan-handoff/SKILL.md",
+            "sync-sources/rules/handoff-isolate-cwd.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "bash scripts/lint-skills.sh",
+            "grep -q 'pan lane' sync-sources/skills/pan-handoff/SKILL.md && grep -q 'continues ←' sync-sources/skills/pan-handoff/SKILL.md"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "skill CLI lint passed",
+            "grep command exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22",
+            "FR-25"
+          ]
+        },
+        "narrative": {
+          "Action": "Per .pan/drafts/pan-4223.md WI-13: create sync-sources/skills/pan-lane/SKILL.md (frontmatter name: pan-lane; triggers 'pan lane', 'launch a lane', 'gauntlet lane'; modeled on sync-sources/skills/pan-worker/SKILL.md; every `pan lane …` command it shows must use only flags that `pan lane <sub> --help` lists, because scripts/lint-skills.sh validates them against the built CLI). Add a 'Workers or lanes?' paragraph stating D1 to sync-sources/skills/pan-worker/SKILL.md. In sync-sources/skills/pan-handoff/SKILL.md add 'To launch a parallel lane, use `pan lane start`, not `pan handoff`.' and 'The successor nests under the source conversation in the Command Deck and the Agents History, and shows `continues ← #<id>`.' Add one line to sync-sources/rules/handoff-isolate-cwd.md: '`pan lane start` creates the isolated directory for you.'"
+        },
+        "items": [
+          {
+            "id": "docs-skills-rules.ac1",
+            "title": "sync-sources/skills/pan-lane/SKILL.md exists with frontmatter name: pan-lane, and `bash scripts/lint-skills.sh` exits 0 after npm run build.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skills-rules.ac2",
+            "title": "sync-sources/skills/pan-handoff/SKILL.md contains 'pan lane start' and 'continues ←', and sync-sources/rules/handoff-isolate-cwd.md contains 'pan lane start'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-dev",
+        "title": "Update developer docs and the CLAUDE.md topic index (WI-13 part)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:08:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4223",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FORKS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -q parent_conversation_id docs/FORKS.md && grep -q 'reference/lanes' CLAUDE.md",
+            "grep -q continuesFrom docs/DASHBOARD-ARCHITECTURE.md && grep -q commandDeck.groups.collapsed docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "first command exits 0",
+            "second command exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-25",
+            "FR-26",
+            "FR-29"
+          ]
+        },
+        "narrative": {
+          "Action": "Per .pan/drafts/pan-4223.md WI-13: in docs/FORKS.md section 'Developer Notes' state that every fork mode stamps parent_conversation_id on the new row at handleConversationSummaryFork's createConversation call and that fork_request and handoff_target_conv_id are unchanged; in docs/DASHBOARD-ARCHITECTURE.md section 'Agents page: Live and History' describe lanes, the lane and continuesFrom fields and the succession-edge rule of keepWithAncestors, and add a 'Command Deck conversation groups' paragraph (nesting on the parent link, depth cap and markers, group ranking and default expansion, the commandDeck.groups.collapsed key); add a Topic Index row 'Gauntlet lanes (`pan lane`)' → reference/lanes.mdx to CLAUDE.md."
+        },
+        "items": [
+          {
+            "id": "docs-dev.ac1",
+            "title": "docs/FORKS.md contains 'parent_conversation_id' in its Developer Notes section, and CLAUDE.md contains a Topic Index row linking reference/lanes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dev.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains 'continuesFrom' and 'commandDeck.groups.collapsed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lane-columns",
+        "to": "fork-parent-link",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-columns",
+        "to": "lane-launch-core",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-columns",
+        "to": "lane-views",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-columns",
+        "to": "lane-report-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-columns",
+        "to": "tell-fixes",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-columns",
+        "to": "deck-tree",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-columns",
+        "to": "agents-dir-server",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-columns",
+        "to": "runtime-start-extract",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-start-extract",
+        "to": "lane-launch-core",
+        "type": "blocks"
+      },
+      {
+        "from": "gauntlet-config",
+        "to": "lane-launch-core",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-worktree",
+        "to": "lane-launch-core",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-contract",
+        "to": "lane-launch-core",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-report-store",
+        "to": "lane-views",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-report-store",
+        "to": "lane-report-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-report-store",
+        "to": "lane-wait",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-launch-core",
+        "to": "lane-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-views",
+        "to": "lane-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-views",
+        "to": "lane-wait",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-routes",
+        "to": "lane-reap",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-launch-core",
+        "to": "lane-reap",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-routes",
+        "to": "lane-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-report-cmd",
+        "to": "lane-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-wait",
+        "to": "lane-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-reap",
+        "to": "lane-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "tell-fixes",
+        "to": "lane-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-tree",
+        "to": "deck-render",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-views",
+        "to": "deck-render",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-views",
+        "to": "agents-dir-server",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-dir-server",
+        "to": "agents-live",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-dir-server",
+        "to": "agents-history",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-cli",
+        "to": "gauntlet-skill",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-cli",
+        "to": "docs-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-cli",
+        "to": "docs-skills-rules",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-parent-link",
+        "to": "docs-dev",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-dir-server",
+        "to": "docs-dev",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-render",
+        "to": "docs-dev",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-live",
+        "to": "docs-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-history",
+        "to": "docs-reference",
+        "type": "blocks"
+      },
+      {
+        "from": "gauntlet-config",
+        "to": "docs-reference",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
