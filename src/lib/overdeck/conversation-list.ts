@@ -5,7 +5,9 @@ import { resolveEffectivePullRequest } from '@overdeck/contracts';
 
 import { scanPendingInputs, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../agent-enrichment.js';
 import { getAgentRuntimeStateSync } from '../agents.js';
+import { latestWorkerReport } from '../agents/worker/report.js';
 import { withConcurrencyLimit } from '../concurrency.js';
+import { laneIterations } from '../lanes/iteration.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { conversationHarnessAlive, listLiveConversationSessions } from './conversation-liveness.js';
 import { resolveConversationGitInfo } from '../../dashboard/server/services/git-info.js';
@@ -21,6 +23,7 @@ import { listPullRequestLinksForConversations } from './conversation-pull-reques
 import {
   listConversations,
   listFavoritedIds,
+  listLaneConversations,
   markConversationRunning,
 } from './conversations.js';
 import {
@@ -105,6 +108,10 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
   const ledgerCosts = new Map(ledgerEntries);
   // PAN-3822: one query for the whole page's PR links, never one per row.
   const pullRequestLinks = listPullRequestLinksForConversations(conversations.map((conv) => conv.name));
+  // PAN-4223 D7: lane iterations count every row of a (run, key, role), archived included.
+  const laneIterationByName = conversations.some((conv) => conv.laneKey)
+    ? laneIterations(listLaneConversations({}))
+    : new Map<string, number>();
   return withConcurrencyLimit(
     conversations.map((conv) => async () => {
       let row = conv;
@@ -195,6 +202,8 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         }
       }
       const ledger = ledgerCosts.get(String(row.id));
+      // PAN-4223 WI-5: a lane's newest report and iteration; no git work here.
+      const laneReport = row.laneKey ? await latestWorkerReport(`conv-${row.name}`) : null;
       return {
         ...row,
         totalCost: ledger ? ledger.cost : row.totalCost,
@@ -216,6 +225,10 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         pendingAskUserQuestion,
         transcriptMissing: conversationTranscriptMissing(row, sessionAlive, convSf),
         needsTerminal: await conversationNeedsTerminal(row, sessionAlive, convSf),
+        ...(row.laneKey ? {
+          laneReport: laneReport ? { seq: laneReport.seq, at: laneReport.at, status: laneReport.status } : null,
+          laneIteration: laneIterationByName.get(row.name) ?? 1,
+        } : {}),
       };
     }),
     CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,

@@ -47,6 +47,7 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveLaneConfig, type LaneConfig } from './config.js';
 import { laneContract } from './contract.js';
+import { distinctLaneCwds } from './iteration.js';
 import { LaneLaunchError, type LaneLaunchRequest, type LaneLaunchResult } from './types.js';
 import { addBranchWorktree, addDetachedWorktree, applySparse, fetchBase, laneDirName } from './worktree.js';
 
@@ -165,12 +166,6 @@ async function iterationBranch(
     if (branch) return branch;
   }
   return conventionBranch(run, key, n);
-}
-
-function distinctCwds(rows: LegacyConversation[]): string[] {
-  const cwds: string[] = [];
-  for (const row of rows) if (!cwds.includes(row.cwd)) cwds.push(row.cwd);
-  return cwds;
 }
 
 function isWithin(child: string, parent: string): boolean {
@@ -304,7 +299,7 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
     }
 
     // 8. Iteration and target directory (D7, D8, FR-7).
-    const cwds = distinctCwds(rows);
+    const cwds = distinctLaneCwds(rows);
     let iteration: number;
     let target: string;
     if (request.reuse) {
