@@ -59,6 +59,7 @@
 | Issue views, God View | [docs/ISSUE-VIEW.md](docs/ISSUE-VIEW.md), [docs/GOD-VIEW.md](docs/GOD-VIEW.md) |
 | Context layers (rules/skills distribution) | [docs/CONTEXT-LAYERS.md](docs/CONTEXT-LAYERS.md) |
 | Flywheel page and loop skill | [docs/FLYWHEEL.md](docs/FLYWHEEL.md) |
+| Gauntlet lanes (`pan lane`) | [reference/lanes.mdx](reference/lanes.mdx) |
 | The no-loss map: every deleted verb/route/view and its new home | [docs/THE-CUT.md](docs/THE-CUT.md) |
 
 ## Small But Sharp
