@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T05:07:47.711Z",
+  "updated": "2026-09-26T05:07:54.139Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-4223",
       "claimedAt": "2026-09-26T05:04:22.224Z",
       "doneAt": "2026-09-26T05:07:47.711Z"
+    },
+    "lane-reap": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T05:07:54.139Z"
     }
   }
 }
