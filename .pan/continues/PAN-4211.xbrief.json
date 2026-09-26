@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4211",
   "created": "2026-09-26T01:35:27.740Z",
-  "updated": "2026-09-26T04:44:12.192Z",
+  "updated": "2026-09-26T04:44:30.203Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "docs-troubled-doors.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T04:44:12.192Z"
+    },
+    "docs-troubled-doors.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:44:30.203Z"
     }
   }
 }
