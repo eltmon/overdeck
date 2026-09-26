@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4211",
   "created": "2026-09-26T01:35:27.740Z",
-  "updated": "2026-09-26T04:42:15.510Z",
+  "updated": "2026-09-26T04:42:27.628Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "start-force-clears-troubled.ac2": {
       "status": "completed",
       "doneAt": "2026-09-26T04:42:15.509Z"
+    },
+    "start-force-clears-troubled.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:42:27.628Z"
     }
   }
 }
