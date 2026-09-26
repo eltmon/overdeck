@@ -331,6 +331,28 @@ pan rollout retry <issue-id>
 
 `pan rollout` is distinct from `pan release`, which publishes npm stable/canary packages.
 
+## Gauntlet Lane Configuration
+
+The optional `gauntlet:` section sets per-project defaults for gauntlet lanes, the conversations that `pan lane start` launches for a gauntlet loop. Every field is optional.
+
+```yaml
+projects:
+  lexerra:
+    gauntlet:
+      lanes_root: /home/eltmon/Projects/lexerra-lanes
+      sparse_checkout: ['/*', '!/client/assets-src/*', '/client/assets-src/KayKit_Medieval_Hexagon/']
+      roles:
+        builder: { model: stealth/space-bunny-alpha }
+        critic: { model: claude-opus-5-5, effort: high }
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `lanes_root` | No | Absolute directory that holds lane worktrees. It must be under your home directory, outside `/tmp`, and must not contain the project checkout. Default: a sibling of the project path named `<project dir>-lanes` (for `/home/u/Projects/lexerra`, `/home/u/Projects/lexerra-lanes`). |
+| `base_ref` | No | Git ref new builder branches are cut from. Default: `origin/<workspace.default_branch>`, or `origin/main`. |
+| `sparse_checkout` | No | Array of non-empty `git sparse-checkout --no-cone` patterns applied to new builder worktrees. |
+| `roles` | No | Per-role `model`, `harness` and `effort` defaults. The keys are the lane roles `builder`, `critic`, `verifier`, `play` and `orchestrator`; any other key is rejected with an error naming it. A `--model`, `--harness` or `--effort` flag on `pan lane start` overrides these values. |
+
 ## Label-Based Routing
 
 Issues are routed to different subdirectories based on their labels:
