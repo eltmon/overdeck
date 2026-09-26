@@ -236,14 +236,30 @@ the forge (`cloister/pr-facts.ts`) and judges them with
 `evaluateMergeReadiness`. Every merge door asks it: the merge-ready set
 (`getMergeReadyIssues`, which feeds the Flywheel merge order and the merge
 train), the dashboard Merge button, the auto-merge executor and the merge
-train's merge-next (all through `triggerMerge`), and the per-project merge
-queue.
+train's merge-next (all through `triggerMerge`), the per-project merge
+queue, and the auto-merge scheduler (#3983,
+`dashboard/server/services/auto-merge-scheduler.ts`), which asks it before it
+schedules a ready, opted-in PR on the merge-train reconciler tick.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 
-1. it exists, is open, is not a draft, and is approved (a forge review
-   decision, else a trusted verdict marker comment, below) with no changes
-   requested;
+1. it exists, is open, is not a draft, has no changes requested, and is
+   **approved on its exact head commit** (#3983, `approvalProvenAtHead` in
+   `cloister/approval-at-head.ts`): a trusted `overdeck-verdict: APPROVED`
+   marker whose `sha=` is the PR head (`approvedAtHead`), or a trusted
+   reviewer's standing GitHub review whose `commit.oid` is the PR head
+   (`forgeApprovalAtHead`, read only when no marker already proves it). A
+   review counts only from an author the marker rule trusts (below), and each
+   author's latest review stands: a later `CHANGES_REQUESTED` or a dismissal
+   withdraws that author's approval, and any trusted author's standing
+   `CHANGES_REQUESTED` leaves the head unapproved. `reviewDecision` alone
+   never counts, and neither does a marker without `sha=` or one naming
+   another commit. This holds for every door, the Merge button included. A
+   GitLab MR is approved only when `/merge_requests/:iid/approvals` names an
+   approver in `approved_by` (what `glab mr approve` records); a `mergeable`
+   merge status, or GitLab's own `approved` with zero approvals required, is
+   not an approval. GitLab ties no approval to a commit, so a push after the
+   approval is caught only by GitLab's own approval-reset setting;
 2. its checks on the head are all green (`none` and `pending` are not green;
    a GitLab pipeline that `skipped` is green, as the board reads it);
 3. **the CI test job passed on the head** when the project runs
@@ -254,11 +270,47 @@ read when the question is asked. The PR is merge-ready when, in order:
 5. the forge reports it `mergeable`.
 
 A refusal names the first failing condition, e.g. `Cannot merge: browser UAT
-failed on PR HEAD <sha>`. The board's derived `ready` state (and so whether
-the Merge button is enabled) is computed from the batched PR listing and
-covers conditions 1, 2 and 5 only; conditions 3 and 4 surface as that
-refusal when the button is clicked. A forge read that fails is itself the
-refusal, e.g. `Cannot merge: GitLab MR view failed for !77: …`.
+failed on PR HEAD <sha>`. `triggerMerge` takes readiness from this gate alone;
+the derived issue state refuses only an issue already merged or a merge
+already running (#3983). A forge read that fails is itself the refusal, e.g.
+`Cannot merge: GitLab MR view failed for !77: …`.
+
+**Bound to the PR it judged (#4066 review).** `triggerMerge` asks the gate for
+the branch it lands (`feature/<issue>` for a normal merge, `strike/<issue>` for
+a strike), which also reads the head fresh instead of from the 60 s facts
+cache, and refuses when the PR it would merge (the merge set's remembered URL
+or the one `ensurePRExists` finds) is not the PR the gate passed. An automatic
+merge (the executor's, carrying the scheduled head) merges only that head: see
+[auto-merge](../configuration/auto-merge.mdx) for the direct and rebase paths.
+It never joins the project merge queue; when another merge holds the slot it is
+deferred and the executor re-runs every check on its next try.
+
+**A manual merge is pinned too (#4066 review).** The Merge button, merge-next
+and the project queue merge the head the gate passed (`mergeHeadPin`, sent as
+`gh pr merge --match-head-commit`, the App merge's `sha` or `glab mr merge
+--sha`). When the merge lands the PR as it is (a clean PR, or a branch already
+up to date with its base), a live head that differs from the gated head is
+refused first (`Cannot merge: the PR head moved to …`); click Merge again to
+gate the new head. When the merge makes its own head (its rebase, or the
+`.planning/` strip), it is pinned to that commit. Either way a push that lands
+after that point fails the merge. A strike landing is not pinned.
+
+**The Merge button (#4066 review).** The board's derived `ready` applies the
+gate's approval rule, not the forge's `reviewDecision`. Every gate evaluation
+records its approval answer per issue and head (`recordApprovalAtHead`); the
+auto-merge scheduler evaluates every opted-in candidate each tick, and a
+PR-facts read whose trusted marker names the head also counts. The batch loader
+reads that answer for the head in the PR listing (`headRefOid`); a miss or an
+answer for another head derives `in-review`, never `ready`. A changed answer
+re-derives the issue and reaches the board as `issue_state.changed`. No forge
+read is added and the frontend does not poll. A PR held for UAT is not gated by
+the scheduler, so its button appears once some gate evaluation or marker read
+has proven it; the Merge endpoint itself always asks the gate. Conditions 3 and
+4 still surface as the refusal when the button is clicked. The UAT train's
+candidate set (`listReadyIssuesForProject`) keeps the forge's own decision: it
+is mostly held issues the scheduler never gates. Promoting a UAT batch lands
+each member only when its derived state is `ready`, so the promote click runs
+the gate for every member first, recording a fresh answer for its head.
 
 **Trusted verdict comments.** The repository is public and anyone can comment
 on a PR, so a verdict marker counts only when its comment's author is `OWNER`,
@@ -266,10 +318,40 @@ on a PR, so a verdict marker counts only when its comment's author is `OWNER`,
 Overdeck posts verdicts as: the authenticated `gh` user or the GitHub App bot,
 resolved once per process and only when some marker needs it. Every other
 author's marker is ignored, whether it approves, requests changes, passes UAT
-or fails it. This applies to the `overdeck-verdict` review marker as well as the
+or fails it.
+
+**Overdeck's identities are matched as accounts, not logins (#4066 review,
+R3-2).** The App's bot is `<slug>[bot]`, with the slug read from the App
+itself: the `app-slug` file its setup writes to `~/.overdeck/github-app/`,
+else `GET /app` under the App's JWT (`resolveAppBotLogin`). Nothing hard-codes
+it. On this deployment it is `overdeck-agent[bot]`, and the review agent's
+verdicts are that bot's reviews, which GitHub reports as `CONTRIBUTOR`, so
+they count only through this identity rule. `gh pr view` reports only a
+login, and strips a bot's `[bot]` suffix, so the author's account type is read
+from GitHub's GraphQL API by the comment's or review's node id, for the
+authors that are not trusted by association. A bot entry matches only an
+author typed `Bot` with the App's slug, and the `gh` user only an author typed
+`User`, so a User account named after the slug is nobody. An author whose type
+cannot be read matches nothing. With the App configured and its slug
+unreadable, no bot is trusted and no marker approves; the next read tries
+again. This applies to the `overdeck-verdict` review marker as well as the
 UAT marker. A marker must stand on its own line (the review marker as the
 comment's first line); a quote-reply (`> <!-- … -->`) or a marker inside prose
 declares nothing.
+
+**Who may approve by marker** (#4066 review). Agents run with the operator's
+`gh` credentials, which GitHub reports as `OWNER`, so any agent can post an
+`overdeck-verdict: APPROVED sha=<head>` comment. When the GitHub App is
+configured, an `APPROVED` review marker therefore counts only when the App's
+bot posted it (a `Bot`-typed author with the App's slug, above); a marker
+from any other author, the owner included, is skipped as if it were not
+there. The review agent's verdict is normally a real review under the App's
+token, so this costs the normal path nothing; the one approval it loses is a
+verdict that fell back to a marker because the App token failed, which then
+needs a fresh review. A `CHANGES_REQUESTED` marker still counts from every
+trusted author: it can only hold a merge back. Without the App, any trusted
+author's `APPROVED` marker counts, which is trust in the operator's
+credentials; the server logs that once per process.
 
 **Failed UAT.** The newest trusted UAT marker that applies to the current
 head decides. A marker applies when its commit is the head (an abbreviated SHA
@@ -339,7 +421,28 @@ tmux alike (`cloister/verdict-caller.ts`): no id is an operator shell, a
 `conv-*` id is an operator conversation, and anything else is an agent
 session. An operator may record any review verdict. An agent session may
 record one only as the issue's own review session (`agent-<issue>-review` or
-its convoy).
+its convoy), an approval included.
+
+An agent holds the operator's shell and can unset or fake its own
+`OVERDECK_AGENT_ID` (#4066 review), so two more signals come first: the
+nearest ancestor process started with a non-`conv-` `OVERDECK_AGENT_ID` (read
+from `/proc/<pid>/environ`, which the agent cannot rewrite) names the caller,
+whatever its own environment says; and a process with `OVERDECK_ISSUE_ID` or
+`OVERDECK_SESSION_TYPE` but no agent id is a managed pane, never the operator.
+
+**Residual risk.** The approval marker is a cooperative control while agents
+run with the operator's `gh` credentials, which GitHub reports as `OWNER`. An
+agent that daemonizes out of its harness's process tree and scrubs all three
+variables is read as the operator, and any agent can post an
+`overdeck-verdict: APPROVED sha=<head>` comment with `gh pr comment` without
+going through this command at all. With the GitHub App configured, that
+comment approves nothing (only the App bot's approval markers count, above),
+and what remains is an agent minting an installation token from the App's
+private key on disk; without the App, the marker trust rule cannot tell that
+comment from the review agent's. The ancestry read fails the other way too: a
+long-lived process started from an agent pane (a tmux or Herdr server, a
+dashboard) passes that agent's id to everything beneath it, so an operator
+conversation under it is read as that agent and its override is refused.
 
 That review session's `blocked`/`failed` verdict is refused only when it is
 proven that the exact head commit carries an approval: with no new commit
@@ -353,8 +456,8 @@ commit. A head that moved during the review gets a marker without `sha=`, so a
 later cycle can block the new head. A forge review posted with `gh pr review`
 still attaches to the head at submit time (follow-up: post it through the
 reviews API with `commit_id`). The
-reviews are read only on this path (`forgeApprovalAtHead` in `pr-facts`), for
-an agent's rejection of an approved PR, so the shared PR read stays small.
+reviews are read by `forgeApprovalAtHead` in `pr-facts`, only on this path
+and in the merge gate (#3983), so the shared PR read stays small.
 Anything short of proof lets the verdict through: a GitLab MR (GitLab ties no
 approval to a sha, and `mergeable` is not an approval), an approval of an
 older commit, an empty review list, a marker without `sha=`, or a failed

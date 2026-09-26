@@ -23,7 +23,7 @@
     "@lexical/react": "^0.41.0",
     "@monaco-editor/react": "^4.7.0",
     "@overdeck/contracts": "workspace:*",
-    "@pierre/diffs": "^1.1.0",
+    "@pierre/diffs": "1.1.22",
     "@radix-ui/react-context-menu": "^2.3.7",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@tailwindcss/typography": "^0.5.20",

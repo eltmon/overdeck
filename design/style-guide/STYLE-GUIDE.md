@@ -443,6 +443,28 @@ the same thing"). Each token has exactly one meaning and an explicit never-list:
 > no longer describes the In Review phase — that phase is an amber human-gate; purple marks
 > specialist/ship/planning activity. `--signal-cost` narrowed to currency only.
 
+### State Tokens (PAN-4197)
+
+Agent-state UI (the Agents page state badges, Live view rows, their glyphs and 3px left rails)
+uses five `--state-*` tokens, each with a `-foreground` text variant. They alias the signal
+semantics above, and every `-foreground` passes WCAG 4.5:1 on Ledger and Broadsheet background
+and card surfaces in light and dark (enforced by
+`src/dashboard/frontend/src/__tests__/state-tokens-contrast.test.ts`). **Live is blue and never
+green** — the test also fails if `--state-live` drifts into the green hue band.
+
+| Token | Color | Always means | Never used for |
+|-------|-------|--------------|----------------|
+| `--state-live` | Blue | A **machine** is working right now — the agent is running and progressing | Done or passing work; idle agents. Never green |
+| `--state-needs-you` | Amber | The **operator** must act — blocked on input, operator pause, ready to merge | Machine waits (scheduler holds, CI running) |
+| `--state-stuck` | Red | Stuck or broken — stale activity, API error, CI failed | Decoration; merely idle agents |
+| `--state-waiting` | Warm neutral | Waiting on the pipeline or idle — queued, held, awaiting review | Anything a human must answer |
+| `--state-done` | Emerald | Finished — the agent's work landed or completed | Running agents |
+
+Utilities (in `index.css` `@layer utilities`): `.badge-bg-state-<s>` (8% tint),
+`.badge-border-state-<s>` (32%), `.text-state-<s>` (the `-foreground` value) and `.bg-state-<s>`
+(solid, for dots and rails). Only agent-state UI uses `--state-*`; every other signal use stays
+on `--info` / `--warning` / `--destructive` / `--success`.
+
 ### Color Restraint (Data-Dense Views)
 
 In dense views like the Kanban board, uncontrolled color usage creates noise that degrades signal clarity. When every element is colored, nothing is colored.

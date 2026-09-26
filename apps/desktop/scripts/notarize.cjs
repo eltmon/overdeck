@@ -32,7 +32,8 @@ exports.default = async function notarizeHook(context) {
   }
 
   // Lazy-require so the hook loads even if the dep isn't installed in a
-  // non-mac context.
+  // non-mac context. @electron/notarize 3 is ESM-only; Node >= 22.12 loads
+  // it here via require(esm) (verified under 22.22).
   const { notarize } = require("@electron/notarize");
 
   const appName = context.packager.appInfo.productFilename;
@@ -40,7 +41,6 @@ exports.default = async function notarizeHook(context) {
 
   console.log(`[notarize] Submitting ${appName}.app to Apple notary service (notarytool)…`);
   await notarize({
-    tool: "notarytool",
     appPath,
     appleApiKey: APPLE_API_KEY,
     appleApiKeyId: APPLE_API_KEY_ID,

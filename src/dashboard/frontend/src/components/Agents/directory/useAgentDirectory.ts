@@ -6,6 +6,10 @@
  * at most once per 2 s, with a trailing refetch for changes inside the
  * window — whenever the live pane inventory changes. A hidden tab neither
  * polls nor invalidates.
+ *
+ * The same hook serves the Live view (PAN-4197): `useAgentDirectory('live')`
+ * reads `?scope=live` — what is running or waiting now — with the same poll
+ * and throttle.
  */
 import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +18,8 @@ import type { AgentDirectoryResponse } from '@overdeck/contracts';
 import { useDashboardStore } from '../../../lib/store';
 
 export type DirectoryWindowHours = 24 | 168;
+/** A time window, or the live scope. */
+export type DirectoryRequest = DirectoryWindowHours | 'live';
 
 export const AGENT_DIRECTORY_QUERY_KEY = 'agent-directory';
 export const PANE_INVALIDATE_THROTTLE_MS = 2_000;
@@ -24,11 +30,17 @@ export async function fetchAgentDirectory(windowHours: DirectoryWindowHours): Pr
   return res.json() as Promise<AgentDirectoryResponse>;
 }
 
+export async function fetchLiveAgentDirectory(): Promise<AgentDirectoryResponse> {
+  const res = await fetch('/api/agent-directory?scope=live');
+  if (!res.ok) throw new Error(`Failed to load the live agents (${res.status})`);
+  return res.json() as Promise<AgentDirectoryResponse>;
+}
+
 function isDocumentHidden(): boolean {
   return typeof document !== 'undefined' && document.visibilityState === 'hidden';
 }
 
-export function useAgentDirectory(windowHours: DirectoryWindowHours) {
+export function useAgentDirectory(request: DirectoryRequest) {
   const queryClient = useQueryClient();
   const backendPanesById = useDashboardStore((s) => s.backendPanesById);
   const lastInvalidatedAt = useRef(0);
@@ -60,8 +72,8 @@ export function useAgentDirectory(windowHours: DirectoryWindowHours) {
   }, [backendPanesById, queryClient]);
 
   return useQuery({
-    queryKey: [AGENT_DIRECTORY_QUERY_KEY, windowHours],
-    queryFn: () => fetchAgentDirectory(windowHours),
+    queryKey: [AGENT_DIRECTORY_QUERY_KEY, request],
+    queryFn: () => (request === 'live' ? fetchLiveAgentDirectory() : fetchAgentDirectory(request)),
     refetchInterval: 5_000,
     refetchIntervalInBackground: false,
     staleTime: 2_000,

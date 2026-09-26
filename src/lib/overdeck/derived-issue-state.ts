@@ -71,6 +71,7 @@ import { getProjectPanPaths } from '../pan-dir/paths.js';
 import { findSpecByIssue } from '../xbrief/io.js';
 import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { inferProjectForge } from '../project-repos.js';
+import { cachedApprovalAtHead } from '../cloister/approval-at-head.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -122,6 +123,12 @@ export interface IssueStateFacts {
   readonly panes: readonly BackendPane[];
   readonly branch?: DerivedBranchState;
   readonly pr?: DerivedPrState;
+  /**
+   * #4066 review: the merge gate's approval answer for the PR's current head
+   * (`approvalProvenAtHead`, cached per head by the gate). Only `true`
+   * derives `ready`; unknown never does.
+   */
+  readonly prApprovedAtHead?: boolean;
   /** The PR merged. Carried separately: a merged PR reports no review state. */
   readonly prMerged: boolean;
   /** A pane printed provider-failure text (429, overloaded, upstream error). */
@@ -145,7 +152,15 @@ function deriveState(facts: IssueStateFacts): IssueState {
   const livePanes = facts.panes.filter(isLive);
 
   if (pr) {
-    if (pr.reviewState === 'approved' && pr.checks === 'green' && pr.mergeable === true) return 'ready';
+    // #4066 review: `ready` is the merge gate's own approval rule, read from
+    // the gate's cached answer for this head, never the forge's
+    // `reviewDecision` (empty without branch protection, and stale on a push).
+    if (
+      facts.prApprovedAtHead === true && pr.reviewState !== 'changes-requested'
+      && pr.checks === 'green' && pr.mergeable === true
+    ) {
+      return 'ready';
+    }
     if (pr.reviewState === 'changes-requested') return 'changes-requested';
     // Any other open PR is in review. GitHub reports no review decision when
     // branch protection does not require one, or once a reviewer is removed —
@@ -217,6 +232,11 @@ export interface IssueStateLoaderDeps {
   readonly readBranch?: (projectPath: string, branch: string) => Promise<DerivedBranchState | null>;
   readonly readPaneText?: (pane: BackendPane) => Promise<string>;
   readonly stuckAfterMs?: number;
+  /**
+   * #4066 review: the merge gate's approval answer for an issue's PR at a head;
+   * `cachedApprovalAtHead` (no forge read) by default.
+   */
+  readonly approvalAtHead?: (issueId: string, headSha: string | null | undefined) => boolean | undefined;
 }
 
 /** The tracker's answer for one issue. */
@@ -228,6 +248,8 @@ export interface TrackerIssueFacts {
 /** What a forge read returns: the PR facts plus whether it merged. */
 export interface LoadedPr extends DerivedPrState {
   readonly merged: boolean;
+  /** The PR's head commit, which the approval answer is keyed by. */
+  readonly headSha?: string | null;
 }
 
 function featureBranchFor(issueId: string): string {
@@ -274,9 +296,10 @@ export interface GhPrRow {
   updatedAt?: string | null;
   closedAt?: string | null;
   author?: { login?: string } | null;
+  headRefOid?: string | null;
 }
 
-const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
+const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
 /** One `gh pr list` per repo, cached briefly — the batch door's forge read. */
 const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[] | null>(PR_CACHE_TTL_MS);
@@ -341,6 +364,7 @@ export function prFromGhRow(row: GhPrRow): LoadedPr | null {
     checks: toChecksState(row.statusCheckRollup),
     mergeable: row.mergeable === 'MERGEABLE' ? true : row.mergeable === 'CONFLICTING' ? false : null,
     merged,
+    headSha: row.headRefOid ?? null,
   };
 }
 
@@ -364,6 +388,7 @@ interface GlabMrRow {
   head_pipeline?: { status?: string } | null;
   approvals_required?: number;
   approved?: boolean;
+  sha?: string;
 }
 
 const cachedRepoMergeRequests = createSettledTtlPromiseCache<string, readonly GlabMrRow[]>(PR_CACHE_TTL_MS);
@@ -392,6 +417,7 @@ export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
       : glabMergeability === 'mergeable' || glabMergeability === 'can_be_merged' ? true
       : glabMergeability ? false : null,
     merged,
+    headSha: row.sha ?? null,
   };
 }
 
@@ -698,6 +724,7 @@ export async function loadIssueStateFacts(
     now,
     ...(branch ? { branch } : {}),
     ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable } } : {}),
+    ...(pr && !pr.merged ? { prApprovedAtHead: (deps.approvalAtHead ?? cachedApprovalAtHead)(issueId, pr.headSha) === true } : {}),
     ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
   };
   return facts;
@@ -743,6 +770,10 @@ export async function listReadyIssuesForProject(
     if (!issueId) continue;
     const pr = prFromGhRow(row);
     if (!pr || pr.merged) continue;
+    // #4066 review: this is the UAT train's candidate set, which is mostly
+    // issues held for UAT. The auto-merge scheduler never runs the gate for a
+    // held issue, so the gate's cached answer would empty the train; it keeps
+    // the forge's own decision. It merges nothing: every merge asks the gate.
     if (pr.reviewState !== 'approved' || pr.checks !== 'green' || pr.mergeable !== true) continue;
     ready.push({ issueId, title: row.title ?? issueId, pr: pr.number });
   }
@@ -785,6 +816,7 @@ export async function loadIssueStatesForProject(
   }
 
   const panes = deps.panes ?? await listPanesWithBackend(now);
+  const approvalAtHead = deps.approvalAtHead ?? cachedApprovalAtHead;
   const out = new Map<string, DerivedIssueState>();
 
   // PAN-3969: the default branch read is one batched `for-each-ref` pair for
@@ -818,6 +850,7 @@ export async function loadIssueStatesForProject(
       now,
       ...(branch ? { branch } : {}),
       ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable } } : {}),
+      ...(pr && !pr.merged ? { prApprovedAtHead: approvalAtHead(issueId, pr.headSha) === true } : {}),
       ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
     };
     out.set(issueId, deriveIssueState(facts));
