@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3634",
   "created": "2026-09-26T06:15:47.084Z",
-  "updated": "2026-09-26T06:19:37.009Z",
+  "updated": "2026-09-26T06:19:45.763Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-3634",
       "claimedAt": "2026-09-26T06:15:47.084Z",
       "doneAt": "2026-09-26T06:19:37.008Z"
+    },
+    "retire-run-id-spawn": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3634",
+      "claimedAt": "2026-09-26T06:19:45.763Z"
     }
   }
 }
