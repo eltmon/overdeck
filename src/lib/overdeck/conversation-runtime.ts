@@ -936,6 +936,72 @@ export async function resolveProjectCwd(
 }
 
 export interface ConversationCreateRequestBody { [key: string]: unknown }
+export interface StartConversationRuntimeInput {
+  conv: Conversation;
+  tmuxSession: string;
+  cwd: string;
+  claudeSessionId: string;
+  model?: string;
+  effort?: string;
+  issueId?: string;
+  harness: RuntimeName;
+  launchContext: ConversationLaunchContext;
+  /** Initial prompt; empty sends nothing (kimi-code context rule unchanged). */
+  message: string;
+}
+/** Test seam only: production callers use the module defaults (PAN-4223 WI-2). */
+export interface StartConversationRuntimeDeps {
+  spawn?: typeof spawnConversationSession;
+  waitReady?: typeof waitForConversationRuntimeReady;
+  deliver?: typeof deliverAgentMessage;
+  stop?: typeof stopConversationRuntime;
+}
+/**
+ * PAN-4223 D16: the one launch path shared by `POST /api/conversations` and the
+ * lane door. Spawn, wait for readiness, deliver the first message; on failure
+ * tear down (harnesses that own a native identity) and record spawn_error.
+ * Never throws.
+ */
+export async function startConversationRuntime(
+  input: StartConversationRuntimeInput,
+  deps: StartConversationRuntimeDeps = {},
+): Promise<void> {
+  const { conv, tmuxSession, cwd, claudeSessionId, model, effort, issueId, harness, launchContext, message } = input;
+  const name = conv.name;
+  const spawn = deps.spawn ?? spawnConversationSession;
+  const waitReady = deps.waitReady ?? waitForConversationRuntimeReady;
+  const deliver = deps.deliver ?? deliverAgentMessage;
+  const stop = deps.stop ?? stopConversationRuntime;
+  try {
+    await spawn(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness, false, launchContext);
+    console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
+    await waitReady(tmuxSession, harness, 'spawn');
+    if (message || (harness === 'kimi-code' && !launchContext.bareContext)) {
+      const method = resolveConversationDeliveryMethod(conv);
+      const delivery = harness === 'kimi-code' && !launchContext.bareContext
+        ? await deliver(
+            tmuxSession,
+            message,
+            'conversation-message',
+            method,
+            { kimiContext: { workspace: cwd } },
+          )
+        : await deliver(tmuxSession, message, 'conversation-message', method);
+      if ((harness === 'acp' || harness === 'opencode' || harness === 'kimi-code') && !delivery.ok) {
+        throw new Error(`${getHarnessBehavior(harness).displayName} initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
+      }
+    }
+  } catch (spawnErr: unknown) {
+    const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
+    console.error(`[conversations] background spawn failed for ${tmuxSession}: ${msg}`);
+    // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
+    // acp — a failed capture must not leave a running tmux session with
+    // no owned native identity presented as a healthy conversation.
+    if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stop(conv, name);
+    updateSpawnError(name, msg);
+    getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
+  }
+}
 export async function handleConversationCreate(
   body: ConversationCreateRequestBody,
   deps: { generateAiTitle: (name: string, message: string) => Promise<void> },
@@ -971,37 +1037,7 @@ export async function handleConversationCreate(
     const title = message ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '') : 'New conversation';
     const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort, harness, projectKey: canonicalProjectKey, ...launchContext });
     getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
-    void (async () => {
-      try {
-        await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness, false, launchContext);
-        console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
-        await waitForConversationRuntimeReady(tmuxSession, harness, 'spawn');
-        if (message || (harness === 'kimi-code' && !launchContext.bareContext)) {
-          const method = resolveConversationDeliveryMethod(conv);
-          const delivery = harness === 'kimi-code' && !launchContext.bareContext
-            ? await deliverAgentMessage(
-                tmuxSession,
-                message,
-                'conversation-message',
-                method,
-                { kimiContext: { workspace: cwd } },
-              )
-            : await deliverAgentMessage(tmuxSession, message, 'conversation-message', method);
-          if ((harness === 'acp' || harness === 'opencode' || harness === 'kimi-code') && !delivery.ok) {
-            throw new Error(`${getHarnessBehavior(harness).displayName} initial prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
-          }
-        }
-      } catch (spawnErr: unknown) {
-        const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
-        console.error(`[conversations] background spawn failed for ${tmuxSession}: ${msg}`);
-        // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
-        // acp — a failed capture must not leave a running tmux session with
-        // no owned native identity presented as a healthy conversation.
-        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') await stopConversationRuntime(conv, name);
-        updateSpawnError(name, msg);
-        getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
-      }
-    })();
+    void startConversationRuntime({ conv, tmuxSession, cwd, claudeSessionId, model, effort, issueId, harness, launchContext, message });
     if (message) {
       void deps.generateAiTitle(name, message).catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
