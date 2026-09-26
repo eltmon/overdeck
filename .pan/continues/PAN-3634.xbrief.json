@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3634",
   "created": "2026-09-26T06:15:47.084Z",
-  "updated": "2026-09-26T08:27:55.554Z",
+  "updated": "2026-09-26T08:28:19.999Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "exemption-reads-startedby.ac1": {
       "status": "completed",
       "doneAt": "2026-09-26T08:27:55.554Z"
+    },
+    "exemption-reads-startedby.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:28:19.999Z"
     }
   }
 }
