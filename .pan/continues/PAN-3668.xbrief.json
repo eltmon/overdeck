@@ -744,7 +744,11 @@
     "cost-ingest.ac2": {
       "status": "completed",
       "doneAt": "2026-09-26T05:50:40.407Z"
+    },
+    "cost-ingest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:50:53.826Z"
     }
   },
-  "updated": "2026-09-26T05:50:40.408Z"
+  "updated": "2026-09-26T05:50:53.827Z"
 }
