@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T01:35:11.925517Z · model: claude-opus-5-5 · open: 817_
+_Last sequenced: 2026-09-26T01:42:08.678722Z · model: claude-opus-5-5 · open: 818_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -14,6 +14,7 @@ _Last sequenced: 2026-09-26T01:35:11.925517Z · model: claude-opus-5-5 · open: 
 | 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
+| 25 | PAN-4225 | M | critical | ok |  |  | Feedback/continue/spec writers dirty the primary checkout and never commit, so main cannot fast-forward (split from PAN-4224) |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
@@ -861,6 +862,10 @@ New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done
 
 New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.
 
+### PAN-4225 (rank 25)
+
+New issue split out of PAN-4224. Review dispatch, verification, close-out and start transitions write per-issue continue and spec files into the primary checkout and never commit them, which blocks the primary checkout from fast-forwarding when the PR merges and lets per-issue state diverge from the branch copy. It is a pipeline-substrate bug with verified evidence, so it ranks critical right behind the in-pipeline PAN-4224 fix and the related PAN-3935 / PAN-3085 plan-home bugs.
+
 ### PAN-3566 (rank 26)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
@@ -1132,10 +1137,10 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T01:35:11.925517Z",
+  "generatedAt": "2026-09-26T01:42:08.678722Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 817,
+  "openCount": 818,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -11249,6 +11254,19 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "rationale": "New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4225",
+      "rank": 25,
+      "size": "M",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Feedback/continue/spec writers dirty the primary checkout and never commit, so main cannot fast-forward (split from PAN-4224)",
+      "rationale": "New issue split out of PAN-4224. Review dispatch, verification, close-out and start transitions write per-issue continue and spec files into the primary checkout and never commit them, which blocks the primary checkout from fast-forwarding when the PR merges and lets per-issue state diverge from the branch copy. It is a pipeline-substrate bug with verified evidence, so it ranks critical right behind the in-pipeline PAN-4224 fix and the related PAN-3935 / PAN-3085 plan-home bugs.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12406,6 +12424,27 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4224",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3935",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3085",
+      "to": "PAN-4225",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
