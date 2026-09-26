@@ -7,11 +7,25 @@
  * branch at report time. A builder's `done` report needs a clean tree whose
  * branch has an upstream holding every commit; `allowUnpushed` waives only
  * the upstream check, never the clean-tree check.
+ *
+ * A critic or verifier lane files exactly one verdict with its done report
+ * (WI-17, FR-33, D24): the value, a defect count, and the absolute path of its
+ * verdict file. Every refusal happens before anything is written.
  */
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 
-import { isWorkerReportStatus, writeWorkerReport, type WorkerReportGit, type WorkerReportStatus } from '../agents/worker/report.js';
+import {
+  isLaneVerdict,
+  isWorkerReportStatus,
+  listWorkerReports,
+  writeWorkerReport,
+  type WorkerReportGit,
+  type WorkerReportStatus,
+  type WorkerReportVerdict,
+} from '../agents/worker/report.js';
 import { getConversationByName, type LaneRole } from '../overdeck/conversations.js';
 
 const execFileAsync = promisify(execFile);
@@ -23,6 +37,42 @@ export interface LaneReportInput {
   body: string;
   status?: WorkerReportStatus;
   allowUnpushed?: boolean;
+  /** Critic and verifier done reports: WOWED, IMPRESSED, NOT_YET, PASS or DEFECTS. */
+  verdict?: string;
+  /** Overrides the defect count read from the verdict file. */
+  defects?: number;
+  /** The verdict JSON the lane wrote; stored as an absolute path. */
+  verdictFile?: string;
+}
+
+const MISSING_VERDICT = "a critic's done report needs --verdict (WOWED, IMPRESSED, NOT_YET, PASS or DEFECTS)";
+
+/** WI-17: the verdict a critic or verifier's done report carries, after every check. */
+async function critiqueVerdict(name: string, input: LaneReportInput): Promise<WorkerReportVerdict> {
+  if (!isLaneVerdict(input.verdict)) throw new Error(MISSING_VERDICT);
+  if ((await listWorkerReports(`conv-${name}`)).some((report) => report.status === 'done')) {
+    throw new Error('one verdict per critic; launch a fresh critic');
+  }
+  let file: string | null = null;
+  let fileText: string | null = null;
+  if (input.verdictFile) {
+    file = resolve(input.verdictFile);
+    fileText = await readFile(file, 'utf8').catch(() => null);
+    if (fileText === null) throw new Error(`verdict file ${file} not found`);
+  }
+  let defects: number | null = null;
+  if (input.defects !== undefined) {
+    if (!Number.isInteger(input.defects) || input.defects < 0) throw new Error(`--defects must be a non-negative integer; got ${input.defects}`);
+    defects = input.defects;
+  } else if (fileText !== null) {
+    try {
+      const parsed = JSON.parse(fileText) as { defects?: unknown };
+      if (Array.isArray(parsed.defects)) defects = parsed.defects.length;
+    } catch {
+      // Not JSON: the count stays unknown.
+    }
+  }
+  return { value: input.verdict, defects, file };
 }
 
 async function git(cwd: string, args: string[]): Promise<string> {
@@ -65,6 +115,10 @@ export async function reportLane(input: LaneReportInput, env: NodeJS.ProcessEnv 
   }
   const status = input.status ?? 'done';
   if (!isWorkerReportStatus(status)) throw new Error(`unknown report status ${String(status)}: expected done, blocked or failed`);
+  const judge = lane.laneRole === 'critic' || lane.laneRole === 'verifier';
+  if (input.verdict !== undefined && !judge) throw new Error('--verdict is for critic and verifier lanes');
+  if (input.verdict !== undefined && status !== 'done') throw new Error('--verdict needs --status done');
+  const verdict = judge && status === 'done' ? await critiqueVerdict(lane.name, input) : null;
 
   let gitFacts: WorkerReportGit | null = null;
   if (GIT_BACKED_ROLES.has(lane.laneRole)) {
@@ -80,6 +134,7 @@ export async function reportLane(input: LaneReportInput, env: NodeJS.ProcessEnv 
     body: input.body,
     status,
     ...(gitFacts ? { git: gitFacts } : {}),
+    ...(verdict ? { verdict } : {}),
   });
-  return `lane ${lane.gauntletRun}/${lane.laneKey} report ${seq}: ${status}`;
+  return `lane ${lane.gauntletRun}/${lane.laneKey} report ${seq}: ${status}${verdict ? `, verdict ${verdict.value}` : ''}`;
 }
