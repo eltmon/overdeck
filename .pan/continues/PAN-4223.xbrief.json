@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T08:19:00.297Z",
+  "updated": "2026-09-26T08:19:11.205Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -620,6 +620,10 @@
     "critic-pairing-views.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T08:19:00.297Z"
+    },
+    "critic-list-enrichment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:11.204Z"
     }
   }
 }
