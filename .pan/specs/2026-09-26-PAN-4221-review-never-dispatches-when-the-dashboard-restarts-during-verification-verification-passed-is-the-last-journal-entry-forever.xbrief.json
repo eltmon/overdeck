@@ -4,17 +4,17 @@
     "created": "2026-09-26T00:33:33Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4221: Review never dispatches when the dashboard restarts during verification (verification.passed is the last journal entry forever)",
-    "updated": "2026-09-26T00:38:29.234Z"
+    "updated": "2026-09-26T00:40:14.207Z"
   },
   "plan": {
     "id": "pan-4221",
     "title": "Review never dispatches when the dashboard restarts during verification (verification.passed is the last journal entry forever)",
-    "status": "proposed",
+    "status": "running",
     "uid": "d4ab0f44-6952-486a-9b14-093df20b8c95",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-26T00:33:33Z",
-    "updated": "2026-09-26T00:38:29.234Z",
+    "updated": "2026-09-26T00:40:14.207Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4221",
