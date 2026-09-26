@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3022",
   "created": "2026-09-26T06:16:24.731Z",
-  "updated": "2026-09-26T08:21:29.684Z",
+  "updated": "2026-09-26T08:21:41.680Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "claim-applies-work-model.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T08:21:29.684Z"
+    },
+    "delete-resolve-issue-work-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:41.680Z"
     }
   }
 }
