@@ -74,6 +74,18 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   project's single-flight reconcile slot for hours.
 - **Single Deacon invariant** — never mount `~/.overdeck` into workspace
   containers; `OVERDECK_DISABLE_DEACON=1` belt-and-suspenders.
+- **The Deacon freeze silences every deacon-lite routine** — `deacon.globally_paused`
+  (overdeck.db `app_settings`, sidebar Snowflake toggle) makes `runDeaconLite()`
+  return before any routine: no stuck nudges, stalled-review recovery,
+  closed-issue reaping, or deferred hand-off retries. It persists across restarts
+  and "Deacon-lite started" still logs. Check it first when a patrol "never ran"
+  (PAN-4210). `CloisterService.isSpawnPaused()` / `cloister.spawns_paused` has no
+  callers; that flag gates nothing.
+- **`state.json` `status` is a spawn-time snapshot** — since PAN-3917,
+  `saveAgentStateAndEmitEvent` (`dashboard/server/services/agent-projection.ts`)
+  only appends an event, so complete-planning's "Marked planning-… as stopped"
+  never reaches `state.json`. Never gate behavior on that label; use the live
+  inventory (`liveness.ts` / `liveAgentInventory`) and `startedAt`/`stoppedAt`.
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
   dies under Bun; circular ESM imports die under tsx/Node source mode).
 - **`execSync` freezes the server** — anything reachable from the dashboard event
@@ -135,4 +147,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
-<!-- last-verified: 2026-09-20 -->
+<!-- last-verified: 2026-09-25 -->
