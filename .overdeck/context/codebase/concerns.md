@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-20.
+Live landmines a change in this repo can step on. Verified 2026-09-26.
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts:88`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -135,4 +135,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
-<!-- last-verified: 2026-09-20 -->
+- **Per-issue continue/spec writers still target the primary checkout,
+  uncommitted** (PAN-4225) — unlike the plan-home push path fixed in PAN-4224
+  (`pushPlanArtifacts`, `promoteWorkspacePrdDraft`), the feedback-writer, session
+  history, and `transitionXBriefOnMain` still write per-issue `.pan/`
+  artifacts into the primary checkout instead of the issue's workspace, and
+  never commit them. `pushPlanArtifacts` tolerates the untracked collisions
+  this leaves behind (clears an identical one, backs up a differing one under
+  `.overdeck/plan-artifact-backups/<stamp>/`) — that's a safety net, not a fix
+  for the write-site bug. Don't add another primary-checkout writer without
+  routing it through the workspace like the fixed paths.
+
+<!-- last-verified: 2026-09-26 -->

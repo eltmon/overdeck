@@ -40,6 +40,36 @@ gh run rerun <run-id> --failed
 After GitHub reports the new result, the existing merge-blocker reconciliation
 poll clears the stale blocker within about 10 minutes.
 
+## Local main diverged after a backlog or order-book write
+
+`pan backlog write-sequence` and `pan orders` commit their `.pan/` write and
+push it so local `main` doesn't drift ahead of origin. When that push runs
+into trouble, you'll see a `Sequence push: ...` or `Order book push: ...`
+warning — printed to the CLI's stderr and, since PAN-4224, also filed as a
+`plan-artifacts` warning in the dashboard activity feed.
+
+Two causes produce this warning:
+
+- **An unrelated local commit.** Local `main` holds a commit outside `.pan/`
+  that the push refuses to carry along. Push it yourself, then re-run the
+  `.pan/` write.
+- **A colliding untracked file.** Origin gained a `.pan/` file (through a
+  merge elsewhere) that this checkout already has as an untracked file at the
+  same path — most often a planning-promotion draft. The push moves that file
+  aside before it can move local `main` onto the new tip: if its bytes matched
+  what's now tracked it's deleted, otherwise it's kept under
+  `.overdeck/plan-artifact-backups/<stamp>/<path>` and named in the warning.
+
+To recover:
+
+1. If the warning names a backed-up file, compare
+   `.overdeck/plan-artifact-backups/<stamp>/<path>` against the file now
+   tracked at `<path>` and merge in whatever local edit is worth keeping.
+2. Run `git pull --rebase` in the plan home to bring local `main` back in
+   sync with origin.
+3. Re-run the `.pan/` write (`pan backlog write-sequence` or the `pan orders`
+   command) if it didn't land.
+
 ## WSL2 Stability Issues (Windows Users)
 
 WSL2 can experience crashes and networking issues, especially under heavy AI agent workloads. Here are recommended `.wslconfig` settings to improve stability.
