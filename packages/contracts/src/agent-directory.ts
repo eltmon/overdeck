@@ -80,6 +80,10 @@ export const DirectoryEntry = Schema.Struct({
     role: Schema.String,
     iteration: Schema.Number,
     reportStatus: Schema.NullOr(Schema.Literals(["done", "blocked", "failed"])),
+    /** Critic/verifier: its verdict (or `pending`); builder: the newest critic verdict. */
+    verdict: Schema.optional(Schema.NullOr(Schema.String)),
+    /** Critic/verifier: the judged builder's legacy conversation id. */
+    criticOf: Schema.optional(Schema.Number),
   })),
   /** PAN-4223: the predecessor's legacy conversation id; successors only (links to /conv/<id>). */
   continuesFrom: Schema.optional(Schema.Number),

@@ -104,6 +104,11 @@ export interface DirectoryConversationRow {
   readonly laneRole?: string | null;
   readonly laneIteration?: number | null;
   readonly laneReport?: { readonly status: 'done' | 'blocked' | 'failed' } | null;
+  /** PAN-4223 WI-23: the critic link and verdicts from the list enrichment. */
+  readonly criticOfConversationId?: number | null;
+  readonly criticOfConversationName?: string | null;
+  readonly laneVerdict?: { readonly value: string } | null;
+  readonly laneLatestVerdict?: { readonly value: string } | null;
 }
 
 /** One subagent as a directory source reports it. */
@@ -549,8 +554,11 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
       projectKey: UNASSIGNED_PROJECT,
       issueId: row.issueId ? row.issueId.toUpperCase() : null,
       issueTitle: null,
-      // PAN-4223: nest by the parent link, lanes and successors alike.
-      parentId: row.parentConversationName ? `conv:${row.parentConversationName}` : null,
+      // PAN-4223: a critic nests under the builder it judges (D27), every
+      // other row by its parent link, lanes and successors alike.
+      parentId: row.criticOfConversationName
+        ? `conv:${row.criticOfConversationName}`
+        : (row.parentConversationName ? `conv:${row.parentConversationName}` : null),
       role: null,
       harness: row.harness ?? 'unknown',
       model: row.model ?? 'unknown',
@@ -561,7 +569,17 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
       source: 'conversation',
       transcript: { route: 'conversation', conversationName: row.name },
       ...(row.laneKey
-        ? { lane: { run: row.gauntletRun ?? '', key: row.laneKey, role: row.laneRole ?? 'builder', iteration: row.laneIteration ?? 1, reportStatus: row.laneReport?.status ?? null } }
+        ? {
+            lane: {
+              run: row.gauntletRun ?? '',
+              key: row.laneKey,
+              role: row.laneRole ?? 'builder',
+              iteration: row.laneIteration ?? 1,
+              reportStatus: row.laneReport?.status ?? null,
+              verdict: row.laneVerdict?.value ?? row.laneLatestVerdict?.value ?? null,
+              ...(row.criticOfConversationId != null ? { criticOf: row.criticOfConversationId } : {}),
+            },
+          }
         : {}),
       ...(!row.laneKey && row.parentConversationId != null ? { continuesFrom: row.parentConversationId } : {}),
     };
