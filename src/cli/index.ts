@@ -511,6 +511,7 @@ await groups.register('caveman');
 await groups.register('scope');
 await groups.register('spawn');
 await groups.register('worker');
+await groups.register('lane');
 await groups.register('flywheel');
 await groups.register('merge');
 await groups.register('artifacts');
