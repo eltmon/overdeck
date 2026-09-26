@@ -104,13 +104,14 @@ function operatorStandDownReason(
   const work = readAgentState(workAgentId);
   if (work) {
     if (work.paused === true) return 'the issue is paused';
-    if (work.status === 'running' || work.status === 'starting') return 'a work agent already exists';
     if (after(work.startedAt)) return 'the work agent was started after the deferral';
     if (after(work.stoppedAt)) return 'the work agent was stopped after the deferral';
   }
-  // A new planning cycle does its own hand-off when it finalizes.
+  // The status label is a spawn-time snapshot: since PAN-3917 complete-planning's
+  // stop projection writes no state.json, so it never reads anything but
+  // 'running' — only startedAt tells us whether this is a new cycle.
   const planning = readAgentState(`planning-${issueLower}`);
-  if (planning && (planning.status === 'running' || planning.status === 'starting' || after(planning.startedAt))) {
+  if (planning && after(planning.startedAt)) {
     return 'planning was restarted after the deferral';
   }
   return null;
@@ -134,7 +135,7 @@ function defaultSpawn(issueId: string): Promise<SpawnWorkAgentResult> {
 }
 
 /** Skip reasons that end the retries without calling it a failure: the operator or the tracker decided. */
-const STAND_DOWN_SKIP_REASONS = new Set(['paused', 'troubled', 'closed-issue']);
+const STAND_DOWN_SKIP_REASONS = new Set(['paused', 'troubled', 'closed-issue', 'already-running']);
 /** Skip reasons no amount of waiting fixes. */
 const GIVE_UP_SKIP_REASONS = new Set(['unauthorized']);
 
