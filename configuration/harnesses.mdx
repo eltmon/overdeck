@@ -132,9 +132,10 @@ internal configuration records are excluded from the chat feed.
 - `gpt-5.6-sol` is the default OpenAI model surfaced by this harness. `gpt-6-astra`
   is the newest and most capable OpenAI model but is opt-in — pick it explicitly.
   `gpt-6-sol` and `gpt-6-luna` (September 2026) are the GPT-6 successors to
-  GPT-5.6 Sol and Luna at half their API price; they are opt-in too and need
-  Codex CLI `0.156.0` or newer. Early rollout reports show `gpt-6-luna` refused
-  on some ChatGPT sign-in accounts
+  GPT-5.6 Sol and Luna at half their API price; they are opt-in too. The Codex
+  CLI lists them in its model catalog from `0.156.1`; older CLIs forward the id
+  to the backend unchanged. Early rollout reports show `gpt-6-luna` refused on
+  some ChatGPT sign-in accounts
   ([openai/codex#47784](https://github.com/openai/codex/issues/47784)).
 - Work agents use a persistent `codex app-server` child by default. Overdeck
   talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
