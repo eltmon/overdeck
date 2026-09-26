@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T07:31:13.517Z",
+  "updated": "2026-09-26T07:31:26.184Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -211,6 +211,11 @@
       "claimedBy": "agent-pan-4223",
       "claimedAt": "2026-09-26T07:30:36.101Z",
       "doneAt": "2026-09-26T07:31:13.516Z"
+    },
+    "deck-verdict-badges": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T07:31:26.183Z"
     }
   }
 }
