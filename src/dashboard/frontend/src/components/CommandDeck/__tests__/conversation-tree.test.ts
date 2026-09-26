@@ -116,3 +116,26 @@ describe('groupSummary', () => {
     expect(groupSummary(group!)).toEqual({ lanes: 3, successors: 2, working: 2, needsYou: 1, reported: 2 });
   });
 });
+
+describe('buildConversationTree critic link (PAN-4223 WI-22)', () => {
+  const critic = (id: number, parent: number, builder: number) =>
+    lane(id, parent, 'crit', { laneRole: 'critic', criticOfConversationId: builder });
+
+  it('nests a critic under the builder it judges, not under the conversation that launched it', () => {
+    const tree = buildConversationTree([conv(1), lane(2, 1, 'b'), critic(3, 1, 2)]);
+    expect(rendered(tree)).toEqual([[1, 0], [2, 1], [3, 2]]);
+    expect(tree[0]?.descendants.find((node) => node.conv.id === 3)).toMatchObject({ criticOf: 2, flattenedFrom: null });
+  });
+
+  it('falls back to the parent link when the builder is not in the list', () => {
+    const tree = buildConversationTree([conv(1), critic(3, 1, 99)]);
+    expect(rendered(tree)).toEqual([[1, 0], [3, 1]]);
+    expect(tree[0]?.descendants[0]?.criticOf).toBeNull();
+  });
+
+  it('flattens a critic of a builder under an orchestrator lane to depth 2 with its builder named', () => {
+    const tree = buildConversationTree([conv(1), lane(2, 1, 'o', { laneRole: 'orchestrator' }), lane(3, 2, 'b'), critic(4, 1, 3)]);
+    expect(rendered(tree)).toEqual([[1, 0], [2, 1], [3, 2], [4, 2]]);
+    expect(tree[0]?.descendants.find((node) => node.conv.id === 4)).toMatchObject({ flattenedFrom: 3, criticOf: 3, naturalDepth: 3 });
+  });
+});

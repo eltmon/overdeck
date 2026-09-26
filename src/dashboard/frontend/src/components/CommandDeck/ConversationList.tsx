@@ -107,7 +107,13 @@ export interface Conversation {
   laneKey?: string | null;
   laneRole?: 'builder' | 'critic' | 'verifier' | 'play' | 'orchestrator' | null;
   laneIteration?: number | null;
-  laneReport?: { seq: number; at: string; status: 'done' | 'blocked' | 'failed' } | null;
+  laneReport?: { seq: number; at: string; status: 'done' | 'blocked' | 'failed'; verdict?: string | null } | null;
+  /** PAN-4223 D26: legacy id of the builder row a critic or verifier lane judges. */
+  criticOfConversationId?: number | null;
+  /** Critic and verifier lanes: the verdict, or `pending` before a done report. */
+  laneVerdict?: { value: string; defects: number | null } | null;
+  /** Builder lanes: the newest critic verdict for this iteration. */
+  laneLatestVerdict?: { value: string; defects: number | null; criticId: number } | null;
   /** PAN-1990: the projects/workspaces registry row this conversation belongs to. Null for pre-migration rows. */
   workspaceId?: string | null;
   /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
@@ -231,7 +237,7 @@ function writeCollapsedGroups(names: ReadonlySet<string>): void {
 }
 
 /** The non-zero group counts, in the order the PRD fixes (WI-10 step 3). */
-function groupSummaryText(node: ConversationTreeNode): string {
+function groupSummaryText(node: ConversationTreeNode<Conversation>): string {
   const summary = groupSummary(node);
   const parts: string[] = [];
   if (summary.successors > 0) parts.push(`${summary.successors} ${summary.successors === 1 ? 'successor' : 'successors'}`);
@@ -322,12 +328,12 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
   // collapsed. Session-only: names the viewer expanded against the default.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(readCollapsedGroups);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
-  const isGroupCollapsed = useCallback((node: ConversationTreeNode) => {
+  const isGroupCollapsed = useCallback((node: ConversationTreeNode<Conversation>) => {
     if (collapsedGroups.has(node.conv.name)) return true;
     if (expandedGroups.has(node.conv.name)) return false;
     return !node.descendants.some((child) => isConversationActive(child.conv));
   }, [collapsedGroups, expandedGroups]);
-  const toggleGroup = useCallback((node: ConversationTreeNode) => {
+  const toggleGroup = useCallback((node: ConversationTreeNode<Conversation>) => {
     const name = node.conv.name;
     const collapse = !isGroupCollapsed(node);
     setCollapsedGroups((previous) => {

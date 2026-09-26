@@ -9,20 +9,40 @@
  * its real parent through `flattenedFrom`. A top-level group sits where its
  * best member would sit in the flat list order, so an ended predecessor with
  * a live successor ranks with the successor.
+ *
+ * A critic or verifier lane nests under the builder it judges when that row is
+ * in the list, else under its parent link (D27).
  */
-import type { Conversation } from './ConversationList';
+/**
+ * The row fields the tree reads. ConversationList's `Conversation` satisfies
+ * it; a local type keeps this module free of an import cycle with the list.
+ */
+export interface TreeConversation {
+  id: number;
+  createdAt: string;
+  sessionAlive: boolean;
+  forkStatus?: string | null;
+  isWorking?: boolean;
+  pendingInputCount?: number;
+  parentConversationId?: number | null;
+  criticOfConversationId?: number | null;
+  laneKey?: string | null;
+  laneReport?: unknown;
+}
 
-export interface ConversationTreeNode {
-  conv: Conversation;
+export interface ConversationTreeNode<C extends TreeConversation = TreeConversation> {
+  conv: C;
   /** Display depth, min(naturalDepth, 2) (D22). */
   depth: 0 | 1 | 2;
   naturalDepth: number;
   /** Top-level nodes only: every descendant in pre-order, each at its display depth. Empty below the top level. */
-  descendants: ConversationTreeNode[];
+  descendants: ConversationTreeNode<C>[];
   /** Parent id when the row has a parent link but the parent is not in `rows` (rendered top level, D6). */
   orphanOf: number | null;
   /** Parent id when naturalDepth > 2 (rendered at depth 2 with a marker, D22). */
   flattenedFrom: number | null;
+  /** The judged builder's id when the display parent came from the critic link (D27). */
+  criticOf: number | null;
 }
 
 export interface ConversationGroupSummary {
@@ -34,23 +54,31 @@ export interface ConversationGroupSummary {
 }
 
 /** The flat list's live predicate (ConversationList `isActive`). */
-export function isConversationActive(conv: Conversation): boolean {
+export function isConversationActive(conv: TreeConversation): boolean {
   return Boolean(conv.sessionAlive || (conv.forkStatus && conv.forkStatus !== 'failed'));
 }
 
-function siblingOrder(a: Conversation, b: Conversation): number {
+function siblingOrder(a: TreeConversation, b: TreeConversation): number {
   const live = Number(isConversationActive(b)) - Number(isConversationActive(a));
   if (live !== 0) return live;
   return Date.parse(a.createdAt) - Date.parse(b.createdAt);
 }
 
-/** Nest every row whose parent link names a row in `rows` (lanes and successors alike); cap display depth at 2. */
-export function buildConversationTree(rows: readonly Conversation[]): ConversationTreeNode[] {
+/** D27: the judged builder when it is in the list, else the parent link. */
+export function displayParentId(conv: TreeConversation, idsInRows: ReadonlySet<number> | ReadonlyMap<number, unknown>): number | null {
+  const builderId = conv.criticOfConversationId ?? null;
+  if (builderId !== null && builderId !== conv.id && idsInRows.has(builderId)) return builderId;
+  return conv.parentConversationId ?? null;
+}
+
+/** Nest every row whose display parent is in `rows` (lanes, critics and successors alike); cap display depth at 2. */
+export function buildConversationTree<C extends TreeConversation>(rows: readonly C[]): ConversationTreeNode<C>[] {
   const indexById = new Map<number, number>();
   rows.forEach((conv, index) => { if (!indexById.has(conv.id)) indexById.set(conv.id, index); });
-  const children = new Map<number, Conversation[]>();
+  const parentOf = (conv: C) => displayParentId(conv, indexById);
+  const children = new Map<number, C[]>();
   for (const conv of rows) {
-    const parentId = conv.parentConversationId ?? null;
+    const parentId = parentOf(conv);
     if (parentId !== null && parentId !== conv.id && indexById.has(parentId)) {
       const siblings = children.get(parentId) ?? [];
       siblings.push(conv);
@@ -60,34 +88,36 @@ export function buildConversationTree(rows: readonly Conversation[]): Conversati
   for (const siblings of children.values()) siblings.sort(siblingOrder);
 
   const visited = new Set<number>();
-  const walk = (conv: Conversation, naturalDepth: number, into: ConversationTreeNode[]): void => {
+  const walk = (conv: C, naturalDepth: number, into: ConversationTreeNode<C>[]): void => {
     for (const child of children.get(conv.id) ?? []) {
       if (visited.has(child.id)) continue;
       visited.add(child.id);
       const depth = Math.min(naturalDepth, 2) as 1 | 2;
+      const parentId = parentOf(child);
       into.push({
         conv: child,
         depth,
         naturalDepth,
         descendants: [],
         orphanOf: null,
-        flattenedFrom: naturalDepth > 2 ? (child.parentConversationId ?? null) : null,
+        flattenedFrom: naturalDepth > 2 ? parentId : null,
+        criticOf: parentId !== null && parentId === child.criticOfConversationId ? parentId : null,
       });
       walk(child, naturalDepth + 1, into);
     }
   };
-  const top = (conv: Conversation, orphanOf: number | null): { node: ConversationTreeNode; rank: number } => {
+  const top = (conv: C, orphanOf: number | null): { node: ConversationTreeNode<C>; rank: number } => {
     visited.add(conv.id);
-    const descendants: ConversationTreeNode[] = [];
+    const descendants: ConversationTreeNode<C>[] = [];
     walk(conv, 1, descendants);
     const rank = Math.min(indexById.get(conv.id) ?? Infinity, ...descendants.map((node) => indexById.get(node.conv.id) ?? Infinity));
-    return { node: { conv, depth: 0, naturalDepth: 0, descendants, orphanOf, flattenedFrom: null }, rank };
+    return { node: { conv, depth: 0, naturalDepth: 0, descendants, orphanOf, flattenedFrom: null, criticOf: null }, rank };
   };
 
-  const groups: Array<{ node: ConversationTreeNode; rank: number }> = [];
+  const groups: Array<{ node: ConversationTreeNode<C>; rank: number }> = [];
   for (const conv of rows) {
     if (visited.has(conv.id)) continue;
-    const parentId = conv.parentConversationId ?? null;
+    const parentId = parentOf(conv);
     if (parentId !== null && parentId !== conv.id && indexById.has(parentId)) continue;
     groups.push(top(conv, parentId !== null && parentId !== conv.id ? parentId : null));
   }
