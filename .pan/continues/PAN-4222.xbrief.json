@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4222",
   "created": "2026-09-26T00:48:25.214Z",
-  "updated": "2026-09-26T05:15:34.391Z",
+  "updated": "2026-09-26T05:15:45.701Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "live-quiet-subagents.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T05:15:34.390Z"
+    },
+    "preview-rail-collapsed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:15:45.701Z"
     }
   }
 }
