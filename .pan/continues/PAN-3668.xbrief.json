@@ -444,7 +444,12 @@
       "claimedBy": "agent-pan-3668",
       "claimedAt": "2026-09-26T04:17:38.393Z",
       "doneAt": "2026-09-26T04:20:58.120Z"
+    },
+    "recovery-stop": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:21:04.143Z"
     }
   },
-  "updated": "2026-09-26T04:20:58.121Z"
+  "updated": "2026-09-26T04:21:04.143Z"
 }
