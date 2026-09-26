@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T07:40:59.193Z",
+  "updated": "2026-09-26T07:50:35.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
       "claimedBy": "agent-pan-4223",
       "claimedAt": "2026-09-26T07:38:54.207Z",
       "doneAt": "2026-09-26T07:40:59.193Z"
+    },
+    "lane-columns.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T07:50:35.848Z"
     }
   }
 }
