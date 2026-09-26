@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4211",
   "created": "2026-09-26T01:35:27.740Z",
-  "updated": "2026-09-26T01:35:27.741Z",
+  "updated": "2026-09-26T03:08:54.214Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "untroubled-verb": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4211",
-      "claimedAt": "2026-09-26T01:35:27.740Z"
+      "claimedAt": "2026-09-26T01:35:27.740Z",
+      "doneAt": "2026-09-26T03:08:54.213Z"
     }
   }
 }
