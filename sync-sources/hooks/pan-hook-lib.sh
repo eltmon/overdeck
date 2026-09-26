@@ -293,6 +293,38 @@ pan_resolve_agent_id() {
   return 0
 }
 
+# Derive a short human-readable description of a tool invocation from its
+# PreToolUse/PostToolUse payload, for the activity line's second line.
+#
+# Precedence (first non-empty wins): tool_input.description -> basename of
+# tool_input.file_path -> tool_input.pattern -> tool_input.url ->
+# tool_input.skill -> empty. Result is the first line only, trimmed, capped
+# at 120 characters. Requires jq; without it, prints nothing.
+#
+# Args:
+#   $1 = raw hook payload JSON (the PreToolUse/PostToolUse event body)
+pan_tool_description() {
+  local tool_info="$1"
+  command -v jq >/dev/null 2>&1 || { printf ''; return 0; }
+  printf '%s' "$tool_info" | jq -r '
+    (.tool_input.description // "") as $d |
+    (.tool_input.file_path // "") as $f |
+    (.tool_input.pattern // "") as $p |
+    (.tool_input.url // "") as $u |
+    (.tool_input.skill // "") as $s |
+    (if $d != "" then $d
+     elif $f != "" then ($f | split("/") | last)
+     elif $p != "" then $p
+     elif $u != "" then $u
+     elif $s != "" then $s
+     else ""
+     end) as $raw |
+    ($raw | split("\n")[0]) as $line |
+    ($line | gsub("^\\s+|\\s+$"; "")) as $trimmed |
+    $trimmed[0:120]
+  ' 2>/dev/null || printf ''
+}
+
 # Emit a runtime event body to the dashboard.
 #
 # Order of operations:

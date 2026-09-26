@@ -453,6 +453,45 @@ describe('buildAgentDirectory — pause facts (PAN-4197 FR-3)', () => {
   });
 });
 
+describe('buildAgentDirectory — runtime id (PAN-4222)', () => {
+  it("gives a conversation entry the conversation's tmux session as runtimeId", async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listConversations: async () => [conversation({ name: 'alpha', tmuxSession: 'conv-alpha' })],
+    }));
+    expect(result.entries.find((entry) => entry.id === 'conv:alpha')).toMatchObject({ runtimeId: 'conv-alpha' });
+  });
+
+  it('puts no runtimeId key on a native agent entry', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1' })],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: 'agent-pan-1' })],
+    }));
+    const entry = result.entries.find((entry) => entry.id === 'agent-pan-1')!;
+    expect(entry).not.toHaveProperty('runtimeId');
+  });
+});
+
+describe('buildAgentDirectory — conversation provider error (PAN-4222 ac1)', () => {
+  it('carries a conversation row\'s providerError onto its entry', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listConversations: async () => [conversation({
+        name: 'alpha', tmuxSession: 'conv-alpha',
+        providerError: { message: 'Your account has insufficient credits.', at: '2026-09-25T22:00:00.000Z' },
+      })],
+    }));
+    expect(result.entries.find((entry) => entry.id === 'conv:alpha')).toMatchObject({
+      providerError: { message: 'Your account has insufficient credits.', at: '2026-09-25T22:00:00.000Z' },
+    });
+  });
+
+  it('puts no providerError key on an entry without one', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listConversations: async () => [conversation({ name: 'alpha', tmuxSession: 'conv-alpha' })],
+    }));
+    expect(result.entries.find((entry) => entry.id === 'conv:alpha')).not.toHaveProperty('providerError');
+  });
+});
+
 describe('buildLiveAgentDirectory (PAN-4197 FR-2)', () => {
   const derived = (states: Record<string, IssueState>) => () =>
     new Map(Object.entries(states).map(([issueId, state]): [string, DerivedIssueState] => [issueId, { issueId, state }]));

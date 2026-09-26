@@ -47,6 +47,45 @@ describe('PAN-800 runtime reducer', () => {
     expect(next.agentRuntimeById[AGENT].currentTool).toBeUndefined()
   })
 
+  it('agent.activity_changed writes currentToolDescription when working (PAN-4222 ac3)', () => {
+    const next = applyEvent(
+      INITIAL_READ_MODEL_STATE,
+      at(1, {
+        type: 'agent.activity_changed',
+        payload: { agentId: AGENT, activity: 'working', currentTool: 'Bash', toolDescription: 'Commit WI-7' },
+      } as any),
+    )
+    expect(next.agentRuntimeById[AGENT]).toMatchObject({
+      activity: 'working',
+      currentTool: 'Bash',
+      currentToolDescription: 'Commit WI-7',
+    })
+  })
+
+  it('agent.activity_changed(idle) clears currentToolDescription (PAN-4222 ac3)', () => {
+    const start = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.activity_changed',
+      payload: { agentId: AGENT, activity: 'working', currentTool: 'Bash', toolDescription: 'Commit WI-7' },
+    } as any))
+    const next = applyEvent(start, at(2, {
+      type: 'agent.activity_changed',
+      payload: { agentId: AGENT, activity: 'idle' },
+    } as any))
+    expect(next.agentRuntimeById[AGENT].currentToolDescription).toBeUndefined()
+  })
+
+  it('agent.thinking_started clears currentToolDescription (PAN-4222 ac3)', () => {
+    const start = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.activity_changed',
+      payload: { agentId: AGENT, activity: 'working', currentTool: 'Bash', toolDescription: 'Commit WI-7' },
+    } as any))
+    const next = applyEvent(start, at(2, {
+      type: 'agent.thinking_started',
+      payload: { agentId: AGENT, lastToolAt: TS },
+    } as any))
+    expect(next.agentRuntimeById[AGENT].currentToolDescription).toBeUndefined()
+  })
+
   it('agent.thinking_started sets activity=thinking with since and lastToolAt', () => {
     const next = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
       type: 'agent.thinking_started',

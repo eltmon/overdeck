@@ -6,7 +6,6 @@ import {
   activityLabel,
   buildLiveSections,
   classifyEntry,
-  lastOutputLine,
   type LiveFacts,
 } from './live-model';
 
@@ -53,8 +52,8 @@ describe('classifyEntry — one case per precedence row', () => {
       { kind: 'stuck', section: 'needs-you', tone: 'stuck', label: 'stuck · idle 3h' }],
     ['5 ready to merge', entry({ id: 'a', state: 'stopped' }), { derived: derived({ state: 'ready' }) },
       { kind: 'ready-to-merge', section: 'needs-you', tone: 'needs-you', label: 'ready to merge' }],
-    ['6 working', entry({ id: 'a', state: 'working' }), { runtime: { currentTool: 'Bash' } },
-      { kind: 'working', section: 'live', tone: 'live', label: 'running Bash' }],
+    ['6 working', entry({ id: 'a', state: 'working' }), { runtime: { currentTool: 'Bash', currentToolDescription: 'Commit WI-7' } },
+      { kind: 'working', section: 'live', tone: 'live', label: 'Bash', detail: 'Commit WI-7' }],
     ['7 remote', entry({ id: 'a', state: 'unknown', location: 'remote' }), {},
       { kind: 'remote', section: 'live', tone: 'live', label: 'running on Fly' }],
     ['8 held', entry({ id: 'a', state: 'stopped', pause: { by: 'scheduler', reason: 'yielded', since: null } }), {},
@@ -113,6 +112,33 @@ describe('classifyEntry — precedence conflicts', () => {
   });
 });
 
+describe('classifyEntry — conversation provider error (PAN-4222)', () => {
+  it('ac2: an idle conversation with providerError classifies into Needs you, since the error time', () => {
+    const subject = entry({
+      id: 'conv:a', kind: 'conversation', role: null, state: 'idle',
+      providerError: { message: 'Your account has insufficient credits.', at: '2026-09-25T11:55:00.000Z' },
+    });
+    expect(classifyEntry(subject, {}, NOW)).toMatchObject({
+      section: 'needs-you', kind: 'api-error', tone: 'stuck', detail: 'Your account has insufficient credits.',
+    });
+    const sections = buildLiveSections([subject], () => ({}), NOW);
+    expect(sections.needsYou[0]!.since).toBe('2026-09-25T11:55:00.000Z');
+  });
+
+  it('ac3: the same entry without providerError classifies into idle', () => {
+    const subject = entry({ id: 'conv:a', kind: 'conversation', role: null, state: 'idle' });
+    expect(classifyEntry(subject, {}, NOW).section).toBe('idle');
+  });
+
+  it('ac4: a blocked conversation with providerError still reads question waiting', () => {
+    const subject = entry({
+      id: 'conv:a', kind: 'conversation', role: null, state: 'blocked',
+      providerError: { message: 'Your account has insufficient credits.', at: '2026-09-25T11:55:00.000Z' },
+    });
+    expect(classifyEntry(subject, {}, NOW)).toMatchObject({ kind: 'question', label: 'question waiting' });
+  });
+});
+
 describe('buildLiveSections', () => {
   it('nests a subagent under its parent row and drops one whose parent is absent', () => {
     const sections = buildLiveSections([
@@ -157,24 +183,34 @@ describe('buildLiveSections', () => {
     expect(sections.live[0]!.since).toBe('2026-09-25T11:59:00.000Z');
     expect(sections.waiting[0]!.since).toBe('2026-09-25T07:00:00.000Z');
   });
-});
 
-describe('activityLabel', () => {
-  it('names the running tool, then thinking, else working', () => {
-    expect(activityLabel({ activity: 'working', currentTool: 'Edit' })).toBe('running Edit');
-    expect(activityLabel({ activity: 'thinking' })).toBe('thinking');
-    expect(activityLabel(undefined)).toBe('working');
+  it("a Live row's since is the newest of itself and its children, not just its own activity (PAN-4222 ac1)", () => {
+    const sections = buildLiveSections([
+      entry({ id: 'orchestrator', kind: 'conversation', role: null, state: 'working' }),
+      entry({
+        id: 'sub:orchestrator:a', kind: 'subagent', parentId: 'orchestrator', state: 'working',
+        lastActivityAt: '2026-09-25T11:59:30.000Z',
+      }),
+    ], (subject) => (subject.id === 'orchestrator' ? { runtime: { lastActivity: '2026-09-25T11:52:00.000Z' } } : {}), NOW);
+    expect(sections.live[0]!.since).toBe('2026-09-25T11:59:30.000Z');
+  });
+
+  it("a Waiting row's since ignores its children (PAN-4222 ac2)", () => {
+    const sections = buildLiveSections([
+      entry({ id: 'w', state: 'stopped', pause: { by: 'machine', reason: null, since: '2026-09-25T07:00:00.000Z' } }),
+      entry({
+        id: 'sub:w:a', kind: 'subagent', parentId: 'w', state: 'working',
+        lastActivityAt: '2026-09-25T11:59:30.000Z',
+      }),
+    ], () => ({}), NOW);
+    expect(sections.waiting[0]!.since).toBe('2026-09-25T07:00:00.000Z');
   });
 });
 
-describe('lastOutputLine', () => {
-  it('returns the last non-empty line without escape codes, truncated to 160 characters', () => {
-    const long = 'x'.repeat(200);
-    const line = lastOutputLine(['first', `\x1b[31m${long}\x1b[0m`, '', '   ']);
-    expect(line).toHaveLength(160);
-    expect(line).toBe(`${'x'.repeat(159)}…`);
-    expect(lastOutputLine(['\x1b[32mdone\x1b[0m', ''])).toBe('done');
-    expect(lastOutputLine(undefined)).toBeNull();
-    expect(lastOutputLine(['', ''])).toBeNull();
+describe('activityLabel', () => {
+  it('names the bare tool, then thinking, else working', () => {
+    expect(activityLabel({ activity: 'working', currentTool: 'Edit' })).toBe('Edit');
+    expect(activityLabel({ activity: 'thinking' })).toBe('thinking');
+    expect(activityLabel(undefined)).toBe('working');
   });
 });

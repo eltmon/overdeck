@@ -1,0 +1,945 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-26T00:39:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4222: Agents page follow-up: live activity line, 1280px preview, false 'quiet' alarms, billing errors in Needs you",
+    "updated": "2026-09-26T00:46:15.288Z"
+  },
+  "plan": {
+    "id": "pan-4222",
+    "title": "Agents page follow-up: live activity line, 1280px preview, false 'quiet' alarms, billing errors in Needs you",
+    "status": "running",
+    "uid": "03cbddc1-8f6f-4f5a-8631-c01f197923d7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-26T00:39:34Z",
+    "updated": "2026-09-26T00:46:15.288Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4222",
+        "label": "PAN-4222",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4222.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4216",
+        "label": "PR #4216 (PAN-4197)",
+        "type": "pr"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "agents-page",
+      "frontend",
+      "hooks",
+      "contracts"
+    ],
+    "narratives": {
+      "Problem": "PAN-4197's Live view merged before the UX critic's round-2 items. (1) Live rows never show activity: LiveAgentRow reads pane output that never arrives, and the runtime snapshot carries only the tool name, so every busy row reads 'running Bash · 1m'; conversation rows get no runtime facts because they are keyed by tmux session. (2) At 1280px a conversation preview keeps the transcript's 256px Agents rail and squeezes the transcript to ~70px. (3) An orchestrator conversation waiting on working subagents reads 'quiet 8m' in red, and the age prints twice ('8m quiet 8m'). (4) The empty page shows two messages, and a conversation stopped on a provider error sits in the Idle footer. Note: the issue's example conv-20260924-3870 is not a billing error — Claude Code wrote its topic into the pane title.",
+      "Proposal": "Carry a tool description from the Claude Code PreToolUse/PostToolUse hooks through heartbeat ingestion into AgentRuntimeSnapshot.currentToolDescription; render line 2 as '<tool> · <description> · <age>' from the runtime snapshot (conversations via a new DirectoryEntry.runtimeId), dropping the pane-output subscription. Date Live rows from the newest of the row and its subagents; show 'quiet <age>' in place of the age. Start the transcript's subagent rail collapsed inside the Agents preview via a prop that never touches the global preference. Render one single-column empty state with no preview. Detect a trailing Claude Code isApiErrorMessage record in live idle conversations (conversation-list enrichment, 64 KB tail) and classify it as the existing 'API error or usage limit' Needs-you reason. Update reference/agents-directory.mdx, docs/DASHBOARD-ARCHITECTURE.md and docs/CONVERSATION-SUBAGENTS.md, and publish before/after screenshots.",
+      "NonGoals": "- No change to History-view classification or colors; its only change is the collapsed preview rail (shared DirectoryTranscript)\n- No pane-text or terminal-title parsing for errors, on any backend\n- No provider-error detection for codex, ACP/OpenCode, kimi, pi or muse transcripts, or for native (non-conversation) agents\n- No provider-error surfacing for stopped (dead-session) conversations\n- No fix to the server pane-output poller (agent-output-service.ts); God View and ZoneB keep their subscriptions\n- No new reason kind, section or state token\n- No change to the global subagent-rail preference outside the Agents page\n- No pan sync, pan reload or dashboard restart from the workspace"
+    },
+    "metadata": {
+      "sizeJustification": "One operator-filed follow-up whose four defects share a single acceptance (one before/after screenshot set on one PR). About half the ~30 files are tests and docs, and the subsystem count is inflated by the first-two-path-segments rule (each doc file and each test dir counts as its own subsystem). The code change itself is concentrated in the Live view (5 files), three hook scripts, and small additive contract fields.",
+      "canonicalFilename": "2026-09-26-PAN-4222-agents-page-follow-up-live-activity-line-1280px-preview-false-quiet-alarms-billing-errors-in-needs-you.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Line 2 activity comes from the hook's tool_input description, not pane output; the Live row drops useAgentOutputSubscription/agentOutputById/lastOutputLine",
+        "rationale": "A Claude Code TUI pane's last line is chrome, the output line never rendered in the critic's soak, and the issue asks for the tool description (e.g. 'Bash · Commit WI-7'), which Claude Code already writes into tool_input.description"
+      },
+      {
+        "summary": "Description precedence: tool_input.description, basename(file_path), pattern, url, skill; first line, max 120 chars",
+        "rationale": "Covers Bash/Agent (description), Read/Edit/Write (file), Grep/Glob (pattern), WebFetch (url) and Skill with one deterministic rule"
+      },
+      {
+        "summary": "Reason label becomes the bare tool name ('Bash'), not 'running Bash'",
+        "rationale": "Matches the issue's exact example 'Bash · Commit WI-7 · 14s'"
+      },
+      {
+        "summary": "Conversations look up runtime facts via a new optional DirectoryEntry.runtimeId = tmuxSession",
+        "rationale": "Conversation hooks report under the tmux session while the directory id is conv:<name>; an explicit field avoids guessing the mapping on the client"
+      },
+      {
+        "summary": "Quiet uses all nested subagents, and 'quiet <age>' replaces the age",
+        "rationale": "The critic's recommended fix; the preview header's 'active ago' moves with it, which is intended"
+      },
+      {
+        "summary": "Preview rail default-collapse is a SubagentRail defaultCollapsed prop that never reads or writes overdeck.ui.agentsRailCollapsed, applied in DirectoryTranscript for both Live and History",
+        "rationale": "Fixes the 1280 squeeze without changing the operator's saved preference on the conversation page; the Live row already lists subagents"
+      },
+      {
+        "summary": "Empty state: when no rows are visible, render a single column with one message and the Idle footer, no preview pane",
+        "rationale": "The critic offered 'collapse the preview or center one message'; dropping the preview when there is nothing to preview is the smallest change that leaves exactly one message"
+      },
+      {
+        "summary": "Provider error = newest non-sidechain user/assistant record of a claude-jsonl transcript is an assistant with isApiErrorMessage true; live idle conversations only; reuse the 'api-error' reason",
+        "rationale": "The issue's example conv-3870 is an idle conversation whose topic mentions billing (Claude Code writes the topic into the terminal title), so title text is unsafe; isApiErrorMessage is the harness's own verified marker"
+      },
+      {
+        "summary": "Keep all four defects in one issue with plan.metadata.sizeJustification rather than splitting",
+        "rationale": "The issue defines one acceptance (one screenshot set, one PR); the subsystem lint trips on doc files alone, so a split would not avoid the justification"
+      },
+      {
+        "summary": "Screenshots are published on orphan branch evidence/pan-4222 from a throwaway worktree and linked from the PR body; the P0 live shot injects the new hook's event through the dev frontend store",
+        "rationale": "gh cannot upload PR images; committing PNGs on the feature branch would land them on main; production :3011 cannot carry toolDescription until this merges and deploys"
+      }
+    ],
+    "items": [
+      {
+        "id": "hook-tool-description",
+        "title": "Hooks send the tool description with activity events",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/pan-hook-lib.sh",
+            "sync-sources/hooks/pre-tool-hook*",
+            "sync-sources/hooks/heartbeat-hook*",
+            "tests/scripts/pre-tool-hook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/scripts/pre-tool-hook.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/scripts/pre-tool-hook.test.ts passes with 4+ cases",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add pan_tool_description() to pan-hook-lib.sh with the D2 precedence (tool_input.description -> basename(file_path) -> pattern -> url -> skill -> empty; first line, trimmed, max 120 chars; empty without jq). pre-tool-hook and heartbeat-hook add toolDescription to their jq activity bodies. New test modeled on tests/scripts/session-start-hook.test.ts (stub pan_emit_event to an event log; heartbeat-hook also needs pan_append_session_index stubbed)."
+        },
+        "items": [
+          {
+            "id": "hook-tool-description.ac1",
+            "title": "Given a PreToolUse payload for Bash with tool_input.description 'Commit WI-7', when pre-tool-hook runs, then the emitted body contains \"tool\":\"Bash\" and \"toolDescription\":\"Commit WI-7\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-tool-description.ac2",
+            "title": "Given a Read payload with tool_input.file_path '/a/b/live-model.ts', when pre-tool-hook runs, then the emitted toolDescription is 'live-model.ts'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-tool-description.ac3",
+            "title": "Given a 300-character multi-line description, when the hook runs, then toolDescription contains only the first line, at most 120 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-tool-description.ac4",
+            "title": "Given the same Bash payload, when heartbeat-hook runs, then the emitted body carries hookName PostToolUse and toolDescription 'Commit WI-7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-tool-description",
+        "title": "Carry toolDescription through heartbeat ingestion and the runtime reducer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/events.ts",
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/event-reducers.ts",
+            "src/dashboard/server/services/agent-event-utils.ts",
+            "tests/contracts/heartbeat-ingestion.test.ts",
+            "tests/contracts/agent-runtime-reducers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/contracts/heartbeat-ingestion.test.ts tests/contracts/agent-runtime-reducers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both contract test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "live-row-tool-line"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add optional toolDescription to AgentActivityChangedEvent.payload and optional currentToolDescription to AgentRuntimeSnapshot. bodyToEvent 'activity' passes source.toolDescription when it is a non-empty string. Reducer: agent.activity_changed sets currentToolDescription only when activity==='working'; every other site that sets currentTool: undefined (grep 'currentTool: undefined' — 4 sites at 5a27ee12bc6: lines 459, 599, 1084, 1126) also sets currentToolDescription: undefined. Rebuild packages/contracts before typecheck."
+        },
+        "items": [
+          {
+            "id": "runtime-tool-description.ac1",
+            "title": "Given a heartbeat body {kind:'activity', activity:'working', tool:'Bash', toolDescription:'Commit WI-7'}, when bodyToEvent and decodeDomainEvent run, then the decoded payload.toolDescription is 'Commit WI-7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-tool-description.ac2",
+            "title": "Given a body without toolDescription, when it is decoded, then decoding succeeds with the field absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-tool-description.ac3",
+            "title": "When the reducer applies the working event, then agentRuntimeById[agent].currentToolDescription is 'Commit WI-7', and a following agent.thinking_started or agent.activity_changed(idle) clears it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-tool-description.ac4",
+            "title": "grep -c 'currentToolDescription: undefined' packages/contracts/src/event-reducers.ts prints 4, matching grep -c 'currentTool: undefined' which prints 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-runtime-id",
+        "title": "Conversation directory entries carry their runtime key",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/agent-directory.ts",
+            "src/dashboard/server/services/agent-directory.ts",
+            "src/dashboard/server/services/__tests__/agent-directory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-directory.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-directory.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add optional runtimeId to DirectoryEntry (doc comment: the id runtime events are keyed under when it differs from id). The conversation entry in buildDirectoryEntries step 3 sets runtimeId: row.tmuxSession. Rebuild contracts."
+        },
+        "items": [
+          {
+            "id": "directory-runtime-id.ac1",
+            "title": "Given a conversation row {name:'alpha', tmuxSession:'conv-alpha'}, when the directory builds, then the entry with id 'conv:alpha' returns runtimeId 'conv-alpha'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-runtime-id.ac2",
+            "title": "Given a native agent, when the directory builds, then its entry contains no runtimeId key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-row-tool-line",
+        "title": "Live row line 2 shows tool, description and age",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/live/live-model.ts",
+            "src/dashboard/frontend/src/components/Agents/live/live-model.test.ts",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentRow.tsx",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.tsx",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Agents/live/live-model.test.ts src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both Live test files pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (decisions D1, D3). activityLabel returns the bare tool name, then 'thinking', else 'working'. classifyEntry rule 6 passes currentToolDescription as the reason detail when a tool is set. LiveFacts.runtime gains currentToolDescription; LiveAgentsView factsFor reads runtimeById[entry.runtimeId ?? entry.id]. LiveAgentRow drops useAgentOutputSubscription, the agentOutputById selector and lastOutputLine; activity = reason.detail. Delete lastOutputLine/OUTPUT_LINE_MAX/ANSI_RE and its test; replace the 'streams a live agent's output' test."
+        },
+        "items": [
+          {
+            "id": "live-row-tool-line.ac1",
+            "title": "Given runtime {currentTool:'Bash', currentToolDescription:'Commit WI-7'} for a working agent, when the Live view renders, then agents-live-reason shows 'Bash' and agents-live-activity shows '· Commit WI-7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-row-tool-line.ac2",
+            "title": "Given a conversation entry with runtimeId 'conv-alpha' and a runtime snapshot keyed 'conv-alpha', when the Live view renders, then its row shows the tool name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-row-tool-line.ac3",
+            "title": "activityLabel returns 'Bash', 'thinking' and 'working' for the three runtime shapes (live-model.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-row-tool-line.ac4",
+            "title": "grep -rn 'useAgentOutputSubscription\\|agentOutputById\\|lastOutputLine' src/dashboard/frontend/src/components/Agents/live/ returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-quiet-subagents",
+        "title": "Quiet counts subagent activity and replaces the age",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/live/live-model.ts",
+            "src/dashboard/frontend/src/components/Agents/live/live-model.test.ts",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentRow.tsx",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.tsx",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Agents/live/live-model.test.ts src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.test.tsx"
+          ],
+          "expected_outputs": [
+            "both Live test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (decision D5). In buildLiveSections, after children attach, a Live row's since becomes the newest parseable timestamp of its own since and every child's lastActivityAt (all children, not just the 3 shown). LiveAgentRow renders 'quiet <age>' (text-state-stuck, data-component agents-live-quiet) in place of agents-live-age when quiet, never both."
+        },
+        "items": [
+          {
+            "id": "live-quiet-subagents.ac1",
+            "title": "Given a working conversation last active 8 minutes ago with a subagent active 30 seconds ago, when sections build, then the row's since is the subagent's time and the row renders no agents-live-quiet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-quiet-subagents.ac2",
+            "title": "Given a Waiting row with children, when sections build, then its since ignores the children",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-quiet-subagents.ac3",
+            "title": "Given a Live row silent for more than 5 minutes across itself and its children, when it renders, then it shows 'quiet 6m' and no agents-live-age element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preview-rail-collapsed",
+        "title": "Agents page preview starts the subagent rail collapsed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/SubagentRail.tsx",
+            "src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/Agents/directory/DirectoryTranscript.tsx",
+            "src/dashboard/frontend/src/components/Agents/directory/DirectoryDetail.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx src/dashboard/frontend/src/components/Agents/directory/DirectoryDetail.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (decision D6). SubagentRail gains defaultCollapsed?: boolean — when set, start collapsed without reading localStorage and never write overdeck.ui.agentsRailCollapsed on toggle. ConversationPanel gains subagentRailCollapsed?: boolean passed to the rail. DirectoryTranscript passes subagentRailCollapsed for the 'agent' and 'conversation' routes (Live preview and History detail both use it)."
+        },
+        "items": [
+          {
+            "id": "preview-rail-collapsed.ac1",
+            "title": "Given defaultCollapsed and localStorage overdeck.ui.agentsRailCollapsed='false', when SubagentRail renders with subagents, then it renders the 'Show agents rail' tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-rail-collapsed.ac2",
+            "title": "When the collapsed tab is clicked with defaultCollapsed set, then the rail expands and localStorage overdeck.ui.agentsRailCollapsed still contains 'false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preview-rail-collapsed.ac3",
+            "title": "Given a conversation entry in DirectoryDetail, when it renders, then ConversationPanel receives subagentRailCollapsed true (or the collapsed tab renders)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-single-empty-state",
+        "title": "Live view renders one empty state with no preview",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.tsx",
+            "src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Agents/live/LiveAgentsView.test.tsx"
+          ],
+          "expected_outputs": [
+            "LiveAgentsView.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (decision D7). When rows.length === 0, render a single column (no Group/Separator/preview Panel): the loading/error status or the agents-live-empty message, followed by the Idle footer (extract the footer JSX into one constant used by both layouts). The History link is always underlined."
+        },
+        "items": [
+          {
+            "id": "live-single-empty-state.ac1",
+            "title": "Given entries: [], when the Live view renders, then agents-live-empty renders and no 'Agent preview' region exists, and 'Select an agent to see its transcript.' is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-single-empty-state.ac2",
+            "title": "Given only idle entries with the footer collapsed, when the view renders, then the single empty message and the idle toggle render with no preview region",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-single-empty-state.ac3",
+            "title": "The History link in the empty message renders with the 'underline' class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-provider-error",
+        "title": "Detect a provider error at the end of a Claude Code conversation transcript",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-provider-error.ts",
+            "src/lib/overdeck/__tests__/conversation-provider-error.test.ts",
+            "src/lib/overdeck/conversation-list.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-provider-error.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-provider-error.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (decision D8). New module: providerErrorFromTranscriptTail(text, cutFirstLine) walks records newest first, skipping non user/assistant and isSidechain records; the first remaining record returns {message (joined text parts, trimmed, max 200), at, status, code} when it is an assistant with isApiErrorMessage===true, else null. readConversationProviderError(path) reads the last 64 KB via fs/promises open/read (pattern: src/lib/agents/transcript-turn.ts) and returns null on any error. conversation-list.ts sets providerError only when sessionAlive && !isWorking && pendingInputCount===0 && transcriptKind==='claude-jsonl', else null. Never parse pane or terminal titles (conv-3870 trap)."
+        },
+        "items": [
+          {
+            "id": "conversation-provider-error.ac1",
+            "title": "Given a tail ending in an assistant record with isApiErrorMessage true, apiErrorStatus 402 and error 'billing_error', when the parser runs, then it returns the message text, status 402, code 'billing_error' and the record timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-provider-error.ac2",
+            "title": "Given the error record followed only by system and attachment records, when the parser runs, then it still returns the error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-provider-error.ac3",
+            "title": "Given the error record followed by a user record, when the parser runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-provider-error.ac4",
+            "title": "Given a normal assistant reply whose text mentions 'OpenCode credits insufficient balance' (conv-3870 shape), when the parser runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-provider-error.ac5",
+            "title": "Given a missing file, when readConversationProviderError runs, then it resolves null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-error-needs-you",
+        "title": "Provider-error conversations classify into Needs you",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/agent-directory.ts",
+            "src/dashboard/server/services/agent-directory.ts",
+            "src/dashboard/server/services/__tests__/agent-directory.test.ts",
+            "src/dashboard/frontend/src/components/Agents/live/live-model.ts",
+            "src/dashboard/frontend/src/components/Agents/live/live-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-directory.test.ts src/dashboard/frontend/src/components/Agents/live/live-model.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. DirectoryEntry gains optional providerError {message, at}; DirectoryConversationRow gains providerError; the conversation entry copies it when present. classifyEntry rule 3 becomes derived?.attention==='api-error' || entry.providerError, with detail entry.providerError?.message ?? null. sinceOf returns providerError.at for that case. Rule 1 (blocked) still wins. Rebuild contracts."
+        },
+        "items": [
+          {
+            "id": "provider-error-needs-you.ac1",
+            "title": "Given a conversation row with providerError, when the directory builds, then the entry contains providerError {message, at}; without it the entry has no providerError key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-error-needs-you.ac2",
+            "title": "Given an idle conversation entry with providerError, when classifyEntry runs, then it returns section needs-you, kind api-error, tone stuck and the message as detail, and the row's since is the error time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-error-needs-you.ac3",
+            "title": "Given the same entry without providerError, when classifyEntry runs, then it returns section idle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-error-needs-you.ac4",
+            "title": "Given a blocked conversation with providerError, when classifyEntry runs, then 'question waiting' wins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-agents-page",
+        "title": "Document the activity line, quiet rule, preview rail, empty state and provider errors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/agents-directory.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/CONVERSATION-SUBAGENTS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Commit WI-7' reference/agents-directory.mdx",
+            "grep -c 'useAgentOutputSubscription' docs/DASHBOARD-ARCHITECTURE.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "first grep prints a count of at least 1",
+            "second grep prints 0",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. reference/agents-directory.mdx: the running-tool reason row becomes '<tool>, thinking, working' with the Bash · Commit WI-7 example, subagent-aware quiet and quiet replacing the age; the API error row adds conversations whose last turn failed at the provider; the preview paragraph notes the collapsed Agents rail; the empty case names the single message. docs/DASHBOARD-ARCHITECTURE.md 'Agents page: Live and History': reasons table rows 3 and 6, replace the useAgentOutputSubscription sentence with the runtime-snapshot description, document DirectoryEntry.runtimeId and providerError, the empty layout and the collapsed preview rail. docs/CONVERSATION-SUBAGENTS.md: one sentence on overdeck.ui.agentsRailCollapsed and the Agents-preview exception."
+        },
+        "items": [
+          {
+            "id": "docs-agents-page.ac1",
+            "title": "reference/agents-directory.mdx contains the example 'Bash · Commit WI-7' and states that a working subagent keeps its parent from reading quiet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agents-page.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains 'runtimeId' and 'providerError' and no longer contains 'useAgentOutputSubscription'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agents-page.ac3",
+            "title": "docs/CONVERSATION-SUBAGENTS.md contains 'overdeck.ui.agentsRailCollapsed' and says the Agents page preview starts the rail collapsed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "evidence-screenshots",
+        "title": "Before/after Playwright screenshots linked from the PR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:39:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4222",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-4222-evidence/capture.mjs",
+            ".pan/notes/pan-4222-evidence.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "node .tmp/pan-4222-evidence/capture.mjs",
+            "git ls-remote --heads origin evidence/pan-4222"
+          ],
+          "expected_outputs": [
+            "capture.mjs writes before/after PNGs for light and dark at 1600 and 1280",
+            "ls-remote prints the evidence/pan-4222 head",
+            ".pan/notes/pan-4222-evidence.md is committed with an 'Item: evidence-screenshots' trailer"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-4",
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 (decision D9). Before = http://127.0.0.1:3011/agents (main). After = workspace frontend via 'cd src/dashboard/frontend && npx vite --port 5174 --strictPort' (proxies /api and /ws to :3011, so rows are live Herdr agents). Isolated Playwright context; abort every non-GET /api/** request; set theme client-side. Capture light/dark at 1600x1000 and 1280x900 for: default list, a conversation-with-subagents selected, and the empty state (route GET /api/agent-directory?scope=live to {entries:[]} for that shot). IMPLEMENTATION CHECKPOINT: inject the new hook's agent.activity_changed event (currentTool 'Bash', toolDescription 'Commit WI-7') for a live Herdr agent through import('/src/lib/store.ts') in page.evaluate and screenshot the row; FALLBACK if the import fails: say so in the PR and rely on WI-1/WI-2/WI-4 tests. Publish PNGs on orphan branch evidence/pan-4222 from a throwaway worktree under .tmp/ (never git checkout in the workspace); PR body embeds ?raw=true links and states which P0 path was used and that the end-to-end hook path is observable after merge + pan reload + pan sync (the work agent runs neither). RACE: the Vite page also receives production agent.activity_changed events (without toolDescription) that overwrite the injected snapshot on the agent's next tool call — take the screenshot in the same page.evaluate/screenshot sequence immediately after injecting, or block /ws/rpc for that one shot. Commit .pan/notes/pan-4222-evidence.md (the link table plus which P0 path was used) with the 'Item: evidence-screenshots' trailer so pan task done finds a tracked commit; the capture script itself stays in gitignored .tmp/. If a pre-push hook fires on the PNG-only evidence branch and fails, surface it — never --no-verify."
+        },
+        "items": [
+          {
+            "id": "evidence-screenshots.ac1",
+            "title": "The PR body contains links to before and after PNGs on branch evidence/pan-4222, in light and dark, at 1600 and 1280, and .pan/notes/pan-4222-evidence.md contains the same link table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evidence-screenshots.ac2",
+            "title": "One after screenshot shows a live Herdr agent row reading 'Bash · Commit WI-7 · <age>', or the PR body states the fallback was used and why",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evidence-screenshots.ac3",
+            "title": "One after screenshot at 1280 shows a selected conversation whose transcript renders beside the collapsed 30px Agents tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evidence-screenshots.ac4",
+            "title": "The capture script aborts every non-GET /api request, so the production dashboard receives no writes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "runtime-tool-description",
+        "to": "live-row-tool-line",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-runtime-id",
+        "to": "live-row-tool-line",
+        "type": "blocks"
+      },
+      {
+        "from": "live-row-tool-line",
+        "to": "live-quiet-subagents",
+        "type": "blocks"
+      },
+      {
+        "from": "live-row-tool-line",
+        "to": "live-single-empty-state",
+        "type": "blocks"
+      },
+      {
+        "from": "live-quiet-subagents",
+        "to": "provider-error-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-runtime-id",
+        "to": "provider-error-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-provider-error",
+        "to": "provider-error-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-tool-description",
+        "to": "docs-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "live-quiet-subagents",
+        "to": "docs-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "live-single-empty-state",
+        "to": "docs-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "preview-rail-collapsed",
+        "to": "docs-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-error-needs-you",
+        "to": "docs-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-tool-description",
+        "to": "evidence-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "live-quiet-subagents",
+        "to": "evidence-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "live-single-empty-state",
+        "to": "evidence-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "preview-rail-collapsed",
+        "to": "evidence-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-error-needs-you",
+        "to": "evidence-screenshots",
+        "type": "blocks"
+      },
+      {
+        "from": "live-quiet-subagents",
+        "to": "live-single-empty-state",
+        "type": "blocks"
+      },
+      {
+        "from": "live-row-tool-line",
+        "to": "provider-error-needs-you",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

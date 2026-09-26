@@ -38,14 +38,15 @@ if [ "$HAVE_JQ" = "1" ]; then
   TRANSCRIPT_PATH=$(echo "$TOOL_INFO" | jq -r '.transcript_path // ""' 2>/dev/null || echo "")
 fi
 
+TOOL_DESCRIPTION=$(pan_tool_description "$TOOL_INFO")
 TS=$(date -Iseconds)
 
 # ── Emit agent.activity_changed(working, tool) ─────────────────────────────
 if [ "$HAVE_JQ" = "1" ]; then
-  BODY=$(jq -n --arg tool "$TOOL_NAME" --arg ts "$TS" \
-    '{kind: "activity", activity: "working", tool: $tool, hookName: "PostToolUse", timestamp: $ts}')
+  BODY=$(jq -n --arg tool "$TOOL_NAME" --arg ts "$TS" --arg desc "$TOOL_DESCRIPTION" \
+    '{kind: "activity", activity: "working", tool: $tool, toolDescription: $desc, hookName: "PostToolUse", timestamp: $ts}')
 else
-  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"hookName\":\"PostToolUse\",\"timestamp\":\"$TS\"}"
+  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"toolDescription\":\"$TOOL_DESCRIPTION\",\"hookName\":\"PostToolUse\",\"timestamp\":\"$TS\"}"
 fi
 pan_emit_event "$AGENT_ID" "$BODY"
 

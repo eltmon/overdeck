@@ -96,6 +96,8 @@ export interface DirectoryConversationRow {
   readonly isWorking: boolean;
   readonly pendingInputCount: number;
   readonly totalCost: number | null;
+  /** A provider error detected at the transcript's end (PAN-4222). */
+  readonly providerError?: { readonly message: string; readonly at: string } | null;
 }
 
 /** One subagent as a directory source reports it. */
@@ -540,6 +542,8 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
       costUsd: typeof row.totalCost === 'number' ? row.totalCost : null,
       source: 'conversation',
       transcript: { route: 'conversation', conversationName: row.name },
+      runtimeId: row.tmuxSession,
+      ...(row.providerError ? { providerError: row.providerError } : {}),
     };
     candidates.push({ entry, cwd: row.cwd || null, explicitProjectKey: row.projectKey });
     if (entry.state !== 'stopped') conversationParents.push({ entry, row });

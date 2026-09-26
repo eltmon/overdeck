@@ -6,22 +6,20 @@
  *
  * Line 1 names the work: the issue id and its title (the role only when it is
  * not `work`), or the conversation's label. Line 2 says why the row is here:
- * the reason, then what a live agent is doing now (its last output line,
- * streamed while the row is mounted) or what a waiting row waits on, then the
- * age, and `quiet <age>` in the stuck tone once a live agent has been silent
- * five minutes. Clicking selects (the preview pane shows it); Open, Enter or a
- * double-click goes to the agent's live pane or the conversation.
+ * the reason, then its tool description (when a tool call names one) or what
+ * a waiting row waits on, then the age, and `quiet <age>` in the stuck tone
+ * once a live agent has been silent five minutes. Clicking selects (the
+ * preview pane shows it); Open, Enter or a double-click goes to the agent's
+ * live pane or the conversation.
  */
 import type { DirectoryEntry } from '@overdeck/contracts';
 
-import { useAgentOutputSubscription } from '../../../hooks/useAgentOutputSubscription';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import { navigateToDecisionSubject } from '../../../lib/navigateToDecision';
 import { usePanesStore } from '../../../lib/panesStore';
-import { useDashboardStore } from '../../../lib/store';
 import { cn } from '../../../lib/utils';
 import { rowTitle } from '../directory/DirectoryList';
-import { LIVE_QUIET_AFTER_MS, lastOutputLine, type LiveRow, type LiveTone } from './live-model';
+import { LIVE_QUIET_AFTER_MS, type LiveRow, type LiveTone } from './live-model';
 
 const RAIL: Record<LiveTone, string> = {
   live: 'bg-state-live',
@@ -51,7 +49,6 @@ export const GLYPH_FONT = 'ui-sans-serif, "DejaVu Sans", "Segoe UI Symbol", "App
 /** Subagent lines shown under a row before `+N more`. */
 export const LIVE_SUBAGENT_LINES = 3;
 
-const EMPTY_LINES: readonly string[] = [];
 const UNASSIGNED_PROJECT = 'unassigned';
 
 export function liveRowDomId(entryId: string): string {
@@ -137,10 +134,7 @@ interface LiveAgentRowProps {
 
 export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgentRowProps) {
   const { entry, reason, children } = row;
-  const live = reason.section === 'live';
-  useAgentOutputSubscription(entry.id, live && entry.kind === 'agent' && entry.location === 'local');
-  const lines = useDashboardStore((state) => state.agentOutputById[entry.id] ?? EMPTY_LINES);
-  const activity = live ? lastOutputLine(lines) : reason.detail;
+  const activity = reason.detail;
   const age = row.since ? ageOf(row.since, now) : '';
   const quiet = isQuiet(row, now);
   const hiddenChildren = Math.max(0, children.length - LIVE_SUBAGENT_LINES);
@@ -200,8 +194,9 @@ export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgent
             </span>
           )}
           <span className="ml-auto flex shrink-0 items-baseline gap-1.5 pl-2 font-mono-ui tabular-nums" title={row.since ?? undefined}>
-            {age && <span data-component="agents-live-age">{age}</span>}
-            {quiet && <span data-component="agents-live-quiet" className="text-state-stuck">quiet {age}</span>}
+            {quiet
+              ? <span data-component="agents-live-quiet" className="text-state-stuck">quiet {age}</span>
+              : age && <span data-component="agents-live-age">{age}</span>}
           </span>
         </div>
         {children.slice(0, LIVE_SUBAGENT_LINES).map((child) => {

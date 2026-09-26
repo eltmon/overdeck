@@ -178,3 +178,13 @@ otherwise; a Codex child keeps the rollout's own task status. Only `claude` and 
 transcripts have subagents; other harnesses answer an empty list. The Agents Directory lists
 these as `subagent` entries under their parent (`src/dashboard/server/services/agent-subagents.ts`).
 
+## Agents rail collapse (PAN-4222)
+
+`SubagentRail`'s collapsed state persists to `localStorage['overdeck.ui.agentsRailCollapsed']`,
+read on mount and written on every toggle — except when the rail is given
+`defaultCollapsed`: it then starts at that state instead of reading localStorage, and toggling it
+never writes back. The Agents page preview (Live's preview pane, and History's detail pane)
+passes `defaultCollapsed`, so it always starts with the rail collapsed at its default 1280px
+width without disturbing whatever collapsed/expanded state the user left on the conversation's
+own full page.
+

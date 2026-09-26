@@ -31,6 +31,9 @@ export const bodyToEvent = (
           agentId,
           activity: source['activity'],
           currentTool: source['tool'] as string | undefined,
+          toolDescription: typeof source['toolDescription'] === 'string' && source['toolDescription'] !== ''
+            ? source['toolDescription']
+            : undefined,
           hookName: source['hookName'] as string | undefined,
         },
       };
