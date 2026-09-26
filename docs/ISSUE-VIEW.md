@@ -102,7 +102,8 @@ The PAN-2499 inventory records action-renderer relocations separately from each 
 
 - A startable issue posts to `POST /api/agents` with its issue and project IDs.
 - A stopped resumable session posts to `POST /api/agents/:agentId/resume`.
-- A paused or troubled issue asks for confirmation, names the gate being cleared, and then posts to `POST /api/agents` with `clearGates: true`.
+- A paused issue opens the recovery dialog (Unpause & start), which posts to `POST /api/agents` with `clearGates: true`.
+- A troubled issue's Start is refused with a 409 whose hint names `pan untroubled <agent-id>`; there is no troubled recovery dialog, so the operator clears the gate from the CLI (or `pan start <id> --force`) before retrying.
 - A running issue renders no start CTA, and a failed request remains visible as an inline error.
 
 The server honors `clearGates` only for a trusted operator-origin request. It clears paused and troubled state through the same shared intervention doors used by the CLI, emits the corresponding intervention event, and refuses a gated spawn when the flag is absent. Do not clear agent state directly in a route or UI component.

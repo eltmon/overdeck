@@ -129,3 +129,4 @@
 1212 src/lib/overdeck/conversation-runtime.ts # PAN-3668
 1219 src/dashboard/server/ws-rpc.ts # PAN-3668
 1034 src/cli/commands/doctor.ts # PAN-3668
+1283 src/cli/commands/start.ts # PAN-4211

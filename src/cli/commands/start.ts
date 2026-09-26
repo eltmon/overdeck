@@ -9,7 +9,8 @@ import { promisify } from 'util';
 import { exec, execFile, execFileSync, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
+import { clearAgentPaused, clearAgentTroubled, getAgentState, spawnAgent } from '../../lib/agents.js';
+import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { attachHintLines, resolveAttach } from '../../lib/terminal-backends/attach-hint.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
@@ -299,6 +300,12 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
   return { issueId, title: issueId, body: '' };
 }
 
+/** PAN-4211: `--force` clears the troubled gate the way dashboard `clearGates` does. */
+async function clearTroubledForForce(agentId: string, issueId: string): Promise<void> {
+  await Effect.runPromise(clearAgentTroubled(agentId));
+  await appendOperatorInterventionEvent({ issueId, kind: 'untroubled', source: 'pan start --force' });
+}
+
 /**
  * Handle remote workspace agent spawning
  */
@@ -307,6 +314,7 @@ async function handleRemoteWorkspace(
   options: IssueOptions,
   spinner: Ora,
   clearPauseBeforeSpawn: boolean,
+  clearTroubledBeforeSpawn: boolean,
   resolved?: ResolvedProject,
 ): Promise<void> {
   const config = loadConfigSync();
@@ -418,6 +426,9 @@ async function handleRemoteWorkspace(
   try {
     if (clearPauseBeforeSpawn) {
       await Effect.runPromise(clearAgentPaused(agentId));
+    }
+    if (clearTroubledBeforeSpawn) {
+      await clearTroubledForForce(agentId, issueId);
     }
 
     const remoteAgent = await spawnRemoteAgent({
@@ -781,13 +792,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
     return exitCli(1);
   }
-  if (existingAgentState?.troubled === true) {
+  const shouldClearTroubledBeforeSpawn = existingAgentState?.troubled === true && options.force === true;
+  if (existingAgentState?.troubled === true && !options.force) {
     const failures = existingAgentState.consecutiveFailures ?? 0;
     process.stderr.write(chalk.red(`Agent ${agentId} is troubled (${failures} failure${failures === 1 ? '' : 's'}) and will not be started.\n`));
     if (existingAgentState.lastFailureReason) {
       process.stderr.write(chalk.red(`Last failure: ${existingAgentState.lastFailureReason}\n`));
     }
-    process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} before starting.\n`));
+    process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} to clear the gate, or pan start ${id} --force to clear it and start now.\n`));
     return exitCli(1);
   }
 
@@ -937,7 +949,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     } else if (!swarmActive) {
       try {
-        await assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
+        await assertCanStartFresh(id, {
+          allowPausedForce: shouldClearPauseBeforeSpawn,
+          allowTroubledForce: shouldClearTroubledBeforeSpawn,
+        });
       } catch (error) {
         if (workspacePath || isRemote) {
           throw error;
@@ -947,7 +962,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Handle remote workspace
     if (effectiveRemote) {
-      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn, resolved ?? undefined);
+      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn, shouldClearTroubledBeforeSpawn, resolved ?? undefined);
       return;
     }
 
@@ -1188,6 +1203,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // details below and exits; any remaining pre-spawn delay is tracker/prompt work.
     if (shouldClearPauseBeforeSpawn) {
       await Effect.runPromise(clearAgentPaused(agentId));
+    }
+    if (shouldClearTroubledBeforeSpawn) {
+      await clearTroubledForForce(agentId, id);
     }
     const agent = await runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
       issueId: id,

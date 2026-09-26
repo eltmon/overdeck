@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T02:32:15.025548Z · model: claude-opus-5-5 · open: 818_
+_Last sequenced: 2026-09-26T05:07:19.410548Z · model: claude-opus-5-5 · open: 818_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1137,7 +1137,7 @@ Triage: maps to the new closed-issue-reap routine, a different mechanism; verify
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T02:32:15.025548Z",
+  "generatedAt": "2026-09-26T05:07:19.410548Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 818,
