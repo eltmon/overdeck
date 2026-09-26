@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4210",
   "created": "2026-09-26T01:39:06.772Z",
-  "updated": "2026-09-26T04:28:33.844Z",
+  "updated": "2026-09-26T04:28:47.475Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "show-freeze-hold.ac1": {
       "status": "completed",
       "doneAt": "2026-09-26T04:28:33.843Z"
+    },
+    "show-freeze-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:28:47.474Z"
     }
   }
 }
