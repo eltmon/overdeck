@@ -571,7 +571,10 @@ Auto-resume is intentionally suppressible:
   acknowledgement at all, so a machine never waives a health warning on a
   retry. Only a refusal whose response carries a guardrail decision is
   deferred; the start gate and the dirty-tree guard also answer 409 and stay
-  failures. See "Deacon-lite" below for the schedule and stop conditions.
+  failures. The retried spawn still runs on the operator's `pan start --model`
+  from planning time (PAN-3022): the model lives in the auto-start consent
+  record the retry spends, not on the deferred request itself. See
+  "Deacon-lite" below for the schedule and stop conditions.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -742,6 +745,9 @@ run 2, 4, 8 and 16 minutes apart, then every 20 minutes. Each one POSTs
 `/api/agents` through `spawnWorkAgentThroughAgentsEndpoint` with
 `autoSpawnConsentRequired: true` and no acknowledgement, so a success spends
 the operator's auto-start consent exactly as the first attempt would have.
+The retried spawn runs on the operator's `pan start --model` from planning
+time (PAN-3022) — the retry carries no model of its own, so it reads the
+consent record's `workModel` and spends it along with the rest of the claim.
 
 It stands down (a `handoff.abandoned` entry with `outcome: 'stood-down'` and an
 info activity line, no failure) when the operator already acted: an

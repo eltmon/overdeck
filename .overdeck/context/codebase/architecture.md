@@ -73,13 +73,22 @@ panes (Herdr default; legacy tmux on `tmux -L overdeck`), with state in
 2. Work agent — `agents/spawn.ts` `spawnAgent` (~:600; single-work tier staffing ~:629)
 3. Role runs — `agents/spawn.ts` `spawnRun` (~:120; slot tier staffing ~:137)
 4. Restart — `agents/resume.ts` / `agents/recovery.ts`
-5. Dashboard start route — `dashboard/server/routes/agents.ts` (~:3156, shells to `pan start`)
+5. Dashboard start route — `POST /api/agents`, `postAgentsRoute` in
+   `dashboard/server/routes/agents/spawn.ts` (~:263, shells to `pan start` via
+   `buildPanStartArgs` in `routes/agents/shared.ts`)
 
 Conversations pin harness at creation in `handleConversationCreate`
 (`src/lib/overdeck/conversation-runtime.ts` ~:918, called from `POST /api/conversations` in
 `routes/conversations.ts` ~:303) — not a spawn site. Conversation kickoff templates read at
 request time live in `roles/` (`handoff.md`, `retrospective.md`); `src/lib/cloister/prompts/*.md`
 are build-copied to `dist/dashboard/prompts/` and cached by `renderPrompt`.
+
+Planning auto-start consent lives in
+`~/.overdeck/agents/planning-<issue>/auto-spawn-on-finalize.json`
+(`planning/auto-spawn-consent.ts`): one generation per planning cycle, claimed
+and spent by the first consent-bearing work spawn (`withAutoSpawnConsentClaim`
+in `agents/spawn.ts` `spawnAgent`/`spawnRun` and `remote/remote-agents.ts`).
+There is no per-issue pipeline record since the Cut (PAN-3917).
 
 ## Projects and workspaces domain (PAN-1990, PAN-3330)
 
@@ -119,4 +128,4 @@ memoized 3 s); entry `state` comes from the pane inventory, never stored
 status. PAN-4197 makes the Live view (`?scope=live`) the default and keeps the
 Directory as `?view=history`.
 
-<!-- last-verified: 2026-09-25 -->
+<!-- last-verified: 2026-09-26 -->

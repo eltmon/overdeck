@@ -10,6 +10,7 @@ interface AutoSpawnConsentRecord {
   generation: string;
   status: 'granted' | 'claimed' | 'spent';
   claimId?: string;
+  workModel?: string;
   updatedAt: string;
 }
 
@@ -17,6 +18,7 @@ export interface AutoSpawnConsentClaim {
   issueId: string;
   generation: string;
   claimId: string;
+  workModel?: string;
 }
 
 export type AcceptAutoSpawnConsent = () => Promise<void>;
@@ -35,9 +37,10 @@ function autoSpawnConsentLockPath(issueId: string): string {
 
 function parseConsentRecord(raw: string): AutoSpawnConsentRecord | null {
   const value = JSON.parse(raw) as Partial<AutoSpawnConsentRecord> & { autoSpawnOnFinalize?: unknown };
+  const workModel = typeof value.workModel === 'string' && value.workModel.length > 0 ? value.workModel : undefined;
   if (value.version === 2 && typeof value.generation === 'string'
     && (value.status === 'granted' || value.status === 'claimed' || value.status === 'spent')) {
-    return value as AutoSpawnConsentRecord;
+    return { ...(value as AutoSpawnConsentRecord), workModel };
   }
   if (typeof value.autoSpawnOnFinalize === 'boolean') {
     return {
@@ -99,12 +102,19 @@ export async function readAutoSpawnOnFinalizeFlagAsync(issueId: string): Promise
   return (await readConsentRecord(issueId))?.status === 'granted';
 }
 
-export async function writeAutoSpawnOnFinalizeFlag(issueId: string, enabled: boolean): Promise<void> {
+export async function writeAutoSpawnOnFinalizeFlag(
+  issueId: string,
+  enabled: boolean,
+  options: { workModel?: string | null } = {},
+): Promise<void> {
   await withConsentLock(issueId, 'planning-consent:new-cycle', async () => {
+    const current = await readConsentRecordForTransition(issueId);
+    const workModel = options.workModel === null ? undefined : (options.workModel ?? current?.workModel);
     await writeConsentRecord(issueId, {
       version: 2,
       generation: randomUUID(),
       status: enabled ? 'granted' : 'spent',
+      workModel,
       updatedAt: new Date().toISOString(),
     });
   });
@@ -126,8 +136,14 @@ export async function claimAutoSpawnConsentForWorkStart(issueId: string): Promis
       claimId,
       updatedAt: new Date().toISOString(),
     });
-    return { issueId: issueId.toUpperCase(), generation: current.generation, claimId };
+    return { issueId: issueId.toUpperCase(), generation: current.generation, claimId, workModel: current.workModel };
   });
+}
+
+export async function readAutoSpawnConsentWorkModel(issueId: string): Promise<string | undefined> {
+  const record = await readConsentRecord(issueId);
+  if (!record || record.status === 'spent') return undefined;
+  return record.workModel;
 }
 
 async function transitionClaim(
@@ -158,7 +174,7 @@ export async function releaseAutoSpawnConsentClaim(claim: AutoSpawnConsentClaim)
 
 export async function withAutoSpawnConsentClaim<T>(
   issueId: string,
-  operation: (accept: AcceptAutoSpawnConsent) => Promise<T>,
+  operation: (accept: AcceptAutoSpawnConsent, claim: AutoSpawnConsentClaim) => Promise<T>,
   options: {
     isAccepted?: (result: T) => boolean;
     logWarning?: (message: string) => void;
@@ -184,7 +200,7 @@ export async function withAutoSpawnConsentClaim<T>(
   };
 
   try {
-    const result = await operation(accept);
+    const result = await operation(accept, claim);
     if (!accepted) {
       if ((options.isAccepted ?? (() => true))(result)) await accept();
       else await releaseAutoSpawnConsentClaim(claim);
