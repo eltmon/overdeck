@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3022",
   "created": "2026-09-26T06:16:24.731Z",
-  "updated": "2026-09-26T08:21:53.592Z",
+  "updated": "2026-09-26T08:22:06.031Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
     "delete-resolve-issue-work-model.ac2": {
       "status": "completed",
       "doneAt": "2026-09-26T08:21:53.592Z"
+    },
+    "docs-handoff-work-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:06.030Z"
     }
   }
 }
