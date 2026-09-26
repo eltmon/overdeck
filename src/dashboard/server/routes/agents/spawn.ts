@@ -9,7 +9,7 @@ import {
   saveAgentState, determineModel, getProviderAuthMode, getAgentState,
   clearAgentPaused, clearAgentTroubled,
 } from '../../../../lib/agents.js';
-import { resolveIssueWorkModel } from '../../../../lib/agents/staffing.js';
+import { readAutoSpawnConsentWorkModel } from '../../../../lib/planning/auto-spawn-consent.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
@@ -57,6 +57,7 @@ import {
   isInternalAgentRequest,
   readJsonBody,
   resolveRequestedStartedBy,
+  resolveWorkSpawnRequestedModel,
   spawnPanCommandDetached,
   updateRegistryForAgentStart,
   type AgentStartGateDecision,
@@ -457,24 +458,29 @@ export const postAgentsRoute = HttpRouter.add(
     const { decision: spawnGuardrails, refusal: guardrailRefusal } = resolveSpawnGuardrailRefusal(issueId, health, guardrailAcknowledgement);
     if (guardrailRefusal) return jsonResponse(guardrailRefusal.body, { status: guardrailRefusal.status });
 
+    // PAN-3022: a consent-bearing spawn with no explicit body model honors the
+    // work model carried on the planning cycle's auto-start consent (the
+    // operator's `pan start --model` at planning time) before the role
+    // default. readAutoSpawnConsentWorkModel's own promise never rejects, but
+    // .catch keeps this lookup fail-open regardless.
+    const consentWorkModel = autoSpawnConsentRequired && !(body as any).model
+      ? yield* Effect.promise(() => readAutoSpawnConsentWorkModel(issueId).catch(() => undefined))
+      : undefined;
+    const requestedModel = resolveWorkSpawnRequestedModel((body as any).model, consentWorkModel);
+
     let spawnModel: string;
     try {
-      // PAN-3022: no explicit body model → honor the per-issue work-model
-      // override (record.workModel, PAN-2997 issue-override tier) before the
-      // role default — same resolution order as `pan start`. Without this the
-      // route resolves the role default and the `pan start --model` child then
-      // persists it, clobbering the stored override.
       spawnModel = determineModel({
-        model: (body as any).model ?? resolveIssueWorkModel(issueId),
+        model: requestedModel,
         role,
         spawnKey: `${role}:${issueId}`,
       });
     } catch (err) {
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
-    // PAN-3857: forward --model to `pan start` only for an explicit body model —
+    // PAN-3857: forward --model to `pan start` only for an explicit/consent model —
     // forwarding a resolved default would skip tier resolution and stamp record.workModel.
-    const explicitModel: string | null = (body as any).model ? spawnModel : null;
+    const explicitModel: string | null = requestedModel ? spawnModel : null;
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
       const codexAuth = yield* Effect.tryPromise({
