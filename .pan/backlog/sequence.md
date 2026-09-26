@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T05:56:12.047219Z · model: claude-opus-5-5 · open: 803_
+_Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 800_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -210,7 +210,6 @@ _Last sequenced: 2026-09-26T05:56:12.047219Z · model: claude-opus-5-5 · open: 
 | 250 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
 | 251 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
 | 252 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 253 | PAN-3295 | M | high | ok |  |  | Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability. |
 | 254 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
@@ -329,7 +328,6 @@ _Last sequenced: 2026-09-26T05:56:12.047219Z · model: claude-opus-5-5 · open: 
 | 371 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
 | 372 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
 | 373 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
-| 374 | PAN-3504 | XS | high | needs-refinement |  |  | Duplicate of PAN-3499 (parked.ts ProjectConfig.projectPath typecheck red on main); confirm landed and close one of the pair. |
 | 375 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
 | 376 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
 | 377 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
@@ -510,7 +508,6 @@ _Last sequenced: 2026-09-26T05:56:12.047219Z · model: claude-opus-5-5 · open: 
 | 561 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
 | 562 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
 | 563 | PAN-3837 | S | medium | needs-refinement |  |  | Stale starting placeholder can no longer occur; remaining half = per-issue fs-lock contention kills auto-handoff spawn with no retry |
-| 564 | PAN-3499 | XS | medium | needs-refinement |  |  | Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate. |
 | 565 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
 | 567 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 568 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
@@ -1118,10 +1115,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T05:56:12.047219Z",
+  "generatedAt": "2026-09-26T05:56:49.453782Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 803,
+  "openCount": 800,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -3627,18 +3624,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-3295",
-      "rank": 253,
-      "size": "M",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3236",
       "rank": 254,
       "size": "XS",
@@ -5072,18 +5057,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "why": "pan tell is codex-conversation-unaware",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-3504",
-      "rank": 374,
-      "size": "XS",
-      "importance": "high",
-      "score": 60,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Duplicate of PAN-3499 (parked.ts ProjectConfig.projectPath typecheck red on main); confirm landed and close one of the pair.",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-3003",
@@ -7286,18 +7259,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "rationale": "Triage: the stale \"starting\" placeholder is structurally gone, but the per-issue record lock (fs-lock.ts) contention that killed the auto-handoff spawn still exists. Raised from the tail to medium because a handoff spawn dying on first contention with no retry is a live pipeline gap.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-3499",
-      "rank": 564,
-      "size": "XS",
-      "importance": "medium",
-      "score": 40,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate.",
-      "gate": "auto",
-      "planning": "skip"
     },
     {
       "issue": "PAN-2978",
@@ -11205,13 +11166,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-3499",
-      "to": "PAN-3504",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.95
     },
     {
       "from": "PAN-3532",
