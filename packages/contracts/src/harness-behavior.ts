@@ -3,13 +3,14 @@ import type { Harness } from "./types"
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
 
-export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui"
+export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui" | "prime-agent-host"
 export type HarnessDeliveryKind =
   | "pty-supervisor"
   | "rpc-fifo"
   | "codex-exec-resume"
   | "codex-app-server-rpc"
   | "acp-host-rpc"
+  | "prime-agent-host-rpc"
   | "tmux-paste"
 export type HarnessReadinessKind =
   | "claude-session-signal"
@@ -19,10 +20,11 @@ export type HarnessReadinessKind =
   | "acp-host-ready"
   | "kimi-session-signal"
   | "muse-tui-prompt"
-export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl"
-export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log"
-export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse"
-export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse"
+  | "prime-agent-host-ready"
+export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl" | "muse-jsonl" | "prime-agent-jsonl"
+export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest" | "muse-session-log" | "prime-agent-session-id"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code" | "opencode" | "muse" | "prime-agent"
+export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code" | "muse" | "prime_agent"
 
 const AGENT_SESSION_PREFIXES = ["agent-", "planning-", "specialist-", "strike-", "inspect-"] as const
 const AGENT_SESSION_SINGLETONS = new Set(["flywheel-orchestrator", "conv-flywheel-orchestrator"])
@@ -57,7 +59,7 @@ export interface HarnessBehavior {
   readonly usesRpcFifo: boolean
   readonly usesCodexHome: boolean
   readonly injectsPromptTimeMemory: boolean
-  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui"
+  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui" | "prime-agent-host"
   readonly readyTimeoutSeconds: number
 }
 
@@ -216,6 +218,29 @@ export const MUSE_BEHAVIOR: HarnessBehavior = {
   readyTimeoutSeconds: 60,
 }
 
+export const PRIME_AGENT_BEHAVIOR: HarnessBehavior = {
+  displayName: "Prime Agent",
+  nativeCommands: [], // 0.8.0 exposes get_commands only for extension/skill commands; none are Overdeck-relevant
+  executableName: "prime-agent",
+  processNames: ["prime-agent"],
+  launchCommandKind: "prime-agent-host",
+  deliveryKind: "prime-agent-host-rpc",
+  readinessKind: "prime-agent-host-ready",
+  transcriptKind: "prime-agent-jsonl",
+  sessionIdSource: "prime-agent-session-id",
+  contextLayerKind: "prime-agent",
+  feedKind: "prime_agent",
+  supportsPtySupervisor: false,
+  supportsChannelsBridge: false,
+  supportsConversationStreaming: true,
+  supportsPatchProjection: false,
+  usesRpcFifo: false,
+  usesCodexHome: false,
+  injectsPromptTimeMemory: false,
+  workAgentMode: "prime-agent-host",
+  readyTimeoutSeconds: 60,
+}
+
 const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   "opencode": OPENCODE_BEHAVIOR,
   "claude-code": CLAUDE_CODE_BEHAVIOR,
@@ -224,6 +249,7 @@ const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   acp: ACP_BEHAVIOR,
   "kimi-code": KIMI_CODE_BEHAVIOR,
   muse: MUSE_BEHAVIOR,
+  "prime-agent": PRIME_AGENT_BEHAVIOR,
 }
 
 export function getHarnessBehavior(harness: HarnessName | undefined | null): HarnessBehavior {
@@ -233,6 +259,7 @@ export function getHarnessBehavior(harness: HarnessName | undefined | null): Har
   if (harness === "acp") return ACP_BEHAVIOR
   if (harness === "kimi-code") return KIMI_CODE_BEHAVIOR
   if (harness === "muse") return MUSE_BEHAVIOR
+  if (harness === "prime-agent") return PRIME_AGENT_BEHAVIOR
   return CLAUDE_CODE_BEHAVIOR
 }
 

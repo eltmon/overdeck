@@ -86,9 +86,9 @@ export type AgentResolution = typeof AgentResolution.Type
 // PAN-1989 retired 'pi'; legacy DB rows read as 'ohmypi' via getHarness().
 // All new write sites use canonical harness literals.
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent'
 
-export const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse'])
+export const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.
