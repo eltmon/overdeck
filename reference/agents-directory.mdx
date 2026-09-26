@@ -55,6 +55,15 @@ or waiting on, then how long ago. A subagent shows as a `↳` line under the
 agent that started it, with `●` while it works; after three, the row says
 `+N more`.
 
+A gauntlet [lane](/reference/lanes) shows as a `↳` line under the
+conversation that launched it: `↳ <role letter> <lane key> i<n> · <state>`,
+with its report badge (`DONE`, `BLOCKED` or `FAILED`), under a lanes toggle on
+that row. Every lane line shows; the three-line cap applies to subagents only.
+A lane that needs you also gets its own row in **Needs you**. A lane whose
+launcher is not on the page keeps its own row. A handoff or fork successor
+always keeps its own row, with a `continues ← #<id>` link to the conversation
+it continues, so a live successor never hides under an ended predecessor.
+
 Click a row to preview it: the right pane shows its header, its issue and PR,
 and its live transcript, and the list stays in view. Use `↑` / `↓` to move the
 selection. **Open** (on the row you hover or select), `Enter` or a
@@ -92,6 +101,13 @@ left pane closed to hide it. **Live** in the top bar goes back.
 | **Locations** (left) | **Local** and, when an agent runs on Fly, **Remote (Fly)**. Under each: your projects, then each issue (newest number first) and one **Conversations** group for work that has no issue. The numbers on the right are live agents of all shown (hover for the words). |
 | **Agents** (middle) | Every entry under the selected place. A subagent or worker sits indented under the agent or conversation that spawned it. When its parent lives somewhere else, the row says **spawned by** that parent instead. Each row shows the id, role, harness and model, last activity and age. |
 | **Detail** (right) | The entry's header (id, harness, model, state, when it started and was last active, cost when known, and a **Spawned by** link), the issue's state, PR, checks and branch with the issue's actions, and the transcript. |
+
+Lanes nest under the conversation that launched them, and handoff and fork
+successors nest under their predecessor; a lane shows `<role letter> <lane key>
+i<n>` before its label and a successor shows a `continues ← #<id>` link.
+History shows at most two levels of nesting. A deeper row keeps its place
+under its real parent's group but renders at the second level, with the
+marker `↳ continued from <parent>` naming its real parent.
 
 Conversations keep their composer in the detail pane. A subagent's transcript
 is read-only: it has no input channel of its own. So is an external agent's:

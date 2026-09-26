@@ -26,6 +26,16 @@ to. Pipeline patrols that act on the `work` role never act on it.
 
 `--issue` is required. Issue-less workers are not supported yet.
 
+### Workers or lanes?
+
+Use a worker for issue-linked delegation inside the managed pipeline: it
+belongs to an issue and reports back to the agent that started it. Use a
+[lane](/reference/lanes) (`pan lane start`) for gauntlet fan-out outside the
+pipeline: a lane is a conversation, so it runs any harness and model, nests
+under its orchestrator on the Command Deck, and has a transcript view and a
+composer. The Command Deck lists conversations only, which is why lanes are
+conversations and not workers.
+
 ## Commands
 
 ```bash
