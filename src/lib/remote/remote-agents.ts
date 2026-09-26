@@ -548,7 +548,11 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
   return withAutoSpawnConsentClaim(
     options.issueId,
-    (acceptConsent) => spawnRemoteAgentWithoutConsentClaim(options, acceptConsent),
+    // PAN-3022: an operator start never reaches this path, so claim.workModel
+    // (the planning cycle's --model) outranks options.model here.
+    (acceptConsent, claim) => spawnRemoteAgentWithoutConsentClaim(
+      { ...options, model: claim.workModel ?? options.model }, acceptConsent,
+    ),
     { isAccepted: (state) => state.status === 'running' },
   );
 }

@@ -440,6 +440,42 @@ describe('spawnAgent PTY supervisor wiring', () => {
     await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1405')).resolves.toBe(false);
   });
 
+  it('applies the consent work model over the caller model for a consent-bearing spawnAgent (PAN-3022)', async () => {
+    writeSupervisorArtifact();
+    const { writeAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { spawnAgent } = await import('../agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-1405', true, { workModel: 'claude-opus-5-5' });
+
+    const state = await spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      startedBy: 'planning-auto-handoff',
+      autoSpawnConsentRequired: true,
+    });
+
+    expect(state.model).toBe('claude-opus-5-5');
+  });
+
+  it('keeps the caller model and leaves consent granted for an operator-started spawnAgent (PAN-3022)', async () => {
+    writeSupervisorArtifact();
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlagAsync } = await import('../planning/auto-spawn-consent.js');
+    const { spawnAgent } = await import('../agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-1405', true, { workModel: 'claude-opus-5-5' });
+
+    const state = await spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      startedBy: 'operator:cli:pan-start',
+    });
+
+    expect(state.model).toBe('claude-sonnet-4-6');
+    await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1405')).resolves.toBe(true);
+  });
+
   it('pins and persists a fresh Claude work-agent session before hooks run', async () => {
     writeSupervisorArtifact();
     const { spawnAgent } = await import('../agents.js');
