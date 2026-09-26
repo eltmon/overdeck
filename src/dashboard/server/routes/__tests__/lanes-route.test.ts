@@ -11,12 +11,21 @@ const launchMock = vi.fn();
 const listMock = vi.fn();
 const invalidateMock = vi.fn();
 const getByNameMock = vi.fn();
+const reapMock = vi.fn();
+const ARCHIVE_DEPS = { marker: 'archive-deps' };
 
 vi.mock('../../../../lib/lanes/launch.js', () => ({ launchLane: (...args: unknown[]) => launchMock(...args) }));
 vi.mock('../../../../lib/lanes/views.js', () => ({
   listLaneViews: (...args: unknown[]) => listMock(...args),
   invalidateLaneViews: () => invalidateMock(),
 }));
+vi.mock('../../../../lib/lanes/reap.js', () => ({
+  reapLane: (...args: unknown[]) => reapMock(...args),
+  LaneReapError: class LaneReapError extends Error {
+    constructor(readonly status: number, message: string) { super(message); }
+  },
+}));
+vi.mock('../conversations.js', () => ({ conversationArchiveDependencies: ARCHIVE_DEPS }));
 vi.mock('../../../../lib/overdeck/conversations.js', () => ({
   LANE_ROLES: ['builder', 'critic', 'verifier', 'play', 'orchestrator'],
   getConversationByName: (...args: unknown[]) => getByNameMock(...args),
@@ -49,6 +58,7 @@ beforeEach(() => {
   listMock.mockReset();
   invalidateMock.mockReset();
   getByNameMock.mockReset();
+  reapMock.mockReset();
 });
 
 describe('lanes routes (PAN-4223 WI-5)', () => {
@@ -57,6 +67,8 @@ describe('lanes routes (PAN-4223 WI-5)', () => {
     expect((await call('POST', '/api/lanes', { body: BODY, origin: evil })).status).toBe(403);
     expect((await call('GET', '/api/lanes', { origin: evil })).status).toBe(403);
     expect((await call('GET', '/api/lanes/lane-1', { origin: evil })).status).toBe(403);
+    expect((await call('POST', '/api/lanes/lane-1/reap', { body: {}, origin: evil })).status).toBe(403);
+    expect(reapMock).not.toHaveBeenCalled();
     expect(launchMock).not.toHaveBeenCalled();
   });
 
@@ -97,5 +109,20 @@ describe('lanes routes (PAN-4223 WI-5)', () => {
     expect(await call('GET', '/api/lanes/conv-lane-1')).toEqual({ status: 200, json: { name: 'lane-1', activity: 'idle' } });
     expect(listMock).toHaveBeenCalledWith({ run: 'hotel', key: '663', role: 'builder' });
     expect((await call('GET', '/api/lanes/root-1')).status).toBe(404);
+  });
+
+  it('reaps with park and keep passed through and the exported archive dependencies', async () => {
+    reapMock.mockResolvedValue({ removed: true, archived: false, parkedPatch: null, warnings: [] });
+    const res = await call('POST', '/api/lanes/lane-1/reap', { body: { keep: true } });
+    expect(res).toEqual({ status: 200, json: { removed: true, archived: false, parkedPatch: null, warnings: [] } });
+    expect(reapMock).toHaveBeenCalledWith('lane-1', { park: false, keep: true }, { archive: ARCHIVE_DEPS });
+    expect(invalidateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes a reap refusal status through and rejects a non-boolean flag', async () => {
+    const { LaneReapError } = await import('../../../../lib/lanes/reap.js');
+    reapMock.mockRejectedValue(new LaneReapError(409, 'lane directory is dirty; pass --park'));
+    expect(await call('POST', '/api/lanes/lane-1/reap', { body: {} })).toEqual({ status: 409, json: { error: 'lane directory is dirty; pass --park' } });
+    expect((await call('POST', '/api/lanes/lane-1/reap', { body: { park: 'yes' } })).status).toBe(400);
   });
 });

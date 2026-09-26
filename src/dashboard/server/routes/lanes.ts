@@ -7,15 +7,19 @@
  *   LaneLaunchError maps to its status with `{ error }`.
  * - `GET /api/lanes?run=&parent=&key=&role=` → `{ generatedAt, lanes }`.
  * - `GET /api/lanes/:name` → one LaneView, or 404 when the name is not a lane.
+ * - `POST /api/lanes/:name/reap` with `{ park?, keep? }` → `reapLane` with the
+ *   archive route's own dependencies (D14), never a second copy of them.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { launchLane } from '../../../lib/lanes/launch.js';
+import { LaneReapError, reapLane } from '../../../lib/lanes/reap.js';
 import { LaneLaunchError, type LaneLaunchRequest } from '../../../lib/lanes/types.js';
 import { invalidateLaneViews, listLaneViews, type LaneViewFilter } from '../../../lib/lanes/views.js';
 import { getConversationByName, LANE_ROLES, type LaneRole } from '../../../lib/overdeck/conversations.js';
 import { jsonResponse } from '../http-helpers.js';
+import { conversationArchiveDependencies } from './conversations.js';
 import { validateOrigin } from './origin-validation.js';
 
 const STRING_FIELDS = ['parent', 'run', 'key', 'role', 'project', 'model', 'harness', 'effort', 'brief', 'briefSource', 'title', 'branch', 'from', 'at'] as const;
@@ -51,7 +55,7 @@ function laneFilter(url: URL): LaneViewFilter {
 }
 
 function errorResponse(error: unknown, context: string) {
-  if (error instanceof LaneLaunchError) return jsonResponse({ error: error.message }, { status: error.status });
+  if (error instanceof LaneLaunchError || error instanceof LaneReapError) return jsonResponse({ error: error.message }, { status: error.status });
   console.error(`[lanes] ${context} failed:`, error instanceof Error ? error.message : String(error));
   return jsonResponse({ error: 'Internal server error' }, { status: 500 });
 }
@@ -129,4 +133,37 @@ const getLaneRoute = HttpRouter.add(
   }),
 );
 
-export const lanesRouteLayer = Layer.mergeAll(postLaneRoute, listLanesRoute, getLaneRoute);
+const reapLaneRoute = HttpRouter.add(
+  'POST',
+  '/api/lanes/:name/reap',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const text = yield* request.text;
+    let body: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = text ? JSON.parse(text) : {};
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return jsonResponse({ error: 'body must be a JSON object' }, { status: 400 });
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return jsonResponse({ error: 'body must be JSON' }, { status: 400 });
+    }
+    for (const field of ['park', 'keep'] as const) {
+      if (body[field] !== undefined && typeof body[field] !== 'boolean') return jsonResponse({ error: `${field} must be a boolean` }, { status: 400 });
+    }
+    return yield* Effect.promise(async () => {
+      try {
+        const result = await reapLane(name, { park: body.park === true, keep: body.keep === true }, { archive: conversationArchiveDependencies });
+        invalidateLaneViews();
+        return jsonResponse(result);
+      } catch (error: unknown) {
+        return errorResponse(error, 'reap');
+      }
+    });
+  }),
+);
+
+export const lanesRouteLayer = Layer.mergeAll(postLaneRoute, listLanesRoute, getLaneRoute, reapLaneRoute);
