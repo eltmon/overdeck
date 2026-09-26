@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T06:04:45.501845Z · model: claude-opus-5-5 · open: 778_
+_Last sequenced: 2026-09-26T06:06:43.506656Z · model: claude-opus-5-5 · open: 778_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -135,7 +135,7 @@ _Last sequenced: 2026-09-26T06:04:45.501845Z · model: claude-opus-5-5 · open: 
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 174 | PAN-3022 | S | high | needs-refinement |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
+| 174 | PAN-3022 | S | high | ok |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 176 | PAN-3668 | L | medium | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
@@ -743,7 +743,7 @@ _Last sequenced: 2026-09-26T06:04:45.501845Z · model: claude-opus-5-5 · open: 
 | 826 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 829 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-3634 | S | low | stale |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 831 | PAN-3634 | S | high | ok |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 835 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
@@ -1093,7 +1093,7 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T06:04:45.501845Z",
+  "generatedAt": "2026-09-26T06:06:43.506656Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 778,
@@ -2781,7 +2781,7 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "size": "S",
       "importance": "high",
       "score": 78,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [],
       "why": "The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override.",
       "rationale": "Triage: verify the workModel-override clobber against the current spawn.ts model resolution; the record it clobbered no longer exists in that form. Rank held.",
@@ -10225,9 +10225,9 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "issue": "PAN-3634",
       "rank": 831,
       "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "stale",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
       "dependsOn": [],
       "why": "Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close",
       "rationale": "Demoted from rank 162: the component this issue targets (flywheelRunId stamping) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
