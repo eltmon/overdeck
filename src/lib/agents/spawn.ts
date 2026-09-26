@@ -1,5 +1,7 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
 import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
+import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
+import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
@@ -277,7 +279,17 @@ async function spawnRunWithoutConsentClaim(
     await Effect.runPromise(saveAgentState(state));
   }
 
-  if (!isAcp) {
+  // Prime Agent (PAN-3668): the host owns provider selection; its credential
+  // travels in the pane env, never in provider exports or the launcher script.
+  const isPrime = resolvedHarness === 'prime-agent';
+  const primeLaunch = isPrime
+    ? await getPrimeAgentLauncherFields(agentId, selectedModel, workspace, harnessLaunch.binaryPath, {
+        effort: options.effort,
+        resumeSessionFile: options.resumeSessionId ? await requirePrimeAgentSessionFile(agentId) : undefined,
+      })
+    : null;
+
+  if (!isAcp && !isPrime) {
     const provider = getProviderForModel(selectedModel as ModelId);
     if (provider.authType === 'credential-file') {
       setupCredentialFileAuth(provider, workspace);
@@ -286,8 +298,8 @@ async function spawnRunWithoutConsentClaim(
     }
   }
 
-  const providerExports = isAcp ? undefined : await getProviderExportsForModel(selectedModel, resolvedHarness);
-  const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel, resolvedHarness);
+  const providerExports = isAcp || isPrime ? undefined : await getProviderExportsForModel(selectedModel, resolvedHarness);
+  const providerEnv = isAcp ? {} : primeLaunch ? primeLaunch.paneEnv : await getProviderEnvForModel(selectedModel, resolvedHarness);
   // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
   // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
   // redirect) through generateLauncherScriptSync so the role launcher emits the
@@ -337,12 +349,13 @@ async function spawnRunWithoutConsentClaim(
   let rawSessionId: string | undefined;
   if (shouldRegisterConversation) {
     // Claude-style harnesses own their session id at launcher construction time.
-    // ACP creates its session during host startup and persists acp-session-id itself.
-    rawSessionId = (isAcp || resolvedHarness === 'kimi-code')
+    // ACP and Prime Agent hosts create their session during startup and persist
+    // <transport>-session-id themselves.
+    rawSessionId = (isAcp || isPrime || resolvedHarness === 'kimi-code')
       ? options.resumeSessionId
       : (options.resumeSessionId ?? randomUUID());
 
-    if (!isAcp && resolvedHarness !== 'kimi-code' && rawSessionId) {
+    if (!isAcp && !isPrime && resolvedHarness !== 'kimi-code' && rawSessionId) {
       appendSessionIdToHistory(agentId, rawSessionId, 'launcher', {
         harness: resolvedHarness,
         model: selectedModel,
@@ -405,6 +418,7 @@ async function spawnRunWithoutConsentClaim(
     ...acpLauncherFields,
     ...kimiCodeLauncherFields,
     ...museLauncherFields,
+    ...(primeLaunch?.fields ?? {}),
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');

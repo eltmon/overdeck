@@ -10,12 +10,16 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+
 export const PRIME_AGENT_SUPPORTED_RANGE = { min: '0.8.0', maxExclusive: '0.9.0' } as const;
 
 /** `prime-agent status --json` → `protocolVersion` for the pinned range. */
 export const PRIME_AGENT_PROTOCOL_VERSION = 7;
 
 export const PRIME_AGENT_INSTALL_COMMAND = 'npm install -g prime-agent@0.8';
+
+/** Levels `--thinking` and `set_thinking_level` accept. Overdeck effort values map 1:1. */
+export const PRIME_AGENT_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
 export const PRIME_AGENT_SUPPORTED_RANGE_LABEL = `${PRIME_AGENT_SUPPORTED_RANGE.min} – <${PRIME_AGENT_SUPPORTED_RANGE.maxExclusive}`;
 

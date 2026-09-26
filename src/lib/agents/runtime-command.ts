@@ -706,6 +706,7 @@ export async function getAgentRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'prime-agent-host') return 'prime-agent-host';
   if (behavior.launchCommandKind === 'muse-tui') return 'muse';
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
@@ -900,6 +901,7 @@ export async function getRoleRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'prime-agent-host') return 'prime-agent-host';
   if (behavior.launchCommandKind === 'muse-tui') return 'muse';
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`

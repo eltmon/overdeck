@@ -1,5 +1,7 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
 import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.js';
+import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
+import { requirePrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
 import { Effect } from 'effect';
@@ -704,9 +706,21 @@ export async function buildAgentLaunchConfig(opts: {
 
   const behavior = getHarnessBehavior(opts.harness);
   const isAcp = behavior.launchCommandKind === 'acp-host';
-  const providerEnv = isAcp ? {} : await getProviderEnvForModel(model, opts.harness);
+  // Prime Agent (PAN-3668): the host owns provider selection; its credential travels
+  // in the pane env, never in provider exports or the launcher script (FR-14).
+  const isPrime = behavior.launchCommandKind === 'prime-agent-host';
+  if (isPrime && !opts.harnessBinaryPath) {
+    throw new Error('Prime Agent launch requires the executable path resolved by preflight');
+  }
+  const primeLaunch = isPrime
+    ? await getPrimeAgentLauncherFields(opts.agentId, model, opts.workspace, opts.harnessBinaryPath!, {
+        effort: opts.effort,
+        resumeSessionFile: opts.spawnMode === 'resume' ? await requirePrimeAgentSessionFile(opts.agentId) : undefined,
+      })
+    : null;
+  const providerEnv = isAcp ? {} : primeLaunch ? primeLaunch.paneEnv : await getProviderEnvForModel(model, opts.harness);
 
-  if (!isAcp) {
+  if (!isAcp && !isPrime) {
     const provider = getProviderForModel(model as ModelId);
     if (provider.authType === 'credential-file') {
       setupCredentialFileAuth(provider, opts.workspace);
@@ -715,7 +729,7 @@ export async function buildAgentLaunchConfig(opts: {
     }
   }
 
-  const providerExports = isAcp ? undefined : await getProviderExportsForModel(model, opts.harness);
+  const providerExports = isAcp || isPrime ? undefined : await getProviderExportsForModel(model, opts.harness);
 
   // PAN-1048: resume/restart launchers must respect the agent's role.
   // A resumed review/test/ship run loads the wrong frontmatter (and wrong
@@ -810,6 +824,7 @@ export async function buildAgentLaunchConfig(opts: {
       ...acpLauncherFields,
       ...kimiCodeLauncherFields,
       ...museLauncherFields,
+      ...(primeLaunch?.fields ?? {}),
     });
     return { launcherContent, providerEnv };
   }
@@ -850,6 +865,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...acpLauncherFields,
     ...kimiCodeLauncherFields,
     ...museLauncherFields,
+    ...(primeLaunch?.fields ?? {}),
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,

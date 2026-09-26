@@ -39,7 +39,7 @@ import {
   primeAgentSessionFilePointerPath,
 } from '../runtimes/storage/prime-agent.js';
 import { appendSessionIdToHistory } from '../session-history.js';
-import { checkPrimeAgentVersion, readPrimeAgentVersionOutput } from './compat.js';
+import { checkPrimeAgentVersion, PRIME_AGENT_THINKING_LEVELS, readPrimeAgentVersionOutput } from './compat.js';
 import { reapPrimeAgentDaemon } from './daemon.js';
 import { PRIME_AGENT_MANAGED_POLICY } from './policy.js';
 import { PrimeAgentRpcClient } from './rpc-client.js';
@@ -55,7 +55,6 @@ const STARTUP_REQUEST_TIMEOUT_MS = 60_000;
 const STDERR_TAIL_BYTES = 64 * 1024;
 const LAUNCH_ERROR_STDERR_BYTES = 2_000;
 
-export const PRIME_AGENT_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 const DIALOG_METHODS = new Set(['select', 'confirm', 'input', 'editor']);
 
 export interface PrimeAgentHostOptions {

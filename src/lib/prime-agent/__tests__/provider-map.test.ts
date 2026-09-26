@@ -43,12 +43,12 @@ describe('resolvePrimeAgentCredential (PAN-3668 WI-8, D12)', () => {
     await expect(resolvePrimeAgentCredential('k3', 'api-key', deps())).resolves.toEqual({ provider: 'kimi-coding', envExports: {} });
   });
 
-  it('allows a launch when only the env var is set', async () => {
+  it('passes an env-var credential through envExports, because agent panes blank provider keys', async () => {
     await expect(resolvePrimeAgentCredential('gpt-5.4', 'api-key', deps({ env: { OPENAI_API_KEY: 'sk-env' } })))
-      .resolves.toEqual({ provider: 'openai', envExports: {} });
+      .resolves.toEqual({ provider: 'openai', envExports: { OPENAI_API_KEY: 'sk-env' } });
   });
 
-  it('exports an Overdeck settings key under Prime env var name only when it is the sole source', async () => {
+  it('exports an Overdeck settings key under Prime env var name when no other source holds one', async () => {
     const result = await resolvePrimeAgentCredential('k3', 'api-key', deps({ loadApiKeys: async () => ({ kimi: 'sk-kimi-settings' }) }));
     expect(result).toEqual({ provider: 'kimi-coding', envExports: { KIMI_API_KEY: 'sk-kimi-settings' } });
 

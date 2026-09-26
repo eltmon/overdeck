@@ -962,3 +962,66 @@ describe('Muse lifecycle review regressions', () => {
     }
   });
 });
+
+describe('Prime Agent work launch (PAN-3668 WI-12)', () => {
+  let resolvePrimeAgentCredentialMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resolvePrimeAgentCredentialMock = vi.fn(async () => ({ provider: 'openai', envExports: { OPENAI_API_KEY: 'sk-prime-test' } }));
+    vi.doMock('../prime-agent/provider-map.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../prime-agent/provider-map.js')),
+      resolvePrimeAgentCredential: resolvePrimeAgentCredentialMock,
+    }));
+  });
+
+  afterEach(() => {
+    vi.doUnmock('../prime-agent/provider-map.js');
+  });
+
+  it('launches the Prime host with the credential in the pane env and delivers the prompt over the host', async () => {
+    const { spawnAgent } = await import('../agents.js');
+
+    await spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'gpt-5.4',
+      harness: 'prime-agent',
+      prompt: 'Implement the next item.',
+    });
+
+    const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    expect(launcher).toMatch(/exec node '.+\/dist\/prime-agent-host\.js' --agent 'agent-pan-1405'/);
+    expect(launcher).toContain("--provider 'openai'");
+    expect(launcher).not.toContain('sk-prime-test');
+    expect(launcher).not.toContain('unset OPENAI_API_KEY');
+    expect(existsSync(join(agentDir, 'prime-agent-context.md'))).toBe(true);
+    expect(existsSync(join(agentDir, 'initial-prompt.md'))).toBe(false);
+    expect(resolvePrimeAgentCredentialMock).toHaveBeenCalledWith('gpt-5.4', expect.anything());
+    expect(createSessionMock).toHaveBeenCalledWith(
+      'agent-pan-1405',
+      workspace,
+      `bash ${join(agentDir, 'launcher.sh')}`,
+      expect.objectContaining({ env: expect.objectContaining({ OPENAI_API_KEY: 'sk-prime-test' }) }),
+    );
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405', 'prime-agent', 30);
+    expect(deliverAgentMessageMock).toHaveBeenCalledWith('agent-pan-1405', expect.stringContaining('Implement the next item.'), 'spawnAgent:initial-prompt');
+    expect(waitForPromptReadyMock.mock.invocationCallOrder[0]).toBeLessThan(deliverAgentMessageMock.mock.invocationCallOrder[0]);
+  });
+
+  it('propagates a credential error before any pane is launched', async () => {
+    resolvePrimeAgentCredentialMock.mockRejectedValue(new Error('Prime Agent cannot launch "gpt-5.4": no credential for Prime provider "openai".'));
+    const { spawnAgent } = await import('../agents.js');
+
+    await expect(spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'gpt-5.4',
+      harness: 'prime-agent',
+      prompt: 'Implement the next item.',
+    })).rejects.toThrow('no credential for Prime provider "openai"');
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+});

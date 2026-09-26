@@ -7,9 +7,11 @@
  *   1. `~/.prime/agent/auth.json` has the Prime provider key (key names are read,
  *      values never);
  *   2. `process.env` has Prime's env var for that provider;
- *   3. Overdeck `config.apiKeys.<provider>` is set. Only in this case the key is
- *      returned in `envExports`, under Prime's env var name, for the launcher to
- *      export to the host.
+ *   3. Overdeck `config.apiKeys.<provider>` is set.
+ * For sources 2 and 3 the key is returned in `envExports`, under Prime's env var
+ * name. The launcher passes it in the terminal-backend launch env, never in the
+ * launcher script (FR-14): agent panes start with every provider key blanked
+ * (BLANKED_PROVIDER_ENV), so an env-var credential would otherwise not reach Prime.
  * The model id passes through unchanged: Prime rejects unknown ids at startup and the
  * host surfaces that as `prime-agent-launch-error`. No fallback model is ever chosen.
  */
@@ -68,7 +70,7 @@ const SUBSCRIPTION_ROUTES: Partial<Record<ProviderName, string>> = {
 export interface PrimeAgentCredential {
   /** Prime provider id for `--provider`. */
   provider: string;
-  /** Env the launcher exports to the host. Non-empty only for an Overdeck settings key (source 3). */
+  /** Credential env for the host's launch env. Empty when Prime's own auth.json holds the key (source 1). */
   envExports: Record<string, string>;
 }
 
@@ -134,7 +136,8 @@ export async function resolvePrimeAgentCredential(
   }
 
   if ((await readAuthFileKeys(authFile)).has(route.provider)) return { provider: route.provider, envExports: {} };
-  if (env[route.envVar]) return { provider: route.provider, envExports: {} };
+  const envKey = env[route.envVar];
+  if (envKey) return { provider: route.provider, envExports: { [route.envVar]: envKey } };
 
   const settingsKey = (await (deps.loadApiKeys ?? defaultLoadApiKeys)())[overdeckProvider];
   if (settingsKey) return { provider: route.provider, envExports: { [route.envVar]: settingsKey } };

@@ -82,6 +82,18 @@ export async function readPrimeAgentSessionFile(agentId: string, agentsRoot?: st
   return info?.isFile() ? sessionFile : null;
 }
 
+/**
+ * The recorded `sessionFile` for a resume (D7). A resume whose session file is gone
+ * fails loudly rather than silently starting a fresh session.
+ */
+export async function requirePrimeAgentSessionFile(agentId: string, agentsRoot?: string): Promise<string> {
+  const sessionFile = await readPrimeAgentSessionFile(agentId, agentsRoot);
+  if (!sessionFile) {
+    throw new Error(`Prime Agent session for ${agentId} cannot be resumed: its recorded session file is missing. Start a new session instead.`);
+  }
+  return sessionFile;
+}
+
 /** The per-agent Prime daemon socket (D2). Throws PrimeAgentSocketPathTooLong over 100 bytes. */
 export function primeAgentDaemonSocketPath(agentId: string, home = getOverdeckHome()): string {
   const digest = createHash('sha256').update(agentId).digest('hex').slice(0, 16);
