@@ -4,17 +4,17 @@
     "created": "2026-09-25T06:54:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4211: No way to clear a 'troubled' agent after the Cut: errors say 'pan untroubled' but the command no longer exists",
-    "updated": "2026-09-25T06:54:34.519Z"
+    "updated": "2026-09-26T01:32:52.548Z"
   },
   "plan": {
     "id": "pan-4211",
     "title": "No way to clear a 'troubled' agent after the Cut: errors say 'pan untroubled' but the command no longer exists",
-    "status": "proposed",
+    "status": "running",
     "uid": "1fe8d14a-200c-4e35-b9cb-4e0975a7c332",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-25T06:54:15Z",
-    "updated": "2026-09-25T06:54:34.519Z",
+    "updated": "2026-09-26T01:32:52.548Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4211",
