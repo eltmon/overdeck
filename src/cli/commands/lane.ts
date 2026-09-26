@@ -22,6 +22,7 @@ import type { Command } from 'commander';
 import { exitCli } from '../exit.js';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import type { WaitOptions, WaitOutcome } from '../../lib/agents/worker/wait.js';
+import { criticChain, formatCriticChain, type PairingRow } from '../../lib/lanes/pairing.js';
 import type { LaneReportInput } from '../../lib/lanes/report.js';
 import type { LaneView } from '../../lib/lanes/views.js';
 import type { LaneSetFilter, LaneSetOptions, LaneSetOutcome } from '../../lib/lanes/wait.js';
@@ -426,6 +427,80 @@ export async function laneReportCommand(options: LaneReportOptions, deps: LaneCl
   }
 }
 
+/** Lane views as pairing rows (WI-18): a pending critic carries no verdict. */
+function pairingRowsOf(lanes: readonly LaneView[]): PairingRow[] {
+  return lanes.map((lane) => {
+    const verdict = lane.verdict && lane.verdict.value !== 'pending'
+      ? { value: lane.verdict.value, defects: lane.verdict.defects, file: lane.verdict.file }
+      : undefined;
+    return {
+      id: lane.id,
+      name: lane.name,
+      run: lane.run,
+      key: lane.key,
+      role: lane.role,
+      iteration: lane.iteration,
+      createdAt: lane.createdAt,
+      criticOfId: lane.criticOf?.id ?? null,
+      activity: lane.archived ? 'stopped' : lane.activity,
+      report: lane.report ? { status: lane.report.status, ...(verdict ? { verdict } : {}) } : null,
+    };
+  });
+}
+
+/**
+ * `pan lane show` (WI-21 step 4, FR-35): the builder → critic chain of one run
+ * and key, then one line per lane.
+ */
+export async function laneShowCommand(
+  ref: string | undefined,
+  options: { run?: string; key?: string; json?: boolean },
+  deps: LaneCliDeps,
+): Promise<number> {
+  // Exactly one form: <lane>, or --run and --key together.
+  if (ref ? Boolean(options.run || options.key) : !(options.run && options.key)) {
+    deps.stderr('pan lane show needs <lane> or --run and --key');
+    return WORKER_EXIT.usage;
+  }
+  let run = options.run ?? '';
+  let key = options.key ?? '';
+  try {
+    if (ref) {
+      const name = ref.startsWith('conv-') ? ref.slice('conv-'.length) : ref;
+      const resolved = /^\d+$/.test(name) ? await deps.resolveLane(name) : null;
+      const answer = await api(deps, 'GET', `/api/lanes/${encodeURIComponent(resolved?.name ?? name)}`);
+      if (answer.status !== 200 || !answer.body) {
+        deps.stderr(`${ref} is not a lane.`);
+        return WORKER_EXIT.usage;
+      }
+      run = String(answer.body.run);
+      key = String(answer.body.key);
+    }
+    const listed = await api(deps, 'GET', `/api/lanes?${new URLSearchParams({ run, key }).toString()}`);
+    if (listed.status !== 200) {
+      deps.stderr(errorOf(listed));
+      return WORKER_EXIT.usage;
+    }
+    const lanes = (listed.body?.lanes ?? []) as LaneView[];
+    const steps = criticChain(run, key, pairingRowsOf(lanes));
+    if (options.json) {
+      deps.stdout(JSON.stringify({ run, key, steps }, null, 2));
+      return WORKER_EXIT.done;
+    }
+    deps.stdout(steps.length > 0 ? formatCriticChain(steps) : `no builder lanes for ${run}/${key}`);
+    for (const lane of lanes) {
+      const judge = lane.role === 'critic' || lane.role === 'verifier';
+      const verdict = judge && lane.verdict ? lane.verdict.value : '-';
+      const file = judge && lane.verdict?.file ? lane.verdict.file : '-';
+      deps.stdout(`#${lane.id} ${lane.role} i${lane.iteration} ${lane.archived ? 'archived' : lane.activity} ${verdict} ${file}`);
+    }
+    return WORKER_EXIT.done;
+  } catch (error) {
+    deps.stderr(`Could not reach the dashboard: ${error instanceof Error ? error.message : String(error)}`);
+    return WORKER_EXIT.usage;
+  }
+}
+
 async function requireLane(ref: string, deps: LaneCliDeps): Promise<LaneRef | null> {
   const lane = await deps.resolveLane(ref);
   if (!lane?.key) {
@@ -482,7 +557,7 @@ export async function laneReapCommand(ref: string, options: { park?: boolean; ke
 export function registerLaneCommands(program: Command, deps: () => LaneCliDeps = defaultLaneCliDeps): void {
   const lane = program
     .command('lane')
-    .description('Gauntlet lanes: launch, list, wait on, report from, stop and reap lane conversations');
+    .description('Gauntlet lanes: launch, list, show, wait on, report from, stop and reap lane conversations');
 
   lane
     .command('start')
@@ -515,6 +590,15 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
     .option('--parent <conv>', 'Only lanes launched by this conversation')
     .option('--json', 'Print JSON')
     .action(async (options: { run?: string; parent?: string; json?: boolean }) => exitCli(await laneListCommand(options, deps())));
+
+  lane
+    .command('show [lane]')
+    .description('Print the builder → critic chain of a run and key, then one line per lane')
+    .option('--run <key>', 'Run key (with --key)')
+    .option('--key <key>', 'Lane key (with --run)')
+    .option('--json', 'Print { run, key, steps }')
+    .action(async (ref: string | undefined, options: { run?: string; key?: string; json?: boolean }) =>
+      exitCli(await laneShowCommand(ref, options, deps())));
 
   lane
     .command('wait [lane]')
