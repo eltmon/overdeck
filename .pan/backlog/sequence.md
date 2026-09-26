@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T06:04:17.118473Z · model: claude-opus-5-5 · open: 779_
+_Last sequenced: 2026-09-26T06:04:45.501845Z · model: claude-opus-5-5 · open: 778_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -391,7 +391,6 @@ _Last sequenced: 2026-09-26T06:04:17.118473Z · model: claude-opus-5-5 · open: 
 | 454 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
 | 455 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
 | 456 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 457 | PAN-3864 | M | medium | needs-refinement |  |  | /agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building |
 | 458 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
 | 459 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
 | 460 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
@@ -1094,10 +1093,10 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T06:04:17.118473Z",
+  "generatedAt": "2026-09-26T06:04:45.501845Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 779,
+  "openCount": 778,
   "nodes": [
     {
       "issue": "PAN-4224",
@@ -5919,19 +5918,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "condition": "ok",
       "dependsOn": [],
       "why": "The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3864",
-      "rank": 457,
-      "size": "M",
-      "importance": "medium",
-      "score": 52,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "/agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building",
-      "rationale": "Triage: verify the stale-strike filtering (FleetAgentsView isFleetAgent) against the current liveness source. Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11310,27 +11296,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "confidence": 0.7
     },
     {
-      "from": "PAN-3862",
-      "to": "PAN-3864",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3863",
-      "to": "PAN-3864",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-3909",
-      "to": "PAN-3864",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-3830",
       "to": "PAN-3831",
       "type": "informs",
@@ -11354,20 +11319,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
     {
       "from": "PAN-3957",
       "to": "PAN-3940",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3864",
-      "to": "PAN-3862",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3864",
-      "to": "PAN-3762",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
