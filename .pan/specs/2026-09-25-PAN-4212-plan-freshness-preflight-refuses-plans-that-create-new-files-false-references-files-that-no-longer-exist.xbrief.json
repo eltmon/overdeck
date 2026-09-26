@@ -4,17 +4,17 @@
     "created": "2026-09-25T06:53:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4212: Plan-freshness preflight refuses plans that create new files (false 'references files that no longer exist')",
-    "updated": "2026-09-25T06:53:52.371Z"
+    "updated": "2026-09-26T01:33:09.212Z"
   },
   "plan": {
     "id": "pan-4212",
     "title": "Plan-freshness preflight refuses plans that create new files (false 'references files that no longer exist')",
-    "status": "proposed",
+    "status": "running",
     "uid": "7b21977b-0f36-47d3-b13f-2fab8ad373ee",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-25T06:53:43Z",
-    "updated": "2026-09-25T06:53:52.371Z",
+    "updated": "2026-09-26T01:33:09.212Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4212",
