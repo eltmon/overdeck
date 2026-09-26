@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T08:18:04.689Z",
+  "updated": "2026-09-26T08:18:20.593Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -604,6 +604,10 @@
     "critic-launch-link.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T08:18:04.688Z"
+    },
+    "critic-launch-link.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:18:20.592Z"
     }
   }
 }
