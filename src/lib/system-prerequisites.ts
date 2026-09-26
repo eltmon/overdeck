@@ -178,6 +178,18 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
     },
   },
   {
+    id: 'prime-agent',
+    name: 'Prime Agent',
+    required: false,
+    purpose: 'Prime Agent harness (RPC)',
+    versionArgs: ['--version'],
+    install: {
+      linux: 'npm install -g prime-agent@0.8',
+      mac: 'npm install -g prime-agent@0.8',
+      win: 'npm install -g prime-agent@0.8',
+    },
+  },
+  {
     id: 'kimi',
     name: 'Kimi Code CLI',
     required: false,
@@ -209,8 +221,9 @@ function normalizeResolution(result: string | null | ExecutableResolution): Exec
 }
 
 const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
-  const { stdout } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
-  return stdout;
+  const { stdout, stderr } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
+  // Some tools (prime-agent 0.8.0) print `--version` on stderr.
+  return stdout.trim() ? stdout : stderr;
 };
 
 const defaultResolver: PrerequisiteResolver = async (command, options) => {
