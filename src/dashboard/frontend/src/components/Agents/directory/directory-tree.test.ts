@@ -114,3 +114,28 @@ describe('filterRows', () => {
     expect(filterRows(rows, '  ')).toHaveLength(5);
   });
 });
+
+describe('entriesForNode — lanes and successors (PAN-4223 WI-11)', () => {
+  const conv = (id: string, overrides: Partial<DirectoryEntry> = {}) =>
+    entry({ id, kind: 'conversation', label: id.replace('conv:', ''), role: null, source: 'conversation', ...overrides });
+
+  it('nests a lane and a successor at depth 1 under their parent conversation', () => {
+    const rows = entriesForNode([
+      conv('conv:root'),
+      conv('conv:lane', { parentId: 'conv:root', lane: { run: 'hotel', key: '663', role: 'builder', iteration: 1, reportStatus: null } }),
+      conv('conv:next', { parentId: 'conv:root', continuesFrom: 10 }),
+    ], 'convs:local:overdeck');
+    expect(rows.map((row) => [row.entry.id, row.depth])).toEqual([['conv:root', 0], ['conv:lane', 1], ['conv:next', 1]]);
+  });
+
+  it('caps a four-long succession chain at depth 2 and names the flattened row\'s real parent', () => {
+    const rows = entriesForNode([
+      conv('conv:a'),
+      conv('conv:b', { parentId: 'conv:a', continuesFrom: 1 }),
+      conv('conv:c', { parentId: 'conv:b', continuesFrom: 2 }),
+      conv('conv:d', { parentId: 'conv:c', continuesFrom: 3 }),
+    ], 'convs:local:overdeck');
+    expect(rows.map((row) => [row.entry.id, row.depth])).toEqual([['conv:a', 0], ['conv:b', 1], ['conv:c', 2], ['conv:d', 2]]);
+    expect(rows.map((row) => row.flattenedFrom)).toEqual([null, null, null, 'c']);
+  });
+});
