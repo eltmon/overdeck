@@ -85,6 +85,7 @@ harness-correct launch artifact from global, project, and workspace layers:
 | **Codex** | `~/.overdeck/context/codex-global.md` | Passed as Codex `developer_instructions` for TUI, exec/resume, and app-server transports |
 | **Pi** | `~/.overdeck/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Overdeck deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
 | **Kimi Code** | `~/.overdeck/context/launch/kimi-code-<workspace-hash>.md` | Sent once per native Kimi session as a clearly delimited first-user-message envelope. The managed context block comes first and the operator's original task follows unchanged in its own block |
+| **Prime Agent** | `<agentDir>/prime-agent-context.md` (per agent) | Passed as `--append-system-prompt` values after Overdeck's managed policy, split on paragraph boundaries into values of at most 100,000 bytes. Overdeck writes nothing under `~/.prime/agent` |
 
 The `claude-global.md` / `pi-global.md` / `codex-global.md` files are **Overdeck-owned render
 artifacts** — the harnesses do not know about them. They exist so the global
@@ -126,7 +127,8 @@ Write completion markers via `/pan-done` when ready for review.
 ```
 
 Blocks may be stacked to target several harnesses; `{{#harness:codex}}` is
-also recognized.
+also recognized, and so is `{{#harness:prime-agent}}` for Prime Agent-only
+instructions.
 
 ## CLI
 

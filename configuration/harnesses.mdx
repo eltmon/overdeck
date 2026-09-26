@@ -13,7 +13,7 @@ that runs in a terminal-backend pane (Herdr by default; see
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, and `muse`. For the wider
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, and `prime-agent`. For the wider
 field of coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -27,10 +27,11 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
 | `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.31. |
 | `muse` | Muse Code (`muse`) | Meta Muse Spark models | Persistent native terminal sessions with separate Standard and Contributor model choices. |
+| `prime-agent` | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (`prime-agent`) | Opt-in multi-provider work | RPC mode behind an Overdeck host, with one private Prime daemon per agent; supports 0.8.x. |
 
 ## Composer commands across harnesses
 
-The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, `acp`, `kimi-code`, and `muse`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
+The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, `acp`, `kimi-code`, `muse`, and `prime-agent`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
 
 Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface.
 
@@ -487,6 +488,140 @@ the terminal backend's environment) to change the timeout, in milliseconds. `0` 
 the OpenCode status check still runs. Each prompt gets at most one
 `prompt_stalled` entry.
 
+### Prime Agent
+
+[Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) is Prime
+Intellect's coding and research agent (`prime-agent`). Overdeck runs it in RPC
+mode behind its own host process, so dashboard messages, `pan tell`, stop,
+resume, transcripts, and cost work the same way as for other harnesses.
+
+#### Install and version
+
+Install the supported release line and check the version:
+
+```bash
+npm install -g prime-agent@0.8
+prime-agent --version
+```
+
+Overdeck supports Prime Agent **0.8.0 – <0.9.0** (daemon protocol 7). A launch
+with a version outside that range fails before any pane opens, and the error
+names the found version and the supported range. `pan doctor` reports the
+installed version, and it warns (it does not fail) when Prime Agent is not
+installed.
+
+#### Choosing Prime Agent
+
+Set `harness: prime-agent` for a role, or pick **Prime Agent** as a provider's
+harness under **Settings → Providers**. The settings offer it for the providers
+it can reach:
+
+| Overdeck provider | Prime provider | API-key env var | `auth.json` key |
+| --- | --- | --- | --- |
+| `anthropic` | `anthropic` | `ANTHROPIC_API_KEY` | `anthropic` |
+| `openai` | `openai` | `OPENAI_API_KEY` | `openai` |
+| `openai` (subscription) | `openai-codex` | — | `openai-codex` |
+| `google` | `google` | `GEMINI_API_KEY` | `google` |
+| `kimi` | `kimi-coding` | `KIMI_API_KEY` | `kimi-coding` |
+| `minimax` | `minimax` | `MINIMAX_API_KEY` | `minimax` |
+| `openrouter` | `openrouter` | `OPENROUTER_API_KEY` | `openrouter` |
+| `zai` | `zai` | `ZAI_API_KEY` | `zai` |
+| `mimo` | `xiaomi` | `XIAOMI_API_KEY` | `xiaomi` |
+| `xai` | `xai` | `XAI_API_KEY` | `xai` |
+| `groq` | `groq` | `GROQ_API_KEY` | `groq` |
+| `cerebras` | `cerebras` | `CEREBRAS_API_KEY` | `cerebras` |
+| `mistral` | `mistral` | `MISTRAL_API_KEY` | `mistral` |
+
+The model ID passes through unchanged. Prime Agent rejects an unknown model at
+startup, and the launch error shows its message. Any other provider fails with a
+mapping error; Overdeck never picks a fallback model.
+
+#### Credentials
+
+A launch is allowed when one of these holds, checked in order:
+
+1. Prime Agent's `~/.prime/agent/auth.json` has the Prime provider key (run
+   `prime-agent`, then `/login`). Overdeck reads only the key names, never the
+   values.
+2. Prime's env var for that provider (see the table) is set in the dashboard's
+   environment.
+3. The provider's API key is set in Overdeck **Settings**.
+
+For sources 2 and 3, Overdeck passes the key in the agent pane's launch
+environment. It never writes a credential into a launcher script, a state file,
+or a log. When no source has a key, the launch fails and the error names the
+`auth.json` key, the env var, and the `/login` path. OpenAI subscription use
+needs the `openai-codex` sign-in in `auth.json`.
+
+#### One private daemon per agent
+
+Prime Agent's RPC mode starts a background supervisor that outlives its client.
+Overdeck gives every agent and conversation its own supervisor by passing
+`--daemon-socket $OVERDECK_HOME/sockets/pd-<hash>.sock`. When the agent stops,
+Overdeck ends that supervisor's process group: `SIGTERM`, then `SIGKILL` if it is
+still listed after 5 seconds. Your own Prime Agent daemon on its default socket
+is never touched.
+
+The socket path must fit the 100-byte unix socket limit. With a very long
+`OVERDECK_HOME`, the launch fails with an error that names the path and its
+length; set a shorter `OVERDECK_HOME`. `pan doctor` warns about any
+Overdeck-owned Prime supervisor whose agent or conversation is gone, and shows
+the `kill -TERM -- -<pid>` command that removes it.
+
+#### Disabled Prime automation
+
+Cloister owns lifecycle and messaging, so Overdeck launches Prime Agent with
+`--no-extensions` and never passes `--goal`, `--autonomous`, `--continue`,
+`--no-session`, or `--offline`. The host refuses Prime's schedules, heartbeats,
+cross-agent messaging, `observe`, `refine`, and root-session changes
+(`new_session`, `switch_session`, `fork`, `clone`). Extension dialogs that no
+dashboard UI can answer are cancelled automatically. Every session also starts
+with a managed policy that keeps RLM children inside the root session and away
+from `pan` lifecycle commands.
+
+#### Security boundary
+
+Prime Agent runs model-generated Python and shell commands as your host user.
+Its workers and IPython kernels are **not a sandbox**. A managed run starts in
+the Overdeck workspace (or its container), but treat the agent as having the
+same file and network access as your user account.
+
+#### Messages, stop, and resume
+
+A message goes to the host, which sends `prompt` when the session is idle and
+`steer` while it is working. Stop sends `interrupt`, closes the pane, and reaps
+the daemon. Resume reopens the recorded session file and checks that its session
+ID matches the one recorded at launch. A mismatch or a missing session file
+fails the resume; Overdeck never replaces it with a fresh session silently.
+
+#### Transcript, cost, and context
+
+The conversation feed renders Prime's own session JSONL under
+`<agentDir>/prime-sessions/`: messages, thinking, tool calls and results,
+compaction, and failed or aborted turns. Durable cost comes from the same file;
+usage from RLM children is folded into the parent message once. Live token
+counts come from Prime's `get_session_stats`.
+
+Overdeck renders its context layers into `<agentDir>/prime-agent-context.md` and
+passes them as `--append-system-prompt` values. Use `harness:prime-agent`
+blocks for Prime-only instructions. Workspace `CLAUDE.md` and `AGENTS.md`
+discovery stays on. Overdeck writes nothing under `~/.prime/agent`.
+
+#### Limitations
+
+- Prime Agent's ACP mode is not used; it cannot resume a session.
+- RLM children are not Overdeck agents; their usage is attributed to the root.
+- User extensions are disabled (`--no-extensions`).
+- A plain transcript fork is unavailable; use a summary fork.
+- The live cost display shows a session total only, with no per-token-type split.
+- macOS and Linux only; Prime Agent does not support Windows natively.
+
+#### Uninstall
+
+Stop your Prime Agent agents and conversations, run
+`npm uninstall -g prime-agent`, then run `pan doctor` and confirm it lists no
+orphaned Prime Agent daemons.
+
 ## Installing oh-my-pi
 
 oh-my-pi is **not** auto-installed. Install it once, then run `pan doctor` to confirm.
@@ -594,11 +729,13 @@ stop or restart them, and their cost is not attributed. See
 
 ## ToS rules
 
-There is exactly **one blocked combination**, gated by
+There are exactly **two blocked combinations**, gated by
 `canUseHarness(harness, model, authMode)` in `src/lib/harness-policy.ts`:
 
 <Warning>
 **Blocked:** `ohmypi` + Anthropic model + Anthropic auth = `subscription`
+
+**Blocked:** `prime-agent` + Anthropic model + Anthropic auth = `subscription`
 </Warning>
 
 This is required by the Claude Code subscription terms — only the `claude-code`
@@ -612,6 +749,9 @@ OAuth subscription. Everything else is allowed:
 | ohmypi | Anthropic | API key | ✅ |
 | ohmypi | Anthropic | subscription | 🚫 |
 | ohmypi | Anthropic | unset (no Anthropic auth) | ✅ |
+| prime-agent | non-Anthropic (see the Prime provider table) | any | ✅ |
+| prime-agent | Anthropic | API key | ✅ |
+| prime-agent | Anthropic | subscription | 🚫 |
 
 The gate is evaluated at every spawn entry point and at every picker UI so a
 stale Settings selection cannot bypass it. When the pipeline routes a role run
@@ -753,6 +893,8 @@ using the OS-bundled `curl` and `tar` tools.
 - `packages/ohmypi-extension/` — vendored lifecycle extension omp loads via `--extension`
 - `src/lib/runtimes/kimi-code.ts` — `KimiCodeRuntimeSync` (native Kimi Code adapter)
 - `src/lib/cost-parsers/kimi-parser.ts` — Kimi `wire.jsonl` usage/cost parser
+- `src/lib/prime-agent/` — Prime Agent host (`host.ts`), RPC client and framing, managed policy, provider map, daemon reaper, and version pin; see [docs/PRIME-AGENT-HARNESS.md](https://github.com/eltmon/overdeck/blob/main/docs/PRIME-AGENT-HARNESS.md)
+- `src/lib/runtimes/prime-agent.ts` — `PrimeAgentRuntimeSync` (Cloister adapter)
 
 ## Storage paths
 
@@ -768,6 +910,7 @@ module for a path instead of building one.
 | `storage/pi.ts` | `<agentDir>/sessions/**.jsonl` and the user's own `~/.pi/agent` (`piSessionsRoot`, `findPiTranscriptPath`) |
 | `storage/acp.ts` | `<agentDir>/acp-session.jsonl`, the transcript for ACP agents including OpenCode (`ACP_TRANSCRIPT_FILE`, `acpTranscriptPath`) |
 | `storage/muse.ts` | `<agentDir>/muse-data/muse/sessions/…/session.jsonl` (`museSessionsRoot`, `resolveMuseSessionPath`) |
+| `storage/prime-agent.ts` | `<agentDir>/prime-sessions/*.jsonl`, the `prime-agent-session-file` pointer, the per-agent daemon socket `$OVERDECK_HOME/sockets/pd-<hash>.sock`, and the path of Prime's own `~/.prime/agent/auth.json` (`primeAgentSessionDir`, `readPrimeAgentSessionFile`, `primeAgentDaemonSocketPath`) |
 
 These modules import only `node:*` and `src/lib/paths.ts`, so any layer can
 use them without an import cycle. The transcript resolver
