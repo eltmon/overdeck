@@ -141,6 +141,7 @@ describe('Prime Agent conversations (PAN-3668 WI-14)', () => {
     await spawnPrime('conv-prime-new', backend, false);
 
     expect(getPrimeAgentLauncherFields).toHaveBeenCalledWith('conv-prime-new', 'gpt-5.4', overdeckHome, '/usr/bin/claude', {
+      authMode: 'anthropic',
       effort: 'high',
       resumeSessionFile: undefined,
       withContext: true,

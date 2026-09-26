@@ -61,6 +61,11 @@ export function primeAgentSessionDir(agentId: string, agentsRoot = join(getOverd
   return join(agentDir(agentId, agentsRoot), PRIME_AGENT_SESSION_DIR);
 }
 
+/** `<agentDir>/prime-agent-context.md`, the rendered launch context the host reads (D8). */
+export function primeAgentContextFilePath(agentId: string, agentsRoot = join(getOverdeckHome(), 'agents')): string {
+  return join(agentDir(agentId, agentsRoot), PRIME_AGENT_CONTEXT_FILE);
+}
+
 export function primeAgentSessionFilePointerPath(agentId: string, agentsRoot = join(getOverdeckHome(), 'agents')): string {
   return join(agentDir(agentId, agentsRoot), PRIME_AGENT_SESSION_FILE_POINTER);
 }

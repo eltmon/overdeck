@@ -48,6 +48,7 @@ import {
   inferMemoryProjectId,
   roleAgentDefinitionPath,
   roleSystemPromptInjection,
+  getProviderAuthMode,
 } from './runtime-command.js';
 
 export type FlywheelSpawnEnv = {
@@ -714,6 +715,7 @@ export async function buildAgentLaunchConfig(opts: {
   }
   const primeLaunch = isPrime
     ? await getPrimeAgentLauncherFields(opts.agentId, model, opts.workspace, opts.harnessBinaryPath!, {
+        authMode: await getProviderAuthMode(model),
         effort: opts.effort,
         resumeSessionFile: opts.spawnMode === 'resume' ? await requirePrimeAgentSessionFile(opts.agentId) : undefined,
       })

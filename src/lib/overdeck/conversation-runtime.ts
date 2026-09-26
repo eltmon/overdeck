@@ -628,6 +628,7 @@ export async function spawnConversationSession(
     // Unlike acp-session-id, the pointer and the recorded id stay: the host
     // verifies the resumed session against both (D7).
     primeLaunch = await getPrimeAgentLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, {
+      authMode: await getProviderAuthMode(model),
       effort,
       resumeSessionFile: resume ? await requirePrimeAgentSessionFile(tmuxSession) : undefined,
       withContext: !bareContext,

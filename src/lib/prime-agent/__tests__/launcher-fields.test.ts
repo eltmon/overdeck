@@ -9,9 +9,6 @@ vi.mock('../provider-map.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../provider-map.js')>()),
   resolvePrimeAgentCredential,
 }));
-vi.mock('../../openai-auth.js', () => ({
-  getOpenAIAuthStatus: vi.fn(async () => ({ loggedIn: false, hasOpenAIApiKey: true })),
-}));
 
 const { getPrimeAgentLauncherFields } = await import('../launcher-fields.js');
 
@@ -36,7 +33,7 @@ describe('getPrimeAgentLauncherFields (PAN-3668 WI-12)', () => {
     resolvePrimeAgentCredential.mockResolvedValue({ provider: 'openai', envExports: { OPENAI_API_KEY: 'sk-test' } });
     const workspace = join(home, 'ws');
 
-    const { fields, paneEnv } = await getPrimeAgentLauncherFields('agent-pan-9', 'gpt-5.4', workspace, '/usr/bin/prime-agent', { effort: 'high' });
+    const { fields, paneEnv } = await getPrimeAgentLauncherFields('agent-pan-9', 'gpt-5.4', workspace, '/usr/bin/prime-agent', { authMode: 'api-key', effort: 'high' });
 
     expect(fields).toEqual({
       harness: 'prime-agent',
@@ -55,13 +52,14 @@ describe('getPrimeAgentLauncherFields (PAN-3668 WI-12)', () => {
     expect(JSON.stringify(fields)).not.toContain('sk-test');
     expect(paneEnv).toEqual({ OPENAI_API_KEY: 'sk-test' });
     expect(existsSync(fields.primeAgent.contextFile)).toBe(true);
-    expect(resolvePrimeAgentCredential).toHaveBeenCalledWith('gpt-5.4', expect.anything());
+    expect(resolvePrimeAgentCredential).toHaveBeenCalledWith('gpt-5.4', 'api-key');
   });
 
   it('passes the resume session file through and drops an effort Prime does not accept', async () => {
     resolvePrimeAgentCredential.mockResolvedValue({ provider: 'kimi-coding', envExports: {} });
 
     const { fields } = await getPrimeAgentLauncherFields('agent-pan-9', 'k3', join(home, 'ws'), '/usr/bin/prime-agent', {
+      authMode: undefined,
       effort: 'ultra',
       resumeSessionFile: '/x/prime-sessions/s.jsonl',
     });
@@ -74,7 +72,7 @@ describe('getPrimeAgentLauncherFields (PAN-3668 WI-12)', () => {
   it('propagates a credential error without materializing context', async () => {
     resolvePrimeAgentCredential.mockRejectedValue(new Error('no credential for Prime provider "openai"'));
 
-    await expect(getPrimeAgentLauncherFields('agent-pan-9', 'gpt-5.4', join(home, 'ws'), '/usr/bin/prime-agent'))
+    await expect(getPrimeAgentLauncherFields('agent-pan-9', 'gpt-5.4', join(home, 'ws'), '/usr/bin/prime-agent', { authMode: 'api-key' }))
       .rejects.toThrow('no credential for Prime provider "openai"');
     expect(existsSync(join(home, 'agents', 'agent-pan-9', 'prime-agent-context.md'))).toBe(false);
   });

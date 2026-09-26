@@ -34,7 +34,7 @@ import { createWorkspace } from '../workspace-manager.js';
 import { isWorkspaceSetupIncomplete } from '../workspace-manager/setup-marker.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentState } from '../agents.js';
-import { claudeSystemPromptFiles, getAcpLauncherFields, getCodexLauncherFields, getKimiCodeLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
+import { claudeSystemPromptFiles, getAcpLauncherFields, getCodexLauncherFields, getKimiCodeLauncherFields, getOhmypiLauncherFields, getProviderAuthMode } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -570,7 +570,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // Prime Agent (PAN-3668 WI-13): the host owns provider selection; its credential
     // travels in the pane env, never in provider exports or the launcher script.
     const primeLaunch = behavior.launchCommandKind === 'prime-agent-host'
-      ? await getPrimeAgentLauncherFields(sessionName, planningModel, workspacePath, harnessLaunch.binaryPath, { effort })
+      ? await getPrimeAgentLauncherFields(sessionName, planningModel, workspacePath, harnessLaunch.binaryPath, { authMode: await getProviderAuthMode(planningModel), effort })
       : null;
 
     const providerExports = behavior.launchCommandKind === 'acp-host' || primeLaunch

@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { getAgentState, saveAgentStateSync } from '../agents/agent-state.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { listAgentStates } from '../agents/queries.js';
-import { waitForHostReady } from '../agents/runtime-command.js';
+import { getProviderAuthMode, waitForHostReady } from '../agents/runtime-command.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getOverdeckHome } from '../paths.js';
@@ -171,6 +171,7 @@ export class PrimeAgentRuntimeSync implements AgentRuntimeSync {
 
     const launch = await prepareHarnessLaunch('prime-agent');
     const { fields, paneEnv } = await getPrimeAgentLauncherFields(config.agentId, config.model, config.workspace, launch.binaryPath, {
+      authMode: await getProviderAuthMode(config.model),
       effort: config.effort,
       resumeSessionFile: config.sessionId ? await requirePrimeAgentSessionFile(config.agentId, this.agentsRoot()) : undefined,
     });
