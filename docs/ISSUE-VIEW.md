@@ -30,6 +30,24 @@ A closed-out issue derives as `closed`, because the tracker outranks the PR in t
 
 `densitySections.ts` owns `DENSITY_SECTIONS`, the declarative membership map for `rail`, `cockpit`, and `console`. Density changes layout and section visibility; it does not create three component trees or three versions of status logic. A shell wraps its existing routing and interaction glue around `<IssueView density="…">`.
 
+### Project-tree rail row
+
+The Command Deck issue tree (`src/dashboard/frontend/src/components/CommandDeck/ProjectTree/`) renders one collapsed/expandable row per issue (`FeatureItem`). Since PAN-4201 that row reads:
+
+- **State badge** — `resolveFeatureStateBadge()` (`ProjectTree/featureStateBadge.ts`) derives the badge shown on the row from the issue's derived state, with source precedence store-derived state → REST `feature.state` → pipeline-bucket/tracker fallback → no badge. It never renders the server's `stateLabel` string (the source of the old "Allocated" pill).
+
+  | Derived state | Label | Tone | Token |
+  | --- | --- | --- | --- |
+  | `backlog`, `parked`, `planned`, `closed` | Backlog / Parked / Planned / Closed | rest | `--muted-foreground` |
+  | `working` | Working | machine | `--info` |
+  | `in-review`, `changes-requested`, `ready` | In review / Changes requested / Ready | human | `--warning` |
+  | a `planned`/`backlog`/null state with a live planning session | Planning | specialist | `--signal-review` |
+  | `merged`, or a null state with `pipelineBucket: 'post_merge_limbo'` | Merged | outcome | `--success` |
+
+- **Activity dot** — the `StatusDot` primitive renders on the row only while an agent session is live (`dominantStatus` is `active`, `thinking`, or `waiting`); it is the row's "something is live right now" signal, separate from the state badge.
+- **Resource cluster** — `ResourceCluster` (`ProjectTree/ResourceCluster.tsx`) is the single icon-only home for resource facts (workspace, branch, tmux, xBRIEF, PRD, tasks, PR, docker) on the row's meta line, in both collapsed and expanded states; a hover popover carries full identifiers. The expanded `ResourcesGroup` lists only live docker containers, headed "Containers" — it no longer repeats branches or PRs (`BranchNode`/`PrNode` were removed).
+- **Pipeline pips** — the five-segment plan/work/review/test/merge strip is labelled, not decorative: `describePipeline()` (`ProjectTree/pipelineStrip.ts`) names the current step in the strip's `title`/`aria-label`, and each segment carries its own per-phase title.
+
 ### Cockpit layout
 
 The cockpit is organized around the live run. Its header carries one phase sentence plus branch, PR, cost, tracker, and shared issue actions; a prioritized `NeedsYouSlot` appears immediately below it when the operator must answer or intervene. `CockpitPhaseRail` follows with live actor, model, harness, start-time, and duration metadata driven by the shared reactive tick; clicking an occupied phase opens that exact session id. It is cockpit-only: the console/drawer `IssuePhaseRail` and the default filled idle `StatusDot` keep their frozen behavior, while cockpit rows opt into the hollow idle and outcome colors. The persistent tab band has exactly six destinations:

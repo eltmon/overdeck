@@ -265,23 +265,35 @@ test.describe('Command Deck resource strip', () => {
     // the row is present and keep the default timeout).
     await expect(pan862Row).toBeVisible({ timeout: 20_000 });
     await expect(pan777Row).toBeVisible();
-    await expect(pan777Row.locator('[class*="featureState"]').getByText('Closed', { exact: true })).toBeVisible();
+    await expect(pan777Row.locator('[class*="featureStateBadge"]').getByText('Closed', { exact: true })).toBeVisible();
 
-    const expectResourceChip = async (title: string, label: string) => {
+    // PAN-4201: resource chips are icon-only — the fact lives in title/aria-label,
+    // not visible text. No workspace/branch/tmux/xBRIEF/tasks/docker chip shows
+    // a visible label; only the PR chip carries a compact `#<number>` badge.
+    const expectResourceChip = async (title: string) => {
       const chip = pan862Item.getByTitle(title);
       await expect(chip).toBeVisible();
       await expect(chip.locator('svg')).toBeVisible();
-      await expect(chip.getByText(label, { exact: true })).toBeVisible();
       return chip;
     };
 
-    const workspaceIcon = await expectResourceChip('workspace: allocated', 'workspace');
-    await expectResourceChip('branch: local 1 · remote 1', 'branch local 1 · remote 1');
-    await expectResourceChip('tmux: 2 sessions', 'tmux');
-    await expectResourceChip('xBRIEF: present', 'xBRIEF');
-    await expectResourceChip('tasks: present', 'tasks');
-    await expectResourceChip('PR: #862 (open) · #863 (open, draft)', '#862');
-    await expectResourceChip('docker: 1 container', 'stack 1');
+    const workspaceIcon = await expectResourceChip('workspace: allocated');
+    await expectResourceChip('branch: local 1 · remote 1');
+    await expectResourceChip('tmux: 2 sessions');
+    await expectResourceChip('xBRIEF: present');
+    await expectResourceChip('tasks: present');
+    const prChip = await expectResourceChip('PR: #862 (open) · #863 (open, draft)');
+    await expect(prChip.getByText('#862', { exact: true })).toBeVisible();
+    // PAN-4201 WI-7: PAN-862 is expanded by default (stateLabel 'In Progress')
+    // and has a docker container, so the expanded Containers group renders it
+    // and the cluster omits its own docker icon — each fact appears once.
+    await expect(pan862Item.getByTitle('docker: 1 container')).toHaveCount(0);
+    await expect(pan862Item.getByText('Containers', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('1 container', { exact: true })).toBeVisible();
+    await pan862Item.getByRole('button', { name: 'Expand resources' }).click();
+    await expect(pan862Item.getByTitle('pan-862-db')).toBeVisible();
+    await expect(pan862Item.getByText('workspace', { exact: true })).toHaveCount(0);
+    await expect(pan862Item.getByText('branch local 1 · remote 1', { exact: true })).toHaveCount(0);
     await workspaceIcon.hover();
 
     await expect(pan862Item.getByText('workspace: /tmp/workspaces/feature-pan-862', { exact: true })).toBeVisible();
@@ -295,9 +307,14 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan862Item.getByText('PR: #863 PAN-862 draft PR (open, draft)', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('docker: pan-862-db', { exact: true })).toBeVisible();
 
+    // Close PAN-862's popover before touching PAN-777 — it renders upward
+    // (`bottom: calc(100% + 4px)`) and the now-expanded Containers group
+    // pushed the row taller, so an open popover can overlap the next row.
+    await page.mouse.move(0, 0);
+    await expect(pan862Item.locator('[class*="featureResourcePopover"]')).toHaveCount(0);
+
     const closedWorkspaceIcon = pan777Item.getByTitle('workspace: allocated');
     await expect(closedWorkspaceIcon.locator('svg')).toBeVisible();
-    await expect(closedWorkspaceIcon.getByText('workspace', { exact: true })).toBeVisible();
     await closedWorkspaceIcon.hover();
     await expect(pan777Item.getByRole('button', { name: 'Cleanup' }).first()).toBeVisible();
   });

@@ -1,0 +1,124 @@
+{
+  "version": "1",
+  "issueId": "PAN-4200",
+  "created": "2026-09-25T06:42:27.234Z",
+  "updated": "2026-09-25T07:53:58.477Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-electron-builder-26": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4200",
+      "claimedAt": "2026-09-25T06:42:27.234Z",
+      "doneAt": "2026-09-25T07:05:52.106Z"
+    },
+    "wi2-electron-pin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4200",
+      "claimedAt": "2026-09-25T07:06:12.014Z",
+      "doneAt": "2026-09-25T07:07:39.494Z"
+    },
+    "wi3-notarize-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4200",
+      "claimedAt": "2026-09-25T07:07:44.874Z",
+      "doneAt": "2026-09-25T07:08:44.941Z"
+    },
+    "wi4-guard-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4200",
+      "claimedAt": "2026-09-25T07:08:53.757Z",
+      "doneAt": "2026-09-25T07:11:31.753Z"
+    },
+    "wi5-docs-build": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4200",
+      "claimedAt": "2026-09-25T07:11:37.003Z",
+      "doneAt": "2026-09-25T07:12:54.095Z"
+    },
+    "wi6-linux-verify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4200",
+      "claimedAt": "2026-09-25T07:13:00.435Z",
+      "doneAt": "2026-09-25T07:32:19.955Z"
+    },
+    "wi1-electron-builder-26.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:49:32.037Z"
+    },
+    "wi1-electron-builder-26.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:50:04.866Z"
+    },
+    "wi1-electron-builder-26.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:50:17.249Z"
+    },
+    "wi1-electron-builder-26.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:50:29.891Z"
+    },
+    "wi2-electron-pin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:50:41.468Z"
+    },
+    "wi2-electron-pin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:50:52.928Z"
+    },
+    "wi3-notarize-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:51:04.319Z"
+    },
+    "wi3-notarize-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:51:15.335Z"
+    },
+    "wi3-notarize-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:51:28.070Z"
+    },
+    "wi4-guard-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:51:42.743Z"
+    },
+    "wi4-guard-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:51:57.118Z"
+    },
+    "wi4-guard-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:52:10.415Z"
+    },
+    "wi5-docs-build.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:52:22.627Z"
+    },
+    "wi5-docs-build.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:52:35.803Z"
+    },
+    "wi5-docs-build.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:52:48.435Z"
+    },
+    "wi6-linux-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:53:02.764Z"
+    },
+    "wi6-linux-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:53:15.864Z"
+    },
+    "wi6-linux-verify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-25T07:53:28.796Z"
+    },
+    "wi2-electron-pin.ac3": {
+      "status": "cancelled"
+    }
+  }
+}
