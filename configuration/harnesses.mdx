@@ -532,8 +532,10 @@ it can reach:
 | `cerebras` | `cerebras` | `CEREBRAS_API_KEY` | `cerebras` |
 | `mistral` | `mistral` | `MISTRAL_API_KEY` | `mistral` |
 
-The model ID passes through unchanged. Prime Agent rejects an unknown model at
-startup, and the launch error shows its message. Any other provider fails with a
+Anthropic models under Anthropic **subscription** auth are blocked for Prime
+Agent by the Claude Code subscription terms (see [ToS rules](#tos-rules)); use
+Anthropic API-key auth instead. The model ID passes through unchanged. Prime
+Agent rejects an unknown model at startup, and the launch error shows its message. Any other provider fails with a
 mapping error; Overdeck never picks a fallback model.
 
 #### Credentials
