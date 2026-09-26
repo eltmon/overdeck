@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 800_
+_Last sequenced: 2026-09-26T05:58:13.605793Z · model: claude-opus-5-5 · open: 791_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -41,7 +41,6 @@ _Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 
 | 57 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
 | 58 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
 | 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 61 | PAN-1560 | XS | high | needs-refinement |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
 | 66 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
@@ -74,7 +73,6 @@ _Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 
 | 96 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
 | 97 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
 | 98 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
-| 99 | PAN-3899 | S | high | ok |  |  | pan reload drops the Deacon/resume boot gates chosen at the last restart, so every deploy relaunches with the Deacon off |
 | 100 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
 | 101 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
 | 102 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
@@ -224,7 +222,6 @@ _Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 
 | 265 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
 | 266 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
 | 267 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 268 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
 | 269 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
 | 270 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
 | 271 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
@@ -370,7 +367,6 @@ _Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 419 | PAN-1740 | XS | medium | needs-refinement |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
 | 420 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
@@ -507,7 +503,6 @@ _Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 
 | 560 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
 | 561 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
 | 562 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 563 | PAN-3837 | S | medium | needs-refinement |  |  | Stale starting placeholder can no longer occur; remaining half = per-issue fs-lock contention kills auto-handoff spawn with no retry |
 | 565 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
 | 567 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
 | 568 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
@@ -671,7 +666,6 @@ _Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 
 | 731 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
 | 732 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
 | 733 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 734 | PAN-810 | XS | low | needs-refinement |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
 | 735 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
 | 736 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
 | 737 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
@@ -759,8 +753,6 @@ _Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 
 | 821 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
 | 822 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
 | 823 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 824 | PAN-3564 | M | low | needs-refinement |  |  | Global state-git lock is gone; verify whether the per-issue fs-lock convoy (100% duty cycle, reviewer spawns die) can still occur |
-| 825 | PAN-3571 | S | low | stale |  |  | Stale: targets work-agent-stop-hook (7b953449633) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 826 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 829 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
@@ -789,7 +781,6 @@ _Last sequenced: 2026-09-26T05:56:49.453782Z · model: claude-opus-5-5 · open: 
 | 854 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
 | 855 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
 | 856 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
-| 857 | PAN-47 | M | low | stale |  |  | PRDs already live under .pan/ on the feature branch; the docs/prds/active merge-blocking flow no longer exists |
 | 858 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
 | 859 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
 | 860 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
@@ -952,10 +943,6 @@ Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as 
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-1560 (rank 61)
-
-Triage: review_status is gone but verification still writes a check run to the PR; the re-post-on-head-move concern may still apply to that flow (PAN-3946 covers the approval-on-old-commit side). Rank held.
-
 ### PAN-2806 (rank 66)
 
 Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.
@@ -1084,10 +1071,6 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
 
 Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.
 
-### PAN-3899 (rank 99)
-
-Rank held at 99. resolveBootGates is only called from restart.ts; reload and the post-merge deploy path relaunch with no OVERDECK_* gate env, so deacon-lite is silently off after most deploys. The related PAN-3898 closed as obsolete after the cut, so that cross-reference is dropped; nothing in the boot-gate defect depended on it.
-
 ### PAN-3811 (rank 100)
 
 New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts shelling straight to docker builder prune --all --force, with no BuildKit bytes in the canonical inventory, no candidate through the resource reclaim door and no age or size floor. The partial strike is a fine urgent backstop, but closing PAN-3809 on it would quietly drop requirements 1-3. Ranked directly behind its parent so the completion work is not forgotten once the emergency lands. Dropped dependsOn PAN-3809 (closed since the prior run).
@@ -1108,6 +1091,14 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
 
 Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
 
+### PAN-3916 (rank 112)
+
+Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
+
+### PAN-3900 (rank 113)
+
+patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1115,10 +1106,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T05:56:49.453782Z",
+  "generatedAt": "2026-09-26T05:58:13.605793Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 800,
+  "openCount": 791,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -1481,19 +1472,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "dependsOn": [],
       "why": "Ghost test sessions absorb every test dispatch",
       "rationale": "Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1560",
-      "rank": 61,
-      "size": "XS",
-      "importance": "high",
-      "score": 84,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED",
-      "rationale": "Triage: review_status is gone but verification still writes a check run to the PR; the re-post-on-head-move concern may still apply to that flow (PAN-3946 covers the approval-on-old-commit side). Rank held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1916,19 +1894,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "dependsOn": [],
       "why": "planning finalizes (issue→planned) but work agent does not auto-spawn",
       "rationale": "Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3899",
-      "rank": 99,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan reload drops the Deacon/resume boot gates chosen at the last restart, so every deploy relaunches with the Deacon off",
-      "rationale": "Rank held at 99. resolveBootGates is only called from restart.ts; reload and the post-merge deploy path relaunch with no OVERDECK_* gate env, so deacon-lite is silently off after most deploys. The related PAN-3898 closed as obsolete after the cut, so that cross-reference is dropped; nothing in the boot-gate defect depended on it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3789,19 +3754,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-1728",
-      "rank": 268,
-      "size": "S",
-      "importance": "medium",
-      "score": 40,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify…",
-      "rationale": "Triage: specs are no longer workspace-local-vs-main-immutable; the violation may not be meaningful under the .pan/ model. Demoted from high to medium.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2241",
       "rank": 269,
       "size": "S",
@@ -5584,19 +5536,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-1740",
-      "rank": 419,
-      "size": "XS",
-      "importance": "medium",
-      "score": 55,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Deacon mislabels SIGTERM workspace container restarts as crashes",
-      "rationale": "Triage: container crash-loop classification is not one of deacon-lite's five routines; verify whether this class of check exists at all post-cut. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1674",
       "rank": 420,
       "size": "S",
@@ -7246,19 +7185,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "why": "tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify.",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-3837",
-      "rank": 563,
-      "size": "S",
-      "importance": "medium",
-      "score": 44,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Stale starting placeholder can no longer occur; remaining half = per-issue fs-lock contention kills auto-handoff spawn with no retry",
-      "rationale": "Triage: the stale \"starting\" placeholder is structurally gone, but the per-issue record lock (fs-lock.ts) contention that killed the auto-handoff spawn still exists. Raised from the tail to medium because a handoff spawn dying on first contention with no retry is a live pipeline gap.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-2978",
@@ -9255,19 +9181,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-810",
-      "rank": 734,
-      "size": "XS",
-      "importance": "low",
-      "score": 18,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Inspector: diagnostic UI when pipeline phase is unknown",
-      "rationale": "Triage: pipeline phase is derived via derived-issue-state.ts; an unknown-phase diagnostic would target that resolver. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-797",
       "rank": 735,
       "size": "M",
@@ -10324,32 +10237,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-3564",
-      "rank": 824,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Global state-git lock is gone; verify whether the per-issue fs-lock convoy (100% duty cycle, reviewer spawns die) can still occur",
-      "rationale": "Triage: the global state-git lock half is gone; fs-lock.ts still has the per-issue lock. Verify whether the convoy can still occur. Rank held at the tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3571",
-      "rank": 825,
-      "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "Stale: targets work-agent-stop-hook (7b953449633) deleted by the PAN-3917 cut (ca15def); re-triage or close",
-      "rationale": "Demoted from rank 32: the component this issue targets (work-agent-stop-hook (7b953449633)) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3248",
       "rank": 826,
       "size": "XS",
@@ -10703,19 +10590,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "condition": "stale",
       "dependsOn": [],
       "why": "Documentation: Clarify issue tracker options beyond Linear",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-47",
-      "rank": 857,
-      "size": "M",
-      "importance": "low",
-      "score": 11,
-      "condition": "stale",
-      "dependsOn": [],
-      "why": "PRDs already live under .pan/ on the feature branch; the docs/prds/active merge-blocking flow no longer exists",
-      "rationale": "Triage: the flow this describes no longer exists. Stale at the tail.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11142,13 +11016,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
     {
       "from": "PAN-3560",
       "to": "PAN-3563",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.85
-    },
-    {
-      "from": "PAN-3564",
-      "to": "PAN-3565",
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.85
@@ -11623,13 +11490,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "confidence": 0.7
     },
     {
-      "from": "PAN-3899",
-      "to": "PAN-3902",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-3909",
       "to": "PAN-3864",
       "type": "informs",
@@ -11693,20 +11553,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "confidence": 1
     },
     {
-      "from": "PAN-3564",
-      "to": "PAN-3560",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3564",
-      "to": "PAN-3563",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3563",
       "to": "PAN-3560",
       "type": "informs",
@@ -11763,13 +11609,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "confidence": 1
     },
     {
-      "from": "PAN-2308",
-      "to": "PAN-1740",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3952",
       "to": "PAN-3944",
       "type": "informs",
@@ -11810,13 +11649,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-3946",
-      "to": "PAN-1560",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     },
     {
       "from": "PAN-3935",
@@ -11957,13 +11789,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-3899",
-      "to": "PAN-4184",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
     },
     {
       "from": "PAN-4191",
