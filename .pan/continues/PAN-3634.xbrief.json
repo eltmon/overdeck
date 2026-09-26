@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3634",
   "created": "2026-09-26T06:15:47.084Z",
-  "updated": "2026-09-26T08:30:20.274Z",
+  "updated": "2026-09-26T08:30:37.172Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "handoff-deferred-retry.ac1": {
       "status": "completed",
       "doneAt": "2026-09-26T08:30:20.274Z"
+    },
+    "handoff-deferred-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:30:37.171Z"
     }
   }
 }
