@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T07:36:21.306Z",
+  "updated": "2026-09-26T07:37:10.804Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,9 +202,10 @@
       "doneAt": "2026-09-26T06:48:58.547Z"
     },
     "lane-show-cmd": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4223",
-      "claimedAt": "2026-09-26T06:59:44.824Z"
+      "claimedAt": "2026-09-26T06:59:44.824Z",
+      "doneAt": "2026-09-26T07:37:10.803Z"
     },
     "deck-critic-tree": {
       "status": "completed",
