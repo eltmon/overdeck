@@ -1,4 +1,6 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
+import { getPrimeAgentLauncherFields } from '../prime-agent/launcher-fields.js';
+import { hostTransportFor } from '../runtimes/host-transport.js';
 /**
  * Spawn Planning Session — background workspace + agent setup
  *
@@ -565,7 +567,13 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       ? getKimiCodeLauncherFields(planningModel, effort)
       : {};
 
-    const providerExports = behavior.launchCommandKind === 'acp-host'
+    // Prime Agent (PAN-3668 WI-13): the host owns provider selection; its credential
+    // travels in the pane env, never in provider exports or the launcher script.
+    const primeLaunch = behavior.launchCommandKind === 'prime-agent-host'
+      ? await getPrimeAgentLauncherFields(sessionName, planningModel, workspacePath, harnessLaunch.binaryPath, { effort })
+      : null;
+
+    const providerExports = behavior.launchCommandKind === 'acp-host' || primeLaunch
       ? undefined
       : await getProviderExportsForModel(planningModel, effectiveHarness);
 
@@ -588,7 +596,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         overdeckEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
         extraEnvExports: [harnessLaunch.pathExport],
-        promptFile: (behavior.launchCommandKind === 'acp-host' || behavior.launchCommandKind === 'kimi-code-tui' || effectiveHarness === 'muse') ? undefined : promptFile,
+        promptFile: (hostTransportFor(effectiveHarness) !== null || behavior.launchCommandKind === 'kimi-code-tui' || effectiveHarness === 'muse') ? undefined : promptFile,
         baseCommand: cmdWithArgs,
         appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
         trapHup: true,
@@ -602,6 +610,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...codexLauncherFields,
         ...acpLauncherFields,
         ...kimiCodeLauncherFields,
+        ...(primeLaunch?.fields ?? {}),
         ...(effectiveHarness === 'muse' ? { museModel: planningModel, museEffort: effort, museContextFile: await materializeMuseContext(sessionName, workspacePath, roleAgentDefinitionPath('plan')) } : {}),
       }),
       { mode: 0o755 },
@@ -628,6 +637,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         argv: ['bash', launcherScript],
         env: {
           ...buildPlanningSessionEnv(startedBy),
+          ...(primeLaunch?.paneEnv ?? {}),
           OVERDECK_AGENT_ID: sessionName,
           OVERDECK_ISSUE_ID: issue.identifier,
           OVERDECK_SESSION_TYPE: 'plan',
@@ -681,7 +691,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       });
     }
 
-    if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host' || behavior.launchCommandKind === 'kimi-code-tui' || effectiveHarness === 'muse') {
+    if (behavior.usesCodexHome || hostTransportFor(effectiveHarness) !== null || behavior.launchCommandKind === 'kimi-code-tui' || effectiveHarness === 'muse') {
       const delivery = await deliverInitialPromptWithRetry(
         sessionName,
         initMessage,
