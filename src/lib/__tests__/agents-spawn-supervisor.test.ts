@@ -1010,6 +1010,26 @@ describe('Prime Agent work launch (PAN-3668 WI-12)', () => {
     expect(waitForPromptReadyMock.mock.invocationCallOrder[0]).toBeLessThan(deliverAgentMessageMock.mock.invocationCallOrder[0]);
   });
 
+  it('recovers a Prime agent by resuming its recorded session file', async () => {
+    const { saveAgentStateSync } = await import('../agents/agent-state.js');
+    const { recoverAgent } = await import('../agents/recovery.js');
+    const state = baseState({ harness: 'prime-agent', model: 'gpt-5.4', status: 'stopped' });
+    saveAgentStateSync(state);
+    const agentDir = join(tmpHome, 'agents', state.id);
+    const sessionFile = join(agentDir, 'prime-sessions', '01a0.jsonl');
+    mkdirSync(join(agentDir, 'prime-sessions'), { recursive: true });
+    writeFileSync(sessionFile, '{"type":"session"}\n');
+    writeFileSync(join(agentDir, 'prime-agent-session-file'), `${sessionFile}\n`);
+    writeFileSync(join(agentDir, 'prime-agent-session-id'), 'prime-session-1\n');
+
+    await expect(recoverAgent(state.id)).resolves.toMatchObject({ action: 'respawned', state: { status: 'running' } });
+
+    const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+    expect(launcher).toMatch(/dist\/prime-agent-host\.js' --agent 'agent-pan-1405'/);
+    expect(launcher).toContain(`--resume '${sessionFile}'`);
+    expect(deliverInitialPromptWithRetryMock).toHaveBeenCalledWith(state.id, expect.any(String), 'recoverAgent:prime-agent-recovery-prompt');
+  });
+
   it('propagates a credential error before any pane is launched', async () => {
     resolvePrimeAgentCredentialMock.mockRejectedValue(new Error('Prime Agent cannot launch "gpt-5.4": no credential for Prime provider "openai".'));
     const { spawnAgent } = await import('../agents.js');
