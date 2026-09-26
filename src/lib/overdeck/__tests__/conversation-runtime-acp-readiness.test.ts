@@ -1,12 +1,12 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const waitForAcpHostReady = vi.fn(async () => {});
+const waitForHostReady = vi.fn(async () => {});
 const tmuxSessionExists = vi.fn((_name: string) => Effect.succeed(true));
 
 vi.mock('../../agents/runtime-command.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../agents/runtime-command.js')>()),
-  waitForAcpHostReady,
+  waitForHostReady,
 }));
 
 vi.mock('../../tmux.js', async (importOriginal) => ({
@@ -18,7 +18,7 @@ const { waitForConversationRuntimeReady } = await import('../conversation-runtim
 
 describe('waitForConversationRuntimeReady — ACP conversations', () => {
   beforeEach(() => {
-    waitForAcpHostReady.mockClear();
+    waitForHostReady.mockClear();
     tmuxSessionExists.mockClear();
   });
 
@@ -29,13 +29,15 @@ describe('waitForConversationRuntimeReady — ACP conversations', () => {
   it.each(['opencode', 'acp'] as const)('%s probes the tmux session, not the selected backend', async (harness) => {
     await waitForConversationRuntimeReady('conv-acp-ready', harness, 'respawn');
 
-    expect(waitForAcpHostReady).toHaveBeenCalledTimes(1);
-    const [agentId, timeoutSec, deps] = waitForAcpHostReady.mock.calls[0] as unknown as [
+    expect(waitForHostReady).toHaveBeenCalledTimes(1);
+    const [agentId, transport, timeoutSec, deps] = waitForHostReady.mock.calls[0] as unknown as [
+      string,
       string,
       number,
       { sessionExists?: (id: string) => Promise<boolean> },
     ];
     expect(agentId).toBe('conv-acp-ready');
+    expect(transport).toBe('acp');
     expect(timeoutSec).toBe(30);
     expect(deps.sessionExists).toBeTypeOf('function');
 

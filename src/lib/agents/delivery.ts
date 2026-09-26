@@ -6,6 +6,7 @@ import { homedir } from 'os';
 import { Effect } from 'effect';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { hostDisplayName, hostSocketPath, hostTokenFile, hostTransportFor, type HostTransport } from '../runtimes/host-transport.js';
 import { markKimiContextDelivered, prepareKimiMessage, type PreparedKimiMessage } from '../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agents.js';
 import type { PromptResult, PromptSender } from '../terminal-backends/types.js';
@@ -64,11 +65,11 @@ async function targetHarness(agentId: string, state: AgentState | null): Promise
 
 /**
  * Does this agent run behind a host process with its own delivery socket?
- * codex app-server (the default codex transport) and ACP/opencode do; codex in
- * `transport: tui` mode does not.
+ * codex app-server (the default codex transport), ACP/opencode and Prime Agent do;
+ * codex in `transport: tui` mode does not.
  */
 async function isHostBackedTarget(harness: RuntimeName | undefined): Promise<boolean> {
-  if (harness === 'acp' || harness === 'opencode') return true;
+  if (hostTransportFor(harness) !== null) return true;
   if (harness !== 'codex') return false;
   try {
     const { loadConfigSync } = await import('../config-yaml.js');
@@ -101,7 +102,7 @@ export function resetDeliveryBackendSelection(): void {
 
 export type DeliveryResult = {
   ok: boolean;
-  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex' | 'herdr';
+  path: 'app-server' | HostTransport | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex' | 'herdr';
   failure?: string;
   /** True when the delivery was suppressed by the keyed dedup record — the
    * side effect already happened on an earlier call with the same key. */
@@ -177,7 +178,7 @@ function overdeckHomeForChannels(): string {
 async function appendChannelDeliveryLog(
   agentId: string,
   entry: {
-    path: 'app-server' | 'acp' | 'supervisor' | 'channel' | 'tmux';
+    path: 'app-server' | HostTransport | 'supervisor' | 'channel' | 'tmux';
     reason?: string;
     caller?: string;
     appServer?: string;
@@ -220,8 +221,8 @@ function readAppServerTokenSync(agentId: string): string | null {
   return readSocketTokenSync(agentId, 'appserver-token');
 }
 
-function readAcpTokenSync(agentId: string): string | null {
-  return readSocketTokenSync(agentId, 'acp-token');
+function readHostTokenSync(agentId: string, transport: HostTransport): string | null {
+  return readSocketTokenSync(agentId, hostTokenFile(transport));
 }
 
 /**
@@ -441,10 +442,12 @@ export async function deliverAgentMessage(
     return { ok: true, path: 'tmux', deduplicated: true, failure: `dropped: ${guard.reason}` };
   }
 
-  const isAcpTarget = state?.harness === 'acp' || state?.harness === 'opencode';
-  if (isAcpTarget && resolvedMethod !== 'auto') {
+  const hostTransport = hostTransportFor(state?.harness);
+  const isHostTarget = hostTransport !== null;
+  if (hostTransport && resolvedMethod !== 'auto') {
+    const name = hostDisplayName(hostTransport);
     throw new Error(
-      `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ACP requires authenticated host RPC delivery`,
+      `MessageDeliveryFailed: ${name} delivery failed for ${normalizedId} (${caller}): ${name} requires authenticated host RPC delivery`,
     );
   }
 
@@ -472,7 +475,7 @@ export async function deliverAgentMessage(
   // crash-independent component enforces the key across the complete side
   // effect. Everything below this branch is the unkeyed cascade.
   if (dedupKey !== undefined) {
-    return completeDelivery(await deliverKeyedAgentMessage(normalizedId, message, caller, resolvedMethod ?? 'auto', isAcpTarget, dedupKey));
+    return completeDelivery(await deliverKeyedAgentMessage(normalizedId, message, caller, resolvedMethod ?? 'auto', hostTransport, dedupKey));
   }
 
   if (resolvedMethod === 'tmux') {
@@ -482,7 +485,7 @@ export async function deliverAgentMessage(
   }
 
   let appServerFailure: string | undefined;
-  if (resolvedMethod === 'auto' && !isAcpTarget) {
+  if (resolvedMethod === 'auto' && !isHostTarget) {
     const appServerSocketPath = join(overdeckHomeForSockets(), 'sockets', `appserver-${normalizedId}.sock`);
     if (existsSync(appServerSocketPath)) {
       const appServerToken = readAppServerTokenSync(normalizedId);
@@ -508,45 +511,51 @@ export async function deliverAgentMessage(
     }
   }
 
-  let acpFailure: string | undefined;
+  let hostFailure: string | undefined;
   if (resolvedMethod === 'auto') {
-    const acpSocketPath = join(overdeckHomeForSockets(), 'sockets', `acp-${normalizedId}.sock`);
-    const acpSocketExists = existsSync(acpSocketPath);
-    if (isAcpTarget || acpSocketExists) {
-      const acpToken = readAcpTokenSync(normalizedId);
-      if (!acpSocketExists) {
-        acpFailure = 'socket-missing';
-      } else if (!acpToken) {
-        acpFailure = 'acp-token-missing';
+    // A conversation id has no agent state, so its transport comes from whichever
+    // host socket exists: ACP first, then Prime Agent.
+    const socketHome = overdeckHomeForSockets();
+    const transport = hostTransport
+      ?? (existsSync(hostSocketPath(normalizedId, 'acp', socketHome)) ? 'acp'
+        : existsSync(hostSocketPath(normalizedId, 'prime-agent', socketHome)) ? 'prime-agent'
+          : null);
+    if (transport) {
+      const socketPath = hostSocketPath(normalizedId, transport, socketHome);
+      const hostToken = readHostTokenSync(normalizedId, transport);
+      if (!existsSync(socketPath)) {
+        hostFailure = 'socket-missing';
+      } else if (!hostToken) {
+        hostFailure = `${hostTokenFile(transport)}-missing`;
       } else {
         try {
-          // The ACP host acknowledges queue acceptance rather than model-turn
+          // The host acknowledges queue acceptance rather than model-turn
           // completion, so this bounds a wedged local host without constraining
           // how long the provider may take to finish the queued turn.
           await postUnixSocketJson(
-            acpSocketPath,
+            socketPath,
             { op: 'message', content: message, meta: { caller } },
             8_000,
-            acpToken,
+            hostToken,
           );
-          await appendChannelDeliveryLog(normalizedId, { path: 'acp', caller });
-          return completeDelivery({ ok: true, path: 'acp' });
+          await appendChannelDeliveryLog(normalizedId, { path: transport, caller });
+          return completeDelivery({ ok: true, path: transport });
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
-          acpFailure = `socket-post-failed: ${reason}`;
+          hostFailure = `socket-post-failed: ${reason}`;
         }
       }
 
-      // ACP prompts only enter the agent through session/prompt on the host RPC
-      // socket. Terminal fallbacks can accept pasted text while bypassing the ACP
-      // session entirely, so an ACP transport failure must remain a loud failure.
+      // Host-backed prompts only enter the agent through the host RPC socket.
+      // Terminal fallbacks can accept pasted text while bypassing the session
+      // entirely, so a host transport failure must remain a loud failure.
       await appendChannelDeliveryLog(normalizedId, {
-        path: 'acp',
-        reason: acpFailure,
+        path: transport,
+        reason: hostFailure,
         caller,
       });
       throw new Error(
-        `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ${acpFailure}`,
+        `MessageDeliveryFailed: ${hostDisplayName(transport)} delivery failed for ${normalizedId} (${caller}): ${hostFailure}`,
       );
     }
   }
@@ -626,7 +635,7 @@ export async function deliverAgentMessage(
       reason: channelFailure,
       caller,
       ...(appServerFailure ? { appServer: appServerFailure } : {}),
-      ...(acpFailure ? { acp: acpFailure } : {}),
+      ...(hostFailure ? { acp: hostFailure } : {}),
       ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
       ...(channelFailure ? { channels: channelFailure } : {}),
     });
@@ -662,12 +671,12 @@ async function deliverKeyedAgentMessage(
   message: string,
   caller: string,
   resolvedMethod: 'auto' | 'supervisor' | 'channels' | 'tmux',
-  isAcpTarget: boolean,
+  hostTransport: HostTransport | null,
   dedupKey: string,
 ): Promise<DeliveryResult> {
-  if (isAcpTarget) {
+  if (hostTransport) {
     throw new Error(
-      `MessageDeliveryFailed: keyed delivery failed for ${normalizedId} (${caller}): the ACP tier cannot enforce a dedup key`,
+      `MessageDeliveryFailed: keyed delivery failed for ${normalizedId} (${caller}): the ${hostDisplayName(hostTransport)} tier cannot enforce a dedup key`,
     );
   }
   if (resolvedMethod === 'channels') {

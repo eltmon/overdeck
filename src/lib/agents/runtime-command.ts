@@ -15,6 +15,7 @@ import type { RoleEffort } from '../config-yaml.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { hostLabel, hostLaunchErrorFile, hostSessionIdFile, hostSocketPath, hostTokenFile, type HostTransport } from '../runtimes/host-transport.js';
 import { initCodexHome } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
 import { piFifoPaths, PiNotReady, writePiCommand } from '../runtimes/pi-fifo.js';
@@ -455,7 +456,7 @@ export async function waitForCodexAppServerReady(
   throw new Error(`Timed out waiting for Codex app-server readiness for ${agentId}.${detail}`);
 }
 
-export interface AcpHostReadyDeps {
+export interface HostReadyDeps {
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   sessionExists?: (agentId: string) => Promise<boolean>;
@@ -463,10 +464,15 @@ export interface AcpHostReadyDeps {
   pathExists?: (path: string) => boolean;
 }
 
-export async function waitForAcpHostReady(
+/**
+ * Wait until a host-backed agent (ACP/OpenCode or Prime Agent, PAN-3668 D5) has
+ * written its session id and token and bound its control socket.
+ */
+export async function waitForHostReady(
   agentId: string,
+  transport: HostTransport,
   timeoutSec = 30,
-  deps: AcpHostReadyDeps = {},
+  deps: HostReadyDeps = {},
 ): Promise<void> {
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms)));
@@ -478,19 +484,20 @@ export async function waitForAcpHostReady(
   const readText = deps.readText ?? ((path: string) => readFileSync(path, 'utf8'));
   const pathExists = deps.pathExists ?? existsSync;
   const agentDir = getAgentDir(agentId);
-  const sessionIdPath = join(agentDir, 'acp-session-id');
-  const errorPath = join(agentDir, 'acp-launch-error');
-  const tokenPath = join(agentDir, 'acp-token');
-  const socketPath = join(getOverdeckHome(), 'sockets', `acp-${agentId}.sock`);
+  const sessionIdPath = join(agentDir, hostSessionIdFile(transport));
+  const errorPath = join(agentDir, hostLaunchErrorFile(transport));
+  const tokenPath = join(agentDir, hostTokenFile(transport));
+  const socketPath = hostSocketPath(agentId, transport);
+  const label = hostLabel(transport);
   const deadline = now() + timeoutSec * 1000;
 
   while (now() < deadline) {
     if (pathExists(errorPath)) {
       const launchError = readText(errorPath).trim();
-      if (launchError) throw new Error(`ACP host ${agentId} failed to start: ${launchError}`);
+      if (launchError) throw new Error(`${label} ${agentId} failed to start: ${launchError}`);
     }
     if (!(await sessionExistsForAgent(agentId))) {
-      throw new Error(`ACP host session ${agentId} exited before readiness.`);
+      throw new Error(`${label} session ${agentId} exited before readiness.`);
     }
 
     try {
@@ -504,7 +511,7 @@ export async function waitForAcpHostReady(
     await sleep(500);
   }
 
-  throw new Error(`Timed out waiting for ACP host readiness for ${agentId}.`);
+  throw new Error(`Timed out waiting for ${label} readiness for ${agentId}.`);
 }
 
 export async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
@@ -516,8 +523,8 @@ export async function waitForPromptReady(agentId: string, harness: RuntimeName |
     await waitForCodexAppServerReady(agentId, timeoutSec);
     return true;
   }
-  if (readinessKind === 'acp-host-ready') {
-    await waitForAcpHostReady(agentId, timeoutSec);
+  if (readinessKind === 'acp-host-ready' || readinessKind === 'prime-agent-host-ready') {
+    await waitForHostReady(agentId, readinessKind === 'acp-host-ready' ? 'acp' : 'prime-agent', timeoutSec);
     return true;
   }
   if (readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);

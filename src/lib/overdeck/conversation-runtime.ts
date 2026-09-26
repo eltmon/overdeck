@@ -55,7 +55,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { waitForClaudeReady } from './claude-readiness.js';
-import { claudeSystemPromptFiles, getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
+import { claudeSystemPromptFiles, getAcpLauncherFields, waitForHostReady, waitForPromptReady } from '../agents/runtime-command.js';
 import { claudeGlobalContextFile, codexGlobalContextFile, workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
@@ -319,7 +319,7 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
     return;
   }
   if (harness === 'acp' || harness === 'opencode') {
-    await waitForAcpHostReady(tmuxSession, 30, { sessionExists: tmuxSessionExists }); // the conversation liveness door, not the agent oracle
+    await waitForHostReady(tmuxSession, 'acp', 30, { sessionExists: tmuxSessionExists }); // the conversation liveness door, not the agent oracle
     return;
   }
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;

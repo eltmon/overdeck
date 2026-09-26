@@ -10,6 +10,7 @@ import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycle } from '../persistent-logger.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { hostTransportFor } from '../runtimes/host-transport.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
@@ -137,7 +138,7 @@ const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-m
 export function resolveAgentDeliveryMethod(
   state: Pick<AgentState, 'harness' | 'deliveryMethod'> | null | undefined,
 ): 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined {
-  if (state?.harness === 'acp' || state?.harness === 'opencode') return 'auto';
+  if (hostTransportFor(state?.harness) !== null) return 'auto';
   return resilientDeliveryMethod(state?.deliveryMethod);
 }
 
@@ -639,10 +640,11 @@ export async function messageAgent(
   // pointer and refuses conv- ids outright, so a conversation is never resumed.
   if (!liveness.alive && isConfirmedDead(liveness)) {
     if (isConversationTarget) {
-      // For opencode/acp/codex the delivery door already routes by harness
-      // (ACP fails loudly on a dead socket instead of typing into a dead
-      // shell), so skip the zombie resume and hand off.
-      if (expectedHarness === 'opencode' || expectedHarness === 'acp' || expectedHarness === 'codex') {
+      // For host-backed harnesses (opencode/acp/prime-agent) and codex the
+      // delivery door already routes by harness (a host transport fails loudly
+      // on a dead socket instead of typing into a dead shell), so skip the
+      // zombie resume and hand off.
+      if (hostTransportFor(expectedHarness) !== null || expectedHarness === 'codex') {
         console.warn(`[agents] ${normalizedId} pane shows no ${expectedHarness} runtime (${liveness.reason}) — skipping the zombie resume and handing off to the harness delivery door`);
         logAgentLifecycle(normalizedId, `messageAgent: pane shows no ${expectedHarness} runtime; handing off to the delivery door (conversations are never resumed, PAN-3879)`);
       } else {

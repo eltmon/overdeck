@@ -15,7 +15,7 @@ vi.mock('../../tmux.js', async () => {
   };
 });
 
-import { waitForAcpHostReady, waitForCodexAppServerReady, waitForPromptReady } from '../runtime-command.js';
+import { waitForCodexAppServerReady, waitForHostReady, waitForPromptReady } from '../runtime-command.js';
 import { shouldUseSupervisorForConversation } from '../../overdeck/conversation-runtime.js';
 
 afterEach(() => {
@@ -54,13 +54,13 @@ describe('waitForCodexAppServerReady', () => {
   });
 });
 
-describe('waitForAcpHostReady', () => {
+describe('waitForHostReady — ACP', () => {
   it('does not accept stale socket and token artifacts without the fresh readiness marker', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-12T00:00:00Z'));
     let readinessPublished = false;
     let settled = false;
-    const pending = waitForAcpHostReady('agent-stale-acp', 2, {
+    const pending = waitForHostReady('agent-stale-acp', 'acp', 2, {
       sessionExists: vi.fn(async () => true),
       pathExists: vi.fn((path: string) => !path.endsWith('acp-launch-error')),
       readText: vi.fn((path: string) => {
@@ -86,13 +86,75 @@ describe('waitForAcpHostReady', () => {
   });
 
   it('surfaces persisted Kimi authentication guidance before the readiness timeout', async () => {
-    await expect(waitForAcpHostReady('agent-auth-failed', 30, {
+    await expect(waitForHostReady('agent-auth-failed', 'acp', 30, {
       sessionExists: vi.fn(async () => true),
       pathExists: vi.fn((path: string) => path.endsWith('acp-launch-error')),
       readText: vi.fn(() => 'Kimi authentication is required. Run `kimi`, then /login, and retry.\n'),
     })).rejects.toThrow(
       'ACP host agent-auth-failed failed to start: Kimi authentication is required. Run `kimi`, then /login, and retry.',
     );
+  });
+});
+
+describe('waitForHostReady — Prime Agent (PAN-3668 WI-6)', () => {
+  it('keys readiness on prime-agent-session-id, prime-agent-token and the prime-agent socket', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-25T00:00:00Z'));
+    const seen: string[] = [];
+    let readinessPublished = false;
+    let settled = false;
+    const pending = waitForHostReady('agent-prime-ready', 'prime-agent', 60, {
+      sessionExists: vi.fn(async () => true),
+      pathExists: vi.fn((path: string) => {
+        seen.push(path);
+        return path.endsWith('prime-agent-agent-prime-ready.sock');
+      }),
+      readText: vi.fn((path: string) => {
+        seen.push(path);
+        if (path.endsWith('prime-agent-session-id')) {
+          if (!readinessPublished) throw Object.assign(new Error('not yet'), { code: 'ENOENT' });
+          return 'prime-session-1\n';
+        }
+        if (path.endsWith('prime-agent-token')) return 'prime-token\n';
+        throw new Error(`unexpected read ${path}`);
+      }),
+    }).finally(() => {
+      settled = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+    readinessPublished = true;
+    await vi.advanceTimersByTimeAsync(500);
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(seen.some((path) => path.endsWith('prime-agent-launch-error'))).toBe(true);
+    expect(seen.some((path) => path.includes('acp-'))).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('surfaces a Prime Agent launch error with the Prime Agent host label', async () => {
+    await expect(waitForHostReady('agent-prime-bad', 'prime-agent', 60, {
+      sessionExists: vi.fn(async () => true),
+      pathExists: vi.fn((path: string) => path.endsWith('prime-agent-launch-error')),
+      readText: vi.fn(() => 'Prime Agent 0.7.2 is outside the supported range 0.8.0 – <0.9.0.\n'),
+    })).rejects.toThrow('Prime Agent host agent-prime-bad failed to start: Prime Agent 0.7.2 is outside the supported range');
+  });
+
+  it('times out with the Prime Agent host label under fake timers', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-25T00:00:00Z'));
+    const pending = waitForHostReady('agent-prime-slow', 'prime-agent', 2, {
+      sessionExists: vi.fn(async () => true),
+      pathExists: vi.fn(() => false),
+      readText: vi.fn(() => {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      }),
+    });
+    const rejection = expect(pending).rejects.toThrow('Timed out waiting for Prime Agent host readiness for agent-prime-slow.');
+    await vi.advanceTimersByTimeAsync(2_500);
+    await rejection;
+    vi.useRealTimers();
   });
 });
 

@@ -22,6 +22,7 @@ import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { hostDisplayName, hostTransportFor } from '../runtimes/host-transport.js';
 import { writeBridgeToken } from '../bridge-token.js';
 import { exactPaneTarget, sessionExists, setOption } from '../tmux.js';
 import { agentPaneExists, closeBackendPane, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
@@ -252,7 +253,8 @@ async function spawnRunWithoutConsentClaim(
   const shouldDeliverPromptViaCodexTui = (shouldRegisterConversation || role === 'worker') && resolvedHarness === 'codex';
   const kickoffOpts = options.parentId ? { sender: { id: options.parentId } } : {};
   const shouldDeliverPromptViaKimiCode = resolvedHarness === 'muse' || resolvedHarness === 'kimi-code';
-  const shouldDeliverPromptViaAcp = resolvedHarness === 'acp' || resolvedHarness === 'opencode';
+  const promptHostTransport = hostTransportFor(resolvedHarness);
+  const shouldDeliverPromptViaHost = promptHostTransport !== null;
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
         prompt: options.prompt,
@@ -266,7 +268,7 @@ async function spawnRunWithoutConsentClaim(
 
   let promptFile: string | undefined;
   const tracksKickoffDelivery = role === 'flywheel';
-  if (prompt && !shouldDeliverPromptViaAcp && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui && !shouldDeliverPromptViaKimiCode))) {
+  if (prompt && !shouldDeliverPromptViaHost && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui && !shouldDeliverPromptViaKimiCode))) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, prompt);
   }
@@ -478,12 +480,12 @@ async function spawnRunWithoutConsentClaim(
   }
 
   if (prompt || resolvedHarness === 'kimi-code') {
-    if (shouldDeliverPromptViaAcp) {
+    if (promptHostTransport) {
       try {
         await waitForPromptReady(agentId, resolvedHarness, 30);
         const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt', undefined, kickoffOpts);
         if (!delivery.ok) {
-          throw new Error(delivery.failure ?? `ACP delivery returned ok=false via ${delivery.path}`);
+          throw new Error(delivery.failure ?? `${hostDisplayName(promptHostTransport)} delivery returned ok=false via ${delivery.path}`);
         }
         if (tracksKickoffDelivery) {
           state.kickoffDelivered = true;
@@ -491,7 +493,7 @@ async function spawnRunWithoutConsentClaim(
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error(`[${agentId}] ACP prompt delivery failed:`, message);
+        console.error(`[${agentId}] ${hostDisplayName(promptHostTransport)} prompt delivery failed:`, message);
         if (tracksKickoffDelivery) {
           await recordKickoffDeliveryFailure(state, issueId, role);
         }
@@ -666,7 +668,7 @@ async function spawnAgentWithoutConsentClaim(
     role,
     model: selectedModel,
   });
-  const isAcp = getHarnessBehavior(resolvedHarness).launchCommandKind === 'acp-host';
+  const promptHostTransport = hostTransportFor(resolvedHarness);
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
   // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
@@ -742,10 +744,11 @@ async function spawnAgentWithoutConsentClaim(
     });
   }
 
-  // ACP receives the initial prompt only after its authenticated host socket is ready.
+  // Host-backed harnesses (ACP/OpenCode, Prime Agent) receive the initial prompt
+  // only after their authenticated host socket is ready.
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
   const tracksKickoffDelivery = role === 'work' || role === 'strike';
-  if (prompt && !isAcp) {
+  if (prompt && promptHostTransport === null) {
     await writeFileAsync(promptFile, prompt);
   }
   if (prompt && tracksKickoffDelivery) {
@@ -897,12 +900,12 @@ async function spawnAgentWithoutConsentClaim(
     : null;
 
   // Send the initial prompt after the harness-specific readiness signal.
-  if (prompt && isAcp) {
+  if (prompt && promptHostTransport) {
     try {
       await waitForPromptReady(agentId, resolvedHarness, 30);
       const delivery = await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
       if (!delivery.ok) {
-        throw new Error(delivery.failure ?? `ACP delivery returned ok=false via ${delivery.path}`);
+        throw new Error(delivery.failure ?? `${hostDisplayName(promptHostTransport)} delivery returned ok=false via ${delivery.path}`);
       }
       if (tracksKickoffDelivery) {
         state.kickoffDelivered = true;
@@ -910,7 +913,7 @@ async function spawnAgentWithoutConsentClaim(
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[${agentId}] ACP prompt delivery failed:`, message);
+      console.error(`[${agentId}] ${hostDisplayName(promptHostTransport)} prompt delivery failed:`, message);
       if (tracksKickoffDelivery) {
         // Already writes the reason markSpawnFailed below would clobber (PAN-2771).
         await recordKickoffDeliveryFailure(state, options.issueId, role);
