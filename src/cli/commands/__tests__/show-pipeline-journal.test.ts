@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { PipelineJournalEntry } from '../../../lib/cloister/pipeline-journal.js';
-import { summarizePipelineEntry } from '../show.js';
+import { pendingHandoffHold, summarizePipelineEntry } from '../show.js';
 
 function entry(
   type: PipelineJournalEntry['type'],
@@ -78,5 +78,24 @@ describe('summarizePipelineEntry', () => {
   it('is empty rather than noisy when an entry carries no data', () => {
     expect(summarizePipelineEntry(entry('merge.completed'))).toBe('');
     expect(summarizePipelineEntry(entry('verification.passed'))).toBe('');
+  });
+});
+
+describe('pendingHandoffHold', () => {
+  it('names the freeze when the last hand-off entry is a pending deferral and the Deacon is frozen', () => {
+    const journal = [entry('handoff.deferred', { attempt: 0, reason: 'guardrails' })];
+    expect(pendingHandoffHold(journal, true, 'PAN-3705'))
+      .toBe('Deferred work-agent start is held: the Deacon is frozen. Unfreeze it or run pan start PAN-3705.');
+  });
+
+  it('says nothing when the Deacon is not frozen', () => {
+    const journal = [entry('handoff.deferred', { attempt: 0, reason: 'guardrails' })];
+    expect(pendingHandoffHold(journal, false, 'PAN-3705')).toBeNull();
+  });
+
+  it('says nothing once the hand-off is no longer pending, even while frozen', () => {
+    expect(pendingHandoffHold([entry('handoff.started', { attempt: 1 })], true, 'PAN-3705')).toBeNull();
+    expect(pendingHandoffHold([entry('handoff.abandoned', { outcome: 'stood-down' })], true, 'PAN-3705')).toBeNull();
+    expect(pendingHandoffHold([], true, 'PAN-3705')).toBeNull();
   });
 });

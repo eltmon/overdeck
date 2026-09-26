@@ -38,7 +38,9 @@ export async function planDoneCommand(id: string, options: { prd?: boolean } = {
   if (result.workAgentSpawned) {
     console.log(chalk.dim(`  Work agent started${result.workAgentMessage ? ` — ${result.workAgentMessage}` : ''}`));
   } else if (result.workAgentDeferred) {
-    console.log(chalk.dim('  Work agent start deferred by spawn guardrails; retried automatically for up to 2 hours'));
+    console.log(chalk.dim(result.workAgentRetryHeld === 'deacon-paused'
+      ? `  Work agent start deferred by spawn guardrails; the retry is held while the Deacon is frozen. Unfreeze it or run pan start ${issueId}.`
+      : '  Work agent start deferred by spawn guardrails; retried automatically for up to 2 hours'));
   } else if (result.workAgentSkipReason) {
     console.log(chalk.dim(`  Work agent not started: ${result.workAgentSkipReason}`));
   }

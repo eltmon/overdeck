@@ -28,6 +28,26 @@ describe('promotePlanning', () => {
       workAgentSkipReason: 'guardrails',
       workAgentDeferred: true,
     });
+    expect(result.workAgentRetryHeld).toBeUndefined();
+  });
+
+  it('carries a frozen-Deacon retry hold through from complete-planning', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      workAgentSpawned: false,
+      workAgentSkipReason: 'guardrails',
+      workAgentError: 'Agent ceiling reached',
+      workAgentDeferred: true,
+      workAgentRetryHeld: 'deacon-paused',
+    }), { status: 200 })));
+
+    const result = await promotePlanning('PAN-4155', true);
+
+    expect(result).toMatchObject({
+      success: true,
+      workAgentDeferred: true,
+      workAgentRetryHeld: 'deacon-paused',
+    });
   });
 
   it('reports no deferral when complete-planning did not journal one', async () => {

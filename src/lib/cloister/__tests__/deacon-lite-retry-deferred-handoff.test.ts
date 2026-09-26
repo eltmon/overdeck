@@ -157,6 +157,8 @@ describe('retryDeferredHandoffs', () => {
     ['a paused issue', () => getAgentState.mockImplementation((id: string) => (
       id === 'agent-pan-4155' ? { id, status: 'stopped', paused: true, startedAt: new Date(T0 - 60 * MINUTE).toISOString() } : null))],
     ['a spent auto-start consent', () => readConsent.mockResolvedValue(false)],
+    ['a planning session restarted after the deferral', () => getAgentState.mockImplementation((id: string) => (
+      id === 'planning-pan-4155' ? { id, status: 'running', startedAt: new Date(T0 + MINUTE).toISOString() } : null))],
   ])('stands down without retrying for %s', async (_label, arrange) => {
     arrange();
     await tick(2);
@@ -175,6 +177,24 @@ describe('retryDeferredHandoffs', () => {
 
     expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.abandoned', data: { outcome: 'stood-down' } });
     expect(appended).toEqual([]);
+  });
+
+  it('retries when the planning label still reads running from before the deferral', async () => {
+    getAgentState.mockImplementation((id: string) => (
+      id === 'planning-pan-4155' ? { id, status: 'running', startedAt: new Date(T0 - 30 * MINUTE).toISOString() } : null));
+    await tick(2);
+
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.retried' });
+  });
+
+  it('retries when a work label reads running with no live pane and an older start', async () => {
+    getAgentState.mockImplementation((id: string) => (
+      id === 'agent-pan-4155' ? { id, status: 'running', startedAt: new Date(T0 - 60 * MINUTE).toISOString() } : null));
+    await tick(2);
+
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.retried' });
   });
 
   it('does nothing while the backend inventory is unreadable', async () => {
@@ -206,5 +226,20 @@ describe('retryDeferredHandoffs', () => {
       autoSpawnConsentRequired: true,
     });
     expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.retried', data: { skipReason: 'guardrails' } });
+  });
+
+  it('stands down when the retried spawn reports the agent already starting or running', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      error: 'Agent agent-pan-4155 is already starting or running.',
+      code: 'AGENT_START_IN_FLIGHT',
+    }), { status: 409 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { spawn: _unused, ...withoutSpawn } = deps()!;
+    await vi.advanceTimersByTimeAsync(2 * MINUTE);
+    await deferred.retryDeferredHandoffs(Date.now(), withoutSpawn);
+
+    expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.abandoned', data: { outcome: 'stood-down' } });
+    expect(appended).toEqual([]);
   });
 });

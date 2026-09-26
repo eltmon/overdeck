@@ -490,7 +490,7 @@ describe('completePlanningArtifacts', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-4155-deferred-'));
     try {
       const emitActivity = vi.fn();
-      const error = recordPlanningAutoHandoffDeferred({
+      const result = recordPlanningAutoHandoffDeferred({
         issueId: 'PAN-4155',
         workspacePath: workspace,
         result: {
@@ -501,9 +501,10 @@ describe('completePlanningArtifacts', () => {
           workAgentDeferred: true,
         },
         emitActivity,
+        readDeaconPaused: () => false,
       });
 
-      expect(error).toBe('Agent ceiling reached');
+      expect(result).toEqual({ error: 'Agent ceiling reached', deaconPaused: false });
       const entries = readPipelineJournal(workspace);
       expect(entries).toHaveLength(1);
       expect(entries[0]).toMatchObject({
@@ -512,6 +513,7 @@ describe('completePlanningArtifacts', () => {
         source: 'complete-planning',
         data: { attempt: 0, reason: 'guardrails', error: 'Agent ceiling reached', httpStatus: 429 },
       });
+      expect(entries[0]!.data).not.toHaveProperty('deaconPaused');
       const data = entries[0]!.data as { deferredAt: string; nextRetryAt: string };
       expect(Date.parse(data.nextRetryAt) - Date.parse(data.deferredAt)).toBe(2 * 60_000);
       expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
@@ -519,6 +521,38 @@ describe('completePlanningArtifacts', () => {
         level: 'warn',
         issueId: 'PAN-4155',
         message: expect.stringContaining('deferred by spawn guardrails'),
+      }));
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('journals a frozen-Deacon hold and says the retry is held', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-4210-frozen-'));
+    try {
+      const emitActivity = vi.fn();
+      const result = recordPlanningAutoHandoffDeferred({
+        issueId: 'PAN-4155',
+        workspacePath: workspace,
+        result: {
+          workAgentSpawned: false,
+          workAgentSkipReason: 'guardrails',
+          workAgentError: 'Agent ceiling reached',
+          workAgentHttpStatus: 429,
+          workAgentDeferred: true,
+        },
+        emitActivity,
+        readDeaconPaused: () => true,
+      });
+
+      expect(result).toEqual({ error: 'Agent ceiling reached', deaconPaused: true });
+      const entries = readPipelineJournal(workspace);
+      expect(entries[0]).toMatchObject({ data: { deaconPaused: true } });
+      expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+        source: 'plan',
+        level: 'warn',
+        issueId: 'PAN-4155',
+        message: expect.stringMatching(/held while the Deacon is frozen.*pan start PAN-4155/),
       }));
     } finally {
       rmSync(workspace, { recursive: true, force: true });

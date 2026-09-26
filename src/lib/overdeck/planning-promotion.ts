@@ -17,6 +17,7 @@ import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { getAgentState } from '../agents.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { recordHandoffDeferred } from '../cloister/deferred-handoff.js';
+import { isDeaconGloballyPaused } from './control-settings.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
@@ -361,34 +362,52 @@ export async function recordPlanningAutoHandoffFailure(options: {
   return error;
 }
 
+/** Default `readDeaconPaused`: the retry hold is advisory, so an unreadable pause flag reads as unpaused. */
+function defaultReadDeaconPaused(): boolean {
+  try {
+    return isDeaconGloballyPaused();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * PAN-4155: a guardrail refused the hand-off. Journal the deferral in the
  * workspace so deacon-lite retries the spawn without acknowledgement, and say
  * so at warn level. No `planning.failed`: that is recorded only if the retries
  * give up.
+ *
+ * PAN-4210: deacon-lite's retry only ever runs from `runDeaconLite()`, which
+ * returns immediately while the Deacon is globally frozen — so a deferral
+ * recorded during a freeze is journaled but silently never retried. Say so.
  */
 export function recordPlanningAutoHandoffDeferred(options: {
   issueId: string;
   workspacePath: string;
   result: CompletePlanningAutoSpawnResult;
   emitActivity?: typeof emitActivityEntry;
-}): string {
+  readDeaconPaused?: () => boolean;
+}): { error: string; deaconPaused: boolean } {
   const error = options.result.workAgentError ?? 'Work agent startup refused by spawn guardrails';
+  const deaconPaused = (options.readDeaconPaused ?? defaultReadDeaconPaused)();
   recordHandoffDeferred({
     workspacePath: options.workspacePath,
     issueId: options.issueId,
     error,
     httpStatus: options.result.workAgentHttpStatus,
+    deaconPaused,
   });
   console.warn(`[complete-planning] ${options.issueId} auto-handoff deferred by spawn guardrails: ${error}`);
   (options.emitActivity ?? emitActivityEntry)({
     source: 'plan',
     level: 'warn',
-    message: `${options.issueId} planning complete; work-agent start deferred by spawn guardrails and retried for up to 2 hours: ${error}`,
+    message: deaconPaused
+      ? `${options.issueId} planning complete; work-agent start deferred by spawn guardrails. The retry is held while the Deacon is frozen: unfreeze it, or run pan start ${options.issueId}. ${error}`
+      : `${options.issueId} planning complete; work-agent start deferred by spawn guardrails and retried for up to 2 hours: ${error}`,
     issueId: options.issueId,
     details: JSON.stringify({ workAgentSkipReason: 'guardrails', workAgentError: error }),
   });
-  return error;
+  return { error, deaconPaused };
 }
 
 export async function completePlanningAutoSpawn(options: {
@@ -775,15 +794,12 @@ export async function completePlanningForIssue(options: {
     // of "Watch Planning". Runs only AFTER the PRD gate and spec promotion
     // succeeded — a rejected finalize leaves the agent running (PAN-3338).
     //
-    // Routed through the canonical transactional write door
-    // (saveAgentStateAndEmitEvent, PAN-1908) instead of a separate row write
-    // + eventStore.append: that split write let a transient liveness-query or
-    // event-store failure leave the agents-table row stopped with no matching
-    // event, which is exactly the DB/read-model divergence this issue exists
-    // to fix. The write door commits the row upsert and the event append in
-    // one SQLite transaction, so a failure here leaves NEITHER changed —
-    // never a split state — and the outer catch keeps it non-fatal to the
-    // finalize response.
+    // Since PAN-3917, saveAgentStateAndEmitEvent's projection only appends an
+    // agent.status_changed event and writes no state.json, so the planning
+    // agent's on-disk status label keeps whatever value it had at spawn time
+    // — reading this call's "stopped" is never observable from state.json.
+    // Nothing downstream may gate behavior on that label (PAN-4210); use
+    // startedAt/stoppedAt or the live inventory instead.
     //
     // hasLiveTmuxSession must be honest at the moment it is recorded, and
     // "the moment" matters: this is called (a) once after the auto-spawn/kill
@@ -860,8 +876,11 @@ export async function completePlanningForIssue(options: {
     const autoHandoffDeferred = autoHandoffFailed && autoSpawnResult?.workAgentDeferred === true
       && Boolean(workspacePath) && existsSync(workspacePath);
     let autoHandoffError: string | undefined;
+    let autoHandoffDeaconPaused = false;
     if (autoHandoffDeferred && autoSpawnResult) {
-      autoHandoffError = recordPlanningAutoHandoffDeferred({ issueId: id, workspacePath, result: autoSpawnResult });
+      const deferred = recordPlanningAutoHandoffDeferred({ issueId: id, workspacePath, result: autoSpawnResult });
+      autoHandoffError = deferred.error;
+      autoHandoffDeaconPaused = deferred.deaconPaused;
     } else if (autoHandoffFailed && autoSpawnResult) {
       autoHandoffError = await recordPlanningAutoHandoffFailure({
         issueId: id,
@@ -903,8 +922,14 @@ export async function completePlanningForIssue(options: {
       ...(autoSpawnResult ?? {}),
       // Only a journaled deferral is retried; say so when it was not journaled.
       ...(autoSpawnResult?.workAgentDeferred ? { workAgentDeferred: autoHandoffDeferred } : {}),
+      // PAN-4210: a deferral recorded while the Deacon is frozen is journaled
+      // but never retried until it thaws — deacon-lite's retry only runs from
+      // runDeaconLite(), which returns immediately while frozen.
+      ...(autoHandoffDeferred && autoHandoffDeaconPaused ? { workAgentRetryHeld: 'deacon-paused' as const } : {}),
       message: autoHandoffDeferred
-        ? `Planning complete; work-agent start deferred by spawn guardrails and retried automatically for up to 2 hours: ${autoHandoffError}`
+        ? autoHandoffDeaconPaused
+          ? `Planning complete; work-agent start deferred by spawn guardrails and held while the Deacon is frozen (unfreeze it or run pan start ${id}): ${autoHandoffError}`
+          : `Planning complete; work-agent start deferred by spawn guardrails and retried automatically for up to 2 hours: ${autoHandoffError}`
         : autoHandoffFailed
         ? `Planning complete, but work-agent startup failed (${autoSpawnResult?.workAgentSkipReason ?? 'spawn-failed'}): ${autoHandoffError}`
         : autoSpawnResult?.workAgentSpawned

@@ -19,6 +19,7 @@ function classifySpawnSkip(status: number, body: Record<string, unknown>): strin
   if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
   if (body['paused'] === true) return 'paused';
   if (body['troubled'] === true) return 'troubled';
+  if (body['code'] === 'AGENT_START_IN_FLIGHT') return 'already-running';
   if (body['guardrails'] || body['requiresAcknowledgement'] === true || status === 409) return 'guardrails';
   if (body['providerHealth']) return 'provider-down';
   if (status === 422 && /already closed|closed issue|cannot start an agent for a closed issue/i.test(error)) return 'closed-issue';
