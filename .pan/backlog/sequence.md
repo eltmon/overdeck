@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T00:24:27.901759Z · model: claude-opus-5-5 · open: 813_
+_Last sequenced: 2026-09-26T00:28:34.616214Z · model: claude-opus-5-5 · open: 814_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 19 | PAN-4221 | S | critical | ok |  |  | A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train |
 | 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
 | 21 | PAN-4210 | M | critical | ok |  |  | Deferred planning→work handoffs live only in memory; a pan reload drops the retry and planned issues never start |
 | 22 | PAN-4211 | S | high | ok |  |  | Troubled-agent gate has no clearing door after the Cut: messages cite the removed 'pan untroubled'; only fix is hand-editing state |
@@ -821,6 +822,10 @@ _Last sequenced: 2026-09-26T00:24:27.901759Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-4221 (rank 19)
+
+New in-pipeline bug. The post-pass review dispatch lives in an in-process callback that dies on every deploy, and deacon-lite skips verification.* tails, so four PRs sat green for 15 hours with no train forming. It stalls the pipeline after every reload, so it ranks critical in the top tier next to PAN-4210, which is the same lost-on-reload class.
+
 ### PAN-4212 (rank 20)
 
 New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.
@@ -1117,10 +1122,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
 
 patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
 
-### PAN-3793 (rank 114)
-
-New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1128,10 +1129,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T00:24:27.901759Z",
+  "generatedAt": "2026-09-26T00:28:34.616214Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 813,
+  "openCount": 814,
   "nodes": [
     {
       "issue": "PAN-4212",
@@ -11193,6 +11194,19 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "rationale": "New bug filed from PAN-4201: pan done refused completion on 36 acceptance-criterion sub-items that no supported verb can close, and the vbrief-ac feedback names a nonexistent pan task close. It ranks critical and right behind PAN-4217 because it blocks completion of every issue planned with nested ACs, the default planner shape. It is marked needs-refinement because PAN-4217 already describes the same missing writer (updateSubItemStatus has no production caller) including the done-preflight half, so it should be closed as a duplicate or fixed by the same change.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4221",
+      "rank": 19,
+      "size": "S",
+      "importance": "critical",
+      "score": 89,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "A dashboard restart mid-verification strands verification.passed; review never dispatches, so green PRs never reach the merge train",
+      "rationale": "New in-pipeline bug. The post-pass review dispatch lives in an in-process callback that dies on every deploy, and deacon-lite skips verification.* tails, so four PRs sat green for 15 hours with no train forming. It stalls the pipeline after every reload, so it ranks critical in the top tier next to PAN-4210, which is the same lost-on-reload class.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12315,6 +12329,13 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4221",
+      "to": "PAN-4210",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
