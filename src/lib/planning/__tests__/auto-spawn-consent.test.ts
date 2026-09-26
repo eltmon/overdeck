@@ -5,6 +5,9 @@ import { join } from 'node:path';
 
 import {
   autoSpawnOnFinalizeFlagPath,
+  claimAutoSpawnConsentForWorkStart,
+  completeAutoSpawnConsentClaim,
+  readAutoSpawnConsentWorkModel,
   readAutoSpawnOnFinalizeFlagAsync,
   withAutoSpawnConsentClaim,
   writeAutoSpawnOnFinalizeFlag,
@@ -124,5 +127,49 @@ describe('auto-spawn consent claims', () => {
     await expect(withAutoSpawnConsentClaim(issueId, operation)).rejects.toThrow();
 
     expect(operation).not.toHaveBeenCalled();
+  });
+
+  it('returns the stored work model while consent is not spent', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: 'k3' });
+
+    await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBe('k3');
+  });
+
+  it('preserves the work model across a new generation, and clears it on request', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: 'k3' });
+
+    await writeAutoSpawnOnFinalizeFlag(issueId, true);
+    await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBe('k3');
+
+    await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: null });
+    await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBeUndefined();
+  });
+
+  it('stops returning the work model once the claim is spent', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: 'k3' });
+    const claim = await claimAutoSpawnConsentForWorkStart(issueId);
+    if (!claim) throw new Error('expected a claim');
+
+    await completeAutoSpawnConsentClaim(claim);
+
+    await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBeUndefined();
+  });
+
+  it('passes the granted work model on the claim into the operation', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: 'k3' });
+    const operation = vi.fn(async (_accept, claim) => claim.workModel);
+
+    await expect(withAutoSpawnConsentClaim(issueId, operation)).resolves.toBe('k3');
+  });
+
+  it('claims successfully with an undefined work model for a v2 record with none, and for a legacy record', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true);
+    const v2Claim = await claimAutoSpawnConsentForWorkStart(issueId);
+    expect(v2Claim?.workModel).toBeUndefined();
+    if (v2Claim) await completeAutoSpawnConsentClaim(v2Claim);
+
+    writeFileSync(autoSpawnOnFinalizeFlagPath(issueId), JSON.stringify({ autoSpawnOnFinalize: true }));
+    const legacyClaim = await claimAutoSpawnConsentForWorkStart(issueId);
+    expect(legacyClaim?.workModel).toBeUndefined();
   });
 });
