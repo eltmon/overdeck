@@ -453,6 +453,24 @@ describe('buildAgentDirectory — pause facts (PAN-4197 FR-3)', () => {
   });
 });
 
+describe('buildAgentDirectory — runtime id (PAN-4222)', () => {
+  it("gives a conversation entry the conversation's tmux session as runtimeId", async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listConversations: async () => [conversation({ name: 'alpha', tmuxSession: 'conv-alpha' })],
+    }));
+    expect(result.entries.find((entry) => entry.id === 'conv:alpha')).toMatchObject({ runtimeId: 'conv-alpha' });
+  });
+
+  it('puts no runtimeId key on a native agent entry', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1' })],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: 'agent-pan-1' })],
+    }));
+    const entry = result.entries.find((entry) => entry.id === 'agent-pan-1')!;
+    expect(entry).not.toHaveProperty('runtimeId');
+  });
+});
+
 describe('buildLiveAgentDirectory (PAN-4197 FR-2)', () => {
   const derived = (states: Record<string, IssueState>) => () =>
     new Map(Object.entries(states).map(([issueId, state]): [string, DerivedIssueState] => [issueId, { issueId, state }]));

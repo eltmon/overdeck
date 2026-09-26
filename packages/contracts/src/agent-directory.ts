@@ -73,6 +73,8 @@ export const DirectoryEntry = Schema.Struct({
   transcript: Schema.NullOr(DirectoryTranscriptRef),
   /** The pause gate from state.json, native agents only (PAN-4197). */
   pause: Schema.optional(DirectoryPause),
+  /** The id runtime events (agentRuntimeById) are keyed under, when it differs from `id` (PAN-4222). */
+  runtimeId: Schema.optional(Schema.String),
 })
 export type DirectoryEntry = typeof DirectoryEntry.Type
 

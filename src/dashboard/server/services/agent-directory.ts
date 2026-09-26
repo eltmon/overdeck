@@ -540,6 +540,7 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
       costUsd: typeof row.totalCost === 'number' ? row.totalCost : null,
       source: 'conversation',
       transcript: { route: 'conversation', conversationName: row.name },
+      runtimeId: row.tmuxSession,
     };
     candidates.push({ entry, cwd: row.cwd || null, explicitProjectKey: row.projectKey });
     if (entry.state !== 'stopped') conversationParents.push({ entry, row });
