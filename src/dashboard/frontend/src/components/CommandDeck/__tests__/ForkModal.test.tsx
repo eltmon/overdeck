@@ -50,6 +50,23 @@ const ACP_CONVERSATION: Conversation = {
   harness: 'acp',
 };
 
+describe('ForkModal Prime Agent source capabilities (PAN-3668)', () => {
+  it('hides Exact copy for a prime-agent source and falls back to a summary', () => {
+    render(
+      <ForkModal
+        conversation={{ ...ACP_CONVERSATION, name: 'Prime source', tmuxSession: 'conv-prime-source', model: 'gpt-5.5', harness: 'prime-agent' }}
+        initialMode="plain"
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+        isPending={false}
+      />,
+    );
+
+    expect(screen.queryByText('Exact copy')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Fresh summary/ })).toBeChecked();
+  });
+});
+
 describe('ForkModal ACP source capabilities', () => {
   it('hides Exact copy and falls back to a summary when plain mode was requested', () => {
     const onConfirm = vi.fn();

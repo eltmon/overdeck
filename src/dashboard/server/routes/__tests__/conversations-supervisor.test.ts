@@ -13,6 +13,7 @@ let overdeckHome: string;
 let channelsEnabled = false;
 let createSupervisorSocket = false;
 let createAcpHostArtifacts = false;
+let createPrimeHostArtifacts = false;
 let resolvedHarnessBinary: string | null = '/usr/bin/claude';
 let resolvedConversationHarness = 'claude-code';
 let resolvedProviderName = 'anthropic';
@@ -77,6 +78,11 @@ vi.mock('../../../../lib/providers.js', () => ({
   resolveKimiCodeModelAlias: vi.fn((m: string) => m),
 }));
 
+vi.mock('../../../../lib/prime-agent/provider-map.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/prime-agent/provider-map.js')>()),
+  resolvePrimeAgentCredential: vi.fn(async () => ({ provider: 'openai', envExports: {} })),
+}));
+
 vi.mock('../../../../lib/harness-resolve.js', () => ({
   resolveHarness: vi.fn(async () => resolvedConversationHarness),
 }));
@@ -116,6 +122,15 @@ vi.mock('../../../../lib/tmux.js', () => ({
       writeFileSync(join(agentDir, 'acp-session-id'), 'fresh-acp-session\n', { mode: 0o600 });
       writeFileSync(join(agentDir, 'acp-token'), 'test-token\n', { mode: 0o600 });
       writeFileSync(join(socketDir, `acp-${session}.sock`), '', { mode: 0o600 });
+    }
+    if (createPrimeHostArtifacts) {
+      const agentDir = join(overdeckHome, 'agents', session);
+      const socketDir = join(overdeckHome, 'sockets');
+      mkdirSync(agentDir, { recursive: true, mode: 0o700 });
+      mkdirSync(socketDir, { recursive: true, mode: 0o700 });
+      writeFileSync(join(agentDir, 'prime-agent-session-id'), 'fresh-prime-session\n', { mode: 0o600 });
+      writeFileSync(join(agentDir, 'prime-agent-token'), 'test-token\n', { mode: 0o600 });
+      writeFileSync(join(socketDir, `prime-agent-${session}.sock`), '', { mode: 0o600 });
     }
   })),
   setOption: vi.fn(() => Effect.succeed(undefined)),
@@ -203,6 +218,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     delete process.env.OVERDECK_DOCKER_WORKSPACE;
     createSupervisorSocket = false;
     createAcpHostArtifacts = false;
+    createPrimeHostArtifacts = false;
     resolvedHarnessBinary = '/usr/bin/claude';
     resolvedConversationHarness = 'claude-code';
     resolvedProviderName = 'anthropic';
@@ -599,6 +615,57 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(tmux.killSession).toHaveBeenCalledWith(session);
   });
 
+  it('creates a Prime Agent conversation on the host and delivers the prompt over it (PAN-3668)', async () => {
+    createPrimeHostArtifacts = true;
+    resolvedHarnessBinary = '/opt/prime/bin/prime-agent';
+    resolvedConversationHarness = 'prime-agent';
+    resolvedProviderName = 'openai';
+    deliveryResult = { ok: true, path: 'prime-agent' };
+    const agents = await import('../../../../lib/agents.js');
+    vi.mocked(agents.deliverAgentMessage).mockClear();
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      { message: 'start the Prime conversation', model: 'gpt-5.4', harness: 'prime-agent' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+    const created = decodeJsonResponse(response);
+    const session = created['tmuxSession'] as string;
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(agents.deliverAgentMessage)).toHaveBeenCalledWith(session, expect.stringContaining('start the Prime conversation'), 'conversation-message', 'auto');
+    });
+    expect(conversations.getConversationByName(created['name'] as string)?.spawnError ?? null).toBeNull();
+    expect(launcherFor(session)).toMatch(/node '.+\/dist\/prime-agent-host\.js' --agent '/);
+    expect(createSessionCalls.some((call) => call.session === session)).toBe(true);
+  });
+
+  it('tears down Prime Agent creation when the initial prompt fails (PAN-3668)', async () => {
+    createPrimeHostArtifacts = true;
+    resolvedHarnessBinary = '/opt/prime/bin/prime-agent';
+    resolvedConversationHarness = 'prime-agent';
+    resolvedProviderName = 'openai';
+    deliveryResult = { ok: false, path: 'prime-agent', failure: 'provider rejected prompt' };
+    const tmux = await import('../../../../lib/tmux.js');
+    vi.mocked(tmux.killSession).mockClear();
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      { message: 'start the Prime conversation', model: 'gpt-5.4', harness: 'prime-agent' },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+    const created = decodeJsonResponse(response);
+    const name = created['name'] as string;
+    const session = created['tmuxSession'] as string;
+
+    await vi.waitFor(() => {
+      expect(conversations.getConversationByName(name)?.spawnError).toContain('Prime Agent initial prompt did not land: provider rejected prompt');
+    });
+    expect(tmux.killSession).toHaveBeenCalledWith(session);
+  });
+
   it.each(['acp', 'muse'])('tears down a newly resolved %s runtime when restart readiness fails', async harness => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     try {
@@ -649,6 +716,7 @@ describe('companion terminal owner teardown (PAN-3974)', () => {
     process.env.OVERDECK_HOME = overdeckHome;
     createSupervisorSocket = true;
     createAcpHostArtifacts = false;
+    createPrimeHostArtifacts = false;
     resolvedHarnessBinary = '/usr/bin/claude';
     resolvedConversationHarness = 'claude-code';
     resolvedProviderName = 'anthropic';
