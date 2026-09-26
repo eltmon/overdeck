@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T08:21:45.094Z",
+  "updated": "2026-09-26T08:22:03.647Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -676,6 +676,10 @@
     "deck-verdict-badges.ac3": {
       "status": "completed",
       "doneAt": "2026-09-26T08:21:45.094Z"
+    },
+    "agents-dir-critic.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:03.646Z"
     }
   }
 }
