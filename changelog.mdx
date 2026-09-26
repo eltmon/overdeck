@@ -8,15 +8,12 @@ Overdeck ships to npm as [`@overdeck/core`](https://www.npmjs.com/package/@overd
 
 This page starts at v0.60.0, the release that removed Overdeck's state layer. Older releases are listed on [GitHub Releases](https://github.com/eltmon/overdeck/releases).
 
-{/* RELEASE STEP: when v0.62.0 is tagged, set description to the tag date (YYYY-MM-DD), delete the tags prop, the "Upcoming release" heading and the "Drafted from" line, point the compare link at the new tag, and add or trim entries for anything merged after this draft. Add the next Unreleased block only once it has entries. See docs/RELEASING.md "Update the public changelog". */}
+{/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". */}
 
-<Update label="v0.62.0" description="Unreleased" tags={["Upcoming"]}>
-  ## Upcoming release
-
-  Drafted from the changes merged to `main` since v0.61.0. The date is set when the release is tagged.
-
+<Update label="v0.62.0" description="2026-09-26">
   #### New
 
+  - **GPT-6 Sol and GPT-6 Luna:** OpenAI's new `gpt-6-sol` and `gpt-6-luna` are in the OpenAI provider, the model pickers and the cost tables, with the Codex 272K context limit applied. Defaults and routing are unchanged; pick them per role. ([#4234](https://github.com/eltmon/overdeck/pull/4234))
   - The Agents page opens on a **Live** view: running and in-pipeline agents are grouped into Needs you, Live and Waiting, each with one reason, in resizable panes with a collapsible preview and a new set of agent state colors. ([#4216](https://github.com/eltmon/overdeck/pull/4216))
   - Start a **bare conversation** from the Command Deck with the "No context" checkbox: no Overdeck-injected context and a faster spawn. ([#4187](https://github.com/eltmon/overdeck/pull/4187))
   - Pull requests are linked to conversations by branch, so a conversation shows the PR it produced. ([#4067](https://github.com/eltmon/overdeck/pull/4067))
@@ -60,7 +57,7 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
   - Every GitHub App API request has a timeout. ([#4060](https://github.com/eltmon/overdeck/pull/4060))
   - JSONL transcripts outside vendor cleanup roots are preserved. ([#3817](https://github.com/eltmon/overdeck/pull/3817))
 
-  [Compare v0.61.0...main](https://github.com/eltmon/overdeck/compare/v0.61.0...main)
+  [Compare v0.61.0...v0.62.0](https://github.com/eltmon/overdeck/compare/v0.61.0...v0.62.0)
 </Update>
 
 <Update label="v0.61.0" description="2026-09-24">
