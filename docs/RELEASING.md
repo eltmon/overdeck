@@ -120,7 +120,7 @@ The generated notes use a structured format:
 The public changelog is [`changelog.mdx`](../changelog.mdx) at the repo root, served by the Mintlify docs site at `/changelog` (the `Changelog` tab in `docs.json`). `pan release` does not edit it, so update it by hand on release day, **before** `pan release stable`. That command needs a clean tree and makes its own release commit.
 
 1. Draft the entries: `pan release notes v<previous> HEAD` lists the features and fixes since the last tag. Rewrite them as plain, user-facing sentences under `#### New`, `#### Improved` and `#### Fixed`, each linking its PR. Skip `chore(workspace)` commits and planning artifacts, and fold internal refactors into one line.
-2. In the top `<Update label="vX.Y.Z" description="Unreleased" tags={["Upcoming"]}>` block, set `label` to the version you will pass to `--version`, set `description` to the release date (`YYYY-MM-DD`), and delete the `tags` prop.
+2. In the top `<Update label="vX.Y.Z" description="Unreleased" tags={["Upcoming"]}>` block, set `label` to the version you will pass to `--version`, set `description` to the release date (`YYYY-MM-DD`), delete the `tags` prop, the "Upcoming release" heading and the "Drafted from" line, and point the compare link at the new tag.
 3. Keep the `RELEASE STEP` comment above the newest block. Add the next `Unreleased` block only once it has entries; an empty one renders on the public page.
 4. Commit (`docs(infra): changelog for vX.Y.Z`), then run `pan release stable --version X.Y.Z` and push `main` and the tag. Mintlify redeploys from `main`.
 
