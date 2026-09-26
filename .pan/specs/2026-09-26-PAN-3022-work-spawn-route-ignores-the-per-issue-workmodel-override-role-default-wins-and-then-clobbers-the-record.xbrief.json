@@ -4,17 +4,17 @@
     "created": "2026-09-26T06:30:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3022: Work-spawn route ignores the per-issue workModel override — role default wins and then clobbers the record",
-    "updated": "2026-09-26T06:14:56.946Z"
+    "updated": "2026-09-26T06:15:51.460Z"
   },
   "plan": {
     "id": "pan-3022",
     "title": "Work-spawn route ignores the per-issue workModel override — role default wins and then clobbers the record",
-    "status": "proposed",
+    "status": "running",
     "uid": "c8a46cfc-3d53-458a-9499-6bad05e2b5c0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-26T06:30:00.000Z",
-    "updated": "2026-09-26T06:14:56.946Z",
+    "updated": "2026-09-26T06:15:51.460Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3022",
