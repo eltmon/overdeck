@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4223",
   "created": "2026-09-26T01:20:43.443Z",
-  "updated": "2026-09-26T02:49:32.342Z",
+  "updated": "2026-09-26T02:49:33.689Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4223",
       "claimedAt": "2026-09-26T02:28:56.804Z",
       "doneAt": "2026-09-26T02:49:32.342Z"
+    },
+    "fork-parent-link": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4223",
+      "claimedAt": "2026-09-26T02:49:33.689Z"
     }
   }
 }
