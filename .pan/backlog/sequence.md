@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-26T06:02:03.029908Z · model: claude-opus-5-5 · open: 784_
+_Last sequenced: 2026-09-26T06:02:53.117226Z · model: claude-opus-5-5 · open: 783_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -41,7 +41,6 @@ _Last sequenced: 2026-09-26T06:02:03.029908Z · model: claude-opus-5-5 · open: 
 | 57 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
 | 58 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
 | 59 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 66 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
@@ -936,10 +935,6 @@ Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as 
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-2806 (rank 66)
-
-Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.
-
 ### PAN-2940 (rank 67)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
@@ -1092,6 +1087,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
 
 patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
 
+### PAN-3793 (rank 114)
+
+New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1099,10 +1098,10 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-26T06:02:03.029908Z",
+  "generatedAt": "2026-09-26T06:02:53.117226Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 784,
+  "openCount": 783,
   "nodes": [
     {
       "issue": "PAN-4224",
@@ -1571,19 +1570,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "dependsOn": [],
       "why": "Ghost test sessions absorb every test dispatch",
       "rationale": "Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-2806",
-      "rank": 66,
-      "size": "S",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "strike merge trigger registry splits across dashboard chunks",
-      "rationale": "Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.",
       "gate": "auto",
       "planning": "auto"
     },
