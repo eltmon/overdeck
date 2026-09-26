@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3634",
   "created": "2026-09-26T06:15:47.084Z",
-  "updated": "2026-09-26T08:29:00.126Z",
+  "updated": "2026-09-26T08:29:12.657Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "exemption-reads-startedby.ac4": {
       "status": "completed",
       "doneAt": "2026-09-26T08:29:00.126Z"
+    },
+    "handoff-complete-planning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:29:12.657Z"
     }
   }
 }
