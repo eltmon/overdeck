@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4249",
   "created": "2026-09-27T09:56:17.310Z",
-  "updated": "2026-09-27T11:29:50.888Z",
+  "updated": "2026-09-27T11:30:00.002Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "contracts-effort-enum.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T11:29:50.888Z"
+    },
+    "contracts-effort-enum.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:00.002Z"
     }
   }
 }
