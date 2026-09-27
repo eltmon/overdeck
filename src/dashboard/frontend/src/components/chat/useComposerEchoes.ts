@@ -1,17 +1,17 @@
 import { useEffect } from 'react';
-import type { ChatMessage } from './chat-types';
+import type { ChatMessage, SubagentSummary } from './chat-types';
 import { useComposerStore, useConversationOptimistic, useConversationFailed } from '../../lib/composerStore';
 import { TURN_STALL_MS } from '../../lib/workingPhase';
 
 /** A display delay cannot prove delivery failed, even across compaction boundaries. */
-export function useComposerEchoes(conversationName: string, messages: ChatMessage[]) {
+export function useComposerEchoes(conversationName: string, messages: ChatMessage[], subagents: SubagentSummary[] = []) {
   const optimistic = useConversationOptimistic(conversationName);
   const failed = useConversationFailed(conversationName);
   const reconcile = useComposerStore((state) => state.reconcileEchoes);
   const markUnknown = useComposerStore((state) => state.markDeliveryUnknown);
   useEffect(() => {
-    reconcile(conversationName, messages);
-  }, [conversationName, messages, optimistic, failed, reconcile]);
+    reconcile(conversationName, messages, subagents);
+  }, [conversationName, messages, subagents, optimistic, failed, reconcile]);
   useEffect(() => {
     const pending = optimistic.find((message) => !message.acknowledged && message.deliveryState !== 'unknown');
     if (!pending) return;

@@ -1265,7 +1265,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     data?.contextUsage ?? conversation.contextUsage ?? null,
   );
 
-  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages);
+  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages, data?.subagents ?? []);
   const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
 
   const handleMessageSent = useCallback((text: string, clientMessageId?: string) => {

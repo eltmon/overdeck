@@ -27,7 +27,7 @@ import type { ComposerCommandResult } from '@overdeck/contracts';
 import { sendConversationMessage, sendFailureDetails, type SendFailureDetails } from './composerSend';
 import { reconcileComposerEchoes, type SendIdentity } from './composerEchoes';
 import { create } from 'zustand';
-import type { ChatMessage, FailedMessage } from '../components/chat/chat-types';
+import type { ChatMessage, FailedMessage, SubagentSummary } from '../components/chat/chat-types';
 import {
   ATTACHMENT_ACCEPT,
   classifyAttachmentKind,
@@ -235,7 +235,7 @@ interface ComposerStore {
 
   addOptimistic(conversationName: string, text: string, serverBaseCount: number, identity?: SendIdentity): void;
   acknowledgeOptimistic(conversationName: string, text: string, clientMessageId?: string): void;
-  reconcileEchoes(conversationName: string, messages: ChatMessage[]): void;
+  reconcileEchoes(conversationName: string, messages: ChatMessage[], subagents?: SubagentSummary[]): void;
   markDeliveryUnknown(conversationName: string, id: string): void;
   clearOptimistic(conversationName: string): void;
 
@@ -421,10 +421,10 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       ),
     })),
 
-  reconcileEchoes: (conversationName, messages) => {
+  reconcileEchoes: (conversationName, messages, subagents = []) => {
     const slice = get().byConversation[conversationName];
     if (!slice) return;
-    const next = reconcileComposerEchoes(slice, messages);
+    const next = reconcileComposerEchoes(slice, messages, subagents);
     if (next === slice) return;
     set((state) => ({ byConversation: mutateSlice(state.byConversation, conversationName, () => next) }));
   },

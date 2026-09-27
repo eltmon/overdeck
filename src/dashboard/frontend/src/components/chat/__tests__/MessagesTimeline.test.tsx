@@ -97,15 +97,32 @@ describe('MessagesTimeline — search', () => {
   });
 
   it.each([
-    ['pending', false, 'Sending…'],
-    ['accepted', true, 'Sent · waiting for transcript'],
-    ['unknown', false, 'Delivery not confirmed'],
-  ] as const)('renders the %s delivery state without losing the message text', (deliveryState, acknowledged, label) => {
+    ['pending', false, 'Sending…', {}],
+    ['accepted', true, 'Sent · waiting for transcript', {}],
+    ['unknown', false, 'Delivery not confirmed', {}],
+    ['subagent', true, 'Delivered to subagent · Investigate flaky test', {
+      deliveredToSubagent: { agentId: 'agent-1', description: 'Investigate flaky test' },
+    }],
+  ] as const)('renders the %s delivery state without losing the message text', (deliveryState, acknowledged, label, extra) => {
     render(<MessagesTimeline messages={[{
-      ...makeMessage('optimistic-id', 'user', 0, 'Preserved prompt'), deliveryState, acknowledged,
+      ...makeMessage('optimistic-id', 'user', 0, 'Preserved prompt'), deliveryState, acknowledged, ...extra,
     }]} workLog={[]} streaming={false} />);
     expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.getByText('Preserved prompt')).toBeInTheDocument();
+  });
+
+  it('renders a subagent landing at full opacity with no spinner and no waiting-for-transcript label (PAN-4247 AC3)', () => {
+    render(<MessagesTimeline messages={[{
+      ...makeMessage('optimistic-id', 'user', 0, 'Preserved prompt'),
+      deliveryState: 'subagent',
+      acknowledged: true,
+      deliveredToSubagent: { agentId: 'agent-1', description: 'Investigate flaky test' },
+    }]} workLog={[]} streaming={false} />);
+    expect(screen.getByText('Delivered to subagent · Investigate flaky test')).toBeInTheDocument();
+    expect(screen.queryByText('Sent · waiting for transcript')).not.toBeInTheDocument();
+    const bubble = screen.getByTitle(/routed this message to running subagent agent-1/);
+    expect(bubble.querySelector('svg')).toBeNull();
+    expect(bubble).not.toHaveStyle({ opacity: '0.6' });
   });
 
   it('handles target-message scroll requests once per target key', async () => {
