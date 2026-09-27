@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T17:23:14.647Z",
+  "updated": "2026-09-27T17:23:23.911Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,10 @@
     "pause-gate.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T17:23:14.647Z"
+    },
+    "pause-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:23:23.911Z"
     }
   }
 }
