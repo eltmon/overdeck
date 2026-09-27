@@ -1,5 +1,13 @@
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
 
+/** The most recent compaction summary record encountered while parsing a transcript. */
+export interface CompactSummaryRecord {
+  text: string;
+  sequence: number;
+  uuid?: string;
+  timestamp?: string;
+}
+
 export interface ParseResult {
   /** Worker-local accumulator generation; changes when a transcript is rebuilt. */
   transcriptGeneration?: number;
@@ -50,6 +58,8 @@ export interface ParseResult {
    * Carried across incremental parses so a response split across read boundaries is counted once.
    */
   countedUsageIds?: Set<string>;
+  /** Most recent compaction summary record encountered while parsing (see CompactSummaryRecord). */
+  latestCompactSummary?: CompactSummaryRecord;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
@@ -73,6 +83,8 @@ export interface ParseState {
   orphanToolUseIds?: Set<string>;
   /** Request/message IDs already counted into cost/tokens (see ParseResult.countedUsageIds). */
   countedUsageIds?: Set<string>;
+  /** Most recent compaction summary record encountered while parsing (see ParseResult.latestCompactSummary). */
+  latestCompactSummary?: CompactSummaryRecord;
 }
 
 export interface ConversationActivitySummary {
@@ -112,6 +124,8 @@ export interface JsonlEntry {
   uuid?: string;
   /** Claude Code per-API-request id. Stable across the multiple JSONL lines of one response. */
   requestId?: string;
+  /** True on the user entry carrying a compaction summary written after a compact_boundary. */
+  isCompactSummary?: boolean;
 }
 
 export interface ContentBlock {
