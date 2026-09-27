@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4249",
   "created": "2026-09-27T09:56:17.310Z",
-  "updated": "2026-09-27T11:32:30.522Z",
+  "updated": "2026-09-27T11:32:40.655Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "settings-api-effort-validation.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T11:32:30.522Z"
+    },
+    "settings-api-effort-validation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:32:40.655Z"
     }
   }
 }
