@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4245",
   "created": "2026-09-27T08:41:51.604Z",
-  "updated": "2026-09-27T09:02:01.330Z",
+  "updated": "2026-09-27T09:12:25.173Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-27T09:01:56.836Z"
     },
     "serializer-summary-window": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4245",
-      "claimedAt": "2026-09-27T09:02:01.330Z"
+      "claimedAt": "2026-09-27T09:02:01.330Z",
+      "doneAt": "2026-09-27T09:12:25.173Z"
     }
   }
 }
