@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T15:49:27.344Z",
+  "updated": "2026-09-27T15:56:02.090Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-09-27T15:49:23.365Z"
     },
     "darwin-available-memory": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4267",
-      "claimedAt": "2026-09-27T15:49:27.344Z"
+      "claimedAt": "2026-09-27T15:49:27.344Z",
+      "doneAt": "2026-09-27T15:56:02.090Z"
     }
   }
 }
