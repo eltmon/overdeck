@@ -191,12 +191,15 @@ export async function buildAgentConversationResult(
       selected = { ...selected, path: safe.path };
     }
 
-    const result = selected.kind === 'claude' ? await parseEntireConversation(selected.path)
+    const rawResult = selected.kind === 'claude' ? await parseEntireConversation(selected.path)
       : selected.kind === 'pi' ? await parsePiConversationMessages(selected.path)
       : selected.kind === 'ohmypi' ? await parseOhmypiConversationMessages(selected.path)
       : selected.kind === 'codex' ? await parseCodexConversationMessages(selected.path)
       : selected.kind === 'acp' ? await parseAcpConversationMessages(selected.path)
       : await sharedTranscriptParser(selected.kind)(selected.path);
+    // latestCompactSummary (PAN-4245) is server-internal title/About input, never an HTTP response field.
+    const { latestCompactSummary: _latestCompactSummary, ...result } =
+      rawResult as typeof rawResult & { latestCompactSummary?: unknown };
 
     if (selected.kind === 'acp') {
       return { status: 200, body: {
@@ -228,9 +231,12 @@ async function buildAgentSubagentResult(
   if (!resolved) {
     return { status: 404, body: { error: `No subagent ${subagentId} found for ${id}.`, checked: [] } };
   }
-  const result = resolved.kind === 'claude'
+  const rawResult = resolved.kind === 'claude'
     ? await parseEntireConversation(resolved.path)
     : await parseCodexConversationMessages(resolved.path);
+  // latestCompactSummary (PAN-4245) is server-internal title/About input, never an HTTP response field.
+  const { latestCompactSummary: _latestCompactSummary, ...result } =
+    rawResult as typeof rawResult & { latestCompactSummary?: unknown };
   return { status: 200, body: { ...result, streaming: false } };
 }
 

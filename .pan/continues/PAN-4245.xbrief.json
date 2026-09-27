@@ -1,0 +1,165 @@
+{
+  "version": "1",
+  "issueId": "PAN-4245",
+  "created": "2026-09-27T08:41:51.604Z",
+  "updated": "2026-09-27T09:46:34.312Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "parser-capture-compact-summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T08:41:51.603Z",
+      "doneAt": "2026-09-27T08:57:32.630Z"
+    },
+    "cache-merge-compact-summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T08:58:08.382Z",
+      "doneAt": "2026-09-27T09:01:56.836Z"
+    },
+    "serializer-summary-window": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T09:02:01.330Z",
+      "doneAt": "2026-09-27T09:12:25.173Z"
+    },
+    "context-aware-prompts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T09:12:36.129Z",
+      "doneAt": "2026-09-27T09:15:31.749Z"
+    },
+    "fallback-title-from-summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T09:15:35.963Z",
+      "doneAt": "2026-09-27T09:18:17.512Z"
+    },
+    "title-refinement-passes-summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T09:18:21.894Z",
+      "doneAt": "2026-09-27T09:21:34.033Z"
+    },
+    "retitle-about-pass-summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T09:21:38.439Z",
+      "doneAt": "2026-09-27T09:28:48.325Z"
+    },
+    "docs-and-2878-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T09:28:57.469Z",
+      "doneAt": "2026-09-27T09:35:33.552Z"
+    },
+    "parser-capture-compact-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:41:47.647Z"
+    },
+    "parser-capture-compact-summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:42:19.982Z"
+    },
+    "parser-capture-compact-summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:42:32.297Z"
+    },
+    "parser-capture-compact-summary.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:42:43.874Z"
+    },
+    "cache-merge-compact-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:42:55.224Z"
+    },
+    "cache-merge-compact-summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:43:07.076Z"
+    },
+    "cache-merge-compact-summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:43:18.234Z"
+    },
+    "serializer-summary-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:43:28.569Z"
+    },
+    "serializer-summary-window.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:43:38.718Z"
+    },
+    "serializer-summary-window.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:43:48.951Z"
+    },
+    "serializer-summary-window.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:43:59.352Z"
+    },
+    "context-aware-prompts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:44:09.793Z"
+    },
+    "context-aware-prompts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:44:19.559Z"
+    },
+    "context-aware-prompts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:44:29.357Z"
+    },
+    "fallback-title-from-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:44:39.061Z"
+    },
+    "fallback-title-from-summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:44:49.775Z"
+    },
+    "fallback-title-from-summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:45:01.028Z"
+    },
+    "title-refinement-passes-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:45:12.422Z"
+    },
+    "title-refinement-passes-summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:45:22.495Z"
+    },
+    "retitle-about-pass-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:45:33.192Z"
+    },
+    "retitle-about-pass-summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:45:43.327Z"
+    },
+    "retitle-about-pass-summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:45:53.478Z"
+    },
+    "docs-and-2878-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:46:03.836Z"
+    },
+    "docs-and-2878-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:46:14.067Z"
+    },
+    "docs-and-2878-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:46:24.263Z"
+    },
+    "docs-and-2878-check.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:46:34.312Z"
+    }
+  }
+}
