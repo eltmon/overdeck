@@ -55,7 +55,7 @@ export interface WaitDeps {
   sleep?: (ms: number) => Promise<void>;
   listReports?: (id: string) => Promise<WorkerReport[]>;
   isAlive?: (id: string) => Promise<LivenessVerdict>;
-  idleAgeMs?: (id: string, now: number) => number | null;
+  idleAgeMs?: (id: string, now: number) => number | null | Promise<number | null>;
   fetchLastAssistantMessage?: (id: string) => Promise<string | null>;
   resolveTranscriptPath?: (id: string) => Promise<string | null>;
 }
@@ -142,7 +142,7 @@ export async function waitForWorkerReport(id: string, options: WaitOptions = {},
     // Idleness counts only after the startup grace: right after a `pan tell` the
     // worker's last activity is still the old turn until its hooks fire.
     if (verdict.alive && current - startedAt >= startupGraceMs) {
-      const idle = idleAge(id, current);
+      const idle = await idleAge(id, current);
       if (idle !== null && idle > idleGraceMs) {
         return reportlessOutcome('idle-without-report', id, fetchLast, resolvePath);
       }

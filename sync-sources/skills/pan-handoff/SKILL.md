@@ -92,6 +92,10 @@ Use `--role <role>` to set the new conversation's pane role: `conversation` (the
 - The current agent knows dead ends, hazards, or file relationships that a passive summary may miss.
 - You want a deliberate context transfer before switching models, harnesses, or tasks.
 
+To launch a parallel lane, use `pan lane start`, not `pan handoff`.
+
+The successor nests under the source conversation in the Command Deck and the Agents History, and shows `continues ← #<id>`.
+
 Use a normal summary fork when a quick passive summary is enough. Use a plain fork only when staying within Claude Code-compatible raw history.
 
 ## Focus

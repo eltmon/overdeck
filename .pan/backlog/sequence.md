@@ -1,18 +1,14 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T14:55:01.986676Z · model: claude-opus-5-5 · open: 782_
+_Last sequenced: 2026-09-27T15:13:22.968928Z · model: claude-opus-5-5 · open: 777_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 13 | PAN-4247 | M | high | ok |  |  | In-pipeline: messages sent during a live subagent land in its sidechain; bubble waits forever and pan tell falsely confirms delivery |
-| 14 | PAN-4245 | M | medium | ok |  |  | In-pipeline: conversation titles/About see only the latest request; feed the latest compaction summary into the transcript. |
-| 15 | PAN-4249 | XL | high | ok |  |  | In-pipeline: one effort resolver, effort on every launch surface, persisted across relaunch, visible, live-changeable, per-tier |
-| 16 | PAN-4224 | M | critical | ok |  |  | Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write |
+| 16 | PAN-4266 | S | medium | ok |  |  | In-pipeline: Command Deck model picker clipped by overflow-hidden column; focus scroll shifts column left. Portal fix. |
 | 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4263 | M | critical | ok |  |  | In-pipeline: PR lookup reads rate limits as 'no PR' and picks a closed PR, so approved verdicts are lost and merges fail |
-| 20 | PAN-4212 | S | critical | ok |  |  | Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files |
 | 21 | PAN-4264 | L | critical | ok |  |  | GitHub rate limits stall verdicts, close-outs and merges several times a day; measure quota per caller, surface it, back off, cut waste |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -138,7 +134,6 @@ _Last sequenced: 2026-09-27T14:55:01.986676Z · model: claude-opus-5-5 · open: 
 | 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 174 | PAN-3022 | S | high | ok |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
 | 176 | PAN-3668 | L | medium | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
@@ -181,16 +176,16 @@ _Last sequenced: 2026-09-27T14:55:01.986676Z · model: claude-opus-5-5 · open: 
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 220 | PAN-4253 | M | high | ok |  | PAN-4249 | S1 of PAN-4249: effort is lost on resume/recovery/rotation/crash respawn; persist effort+source on AgentState and re-apply |
+| 220 | PAN-4253 | M | high | ok |  |  | S1 of PAN-4249: effort is lost on resume/recovery/rotation/crash respawn; persist effort+source on AgentState and re-apply |
 | 221 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 223 | PAN-4254 | M | high | ok |  | PAN-4249 | S2 of PAN-4249: conversations reject xhigh/max so resume/restart-all throw; composer effort picker, switch-model keeps it, handoff --effort |
-| 224 | PAN-4256 | M | high | ok |  | PAN-4249 | S4 of PAN-4249: review/test/worker/spawn/flywheel/dashboard/Fly launches ignore roles.<role>.effort; route all through resolveEffort |
-| 225 | PAN-4258 | S | medium | ok |  | PAN-4249 | S6 of PAN-4249: pan plan takes all five levels, PlanDialog defaults to high, fix xhigh/max rendering as "LOW effort planning" |
-| 226 | PAN-4255 | M | medium | ok |  | PAN-4249, PAN-4253 | S3 of PAN-4249: live /effort change on claude-code via terminal backend, persisted after confirmation; drop "Effort unverified" |
-| 227 | PAN-4257 | M | medium | ok |  | PAN-4249 | S5 of PAN-4249: per-slot effort from the tier table and optional effort-first escalation; tier/sub-role effort in Settings |
-| 228 | PAN-4260 | M | medium | ok |  | PAN-4249 | S8 of PAN-4249: per-harness effort mapping tests, clamping in adapters, lint:effort baseline down, CLIProxy --effort spike, docs |
-| 229 | PAN-4259 | M | medium | ok |  | PAN-4249, PAN-4253 | S7 of PAN-4249: show effective effort+source on Agents rows, issue view, pan status/show; add effort to cost ledger and sessions.json |
+| 223 | PAN-4254 | M | high | ok |  |  | S2 of PAN-4249: conversations reject xhigh/max so resume/restart-all throw; composer effort picker, switch-model keeps it, handoff --effort |
+| 224 | PAN-4256 | M | high | ok |  |  | S4 of PAN-4249: review/test/worker/spawn/flywheel/dashboard/Fly launches ignore roles.<role>.effort; route all through resolveEffort |
+| 225 | PAN-4258 | S | medium | ok |  |  | S6 of PAN-4249: pan plan takes all five levels, PlanDialog defaults to high, fix xhigh/max rendering as "LOW effort planning" |
+| 226 | PAN-4255 | M | medium | ok |  | PAN-4253 | S3 of PAN-4249: live /effort change on claude-code via terminal backend, persisted after confirmation; drop "Effort unverified" |
+| 227 | PAN-4257 | M | medium | ok |  |  | S5 of PAN-4249: per-slot effort from the tier table and optional effort-first escalation; tier/sub-role effort in Settings |
+| 228 | PAN-4260 | M | medium | ok |  |  | S8 of PAN-4249: per-harness effort mapping tests, clamping in adapters, lint:effort baseline down, CLIProxy --effort spike, docs |
+| 229 | PAN-4259 | M | medium | ok |  | PAN-4253 | S7 of PAN-4249: show effective effort+source on Agents rows, issue view, pan status/show; add effort to cost ledger and sessions.json |
 | 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
 | 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
 | 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
@@ -252,7 +247,7 @@ _Last sequenced: 2026-09-27T14:55:01.986676Z · model: claude-opus-5-5 · open: 
 | 299 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
 | 300 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
 | 301 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
-| 302 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
+| 302 | PAN-1142 | M | high | needs-refinement |  |  | Per-role/conversation effort config; likely superseded by merged PAN-4249 resolver and its S-slices, confirm or close |
 | 303 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
 | 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
 | 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
@@ -701,7 +696,7 @@ _Last sequenced: 2026-09-27T14:55:01.986676Z · model: claude-opus-5-5 · open: 
 | 777 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
 | 778 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
 | 779 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 780 | PAN-480 | M | low | ok |  |  | Pass --effort flag when spawning planning agents via Cloister |
+| 780 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
 | 781 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
 | 782 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
 | 783 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
@@ -790,21 +785,9 @@ _Last sequenced: 2026-09-27T14:55:01.986676Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-4247 (rank 13)
+### PAN-4266 (rank 16)
 
-New in-pipeline issue, pinned in the top tier. Operator instructions and cross-conversation pan tell messages silently land in a background subagent sidechain, and pan tell reports the turn as confirmed, which deadlocked a live conversation. That loss of operator control makes it high importance; the fix is scoped to composer echo reconciliation plus pan tell reporting, with clear acceptance criteria.
-
-### PAN-4245 (rank 14)
-
-New since the prior run and already in the pipeline with a planned PRD, so it is pinned in a free top slot beside the other live workspaces rather than ranked against the queue; it improves conversation title and About accuracy for long, compacted sessions but does not touch pipeline substrate.
-
-### PAN-4249 (rank 15)
-
-New in-pipeline issue, pinned in a free top-tier slot beside the other live workspaces. It consolidates PAN-1142, PAN-3919 and PAN-480: effort is resolved ad hoc in about 13 places, config is mostly ignored, relaunch drops it, and conversations reject xhigh/max. Effort is a major cost and quality lever that touches every launch path, so it is high importance and XL; the acceptance criteria are concrete and table-testable.
-
-### PAN-4224 (rank 16)
-
-New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.
+New since prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the rank slot vacated by closed PAN-4224. The body gives a measured cause, exact files, a four-step fix and Playwright acceptance criteria, so condition is ok.
 
 ### PAN-4223 (rank 17)
 
@@ -817,10 +800,6 @@ New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's ro
 ### PAN-4263 (rank 19)
 
 New in-pipeline issue, pinned in the top tier at a free rank. One function (getExistingGitHubArtifact in src/lib/forge.ts) swallows gh errors so a rate-limited lookup reads as 'no PR', refusing reviewer verdicts, and the App path takes prs[0], which can be an older closed PR, so merges target the wrong PR. It already stalled PAN-4222, PAN-3634 and PAN-3668 with approved reviews the merge gate never saw, so it is critical pipeline substrate; the fix and acceptance criteria are concrete.
-
-### PAN-4212 (rank 20)
-
-New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.
 
 ### PAN-4264 (rank 21)
 
@@ -1090,6 +1069,22 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
 
 Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
 
+### PAN-3916 (rank 112)
+
+Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
+
+### PAN-3900 (rank 113)
+
+patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
+
+### PAN-3793 (rank 114)
+
+New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
+
+### PAN-2639 (rank 115)
+
+codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1097,47 +1092,21 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T14:55:01.986676Z",
+  "generatedAt": "2026-09-27T15:13:22.968928Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 782,
+  "openCount": 777,
   "nodes": [
     {
-      "issue": "PAN-4247",
-      "rank": 13,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: messages sent during a live subagent land in its sidechain; bubble waits forever and pan tell falsely confirms delivery",
-      "rationale": "New in-pipeline issue, pinned in the top tier. Operator instructions and cross-conversation pan tell messages silently land in a background subagent sidechain, and pan tell reports the turn as confirmed, which deadlocked a live conversation. That loss of operator control makes it high importance; the fix is scoped to composer echo reconciliation plus pan tell reporting, with clear acceptance criteria.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4245",
-      "rank": 14,
-      "size": "M",
+      "issue": "PAN-4266",
+      "rank": 16,
+      "size": "S",
       "importance": "medium",
       "score": 62,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In-pipeline: conversation titles/About see only the latest request; feed the latest compaction summary into the transcript.",
-      "rationale": "New since the prior run and already in the pipeline with a planned PRD, so it is pinned in a free top slot beside the other live workspaces rather than ranked against the queue; it improves conversation title and About accuracy for long, compacted sessions but does not touch pipeline substrate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4224",
-      "rank": 16,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sequence push lands on origin but local main can't follow: untracked .pan drafts block reset --keep, so primary main drifts every write",
-      "rationale": "New in-pipeline bug. pushPlanArtifacts pushes the sequence commit but reset --keep is refused by untracked .pan drafts/continues in the plan home, so primary main silently diverges on every write-sequence and blocks plain git pull. It hits the plan-artifact substrate every sequencer run and shares the push path with PAN-4166 and the draft-placement bug PAN-3935, so it ranks critical at the head of the in-pipeline cluster.",
+      "why": "In-pipeline: Command Deck model picker clipped by overflow-hidden column; focus scroll shifts column left. Portal fix.",
+      "rationale": "New since prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the rank slot vacated by closed PAN-4224. The body gives a measured cause, exact files, a four-step fix and Playwright acceptance criteria, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1168,15 +1137,28 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
-      "issue": "PAN-4212",
-      "rank": 20,
-      "size": "S",
+      "issue": "PAN-4263",
+      "rank": 19,
+      "size": "M",
       "importance": "critical",
       "score": 88,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Freshness preflight flags to-be-created files as missing, so auto-start silently refuses any plan that adds files",
-      "rationale": "New in-pipeline bug. The plan-freshness check treats every files_scope path as must-exist, so every plan that creates a file looks stale and the auto-start handoff is refused without an operator. It blocks pipeline pickup directly (PAN-4199 and PAN-1641 already needed --skip-freshness), so it ranks critical near the top.",
+      "why": "In-pipeline: PR lookup reads rate limits as 'no PR' and picks a closed PR, so approved verdicts are lost and merges fail",
+      "rationale": "New in-pipeline issue, pinned in the top tier at a free rank. One function (getExistingGitHubArtifact in src/lib/forge.ts) swallows gh errors so a rate-limited lookup reads as 'no PR', refusing reviewer verdicts, and the App path takes prs[0], which can be an older closed PR, so merges target the wrong PR. It already stalled PAN-4222, PAN-3634 and PAN-3668 with approved reviews the merge gate never saw, so it is critical pipeline substrate; the fix and acceptance criteria are concrete.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4264",
+      "rank": 21,
+      "size": "L",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "GitHub rate limits stall verdicts, close-outs and merges several times a day; measure quota per caller, surface it, back off, cut waste",
+      "rationale": "New issue, placed in a free top-tier slot next to PAN-4263. GitHub GraphQL refusals for the shared eltmon user stall the pipeline several times a day (lost review verdicts, failed merges, stale membership), and Overdeck cannot currently see or explain them. The fix is concrete and staged: per-caller quota measurement from real response headers, a dashboard surface, backoff until reset, and removal of about 20 wasted refreshes an hour from misconfigured projects. PAN-4263 fixes the one misread in forge.ts; this issue fixes the systemic cause, so it ranks critical as pipeline substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2780,19 +2762,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "skip"
     },
     {
-      "issue": "PAN-3022",
-      "rank": 174,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override.",
-      "rationale": "Triage: verify the workModel-override clobber against the current spawn.ts model resolution; the record it clobbered no longer exists in that form. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2642",
       "rank": 175,
       "size": "XL",
@@ -3316,6 +3285,19 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "planning": "auto"
     },
     {
+      "issue": "PAN-4253",
+      "rank": 220,
+      "size": "M",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "S1 of PAN-4249: effort is lost on resume/recovery/rotation/crash respawn; persist effort+source on AgentState and re-apply",
+      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4242",
       "rank": 221,
       "size": "M",
@@ -3338,6 +3320,101 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "dependsOn": [],
       "why": "Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope.",
       "rationale": "Demoted from rank 64 (critical/92) because the closure of its blocker PAN-2828 and of PAN-3898 falsified most of the premise. Defect 1 — the verification gate demanding a vBRIEF checklist strikes never have — is fixed: src/dashboard/server/routes/workspaces/merge-strike.ts:36 sets skipPlanChecklist: true for request.kind === 'strike', and verification-runner.ts:775 honours it, so the incomplete-plan-items gate no longer fires for a strike. Defect 3 — the landing loop leaving strike_landing_state: 'recovering' after a transient fetch failure — describes deacon-strike-landing.ts, which the PAN-3917 cut deleted; no stored strike landing state remains to retry. Only defect 2 may survive: feedback delivery can still strand on feedback_delivery_needs_you (src/lib/cloister/review-verdict-feedback.ts:276) when the target agent has exited, although the strike carve-out removes the failure that used to trigger it. Held above the obsolete tail rather than sent to it, because that residual needs a rescope against the current code rather than a close.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4254",
+      "rank": 223,
+      "size": "M",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "S2 of PAN-4249: conversations reject xhigh/max so resume/restart-all throw; composer effort picker, switch-model keeps it, handoff --effort",
+      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4256",
+      "rank": 224,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "S4 of PAN-4249: review/test/worker/spawn/flywheel/dashboard/Fly launches ignore roles.<role>.effort; route all through resolveEffort",
+      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4258",
+      "rank": 225,
+      "size": "S",
+      "importance": "medium",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "S6 of PAN-4249: pan plan takes all five levels, PlanDialog defaults to high, fix xhigh/max rendering as \"LOW effort planning\"",
+      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4255",
+      "rank": 226,
+      "size": "M",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4253"
+      ],
+      "why": "S3 of PAN-4249: live /effort change on claude-code via terminal backend, persisted after confirmation; drop \"Effort unverified\"",
+      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4257",
+      "rank": 227,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "S5 of PAN-4249: per-slot effort from the tier table and optional effort-first escalation; tier/sub-role effort in Settings",
+      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4260",
+      "rank": 228,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "S8 of PAN-4249: per-harness effort mapping tests, clamping in adapters, lint:effort baseline down, CLIProxy --effort spike, docs",
+      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4259",
+      "rank": 229,
+      "size": "M",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4253"
+      ],
+      "why": "S7 of PAN-4249: show effective effort+source on Agents rows, issue view, pan status/show; add effort to cost ledger and sessions.json",
+      "rationale": "Foundation PAN-4249 merged via PR #4261, so this slice is unblocked; rank kept because its impact matches its peers at this tier.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4094,9 +4171,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "size": "M",
       "importance": "high",
       "score": 70,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Add reasoning effort level to per-role / per-conversation model config",
+      "why": "Per-role/conversation effort config; likely superseded by merged PAN-4249 resolver and its S-slices, confirm or close",
+      "rationale": "PAN-4249 merged a single effort resolver with role/sub-role/tier effort, so this older request now carries duplicate risk; condition set to needs-refinement, rank kept.",
       "gate": "auto",
       "planning": "interactive"
     },
@@ -4324,6 +4402,18 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "dependsOn": [],
       "why": "Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived",
       "rationale": "Triage: the record anchor is gone but convergence still reads round artifacts; the SHA-derivation fragility may still apply. Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4265",
+      "rank": 322,
+      "size": "M",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "'Setup changed' sync banner shows after most merges; auto-run light sync after reload and say what changed when it does show",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5039,6 +5129,18 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "condition": "ok",
       "dependsOn": [],
       "why": "codex agents can wedge on the Codex CLI first-run/consent screen",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4250",
+      "rank": 385,
+      "size": "XS",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Stale dated CONVERSATION_TITLE_MODEL literal throws UnknownModelError when titleModel config is unset; one-line fix plus audit",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9559,9 +9661,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "size": "M",
       "importance": "low",
       "score": 13,
-      "condition": "ok",
+      "condition": "needs-refinement",
       "dependsOn": [],
-      "why": "Pass --effort flag when spawning planning agents via Cloister",
+      "why": "Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close",
+      "rationale": "PAN-4249 merged a single effort resolver with role/sub-role/tier effort, so this older request now carries duplicate risk; condition set to needs-refinement, rank kept.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10611,191 +10714,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-4249",
-      "rank": 15,
-      "size": "XL",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: one effort resolver, effort on every launch surface, persisted across relaunch, visible, live-changeable, per-tier",
-      "rationale": "New in-pipeline issue, pinned in a free top-tier slot beside the other live workspaces. It consolidates PAN-1142, PAN-3919 and PAN-480: effort is resolved ad hoc in about 13 places, config is mostly ignored, relaunch drops it, and conversations reject xhigh/max. Effort is a major cost and quality lever that touches every launch path, so it is high importance and XL; the acceptance criteria are concrete and table-testable.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4250",
-      "rank": 385,
-      "size": "XS",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stale dated CONVERSATION_TITLE_MODEL literal throws UnknownModelError when titleModel config is unset; one-line fix plus audit",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4253",
-      "rank": 220,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4249"
-      ],
-      "why": "S1 of PAN-4249: effort is lost on resume/recovery/rotation/crash respawn; persist effort+source on AgentState and re-apply",
-      "rationale": "New this run: high/74 because it fixes a real bug (explicit --effort silently reverts to high after any relaunch) and later slices read the persisted effortSource.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4254",
-      "rank": 223,
-      "size": "M",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4249"
-      ],
-      "why": "S2 of PAN-4249: conversations reject xhigh/max so resume/restart-all throw; composer effort picker, switch-model keeps it, handoff --effort",
-      "rationale": "New this run: high/74 because the SAFE_EFFORT_PATTERN bug makes resume and restart-all throw after a live xhigh/max change.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4256",
-      "rank": 224,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4249"
-      ],
-      "why": "S4 of PAN-4249: review/test/worker/spawn/flywheel/dashboard/Fly launches ignore roles.<role>.effort; route all through resolveEffort",
-      "rationale": "New this run: high/72 because roles.<role>.effort is validated but ignored on most launch surfaces, including the flywheel setting shown in the UI.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4258",
-      "rank": 225,
-      "size": "S",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4249"
-      ],
-      "why": "S6 of PAN-4249: pan plan takes all five levels, PlanDialog defaults to high, fix xhigh/max rendering as \"LOW effort planning\"",
-      "rationale": "New this run: medium/66; a scoped slice with a user-visible prompt bug, lower reach than the relaunch and role-surface slices.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4255",
-      "rank": 226,
-      "size": "M",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4249",
-        "PAN-4253"
-      ],
-      "why": "S3 of PAN-4249: live /effort change on claude-code via terminal backend, persisted after confirmation; drop \"Effort unverified\"",
-      "rationale": "New this run: medium/64; live change for work agents persists to agent state, so it follows the S1 persistence slice (PAN-4253).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4257",
-      "rank": 227,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4249"
-      ],
-      "why": "S5 of PAN-4249: per-slot effort from the tier table and optional effort-first escalation; tier/sub-role effort in Settings",
-      "rationale": "New this run: medium/62; tier-driven effort is a cost lever for swarm slots, but no current slot run is broken without it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4260",
-      "rank": 228,
-      "size": "M",
-      "importance": "medium",
-      "score": 60,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4249"
-      ],
-      "why": "S8 of PAN-4249: per-harness effort mapping tests, clamping in adapters, lint:effort baseline down, CLIProxy --effort spike, docs",
-      "rationale": "New this run: medium/60; correctness hardening and docs for harness mappings, including a spike on CLIProxy-routed GPT effort.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4259",
-      "rank": 229,
-      "size": "M",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4249",
-        "PAN-4253"
-      ],
-      "why": "S7 of PAN-4249: show effective effort+source on Agents rows, issue view, pan status/show; add effort to cost ledger and sessions.json",
-      "rationale": "New this run: medium/58; visibility and cost-by-effort analysis, which displays the effortSource that PAN-4253 persists.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4263",
-      "rank": 19,
-      "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: PR lookup reads rate limits as 'no PR' and picks a closed PR, so approved verdicts are lost and merges fail",
-      "rationale": "New in-pipeline issue, pinned in the top tier at a free rank. One function (getExistingGitHubArtifact in src/lib/forge.ts) swallows gh errors so a rate-limited lookup reads as 'no PR', refusing reviewer verdicts, and the App path takes prs[0], which can be an older closed PR, so merges target the wrong PR. It already stalled PAN-4222, PAN-3634 and PAN-3668 with approved reviews the merge gate never saw, so it is critical pipeline substrate; the fix and acceptance criteria are concrete.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4264",
-      "rank": 21,
-      "size": "L",
-      "importance": "critical",
-      "score": 85,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "GitHub rate limits stall verdicts, close-outs and merges several times a day; measure quota per caller, surface it, back off, cut waste",
-      "rationale": "New issue, placed in a free top-tier slot next to PAN-4263. GitHub GraphQL refusals for the shared eltmon user stall the pipeline several times a day (lost review verdicts, failed merges, stale membership), and Overdeck cannot currently see or explain them. The fix is concrete and staged: per-caller quota measurement from real response headers, a dashboard surface, backoff until reset, and removal of about 20 wasted refreshes an hour from misconfigured projects. PAN-4263 fixes the one misread in forge.ts; this issue fixes the systemic cause, so it ranks critical as pipeline substrate.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4265",
-      "rank": 322,
-      "size": "M",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "'Setup changed' sync banner shows after most merges; auto-run light sync after reload and say what changed when it does show",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -11661,13 +11579,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "confidence": 0.7
     },
     {
-      "from": "PAN-4212",
-      "to": "PAN-1641",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-4217",
       "to": "PAN-4219",
       "type": "unblocks",
@@ -11680,27 +11591,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4224",
-      "to": "PAN-4166",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4224",
-      "to": "PAN-3935",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-4224",
-      "to": "PAN-4225",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-3935",
@@ -11810,83 +11700,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
     {
       "from": "PAN-1641",
       "to": "PAN-4248",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-1142",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-3919",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-480",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.9
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-4253",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-4254",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-4256",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-4258",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-4255",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-4257",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-4260",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4249",
-      "to": "PAN-4259",
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
