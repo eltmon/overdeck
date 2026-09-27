@@ -114,10 +114,11 @@ exec, which vanishes the pid before `ps` can observe it under load (PAN-4244).
 Poll a real process's state against a wall-clock deadline, never an unbounded
 loop. On timeout, throw an error that names the pid, the phase that stalled,
 and the last observed state — a bare "timed out" gives the next debugger
-nothing to go on. Pace the polling with `setImmediate`, not `setTimeout`: the
-fixture should run to completion before the test calls `vi.useFakeTimers()`,
-and `setImmediate` avoids getting caught by a fake clock if that ordering ever
-shifts.
+nothing to go on. Pace the polling with `setImmediate`, not `setTimeout`, and
+run the fixture to completion before the test calls `vi.useFakeTimers()`: once
+fake timers are installed, both `setTimeout` and the deadline's own
+`Date.now()` calls can freeze, so the ordering — real fixture first, fake
+clock after — is what keeps the poll live.
 
 ## Dashboard UI Testing
 
