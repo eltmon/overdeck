@@ -20,18 +20,17 @@ const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   Reopen: 'reopen',
   Cancel: 'cancel',
   'Resume session': 'resumeSession',
-  'Reset session': 'resetSession',
-  'Complete work reset': 'completeWorkReset',
+  // PAN-4198 D6: Reset session, Complete work reset and Restart from plan are
+  // options inside the one Restart agent… dialog.
+  'Reset session': 'restartAgent',
+  'Complete work reset': 'restartAgent',
   'Restart agent': 'restartAgent',
-  'Restart from plan': 'restartFromPlan',
+  'Restart from plan': 'restartAgent',
   Tasks: 'tasks',
-  Transcripts: 'transcripts',
-  Discussions: 'discussions',
-  Upload: 'upload',
-  Inference: 'inference',
-  'Sync discussions': 'syncDiscussions',
+  // PAN-4198 D6: Transcripts, Discussions, Upload, Inference, Sync discussions
+  // and Copy settings left the registry. Their RETIREMENT_AUDIT rows in
+  // issueActions.parity.test.tsx name each new home or drop reason.
   'Sync main': 'syncMain',
-  'Copy settings': 'copySettings',
   Open: 'open',
 };
 

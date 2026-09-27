@@ -260,9 +260,11 @@ function layoutForState(registry: readonly IssueActionEntry[], state: IssueActio
     .map((action) => byKey.get(action.key))
     .filter((view): view is IssueActionView => !!view);
   const primaryKeys = new Set(primary.map((view) => view.action.key));
-  const rest = all.filter((view) => !primaryKeys.has(view.action.key));
+  const rest = all.filter((view) => (
+    !primaryKeys.has(view.action.key) && view.enabled && view.action.placement === 'menu'
+  ));
   const secondary = rest
-    .filter((view) => view.enabled && view.action.kind !== 'destructive' && view.action.group !== 'danger')
+    .filter((view) => view.action.kind !== 'destructive' && view.action.group !== 'danger')
     .slice(0, 4);
   const secondaryKeys = new Set(secondary.map((view) => view.action.key));
   const overflow = rest.filter((view) => !secondaryKeys.has(view.action.key));
@@ -303,6 +305,8 @@ function surfaceContexts(sessionPresence: StateFixture['sessionPresence']): Surf
   };
 }
 
+const STRIP_SURFACES = new Set<Surface>(['cockpit', 'board', 'drawer']);
+
 export function expectedActions(
   registry: ActionRegistry,
   state: IssueActionState,
@@ -326,8 +330,13 @@ export function expectedActions(
   const enabledPinKeys = surface === 'drawer'
     ? new Set(layout.all.filter((view) => view.action.key === 'viewPr' && view.enabled).map((view) => view.action.key))
     : new Set<string>();
-  const grouped = [...layout.all].filter((view) => !enabledPinKeys.has(view.action.key));
-  const rendered = layout.all;
+  // PAN-4198 (FR-1): the grouped body lists the enabled, menu-placed entries.
+  const menuRows = layout.all.filter((view) => view.enabled && view.action.placement === 'menu');
+  const enabledPrimaryKeys = new Set(layout.primary.filter((view) => view.enabled).map((view) => view.action.key));
+  // FR-3: an enabled primary sits in "Next step" and is dropped from its group.
+  const grouped = menuRows.filter((view) => (
+    !enabledPinKeys.has(view.action.key) && !enabledPrimaryKeys.has(view.action.key)
+  ));
   const railExtras = surface === 'rail'
     ? registry.rail
       .filter((action) => action.ownerSurface === 'FeatureItem' && action.scope === 'session-artifact')
@@ -336,14 +345,17 @@ export function expectedActions(
   const normalGroups = GROUP_ORDER
     .filter((group) => group !== 'danger')
     .filter((group) => grouped.some((view) => view.action.group === group));
-  const phaseSection = (surface !== 'zone-b')
-    && layout.primary.some((view) => view.enabled)
-    ? ['phase']
-    : [];
+  const phaseSection = (surface !== 'zone-b') && enabledPrimaryKeys.size > 0 ? ['phase'] : [];
   const sessionSection = railExtras.length > 0 ? ['session'] : [];
-  const groupOrder = [...phaseSection, ...normalGroups, ...sessionSection, 'danger'];
+  // FR-4: Danger renders only when something in it is enabled.
+  const dangerSection = grouped.some((view) => view.action.group === 'danger') ? ['danger'] : [];
+  const groupOrder = [...phaseSection, ...normalGroups, ...sessionSection, ...dangerSection];
+  // The inline strip renders every phase primary, gated ones included, so a
+  // strip surface also shows a disabled primary button.
+  const stripRows = STRIP_SURFACES.has(surface) ? layout.primary : [];
   const actions = Object.fromEntries([
-    ...rendered.map((view) => [issueId(view.action.key), view.enabled] as const),
+    ...stripRows.map((view) => [issueId(view.action.key), view.enabled] as const),
+    ...menuRows.map((view) => [issueId(view.action.key), true] as const),
     ...railExtras.map((action) => [nonIssueId(action.scope, action.key), true] as const),
   ]);
 
@@ -536,7 +548,12 @@ function renderSurface(surface: Surface, fixture: StateFixture, context: Surface
   }
 
   if (surface !== 'zone-b') {
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
+    // PAN-4198: both disclosures are absent when they hold nothing, and the
+    // session utilities moved behind Debug (D13).
+    const debug = screen.queryByTestId('issue-action-debug-toggle');
+    if (debug) fireEvent.click(debug);
+    const danger = screen.queryByRole('menuitem', { name: 'Danger' });
+    if (danger) fireEvent.click(danger);
   }
 }
 
@@ -546,6 +563,7 @@ const CONTROL_TEST_IDS = new Set([
   'issue-action-overflow-button',
   'issue-action-pin-spacer',
   'issue-action-explain-toggle',
+  'issue-action-debug-toggle',
 ]);
 
 function observeSurface(surface: Surface): SurfaceExpectation {
@@ -611,7 +629,8 @@ function compareSurface(expected: SurfaceExpectation, actual: SurfaceExpectation
     if (actual.actions[id] !== expected.actions[id]) throw new Error(`gating divergence: ${id}`);
   }
   if (JSON.stringify(actual.groupOrder) !== JSON.stringify(expected.groupOrder)) throw new Error('group-order mutation');
-  if (expected.dangerLast !== actual.dangerLast || !actual.dangerLast) throw new Error('danger actions are not last');
+  if (expected.dangerLast !== actual.dangerLast) throw new Error('danger actions are not last');
+  if (actual.groupOrder.includes('danger') && !actual.dangerLast) throw new Error('danger actions are not last');
   if (JSON.stringify(actual.pinnedComponents.sort()) !== JSON.stringify(expected.pinnedComponents.sort())) {
     throw new Error('pinned component mismatch');
   }
