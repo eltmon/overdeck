@@ -15,8 +15,18 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { COMPOSER_COMMAND_MANIFEST } from '@overdeck/contracts';
+
+vi.mock('../activity-logger.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../activity-logger.js')>(),
+  emitActivityEntry: vi.fn(),
+}));
+
+import { decideResumeGate, type ResumeGateBlock } from '../agents/agent-state.js';
+import { evaluateAgentStartGate } from '../../dashboard/server/routes/agents/shared.js';
+import { classifyParked, type ParkedSignals } from '../parked/resolver.js';
+import type { AgentState } from '../agents.js';
 
 const ROOT = process.cwd();
 
@@ -188,5 +198,63 @@ describe('agent-facing text names only registered pan commands (PAN-3868, PAN-39
     for (const { file, registration } of Object.values(HIDDEN_COMMANDS)) {
       expect(readFileSync(join(ROOT, file), 'utf-8')).toContain(registration);
     }
+  });
+});
+
+describe('operator gate messages name only registered pan commands (PAN-4211)', () => {
+  const NOW = Date.parse('2026-09-25T12:00:00.000Z');
+
+  function baseAgent(overrides: Partial<AgentState>): AgentState {
+    return {
+      id: 'agent-pan-1',
+      issueId: 'PAN-1',
+      role: 'work',
+      status: 'stopped',
+      workspace: '/tmp/ws',
+      startedAt: new Date(NOW).toISOString(),
+      ...overrides,
+    } as AgentState;
+  }
+
+  it('resolves every pan command in troubled and paused gate messages', () => {
+    const registry = buildRegistry();
+
+    const troubled: ResumeGateBlock = { gate: 'troubled', reason: 'agent is troubled (3 failures)' };
+    const paused: ResumeGateBlock = { gate: 'paused', reason: 'agent is paused' };
+
+    const texts: string[] = [];
+    for (const block of [troubled, paused]) {
+      for (const intent of ['merge-preparation', 'operator-start'] as const) {
+        const decision = decideResumeGate(block, intent);
+        if ('reason' in decision) texts.push(decision.reason);
+      }
+    }
+
+    const troubledStartGate = evaluateAgentStartGate('agent-pan-1', { troubled: true, consecutiveFailures: 3 });
+    const pausedStartGate = evaluateAgentStartGate('agent-pan-1', { paused: true });
+    if (troubledStartGate?.hint) texts.push(troubledStartGate.hint);
+    if (pausedStartGate?.hint) texts.push(pausedStartGate.hint);
+
+    const troubledAgent = baseAgent({ id: 'agent-pan-1', troubled: true, troubledAt: new Date(NOW).toISOString() });
+    const pausedAgent = baseAgent({ id: 'agent-pan-2', paused: true, pausedAt: new Date(NOW).toISOString() });
+    const signals: ParkedSignals = {
+      issueId: 'PAN-1',
+      agents: [troubledAgent, pausedAgent],
+      liveAgents: [],
+      issueClosed: null,
+      now: NOW,
+    };
+    for (const row of classifyParked(signals)) texts.push(row.unparkCondition);
+
+    expect(texts.length).toBeGreaterThan(0);
+    expect(texts.every((t) => t.length > 0)).toBe(true);
+
+    const bad = texts.flatMap((t) => commandsIn(t).map((words) => unregistered(words, registry)).filter((x): x is string => x !== null));
+    expect(bad).toEqual([]);
+  });
+
+  it('fails if `untroubled` is ever removed from the registry (mirrors the `pan work done` regression)', () => {
+    const registry = buildRegistry();
+    expect(unregistered(['untroubled'], registry)).toBeNull();
   });
 });

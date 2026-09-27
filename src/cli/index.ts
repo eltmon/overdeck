@@ -366,6 +366,11 @@ program
   .action(lazyAction(() => import('./commands/unpause.js'), 'unpauseCommand'));
 
 program
+  .command('untroubled <id>')
+  .description('Clear an agent troubled gate without spawning it')
+  .action(lazyAction(() => import('./commands/untroubled.js'), 'untroubledCommand'));
+
+program
   .command('fork [conv]')
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
   .option('--model <model>', 'Model for the summary-forked session')
@@ -461,7 +466,7 @@ program
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
   .option('--plan-model <model>', 'Planning model override when this start auto-plans (defaults to roles.plan.model); the work model stays --model')
   .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal xBRIEF from the issue title/body')
-  .option('--force', 'Clear paused and pending-operator-decision gates and start anyway')
+  .option('--force', 'Clear paused, troubled, and pending-operator-decision gates and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')

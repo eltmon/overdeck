@@ -245,6 +245,11 @@ When only asked for a report, print it with `phase=watch` and continue.
   report to: `GET /api/flywheel/status` is a derived read of your transcript,
   and the tick marker is how you report. The derived state table above is the
   only source of truth for an issue's position.
+- Do not auto-start pipeline-machinery refactors (TENET-10): changes to the
+  deacon, the flywheel loop, conversation live-control, the merge or review
+  routes, or the agents runtime. Mark them `needs-handoff` and route them
+  through a supervised `pan handoff` instead. A broken change there turns
+  main red and stalls every other merge.
 
 ## See Also
 

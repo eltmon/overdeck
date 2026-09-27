@@ -1,4 +1,5 @@
 import type { ModelCapability } from './model-capability-types.js';
+import { CLIPROXY_GPT56_CONTEXT_WINDOW } from './model-context-windows.js';
 
 /** September 2026 additions; sources and context constraints: docs/MODEL-CONTEXT-AUDIT.md.
  * Skill scores inherit the previous family baseline until benchmarked. */
@@ -148,6 +149,60 @@ export const AUDITED_MODEL_ADDITIONS = {
       'context-length': 99,
     },
     notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
+  },
+
+  // GPT-6 Sol / Luna (2026-09-22). Codex 0.157.1 `codex debug models`: context_window 272000,
+  // max_context_window 872000, supported_in_api true; Sol default effort low, Luna medium.
+  // Pricing and 1.05M context / 128K output: developers.openai.com/api/docs/models/gpt-6-sol and /gpt-6-luna.
+  // Skills inherit the gpt-5.6-sol / gpt-5.6-luna baselines.
+  'gpt-6-sol': {
+    model: 'gpt-6-sol',
+    provider: 'openai',
+    displayName: 'GPT-6 Sol',
+    costPer1MTokens: 6, // $2.00 in / $10.00 out ($0.20 cached)
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    maxOutputTokens: 128_000,
+    minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: {
+      'code-generation': 98,
+      'code-review': 95,
+      debugging: 97,
+      planning: 96,
+      documentation: 93,
+      testing: 95,
+      security: 92,
+      performance: 93,
+      synthesis: 95,
+      speed: 65,
+      'context-length': 95,
+    },
+    notes: 'OpenAI GPT-6 mid tier (September 2026), successor to gpt-5.6-sol at half its API price. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant: the 372K pin was measured on gpt-5.6-sol only. 1.05M marketing context.',
+  },
+
+  'gpt-6-luna': {
+    model: 'gpt-6-luna',
+    provider: 'openai',
+    displayName: 'GPT-6 Luna',
+    costPer1MTokens: 0.3, // $0.10 in / $0.50 out ($0.01 cached)
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    maxOutputTokens: 128_000,
+    minTier: 'plus',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: {
+      'code-generation': 82,
+      'code-review': 78,
+      debugging: 76,
+      planning: 72,
+      documentation: 80,
+      testing: 76,
+      security: 68,
+      performance: 72,
+      synthesis: 75,
+      speed: 90,
+      'context-length': 90,
+    },
+    notes: 'OpenAI GPT-6 fast/cheap tier (September 2026), successor to gpt-5.6-luna. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant: the 372K pin was measured on gpt-5.6-sol only. 1.05M marketing context.',
   },
 
 } satisfies Record<string, ModelCapability>;
