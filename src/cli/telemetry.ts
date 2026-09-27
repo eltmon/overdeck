@@ -8,7 +8,9 @@ import {
   getAnalyticsService,
   setAnalyticsClientTypeForProcess,
   shutdownAnalyticsServices,
+  trackAnalyticsTask,
 } from '../lib/telemetry/service.js';
+import { maybeSendInstanceHeartbeat } from '../lib/telemetry/instance-heartbeat.js';
 import { registerCliExitFinalizer } from './exit.js';
 import { registerGitHubRateLimitedTelemetry } from '../lib/telemetry/github-quota-telemetry.js';
 
@@ -39,14 +41,29 @@ export class CliTelemetryLifecycle {
   private readonly analytics: Pick<AnalyticsService, 'capture' | 'shutdown'>;
   private readonly shutdown: () => Promise<void>;
 
+  private readonly heartbeat: (() => Promise<unknown>) | undefined;
+
   constructor(
     analytics?: Pick<AnalyticsService, 'capture' | 'shutdown'>,
     private readonly startedAt = Date.now(),
+    heartbeat?: () => Promise<unknown>,
   ) {
     this.analytics = analytics ?? getAnalyticsService('cli');
     this.shutdown = analytics
       ? () => analytics.shutdown()
       : shutdownAnalyticsServices;
+    // PAN-4264: the daily instance_heartbeat (dashboard_running: false). An
+    // injected analytics client gets none unless the caller passes one.
+    this.heartbeat = heartbeat ?? (analytics ? undefined : async () => {
+      // Loaded on first use to keep projects.ts out of the CLI startup graph.
+      const { listProjectsSync } = await import('../lib/projects.js');
+      return maybeSendInstanceHeartbeat({
+        dashboardRunning: false,
+        listProjects: listProjectsSync,
+        listAgents: () => [],
+        analytics: this.analytics,
+      });
+    });
   }
 
   finish(ok: boolean, argv = process.argv, finishedAt = Date.now()): Promise<void> {
@@ -60,6 +77,8 @@ export class CliTelemetryLifecycle {
       ok,
       duration_ms: bucketCliDuration(Math.max(0, finishedAt - this.startedAt)),
     });
+    // Tracked, not awaited: shutdownAnalyticsServices waits for it within its deadline.
+    if (this.heartbeat) void trackAnalyticsTask(this.heartbeat());
     await this.shutdown();
   }
 }

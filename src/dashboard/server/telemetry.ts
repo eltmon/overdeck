@@ -4,6 +4,7 @@ import { listRunningAgents } from '../../lib/agents.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { isListedOrRunning, listLiveAgentIds } from '../../lib/terminal-backends/inventory.js';
 import { getAnalyticsService } from '../../lib/telemetry/service.js';
+import { maybeSendInstanceHeartbeat } from '../../lib/telemetry/instance-heartbeat.js';
 
 interface ServerBootTelemetryDeps {
   analytics: {
@@ -62,4 +63,26 @@ export function startServerBootTelemetry(
   deps: ServerBootTelemetryDeps = defaultDeps,
 ): void {
   void captureServerBootTelemetry(deps);
+  startInstanceHeartbeat();
+}
+
+/** PAN-4264: hourly check for the daily instance_heartbeat. */
+export const INSTANCE_HEARTBEAT_CHECK_MS = 60 * 60_000;
+
+/**
+ * PAN-4264: check the daily `instance_heartbeat` at boot and then hourly
+ * (`dashboard_running: true`). Returns the stop function.
+ */
+export function startInstanceHeartbeat(
+  send: () => Promise<unknown> = () => maybeSendInstanceHeartbeat({
+    dashboardRunning: true,
+    listProjects: listProjectsSync,
+    listAgents: listBootTelemetryAgents,
+    analytics: serverAnalytics,
+  }),
+): () => void {
+  void send();
+  const timer = setInterval(() => void send(), INSTANCE_HEARTBEAT_CHECK_MS);
+  timer.unref?.();
+  return () => clearInterval(timer);
 }
