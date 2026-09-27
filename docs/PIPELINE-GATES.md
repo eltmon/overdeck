@@ -657,8 +657,8 @@ observe and nudge — none reconciles a stored copy of anything:
    PAN-4221) — re-requests a review a dashboard restart left undispatched.
 
 While the Deacon is frozen (`deacon.globally_paused`), `runDeaconLite()`
-returns before any of the six routines run — none of them fires at all until
-it thaws (PAN-4210).
+returns before any of the seven routines run — none of them fires at all
+until it thaws (PAN-4210).
 
 `recoverStalledReviews` reads the journal and the issue pause gate
 (`getIssuePause`, see "Manual pause" above), with no GitHub call and no tracker
