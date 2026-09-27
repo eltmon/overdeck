@@ -1,0 +1,1088 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T23:24:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4278: Terminal permission prompts (incl. subagents) need an answerable dashboard dialog, and composer input must not be pasted into or lost around them",
+    "updated": "2026-09-27T23:28:37.530Z"
+  },
+  "plan": {
+    "id": "pan-4278",
+    "title": "Terminal permission prompts (incl. subagents) need an answerable dashboard dialog, and composer input must not be pasted into or lost around them",
+    "status": "proposed",
+    "uid": "37f97fca-2dae-403b-be89-be4e575f69a8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-27T23:24:30Z",
+    "updated": "2026-09-27T23:28:37.530Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4278",
+        "label": "PAN-4278",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4278.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversations",
+      "permissions",
+      "composer",
+      "delivery",
+      "herdr"
+    ],
+    "metadata": {
+      "sizeJustification": "The issue's four fixes share one parser (FR-1 feeds the dialog, the feed and the composer hold), one feed contract, and one docs section, and AC 4 asks for a single PR write-up; splitting would leave the hold without its parser and the docs without their subject. Files span only src/lib, src/dashboard and docs, with narrow per-item scopes.",
+      "canonicalFilename": "2026-09-27-PAN-4278-terminal-permission-prompts-incl-subagents-need-an-answerable-dashboard-dialog-and-composer-input-must-not-be-pasted-into-or-lost-around-them.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A Claude Code permission prompt inside a dashboard conversation (including one raised by a background subagent) blocks work for hours with nothing answerable in the dashboard: the PermissionRequest hook only lights an icon, the pending-input feed never reports permission prompts, and the conversation pane-choice path reads tmux only. Separately, composer messages can vanish: the composer route discards deliverAgentMessage's result, so a Herdr refusal returns ok:true with no log line (conversation 20260927-3978, two sends at 15:24 UTC).",
+      "Proposal": "Parse the prompt from the pane (authoritative) and enrich it with hook facts kept in an in-memory registry keyed by conversation and agent_id; expose pendingPermission on the conversation pending-input feed; answer it through a signature-checked keystroke route (arrows+Enter via resolveAgentPaneIo) that confirms by re-reading; show a TerminalPermissionDialog, a Needs you row with elapsed time and desktop notifications re-sent at 5 and 30 minutes. The composer route refuses to paste while a prompt is up (before ensure-main) and the browser holds and later resends the message with a fresh clientMessageId. The composer route checks the DeliveryResult, logs every outcome and returns 502 not-delivered, rendered as 'Not delivered — resend'. A probe root-causes the 15:24 loss and the PR documents it. Full detail: .pan/drafts/PAN-4278.md.",
+      "NonGoals": "- Answering terminal permission prompts for work/review/test agents (they keep the existing toast; follow-up issue)\n- Non-Claude-Code harnesses (Codex approvals and pi ask modals keep their own paths)\n- Persisting held messages across page reloads or adding a server-side message queue\n- Changing Herdr's agent_prompt_stalled/timeout = delivered contract in herdr.ts\n- Unifying src/lib/agent-input-detection.ts with the new permission parser\n- Fixing the tmux-only read in claudeConversationPaneChoice beyond skipping it while a permission is pending\n- Editing the separate overdeck-knowledge (OKF) repo\n- Changing the Channels permission relay or ChannelPermissionDialog\n- Sending digit keys or Escape to answer a permission prompt\n- Switching Claude Code's agent selector view to reach a subagent's prompt\n- Holding composer messages on a registry-only (not on-screen) permission entry"
+    },
+    "autoDecisions": [
+      {
+        "summary": "One plan with sizeJustification instead of sibling issues",
+        "rationale": "AC 4 asks for one PR write-up; the composer hold consumes the permission parser; the docs item covers both halves."
+      },
+      {
+        "summary": "Scope is Claude Code conversations; agents keep the toast",
+        "rationale": "All evidence and the hook route are conversation-scoped; agents have Channels and a separate detector, so extending them would double the surface."
+      },
+      {
+        "summary": "The pane is authoritative; the hook registry only enriches",
+        "rationale": "The issue says never send keys unless the pane shows the expected prompt; the hook payload also lacks the reason text, which exists only on screen."
+      },
+      {
+        "summary": "Answer with arrow keys + Enter; Deny selects the No row",
+        "rationale": "Matches buildChoiceKeystrokes' rationale (digit keys not guaranteed across versions) and avoids Escape side effects."
+      },
+      {
+        "summary": "Client-side hold with server-side refusal (409 permission-pending)",
+        "rationale": "Overdeck stores no derivable state; the server never pastes into a prompt, and the browser already owns the optimistic bubble."
+      },
+      {
+        "summary": "Released held messages and not-delivered resends use a fresh clientMessageId",
+        "rationale": "withConversationMessageReceipt caches every response per clientMessageId for 24h, so reusing the id would replay the refusal."
+      },
+      {
+        "summary": "Permission check runs before ensureMainInputTarget",
+        "rationale": "Ensure-main sends Down/Enter, which would move and confirm the permission menu."
+      },
+      {
+        "summary": "Docs go to docs/DASHBOARD-ARCHITECTURE.md, not the OKF concept",
+        "rationale": "The OKF bundle is a separate repo outside this PR."
+      },
+      {
+        "summary": "Registry is in memory per dashboard process",
+        "rationale": "Hook facts are transient; after a restart the pane still drives the dialog with an 'Unknown agent' label."
+      },
+      {
+        "summary": "Hold only when the pane shows the prompt (answerable true)",
+        "rationale": "The registry is fed by a 1-second best-effort curl; a lost clear would otherwise block every send forever."
+      }
+    ],
+    "items": [
+      {
+        "id": "permission-prompt-parser",
+        "title": "Parse Claude Code permission prompts from a pane screen, with captured fixtures",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/permission-prompt.ts",
+            "src/lib/agents/__fixtures__/claude-code-2.1.280/permission-*.txt",
+            "src/lib/agents/__tests__/permission-prompt.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/permission-prompt.test.ts"
+          ],
+          "expected_outputs": [
+            "permission-prompt.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "permission-feed",
+            "permission-answer-route",
+            "hold-server"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1 (.pan/drafts/PAN-4278.md). Create src/lib/agents/permission-prompt.ts exporting parsePermissionPrompt(paneText) and permissionKeystrokes(prompt, choice) with the exact API in the PRD. Build on parsePaneChoiceMenu(pane,{mode:'guard'}) from src/lib/pane-choice-menu.ts; accept 2 or 3 options (first /^yes\\b/i, last /^no\\b/i, middle matches the 'don't ask again' pattern); classify allow-once/allow-always/deny; extract header, detail lines, reason line, selectedIndex, signature. Keys = arrows from the cursor row to the target + Enter (never digits, never Escape). Capture fixtures permission-bash.txt, permission-dangerous-rm.txt, permission-subagent.txt from Claude Code 2.1.280 in a throwaway `tmux -L pan4278probe` server with a scratch cwd (implementation checkpoint; fallback: hand-written variant with a '# hand-written: <why>' first line). Never probe a live agent pane. Subagent checkpoint: if the subagent's prompt does NOT draw in the main view (only while that subagent's selector row is the filled-dot view), record that in the fixture header and in the PR; W3 then returns the registry-built answerable:false row for it, and switching views to answer stays out of scope — do not add view-switching keystrokes."
+        },
+        "items": [
+          {
+            "id": "permission-prompt-parser.ac1",
+            "title": "Given the captured 3-option Bash fixture, parsePermissionPrompt returns header, the command in detailLines, three options classified allow-once/allow-always/deny, and a non-empty signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-prompt-parser.ac2",
+            "title": "Given the dangerous-rm fixture, parsePermissionPrompt returns the 'Dangerous rm operation' text as reason and accepts a 2-option menu",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-prompt-parser.ac3",
+            "title": "Given the agent-selector fixture or a PAN-3113 resume menu, parsePermissionPrompt returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-prompt-parser.ac4",
+            "title": "permissionKeystrokes returns arrow keys to the No row followed by Enter for deny, and returns null for allow-always on a 2-option prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "permission-registry",
+        "title": "Record PermissionRequest hook facts per conversation and agent key",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-permission-registry.ts",
+            "src/dashboard/server/routes/hooks.ts",
+            "src/dashboard/server/routes/__tests__/hooks-permission-event.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/hooks-permission-event.test.ts"
+          ],
+          "expected_outputs": [
+            "hooks-permission-event.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Create the in-memory registry module with recordPermissionRequest/clearPermissionRequest/listPermissionRequests/firstSeenAt/resetPermissionRegistryForTests. In routes/hooks.ts extract postPermissionEventRoute's body logic into exported handlePermissionEventBody(body, deps): agentKey = agent_id ?? 'main'; PermissionRequest records {toolName, toolInputPreview (Bash command / file_path / JSON, 200 chars), agentId, agentType, agentDescription from <subagentsDirFor(transcript_path)>/agent-<id>.meta.json .description, requestedAt}; CLEAR_ON events clear the same agentKey; waiting = registry still has entries for the conversation; log line adds agent=<key>. Async fs only."
+        },
+        "items": [
+          {
+            "id": "permission-registry.ac1",
+            "title": "Given a PermissionRequest hook body with agent_id and a meta.json on disk, the registry records the subagent description and tool input preview",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-registry.ac2",
+            "title": "Given a waiting subagent entry, a main-thread PostToolUse leaves that entry in place and the emitted event keeps waiting=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-registry.ac3",
+            "title": "Given one waiting entry, a PermissionDenied with the same agent_id removes it and the emitted event reports waiting=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "permission-feed",
+        "title": "Report pendingPermission on the conversation pending-input feed and read",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-permission.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/__tests__/conversation-permission-feed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-permission-feed.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-permission-feed.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "permission-dialog",
+            "permission-needs-you",
+            "permission-notify",
+            "hold-server",
+            "hold-client"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. Create src/lib/overdeck/conversation-permission.ts with conversationPendingPermission(conv, deps) returning the PendingPermission shape in the PRD. Read the pane only via resolveAgentPaneIo(conv.tmuxSession).read(90) (Herdr and tmux; a read throw means no prompt). Prompt on pane => answerable row; registry entry but no prompt => answerable:false row from the oldest entry; label per PRD Decision 8; since = registry requestedAt else firstSeenAt. In conversation-reads.ts: compute it before the pane-choice check in getConversationsPendingInputFeed, skip claudeConversationPaneChoice when non-null, and let a row with only pendingPermission through; in getConversationRead push 'permissionRequest' into pendingInputKinds and return pendingPermission. Claude Code harness only. If the main view shows no prompt for a registered subagent (see the W1 subagent checkpoint), the registry-built answerable:false row still names the subagent."
+        },
+        "items": [
+          {
+            "id": "permission-feed.ac1",
+            "title": "Given an injected pane read showing the permission fixture, the feed row includes pendingPermission with answerable true, the parsed options and a signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-feed.ac2",
+            "title": "Given a registry entry and a pane with no prompt, the feed row includes pendingPermission with answerable false and signature null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-feed.ac3",
+            "title": "Given two registry entries whose previews do not match the pane, pendingPermission.agentLabel is 'Unknown agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-feed.ac4",
+            "title": "Given a codex conversation, conversationPendingPermission returns null without reading the pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "permission-answer-route",
+        "title": "Answer a conversation permission prompt via POST /api/conversations/:id/permission",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-permission.ts",
+            "src/dashboard/server/routes/conversations.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/overdeck/__tests__/conversation-permission-answer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-permission-answer.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-permission-answer.test.ts passes",
+            "no-loss-matrix.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Add handleConversationPermissionAnswer(rawId, body, deps{io?, sleep?}) to conversation-permission.ts and the route beside POST /api/conversations/:id/pane-choice with the same validateOrigin guard. Sequence: validate choice/signature (400) -> resolve conversation (404/400 non-Claude) -> read+parse via resolveAgentPaneIo -> 409 prompt-gone / prompt-changed, 400 choice-not-offered -> send permissionKeystrokes with 60ms gaps -> sleep 700ms -> re-read; same signature => 409 delivery-unconfirmed; else {ok:true, answered}. Add the no-loss-matrix row from the PRD. Injected sleep in tests, no real timers."
+        },
+        "items": [
+          {
+            "id": "permission-answer-route.ac1",
+            "title": "Given the prompt fixture with the cursor on Yes, choice deny sends Down keys to the No row then Enter and returns ok when the re-read shows no prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-answer-route.ac2",
+            "title": "Given a pane without a prompt, the route returns 409 prompt-gone and sends no keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-answer-route.ac3",
+            "title": "Given a pane whose prompt signature differs from the request, the route returns 409 prompt-changed and sends no keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-answer-route.ac4",
+            "title": "Given the prompt still on screen after the keys, the route returns 409 delivery-unconfirmed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-answer-route.ac5",
+            "title": "NO_LOSS_MATRIX contains a row whose surface is 'POST /api/conversations/:id/permission'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "permission-dialog",
+        "title": "Show TerminalPermissionDialog for conversation permission prompts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/TerminalPermissionDialog.tsx",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/api.ts",
+            "src/dashboard/frontend/src/components/__tests__/TerminalPermissionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/__tests__/TerminalPermissionDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "TerminalPermissionDialog.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. New TerminalPermissionDialog mirroring ChannelPermissionDialog's props and overlay; rows Conversation, Agent, Tool, Command (<pre>), Reason (when present); buttons from options (Allow once / Allow always / Deny); non-answerable shows the 'not visible on the agent's screen' text and only Open terminal and Dismiss (Dismiss hides that signature/agent key for this browser session; it is the escape for a stale registry entry). Wire it in usePendingInputDialogs from the ['conv-ask-user-question'] rows (add pendingPermission to ConvAskUserQuestionRow), oldest since first; add respondToTerminalPermission in App/api.ts; mount in App.tsx beside ChannelPermissionDialog. After an answer keep 'Confirming…' until a later poll drops that signature; never hide optimistically; delivery-unconfirmed shows a toast. Follow the pan-style-guide skill."
+        },
+        "items": [
+          {
+            "id": "permission-dialog.ac1",
+            "title": "Given an answerable subagent pendingPermission, the dialog renders the subagent label, the command and the reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-dialog.ac2",
+            "title": "Given a 2-option prompt, the dialog renders Allow once and Deny and no Allow always button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-dialog.ac3",
+            "title": "Given answerable false, the dialog renders only Open terminal and Dismiss buttons and no answer buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-dialog.ac4",
+            "title": "When Deny is clicked, the dialog posts choice deny with the signature and stays open showing Confirming… until the feed no longer reports that signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "permission-needs-you",
+        "title": "Raise pending permissions into Needs you with elapsed wait",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions-permission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/useDecisions-permission.test.ts"
+          ],
+          "expected_outputs": [
+            "useDecisions-permission.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In useDecisions merge each conversation feed row with pendingPermission as kind permissionRequest (already in BLOCKING_KINDS), since = pendingPermission.since, detail '<agentLabel> · <toolName>'. NeedsYouSection renders 'waiting <formatRelativeTime(since, now)>' when since is non-empty and sorts oldest since first."
+        },
+        "items": [
+          {
+            "id": "permission-needs-you.ac1",
+            "title": "Given a feed row with pendingPermission, useDecisions emits a permissionRequest decision for that conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-needs-you.ac2",
+            "title": "NeedsYouSection renders 'waiting' followed by the relative elapsed time for that decision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-needs-you.ac3",
+            "title": "Given two pending permissions, the older since renders first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "permission-notify",
+        "title": "Desktop-notify pending permissions with 5 and 30 minute re-notify",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.permission-notify.test.tsx"
+          ],
+          "expected_outputs": [
+            "usePendingInputDialogs.permission-notify.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. Key conv-perm::<name>::<signature ?? 'unanswerable'>; announce on first sight (title 'Permission needed'); schedule re-announce at since+5min and since+30min; clear timers when the key leaves the live set; click focuses the window and opens the permission dialog. Tests use vi.useFakeTimers + advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "permission-notify.ac1",
+            "title": "Given a new pending permission, one desktop Notification is created with title 'Permission needed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-notify.ac2",
+            "title": "With fake timers advanced 5 and then 30 minutes while still pending, a Notification is created again at each mark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "permission-notify.ac3",
+            "title": "Given the permission clears before 5 minutes, no further Notification is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hold-server",
+        "title": "Refuse composer pastes while a permission prompt is pending, before ensure-main",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/__tests__/conversation-message-permission-hold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-message-permission-hold.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-message-permission-hold.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. As the first statement inside `if (harness === 'claude-code')` in handleConversationMessage — ABOVE the ensureMainInputTarget call — call deps.conversationPendingPermission ?? conversationPendingPermission; hold ONLY when the result has answerable === true (the pane shows the prompt). Then log the hold and return 409 {error:'Waiting: the agent needs a permission answer first', code:'permission-pending', deliveryUnknown:false, retryable:true}. A registry-only row (answerable false) never gates delivery: a dropped CLEAR_ON hook post could leave it stale and would block the composer forever. Ensure-main must never run while a prompt is up (its Down/Enter would answer the prompt)."
+        },
+        "items": [
+          {
+            "id": "hold-server.ac1",
+            "title": "Given a fixture pane showing a permission prompt, the composer route returns 409 with code permission-pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-server.ac2",
+            "title": "Given a pane showing a permission prompt, the route calls neither ensureMainInputTarget nor deliverAgentMessage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-server.ac3",
+            "title": "Given the same message after the fixture pane shows no prompt, the route delivers it and returns ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-server.ac4",
+            "title": "Given a registry-only pending permission (answerable false) and a pane without a prompt, the route delivers the message and returns ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hold-client",
+        "title": "Hold refused composer messages and resend them when the prompt clears",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerSend.ts",
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/chat-types.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/App/hooks/useHeldMessageRelease.ts",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/hooks/useHeldMessageRelease.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/App/hooks/useHeldMessageRelease.test.tsx"
+          ],
+          "expected_outputs": [
+            "useHeldMessageRelease.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. MessageSendError gains code parsed from the response body; composerStore gains hold/releaseHeld and deliveryState 'held'; ComposerFooter calls hold on code permission-pending instead of onSendFailed; messageRows labels held bubbles 'Waiting: the agent needs a permission answer first' with Discard. New App-level useHeldMessageRelease resends held texts in order with a FRESH clientMessageId and no retry flag (receipts cache every response 24h — PRD Decision 6) once the feed has no row for that conversation, or a row without pendingPermission (the feed omits conversations with nothing pending); a second permission-pending re-holds."
+        },
+        "items": [
+          {
+            "id": "hold-client.ac1",
+            "title": "Given a 409 permission-pending response, the bubble renders 'Waiting: the agent needs a permission answer first' and no failure outbox entry is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-client.ac2",
+            "title": "Given held messages and a feed poll with no row for that conversation, or a row without pendingPermission, the hook resends each held text in send order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-client.ac3",
+            "title": "The released resend sends a clientMessageId different from the original and no retry flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-client.ac4",
+            "title": "Given pendingPermission still present, held messages are not resent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery-result",
+        "title": "Return 502 not-delivered when conversation delivery fails and log every outcome",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "src/dashboard/server/services/conversation-eaten-message-watcher.ts",
+            "src/lib/overdeck/__tests__/conversation-message-delivery-result.test.ts",
+            "src/dashboard/server/services/__tests__/conversation-eaten-message-watcher.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-message-delivery-result.test.ts src/dashboard/server/services/__tests__/conversation-eaten-message-watcher.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-message-delivery-result.test.ts passes",
+            "conversation-eaten-message-watcher.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. Capture deliverAgentMessage's DeliveryResult at both call sites (Kimi and default) in handleConversationMessage (make it injectable via deps.deliverAgentMessage). ok:false => console.warn '[conversations] <name>: not delivered via <path>: <failure>' and 502 {code:'not-delivered', deliveryUnknown:false, retryable:true}; ok:true => log '[conversations] <name>: delivered via <path>' (+ ' (deduplicated)'). Eaten-message watcher sets redelivered only when the redelivery returned ok:true and logs a failure line otherwise."
+        },
+        "items": [
+          {
+            "id": "delivery-result.ac1",
+            "title": "Given deliverAgentMessage returns {ok:false, path:'herdr', failure:'refused: …'}, the composer route returns 502 with code not-delivered and logs the not-delivered line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-result.ac2",
+            "title": "Given deliverAgentMessage returns ok, the route logs 'delivered via herdr' and returns ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-result.ac3",
+            "title": "Given the watcher's redelivery returns ok:false, the watcher does not report 'redelivered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "not-delivered-ui",
+        "title": "Render 'Not delivered — resend' for not-delivered failures",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx"
+          ],
+          "expected_outputs": [
+            "MessagesTimeline.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11. failSend records the server code; retryFailed treats code 'not-delivered' like notFoundInTranscript (fresh clientMessageId, no retry flag); MessagesTimeline outbox label shows 'Not delivered — resend' first when code is not-delivered, keeping the Resend button."
+        },
+        "items": [
+          {
+            "id": "not-delivered-ui.ac1",
+            "title": "Given a failed entry with code not-delivered, the outbox renders 'Not delivered — resend' with a Resend button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "not-delivered-ui.ac2",
+            "title": "Resend of a not-delivered entry sends a new clientMessageId without the retry flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "root-cause-probe",
+        "title": "Root-cause the 15:24 lost messages and pin it with a regression test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/__tests__/delivery-herdr-result.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/delivery-herdr-result.test.ts"
+          ],
+          "expected_outputs": [
+            "delivery-herdr-result.test.ts passes",
+            "PR body contains '## Root cause'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W12. In a throwaway Herdr session and scratch cwd (never the operator's panes), run a Claude Code pane with a background Agent and prompt it twice mid-turn through herdrBackend.prompt / deliverAgentMessage, recording raw RPC results. Candidates: (1) agent.prompt threw/refused (agent_blocked) -> ok:false swallowed; (2) agent_prompt_stalled/timeout reported delivered; (3) prompt-guard dropped -> ok:true deduplicated. Write the PR body section '## Root cause' naming the reproduced path with evidence, or each candidate ruled in/out and which fix covers it. Add a regression test that injects the reproduced result into deliverAgentMessage and asserts the composer-visible outcome. Fallback when Herdr cannot be driven headlessly: inject each candidate result and say so in the write-up."
+        },
+        "items": [
+          {
+            "id": "root-cause-probe.ac1",
+            "title": "The PR body contains a '## Root cause' heading that names a code path in delivery.ts, herdr.ts or conversation-message.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-cause-probe.ac2",
+            "title": "delivery-herdr-result.test.ts reproduces the named path with an injected Herdr result and asserts the resulting DeliveryResult",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document terminal permission prompts, held messages and not-delivered failures",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'permission-pending' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'Not delivered — resend' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W13. Add '## Terminal permission prompts and held messages (PAN-4278)' after the Command Deck reasons table: registry + pane parse, answerable vs Open terminal, arrow+Enter keys, Needs you and 5/30-minute notifications, 409 permission-pending hold and client release (reload drops held bubbles), 502 not-delivered and 'Not delivered — resend', the remaining Herdr stall limitation, and that work agents still get the toast. Update reasons-table row 1 to mention conversation terminal permission prompts."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'Terminal permission prompts and held messages' heading that explains the answerable vs Open terminal rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The doc names the 409 permission-pending hold and the 'Not delivered — resend' label (grep returns a line for each)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codebase-map",
+        "title": "Refresh the codebase map for the permission modules and hazards",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:24:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4278",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".overdeck/context/codebase/concerns.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'permission-prompt' .overdeck/context/codebase/architecture.md",
+            "grep -n 'ensureMainInputTarget' .overdeck/context/codebase/concerns.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W14. concerns.md: add the two permission detectors note, the 'permission check before ensure-main' hazard, and the receipts-cache fresh-clientMessageId rule. architecture.md: one line for agents/permission-prompt.ts and overdeck/conversation-permission*.ts. Bump last-verified dates."
+        },
+        "items": [
+          {
+            "id": "codebase-map.ac1",
+            "title": "architecture.md lists src/lib/agents/permission-prompt.ts (grep returns a line)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codebase-map.ac2",
+            "title": "concerns.md states that the permission check runs before ensureMainInputTarget (grep 'ensureMainInputTarget' returns a line in the new entry)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "permission-prompt-parser",
+        "to": "permission-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-registry",
+        "to": "permission-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-feed",
+        "to": "permission-answer-route",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-feed",
+        "to": "permission-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-answer-route",
+        "to": "permission-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-feed",
+        "to": "permission-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-feed",
+        "to": "permission-notify",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-dialog",
+        "to": "permission-notify",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-feed",
+        "to": "hold-server",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-result",
+        "to": "hold-server",
+        "type": "blocks"
+      },
+      {
+        "from": "hold-server",
+        "to": "hold-client",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-dialog",
+        "to": "hold-client",
+        "type": "blocks"
+      },
+      {
+        "from": "not-delivered-ui",
+        "to": "hold-client",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-result",
+        "to": "not-delivered-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-result",
+        "to": "root-cause-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-dialog",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "hold-client",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "root-cause-probe",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-needs-you",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "permission-notify",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
