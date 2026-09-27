@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T15:55:16.725Z",
+  "updated": "2026-09-27T15:56:09.139Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-27T15:55:02.970Z"
     },
     "app-token-cache": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4264",
-      "claimedAt": "2026-09-27T15:55:16.725Z"
+      "claimedAt": "2026-09-27T15:55:16.725Z",
+      "doneAt": "2026-09-27T15:56:09.138Z"
     }
   }
 }
