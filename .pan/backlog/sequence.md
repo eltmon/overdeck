@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T15:31:51.166078Z · model: claude-opus-5-5 · open: 780_
+_Last sequenced: 2026-09-27T17:22:05.422086Z · model: claude-opus-5-5 · open: 781_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -657,6 +657,7 @@ _Last sequenced: 2026-09-27T15:31:51.166078Z · model: claude-opus-5-5 · open: 
 | 733 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
 | 734 | PAN-4248 | L | medium | ok |  | PAN-1641 | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; starts after PAN-1641 merges. |
 | 735 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 736 | PAN-4275 | S | low | ok |  | PAN-1641 | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge |
 | 737 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
 | 738 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
 | 739 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
@@ -1095,10 +1096,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T15:31:51.166078Z",
+  "generatedAt": "2026-09-27T17:22:05.422086Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 780,
+  "openCount": 781,
   "nodes": [
     {
       "issue": "PAN-4267",
@@ -10756,6 +10757,21 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "rationale": "New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4275",
+      "rank": 736,
+      "size": "S",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-1641"
+      ],
+      "why": "Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge",
+      "rationale": "New follow-up carved from PAN-1641's cancelled e2e item; ranked just below its in-pipeline parent as low-importance local-model work.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11801,6 +11817,20 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-1641",
+      "to": "PAN-4275",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4275",
+      "to": "PAN-3684",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
     }
   ]
 }
