@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T16:42:05.565Z",
+  "updated": "2026-09-27T16:42:10.111Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
       "claimedBy": "agent-pan-4264",
       "claimedAt": "2026-09-27T16:38:56.179Z",
       "doneAt": "2026-09-27T16:42:05.565Z"
+    },
+    "app-404-fallback": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:42:10.110Z"
     }
   }
 }
