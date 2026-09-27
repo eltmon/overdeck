@@ -290,6 +290,8 @@ describe('GitHubClient quota metering (PAN-4264)', () => {
   });
 
   afterEach(async () => {
+    const { flushLedgerWrites } = await import('../../../../lib/github-quota/ledger.js');
+    await flushLedgerWrites();
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
     const { rmSync } = await import('fs');
@@ -346,7 +348,8 @@ describe('GitHubClient quota metering (PAN-4264)', () => {
     }), { status: 200, headers: { 'x-ratelimit-remaining': '4999', 'x-ratelimit-limit': '5000' } }));
 
     await runProgram(await getIssueEffect());
-    const { readLedgerWindow } = await import('../../../../lib/github-quota/ledger.js');
+    const { flushLedgerWrites, readLedgerWindow } = await import('../../../../lib/github-quota/ledger.js');
+    await flushLedgerWrites();
     expect(readLedgerWindow(Date.now())).toEqual([expect.objectContaining({
       caller: 'tracker-client', pool: 'pat', bucket: 'rest', outcome: 'ok', remaining: 4999, limit: 5000,
     })]);

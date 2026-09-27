@@ -117,17 +117,39 @@ export async function appendLedgerEntry(input: LedgerEntryInput): Promise<void> 
     const entry: LedgerEntry = { ...input, ts: input.ts ?? new Date(nowMs).toISOString(), pid: input.pid ?? process.pid };
     const entryMs = Date.parse(entry.ts);
     const fileMs = Number.isFinite(entryMs) ? entryMs : nowMs;
-    await mkdir(getGitHubQuotaDir(), { recursive: true });
-    await appendFile(ledgerFilePath(fileMs), `${JSON.stringify(entry)}\n`);
+    // Resolve both paths before the first await, so a queued append lands in
+    // the home that was current when the call was metered.
+    const dir = getGitHubQuotaDir();
+    const file = ledgerFilePath(fileMs);
+    await mkdir(dir, { recursive: true });
+    await appendFile(file, `${JSON.stringify(entry)}\n`);
 
     const hour = Math.floor(nowMs / HOUR_MS);
     if (lastAppendHour !== hour) {
       lastAppendHour = hour;
-      await pruneLedger(nowMs);
+      await pruneLedger(nowMs, dir);
     }
   } catch {
     // NFR-2: metering never fails the caller.
   }
+}
+
+const pendingAppends = new Set<Promise<void>>();
+
+/**
+ * Append an entry without making the caller wait for the disk. Metered GitHub
+ * calls use this on their normal path, so metering never delays the call it
+ * measures. `flushLedgerWrites` awaits every queued append.
+ */
+export function queueLedgerEntry(input: LedgerEntryInput): void {
+  const pending = appendLedgerEntry(input);
+  pendingAppends.add(pending);
+  void pending.finally(() => pendingAppends.delete(pending));
+}
+
+/** Resolve once every append queued by `queueLedgerEntry` so far has landed. */
+export async function flushLedgerWrites(): Promise<void> {
+  await Promise.all([...pendingAppends]);
 }
 
 function isLedgerEntry(value: unknown): value is LedgerEntry {
@@ -245,11 +267,10 @@ function ledgerFileHourStartMs(name: string): number | null {
  * current hour. The current and previous hour files (the read window) are
  * always kept. Never throws.
  */
-export async function pruneLedger(nowMs: number): Promise<void> {
+export async function pruneLedger(nowMs: number, dir: string = getGitHubQuotaDir()): Promise<void> {
   try {
     const currentHourStart = Math.floor(nowMs / HOUR_MS) * HOUR_MS;
     const oldestKept = currentHourStart - 2 * HOUR_MS;
-    const dir = getGitHubQuotaDir();
     const names = await readdir(dir);
     await Promise.all(names.map(async (name) => {
       const hourStart = ledgerFileHourStartMs(name);

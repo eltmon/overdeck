@@ -9,7 +9,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { withGitHubCaller } from '../../../../src/lib/github-quota/caller-context.js';
-import { getGitHubQuotaDir, readLedgerWindow } from '../../../../src/lib/github-quota/ledger.js';
+import { flushLedgerWrites, getGitHubQuotaDir, readLedgerWindow } from '../../../../src/lib/github-quota/ledger.js';
 import {
   GitHubQuotaPausedError,
   GitHubRateLimitedError,
@@ -28,7 +28,8 @@ describe('runGh (PAN-4264)', () => {
     process.env.OVERDECK_HOME = home;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushLedgerWrites();
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
     rmSync(home, { recursive: true, force: true });
@@ -40,6 +41,7 @@ describe('runGh (PAN-4264)', () => {
 
     expect(result).toEqual({ stdout: '[]' });
     expect(exec).toHaveBeenCalledWith(['pr', 'list', '--json', 'number'], { cwd: '/repo', timeout: 20_000, maxBuffer: 8 * 1024 * 1024 });
+    await flushLedgerWrites();
     const [entry] = readLedgerWindow(Date.now());
     expect(entry).toMatchObject({
       kind: 'call', caller: 'pr-cache', pool: 'user', bucket: 'graphql', cost: 1, estimated: true, outcome: 'ok',
@@ -50,6 +52,7 @@ describe('runGh (PAN-4264)', () => {
     const exec = vi.fn().mockResolvedValue({ stdout: '{}' });
     await withGitHubCaller('ci-repair', () => runGh(['api', 'repos/o/r/actions/runs'], { exec }));
     await runGh(['api', 'user', '--jq', '.login'], { exec });
+    await flushLedgerWrites();
     expect(readLedgerWindow(Date.now()).map((e) => [e.caller, e.bucket, e.estimated])).toEqual([
       ['ci-repair', 'rest', false],
       ['other', 'rest', false],
@@ -61,6 +64,7 @@ describe('runGh (PAN-4264)', () => {
       stdout: JSON.stringify({ data: { rateLimit: { cost: 3, remaining: 4990, limit: 5000, resetAt: '2026-09-27T16:00:00Z' } } }),
     });
     await runGh(['api', 'graphql', '-f', 'query=q'], { caller: 'pipeline-membership', exec, onSuccess: readGraphqlRateLimit });
+    await flushLedgerWrites();
     expect(readLedgerWindow(Date.now())[0]).toMatchObject({
       bucket: 'graphql', cost: 3, estimated: false, remaining: 4990, limit: 5000, resetAt: '2026-09-27T16:00:00Z',
     });
@@ -105,6 +109,7 @@ describe('runGh (PAN-4264)', () => {
     const exec = vi.fn().mockRejectedValue(failure);
 
     await expect(runGh(['issue', 'view', '9'], { caller: 'close-out', exec })).rejects.toBe(failure);
+    await flushLedgerWrites();
     expect(readLedgerWindow(Date.now()).map((e) => e.outcome)).toEqual(['error']);
     expect(readActivePause()).toEqual([]);
   });

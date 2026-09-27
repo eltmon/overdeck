@@ -21,7 +21,7 @@ import { promisify } from 'node:util';
 import type { GitHubQuotaBucket, GitHubQuotaCaller } from '@overdeck/contracts';
 import { currentGitHubCaller } from './caller-context.js';
 import { classifyGitHubRefusal } from './classify.js';
-import { appendLedgerEntry, type LedgerEntry, type LedgerEntryInput } from './ledger.js';
+import { queueLedgerEntry, type LedgerEntry, type LedgerEntryInput } from './ledger.js';
 import { assertGitHubCallAllowed, GitHubRateLimitedError, recordGitHubRefusal } from './pause-gate.js';
 
 const execFileAsync = promisify(execFile);
@@ -122,7 +122,7 @@ export async function runGh(args: string[], opts: RunGhOptions = {}): Promise<{ 
       const pause = await recordGitHubRefusal({ pool: 'user', bucket, caller, refusal });
       throw new GitHubRateLimitedError(pause, { cause: error });
     }
-    await appendLedgerEntry({ ...base, outcome: 'error' });
+    queueLedgerEntry({ ...base, outcome: 'error' });
     throw error;
   }
 
@@ -134,6 +134,6 @@ export async function runGh(args: string[], opts: RunGhOptions = {}): Promise<{ 
       // NFR-2: a metering parse failure never fails the call.
     }
   }
-  await appendLedgerEntry({ ...base, ...extra, kind: 'call', caller, pool: 'user', bucket, outcome: 'ok' });
+  queueLedgerEntry({ ...base, ...extra, kind: 'call', caller, pool: 'user', bucket, outcome: 'ok' });
   return result;
 }

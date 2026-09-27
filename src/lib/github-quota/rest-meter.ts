@@ -12,7 +12,7 @@
 import type { GitHubQuotaCaller, GitHubQuotaPool } from '@overdeck/contracts';
 import { currentGitHubCaller } from './caller-context.js';
 import { classifyGitHubRefusal, type GitHubRefusal } from './classify.js';
-import { appendLedgerEntry, type LedgerEntry } from './ledger.js';
+import { queueLedgerEntry, type LedgerEntry } from './ledger.js';
 import {
   assertGitHubCallAllowed,
   activeGitHubPause,
@@ -78,7 +78,7 @@ export async function recordRestResponse(input: {
     }
   }
 
-  await appendLedgerEntry({
+  queueLedgerEntry({
     kind: 'call',
     caller,
     pool,

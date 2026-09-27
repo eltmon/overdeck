@@ -695,6 +695,8 @@ describe('App REST quota metering (PAN-4264)', () => {
 
   afterEach(async () => {
     vi.unstubAllGlobals();
+    const { flushLedgerWrites } = await import('../../../src/lib/github-quota/ledger.js');
+    await flushLedgerWrites();
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
     const { rm } = await import('fs/promises');
@@ -707,7 +709,8 @@ describe('App REST quota metering (PAN-4264)', () => {
 
   async function readLedgerLines(): Promise<Array<Record<string, unknown>>> {
     const { readFile } = await import('fs/promises');
-    const { ledgerFilePath } = await import('../../../src/lib/github-quota/ledger.js');
+    const { flushLedgerWrites, ledgerFilePath } = await import('../../../src/lib/github-quota/ledger.js');
+    await flushLedgerWrites();
     const raw = await readFile(ledgerFilePath(Date.now()), 'utf8');
     return raw.trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
   }
