@@ -7,6 +7,7 @@ import { dashboardMutationJsonHeaders } from './lib/wsTransport';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
+import { TerminalPermissionDialog } from './components/TerminalPermissionDialog';
 import { AskUserQuestionDialog } from './components/AskUserQuestionDialog';
 import { PlanApprovalDialog } from './components/PlanApprovalDialog';
 import { EventRouter } from './components/EventRouter';
@@ -647,6 +648,7 @@ export default function App() {
     isChannelPermissionSubmitting,
     handleAllowChannelPermission,
     handleDenyChannelPermission,
+    terminalPermissionDialog,
     currentAskUserQuestionSubject,
     isAskUserQuestionSubmitting,
     handleSubmitAskUserQuestion,
@@ -954,6 +956,7 @@ export default function App() {
         onAllow={handleAllowChannelPermission}
         onDeny={handleDenyChannelPermission}
       />
+      <TerminalPermissionDialog {...terminalPermissionDialog} />
 
       {/* PAN-1520 — AskUserQuestion interactive dialog (covers both work
           agents and conversation sessions — same modal, same code path). */}

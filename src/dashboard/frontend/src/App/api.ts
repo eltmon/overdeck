@@ -106,6 +106,33 @@ export async function respondToChannelPermission(
   throw new Error(message);
 }
 
+/** PAN-4278 — outcome of answering a conversation's terminal permission prompt. */
+export interface TerminalPermissionAnswerResult {
+  ok: boolean;
+  status: number;
+  code?: string;
+  error?: string;
+}
+
+export async function respondToTerminalPermission(
+  conversationName: string,
+  signature: string,
+  choice: 'allow-once' | 'allow-always' | 'deny',
+): Promise<TerminalPermissionAnswerResult> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(conversationName)}/permission`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ signature, choice }),
+  });
+  let body: { code?: string; error?: string } = {};
+  try {
+    body = await res.json() as { code?: string; error?: string };
+  } catch {
+    // A body-less failure keeps the status alone.
+  }
+  return { ok: res.ok, status: res.status, code: body.code, error: body.error };
+}
+
 export async function fetchCliproxyStatus(): Promise<CliproxyStatus> {
   const res = await fetch('/api/cliproxy/status');
   if (!res.ok) throw new Error('Failed to fetch CLIProxy status');

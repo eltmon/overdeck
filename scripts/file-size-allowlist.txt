@@ -132,3 +132,4 @@
 1083 src/lib/github-app.ts # PAN-4264
 1754 src/dashboard/server/services/issue-data-service.ts # PAN-4264
 1034 src/cli/commands/doctor.ts # PAN-4264
+1022 src/dashboard/frontend/src/App.tsx # PAN-4278

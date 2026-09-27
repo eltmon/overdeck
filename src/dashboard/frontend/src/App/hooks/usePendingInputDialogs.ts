@@ -5,6 +5,8 @@ import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ConfirmationRequest } from '../../components/ConfirmationDialog';
 import type { AskUserQuestionSubject } from '../../components/AskUserQuestionDialog';
 import type { PlanApprovalSubject } from '../../components/PlanApprovalDialog';
+import type { TerminalPendingPermission } from '../../components/TerminalPermissionDialog';
+import { useTerminalPermissionDialog } from './useTerminalPermissionDialog';
 import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAskUserQuestion, selectAgentsWithPendingProposedPlan, selectChannelPermissionRequests } from '../../lib/store';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
@@ -25,6 +27,8 @@ type ConvAskUserQuestionRow = {
   pendingAskUserQuestion?: AskUserQuestionSubject['pendingAskUserQuestion'];
   // PAN-1520 (FR-2) — pending ExitPlanMode plan payload for conversation rows.
   pendingProposedPlan?: PlanApprovalSubject['pendingProposedPlan'];
+  // PAN-4278 — a Claude Code terminal permission prompt blocking the conversation.
+  pendingPermission?: TerminalPendingPermission;
 };
 
 interface UsePendingInputDialogsArgs {
@@ -134,6 +138,9 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     refetchIntervalInBackground: true,
   });
   convAskUserQuestionRowsRef.current = convAskUserQuestionRows;
+  // PAN-4278 — terminal permission prompts share the channel-permission tier:
+  // they wait while a channel request shows and hold back the AUQ/plan dialogs.
+  const terminalPermissionDialog = useTerminalPermissionDialog(convAskUserQuestionRows, currentChannelPermissionRequest !== null);
 
   // PAN-1520 (FR-3) — plan-approval subjects across agents and conversations,
   // mirroring the AUQ subject assembly below.
@@ -675,11 +682,12 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     isChannelPermissionSubmitting: channelPermissionResponseMutation.isPending,
     handleAllowChannelPermission,
     handleDenyChannelPermission,
-    currentAskUserQuestionSubject,
+    terminalPermissionDialog,
+    currentAskUserQuestionSubject: terminalPermissionDialog.isOpen ? null : currentAskUserQuestionSubject,
     isAskUserQuestionSubmitting: askUserQuestionAnswerMutation.isPending || codexApprovalMutation.isPending,
     handleSubmitAskUserQuestion,
     handleDismissAskUserQuestion,
-    currentPlanApprovalSubject,
+    currentPlanApprovalSubject: terminalPermissionDialog.isOpen ? null : currentPlanApprovalSubject,
     isPlanActionSubmitting: planActionMutation.isPending,
     handleApprovePlan,
     handleRequestPlanChanges,
