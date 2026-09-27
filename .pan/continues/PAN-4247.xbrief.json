@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:48:39.599Z",
+  "updated": "2026-09-27T11:48:49.711Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "delivery-landing-kind.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T11:48:39.599Z"
+    },
+    "delivery-landing-kind.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:48:49.711Z"
     }
   }
 }
