@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-09-27T15:34:03.628Z",
+  "updated": "2026-09-27T15:34:16.123Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -551,7 +551,8 @@
       "status": "cancelled"
     },
     "ollama-e2e-acceptance.ac2": {
-      "status": "pending"
+      "status": "completed",
+      "doneAt": "2026-09-27T15:34:16.123Z"
     },
     "ollama-e2e-acceptance.ac3": {
       "status": "cancelled"
