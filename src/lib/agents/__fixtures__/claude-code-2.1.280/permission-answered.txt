@@ -1,0 +1,21 @@
+
+ ▐▛███▛█   Claude Code v2.1.280
+▝▜██████▀  Haiku 4.5 · Claude Max
+  ▝▝ ▝▝    /tmp/probe
+
+❯ Please clear my scratch queue by running this exact Bash command: cd /tmp/probe && mkdir
+  -p queue && rm -f queue/* && echo cleared
+
+  Ran 1 shell command
+
+● Done — scratch queue cleared.
+
+✻ Churned for 5s · done 7:32 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 4.5 (claude-haiku-4-5-20251001)  /tmp/probe  main
+  ctx 25%  8/200.0k  out 38  cost $0.0488
+  5h 5% (4h27m)  7d 73% (91h27m)
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent
