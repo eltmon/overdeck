@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T04:49:53.034842Z · model: claude-opus-5-5 · open: 773_
+_Last sequenced: 2026-09-27T05:13:05.254725Z · model: claude-opus-5-5 · open: 774_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -180,6 +180,7 @@ _Last sequenced: 2026-09-27T04:49:53.034842Z · model: claude-opus-5-5 · open: 
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
+| 221 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
 | 222 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
 | 228 | PAN-4200 | S | high | ok |  |  | bun audit critical: tar 6.2.1 via electron-builder 25; bump to builder 26 + notarize 3 + electron 40.10.6 to clear it. |
 | 229 | PAN-4199 | L | high | ok |  |  | Restored Flywheel page shows closed issues as working, drops titles, and lost ~12 old affordances; derive each on read. |
@@ -1088,10 +1089,10 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T04:49:53.034842Z",
+  "generatedAt": "2026-09-27T05:13:05.254725Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 773,
+  "openCount": 774,
   "nodes": [
     {
       "issue": "PAN-4224",
@@ -10654,6 +10655,19 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "rationale": "New this pass. computeWorkspaceRepoRoots builds its fallback candidate by joining the workspace path with an absolute repoPath, so any polyrepo repo whose configured name differs from its directory is never found. That makes pan task done refuse valid Item trailers and also affects head snapshots and merge completeness for MYN. The fix is a one-line candidate change plus a test, and a symlink workaround exists, so it ranks high rather than critical.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4242",
+      "rank": 221,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live",
+      "rationale": "New bug, seen twice (2026-09-21 and 2026-09-27): the handoff spawn path never pre-trusts --cwd, so the successor blocks at the Claude Code trust dialog while the dashboard reports it alive. Handoff chains are a core operator workflow and the failure is silent, so it ranks high among the operator-visible reliability bugs; fix step 1 overlaps PAN-900 (trust devroot for conversations).",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11727,6 +11741,13 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4242",
+      "to": "PAN-900",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
