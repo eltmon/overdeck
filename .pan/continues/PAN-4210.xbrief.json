@@ -1,0 +1,149 @@
+{
+  "version": "1",
+  "issueId": "PAN-4210",
+  "created": "2026-09-26T01:39:06.772Z",
+  "updated": "2026-09-26T04:30:13.081Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "stand-down-facts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4210",
+      "claimedAt": "2026-09-26T01:39:06.772Z",
+      "doneAt": "2026-09-26T02:14:48.654Z"
+    },
+    "boot-scheduler-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4210",
+      "claimedAt": "2026-09-26T02:15:06.754Z",
+      "doneAt": "2026-09-26T02:54:35.879Z"
+    },
+    "deferral-reports-freeze": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4210",
+      "claimedAt": "2026-09-26T02:54:53.944Z",
+      "doneAt": "2026-09-26T03:54:39.529Z"
+    },
+    "cli-reports-freeze": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4210",
+      "claimedAt": "2026-09-26T03:54:50.197Z",
+      "doneAt": "2026-09-26T04:10:34.827Z"
+    },
+    "show-freeze-hold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4210",
+      "claimedAt": "2026-09-26T04:10:46.463Z",
+      "doneAt": "2026-09-26T04:16:57.144Z"
+    },
+    "docs-freeze-hold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4210",
+      "claimedAt": "2026-09-26T04:17:07.631Z",
+      "doneAt": "2026-09-26T04:18:57.382Z"
+    },
+    "stand-down-facts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:25:07.945Z"
+    },
+    "stand-down-facts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:25:22.826Z"
+    },
+    "stand-down-facts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:25:38.437Z"
+    },
+    "stand-down-facts.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:25:53.175Z"
+    },
+    "stand-down-facts.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:26:09.258Z"
+    },
+    "boot-scheduler-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:26:20.861Z"
+    },
+    "boot-scheduler-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:26:32.328Z"
+    },
+    "boot-scheduler-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:26:43.854Z"
+    },
+    "boot-scheduler-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:26:54.689Z"
+    },
+    "deferral-reports-freeze.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:27:05.812Z"
+    },
+    "deferral-reports-freeze.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:27:16.771Z"
+    },
+    "deferral-reports-freeze.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:27:27.155Z"
+    },
+    "deferral-reports-freeze.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:27:37.249Z"
+    },
+    "deferral-reports-freeze.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:27:47.259Z"
+    },
+    "cli-reports-freeze.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:27:57.050Z"
+    },
+    "cli-reports-freeze.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:28:06.635Z"
+    },
+    "cli-reports-freeze.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:28:19.238Z"
+    },
+    "show-freeze-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:28:33.843Z"
+    },
+    "show-freeze-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:28:47.474Z"
+    },
+    "show-freeze-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:29:02.209Z"
+    },
+    "show-freeze-hold.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:29:16.212Z"
+    },
+    "docs-freeze-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:29:30.945Z"
+    },
+    "docs-freeze-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:29:43.888Z"
+    },
+    "docs-freeze-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:29:57.070Z"
+    },
+    "docs-freeze-hold.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T04:30:13.081Z"
+    }
+  }
+}

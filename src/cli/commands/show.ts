@@ -21,6 +21,7 @@ import { getAgentRuntimeStateSync, getAgentState } from '../../lib/agents.js';
 import { getAgentEffectiveLastActivityMs, isAlive, type LivenessVerdict } from '../../lib/agents/liveness.js';
 import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { getDerivedIssueState } from '../../lib/overdeck/derived-issue-state.js';
+import { isDeaconGloballyPaused } from '../../lib/overdeck/control-settings.js';
 import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
 import { readPipelineJournal, type PipelineJournalEntry } from '../../lib/cloister/pipeline-journal.js';
 import type { DerivedIssueState } from '@overdeck/contracts';
@@ -171,6 +172,24 @@ function journalClock(at: string): string {
   return Number.isNaN(when.getTime()) ? '--:--:--' : when.toTimeString().slice(0, 8);
 }
 
+/**
+ * PAN-4210: a deferred hand-off retry only ever runs from `runDeaconLite()`,
+ * which returns immediately while `deacon.globally_paused` is true — so a
+ * pending deferral silently never retries while the Deacon is frozen. Says so
+ * when the journal's last hand-off entry is still pending and the freeze is on.
+ */
+export function pendingHandoffHold(
+  journal: readonly PipelineJournalEntry[],
+  deaconPaused: boolean,
+  issueId: string,
+): string | null {
+  if (!deaconPaused) return null;
+  const lastHandoff = [...journal].reverse().find((entry) => entry.type.startsWith('handoff.'));
+  if (!lastHandoff) return null;
+  if (lastHandoff.type !== 'handoff.deferred' && lastHandoff.type !== 'handoff.retried') return null;
+  return `Deferred work-agent start is held: the Deacon is frozen. Unfreeze it or run pan start ${issueId}.`;
+}
+
 export async function showCommand(id: string, options: ShowOptions = {}): Promise<void> {
   const { cv, context, health, json } = options;
 
@@ -259,6 +278,17 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       console.log(`    ${chalk.dim(journalClock(entry.at))}  ${entry.type.padEnd(21)} ${chalk.dim(summary)}`);
     }
     console.log('');
+  }
+
+  // PAN-4210: a pending deferred hand-off silently never retries while the
+  // Deacon is frozen — say so. An unreadable pause flag reads as unpaused.
+  let deaconPaused = false;
+  try {
+    deaconPaused = isDeaconGloballyPaused();
+  } catch { /* treat as unpaused */ }
+  const handoffHold = pendingHandoffHold(journal, deaconPaused, issueId);
+  if (handoffHold) {
+    console.log(`  ${chalk.yellow(handoffHold)}`);
   }
 
   // Health line
