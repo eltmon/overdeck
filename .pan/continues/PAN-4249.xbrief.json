@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4249",
   "created": "2026-09-27T09:56:17.310Z",
-  "updated": "2026-09-27T10:30:59.385Z",
+  "updated": "2026-09-27T10:31:08.873Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4249",
       "claimedAt": "2026-09-27T10:22:14.975Z",
       "doneAt": "2026-09-27T10:30:59.385Z"
+    },
+    "sub-role-effort-validation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:31:08.873Z"
     }
   }
 }
