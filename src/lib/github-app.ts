@@ -134,6 +134,7 @@ export interface GitHubPullRequestForHead {
   merged: boolean;
   mergedAt: string | null;
   mergeCommit: string | null;
+  updatedAt: string | null;
   url?: string;
 }
 
@@ -656,6 +657,7 @@ export async function listPullRequestsForHead(
     merged?: boolean;
     merged_at?: string | null;
     merge_commit_sha?: string | null;
+    updated_at?: string | null;
   }>>(`/repos/${owner}/${repo}/pulls?${params.toString()}`);
 
   return pulls.map((pull) => ({
@@ -664,6 +666,7 @@ export async function listPullRequestsForHead(
     merged: pull.merged === true || pull.merged_at != null,
     mergedAt: pull.merged_at ?? null,
     mergeCommit: pull.merge_commit_sha ?? null,
+    updatedAt: pull.updated_at ?? null,
     url: pull.html_url,
   }));
 }

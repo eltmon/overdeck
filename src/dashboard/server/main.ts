@@ -69,6 +69,7 @@ import { registerGitHubRateLimitedTelemetry, startGitHubQuotaTelemetry } from '.
 import { ensureOperatorHash } from '../../lib/telemetry/operator-hash.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
+import { startSyncAutoService, stopSyncAutoService } from './services/sync-auto-service.js';
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { setLastCleanShutdownAt } from '../../lib/overdeck/control-settings.js';
@@ -581,6 +582,9 @@ console.log('[overdeck] Memory transcript poller started');
 startCostReconcileService();
 console.log('[overdeck] Cost reconciler started');
 
+startSyncAutoService({ autoRun: !isPeerDashboard });
+console.log(`[overdeck] Sync auto service started${isPeerDashboard ? ' (peer: observe only)' : ''}`);
+
 const conversationSearchWatcher = startConversationSearchWatcher();
 console.log(conversationSearchWatcher
   ? '[overdeck] Conversation search watcher started'
@@ -737,6 +741,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
+  stopSyncAutoService();
   stopRestartAnnouncer();
   await stopAllKnowledgeViewers().catch((err) => console.warn('[knowledge-viewer] shutdown failed:', err?.message ?? err));
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));

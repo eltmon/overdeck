@@ -1,0 +1,14 @@
+✻ Waiting for 1 background agent to finish
+
+──────────────────────────────── Sleep probe ─
+❯
+────────────────────────────────────────
+  Haiku 4.5 (claude-haiku-4-5-20251001)  /tmp/probe  master
+  ctx 24%  8/200.0k  out 38  cost $0.2068
+  5h 18% (1h46m)  7d 69% (99h26m)
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent
+
+  ◯ main
+  ◯ general-purpose (+3)  Scanning handleConversationCreate for cwd defaults     5m 19s · ↓ 102.2k tokens
+  ● Explore  Map the delivery door     12s · ↓ 4.1k tokens
+  ◯ Plan  Draft the plan     3s · ↓ 900 tokens

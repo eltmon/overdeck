@@ -71,6 +71,7 @@ import { parseKimiConversationMessages } from '../../dashboard/server/services/k
 import { resolveEffectivePullRequest } from '@overdeck/contracts';
 import { listConversationPullRequests } from './conversation-pull-requests.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
+import { readConversationInputTarget } from './conversation-input-target.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
 import { findClaudeSessionFileById } from './claude-session-file-search.js';
 import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
@@ -491,9 +492,11 @@ export async function getConversationRead(
       }
     }
     const pullRequests = listConversationPullRequests(conv.name); // PAN-3822
+    const inputTarget = await readConversationInputTarget(conv, sessionAlive, convSf); // PAN-4268
     return result({
       ...conv,
       sessionAlive,
+      ...(inputTarget ? { inputTarget } : {}),
       contextUsage,
       branch: gitInfo.branch,
       isWorktree: gitInfo.isWorktree,

@@ -1023,6 +1023,16 @@ focus, disabled-item skipping, and focus return when a trigger ref is supplied.
 Popover callers must provide an accessible name, constrain portaled placement to
 the viewport, and return focus to the trigger after dismissal.
 
+**Anchored pickers in clipped columns (PAN-4266).** The chat model picker and
+effort picker keep their own two-panel frame, but their dropdown renders in a
+portal on `document.body` with `position: fixed`, placed by
+`chat/useFloatingPickerPosition.ts` from the trigger's `getBoundingClientRect()`
+and clamped inside the viewport with an 8 px gutter. Any control that opens
+inside an `overflow: hidden` column must do the same. Focus a field inside such
+a dropdown with `focus({ preventScroll: true })` — never the `autoFocus`
+attribute — because the browser otherwise scrolls the clipped column sideways
+and the user cannot scroll it back.
+
 The scoped God View neon theme and terminal presentation remain intentional
 visual exceptions. Kanban and IssueCard status stripes may retain stable
 task-state color encoding, but their menus and popovers still use the shared

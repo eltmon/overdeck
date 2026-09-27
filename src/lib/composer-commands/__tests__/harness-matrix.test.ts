@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   deliverControl: vi.fn().mockResolvedValue(undefined),
   getAgentState: vi.fn(),
   getConversationByName: vi.fn(),
-  messageAgent: vi.fn().mockResolvedValue(undefined),
+  messageAgent: vi.fn().mockResolvedValue({ delivered: true, queuedToMail: true }),
   runDetachedCommand: vi.fn(async (argv: readonly string[]) => ({
     kind: 'activity' as const,
     status: 'accepted' as const,
@@ -109,6 +109,7 @@ function dependencies() {
     generateAiTitle: vi.fn(async () => {}),
     shouldInterceptManualCompact: vi.fn(() => false),
     transformMessageForHarness: vi.fn((message: string) => message),
+    ensureMainInputTarget: vi.fn(async () => ({ ok: true as const, check: 'no-selector' as const })),
   };
 }
 
@@ -195,7 +196,7 @@ describe('composer command harness interception matrix (all KNOWN_HARNESSES)', (
         deps,
       );
 
-      expect(decodeJsonResponse(response)).toEqual({ ok: true });
+      expect(decodeJsonResponse(response)).toEqual(harness === 'claude-code' ? { ok: true, inputTarget: 'main' } : { ok: true });
       expect(deps.transformMessageForHarness).toHaveBeenCalledWith(message, harness, []);
       if (harness === 'ohmypi') {
         expect(mocks.deliverControl).toHaveBeenCalledOnce();

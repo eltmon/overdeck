@@ -108,6 +108,8 @@ function procMemory(
     swapFree: number;
     psiSomeAvg10: number | null;
     psiFullAvg10: number | null;
+    macPressureLevel: 'normal' | 'warn' | 'critical' | null;
+    swapGrowsOnDemand: boolean;
   }> = {},
 ) {
   return {
@@ -116,6 +118,8 @@ function procMemory(
     swapFree: 8 * GIB,
     psiSomeAvg10: 0,
     psiFullAvg10: 0,
+    macPressureLevel: null,
+    swapGrowsOnDemand: false,
     ...overrides,
   };
 }
@@ -524,6 +528,58 @@ describe('assessMemoryPressure', () => {
     const verdict = await assessMemoryPressure();
     expect(getCachedMemoryVerdict()).toEqual(verdict);
     expect(getCachedMemoryVerdict()?.trigger).toEqual(verdict.trigger);
+  });
+
+  it('darwin: ignores low swap when pressure is normal and available memory is above SOFT', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      swapFree: 0,
+      psiFullAvg10: null,
+      macPressureLevel: 'normal',
+      swapGrowsOnDemand: true,
+    }));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      band: 'ok',
+      trigger: null,
+    });
+  });
+
+  it('darwin: sheds on critical kernel pressure even above the HARD reserve', async () => {
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB, {
+      macPressureLevel: 'critical',
+      swapGrowsOnDemand: true,
+    }));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      band: 'hard',
+      trigger: {
+        kind: 'mac-pressure-critical',
+        readingBytes: 20 * GIB,
+        thresholdBytes: 4 * GIB,
+      },
+    });
+  });
+
+  it('darwin: re-admits a held governor once pressure stays normal for the calm window', async () => {
+    vi.useFakeTimers();
+    try {
+      readProcMemoryMock.mockResolvedValueOnce(procMemory(7 * GIB, {
+        psiFullAvg10: null,
+        macPressureLevel: 'normal',
+        swapGrowsOnDemand: true,
+      }));
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      await vi.advanceTimersByTimeAsync(600_000);
+      readProcMemoryMock.mockResolvedValue(procMemory(9 * GIB, {
+        psiFullAvg10: null,
+        macPressureLevel: 'normal',
+        swapGrowsOnDemand: true,
+      }));
+      await expect(assessMemoryPressure()).resolves.toMatchObject({ band: 'ok', trigger: null });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

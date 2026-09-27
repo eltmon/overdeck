@@ -1,0 +1,9 @@
+Needs input
+ ✻ Counter run                     The background sleep probe is running.                0s
+ ✻ Another session                 Waiting for review                                   39d
+Completed
+ ∙ Older session                   Finished the map layer                               56m
+────────────────────────────────────────
+❯ describe a task for a new session
+────────────────────────────────────────
+  ⏵⏵ bypass permissions · enter to return · space to reply · ctrl+x to delete · ? for shortcuts

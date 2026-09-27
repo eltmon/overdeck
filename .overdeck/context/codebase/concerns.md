@@ -147,6 +147,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
+- **The memory governor gates almost nothing** (PAN-4267) — the governor band
+  (`assessMemoryPressure`, `cloister/memory-governor.ts`) is read only by the
+  memory-pressure patrol (activity feed) and `preemption.ts resumeYieldedAgents`;
+  `shed()` has no callers. Conversations and `POST /api/agents` never read it —
+  agent starts are gated by `evaluateSpawnGuardrails` (`routes/agents/shared.ts`)
+  against `memoryWarnGb`/`memoryBlockGb`, a separate threshold pair. On macOS the
+  governor reader (`readProcMemoryDarwin`, `system-health-service.ts`) and the
+  header collector (`system-health/darwin.ts`) measured available memory with
+  different formulas until PAN-4267 unified them.
+
 - **`git log --all` is not "the repository's history" here.** Overdeck keeps
   tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and
   work sessions snapshot their trees there). `--all` walks them, so any file a
@@ -173,6 +183,21 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   deacon-lite runs only in the deacon child, where
   `getRequestReviewStarter()` is always null — reach the review pipeline via
   `requestReviewThroughRoute`.
+- **Claude Code's agent selector decides where typed input goes** (PAN-4268) —
+  the `● main` / `◯ <type>  <description>` rows under the prompt box. Pasting
+  into a pane whose `●` is on a subagent misroutes; with footer focus (`❯` on a
+  row) text is swallowed and `x` stops a subagent. Only `Down/Up/Enter/Escape`.
+
+- **Forge PR lookups: failure vs absence, and stale stored URLs** (PAN-4263) —
+  `discoverArtifact` (`src/lib/forge.ts`) is called without `repository` by
+  every production caller, so it always takes the `gh pr view` path, never the
+  GitHub App path. Before PAN-4263 that path swallowed gh errors
+  (`2>/dev/null || true`), so a rate limit read as "no PR". The merge path in
+  `routes/workspaces/merge-ops.ts` preferred the persisted
+  `merge_set_repos.artifact_url` over the freshly resolved PR, which can be a
+  long-closed first PR. Treat stored artifact URLs as hints, never as the PR the
+  gate judged.
+
 - **New GitHub callers must go through the quota meter** (PAN-4264) — exec
   `gh` with `runGh` (`src/lib/github-quota/run-gh.ts`) and name the caller
   with `withGitHubCaller`, or its spend only shows up as `unattributed` and it

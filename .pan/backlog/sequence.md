@@ -1,15 +1,17 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T15:13:22.968928Z · model: claude-opus-5-5 · open: 777_
+_Last sequenced: 2026-09-27T17:22:05.422086Z · model: claude-opus-5-5 · open: 781_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 16 | PAN-4266 | S | medium | ok |  |  | In-pipeline: Command Deck model picker clipped by overflow-hidden column; focus scroll shifts column left. Portal fix. |
+| 16 | PAN-4267 | M | high | ok |  |  | In-pipeline: memory governor fixed 4/12 GB floors + macOS free-memory measure lock small Macs in permanent shedding. |
 | 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4263 | M | critical | ok |  |  | In-pipeline: PR lookup reads rate limits as 'no PR' and picks a closed PR, so approved verdicts are lost and merges fail |
-| 21 | PAN-4264 | L | critical | ok |  |  | GitHub rate limits stall verdicts, close-outs and merges several times a day; measure quota per caller, surface it, back off, cut waste |
+| 20 | PAN-4266 | S | medium | ok |  |  | In-pipeline: Command Deck model picker dropdown clipped by overflow-hidden column; focus scroll shifts the column left |
+| 21 | PAN-4264 | L | high | ok |  |  | In-pipeline: GraphQL quota exhaustion stalls verdicts, close-outs and merges; measure per caller, surface, back off, stop waste. |
+| 22 | PAN-4268 | M | high | ok |  |  | In-pipeline: composer and pan tell guess subagent routing; parse Claude Code's agent selector and deliver to main or fail loudly. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -71,6 +73,7 @@ _Last sequenced: 2026-09-27T15:13:22.968928Z · model: claude-opus-5-5 · open: 
 | 96 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
 | 97 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
 | 98 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
+| 99 | PAN-4269 | M | high | ok |  |  | macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find). |
 | 100 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
 | 101 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
 | 102 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
@@ -654,6 +657,7 @@ _Last sequenced: 2026-09-27T15:13:22.968928Z · model: claude-opus-5-5 · open: 
 | 733 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
 | 734 | PAN-4248 | L | medium | ok |  | PAN-1641 | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; starts after PAN-1641 merges. |
 | 735 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 736 | PAN-4275 | S | low | ok |  | PAN-1641 | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge |
 | 737 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
 | 738 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
 | 739 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
@@ -785,9 +789,9 @@ _Last sequenced: 2026-09-27T15:13:22.968928Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-4266 (rank 16)
+### PAN-4267 (rank 16)
 
-New since prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the rank slot vacated by closed PAN-4224. The body gives a measured cause, exact files, a four-step fix and Playwright acceptance criteria, so condition is ok.
+New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 16, the slot vacated by PAN-4266 (now labeled in-progress and out of the backlog manifest). A permanent admission lockout makes Overdeck unusable on 8-16 GB Macs, so importance is high; the body names the exact defaults function, a four-part fix and testable acceptance criteria, so condition is ok.
 
 ### PAN-4223 (rank 17)
 
@@ -801,9 +805,17 @@ New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's ro
 
 New in-pipeline issue, pinned in the top tier at a free rank. One function (getExistingGitHubArtifact in src/lib/forge.ts) swallows gh errors so a rate-limited lookup reads as 'no PR', refusing reviewer verdicts, and the App path takes prs[0], which can be an older closed PR, so merges target the wrong PR. It already stalled PAN-4222, PAN-3634 and PAN-3668 with approved reviews the merge gate never saw, so it is critical pipeline substrate; the fix and acceptance criteria are concrete.
 
+### PAN-4266 (rank 20)
+
+New in-pipeline issue with a measured cause and mechanical Playwright AC; pinned into the free in-pipeline slot at rank 20 without moving any other node, medium importance because it is dashboard UX rather than pipeline substrate.
+
 ### PAN-4264 (rank 21)
 
-New issue, placed in a free top-tier slot next to PAN-4263. GitHub GraphQL refusals for the shared eltmon user stall the pipeline several times a day (lost review verdicts, failed merges, stale membership), and Overdeck cannot currently see or explain them. The fix is concrete and staged: per-caller quota measurement from real response headers, a dashboard surface, backoff until reset, and removal of about 20 wasted refreshes an hour from misconfigured projects. PAN-4263 fixes the one misread in forge.ts; this issue fixes the systemic cause, so it ranks critical as pipeline substrate.
+New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the free rank 21 beside PAN-4263, which it generalizes. Rate-limit refusals several times a day stall review verdicts, close-outs and merges, so importance is high; the body gives a five-part fix with mechanically checkable acceptance criteria, so condition is ok.
+
+### PAN-4268 (rank 22)
+
+New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 22, the free slot between PAN-4264 and PAN-4217. Messages silently landing in a subagent is a delivery-correctness bug on the operator's main input path, so importance is high; the body gives a five-step fix, captured pane evidence and fixture-testable acceptance criteria, so condition is ok. Its predecessor PAN-4247 is closed, so no dependency edge is emitted.
 
 ### PAN-4217 (rank 23)
 
@@ -1049,6 +1061,10 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
 
 Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.
 
+### PAN-4269 (rank 99)
+
+New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.
+
 ### PAN-3811 (rank 100)
 
 New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts shelling straight to docker builder prune --all --force, with no BuildKit bytes in the canonical inventory, no candidate through the resource reclaim door and no age or size floor. The partial strike is a fine urgent backstop, but closing PAN-3809 on it would quietly drop requirements 1-3. Ranked directly behind its parent so the completion work is not forgotten once the emergency lands. Dropped dependsOn PAN-3809 (closed since the prior run).
@@ -1073,18 +1089,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 
 Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
 
-### PAN-3900 (rank 113)
-
-patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
-
-### PAN-3793 (rank 114)
-
-New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
-
-### PAN-2639 (rank 115)
-
-codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1092,21 +1096,21 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T15:13:22.968928Z",
+  "generatedAt": "2026-09-27T17:22:05.422086Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 777,
+  "openCount": 781,
   "nodes": [
     {
-      "issue": "PAN-4266",
+      "issue": "PAN-4267",
       "rank": 16,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In-pipeline: Command Deck model picker clipped by overflow-hidden column; focus scroll shifts column left. Portal fix.",
-      "rationale": "New since prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the rank slot vacated by closed PAN-4224. The body gives a measured cause, exact files, a four-step fix and Playwright acceptance criteria, so condition is ok.",
+      "why": "In-pipeline: memory governor fixed 4/12 GB floors + macOS free-memory measure lock small Macs in permanent shedding.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 16, the slot vacated by PAN-4266 (now labeled in-progress and out of the backlog manifest). A permanent admission lockout makes Overdeck unusable on 8-16 GB Macs, so importance is high; the body names the exact defaults function, a four-part fix and testable acceptance criteria, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1150,15 +1154,28 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "planning": "auto"
     },
     {
-      "issue": "PAN-4264",
-      "rank": 21,
-      "size": "L",
-      "importance": "critical",
-      "score": 85,
+      "issue": "PAN-4266",
+      "rank": 20,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
       "condition": "ok",
       "dependsOn": [],
-      "why": "GitHub rate limits stall verdicts, close-outs and merges several times a day; measure quota per caller, surface it, back off, cut waste",
-      "rationale": "New issue, placed in a free top-tier slot next to PAN-4263. GitHub GraphQL refusals for the shared eltmon user stall the pipeline several times a day (lost review verdicts, failed merges, stale membership), and Overdeck cannot currently see or explain them. The fix is concrete and staged: per-caller quota measurement from real response headers, a dashboard surface, backoff until reset, and removal of about 20 wasted refreshes an hour from misconfigured projects. PAN-4263 fixes the one misread in forge.ts; this issue fixes the systemic cause, so it ranks critical as pipeline substrate.",
+      "why": "In-pipeline: Command Deck model picker dropdown clipped by overflow-hidden column; focus scroll shifts the column left",
+      "rationale": "New in-pipeline issue with a measured cause and mechanical Playwright AC; pinned into the free in-pipeline slot at rank 20 without moving any other node, medium importance because it is dashboard UX rather than pipeline substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4268",
+      "rank": 22,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: composer and pan tell guess subagent routing; parse Claude Code's agent selector and deliver to main or fail loudly.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 22, the free slot between PAN-4264 and PAN-4217. Messages silently landing in a subagent is a delivery-correctness bug on the operator's main input path, so importance is high; the body gives a five-step fix, captured pane evidence and fixture-testable acceptance criteria, so condition is ok. Its predecessor PAN-4247 is closed, so no dependency edge is emitted.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10714,6 +10731,47 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4264",
+      "rank": 21,
+      "size": "L",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: GraphQL quota exhaustion stalls verdicts, close-outs and merges; measure per caller, surface, back off, stop waste.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the free rank 21 beside PAN-4263, which it generalizes. Rate-limit refusals several times a day stall review verdicts, close-outs and merges, so importance is high; the body gives a five-part fix with mechanically checkable acceptance criteria, so condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4269",
+      "rank": 99,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find).",
+      "rationale": "New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4275",
+      "rank": 736,
+      "size": "S",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-1641"
+      ],
+      "why": "Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge",
+      "rationale": "New follow-up carved from PAN-1641's cancelled e2e item; ranked just below its in-pipeline parent as low-importance local-model work.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11747,8 +11805,29 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "confidence": 0.5
     },
     {
-      "from": "PAN-4263",
-      "to": "PAN-4264",
+      "from": "PAN-4264",
+      "to": "PAN-4263",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4267",
+      "to": "PAN-4269",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-1641",
+      "to": "PAN-4275",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4275",
+      "to": "PAN-3684",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7

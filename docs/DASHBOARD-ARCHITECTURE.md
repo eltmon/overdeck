@@ -293,7 +293,12 @@ door that does not exist; a real record read door would be a separate change.
   A pending user bubble's `deliveryState` renders one of: `pending` ("Sending…"),
   `unknown` ("Delivery not confirmed"), `accepted` ("Sent · waiting for transcript"), or
   `subagent` ("Delivered to subagent · `<description>`" — Claude Code routed the message
-  into a running subagent instead of this conversation; PAN-4247). An `accepted` bubble
+  into a running subagent instead of this conversation; PAN-4247). Before pasting, the
+  composer route checks Claude Code's agent selector and switches input back to the main
+  agent (PAN-4268); if that cannot be confirmed the route answers 409
+  `input-target-not-main`, the toast shows the reason, and the draft stays in the editor.
+  Conversation rows carry `inputTarget` (`'main' | { subagent } | 'unknown'`), which
+  drives the composer's "Typed messages are going to subagent" notice. An `accepted` bubble
   that stays unmatched for `TURN_STALL_MS` (4 minutes) **while the conversation is not
   streaming** moves to the outbox as "Not found in transcript", with **Resend** (a fresh
   send identity — new `clientMessageId`, no inherited `createdAt`, no `retry` flag, since

@@ -18,7 +18,7 @@ export interface MemoryPressureThresholds {
   criticalBytes: number;
 }
 
-export type GovernorTriggerKind = 'soft-dip' | 'hard' | 'swap-psi' | 'psi-unavailable';
+export type GovernorTriggerKind = 'soft-dip' | 'hard' | 'swap-psi' | 'psi-unavailable' | 'mac-pressure-critical';
 
 export interface GovernorTrigger {
   kind: GovernorTriggerKind;
@@ -37,6 +37,8 @@ export interface MemoryVerdict {
   psiFullAvg10?: number | null;
   loadPerCore?: number | null;
   trigger?: GovernorTrigger | null;
+  /** PAN-4267: macOS's own kernel pressure level, null on Linux. */
+  macPressureLevel?: 'normal' | 'warn' | 'critical' | null;
 }
 
 let cachedVerdict: MemoryVerdict | null = null;

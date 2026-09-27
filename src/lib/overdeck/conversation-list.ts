@@ -20,6 +20,7 @@ import {
   conversationSessionAliveFromState,
 } from './conversation-runtime.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
+import { readConversationInputTarget } from './conversation-input-target.js';
 import { readConversationProviderError } from './conversation-provider-error.js';
 import { listPullRequestLinksForConversations } from './conversation-pull-requests.js';
 import {
@@ -210,6 +211,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
           }
         }
       }
+      const inputTarget = await readConversationInputTarget(row, sessionAlive, convSf);
       let pendingInputCount = 0;
       let pendingInputKinds: PendingInputKind[] = [];
       let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
@@ -265,6 +267,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         sessionAlive,
         isWorking,
         currentTool,
+        ...(inputTarget ? { inputTarget } : {}),
         stalledSince,
         isFavorited: favoritedNames.has(row.name),
         compacting,

@@ -8,13 +8,14 @@
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Lock, Search, LayoutGrid } from 'lucide-react';
 import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
   getDefaultConversationModel,
   ensureDefaultConversationModel,
 } from './defaultConversationModel';
-import { usePickerPosition } from './usePickerPosition';
+import { useFloatingPickerPosition } from './useFloatingPickerPosition';
 import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
 import { HARNESS_OPTIONS, canUsePickerHarness, expandHarnessRows, type HarnessPolicyDecisions } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
@@ -229,9 +230,11 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const liveConversationRef = useRef(liveConversation);
   liveConversationRef.current = liveConversation;
-  const { openUp, align, maxHeight } = usePickerPosition(open, ref);
+  const { style: dropdownStyle } = useFloatingPickerPosition(open, ref, dropdownRef);
 
   // Reset search when dropdown closes
   useEffect(() => {
@@ -347,10 +350,17 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  // Focus the search input without scrolling the clipped conversation column (PAN-4266)
+  useEffect(() => {
+    if (open) searchRef.current?.focus({ preventScroll: true });
   }, [open]);
 
   // Filtered model groups — respects both provider filter and search query
@@ -457,13 +467,12 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
       </button>
 
       {/* ── Dropdown ── */}
-      {open && (
+      {open && createPortal(
         <div
-          className={`${styles.pickerDropdown} ${openUp ? styles.pickerDropdownUp : ''}`}
-          style={{
-            maxHeight: `${maxHeight}px`,
-            ...(align === 'right' ? { left: 'auto', right: 0 } : {}),
-          }}
+          ref={dropdownRef}
+          data-testid="model-picker-dropdown"
+          className={styles.pickerDropdown}
+          style={dropdownStyle}
         >
           {/* Provider filter sidebar */}
           {showProviderSidebar && (
@@ -561,13 +570,13 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
             <div className={styles.pickerSearchWrapper}>
               <Search size={11} className={styles.pickerSearchIcon} />
               <input
+                ref={searchRef}
                 type="text"
                 className={styles.pickerSearchInput}
                 placeholder="Search models…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.stopPropagation()}
-                autoFocus
               />
             </div>
 
@@ -630,7 +639,8 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

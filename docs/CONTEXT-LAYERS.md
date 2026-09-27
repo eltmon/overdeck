@@ -106,11 +106,33 @@ injecting it again. This transport does not create or edit `AGENTS.md`,
 
 `pan sync` also:
 
-- writes a sync-input manifest. After an Overdeck upgrade changes bundled
-  context, hooks, agents, or skills, the dashboard shows a **Sync now** banner;
-  the button runs `pan sync` on the host and disappears only after the manifest
-  matches the installed package;
+- writes a sync-input manifest (`~/.overdeck/.sync-manifest.json`, version 2,
+  PAN-4265). It records a digest for each input: every `sync-sources/` file,
+  the global layer, each project's context file and `.pan/skills/` tree, the
+  dev-mode flag, and the cwd-scoped skills mirror. `pan sync --if-changed`
+  compares every input. The dashboard ignores the directory `pan sync` ran
+  from, so a sync run from any workspace satisfies it;
 - folds bundled engineering rules into harness-specific launch artifacts.
+
+The dashboard keeps the synced setup current by itself. Its sync auto service
+(`src/dashboard/server/services/sync-auto-service.ts`) evaluates the inputs at
+boot and every 60 s. When they changed, it runs the light
+`pan sync --if-changed` once per input set, 60 s after boot at the earliest. A
+`pan reload` replaces the server, so every reload gets this boot sync, and a
+merge that moves the main checkout's `sync-sources/` is synced within about
+a minute. A failed or non-converging run is not retried until the inputs change
+again. Peer dashboards only observe.
+
+The **Setup changed** banner appears only when auto-sync failed, ran but could
+not apply the change, or is turned off. It names what changed, for example
+"3 skills and 1 rule changed"; hover it for the changed files. **Sync now**
+(or **Retry sync** after a failure) runs the same light `pan sync`. Turn
+auto-sync off in `~/.overdeck/config.yaml`:
+
+```yaml
+context:
+  auto_sync: false   # default true; the banner then shows for every needed sync
+```
 
 ## Bare conversations (no Overdeck context)
 

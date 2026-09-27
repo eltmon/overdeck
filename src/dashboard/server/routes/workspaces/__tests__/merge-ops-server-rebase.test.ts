@@ -116,8 +116,9 @@ vi.mock('../../../../../lib/tmux.js', () => ({  // PAN-3917 (W6): the backend in
   listPaneValuesSync: () => [],
   listPaneValues: async () => [],
  sessionExists: mocks.sessionExists }));
-vi.mock('../../../../../lib/forge.js', () => ({
+vi.mock('../../../../../lib/forge.js', async (importOriginal) => ({
   getForgeAdapter: vi.fn(() => ({ commentOnArtifact: vi.fn(), mergeReviewArtifact: mocks.mergeReviewArtifact })),
+  parseArtifactRef: (await importOriginal<typeof import('../../../../../lib/forge.js')>()).parseArtifactRef,
 }));
 vi.mock('../../workspaces.js', () => ({
   completePendingOperation: mocks.completePendingOperation,

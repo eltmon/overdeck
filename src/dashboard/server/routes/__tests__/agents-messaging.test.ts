@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
   getAgentState: vi.fn(),
-  messageAgent: vi.fn().mockResolvedValue(undefined),
+  messageAgent: vi.fn().mockResolvedValue({ delivered: true, queuedToMail: true }),
   runCapturedCommand: vi.fn(async (argv: readonly string[]) => ({
     kind: 'captured' as const,
     status: 'completed' as const,
@@ -123,5 +123,27 @@ describe('agent message composer routing', () => {
       'please continue',
       'dashboard:user-message',
     );
+  });
+
+  it('answers 409 input-target-not-main when Claude Code input cannot be moved to main (PAN-4268)', async () => {
+    const reason = "Could not move keyboard focus into Claude Code's agent selector.";
+    agentMocks.messageAgent.mockResolvedValueOnce({
+      delivered: false,
+      queuedToMail: true,
+      confirmed: false,
+      reason,
+      inputTargetRefusal: { reason, inputTarget: { subagent: 'Counter run' } },
+    });
+
+    const response = await handleAgentMessage('agent-pan-42', 'please continue');
+
+    expect(response.status).toBe(409);
+    expect(decodeJsonResponse(response)).toEqual({
+      error: reason,
+      code: 'input-target-not-main',
+      inputTarget: { subagent: 'Counter run' },
+      deliveryUnknown: false,
+      retryable: true,
+    });
   });
 });

@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, messageAgent } from '../../../../lib/agents.js';
+import type { MessageDeliveryOutcome } from '../../../../lib/agents/messaging.js';
 import {
   ComposerCommandConfirmationError,
   composerCommandConfirmationFromBody,
@@ -23,7 +24,11 @@ import { httpHandler } from '../http-handler.js';
 import { validateOrigin } from '../origin-validation.js';
 import { readJsonBody } from './shared.js';
 
-async function sendAgentMessage(id: string, message: string) {
+type SendAgentMessageResult =
+  | { kind: 'sent'; body: { success: true; remote?: true } }
+  | { kind: 'refused'; refusal: NonNullable<MessageDeliveryOutcome['inputTargetRefusal']> };
+
+async function sendAgentMessage(id: string, message: string): Promise<SendAgentMessageResult> {
   const agentStateDir = join(homedir(), '.overdeck', 'agents', id);
   const remoteStateFile = join(agentStateDir, 'remote-state.json');
   let isRemote = false;
@@ -35,8 +40,10 @@ async function sendAgentMessage(id: string, message: string) {
     } catch {}
   }
 
-  await messageAgent(id, message, 'dashboard:user-message');
-  return isRemote ? { success: true, remote: true } : { success: true };
+  const outcome = await messageAgent(id, message, 'dashboard:user-message');
+  // PAN-4268: Claude Code's input could not be moved to the main agent.
+  if (outcome.inputTargetRefusal) return { kind: 'refused', refusal: outcome.inputTargetRefusal };
+  return { kind: 'sent', body: isRemote ? { success: true, remote: true } : { success: true } };
 }
 
 export async function handleAgentMessage(
@@ -99,7 +106,17 @@ export async function handleAgentMessage(
     }, { status });
   }
 
-  return jsonResponse(await sendAgentMessage(id, message));
+  const sent = await sendAgentMessage(id, message);
+  if (sent.kind === 'refused') {
+    return jsonResponse({
+      error: sent.refusal.reason,
+      code: 'input-target-not-main',
+      inputTarget: sent.refusal.inputTarget,
+      deliveryUnknown: false,
+      retryable: true,
+    }, { status: 409 });
+  }
+  return jsonResponse(sent.body);
 }
 
 export function validateAgentMessageOrigin(request: HttpServerRequest.HttpServerRequest) {
