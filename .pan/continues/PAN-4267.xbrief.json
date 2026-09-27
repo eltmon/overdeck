@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T15:44:09.732Z",
+  "updated": "2026-09-27T15:49:23.365Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-27T15:44:06.016Z"
     },
     "reserve-normalization": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4267",
-      "claimedAt": "2026-09-27T15:44:09.732Z"
+      "claimedAt": "2026-09-27T15:44:09.732Z",
+      "doneAt": "2026-09-27T15:49:23.365Z"
     }
   }
 }
