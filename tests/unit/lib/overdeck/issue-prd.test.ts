@@ -53,6 +53,29 @@ describe('getIssuePrd', () => {
     });
   });
 
+  /**
+   * PAN-4224: complete-planning now promotes the PRD draft onto the issue's
+   * workspace plan home instead of the primary checkout, so getIssuePrd must
+   * find it there even when the primary has no copy.
+   */
+  it('finds a draft that exists only in the issue workspace', async () => {
+    const draftPath = join(state.projectPath, 'workspaces', 'feature-pan-3231', '.pan', 'drafts', 'PAN-3231.md');
+    await mkdir(join(state.projectPath, 'workspaces', 'feature-pan-3231', '.pan', 'drafts'), { recursive: true });
+    await writeFile(draftPath, '# PAN-3231\n\nWorkspace draft.\n');
+
+    const response = await Effect.runPromise(getIssuePrd('PAN-3231'));
+    const body = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      hasPrd: true,
+      content: '# PAN-3231\n\nWorkspace draft.\n',
+      path: draftPath,
+      status: 'draft',
+      format: 'pan-draft',
+    });
+  });
+
   it('returns 404 without substituting workspace continue state', async () => {
     const continuePath = join(state.projectPath, 'workspaces', 'feature-pan-3231', '.overdeck', 'continue.json');
     await mkdir(join(state.projectPath, 'workspaces', 'feature-pan-3231', '.overdeck'), { recursive: true });

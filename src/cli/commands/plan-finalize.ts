@@ -165,12 +165,12 @@ function readPrdDraftText(workspacePath: string, issueId: string): string | unde
 export function formatPrdGateFailureMessage(
   issueId: string,
   result: PrdGateResult,
-  projectRootHint: string | null,
+  draftRootHint: string | null,
 ): string {
   if (result.reason === 'too-short') {
     return `✗ PRD-first gate: PRD draft too short for ${issueId}. Found ${result.path} (${result.lineCount} lines; minimum is ${MIN_PRD_LINES}). Expand it into a real implementation brief, then re-run finalize. For a genuinely trivial issue use --no-prd.`;
   }
-  const canonical = projectRootHint ? getIssueDraftPath(projectRootHint, issueId) : `.pan/drafts/${issueId}.md`;
+  const canonical = draftRootHint ? getIssueDraftPath(draftRootHint, issueId) : `.pan/drafts/${issueId}.md`;
   return `✗ PRD-first gate: no PRD draft found for ${issueId}. Write ${canonical} first (roles/plan.md, Outputs #1), then re-run finalize. For a genuinely trivial issue use --no-prd.`;
 }
 
@@ -219,7 +219,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   } else {
     const prdGate = checkPrdGate({ projectRoot: projectRootHint, workspacePath, issueId });
     if (!prdGate.ok) {
-      const message = formatPrdGateFailureMessage(issueId, prdGate, projectRootHint);
+      const message = formatPrdGateFailureMessage(issueId, prdGate, workspacePath);
       if (options.json) {
         console.log(JSON.stringify({ success: false, error: 'PRD-first gate failed', message, prdGate }));
       } else {

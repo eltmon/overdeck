@@ -661,16 +661,21 @@ export async function completePlanningForIssue(options: {
         emitCompletePlanningPhase(id, 'prdGate', 'success', `found ${prdGate.path} (${prdGate.lineCount} lines)`);
       }
 
-      // PRD promotion: the gate accepts a workspace-authored draft, but the
-      // workspace is disposable — promote it to drafts/ on the state plane so
-      // the PRD survives workspace teardown (the PAN-2858 defect: spec promoted,
-      // PRD stranded). Never overwrites an existing canonical draft. Runs even
-      // under the noPrd bypass — if a draft exists anyway, promoting it is
-      // strictly better than stranding it. A promotion failure is a state-door
-      // write failure and fails promotion loudly, same as a spec-write failure.
+      // PRD promotion: promote the workspace-authored draft to the canonical
+      // `.pan/drafts/` location in the workspace's own plan home, so it is a
+      // tracked file the issue's own commits carry (the PAN-2858 defect: spec
+      // promoted, PRD stranded). The target is the workspace, not the primary
+      // checkout — writing it there instead used to leave an untracked file
+      // behind that later broke the primary's plan-artifact push (PAN-4224).
+      // primaryRoot is a read-only fallback for a draft an earlier, unfixed
+      // run already stranded in the primary checkout. Never overwrites an
+      // existing canonical draft. Runs even under the noPrd bypass — if a
+      // draft exists anyway, promoting it is strictly better than stranding
+      // it. A promotion failure fails this route loudly, same as a spec-write
+      // failure.
       try {
         const draftPromotion = await Effect.runPromise(
-          promoteWorkspacePrdDraft({ projectRoot: projectPath, workspacePath, issueId: id }),
+          promoteWorkspacePrdDraft({ projectRoot: workspacePath, workspacePath, issueId: id, primaryRoot: projectPath }),
         );
         if (draftPromotion.promoted) {
           const removalNote = draftPromotion.sourceRemoved ? '' : ' (workspace copy left in place)';

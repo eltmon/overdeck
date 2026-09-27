@@ -108,31 +108,42 @@ export function findPrdAtStatus(
   return null;
 }
 
-function draftPrdCandidates(projectPath: string, issueId: string): PrdLocation[] {
-  // Canonical drafts exist in both filename cases on disk (the door writes
-  // UPPER.md; humans and conversations historically wrote lower.md) — accept
-  // either, matching checkPrdGateSync.
-  return [
-    { path: getIssueDraftPath(projectPath, issueId), format: 'pan-draft', status: 'draft' },
-    { path: getDraftPath(projectPath, `${issueId.toLowerCase()}.md`), format: 'pan-draft', status: 'draft' },
+/**
+ * Workspace candidates first, when a `workspacePath` is given: complete-planning
+ * now promotes the PRD draft onto the issue's own workspace plan home rather
+ * than the primary checkout (PAN-4224), so a draft written there is the
+ * freshest copy and must win over a stale or not-yet-synced primary one.
+ *
+ * Canonical drafts exist in both filename cases on disk (the door writes
+ * UPPER.md; humans and conversations historically wrote lower.md) — accept
+ * either, matching checkPrdGateSync.
+ */
+function draftPrdCandidates(projectPath: string, issueId: string, workspacePath?: string | null): PrdLocation[] {
+  const candidatesFor = (root: string): PrdLocation[] => [
+    { path: getIssueDraftPath(root, issueId), format: 'pan-draft', status: 'draft' },
+    { path: getDraftPath(root, `${issueId.toLowerCase()}.md`), format: 'pan-draft', status: 'draft' },
   ];
+  return [...(workspacePath ? candidatesFor(workspacePath) : []), ...candidatesFor(projectPath)];
 }
 
-export function findDraftPrdSync(projectPath: string, issueId: string): PrdLocation | null {
-  for (const candidate of draftPrdCandidates(projectPath, issueId)) {
+export function findDraftPrdSync(projectPath: string, issueId: string, workspacePath?: string | null): PrdLocation | null {
+  for (const candidate of draftPrdCandidates(projectPath, issueId, workspacePath)) {
     if (existsSync(candidate.path)) return candidate;
   }
   return null;
 }
 
-/** Find an issue's draft PRD under the project's `.pan/drafts/`, or null. */
-export async function findDraftPrd(projectPath: string, issueId: string): Promise<PrdLocation | null> {
-  for (const candidate of draftPrdCandidates(projectPath, issueId)) {
+/**
+ * Find an issue's draft PRD, or null. Checks the issue's workspace plan home
+ * (when `workspacePath` is given) before the project's `.pan/drafts/`.
+ */
+export async function findDraftPrd(projectPath: string, issueId: string, workspacePath?: string | null): Promise<PrdLocation | null> {
+  for (const candidate of draftPrdCandidates(projectPath, issueId, workspacePath)) {
     try {
       await access(candidate.path);
       return candidate;
     } catch {
-      // Try the historical filename case before reporting no draft.
+      // Try the next candidate before reporting no draft.
     }
   }
   return null;
@@ -141,14 +152,17 @@ export async function findDraftPrd(projectPath: string, issueId: string): Promis
 /**
  * Find a PRD across all lifecycle statuses, in priority order:
  * active → completed → planned → draft. Returns the first match or null.
+ * `workspacePath`, when given, is checked before the project path within the
+ * draft tier (PAN-4224).
  */
 export function findPrdAnywhere(
   projectPath: string,
   issueId: string,
+  workspacePath?: string | null,
 ): PrdLocation | null {
   for (const status of ['active', 'completed', 'planned'] as const) {
     const loc = findPrdAtStatus(projectPath, issueId, status);
     if (loc) return loc;
   }
-  return findDraftPrdSync(projectPath, issueId)
+  return findDraftPrdSync(projectPath, issueId, workspacePath)
 }

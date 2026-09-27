@@ -504,6 +504,27 @@ describe('resource-discovery membership-aware state labels', () => {
     ]);
   });
 
+  /**
+   * PAN-4224: complete-planning now promotes the PRD draft onto the issue's
+   * workspace plan home instead of the primary checkout, so the PRD resource
+   * badge must be able to find it there too.
+   */
+  it('looks up the PRD draft under the issue workspace, not just the primary checkout', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-3341', title: 'Some issue' },
+    ]);
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([]);
+
+    await refreshResourceAllocatedProjects([project]);
+    await getCachedResourceAllocatedIssues();
+
+    expect(mocks.findDraftPrd).toHaveBeenCalledWith(
+      '/tmp/overdeck',
+      'PAN-3341',
+      '/tmp/overdeck/workspaces/feature-pan-3341',
+    );
+  });
+
   it('labels tracker-closed clean-terminal residue without tmux as done', async () => {
     mocks.issueService.getIssues.mockReturnValue([
       { identifier: 'PAN-3343', title: 'Closed work with Docker residue', state: 'closed' },

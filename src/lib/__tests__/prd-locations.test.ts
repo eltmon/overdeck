@@ -7,13 +7,16 @@ import { findDraftPrd, findDraftPrdSync, findPrdAnywhere } from '../prd-location
 import { getDraftsDir } from '../pan-dir/index.js';
 
 let projectRoot: string;
+let workspacePath: string;
 
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'prd-locations-'));
+  workspacePath = mkdtempSync(join(tmpdir(), 'prd-locations-ws-'));
 });
 
 afterEach(() => {
   if (existsSync(projectRoot)) rmSync(projectRoot, { recursive: true, force: true });
+  if (existsSync(workspacePath)) rmSync(workspacePath, { recursive: true, force: true });
 });
 
 describe('findDraftPrdSync', () => {
@@ -42,6 +45,33 @@ describe('findDraftPrdSync', () => {
   it('returns null when no draft exists', () => {
     expect(findDraftPrdSync(projectRoot, 'PAN-2858')).toBeNull();
   });
+
+  /**
+   * PAN-4224: complete-planning now promotes the PRD draft onto the issue's
+   * workspace plan home, not the primary checkout, so a reader given a
+   * workspacePath must prefer its draft over a stale or absent primary copy.
+   */
+  it('prefers the workspace draft over the primary checkout when both exist', () => {
+    const primaryDraftsDir = getDraftsDir(projectRoot);
+    mkdirSync(primaryDraftsDir, { recursive: true });
+    writeFileSync(join(primaryDraftsDir, 'pan-2858.md'), 'primary\n', 'utf-8');
+
+    const wsDraftsDir = getDraftsDir(workspacePath);
+    mkdirSync(wsDraftsDir, { recursive: true });
+    const wsDraft = join(wsDraftsDir, 'pan-2858.md');
+    writeFileSync(wsDraft, 'workspace\n', 'utf-8');
+
+    expect(findDraftPrdSync(projectRoot, 'PAN-2858', workspacePath)?.path).toBe(wsDraft);
+  });
+
+  it('falls back to the primary checkout when only it holds a draft', () => {
+    const primaryDraftsDir = getDraftsDir(projectRoot);
+    mkdirSync(primaryDraftsDir, { recursive: true });
+    const primaryDraft = join(primaryDraftsDir, 'pan-2858.md');
+    writeFileSync(primaryDraft, 'primary\n', 'utf-8');
+
+    expect(findDraftPrdSync(projectRoot, 'PAN-2858', workspacePath)?.path).toBe(primaryDraft);
+  });
 });
 
 describe('findDraftPrd', () => {
@@ -61,6 +91,20 @@ describe('findDraftPrd', () => {
   it('returns null asynchronously when no draft exists', async () => {
     await expect(findDraftPrd(projectRoot, 'PAN-2858')).resolves.toBeNull();
   });
+
+  it('prefers the workspace draft over the primary checkout when both exist', async () => {
+    const primaryDraftsDir = getDraftsDir(projectRoot);
+    mkdirSync(primaryDraftsDir, { recursive: true });
+    writeFileSync(join(primaryDraftsDir, 'pan-2858.md'), 'primary\n', 'utf-8');
+
+    const wsDraftsDir = getDraftsDir(workspacePath);
+    mkdirSync(wsDraftsDir, { recursive: true });
+    const wsDraft = join(wsDraftsDir, 'pan-2858.md');
+    writeFileSync(wsDraft, 'workspace\n', 'utf-8');
+
+    const location = await findDraftPrd(projectRoot, 'PAN-2858', workspacePath);
+    expect(location?.path).toBe(wsDraft);
+  });
 });
 
 describe('findPrdAnywhere', () => {
@@ -73,5 +117,19 @@ describe('findPrdAnywhere', () => {
     const loc = findPrdAnywhere(projectRoot, 'PAN-2858');
     expect(loc?.format).toBe('pan-draft');
     expect(loc?.path).toBe(lower);
+  });
+
+  it('prefers the workspace draft over the primary checkout within the draft tier', () => {
+    const primaryDraftsDir = getDraftsDir(projectRoot);
+    mkdirSync(primaryDraftsDir, { recursive: true });
+    writeFileSync(join(primaryDraftsDir, 'pan-2858.md'), 'primary\n', 'utf-8');
+
+    const wsDraftsDir = getDraftsDir(workspacePath);
+    mkdirSync(wsDraftsDir, { recursive: true });
+    const wsDraft = join(wsDraftsDir, 'pan-2858.md');
+    writeFileSync(wsDraft, 'workspace\n', 'utf-8');
+
+    const loc = findPrdAnywhere(projectRoot, 'PAN-2858', workspacePath);
+    expect(loc?.path).toBe(wsDraft);
   });
 });

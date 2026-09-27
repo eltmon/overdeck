@@ -54,6 +54,12 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   findProjectByPath: vi.fn(() => null),
 }));
 
+const mockFindPrdAnywhere = vi.hoisted(() => vi.fn(() => null));
+vi.mock('../../../../../src/lib/prd-locations.js', () => ({
+  findPrdAnywhere: mockFindPrdAnywhere,
+  readPrdContent: vi.fn(async () => null),
+}));
+
 const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
 vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
@@ -86,7 +92,7 @@ vi.mock('node:fs/promises', async () => {
   };
 });
 
-import { extractReviewerRole, fetchActivityDataWithContext } from '../../../../../src/dashboard/server/routes/command-deck.ts';
+import { extractReviewerRole, fetchActivityDataWithContext, fetchPlanningData } from '../../../../../src/dashboard/server/routes/command-deck.ts';
 import { resolveJsonlPath } from '../../../../../src/dashboard/server/routes/jsonl-resolver.js';
 
 const mockAgentStates = vi.hoisted(() => new Map<string, any>());
@@ -315,5 +321,27 @@ describe('fetchActivityDataWithContext', () => {
       type: 'ship',
       hasJsonl: true,
     });
+  });
+});
+
+describe('fetchPlanningData', () => {
+  beforeEach(() => {
+    mockFindPrdAnywhere.mockClear();
+    mockFindPrdAnywhere.mockReturnValue(null);
+  });
+
+  /**
+   * PAN-4224: complete-planning now promotes the PRD draft onto the issue's
+   * workspace plan home instead of the primary checkout, so the planning tab
+   * must look there too, not just the primary project path.
+   */
+  it('looks up the PRD draft under the issue workspace, not just the primary checkout', async () => {
+    await fetchPlanningData('PAN-3341');
+
+    expect(mockFindPrdAnywhere).toHaveBeenCalledWith(
+      '/tmp/overdeck',
+      'PAN-3341',
+      '/tmp/overdeck/workspaces/feature-pan-3341',
+    );
   });
 });

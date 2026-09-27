@@ -618,7 +618,7 @@ const getMissionControlPlanningRoute = HttpRouter.add(
   })),
 );
 
-async function fetchPlanningData(
+export async function fetchPlanningData(
   issueId: string,
   options: { summaryOnly?: boolean } = {},
 ): Promise<unknown> {
@@ -669,7 +669,7 @@ async function fetchPlanningData(
   } catch { /* no xBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
-    const prdLocation = findPrdAnywhere(projectPath, issueId);
+    const prdLocation = findPrdAnywhere(projectPath, issueId, workspacePath);
     const prd = prdLocation ? await readPrdContent(prdLocation) : null;
     if (prd) {
       result.prd = prd;
@@ -708,7 +708,7 @@ async function fetchPlanningData(
     // findPrdAnywhere covers legacy docs/prds roots and canonical
     // drafts/<issue>.md on the state branch, which the status-only loop missed,
     // so promoted PRDs were invisible here.
-    const prdLocation = findPrdAnywhere(projectPath, issueId);
+    const prdLocation = findPrdAnywhere(projectPath, issueId, workspacePath);
     const content = prdLocation ? await readPrdContent(prdLocation) : null;
     if (content) {
       result.prd = content;
