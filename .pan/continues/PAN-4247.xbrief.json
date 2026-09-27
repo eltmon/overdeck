@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:10:17.016Z",
+  "updated": "2026-09-27T11:23:32.164Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-09-27T11:10:08.416Z"
     },
     "not-found-outbox": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4247",
-      "claimedAt": "2026-09-27T11:10:17.015Z"
+      "claimedAt": "2026-09-27T11:10:17.015Z",
+      "doneAt": "2026-09-27T11:23:32.164Z"
     }
   }
 }
