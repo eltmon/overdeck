@@ -35,6 +35,7 @@ export function useTerminalPermissionDialog(rows: TerminalPermissionFeedRow[], b
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [focusedName, setFocusedName] = useState<string | null>(null);
 
   const subjects: TerminalPermissionSubject[] = rows
     .filter((row): row is TerminalPermissionFeedRow & { pendingPermission: TerminalPendingPermission } => row.pendingPermission != null)
@@ -43,6 +44,7 @@ export function useTerminalPermissionDialog(rows: TerminalPermissionFeedRow[], b
     .sort((a, b) => a.pendingPermission.since.localeCompare(b.pendingPermission.since));
   const subject =
     subjects.find((s) => terminalPermissionKey(s.conversationName, s.pendingPermission) === confirmingKey)
+    ?? subjects.find((s) => s.conversationName === focusedName)
     ?? subjects[0]
     ?? null;
   const liveKeys = subjects.map((s) => terminalPermissionKey(s.conversationName, s.pendingPermission)).join('\n');
@@ -93,7 +95,14 @@ export function useTerminalPermissionDialog(rows: TerminalPermissionFeedRow[], b
     navigateToDecisionSubject({ id: subject.conversationName, source: 'conversation' });
   }, [dismiss, subject]);
 
+  /** Bring one conversation's prompt forward (notification click), undoing a dismissal. */
+  const focus = useCallback((conversationName: string) => {
+    setFocusedName(conversationName);
+    setDismissed((prev) => new Set([...prev].filter((key) => !key.startsWith(`${conversationName}::`))));
+  }, []);
+
   return {
+    focus,
     subject,
     isOpen: subject !== null && !blocked,
     isSubmitting,

@@ -7,6 +7,7 @@ import type { AskUserQuestionSubject } from '../../components/AskUserQuestionDia
 import type { PlanApprovalSubject } from '../../components/PlanApprovalDialog';
 import type { TerminalPendingPermission } from '../../components/TerminalPermissionDialog';
 import { useTerminalPermissionDialog } from './useTerminalPermissionDialog';
+import { showPendingInputNotification, usePermissionNotifications } from './usePermissionNotifications';
 import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAskUserQuestion, selectAgentsWithPendingProposedPlan, selectChannelPermissionRequests } from '../../lib/store';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
@@ -68,6 +69,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
   // Latest pending-input feed rows, readable from the reopen effect without
   // re-running it on every 4s poll (FR-5 routing needs the conv rows).
   const convAskUserQuestionRowsRef = useRef<ConvAskUserQuestionRow[]>([]);
+  const focusTerminalPermissionRef = useRef<(conversationName: string) => void>(() => {});
 
   useEffect(() => {
     if (!askUserQuestionReopenId) return;
@@ -84,6 +86,12 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     // notification must open the plan-approval dialog, not the AUQ modal.
     // AUQ wins when both are somehow pending (it blocks the plan answer anyway).
     const convRow = convAskUserQuestionRowsRef.current.find((c) => c.name === askUserQuestionReopenId);
+    // PAN-4278 — a terminal permission prompt blocks everything else the
+    // conversation shows, so a click on its notification opens that dialog.
+    if (convRow?.pendingPermission) {
+      focusTerminalPermissionRef.current(askUserQuestionReopenId);
+      return;
+    }
     const hasAuq = agentEntry?.pendingAskUserQuestion != null || convRow?.pendingAskUserQuestion != null;
     const hasPlan = agentEntry?.pendingProposedPlan != null || convRow?.pendingProposedPlan != null;
     if (!hasAuq && hasPlan) {
@@ -140,7 +148,10 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
   convAskUserQuestionRowsRef.current = convAskUserQuestionRows;
   // PAN-4278 — terminal permission prompts share the channel-permission tier:
   // they wait while a channel request shows and hold back the AUQ/plan dialogs.
-  const terminalPermissionDialog = useTerminalPermissionDialog(convAskUserQuestionRows, currentChannelPermissionRequest !== null);
+  const { focus: focusTerminalPermission, ...terminalPermissionDialog } =
+    useTerminalPermissionDialog(convAskUserQuestionRows, currentChannelPermissionRequest !== null);
+  focusTerminalPermissionRef.current = focusTerminalPermission;
+  usePermissionNotifications(convAskUserQuestionRows, requestAskUserQuestionReopen);
 
   // PAN-1520 (FR-3) — plan-approval subjects across agents and conversations,
   // mirroring the AUQ subject assembly below.
@@ -272,18 +283,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       const key = id;
       if (notifiedPendingInputRef.current.has(key)) return;
       notifiedPendingInputRef.current.add(key);
-      const reopen = (): void => requestAskUserQuestionReopen(subjectId);
-      toast.info(title, {
-        description: body,
-        duration: 12000,
-        action: { label: 'Answer', onClick: reopen },
-      });
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        try {
-          const n = new Notification(title, { body, tag: key });
-          n.onclick = (): void => { window.focus(); reopen(); n.close(); };
-        } catch { /* ignore */ }
-      }
+      showPendingInputNotification(key, title, body, () => requestAskUserQuestionReopen(subjectId));
     };
 
     for (const a of agentsWithAskUserQuestion) {
