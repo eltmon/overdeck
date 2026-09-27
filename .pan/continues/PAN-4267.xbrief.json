@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T15:34:04.785Z",
+  "updated": "2026-09-27T15:41:13.595Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "governor-reserve-defaults": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4267",
-      "claimedAt": "2026-09-27T15:34:04.785Z"
+      "claimedAt": "2026-09-27T15:34:04.785Z",
+      "doneAt": "2026-09-27T15:41:13.594Z"
     }
   }
 }
