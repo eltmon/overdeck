@@ -20,7 +20,7 @@ import { GitHubApiError, ConfigError, FsError } from './errors.js';
 import { ensureBotCredentialFile, resolveWorkspaceRemote } from './github-credentials.js';
 import { withConcurrencyLimit } from './concurrency.js';
 import { isAdvisoryCheckName } from './advisory-checks.js';
-import { beginAppRestCall, finishAppRestCall } from './github-quota/app-meter.js';
+import { beginAppRestCall, finishAppRestCall } from './github-quota/rest-meter.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Cause, Effect, Exit } from 'effect';
 
 // ─── Mock global fetch ────────────────────────────────────────────────────────
@@ -271,5 +271,84 @@ describe('GitHubClient Effect service', () => {
         }),
       );
     });
+  });
+});
+
+// PAN-4264 Work Item 6: the PAT client is metered in the `pat` pool and a
+// rate-limit refusal pauses the PAT REST bucket.
+describe('GitHubClient quota metering (PAN-4264)', () => {
+  const originalHome = process.env.OVERDECK_HOME;
+  let home: string;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockGetGitHubConfig.mockReturnValue({ token: 'ghp_test123', repos: [] });
+    const { mkdtempSync } = await import('fs');
+    const { tmpdir } = await import('os');
+    home = mkdtempSync(`${tmpdir()}/pan-pat-quota-`);
+    process.env.OVERDECK_HOME = home;
+  });
+
+  afterEach(async () => {
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    const { rmSync } = await import('fs');
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  async function getIssueEffect() {
+    const { GitHubClient, GitHubClientLive } = await import('../github-client.js');
+    return Effect.gen(function* () {
+      const client = yield* GitHubClient;
+      return yield* client.getIssue('owner', 'repo', 7);
+    }).pipe(Effect.provide(GitHubClientLive));
+  }
+
+  it('writes a 30-second secondary pause and fails with RateLimited for a 429 with Retry-After: 30', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 8, 27, 15, 0));
+    try {
+      mockFetch.mockResolvedValueOnce(new Response('{"message":"slow down"}', {
+        status: 429,
+        headers: { 'Retry-After': '30' },
+      }));
+
+      const err = await runProgramFail(await getIssueEffect());
+      const { RateLimited } = await import('../typed-errors.js');
+      expect(err).toBeInstanceOf(RateLimited);
+      expect((err as InstanceType<typeof RateLimited>).retryAfter).toBe(30);
+
+      const { readActivePause } = await import('../../../../lib/github-quota/pause-gate.js');
+      const [pause] = readActivePause();
+      expect(pause).toMatchObject({ pool: 'pat', bucket: 'rest', kind: 'secondary', caller: 'tracker-client' });
+      expect(Date.parse(pause!.until) - Date.now()).toBe(30_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails with RateLimited for a 403 with zero remaining and records the pause', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('{"message":"API rate limit exceeded for user."}', {
+      status: 403,
+      headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 600) },
+    }));
+
+    const err = await runProgramFail(await getIssueEffect());
+    const { RateLimited } = await import('../typed-errors.js');
+    expect(err).toBeInstanceOf(RateLimited);
+    const { readActivePause } = await import('../../../../lib/github-quota/pause-gate.js');
+    expect(readActivePause()).toEqual([expect.objectContaining({ pool: 'pat', bucket: 'rest', kind: 'primary' })]);
+  });
+
+  it('appends a pat-pool ledger line for a successful call', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      number: 7, title: 't', body: '', state: 'open', labels: [], html_url: 'u',
+    }), { status: 200, headers: { 'x-ratelimit-remaining': '4999', 'x-ratelimit-limit': '5000' } }));
+
+    await runProgram(await getIssueEffect());
+    const { readLedgerWindow } = await import('../../../../lib/github-quota/ledger.js');
+    expect(readLedgerWindow(Date.now())).toEqual([expect.objectContaining({
+      caller: 'tracker-client', pool: 'pat', bucket: 'rest', outcome: 'ok', remaining: 4999, limit: 5000,
+    })]);
   });
 });
