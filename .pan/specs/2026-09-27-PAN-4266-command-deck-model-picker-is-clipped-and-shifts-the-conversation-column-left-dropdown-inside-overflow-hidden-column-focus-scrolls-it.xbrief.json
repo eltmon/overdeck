@@ -1,0 +1,640 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T15:16:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4266: Command Deck model picker is clipped and shifts the conversation column left (dropdown inside overflow-hidden column; focus scrolls it)",
+    "updated": "2026-09-27T15:19:57.776Z"
+  },
+  "plan": {
+    "id": "pan-4266",
+    "title": "Command Deck model picker is clipped and shifts the conversation column left (dropdown inside overflow-hidden column; focus scrolls it)",
+    "status": "running",
+    "uid": "17c073d9-8e9f-4f85-8bae-49dc760c9d8e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-27T15:16:16Z",
+    "updated": "2026-09-27T15:19:57.776Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4266",
+        "label": "PAN-4266",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4266.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "command-deck",
+      "model-picker",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "In the Command Deck, the chat model picker (chat/ModelPicker.tsx, styled by command-deck.module.css .pickerDropdown) renders a 300-460px absolute dropdown inside the 320px conversation column (.sidebar, overflow: hidden), so the dropdown is clipped. Its search input uses React autoFocus, which calls focus() without preventScroll, so the browser scrolls the overflow-hidden column sideways and the column content stays shifted left until reload. The effort picker shares the dropdown class.",
+      "Proposal": "Add a resetClippedAncestorScroll helper and a new useFloatingPickerPosition hook that places a position: fixed dropdown from the trigger's getBoundingClientRect(), flips/clamps it inside the viewport with an 8px gutter, repositions on resize/scroll/ResizeObserver, and resets clipped-ancestor scrollLeft on close. Render the chat model picker and effort picker dropdowns through createPortal(document.body) using that hook, fix outside-click detection for the portal, and focus the search input with preventScroll. Clean up the now-dead CSS, prove it with a stubbed Playwright spec plus light/dark screenshots, document the rule in STYLE-GUIDE.md, and add the new unit tests to the CI frontend subset.",
+      "NonGoals": "- Changing shared/ModelPicker/ModelPicker.tsx (ModelSelect, HarnessSelect, ModelHarnessPicker)\n- Changing chat/usePickerPosition.ts or chat/MarkdownFileLink.tsx\n- Adopting PopoverSurface/MenuSurface for the pickers or changing the picker frame's look (colors, borders, radius, shadow, width, two-panel layout)\n- Adding keyboard navigation, focus return to the trigger, or new Escape handling\n- Changing overflow on .sidebar, .layout, or <main>\n- Closing the dropdown on scroll\n- Running the Playwright spec against the operator's live dashboard on :3011"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix chat/ModelPicker.tsx and chat/EffortPicker.tsx, not shared/ModelPicker/ModelPicker.tsx",
+        "rationale": "The issue's measured values (z-index 9999, 460px max width, focused search input) match command-deck.module.css .pickerDropdown used only by the chat pickers; CommandDeck/index.tsx renders the chat ModelPicker. The shared ModelSelect has no search input and a trigger-width dropdown, so neither failure mechanism applies."
+      },
+      {
+        "summary": "Create a new useFloatingPickerPosition hook instead of changing usePickerPosition",
+        "rationale": "chat/MarkdownFileLink.tsx depends on usePickerPosition's { openUp, align, maxHeight } contract; a new hook avoids unrequested changes there."
+      },
+      {
+        "summary": "Use createPortal directly instead of shared PopoverSurface/MenuSurface",
+        "rationale": "MENU_SURFACE_CLASS (max-h-[70vh] overflow-y-auto p-1) fights the two-panel flex-row overflow-hidden frame, PopoverSurface forces role=dialog, and its autoFocus focuses without preventScroll. ConversationActionMenu.tsx already uses createPortal directly."
+      },
+      {
+        "summary": "Reposition on scroll and resize rather than closing",
+        "rationale": "The issue's Fix step 1 says reposition on scroll and resize."
+      },
+      {
+        "summary": "Reset scrollLeft only on overflow-x: hidden ancestors, never scrollTop or auto/scroll containers",
+        "rationale": "Settings -> Roles hosts the picker inside a scrollable page; touching real scroll containers or scrollTop would make it jump on close."
+      },
+      {
+        "summary": "Verify composer pickers with existing Vitest suites; verify Command Deck and home picker with a stubbed Playwright spec",
+        "rationale": "The composer needs a live conversation that the PAN-4198 stub harness does not provide; the stub keeps the spec off the operator's dashboard."
+      },
+      {
+        "summary": "Commit screenshots to docs/images/pan-4266/ and embed them in the PR body by path",
+        "rationale": "Same approach as PAN-4198: GitHub has no API to attach images to a PR body and test-results/ is gitignored."
+      }
+    ],
+    "items": [
+      {
+        "id": "clipped-scroll-reset",
+        "title": "Add resetClippedAncestorScroll helper for clipped columns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:16:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4266",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/resetClippedScroll.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/resetClippedScroll.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/resetClippedScroll.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "resetClippedScroll.test.ts passes with 4 tests",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4266.md). Create src/dashboard/frontend/src/components/chat/resetClippedScroll.ts exporting resetClippedAncestorScroll(start: HTMLElement | null): void, exactly as the PRD snippet: walk start.parentElement up to (not including) document.body; for each element whose scrollLeft !== 0 AND getComputedStyle(el).overflowX === 'hidden', set scrollLeft = 0. Never touch scrollTop; never touch auto/scroll/visible/clip containers. Add the header comment from the PRD. Tests in chat/__tests__/resetClippedScroll.test.ts run under happy-dom: set el.style.overflowX explicitly (do not rely on the overflow shorthand) and assign scrollLeft directly."
+        },
+        "items": [
+          {
+            "id": "clipped-scroll-reset.ac1",
+            "title": "Given an ancestor with overflow-x hidden and scrollLeft 64, when resetClippedAncestorScroll runs on a descendant, then that ancestor's scrollLeft becomes 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clipped-scroll-reset.ac2",
+            "title": "Given an ancestor with overflow-x auto and scrollLeft 64, when the helper runs, then it preserves scrollLeft 64",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clipped-scroll-reset.ac3",
+            "title": "Given a hidden ancestor with scrollTop 50, when the helper runs, then it preserves scrollTop 50, and calling it with null returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "floating-position-hook",
+        "title": "Add useFloatingPickerPosition hook for portaled fixed dropdowns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:16:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4266",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useFloatingPickerPosition.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/useFloatingPickerPosition.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/useFloatingPickerPosition.test.tsx",
+            "npm run typecheck:frontend",
+            "npx eslint src/dashboard/frontend/src/components/chat/useFloatingPickerPosition.ts --no-inline-config"
+          ],
+          "expected_outputs": [
+            "useFloatingPickerPosition.test.tsx passes",
+            "typecheck:frontend completes without errors",
+            "eslint reports no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "model-picker-portal",
+            "effort-picker-portal"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create chat/useFloatingPickerPosition.ts with signature useFloatingPickerPosition(open, anchorRef, dropdownRef, { preferredHeight = 400 }) => { style: CSSProperties }. Follow the PRD's 9-step algorithm exactly: GUTTER 8, GAP 4, MIN_DOWN_HEIGHT 240; measure only anchor getBoundingClientRect() and dropdownRef.current.offsetWidth (never the dropdown's own rect); openUp flip; left-align then right-align-to-trigger then clamp into [8, innerWidth-8-width]; style = { position:'fixed', left, right:'auto', maxHeight, top or 'auto', bottom or 'auto' }; setState only when a number changed; useLayoutEffect while open; listeners: window resize, window scroll {capture:true, passive:true} ignoring targets inside the dropdown, ResizeObserver on the dropdown when defined; cleanup on close/unmount; on open true->false call resetClippedAncestorScroll(anchorRef.current) from ./resetClippedScroll; before first measurement return { position:'fixed', visibility:'hidden', top:0, left:0 }. Do NOT edit chat/usePickerPosition.ts (MarkdownFileLink.tsx depends on it)."
+        },
+        "items": [
+          {
+            "id": "floating-position-hook.ac1",
+            "title": "Given an anchor at left 600 in a 1512px viewport and a 460px-wide dropdown, when the hook measures, then it returns style.left 600 and style.top equal to anchor bottom plus 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floating-position-hook.ac2",
+            "title": "Given an anchor whose right edge is at 1500, when the dropdown would overflow the right gutter, then it aligns the dropdown right edge to the anchor (left 1040); given an anchor at left 2, then it clamps left to 8",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floating-position-hook.ac3",
+            "title": "Given an anchor at top 900 in a 982px viewport, when the hook measures, then it returns top 'auto' and bottom 86 (opens upward)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floating-position-hook.ac4",
+            "title": "Given the dropdown is open, when the anchor rect changes and a window resize event fires, then it emits the updated style.left",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "floating-position-hook.ac5",
+            "title": "Given an overflow-x hidden parent with scrollLeft 50, when open changes from true to false, then the parent's scrollLeft becomes 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "model-picker-portal",
+        "title": "Render chat ModelPicker dropdown in a body portal with preventScroll focus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:16:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4266",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ModelPicker.test.tsx src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx src/components/simple/TalkItThrough.test.tsx",
+            "npm run typecheck:frontend",
+            "npx eslint src/dashboard/frontend/src/components/chat/ModelPicker.tsx --no-inline-config"
+          ],
+          "expected_outputs": [
+            "ModelPicker.test.tsx, ComposerFooter.model-picker.test.tsx and TalkItThrough.test.tsx all pass",
+            "typecheck:frontend completes without errors",
+            "eslint reports no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In chat/ModelPicker.tsx: import createPortal from react-dom; replace the usePickerPosition import/call (~line 234) with const { style: dropdownStyle } = useFloatingPickerPosition(open, ref, dropdownRef); add dropdownRef and searchRef; outside-click handler (~346-354) returns early when ref.current or dropdownRef.current contains the target, else setOpen(false); add useEffect(() => { if (open) searchRef.current?.focus({ preventScroll: true }); }, [open]); render the dropdown via createPortal(<div ref={dropdownRef} data-testid=\"model-picker-dropdown\" className={styles.pickerDropdown} style={dropdownStyle}>...</div>, document.body) — drop the pickerDropdownUp class and the align/maxHeight inline style; on the search input remove autoFocus and add ref={searchRef}. Append a 'PAN-4266 portal' describe block to chat/__tests__/ModelPicker.test.tsx with the four tests from the PRD. Existing tests that click rows inside the dropdown are the FR-6 regression guard and must pass unmodified."
+        },
+        "items": [
+          {
+            "id": "model-picker-portal.ac1",
+            "title": "Given the picker is opened, when the test queries data-testid model-picker-dropdown, then its parentElement is document.body and the render container does not contain it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-picker-portal.ac2",
+            "title": "Given a spy on HTMLElement.prototype.focus, when the picker opens, then focus is called on the search input with { preventScroll: true } and the input renders without an autofocus attribute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-picker-portal.ac3",
+            "title": "Given the dropdown is open, when mousedown fires on document.body, then the dropdown closes; when mousedown fires on a node inside the dropdown, then it stays open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-picker-portal.ac4",
+            "title": "Given the existing ModelPicker and ComposerFooter model-picker suites, when they run against the portaled dropdown, then every harness-row and model-row click still selects the row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-picker-portal",
+        "title": "Render EffortPicker dropdown in a body portal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:16:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4266",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/EffortPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/EffortPicker.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/EffortPicker.test.tsx src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+            "npm run typecheck:frontend",
+            "npx eslint src/dashboard/frontend/src/components/chat/EffortPicker.tsx --no-inline-config"
+          ],
+          "expected_outputs": [
+            "EffortPicker.test.tsx and ComposerFooter.model-picker.test.tsx pass",
+            "typecheck:frontend completes without errors",
+            "eslint reports no errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In chat/EffortPicker.tsx apply the WI-3 pattern: createPortal to document.body; useFloatingPickerPosition(open, ref, dropdownRef, { preferredHeight: 240 }) replaces usePickerPosition; outside-click checks both ref and dropdownRef; dropdown div gets ref={dropdownRef}, data-testid=\"effort-picker-dropdown\", className={styles.pickerDropdown}, style from the hook (drop pickerDropdownUp and the align/maxHeight inline style). No focus change (no search input). Create chat/__tests__/EffortPicker.test.tsx with the four tests from the PRD."
+        },
+        "items": [
+          {
+            "id": "effort-picker-portal.ac1",
+            "title": "Given the effort picker is opened, when the test queries data-testid effort-picker-dropdown, then its parentElement is document.body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-picker-portal.ac2",
+            "title": "Given the dropdown is open, when the user clicks 'Low', then onChange is called with 'low' and the dropdown closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-picker-portal.ac3",
+            "title": "Given the dropdown is open, when mousedown fires on document.body, then the dropdown closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-picker-portal.ac4",
+            "title": "Given availableLevels is an empty array, when the picker renders, then it renders the 'effort n/a for this model' hint and no dropdown trigger",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-css-cleanup",
+        "title": "Make .pickerDropdown fixed-position and delete .pickerDropdownUp",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-09-27T15:16:16Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4266",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -rn pickerDropdownUp src/dashboard/frontend/src || echo NO_MATCHES",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "grep prints NO_MATCHES",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In command-deck.module.css .pickerDropdown (~line 4662) replace 'position: absolute; left: 0; top: calc(100% + 4px);' with 'position: fixed;' preceded by the comment '/* PAN-4266: portaled to <body>; useFloatingPickerPosition sets top/left inline. */'. Delete the .pickerDropdownUp rule (~line 4678). Leave every other declaration (z-index 9999, border, radius, shadow, min/max width, flex row, overflow hidden) unchanged."
+        },
+        "items": [
+          {
+            "id": "picker-css-cleanup.ac1",
+            "title": "Given the cleanup is applied, when grep searches src/dashboard/frontend/src for pickerDropdownUp, then it returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-css-cleanup.ac2",
+            "title": "Given the .pickerDropdown rule, when read, then it declares position: fixed and z-index: 9999 and contains no left: or top: declaration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-clipping-spec",
+        "title": "Add Playwright spec proving the Command Deck picker is unclipped, with light/dark screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:16:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4266",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4266-model-picker.spec.ts",
+            "docs/images/pan-4266/command-deck-picker-light-1512x982.png",
+            "docs/images/pan-4266/command-deck-picker-dark-1512x982.png",
+            "docs/images/pan-4266/command-deck-picker-light-1280x800.png",
+            "docs/images/pan-4266/command-deck-picker-dark-1280x800.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && (npx vite --port 3911 --strictPort >/tmp/pan-4266-vite.log 2>&1 &) && sleep 8 && PAN_4266_BASE_URL=http://127.0.0.1:3911 npx playwright test tests/pan-4266-model-picker.spec.ts",
+            "ls docs/images/pan-4266/*.png"
+          ],
+          "expected_outputs": [
+            "playwright reports all tests passed",
+            "four PNG files listed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create src/dashboard/frontend/tests/pan-4266-model-picker.spec.ts by copying installMockTransport, routeDashboardApis, freezeAnimations and setTheme from tests/pan-4198-issue-menu.spec.ts with an empty snapshot. Base URL env PAN_4266_BASE_URL (default http://127.0.0.1:3911); header comment gives the vite + playwright run recipe. Per viewport {1512x982 at deviceScaleFactor 2, 1280x800}: goto /command-deck; record heading = getByRole('heading', {name:'Command Deck'}) x; click '[class*=\"sidebarHeaderGroup\"] [class*=\"pickerBtn\"]'.first(); assert getByTestId('model-picker-dropdown') box within [7.5, W-7.5]x[7.5, H-7.5]; evaluate elementFromPoint at 4 corners inset 2px all inside the dropdown; heading x unchanged (±0.5) and every heading ancestor scrollLeft 0; screenshot light and dark to docs/images/pan-4266/command-deck-picker-<theme>-<W>x<H>.png; click the heading to close; dropdown detached and heading x unchanged. Add the simple-home case (localStorage overdeck:ui-mode=simple) with the PRD's implementation checkpoint + fallback. Red-first checkpoint: git restore --source=origin/main -- src/dashboard/frontend/src/components/chat/ModelPicker.tsx, run spec, confirm clip assertions fail, then git restore --source=HEAD -- that file and confirm green; record both in the PR body. Never git stash / git checkout. Use an isolated Playwright browser; never contact the dashboard on :3011. Stop the vite server afterwards. Embed the four PNGs in the PR body by repo path."
+        },
+        "items": [
+          {
+            "id": "playwright-clipping-spec.ac1",
+            "title": "Given the stubbed Command Deck at 1512x982 and 1280x800, when the model picker opens, then the dropdown bounding box stays within the viewport with an 8px gutter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-clipping-spec.ac2",
+            "title": "Given the open dropdown, when elementFromPoint runs at each corner inset 2px, then all four points return a node inside data-testid model-picker-dropdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-clipping-spec.ac3",
+            "title": "Given the heading 'Command Deck' left edge recorded before opening, when the picker opens and then closes, then the heading left edge is unchanged within 0.5px and every ancestor scrollLeft stays 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-clipping-spec.ac4",
+            "title": "Given the spec run, when screenshots are taken in light and dark mode at both viewports, then it creates four PNG files under docs/images/pan-4266/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "style-guide-picker-rule",
+        "title": "Document the anchored-picker portal rule in the style guide",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-09-27T15:16:16Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4266",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/STYLE-GUIDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Anchored pickers in clipped columns (PAN-4266)' design/style-guide/STYLE-GUIDE.md",
+            "grep -n 'preventScroll' design/style-guide/STYLE-GUIDE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new paragraph heading line",
+            "grep prints a line mentioning preventScroll"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In design/style-guide/STYLE-GUIDE.md section '### Context Menus and Popovers' (~line 1011), append the exact 'Anchored pickers in clipped columns (PAN-4266)' paragraph from the PRD after the paragraph that starts 'Shared menu behavior includes'. No other doc changes."
+        },
+        "items": [
+          {
+            "id": "style-guide-picker-rule.ac1",
+            "title": "Given STYLE-GUIDE.md, when the Context Menus and Popovers section is read, then it contains a paragraph titled 'Anchored pickers in clipped columns (PAN-4266)' that names chat/useFloatingPickerPosition.ts, document.body portal, position: fixed and the 8px gutter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "style-guide-picker-rule.ac2",
+            "title": "Given that paragraph, when read, then it states focus inside such dropdowns uses focus({ preventScroll: true }) and rejects the autoFocus attribute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-frontend-subset",
+        "title": "Add the picker unit tests to the CI frontend test subset",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-09-27T15:16:16Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4266",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset"
+          ],
+          "expected_outputs": [
+            "test:frontend-subset passes and its output lists resetClippedScroll, useFloatingPickerPosition, ModelPicker and EffortPicker test files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In root package.json script test:frontend-subset (~line 135), append: src/components/chat/__tests__/resetClippedScroll.test.ts src/components/chat/__tests__/useFloatingPickerPosition.test.tsx src/components/chat/__tests__/ModelPicker.test.tsx src/components/chat/__tests__/EffortPicker.test.tsx. Change nothing else in package.json."
+        },
+        "items": [
+          {
+            "id": "ci-frontend-subset.ac1",
+            "title": "Given the updated package.json, when npm run test:frontend-subset runs, then it executes the four picker test files and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-frontend-subset.ac2",
+            "title": "Given the updated script, when diffed against origin/main, then only the four appended paths differ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "clipped-scroll-reset",
+        "to": "floating-position-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "floating-position-hook",
+        "to": "model-picker-portal",
+        "type": "blocks"
+      },
+      {
+        "from": "floating-position-hook",
+        "to": "effort-picker-portal",
+        "type": "blocks"
+      },
+      {
+        "from": "model-picker-portal",
+        "to": "picker-css-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-picker-portal",
+        "to": "picker-css-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "model-picker-portal",
+        "to": "playwright-clipping-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "picker-css-cleanup",
+        "to": "playwright-clipping-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "model-picker-portal",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-picker-portal",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-27-PAN-4266-command-deck-model-picker-is-clipped-and-shifts-the-conversation-column-left-dropdown-inside-overflow-hidden-column-focus-scrolls-it.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
