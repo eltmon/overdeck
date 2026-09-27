@@ -158,15 +158,19 @@ export interface ConversationSearchConfig {
 export interface TieredExecutionConfig {
   enabled: boolean;
   tiers: Record<string, {
+    /** A model id or a `workhorse:<slot>` ref (PAN-4191). */
     model: ModelId;
+    /** PAN-4191: set by the server when `model` is the dereffed value of this ref. */
+    modelRef?: string;
     harness: Harness;
     difficulties: XBriefDifficulty[];
     /** PAN-2391: weighted entries this tier spreads tasks across. When
      * present, model/harness above are the max-weight representative. */
-    distribution?: Array<{ model: ModelId; harness: Harness; weight: number }>;
+    distribution?: Array<{ model: ModelId; modelRef?: string; harness: Harness; weight: number }>;
   }>;
   supervisor?: {
     model: ModelId;
+    modelRef?: string;
     harness: Harness;
     subscribe: 'all' | 'flagged' | 'sampled';
   };
