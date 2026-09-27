@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:20:11.616Z",
+  "updated": "2026-09-27T16:20:22.163Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "reserve-normalization.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T16:20:11.616Z"
+    },
+    "reserve-normalization.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:22.162Z"
     }
   }
 }
