@@ -60,6 +60,7 @@ async function send(harness: 'claude-code' | 'codex', ensure: (agentId: string) 
     resolveSessionFile: async () => null,
     generateAiTitle: async () => {},
     ensureMainInputTarget: ensure,
+    conversationPendingPermission: async () => null,
   })) as unknown as { status: number; body: Record<string, unknown> };
 }
 

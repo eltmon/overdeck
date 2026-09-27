@@ -54,6 +54,7 @@ async function send(result: DeliveryResult) {
     resolveSessionFile: async () => null,
     generateAiTitle: async () => {},
     ensureMainInputTarget: async () => ({ ok: true, inputTarget: 'main' }),
+    conversationPendingPermission: async () => null,
     deliverAgentMessage: deliver,
   })) as unknown as { status: number; body: Record<string, unknown> };
   return { response, deliver };

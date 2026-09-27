@@ -16,6 +16,7 @@ import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
 import type { DeliveryResult } from '../agents/delivery.js';
 import { ensureMainInputTarget, type EnsureMainResult } from '../agents/input-target.js';
+import { conversationPendingPermission, type PendingPermission } from './conversation-permission.js';
 import {
   ComposerCommandConfirmationError,
   composerCommandConfirmationFromBody,
@@ -210,6 +211,8 @@ export interface ConversationMessageDependencies {
   transformMessageForHarness?(message: string, harness: RuntimeName, attachmentPaths: string[]): string;
   /** PAN-4268: move Claude Code's input to the main agent before pasting. */
   ensureMainInputTarget?: (agentId: string) => Promise<EnsureMainResult>;
+  /** PAN-4278: the permission prompt check that runs before ensure-main. */
+  conversationPendingPermission?: (conv: Conversation) => Promise<PendingPermission | null>;
   /** PAN-4278: injectable for tests; the route inspects its DeliveryResult. */
   deliverAgentMessage?: typeof deliverAgentMessage;
 }
@@ -533,6 +536,20 @@ export async function handleConversationMessage(
     });
   } else {
     if (harness === 'claude-code') {
+      // PAN-4278: never paste into a permission prompt. Checked BEFORE
+      // ensure-main, whose Down/Enter would move the menu cursor and answer it.
+      // Only a prompt on the pane holds the message — a stale hook entry alone
+      // must never block sends.
+      const pendingPermission = await (deps.conversationPendingPermission ?? conversationPendingPermission)(conv);
+      if (pendingPermission?.answerable) {
+        console.log(`[conversations] ${conv.name}: holding message — permission prompt pending (${pendingPermission.agentLabel})`);
+        return jsonResponse({
+          error: 'Waiting: the agent needs a permission answer first',
+          code: 'permission-pending',
+          deliveryUnknown: false,
+          retryable: true,
+        }, { status: 409 });
+      }
       const ensure = deps.ensureMainInputTarget ?? ensureMainInputTarget;
       const target = await ensure(conv.tmuxSession);
       if (!target.ok) {
