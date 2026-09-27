@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T17:07:50.861Z",
+  "updated": "2026-09-27T17:07:55.424Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,11 @@
       "claimedBy": "agent-pan-4264",
       "claimedAt": "2026-09-27T17:03:40.889Z",
       "doneAt": "2026-09-27T17:07:50.860Z"
+    },
+    "docs-quota-policy": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T17:07:55.424Z"
     }
   }
 }
