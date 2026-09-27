@@ -4,17 +4,17 @@
     "created": "2026-09-27T15:27:41Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4267: Memory governor locks out small Macs: fixed 4/12 GB floors and macOS 'available' memory keep Overdeck in permanent shedding",
-    "updated": "2026-09-27T15:32:40.189Z"
+    "updated": "2026-09-27T15:33:16.459Z"
   },
   "plan": {
     "id": "pan-4267",
     "title": "Memory governor locks out small Macs: fixed 4/12 GB floors and macOS 'available' memory keep Overdeck in permanent shedding",
-    "status": "proposed",
+    "status": "running",
     "uid": "62650d69-6492-4a3e-b6f6-d636b4bc2c5e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T15:27:41Z",
-    "updated": "2026-09-27T15:32:40.189Z",
+    "updated": "2026-09-27T15:33:16.459Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4267",
