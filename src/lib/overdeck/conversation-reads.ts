@@ -73,6 +73,7 @@ import { listConversationPullRequests } from './conversation-pull-requests.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
+import { conversationPendingPermission, readConversationPermission, type PendingPermission } from './conversation-permission.js';
 import { findClaudeSessionFileById } from './claude-session-file-search.js';
 import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 import { isKimiWirePath } from '../runtimes/storage/kimi-code.js';
@@ -406,11 +407,18 @@ export async function getConversationsPendingInputFeed(
         // PAN-3113 — blocking numbered-choice menus (the Claude Code
         // session-resume gate et al.) never reach the JSONL transcript, so
         // the scan above cannot see them; they exist only in the pane.
+        // PAN-4278 — a terminal permission prompt (main thread or subagent)
+        // is pane-only too. One pane read serves both checks on tmux; when a
+        // permission is pending the pane-choice check is skipped so one
+        // decision surface shows at a time.
+        const permission = await readConversationPermission(conv);
+        const pendingPermission = permission.pendingPermission;
         let paneChoice: PendingPaneChoice | null = null;
-        if (!pending && !pendingPlan) {
-          paneChoice = await claudeConversationPaneChoice(conv);
+        if (!pending && !pendingPlan && !pendingPermission) {
+          const sharedPane = permission.tmuxPaneText;
+          paneChoice = await claudeConversationPaneChoice(conv, sharedPane !== null ? { capture: async () => sharedPane } : {});
         }
-        if (!pending && !pendingPlan && !paneChoice) return null;
+        if (!pending && !pendingPlan && !paneChoice && !pendingPermission) return null;
         return {
           name: conv.name,
           title: conv.title ?? null,
@@ -421,6 +429,7 @@ export async function getConversationsPendingInputFeed(
           ...(pending ? { pendingAskUserQuestion: pending } : {}),
           ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
           ...(paneChoice ? { pendingPaneChoice: paneChoice } : {}),
+          ...(pendingPermission ? { pendingPermission } : {}),
         };
       }),
       8,
@@ -481,6 +490,16 @@ export async function getConversationRead(
         if (codex.approval) pendingAskUserQuestion = codex.approval;
       }
     }
+    // PAN-4278 — a terminal permission prompt on the pane (or a hook entry
+    // for one) blocks the conversation whatever else is pending.
+    let pendingPermission: PendingPermission | null = null;
+    if (sessionAlive) {
+      pendingPermission = await conversationPendingPermission(conv);
+      if (pendingPermission) {
+        pendingInputKinds = [...pendingInputKinds, 'permissionRequest'];
+        pendingInputCount = pendingInputKinds.length;
+      }
+    }
     // PAN-3113 — pane choice menus are pane-only; check them when nothing
     // else is pending so one decision surface shows at a time.
     let pendingPaneChoice: PendingPaneChoice | null = null;
@@ -506,6 +525,7 @@ export async function getConversationRead(
       pendingInputKinds,
       pendingAskUserQuestion,
       ...(pendingPaneChoice ? { pendingPaneChoice } : {}),
+      ...(pendingPermission ? { pendingPermission } : {}),
       transcriptMissing: conversationTranscriptMissing(conv, sessionAlive, convSf),
       needsTerminal: await conversationNeedsTerminal(conv, sessionAlive, convSf),
     });
