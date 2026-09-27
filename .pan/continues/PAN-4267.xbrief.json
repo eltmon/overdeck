@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:05:19.572Z",
+  "updated": "2026-09-27T16:09:58.399Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-27T16:05:15.948Z"
     },
     "truthful-patrol-messages": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4267",
-      "claimedAt": "2026-09-27T16:05:19.572Z"
+      "claimedAt": "2026-09-27T16:05:19.572Z",
+      "doneAt": "2026-09-27T16:09:58.399Z"
     }
   }
 }
