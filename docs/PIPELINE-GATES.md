@@ -602,20 +602,42 @@ Auto-resume is intentionally suppressible:
   leaves it unset so autonomous recovery stays eligible. Recording an OOM
   kill as an operator stop is what once turned a transient resource event
   into a permanent stall.
-- **Memory gate (PAN-2500):** the hysteresis resource governor
-  (`assessMemoryPressure` in `cloister/memory-governor.ts`) has two
-  consumers: the preemptive scheduler (`preemption.ts`) and the
-  memory-pressure patrol (`memory-pressure-patrol.ts`). Below the SOFT
-  reserve they defer new admissions; below HARD the patrol sheds (stops
-  merged/closed Docker stacks, then pauses idle work agents); neither
-  re-admits until memory clears RECOVERY. It does **not** gate every
-  dispatch path: no spawn path reads `getCachedMemoryVerdict`. POST
-  `/api/agents` — the operator's start, the planning auto-handoff and its
-  deferred retry — sees memory only through `evaluateSpawnGuardrails`
-  (`routes/agents/shared.ts`), which classifies free RAM against the
-  `memoryWarnGb`/`memoryBlockGb` thresholds with no hysteresis. This is
-  separate from `--no-resume`, which suppresses resume outright regardless
-  of memory.
+- **Memory gate (PAN-2500, scaled defaults PAN-4267):** the hysteresis
+  resource governor (`assessMemoryPressure` in `cloister/memory-governor.ts`)
+  gates exactly one caller: the preemptive scheduler's
+  `preemption.ts:resumeYieldedAgents`. It also feeds the memory-pressure
+  patrol (`memory-pressure-patrol.ts`), which only reports the band to the
+  activity feed — `shed()` (stack-stop / idle-agent-pause reclaim) has no
+  caller anywhere in the codebase. The governor never gates conversations,
+  `pan start`, or dashboard Start. Below the SOFT reserve the governor
+  defers `resumeYieldedAgents`; below HARD it reports `shedding`; neither
+  re-admits until memory clears RECOVERY. Reserve defaults are a share of
+  RAM with an absolute floor and a cap (hard &le; 10%, soft &le; 20%,
+  watch &le; 25%, recovery &le; 35% of total RAM; see
+  `src/lib/config-yaml/governor-reserves.ts`), so a small host (an 8-16 GB
+  Mac) gets workable reserves instead of a recovery reserve at or above its
+  total RAM; hosts at or above 40 GB keep the pre-PAN-4267 values. It does
+  **not** gate every dispatch path: no spawn path reads
+  `getCachedMemoryVerdict`. POST `/api/agents` — the operator's start, the
+  planning auto-handoff and its deferred retry — sees memory only through
+  `evaluateSpawnGuardrails` (`routes/agents/shared.ts`), which classifies
+  free RAM against the `memoryWarnGb`/`memoryBlockGb` thresholds with no
+  hysteresis; these defaults are also scaled, `min(4, RAM/8)` GB warn and
+  `min(2, RAM/16)` GB block. This is separate from `--no-resume`, which
+  suppresses resume outright regardless of memory.
+- **macOS measurement (PAN-4267):** the header collector
+  (`system-health/darwin.ts`) and the governor's reader
+  (`readProcMemoryDarwin` in `dashboard/server/services/proc-memory.ts`)
+  share one available-memory calculation
+  (`computeDarwinAvailableMemoryBytes`): `memory_pressure -Q`'s free
+  percentage of total RAM first, falling back to the Activity Monitor
+  `vm_stat` formula (`total - (anonymous - purgeable + wired + compressor)`)
+  when memory_pressure is unavailable. macOS has no PSI and allocates swap
+  on demand, so the governor ignores swap runway there
+  (`swapGrowsOnDemand`) and instead reads the kernel's own
+  `kern.memorystatus_vm_pressure_level` sysctl as its stall signal: level 4
+  (critical) sheds immediately regardless of the memory reserves, and level
+  1 (normal) counts as calm for the holding re-admit window.
 - **Operator-started exemption (PAN-1812, PAN-3634):** when
   `exempt_operator_started` is on, the emergency brake
   (`concurrency.ts:emergencyBrake`) and the memory governor's shed

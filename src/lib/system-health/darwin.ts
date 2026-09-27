@@ -31,11 +31,16 @@ export interface DarwinCollectorAdapters {
   now(): number;
 }
 
+export type DarwinAvailableMemorySource = 'activity-monitor' | 'free-inactive-speculative';
+
 export interface ParsedDarwinVmStat {
   pageSizeBytes: number;
   availableMemoryBytes?: number;
+  availableSource?: DarwinAvailableMemorySource;
   swap?: SwapCounters;
 }
+
+export type DarwinMemoryPressureLevel = 'normal' | 'warn' | 'critical';
 
 export interface ParsedDarwinSwapUsage {
   totalBytes: number;
@@ -58,7 +63,14 @@ export function parseDarwinMemoryPressure(content: string): number | null {
   return null;
 }
 
-export function parseDarwinVmStat(content: string): ParsedDarwinVmStat | null {
+const ACTIVITY_MONITOR_PAGE_NAMES = [
+  'Anonymous pages',
+  'Pages purgeable',
+  'Pages wired down',
+  'Pages occupied by compressor',
+];
+
+export function parseDarwinVmStat(content: string, totalMemoryBytes?: number): ParsedDarwinVmStat | null {
   const pageSizeMatch = content.match(/page size of\s+(\d+)\s+bytes/i);
   if (!pageSizeMatch) return null;
   const pageSizeBytes = Number(pageSizeMatch[1]);
@@ -72,18 +84,76 @@ export function parseDarwinVmStat(content: string): ParsedDarwinVmStat | null {
     if (Number.isFinite(value)) pages.set(match[1]!.trim(), value);
   }
 
-  const availablePageNames = ['Pages free', 'Pages inactive', 'Pages speculative'];
-  const availablePages = availablePageNames.every((name) => pages.has(name))
-    ? availablePageNames.reduce((sum, name) => sum + pages.get(name)!, 0)
-    : undefined;
+  let availableMemoryBytes: number | undefined;
+  let availableSource: DarwinAvailableMemorySource | undefined;
+
+  if (totalMemoryBytes != null && totalMemoryBytes > 0 && ACTIVITY_MONITOR_PAGE_NAMES.every((name) => pages.has(name))) {
+    // PAN-4267: this is the formula Activity Monitor uses (used = anonymous -
+    // purgeable + wired + compressor); it agrees with what an operator sees
+    // on-screen, unlike the free+inactive+speculative sum below.
+    const anonymous = pages.get('Anonymous pages')!;
+    const purgeable = pages.get('Pages purgeable')!;
+    const wired = pages.get('Pages wired down')!;
+    const compressor = pages.get('Pages occupied by compressor')!;
+    const usedBytes = (anonymous - purgeable + wired + compressor) * pageSizeBytes;
+    availableMemoryBytes = Math.max(0, totalMemoryBytes - usedBytes);
+    availableSource = 'activity-monitor';
+  } else {
+    const availablePageNames = ['Pages free', 'Pages inactive', 'Pages speculative'];
+    const availablePages = availablePageNames.every((name) => pages.has(name))
+      ? availablePageNames.reduce((sum, name) => sum + pages.get(name)!, 0)
+      : undefined;
+    if (availablePages != null) {
+      availableMemoryBytes = availablePages * pageSizeBytes;
+      availableSource = 'free-inactive-speculative';
+    }
+  }
+
   const swapIn = pages.get('Swapins');
   const swapOut = pages.get('Swapouts');
 
   return {
     pageSizeBytes,
-    availableMemoryBytes: availablePages == null ? undefined : availablePages * pageSizeBytes,
+    availableMemoryBytes,
+    availableSource,
     swap: swapIn == null || swapOut == null ? undefined : { pagesIn: swapIn, pagesOut: swapOut },
   };
+}
+
+export interface ComputeDarwinAvailableMemoryBytesInput {
+  pressureOutput: string | null;
+  vmStatOutput: string | null;
+  totalMemoryBytes: number;
+}
+
+/**
+ * PAN-4267: the one macOS available-memory calculation shared by the header
+ * collector and the deacon memory governor, so they can no longer disagree.
+ * Prefers memory_pressure's free percentage, falls back to vm_stat.
+ */
+export function computeDarwinAvailableMemoryBytes({
+  pressureOutput,
+  vmStatOutput,
+  totalMemoryBytes,
+}: ComputeDarwinAvailableMemoryBytesInput): number | null {
+  if (pressureOutput != null) {
+    const freePercent = parseDarwinMemoryPressure(pressureOutput);
+    if (freePercent != null) return Math.round(totalMemoryBytes * freePercent / 100);
+  }
+  if (vmStatOutput != null) {
+    const vmStat = parseDarwinVmStat(vmStatOutput, totalMemoryBytes);
+    if (vmStat?.availableMemoryBytes != null) return vmStat.availableMemoryBytes;
+  }
+  return null;
+}
+
+export function parseDarwinPressureLevel(content: string): DarwinMemoryPressureLevel | null {
+  switch (content.trim()) {
+    case '1': return 'normal';
+    case '2': return 'warn';
+    case '4': return 'critical';
+    default: return null;
+  }
 }
 
 function unitBytes(value: string, unit: string): number | null {
@@ -195,14 +265,16 @@ export function createDarwinHostHealthCollector(
       const pressureFreePercent = pressureOutput == null
         ? null
         : parseDarwinMemoryPressure(pressureOutput);
-      const vmStat = vmStatOutput == null ? null : parseDarwinVmStat(vmStatOutput);
+      const totalMemoryBytes = adapters.totalMemoryBytes();
+      const vmStat = vmStatOutput == null ? null : parseDarwinVmStat(vmStatOutput, totalMemoryBytes);
       const swapUsage = swapOutput == null ? null : parseDarwinSwapUsage(swapOutput);
       const cpuInfo = adapters.cpus();
       const cpuCounters = aggregateDarwinCpuCounters(cpuInfo);
-      const totalMemoryBytes = adapters.totalMemoryBytes();
-      const availableMemoryBytes = pressureFreePercent != null
-        ? Math.round(totalMemoryBytes * pressureFreePercent / 100)
-        : vmStat?.availableMemoryBytes ?? null;
+      const availableMemoryBytes = computeDarwinAvailableMemoryBytes({
+        pressureOutput,
+        vmStatOutput,
+        totalMemoryBytes,
+      });
       const usedMemoryBytes = Number.isFinite(totalMemoryBytes) && availableMemoryBytes != null
         ? Math.max(totalMemoryBytes - availableMemoryBytes, 0)
         : null;
