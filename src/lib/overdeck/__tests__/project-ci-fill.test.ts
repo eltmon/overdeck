@@ -200,6 +200,18 @@ describe('startProjectCiRefill', () => {
     expect(fill).toHaveBeenCalledTimes(2);
   });
 
+  it('PAN-4264: delays the first fill by initialDelayMs', async () => {
+    vi.useFakeTimers();
+    const fill = vi.fn(async () => 0);
+    startProjectCiRefill(15 * 60 * 1000, { fill, initialDelayMs: 120_000 });
+
+    expect(fill).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(119_999);
+    expect(fill).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fill).toHaveBeenCalledTimes(1);
+  });
+
   it('contains rejected fills and continues scheduling later ticks', async () => {
     vi.useFakeTimers();
     const fill = vi.fn(async () => { throw new Error('gh unavailable'); });

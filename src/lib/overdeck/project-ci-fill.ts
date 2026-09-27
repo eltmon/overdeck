@@ -150,6 +150,11 @@ export function startProjectCiRefill(
     fill?: () => Promise<number>;
     warn?: (message: string) => void;
     setIntervalFn?: typeof setInterval;
+    /**
+     * PAN-4264: delay the first fill (the dashboard passes 2 minutes so the
+     * refill does not add to the boot burst of GitHub calls). Default: run now.
+     */
+    initialDelayMs?: number;
   } = {},
 ): ReturnType<typeof setInterval> {
   const state = createProjectCiFillState();
@@ -170,7 +175,11 @@ export function startProjectCiRefill(
       });
   };
 
-  run();
+  if (deps.initialDelayMs && deps.initialDelayMs > 0) {
+    setTimeout(run, deps.initialDelayMs).unref?.();
+  } else {
+    run();
+  }
   const timer = (deps.setIntervalFn ?? setInterval)(run, intervalMs);
   timer.unref();
   return timer;

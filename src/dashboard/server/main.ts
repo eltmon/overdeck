@@ -15,8 +15,9 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
-  enqueueProjectsResourceRefresh,
+  enqueueProjectsResourceRefreshStaggered,
   getProjectResourceRefreshQueueState,
+  PROJECT_RESOURCE_BOOT_STAGGER_WINDOW_MS,
   startProjectResourceConvergence,
   stopProjectResourceRefreshQueue,
   whenProjectResourceRefreshIdle,
@@ -619,10 +620,12 @@ void (async () => {
     console.log('[overdeck] Project resource refresh queue and resources snapshot service started');
 
     const warmStart = Date.now();
-    enqueueProjectsResourceRefresh(
+    // PAN-4264: one project at a time over 60 s, not one burst of GitHub calls.
+    await enqueueProjectsResourceRefreshStaggered(
       listProjectsSync().map((entry) => entry.config),
       'boot-warm',
-    );
+      PROJECT_RESOURCE_BOOT_STAGGER_WINDOW_MS,
+    ).done;
     await whenProjectResourceRefreshIdle();
     const queueState = getProjectResourceRefreshQueueState();
     if (queueState.lastError) {
