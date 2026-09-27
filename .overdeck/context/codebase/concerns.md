@@ -147,6 +147,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
+- **`git log --all` is not "the repository's history" here.** Overdeck keeps
+  tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and
+  work sessions snapshot their trees there). `--all` walks them, so any file a
+  session ever drafted reads as "tracked", and the walk is slow. Ask history
+  questions of `HEAD` (or a named branch) instead — PAN-4212.
+
 - **Per-issue continue/spec writers still target the primary checkout,
   uncommitted** (PAN-4225) — unlike the plan-home push path fixed in PAN-4224
   (`pushPlanArtifacts`, `promoteWorkspacePrdDraft`), the feedback-writer, session
