@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4249",
   "created": "2026-09-27T09:56:17.310Z",
-  "updated": "2026-09-27T11:32:50.589Z",
+  "updated": "2026-09-27T11:33:00.910Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "pan-start-effort.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T11:32:50.588Z"
+    },
+    "pan-start-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:33:00.910Z"
     }
   }
 }
