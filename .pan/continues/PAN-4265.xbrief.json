@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4265",
   "created": "2026-09-27T15:21:17.185Z",
-  "updated": "2026-09-27T15:39:22.890Z",
+  "updated": "2026-09-27T15:39:34.528Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "change-summary.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T15:39:22.890Z"
+    },
+    "change-summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:39:34.528Z"
     }
   }
 }
