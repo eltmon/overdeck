@@ -19,6 +19,12 @@
  * `ChatMessage[]` (via `serializeConversationTranscript`) so it stays a pure
  * leaf utility, importable from both CLI and dashboard-server code without a
  * layering inversion.
+ *
+ * PAN-4245: a transcript may open with the latest compaction summary (a
+ * caller-supplied `TranscriptCompactSummary`) instead of a plain head/tail
+ * excerpt. When it does, titles and the About summary describe the overall
+ * scope of work still in context — the summarized earlier work plus anything
+ * new since — rather than only the most recent message.
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
