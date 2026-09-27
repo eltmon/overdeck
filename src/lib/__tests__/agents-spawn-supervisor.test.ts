@@ -586,6 +586,22 @@ describe('spawnAgent PTY supervisor wiring', () => {
     await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-1405')).resolves.toBe(false);
   });
 
+  it('applies the consent work model over the caller model for a consent-bearing spawnRun (PAN-3022)', async () => {
+    writeSupervisorArtifact();
+    const { writeAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { spawnRun } = await import('../agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-1405', true, { workModel: 'claude-opus-5-5' });
+
+    const state = await spawnRun('PAN-1405', 'work', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+      startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: true,
+    });
+
+    expect(state.model).toBe('claude-opus-5-5');
+  });
+
   it('does not inspect planning consent for specialist spawnRun launches', async () => {
     const consentDir = join(tmpHome, 'agents', 'planning-pan-1405');
     mkdirSync(consentDir, { recursive: true });

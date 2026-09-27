@@ -135,6 +135,25 @@ describe('auto-spawn consent claims', () => {
     await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBe('k3');
   });
 
+  it('a new-cycle write self-heals an unreadable consent file instead of throwing', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true);
+    writeFileSync(autoSpawnOnFinalizeFlagPath(issueId), '');
+
+    await expect(
+      writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: 'k3' }),
+    ).resolves.toBeUndefined();
+    await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBe('k3');
+  });
+
+  it('self-heals an unreadable consent file even with no workModel option (resolveAutoSpawnOnFinalize path)', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true);
+    writeFileSync(autoSpawnOnFinalizeFlagPath(issueId), '{invalid-json');
+
+    await expect(writeAutoSpawnOnFinalizeFlag(issueId, true)).resolves.toBeUndefined();
+    await expect(readAutoSpawnOnFinalizeFlagAsync(issueId)).resolves.toBe(true);
+    await expect(readAutoSpawnConsentWorkModel(issueId)).resolves.toBeUndefined();
+  });
+
   it('preserves the work model across a new generation, and clears it on request', async () => {
     await writeAutoSpawnOnFinalizeFlag(issueId, true, { workModel: 'k3' });
 

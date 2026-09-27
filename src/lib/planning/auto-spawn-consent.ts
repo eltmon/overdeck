@@ -108,8 +108,13 @@ export async function writeAutoSpawnOnFinalizeFlag(
   options: { workModel?: string | null } = {},
 ): Promise<void> {
   await withConsentLock(issueId, 'planning-consent:new-cycle', async () => {
-    const current = await readConsentRecordForTransition(issueId);
-    const workModel = options.workModel === null ? undefined : (options.workModel ?? current?.workModel);
+    // Read tolerantly (never throws — null on any unreadable/corrupt file) and
+    // only when workModel is omitted: an unreadable prior record must not
+    // block a fresh generation from overwriting it, which is the only
+    // self-heal path for a corrupt consent file.
+    const workModel = options.workModel === null
+      ? undefined
+      : (options.workModel ?? (await readConsentRecord(issueId))?.workModel);
     await writeConsentRecord(issueId, {
       version: 2,
       generation: randomUUID(),

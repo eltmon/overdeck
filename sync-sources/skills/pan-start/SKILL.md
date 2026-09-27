@@ -67,8 +67,9 @@ this start also kicks off planning, the auto-start handoff — including the
 deferred retry and stack-rebuild paths — runs the work agent on that `--model`:
 it is stored with that planning cycle's own auto-start consent (PAN-3022) and
 is not reused once the handoff spends the consent claim. A later bare
-`pan start` falls back to the project/global config default, not to whatever a
-previous `pan start` passed. Swarm policy (foreman vs. serial work) and review
+`pan start` restart keeps that model as resume continuity (same as any other
+restart); only `--fresh` or a pending `pan reset-session` drops it back to the
+project/global config default. Swarm policy (foreman vs. serial work) and review
 mode (`quick`/`full`/`none`) are likewise project/global `config.yaml` settings
 now, not per-issue overrides or `pan start` flags.
 When this start also kicks off planning (no plan exists yet), `--plan-model <model>` overrides
