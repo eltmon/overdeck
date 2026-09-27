@@ -1,15 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T15:13:22.968928Z · model: claude-opus-5-5 · open: 777_
+_Last sequenced: 2026-09-27T15:30:17.299178Z · model: claude-opus-5-5 · open: 778_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 16 | PAN-4266 | S | medium | ok |  |  | In-pipeline: Command Deck model picker clipped by overflow-hidden column; focus scroll shifts column left. Portal fix. |
+| 16 | PAN-4267 | M | high | ok |  |  | In-pipeline: memory governor fixed 4/12 GB floors + macOS free-memory measure lock small Macs in permanent shedding. |
 | 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4263 | M | critical | ok |  |  | In-pipeline: PR lookup reads rate limits as 'no PR' and picks a closed PR, so approved verdicts are lost and merges fail |
-| 21 | PAN-4264 | L | critical | ok |  |  | GitHub rate limits stall verdicts, close-outs and merges several times a day; measure quota per caller, surface it, back off, cut waste |
+| 20 | PAN-4266 | S | medium | ok |  |  | In-pipeline: Command Deck model picker dropdown clipped by overflow-hidden column; focus scroll shifts the column left |
+| 22 | PAN-4268 | M | high | ok |  |  | In-pipeline: composer and pan tell guess subagent routing; parse Claude Code's agent selector and deliver to main or fail loudly. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -785,9 +786,9 @@ _Last sequenced: 2026-09-27T15:13:22.968928Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-4266 (rank 16)
+### PAN-4267 (rank 16)
 
-New since prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the rank slot vacated by closed PAN-4224. The body gives a measured cause, exact files, a four-step fix and Playwright acceptance criteria, so condition is ok.
+New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 16, the slot vacated by PAN-4266 (now labeled in-progress and out of the backlog manifest). A permanent admission lockout makes Overdeck unusable on 8-16 GB Macs, so importance is high; the body names the exact defaults function, a four-part fix and testable acceptance criteria, so condition is ok.
 
 ### PAN-4223 (rank 17)
 
@@ -801,9 +802,13 @@ New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's ro
 
 New in-pipeline issue, pinned in the top tier at a free rank. One function (getExistingGitHubArtifact in src/lib/forge.ts) swallows gh errors so a rate-limited lookup reads as 'no PR', refusing reviewer verdicts, and the App path takes prs[0], which can be an older closed PR, so merges target the wrong PR. It already stalled PAN-4222, PAN-3634 and PAN-3668 with approved reviews the merge gate never saw, so it is critical pipeline substrate; the fix and acceptance criteria are concrete.
 
-### PAN-4264 (rank 21)
+### PAN-4266 (rank 20)
 
-New issue, placed in a free top-tier slot next to PAN-4263. GitHub GraphQL refusals for the shared eltmon user stall the pipeline several times a day (lost review verdicts, failed merges, stale membership), and Overdeck cannot currently see or explain them. The fix is concrete and staged: per-caller quota measurement from real response headers, a dashboard surface, backoff until reset, and removal of about 20 wasted refreshes an hour from misconfigured projects. PAN-4263 fixes the one misread in forge.ts; this issue fixes the systemic cause, so it ranks critical as pipeline substrate.
+New in-pipeline issue with a measured cause and mechanical Playwright AC; pinned into the free in-pipeline slot at rank 20 without moving any other node, medium importance because it is dashboard UX rather than pipeline substrate.
+
+### PAN-4268 (rank 22)
+
+New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 22, the free slot between PAN-4264 and PAN-4217. Messages silently landing in a subagent is a delivery-correctness bug on the operator's main input path, so importance is high; the body gives a five-step fix, captured pane evidence and fixture-testable acceptance criteria, so condition is ok. Its predecessor PAN-4247 is closed, so no dependency edge is emitted.
 
 ### PAN-4217 (rank 23)
 
@@ -1081,10 +1086,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 
 New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
 
-### PAN-2639 (rank 115)
-
-codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1092,21 +1093,21 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T15:13:22.968928Z",
+  "generatedAt": "2026-09-27T15:30:17.299178Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 777,
+  "openCount": 778,
   "nodes": [
     {
-      "issue": "PAN-4266",
+      "issue": "PAN-4267",
       "rank": 16,
-      "size": "S",
-      "importance": "medium",
-      "score": 62,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In-pipeline: Command Deck model picker clipped by overflow-hidden column; focus scroll shifts column left. Portal fix.",
-      "rationale": "New since prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the rank slot vacated by closed PAN-4224. The body gives a measured cause, exact files, a four-step fix and Playwright acceptance criteria, so condition is ok.",
+      "why": "In-pipeline: memory governor fixed 4/12 GB floors + macOS free-memory measure lock small Macs in permanent shedding.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 16, the slot vacated by PAN-4266 (now labeled in-progress and out of the backlog manifest). A permanent admission lockout makes Overdeck unusable on 8-16 GB Macs, so importance is high; the body names the exact defaults function, a four-part fix and testable acceptance criteria, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1150,15 +1151,28 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "planning": "auto"
     },
     {
-      "issue": "PAN-4264",
-      "rank": 21,
-      "size": "L",
-      "importance": "critical",
-      "score": 85,
+      "issue": "PAN-4266",
+      "rank": 20,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
       "condition": "ok",
       "dependsOn": [],
-      "why": "GitHub rate limits stall verdicts, close-outs and merges several times a day; measure quota per caller, surface it, back off, cut waste",
-      "rationale": "New issue, placed in a free top-tier slot next to PAN-4263. GitHub GraphQL refusals for the shared eltmon user stall the pipeline several times a day (lost review verdicts, failed merges, stale membership), and Overdeck cannot currently see or explain them. The fix is concrete and staged: per-caller quota measurement from real response headers, a dashboard surface, backoff until reset, and removal of about 20 wasted refreshes an hour from misconfigured projects. PAN-4263 fixes the one misread in forge.ts; this issue fixes the systemic cause, so it ranks critical as pipeline substrate.",
+      "why": "In-pipeline: Command Deck model picker dropdown clipped by overflow-hidden column; focus scroll shifts the column left",
+      "rationale": "New in-pipeline issue with a measured cause and mechanical Playwright AC; pinned into the free in-pipeline slot at rank 20 without moving any other node, medium importance because it is dashboard UX rather than pipeline substrate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4268",
+      "rank": 22,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: composer and pan tell guess subagent routing; parse Claude Code's agent selector and deliver to main or fail loudly.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 22, the free slot between PAN-4264 and PAN-4217. Messages silently landing in a subagent is a delivery-correctness bug on the operator's main input path, so importance is high; the body gives a five-step fix, captured pane evidence and fixture-testable acceptance criteria, so condition is ok. Its predecessor PAN-4247 is closed, so no dependency edge is emitted.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11745,13 +11759,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-4263",
-      "to": "PAN-4264",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
     }
   ]
 }
