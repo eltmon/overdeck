@@ -786,8 +786,8 @@ export async function retitleConversation(
     if (!sessionFile || !existsSync(sessionFile)) {
       return result({ error: 'Conversation has no transcript yet' }, 400);
     }
-    const { messages } = await getCachedMessages(sessionFile, false);
-    const transcript = serializeConversationTranscript(messages);
+    const { messages, latestCompactSummary } = await getCachedMessages(sessionFile, false);
+    const transcript = serializeConversationTranscript(messages, { compactSummary: latestCompactSummary, purpose: 'title' });
     if (!transcript.trim()) {
       return result({ error: 'Conversation has no messages to summarize yet' }, 400);
     }
@@ -838,7 +838,7 @@ export async function getConversationAbout(
       return result({ ...cached.data, cached: true });
     }
 
-    const { messages } = await getCachedMessages(sessionFile, false);
+    const { messages, latestCompactSummary } = await getCachedMessages(sessionFile, false);
     const conversational = messages.filter(
       (m) => m.role !== 'system' && typeof m.text === 'string' && m.text.trim().length > 0,
     );
@@ -846,7 +846,7 @@ export async function getConversationAbout(
       return result({ summary: null, messageCount: 0, generatedAt: null });
     }
 
-    const transcript = serializeConversationTranscript(messages);
+    const transcript = serializeConversationTranscript(messages, { compactSummary: latestCompactSummary, purpose: 'about' });
     const aboutModel = configuredTitleModel();
     console.log(`[claude-invoke] purpose=conversation-about | model=${aboutModel} | conversation=${name} | transcriptChars=${transcript.length}`);
     const summary = await summarizeTranscriptAbout(transcript, aboutModel);

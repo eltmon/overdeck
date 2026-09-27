@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createConversation } from '../../../../src/lib/overdeck/conversations.js';
 
 let testHome: string;
 
@@ -11,7 +13,9 @@ beforeEach(() => {
   process.env.OVERDECK_HOME = testHome;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  const { closeOverdeckDatabase } = await import('../../../../src/lib/overdeck/infra.js');
+  closeOverdeckDatabase();
   delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });
@@ -100,5 +104,39 @@ describe('getCachedMessages — latestCompactSummary', () => {
     const second = await getCachedMessages(file, false);
     expect(second.latestCompactSummary?.text).toBe('Summary B: later work on billing.');
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('getConversationAbout — latestCompactSummary', () => {
+  it('ac2: passes the latest compaction summary and only after-summary turns to summarizeTranscriptAbout', async () => {
+    const summaryText = [
+      'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
+      '',
+      'Summary:',
+      '1. Primary Request and Intent: Migrate the billing service to the new invoicing API.',
+    ].join('\n');
+
+    createConversation({ name: 'about-with-summary', tmuxSession: 'conv-about-with-summary', cwd: '/tmp' });
+    const sessionFile = join(testHome, 'about-with-summary.jsonl');
+    writeFileSync(sessionFile, `${[
+      userLine('before summary turn'),
+      boundaryLine(),
+      userLine(summaryText, { isCompactSummary: true }),
+      userLine('after summary turn'),
+    ].join('\n')}\n`);
+
+    const transcriptSummary = await import('../../../../src/lib/conversations/transcript-summary.js');
+    const summarizeSpy = vi.spyOn(transcriptSummary, 'summarizeTranscriptAbout').mockResolvedValue('Migrating billing to the invoicing API.');
+
+    const { getConversationAbout } = await import('../../../../src/lib/overdeck/conversation-reads.js');
+    await getConversationAbout('about-with-summary', true, {
+      resolveSessionFile: () => Promise.resolve(sessionFile),
+    });
+
+    expect(summarizeSpy).toHaveBeenCalledTimes(1);
+    const transcriptArg = summarizeSpy.mock.calls[0]![0] as string;
+    expect(transcriptArg).toContain('Primary Request and Intent');
+    expect(transcriptArg).toContain('after summary turn');
+    expect(transcriptArg).not.toContain('before summary turn');
   });
 });
