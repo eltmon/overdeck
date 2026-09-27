@@ -1,0 +1,889 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T09:50:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4249: Reasoning effort, end to end: one resolver, set on every launch surface, persisted, visible, changeable live, and per-tier",
+    "updated": "2026-09-27T09:54:25.649Z"
+  },
+  "plan": {
+    "id": "pan-4249",
+    "title": "Reasoning effort, end to end: one resolver, set on every launch surface, persisted, visible, changeable live, and per-tier",
+    "status": "proposed",
+    "uid": "b8715cd0-519d-4f6b-a848-ce174cac1b58",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-27T09:50:35Z",
+    "updated": "2026-09-27T09:54:25.649Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4249",
+        "label": "PAN-4249",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4253",
+        "label": "PAN-4253",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4254",
+        "label": "PAN-4254",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4255",
+        "label": "PAN-4255",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4256",
+        "label": "PAN-4256",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4257",
+        "label": "PAN-4257",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4258",
+        "label": "PAN-4258",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4259",
+        "label": "PAN-4259",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4260",
+        "label": "PAN-4260",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effort",
+      "config",
+      "resolver",
+      "harness",
+      "foundation"
+    ],
+    "metadata": {
+      "sizeJustification": "25 files, at the 25-file cap. Only three code subsystems are touched (packages/contracts, src/lib, src/cli). The other six 'subsystems' the first-two-segment counter reports are single top-level files: package.json, docs.json, scripts/lint-effort.sh, configuration/effort.mdx, docs/CONFIGURATION.md and docs/MODEL-CONTEXT-AUDIT.md. The full effort program was already decomposed into eight sibling issues (#4253-#4260); this plan is only the foundation slice.",
+      "canonicalFilename": "2026-09-27-PAN-4249-reasoning-effort-end-to-end-one-resolver-set-on-every-launch-surface-persisted-visible-changeable-live-and-per-tier.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Reasoning effort is resolved ad hoc in about 13 places, each with its own `?? 'high'` fallback, and the level enum is copied at least 10 times. roles.<role>.effort is validated for every role but read only by `pan start` for work; sub-roles, tiers and projects carry no effort; config validation is duplicated between config-yaml/roles.ts and settings-api.ts; and an explicit unsupported level hard-fails instead of clamping. Every other effort gap (relaunch, conversations, live change, role surfaces, tier slots, planning, visibility, harness mapping) needs one resolver and one enum first.",
+      "Proposal": "Ship the foundation of the effort program here and the surfaces in eight sibling issues (#4253-#4260). Add one EffortLevel/EFFORT_LEVELS in packages/contracts/src/effort.ts plus per-harness effortLevels on HarnessBehavior; add resolveEffort() in src/lib/agents/resolve-effort.ts with the precedence explicit > item > plan > tier > sub-role > role > project > default 'high' and model∩harness clamping; add effort to sub-roles, tiers and projects with one shared validator; wire `pan start` and the three runtime-command.ts fallbacks (definition-less role runs, codex and omp launcher fields) through the resolver; add a lint:effort ratchet; and document it all in configuration/effort.mdx.",
+      "NonGoals": "- No changes under src/dashboard/ (frontend or server); those belong to siblings #4254, #4255, #4256, #4257, #4258, #4259\n- No new per-issue record, database column or issue-record field for effort; the per-issue override lives in the xBRIEF (plan.metadata.effort, item metadata.effort)\n- No persistence of effort on AgentState, conversations, the cost ledger or sessions.json (siblings #4253, #4254, #4259)\n- No change to how swarm/foreman/tier slots or escalation pick effort; tier effort is validated and resolvable only (sibling #4257)\n- No change to the planning-effort path at start.ts:904 or to pan plan (sibling #4258)\n- No removal of harness-adapter fallbacks outside runtime-command.ts (sibling #4260)\n- No change to sync-sources/rules/effort-high-default.md or to roles/*.md frontmatter\n- No xhigh or max default anywhere"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Decompose into a foundation slice (this issue) plus eight sibling issues #4253-#4260, filed during planning and each blocked by #4249.",
+        "rationale": "The full program touches about 70 files across six code areas, and the plan-finalize surface lint caps one plan at 25 files. The audit already groups the work by launch surface, so each surface is an independently shippable vertical slice."
+      },
+      {
+        "summary": "The per-issue effort override lives in the xBRIEF as plan.metadata.effort, with per-item metadata.effort above it, not on an issue record.",
+        "rationale": "PAN-3917 removed per-issue records by design (resolveIssueWorkModel now always returns undefined). The xBRIEF is committed in git and derivable, and it is already the home of plan.metadata.tiered_execution and the per-bead metadata.model override."
+      },
+      {
+        "summary": "resolveEffort takes an already-resolved tierName instead of a difficulty.",
+        "rationale": "resolveTier already maps difficulty to a tier, so re-resolving it inside the effort resolver would duplicate tier logic and could disagree with staffing."
+      },
+      {
+        "summary": "The resolver clamps canonical to canonical against model levels ∩ HarnessBehavior.effortLevels. Harness-native translation (Kimi, opencode) stays in adapters.",
+        "rationale": "Clamping is policy that every launch shares. Translation is a per-harness wire detail. Keeping them apart keeps the resolver's output a canonical EffortLevel."
+      },
+      {
+        "summary": "Config values the configured model cannot run are still rejected at load. Explicit runtime values (pan start --effort) are clamped with a stderr warning. Non-canonical explicit values still exit 1.",
+        "rationale": "This keeps the existing config-yaml-roles and settings-api tests valid while meeting the issue's clamp-with-warning goal for runtime input."
+      },
+      {
+        "summary": "Per-harness supported levels live on HarnessBehavior.effortLevels in packages/contracts. Only ohmypi and muse are restricted (no max).",
+        "rationale": "harness-behavior.ts is the existing per-harness capability table. The audit shows omp --thinking and muse --reasoning-effort both stop at xhigh."
+      },
+      {
+        "summary": "The lint:effort ratchet fails only when a file's count rises above its baseline. A lower count prints a note instead of failing.",
+        "rationale": "Eight siblings will lower counts in parallel, and a strict-equality ratchet would make each of them conflict on baseline lines."
+      },
+      {
+        "summary": "The effort-high-default rule wording and roles/*.md frontmatter stay unchanged. The resolver's default layer is 'high'.",
+        "rationale": "The rule already says what the resolver implements. Frontmatter stops deciding launches once callers pass a resolved effort."
+      },
+      {
+        "summary": "Split supportedEffortLevels, clampEffort and effortConfigErrors into a leaf module, src/lib/agents/effort-support.ts, separate from resolve-effort.ts.",
+        "rationale": "src/lib/config-yaml.ts re-exports config-yaml/roles.js, so the config validators cannot import a module that reads config-yaml without forming a cycle that npm run lint:circular rejects. tier-table-types.ts (PAN-4191) is the repo precedent for this split."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-effort-enum",
+        "title": "Add the canonical effort enum to packages/contracts and alias the three copies to it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4249",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "packages/contracts/src/effort.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/flywheel.ts",
+            "packages/contracts/src/harness-behavior.ts",
+            "src/lib/model-capability-types.ts",
+            "src/lib/config-yaml/schema.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run packages/contracts/src/flywheel.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "flywheel.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "effort-config-types",
+            "effort-support-leaf",
+            "resolve-effort-module",
+            "runtime-command-effort",
+            "effort-lint-ratchet"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1 (.pan/drafts/PAN-4249.md). Create packages/contracts/src/effort.ts exporting EFFORT_LEVELS (['low','medium','high','xhigh','max'] as const), EffortLevel, DEFAULT_EFFORT='high', EffortSource ('explicit'|'item'|'plan'|'tier'|'sub-role'|'role'|'project'|'default'), EffortLevelSchema=Schema.Literals(EFFORT_LEVELS) (checkpoint: fall back to Schema.Literals([...EFFORT_LEVELS]) if the readonly tuple fails typecheck), isEffortLevel, compareEffort. Export it from packages/contracts/src/index.ts next to harness-behavior. In flywheel.ts replace the literal union at :13 with EffortLevel and FlywheelEffort at :17 with EffortLevelSchema. Add `readonly effortLevels?: readonly EffortLevel[]` to HarnessBehavior and set ['low','medium','high','xhigh'] on OHMYPI_BEHAVIOR and MUSE_BEHAVIOR only. Make src/lib/model-capability-types.ts:26 re-export EffortLevel from @overdeck/contracts, and make ROLE_EFFORTS in src/lib/config-yaml/schema.ts:380 equal EFFORT_LEVELS (keep the name as a deprecated alias)."
+        },
+        "items": [
+          {
+            "id": "contracts-effort-enum.ac1",
+            "title": "Given the branch, when running `rg -n \"'low' \\| 'medium'|\\[\\\"low\\\", \\\"medium\\\"\" packages/contracts/src/flywheel.ts src/lib/model-capability-types.ts src/lib/config-yaml/schema.ts`, then it prints no matches (the three copies derive from EFFORT_LEVELS)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-effort-enum.ac2",
+            "title": "packages/contracts/src/effort.ts contains exports for EFFORT_LEVELS, EffortLevel, DEFAULT_EFFORT (equal to 'high'), EffortSource, EffortLevelSchema, isEffortLevel and compareEffort, and `@overdeck/contracts` re-exports them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-effort-enum.ac3",
+            "title": "getHarnessBehavior('ohmypi').effortLevels and getHarnessBehavior('muse').effortLevels return ['low','medium','high','xhigh']; every other harness returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-config-types",
+        "title": "Add optional effort fields to RoleSubConfig, TierDefinition and ProjectConfig",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4249",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/agents/tier-table-types.ts",
+            "src/lib/projects.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3 steps 1, 2 and 4 (types only). schema.ts:375-377 RoleSubConfig gains `effort?: RoleEffort`. tier-table-types.ts TierDefinition gains `effort?: EffortLevel` after `difficulties`, with the doc comment from the PRD. src/lib/projects.ts ProjectConfig (:360) gains `effort?: EffortLevel` with the doc comment saying resolveEffort ignores non-canonical values with a warning. Add no loader validation to projects.ts (loadProjectsConfigSync at :512 does no per-field validation)."
+        },
+        "items": [
+          {
+            "id": "effort-config-types.ac1",
+            "title": "Given a config object with `effort` set on a sub-role, a tier and a project entry, `npm run typecheck` accepts it because RoleSubConfig, TierDefinition and ProjectConfig each declare an optional `effort: EffortLevel`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-config-types.ac2",
+            "title": "`npm run typecheck` exits 0 and src/lib/projects.ts gains no new validation code in loadProjectsConfigSync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-support-leaf",
+        "title": "Create the effort-support leaf module with clamping and config-error helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4249",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "resolve-effort-module",
+            "sub-role-effort-validation",
+            "tier-effort-validation",
+            "settings-api-effort-validation"
+          ],
+          "files_scope": [
+            "src/lib/agents/effort-support.ts",
+            "src/lib/agents/__tests__/resolve-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/resolve-effort.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the effort-support describe block passes",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2a and D13. Create src/lib/agents/effort-support.ts importing only @overdeck/contracts, ../model-capabilities.js, and `import type` from ../runtimes/types.js (never config-yaml, projects, or resolve-effort). Export supportedEffortLevels(model?, harness?), which intersects getModelEffortLevels(model) (undefined or [] = all five) with getHarnessBehavior(harness).effortLevels (undefined = all five). Export clampEffort(requested, model?, harness?) -> { effort, clamped, warning? }, following the D6 rule: keep the level if supported, else use the highest supported level below it, else the lowest supported level. When the set is empty, keep the requested level and add a warning. The warning text is `Effort '<requested>' is not supported by <model>/<harness>; using '<effort>'.`. Export effortConfigErrors(fieldPath, effort, models), whose messages must be byte-identical to today's settings-api.ts strings. The leaf exists so that config-yaml/roles.ts, settings-api.ts and tier-table.ts can validate effort without importing resolve-effort.ts: config-yaml.ts re-exports config-yaml/roles.js, so that import would create a cycle. Create src/lib/agents/__tests__/resolve-effort.test.ts with a describe('effort-support') block holding the clamping rows (mock ../../model-capabilities.js) and the three effortConfigErrors message rows."
+        },
+        "items": [
+          {
+            "id": "effort-support-leaf.ac1",
+            "title": "clampEffort('max', undefined, 'ohmypi') returns { effort: 'xhigh', clamped: true } with a warning, and a model whose levels are ['high','max'] clamps 'low' to 'high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-support-leaf.ac2",
+            "title": "effortConfigErrors returns [] for undefined, 'roles.work.effort must be one of low, medium, high, xhigh, max' for 'bogus', and the `is not supported by <model> (supported: ...)` message for a model that lacks the level",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-support-leaf.ac3",
+            "title": "src/lib/agents/effort-support.ts contains no import of config-yaml, projects or resolve-effort, and `npm run lint:circular` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolve-effort-module",
+        "title": "Create resolveEffort with the full precedence chain on top of the effort-support leaf",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4249",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/agents/resolve-effort.ts",
+            "src/lib/agents/__tests__/resolve-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/resolve-effort.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "resolve-effort.test.ts passes with every precedence row",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "pan-start-effort",
+            "runtime-command-effort"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2b. Create src/lib/agents/resolve-effort.ts exporting ResolveEffortInput, ResolvedEffort {effort, source, requested, clamped, warning?}, InvalidEffortError and resolveEffort as specified in the PRD. It imports clampEffort from ./effort-support.js and may import ../config-yaml.js (loadConfigSync default when input.config is absent) and ../projects.js. Precedence: explicit > item > plan > tier(tierName) > sub-role > role > project > default 'high'. An invalid explicit value throws InvalidEffortError. Invalid item, plan or project values fall through (a project value also adds a warning). Project lookup: resolveProjectFromIssueSync(issueId).projectKey, then loadProjectsConfigSync().projects[key]?.effort, in try/catch. Then clamp through clampEffort(requested, model, harness). The module is synchronous and spawns no child processes. Add a describe('resolveEffort') block to src/lib/agents/__tests__/resolve-effort.test.ts with it.each rows: one per precedence layer, the all-empty default row, the invalid-explicit throw, invalid itemEffort fall-through, one clamp-through row, and a `role: 'work', explicit: 'max'` row on a model without max (the pan start shape)."
+        },
+        "items": [
+          {
+            "id": "resolve-effort-module.ac1",
+            "title": "Given every layer set, resolveEffort returns the explicit value with source 'explicit'. Removing each higher layer in turn returns the next layer's value and source, down to { effort: 'high', source: 'default' } when nothing is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-effort-module.ac2",
+            "title": "resolveEffort({ explicit: 'bogus' }) throws InvalidEffortError, while an itemEffort of 'bogus' falls through to the next layer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-effort-module.ac3",
+            "title": "resolveEffort({ role: 'work', explicit: 'max', model: <model without max> }) returns clamped: true with the next-lower supported level and a warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-effort-module.ac4",
+            "title": "`rg -n resolve-effort src/lib/config-yaml src/lib/settings-api.ts src/lib/agents/tier-table.ts` prints nothing, and `npm run lint:circular` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sub-role-effort-validation",
+        "title": "Validate role and sub-role effort in config-yaml/roles.ts through effortConfigErrors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4249",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/roles.ts",
+            "src/lib/__tests__/config-yaml-roles.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/config-yaml-roles.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "config-yaml-roles.test.ts passes including the new sub-role cases",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3 step 5. In src/lib/config-yaml/roles.ts replace the role-effort checks at :297-299 and the model check at :344-350 with effortConfigErrors, throwing `config.yaml: ${errors[0]}`. Add the same check for each roleConfig.sub[subRole].effort against the sub-role's dereffed model (or the role's model when the sub model is PARENT_MODEL_REF or unset). Add tests to src/lib/__tests__/config-yaml-roles.test.ts: sub effort max accepted on a max-capable model, sub effort 'bogus' rejected, sub effort unsupported by the sub model rejected. Existing role-effort cases must pass unedited. Import effortConfigErrors from the effort-support leaf (../agents/effort-support.js or ./effort-support.js), never from resolve-effort.ts, because config-yaml.ts re-exports roles.ts and that import would create a cycle. Run npm run lint:circular after wiring."
+        },
+        "items": [
+          {
+            "id": "sub-role-effort-validation.ac1",
+            "title": "Given roles.review.sub.security.effort: bogus, config validation throws 'config.yaml: roles.review.sub.security.effort must be one of low, medium, high, xhigh, max'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sub-role-effort-validation.ac2",
+            "title": "Given a sub-role effort its sub-role model does not support, config validation rejects it with the `is not supported by` message naming that model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sub-role-effort-validation.ac3",
+            "title": "src/lib/__tests__/config-yaml-roles.test.ts passes with its pre-existing role-effort cases left unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier-effort-validation",
+        "title": "Validate tier effort in tier-table.ts and carry it into the validated tier",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4249",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-table.ts",
+            "src/lib/agents/__tests__/tier-table.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/tier-table.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tier-table.test.ts passes including the new effort cases",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3 step 3. In validateTieredExecutionConfig (src/lib/agents/tier-table.ts, per-tier loop after the difficulties check), when tier.effort !== undefined call effortConfigErrors(path, tier.effort, models) where models is [model] or every distribution[].model, and throw TieredExecutionConfigError with the first error. Spread `...(tier.effort ? { effort: tier.effort } : {})` into normalizedTiers[tierName]. Tests in src/lib/agents/__tests__/tier-table.test.ts: tier effort 'low' preserved, 'bogus' rejected, a distribution entry model lacking the level rejected. Slots do not consume tier effort in this issue (sibling #4257). Import effortConfigErrors from the effort-support leaf (../agents/effort-support.js or ./effort-support.js), never from resolve-effort.ts, because config-yaml.ts re-exports roles.ts and that import would create a cycle. Run npm run lint:circular after wiring."
+        },
+        "items": [
+          {
+            "id": "tier-effort-validation.ac1",
+            "title": "Given a tier with effort: low, validateTieredExecutionConfig returns that tier with effort 'low'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-effort-validation.ac2",
+            "title": "Given a tier with effort: bogus, validateTieredExecutionConfig throws TieredExecutionConfigError naming tiered_execution.tiers.<name>.effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-effort-validation.ac3",
+            "title": "Given a distribution tier whose entry model lacks the configured level, validation rejects it with the `is not supported by` message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-effort-validation",
+        "title": "Collapse settings-api effort validation onto effortConfigErrors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4249",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/settings-api.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "settings-api.test.ts passes unedited",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3 step 6. In src/lib/settings-api.ts replace the effort branch in validateRoleFields (:512-515) and the model-aware effort block (:585-609) with errors.push(...effortConfigErrors(fieldPath, effort, models)), where models is the resolved scalar model or every distribution entry's resolved model. Message text stays byte-identical, so src/lib/__tests__/settings-api.test.ts passes without edits. The file must not grow (it shrinks). Import effortConfigErrors from the effort-support leaf (../agents/effort-support.js or ./effort-support.js), never from resolve-effort.ts, because config-yaml.ts re-exports roles.ts and that import would create a cycle. Run npm run lint:circular after wiring."
+        },
+        "items": [
+          {
+            "id": "settings-api-effort-validation.ac1",
+            "title": "src/lib/settings-api.ts calls effortConfigErrors and no longer contains its own `is not supported by` effort message literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-effort-validation.ac2",
+            "title": "src/lib/__tests__/settings-api.test.ts passes without edits, so the effort error strings the dashboard receives are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-start-effort",
+        "title": "Resolve pan start work effort through resolveEffort and clamp unsupported explicit levels",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4249",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint-file-size reports no growth for start.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Replace src/cli/commands/start.ts:745-763 (grep `// Resolve the Claude Code --effort level for this spawn`) with the resolveEffort call in the PRD: explicit options.effort, role 'work', issueId id, model resolveRoleModel('work', spawnModel || undefined, yamlConfig), harness requestedHarness, config yamlConfig. Print effort.warning to stderr. Catch InvalidEffortError and exit 1 with `Invalid --effort value: <v>. Expected one of low, medium, high, xhigh, max.`. Keep `effort: resolvedEffort` at the spawnAgent call (~:1220). Do not touch :904 (planning effort, sibling #4258). Remove now-unused imports. start.ts must stay at or below 1283 lines (scripts/file-size-allowlist.txt)."
+        },
+        "items": [
+          {
+            "id": "pan-start-effort.ac1",
+            "title": "src/cli/commands/start.ts contains no `options.effort ?? yamlConfig.roles?.work?.effort` expression and calls resolveEffort with role 'work' and explicit options.effort",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-start-effort.ac2",
+            "title": "Given `pan start <id> --effort bogus`, the command exits 1 and prints `Invalid --effort value: bogus`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-start-effort.ac3",
+            "title": "Given an explicit level the work model lacks, start.ts writes the resolver's warning to stderr and launches with the clamped level instead of exiting 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-command-effort",
+        "title": "Route the three runtime-command.ts effort fallbacks through resolveEffort",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4249",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/__tests__/runtime-command-effort.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/runtime-command-effort.test.ts src/lib/agents/__tests__/runtime-command.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "runtime-command-effort.test.ts and runtime-command.test.ts pass",
+            "lint-file-size reports no growth for runtime-command.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In src/lib/agents/runtime-command.ts: line 929 (getRoleRuntimeBaseCommand, grep `const effortFlag = !definitionPath`) uses resolveEffort({ explicit: effort, role, subRole, model: validatedModel, harness }).effort; line 201 (getCodexLauncherFields) uses resolveEffort({ explicit: effort, role, model, harness: 'codex' }).effort; line 111 (getOhmypiLauncherFields) uses resolveEffort({ explicit: effort, model, harness: 'ohmypi' }).effort. Reword the PAN-3077 comment to say the resolver supplies the default. File stays at or below 961 lines. Extend src/lib/agents/__tests__/runtime-command-effort.test.ts: config roles.review.sub.security.effort: low yields ` --effort low` for the security sub-role; ohmypi with effort 'max' yields piEffort 'xhigh'; keep both PAN-3077 cases green."
+        },
+        "items": [
+          {
+            "id": "runtime-command-effort.ac1",
+            "title": "Given config roles.review.sub.security.effort: low, getRoleRuntimeBaseCommand for role 'review' sub-role 'security' on claude-code emits ` --effort low`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-command-effort.ac2",
+            "title": "Given no effort config, getRoleRuntimeBaseCommand for a definition-less run still emits exactly one ` --effort high` (the PAN-3077 cases pass unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-command-effort.ac3",
+            "title": "getOhmypiLauncherFields with effort 'max' returns piEffort 'xhigh', and runtime-command.ts contains no `effort ?? 'high'` expression",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-lint-ratchet",
+        "title": "Add the lint:effort ratchet against new effort fallbacks and enum copies",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4249",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-effort.sh",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:effort"
+          ],
+          "expected_outputs": [
+            "lint:effort exits 0 on the branch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. Create scripts/lint-effort.sh (bash, set -euo pipefail, cd to repo root, rg) scanning src/ and packages/*/src/ *.ts/*.tsx, excluding *.test.ts(x), __tests__, packages/contracts/src/effort.ts, and the per-model data files src/lib/model-capabilities.ts and src/lib/model-capability-additions.ts (their effortLevels arrays are model data, not enum copies; counting them would fail the lint whenever a model is added), counting four patterns per file: fallback `[Ee]ffort[A-Za-z]*\\)?\\s*\\?\\?\\s*['\"](low|medium|high|xhigh|max)['\"]`, union `['\"]low['\"]\\s*\\|\\s*['\"]medium['\"]`, array `\\[\\s*['\"]low['\"]\\s*,\\s*['\"]medium['\"]`, regex `low\\|medium\\|high`. Embed `declare -A BASELINE` generated after the code items land, one comment per row naming the sibling issue (#4253-#4260) that removes it. Fail with the PRD's message when a file exceeds its baseline or an unlisted file matches; print `note: lower BASELINE[<path>] to <n>` when below. Add `\"lint:effort\": \"bash scripts/lint-effort.sh\"` to package.json and append `&& npm run lint:effort` after `npm run lint:liveness` in the lint script. Self-test by adding and removing a temporary `effort ?? 'high'` line, and record both runs in the commit body."
+        },
+        "items": [
+          {
+            "id": "effort-lint-ratchet.ac1",
+            "title": "`npm run lint:effort` exits 0 on the finished branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-lint-ratchet.ac2",
+            "title": "Given a new `const e = effort ?? 'high'` line in any non-test src/lib file, `npm run lint:effort` exits 1 and names that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-lint-ratchet.ac3",
+            "title": "package.json's lint script contains `npm run lint:effort`, and the BASELINE in scripts/lint-effort.sh contains no row for src/lib/agents/runtime-command.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-lint-ratchet.ac4",
+            "title": "Given a new model entry with an effortLevels array added to src/lib/model-capabilities.ts, `npm run lint:effort` still exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "effort-docs",
+        "title": "Document effort levels, precedence, config keys and clamping in configuration/effort.mdx and fix the stale docs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:50:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4249",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/effort.mdx",
+            "docs.json",
+            "docs/CONFIGURATION.md",
+            "docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"JSON.parse(require('fs').readFileSync('docs.json','utf8'))\"",
+            "rg -n 'configuration/effort' docs.json docs/CONFIGURATION.md"
+          ],
+          "expected_outputs": [
+            "docs.json parses as JSON",
+            "both files reference configuration/effort"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. Create configuration/effort.mdx (title 'Reasoning effort') with sections: Levels (five levels, high default, never xhigh/max), Where effort comes from (D3 precedence table with the YAML key per layer), Config keys (YAML examples for roles.<role>.effort, roles.<role>.sub.<name>.effort, tiered_execution.tiers.<name>.effort, projects.yaml effort, xBRIEF plan.metadata.effort and item metadata.effort), Clamping (D6 rule, pi/muse no max, config rejects vs flag clamps), What honors it today (pan start work, definition-less role runs, codex/omp launcher fields; everything else linked to siblings #4253-#4260). Add \"configuration/effort\" to docs.json after \"configuration/harnesses\". Update docs/CONFIGURATION.md:249's third cell to link configuration/effort. Replace the stale sentence in docs/MODEL-CONTEXT-AUDIT.md's `## Effort` section with the PRD's replacement text."
+        },
+        "items": [
+          {
+            "id": "effort-docs.ac1",
+            "title": "configuration/effort.mdx renders a precedence table listing explicit, item, plan, tier, sub-role, role, project and default in that order, and states that the default is high",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-docs.ac2",
+            "title": "docs.json contains \"configuration/effort\" in the Configuration group directly after \"configuration/harnesses\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "effort-docs.ac3",
+            "title": "docs/MODEL-CONTEXT-AUDIT.md no longer contains 'passed through conversation, work, specialist, and planning launches' and instead names resolveEffort and the surfaces that use it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-effort-enum",
+        "to": "effort-config-types",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-effort-enum",
+        "to": "effort-support-leaf",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-support-leaf",
+        "to": "resolve-effort-module",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-config-types",
+        "to": "resolve-effort-module",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-support-leaf",
+        "to": "sub-role-effort-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-config-types",
+        "to": "sub-role-effort-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-support-leaf",
+        "to": "tier-effort-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-config-types",
+        "to": "tier-effort-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "effort-support-leaf",
+        "to": "settings-api-effort-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-effort-module",
+        "to": "pan-start-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-effort-module",
+        "to": "runtime-command-effort",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-effort-enum",
+        "to": "effort-lint-ratchet",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-command-effort",
+        "to": "effort-lint-ratchet",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
