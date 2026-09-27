@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T18:17:41.601145Z · model: claude-opus-5-5 · open: 781_
+_Last sequenced: 2026-09-27T23:13:19.217935Z · model: claude-opus-5-5 · open: 782_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 15 | PAN-4278 | L | high | ok |  |  | In-pipeline: terminal permission prompts block agents for hours with no dashboard dialog; composer sends near them get lost. |
 | 16 | PAN-4267 | M | high | ok |  |  | In-pipeline: memory governor fixed 4/12 GB floors + macOS free-memory measure lock small Macs in permanent shedding. |
 | 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
@@ -789,6 +790,10 @@ _Last sequenced: 2026-09-27T18:17:41.601145Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-4278 (rank 15)
+
+New since the prior run and already in the pipeline, so it is pinned at rank 15, directly ahead of the in-pipeline cluster, without displacing any existing rank. A subagent sat blocked on an unanswerable permission prompt for 7.5 hours and two operator messages vanished, which breaks the core supervise-from-the-dashboard loop, so importance is high; the body gives a four-part fix with fixture-testable acceptance criteria, so condition is ok. It shares the composer-to-pane delivery path with PAN-4268 and PAN-3630, recorded as advisory informs edges.
+
 ### PAN-4267 (rank 16)
 
 New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 16, the slot vacated by PAN-4266 (now labeled in-progress and out of the backlog manifest). A permanent admission lockout makes Overdeck unusable on 8-16 GB Macs, so importance is high; the body names the exact defaults function, a four-part fix and testable acceptance criteria, so condition is ok.
@@ -1085,10 +1090,6 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
 
 Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
 
-### PAN-3916 (rank 112)
-
-Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1096,10 +1097,10 @@ Every path that starts a new Claude session for an existing agent must repoint s
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T18:17:41.601145Z",
+  "generatedAt": "2026-09-27T23:13:19.217935Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 781,
+  "openCount": 782,
   "nodes": [
     {
       "issue": "PAN-4267",
@@ -10772,6 +10773,19 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "rationale": "New follow-up carved from PAN-1641's cancelled e2e item; ranked just below its in-pipeline parent as low-importance local-model work.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4278",
+      "rank": 15,
+      "size": "L",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: terminal permission prompts block agents for hours with no dashboard dialog; composer sends near them get lost.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 15, directly ahead of the in-pipeline cluster, without displacing any existing rank. A subagent sat blocked on an unanswerable permission prompt for 7.5 hours and two operator messages vanished, which breaks the core supervise-from-the-dashboard loop, so importance is high; the body gives a four-part fix with fixture-testable acceptance criteria, so condition is ok. It shares the composer-to-pane delivery path with PAN-4268 and PAN-3630, recorded as advisory informs edges.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11831,6 +11845,20 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-4268",
+      "to": "PAN-4278",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-3630",
+      "to": "PAN-4278",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
