@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T16:07:04.764Z",
+  "updated": "2026-09-27T16:07:14.621Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "playwright-clipping-spec.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T16:07:04.764Z"
+    },
+    "style-guide-picker-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:07:14.621Z"
     }
   }
 }
