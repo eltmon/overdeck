@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4265",
   "created": "2026-09-27T15:21:17.185Z",
-  "updated": "2026-09-27T15:27:04.574Z",
+  "updated": "2026-09-27T15:27:09.509Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4265",
       "claimedAt": "2026-09-27T15:24:54.281Z",
       "doneAt": "2026-09-27T15:27:04.574Z"
+    },
+    "auto-sync-service": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:27:09.509Z"
     }
   }
 }
