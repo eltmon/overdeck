@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { ExternalLink, User, Play, Eye, DollarSign, ChevronDown, ChevronRight, Sparkles, FileText, List, ScrollText } from 'lucide-react';
+import { ExternalLink, User, Play, Eye, DollarSign, ChevronDown, ChevronRight, FileText, List, ScrollText } from 'lucide-react';
 import { useDashboardStore, selectBackendPanes, selectDerivedIssueState } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
@@ -265,7 +265,7 @@ export function ListIssueRow({
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
-  onPlan: (issue: Issue, autoStart?: boolean) => void;
+  onPlan: (issue: Issue) => void;
   isBulkSelected?: boolean;
   onBulkToggle?: () => void;
 }) {
@@ -409,6 +409,9 @@ export function ListIssueRow({
         <div className="flex items-center gap-1 shrink-0">
           {/* Plan/Start button for backlog/todo, plus in_progress issues with no running
               agent (e.g. PAN-977 hit the empty-spawn bug and needs re-planning). */}
+          {/* PAN-4198 (D8): one Plan button. The separate Auto-plan shortcut is
+              gone — it worked only through PlanDialog's autoStart auto-click, and
+              "Plan automatically" is one click inside the dialog. */}
           {!isRunning && (canonical === 'backlog' || canonical === 'todo' || canonical === 'in_progress') && (
             <div className="inline-flex items-center rounded border border-border/70 overflow-hidden">
               <button
@@ -422,19 +425,6 @@ export function ListIssueRow({
               >
                 <Play className="w-3.5 h-3.5" />
               </button>
-              {canonical !== 'in_progress' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onPlan(issue, true);
-                  }}
-                  className="p-1 text-primary hover:text-primary/80 border-l border-border/70 transition-colors"
-                  title="Auto-plan issue"
-                  data-testid={`list-auto-plan-${issue.identifier}`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                </button>
-              )}
             </div>
           )}
 
@@ -547,7 +537,7 @@ interface IssueCardProps {
   /** PAN-1234: keyboard navigation focus indicator. */
   isFocused?: boolean;
   onSelect: () => void;
-  onPlan: (autoStart?: boolean) => void; // Lifted to parent to survive re-renders
+  onPlan: () => void; // Lifted to parent to survive re-renders
   onViewTasks?: (issue: Issue) => void;
   onViewXBrief?: (issue: Issue) => void;
   isBulkSelected?: boolean;

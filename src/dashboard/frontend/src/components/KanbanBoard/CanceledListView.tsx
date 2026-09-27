@@ -30,7 +30,7 @@ export function CanceledListView({
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
-  onPlan: (issue: Issue, autoStart?: boolean) => void;
+  onPlan: (issue: Issue) => void;
   isBulkSelected: (id: string) => boolean;
   onBulkToggle: (id: string) => void;
 }) {

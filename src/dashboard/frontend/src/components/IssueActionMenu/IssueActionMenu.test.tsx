@@ -102,7 +102,7 @@ describe('IssueActionMenu', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="inline" />);
 
     expect(screen.getByTestId('issue-action-plan')).toHaveTextContent('Plan');
-    expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
+    expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start work');
   });
 
   it('enables Close out as the primary action once the PR has merged', async () => {
@@ -140,34 +140,50 @@ describe('IssueActionMenu', () => {
     expect(screen.getAllByTestId('issue-action-plan')[0]).toHaveTextContent('Plan');
   });
 
-  it('renders only agent-control actions when agentScopeOnly is enabled', () => {
+  it('renders only the enabled agent controls when agentScopeOnly is enabled', () => {
     mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'running', paused: true }) });
 
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" agentScopeOnly />);
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
 
     const menu = screen.getByTestId('issue-action-overflow-menu');
-    for (const label of [
-      'Tell agent',
-      'Recover agent',
-      'Resume session',
-    ]) {
+    // A paused, running agent: talk to it, stop it, or let it continue.
+    for (const label of ['Message agent', 'Stop agent', 'Let agent continue']) {
       expect(within(menu).getByText(label)).toBeInTheDocument();
     }
-    // Stop/Pause/Unpause live behind the collapsed Danger disclosure (C-ACTIONS).
-    fireEvent.click(within(menu).getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
-    for (const label of ['Stop agent', 'Pause agent', 'Unpause agent']) {
-      expect(within(menu).getByText(label)).toBeInTheDocument();
+    // PAN-4198 (FR-1): gated entries are omitted, not shown disabled. Pause is
+    // meaningless on an already-paused agent; Recover and Resume need a stopped one.
+    for (const label of ['Pause agent', 'Recover agent', 'Resume']) {
+      expect(within(menu).queryByText(label), label).not.toBeInTheDocument();
     }
     expect(screen.queryByTestId('issue-action-switchModel')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-destroyWorkspace')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-reopen')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-syncMain')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-open')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
+    for (const key of ['plan', 'closeOut', 'destroyWorkspace', 'reopen', 'syncMain', 'open', 'viewPr', 'resetIssue', 'cancel']) {
+      expect(within(menu).queryByTestId(`issue-action-${key}`), key).not.toBeInTheDocument();
+    }
+  });
+
+  it('still reaches the contextual Recover and Resume entries for a stopped agent (NFR-2)', () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/has-session')) return Response.json({ lifecycle: { canResumeSession: true } });
+      if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', path: '/tmp/pan-1' });
+      return Response.json({ success: true });
+    }));
+    mockStore({
+      currentIssue: issue({ status: 'In Progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }),
+      currentAgent: agent({ status: 'stopped', lifecycle: { canResumeSession: true } } as Partial<Agent>),
+      derived: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
+    });
+
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" agentScopeOnly />);
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+
+    const menu = screen.getByTestId('issue-action-overflow-menu');
+    // recoverAgent is `placement: 'contextual'`, so this proves D5: the
+    // agent-scope allowlist ignores placement.
+    expect(within(menu).getByText('Recover agent')).toBeInTheDocument();
+    expect(within(menu).getByText('Resume')).toBeInTheDocument();
+    expect(within(menu).queryByText('Stop agent')).not.toBeInTheDocument();
   });
 
   it('renders primary-strip primaries with a labelled grouped overflow', () => {
@@ -182,13 +198,13 @@ describe('IssueActionMenu', () => {
 
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" />);
 
-    expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
+    expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start work');
     const overflowButton = screen.getByTestId('issue-action-overflow-button');
     expect(overflowButton).toHaveTextContent(/^\d+ more$/);
     fireEvent.click(overflowButton);
     expect(screen.getByTestId('issue-action-overflow-menu')).toBeInTheDocument();
     expect(document.querySelector('[data-issue-action-section="inspect"]')).toBeInTheDocument();
-    expect(screen.getByTestId('issue-action-tasks')).toHaveTextContent('Tasks');
+    expect(screen.getByTestId('issue-action-tasks')).toHaveTextContent('Show plan and tasks');
     // The overflow is the full menu: the phase section also shows the primary.
     expect(within(screen.getByTestId('issue-action-overflow-menu')).getAllByTestId('issue-action-startAgent').length).toBeGreaterThan(0);
   });
@@ -199,6 +215,8 @@ describe('IssueActionMenu', () => {
     mockStore({
       currentIssue: issue({ status: 'In Progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }),
       currentAgent: agent({ status: 'stopped' }),
+      // PAN-4198: Request review is gated on the work state with no PR yet.
+      derived: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
     });
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" pinRight={['requestReview']} />);
 
@@ -223,6 +241,8 @@ describe('IssueActionMenu', () => {
     mockStore({
       currentIssue: issue({ status: 'In Progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }),
       currentAgent: agent({ status: 'stopped' }),
+      // PAN-4198: Request review is gated on the work state with no PR yet.
+      derived: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
     });
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" pinRight={['requestReview']} />);
 
@@ -245,6 +265,8 @@ describe('IssueActionMenu', () => {
     mockStore({
       currentIssue: issue({ status: 'In Progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }),
       currentAgent: agent({ status: 'stopped' }),
+      // PAN-4198: Request review is gated on the work state with no PR yet.
+      derived: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
     });
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" pinRight={['requestReview']} />);
 
@@ -280,7 +302,7 @@ describe('IssueActionMenu', () => {
     );
 
     expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
-    expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('View PR');
+    expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('Open pull request');
     expect(screen.getByText('Pinned tasks')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
@@ -290,7 +312,7 @@ describe('IssueActionMenu', () => {
     expect(within(overflow).queryByText('Pinned tasks')).not.toBeInTheDocument();
   });
 
-  it('keeps a disabled requested registry pin in grouped overflow', () => {
+  it('drops a requested registry pin entirely when it is gated (PAN-4198 FR-1)', () => {
     renderMenu(
       <IssueActionMenu
         issueId="PAN-1"
@@ -304,8 +326,10 @@ describe('IssueActionMenu', () => {
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
     const overflow = screen.getByTestId('issue-action-overflow-menu');
-    expect(within(overflow).getByTestId('issue-action-disabled-viewPr')).toBeInTheDocument();
-    expect(within(overflow).getByTestId('issue-action-viewPr')).toBeDisabled();
+    // There is no PR to open, so Open pull request is neither pinned nor listed
+    // in the overflow — it used to sit there disabled with a reason.
+    expect(within(overflow).queryByTestId('issue-action-disabled-viewPr')).not.toBeInTheDocument();
+    expect(within(overflow).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
   });
 
   it('renders only registry-backed action rows in grouped overflow', () => {
@@ -318,7 +342,7 @@ describe('IssueActionMenu', () => {
     );
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
 
     const registryKeys = new Set(ISSUE_ACTIONS.map((action) => action.key));
     const renderedActionKeys = Array.from(
@@ -336,19 +360,21 @@ describe('IssueActionMenu', () => {
   it('opens a confirmation dialog before destructive actions can run', async () => {
     const fetchMock = mockFetch();
     vi.stubGlobal('fetch', fetchMock);
+    // PAN-4198: Reset to Todo is offered only when there is something to reset.
+    mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }) });
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
     fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
 
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith('/api/issues/PAN-1/reset', expect.anything());
 
-    const confirmButton = screen.getByRole('button', { name: 'Reset issue' });
+    const confirmButton = screen.getByRole('button', { name: 'Reset to Todo' });
     expect(confirmButton).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Reset issue' } });
+    fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Reset to Todo' } });
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
@@ -359,27 +385,10 @@ describe('IssueActionMenu', () => {
     });
   });
 
-  it('sends deleteWorkspace true when the confirmed wipe action runs', async () => {
-    const fetchMock = mockFetch();
-    vi.stubGlobal('fetch', fetchMock);
-    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
-
-    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
-    fireEvent.click(screen.getByTestId('issue-action-wipe'));
-
-    const confirmButton = screen.getByRole('button', { name: 'Wipe' });
-    expect(confirmButton).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Wipe' } });
-    fireEvent.click(confirmButton);
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/deep-wipe', expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ deleteWorkspace: true }),
-      }));
-    });
-  });
+  // PAN-4198 D6: the `wipe` entry left the registry (RETIREMENT_AUDIT row
+  // "wipe" → resetIssue in issueActions.parity.test.tsx). Its deep-wipe case
+  // is gone with it; the Reset to Todo case above pins the same
+  // `{ deleteWorkspace: true }` body through the surviving action.
 
   it('renders disabled actions with a tooltip reason', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="inline" />);
@@ -432,7 +441,7 @@ describe('IssueActionMenu', () => {
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
-  it('disables the open action with a no-workspace tooltip', () => {
+  it('omits Open in editor until a workspace exists (PAN-4198 FR-1)', () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/planning-state')) return Response.json({ hasPlan: false, hasTasks: false, tasksCount: 0, planningComplete: false });
@@ -441,11 +450,16 @@ describe('IssueActionMenu', () => {
     }));
 
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
-
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    const disabledOpen = screen.getByTestId('issue-action-disabled-open');
-    expect(within(disabledOpen).getByRole('menuitem')).toBeDisabled();
-    expect(disabledOpen).toHaveAttribute('title', 'Workspace does not exist');
+    expect(screen.queryByTestId('issue-action-disabled-open')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-open')).not.toBeInTheDocument();
+  });
+
+  it('offers Open in editor once the workspace exists', () => {
+    mockStore({ currentIssue: issue({ workspacePath: '/tmp/pan-1' }) });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    expect(screen.getByTestId('issue-action-open')).toBeInTheDocument();
   });
 
   it('opens the shared tell dialog and sends the entered message', async () => {
@@ -457,7 +471,7 @@ describe('IssueActionMenu', () => {
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
     fireEvent.click(screen.getByTestId('issue-action-tell'));
 
-    expect(screen.getByRole('dialog', { name: 'Tell agent' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Message agent' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Message to send to the agent'), { target: { value: 'Please continue' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
