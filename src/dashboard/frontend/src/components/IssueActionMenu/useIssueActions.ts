@@ -58,7 +58,13 @@ export type UseIssueActionsResult = IssueActionLayout & {
   phase: PipelinePhase;
   activeDialog: IssueActionDialogState;
   closeDialog: () => void;
-  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => void;
+  submitDialogAction: (
+    action: IssueActionEntry,
+    body?: Record<string, unknown>,
+    selectedTaskId?: string | null,
+    /** PAN-4198 (D11): overrides `action.endpoint` for this one call. */
+    endpoint?: string,
+  ) => void;
   createOrderBookForIssue: (name: string) => Promise<void>;
   isActionPending: (key: IssueActionKey) => boolean;
 };
@@ -67,6 +73,8 @@ type PostActionInput = {
   action: IssueActionEntry;
   body?: Record<string, unknown>;
   selectedTaskId?: string | null;
+  /** PAN-4198 (D11): posted instead of `action.endpoint` when present. */
+  endpoint?: string;
 };
 
 function activeAgentForIssue(agents: Agent[], issueId: string) {
@@ -105,20 +113,13 @@ const REVIEW_MODE_SUBMENU_OPTIONS = [
 function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue | undefined) {
   switch (action.key) {
     case 'startAgent':
-    case 'restartFromPlan':
       return { issueId, projectId: issue?.project?.id };
-    case 'startSkipPlanning':
-      return { issueId, projectId: issue?.project?.id, auto: true };
     case 'createWorkspace':
       return { issueId, projectId: issue?.project?.id };
     case 'resetIssue':
       return { deleteWorkspace: true };
-    case 'wipe':
-      return { deleteWorkspace: true };
     case 'cancel':
       return { wipeWorkspace: true };
-    case 'completeWorkReset':
-      return { spawn: false };
     case 'doneWork':
       return { message: `If implementation is complete, run: pan done ${issueId} -c "Implementation complete". If work remains, continue the current task.` };
     default:
@@ -129,7 +130,6 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
 function disabledReasonForAction(action: IssueActionEntry) {
   switch (action.key) {
     case 'plan':
-    case 'autoPlan':
       return 'Planning is available only before a plan exists and before the issue is done.';
     case 'startAgent':
       return 'Start agent is available after planning when no agent is running.';
@@ -140,10 +140,9 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'pause':
       return 'This action requires a running agent.';
     case 'resumeSession':
-    case 'resetSession':
       return 'This action requires a stopped agent with a resumable session.';
-    case 'completeWorkReset':
-      return 'This action requires an existing work agent with a workspace.';
+    case 'restartAgent':
+      return 'This action requires a work agent that has not reached review.';
     case 'requestReview':
       return 'Review can be requested after workspace work is idle and not already in review.';
     case 'restartReview':
@@ -155,23 +154,15 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'open':
       return 'Workspace does not exist';
     case 'syncMain':
-    case 'copySettings':
+      return 'Updating from main requires a workspace with no running agent.';
     case 'destroyWorkspace':
-      return 'This action requires an existing workspace.';
+      return 'Deleting the workspace is available only after the issue is closed.';
     case 'tasks':
       return 'No plan or tasks are available for this issue yet.';
-    case 'inference':
-      return 'No inference artifact is available for this issue.';
-    case 'discussions':
-      return 'No discussion artifact is available for this issue.';
-    case 'transcripts':
-      return 'No transcript artifact is available for this issue.';
     case 'closeOut':
       return 'Close out is available only after merge verification.';
     case 'merge':
       return 'Merge is available once review has approved and the PR is mergeable.';
-    case 'upload':
-      return 'Transcript upload is temporarily unavailable while its endpoint is rebuilt.';
     case 'reopen':
       return 'Reopen is available only for done or canceled issues.';
     case 'unpause':
@@ -183,39 +174,26 @@ function disabledReasonForAction(action: IssueActionEntry) {
 
 const dialogActionKeys = new Set<IssueActionKey>([
   'plan',
-  'autoPlan',
-  'startSkipPlanning',
   'tell',
   'open',
-  'upload',
+  // PAN-4198: Restart agent… asks keep-memory vs fresh-session in its dialog.
+  'restartAgent',
 ]);
 
 const artifactTabs: Partial<Record<IssueActionKey, string>> = {
   tasks: 'tasks',
-  inference: 'inference',
-  discussions: 'discussions',
-  transcripts: 'conversation',
 };
 
 function destructiveMessage(action: IssueActionEntry, issueId: string) {
   switch (action.key) {
     case 'closeOut':
       return `Close out ${issueId}?\n\nThis final cleanup archives workspace artifacts, cleans up agent state and workspace resources, and closes the tracker issue.`;
-    case 'wipe':
-      return `Wipe ${issueId}?\n\nThis is destructive and removes workspace and agent state for the issue.`;
     case 'destroyWorkspace':
       return `Destroy the workspace for ${issueId}?\n\nThis removes workspace resources but leaves the issue record intact.`;
     case 'resetIssue':
       return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears tasks and xBRIEF state, and moves the issue back to Todo.`;
     case 'cancel':
       return `Cancel ${issueId}?\n\nThis cancels the issue and wipes the workspace state for the abandoned run.`;
-    case 'resetSession':
-      return `Reset the saved session for ${issueId}?\n\nThe next start will create a fresh agent session.`;
-    case 'restartFromPlan':
-    case 'restartAgent':
-      return `Restart work for ${issueId}?\n\nThis stops the current agent path and starts a replacement run from existing context.`;
-    case 'completeWorkReset':
-      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, xBRIEF, tasks, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
     default:
       return `${action.label} for ${issueId}?`;
   }
@@ -305,10 +283,11 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
   const postActionMutation = useMutation({
-    mutationFn: async ({ action, body, selectedTaskId }: PostActionInput) => {
-      if (!action.endpoint) return { success: true };
+    mutationFn: async ({ action, body, selectedTaskId, endpoint }: PostActionInput) => {
+      const target = endpoint ?? action.endpoint;
+      if (!target) return { success: true };
       const payload = body ?? bodyForAction(action, issueId, issue);
-      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), {
+      const response = await fetch(interpolateEndpoint(target, issueId, agent, state, selectedTaskId), {
         method: 'POST',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),
@@ -327,7 +306,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
           openRecovery({
             ...recovery,
             issueId,
-            retry: { url: interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), body: payload ?? {} },
+            retry: { url: interpolateEndpoint(target, issueId, agent, state, selectedTaskId), body: payload ?? {} },
           });
           return { success: false, recovery: true };
         }
@@ -370,9 +349,14 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     onSettled: () => setPendingKey(null),
   });
 
-  const submitDialogAction = useCallback((action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => {
+  const submitDialogAction = useCallback((
+    action: IssueActionEntry,
+    body?: Record<string, unknown>,
+    selectedTaskId?: string | null,
+    endpoint?: string,
+  ) => {
     setPendingKey(action.key);
-    postActionMutation.mutate({ action, body, selectedTaskId });
+    postActionMutation.mutate({ action, body, selectedTaskId, endpoint });
   }, [postActionMutation]);
 
   const addToOrderBookMutation = useMutation({
@@ -435,6 +419,13 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     if (action.key === 'viewPr') {
       const url = state.prUrl ?? state.workspace?.mrUrl;
       if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // PAN-4198 (D9): "Open planning session" is navigation, not a POST — the
+    // drawer's conversation tab is where the live planning agent renders.
+    if (action.key === 'watchPlanning') {
+      openIssue(issueId, 'conversation');
       return;
     }
 
@@ -510,8 +501,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       .map((action) => byKey.get(action.key))
       .filter((view): view is IssueActionView => !!view);
     const primaryKeys = new Set(primary.map((view) => view.action.key));
-    const rest = all.filter((view) => !primaryKeys.has(view.action.key));
-    const secondary = rest.filter((view) => view.enabled && view.action.kind !== 'destructive' && view.action.group !== 'danger').slice(0, 4);
+    // PAN-4198 (FR-1): the strip and its overflow offer only what the operator
+    // can act on right now, and only actions that belong in a menu.
+    const rest = all.filter((view) => !primaryKeys.has(view.action.key) && view.enabled && view.action.placement === 'menu');
+    const secondary = rest.filter((view) => view.action.kind !== 'destructive' && view.action.group !== 'danger').slice(0, 4);
     const secondaryKeys = new Set(secondary.map((view) => view.action.key));
     const overflow = rest.filter((view) => !secondaryKeys.has(view.action.key));
     return { all, primary, secondary, overflow };

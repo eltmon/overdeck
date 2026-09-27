@@ -34,20 +34,39 @@ Do not recommend GitFlow or a long-lived `develop` branch unless the user explic
 
 ## Preferred operator flow
 
-1. Run:
+Every stable release updates the public changelog and ends with a clean-install
+check. Neither step is optional.
+
+1. **Update the changelog first.** Add a `<Update label="vX.Y.Z" description="YYYY-MM-DD">`
+   block at the top of `changelog.mdx` with the user-facing changes since the
+   previous tag and a compare link to the new tag. Commit it as
+   `docs(infra): changelog for vX.Y.Z` and push `main`. `pan release` does not
+   edit the changelog, and it needs a clean tree. Details: `docs/RELEASING.md`,
+   "Update the public changelog".
+2. Run:
    ```bash
    pan release check
    ```
-2. Create a stable or canary release:
+3. Create a stable or canary release:
    ```bash
    pan release stable --version 0.7.1
    pan release canary --version 0.8.0-canary.1
    ```
-3. Push intentionally:
+4. Push intentionally:
    ```bash
    git push origin main
    git push origin v0.7.1
    ```
+5. **Verify a clean install after npm shows the new version.** Run the advertised
+   launch command with an empty cache and an empty global prefix, so a global
+   install on this machine can't hide a broken package:
+   ```bash
+   T=$(mktemp -d); cd "$T"
+   npm_config_prefix="$T/prefix" npx --yes --cache "$T/cache" @overdeck/core@X.Y.Z --version
+   ```
+   It must print `X.Y.Z`. If npm fails (for example `reading 'edgesOut'` or
+   `EUNSUPPORTEDPROTOCOL`), the release is broken for every new user: fix it and
+   ship a patch release the same day.
 
 ## What the CLI does
 
@@ -82,6 +101,10 @@ Prerequisites that must stay true or publishing breaks:
 - **No `workspace:*` in runtime `dependencies`** — bundled workspace packages
   (e.g. `@overdeck/contracts`) belong in `devDependencies`, or consumers'
   `npm install` fails with `EUNSUPPORTEDPROTOCOL`.
+- **No test frameworks in runtime `dependencies`** (`vitest`, `@effect/vitest`,
+  `@vitest/*`, `jest`, `@playwright/test`). 0.60.0–0.62.0 shipped `@effect/vitest`
+  there, and its peer graph crashed `npx @overdeck/core` with `reading 'edgesOut'`.
+  `scripts/lint-dist-externals.mjs` fails the build on this.
 - `publishConfig.access: "public"` on every publishable package.
 
 First-time setup for a brand-new package (npm org creation, the one-time

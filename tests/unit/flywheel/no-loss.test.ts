@@ -83,6 +83,23 @@ const NO_LOSS: Record<string, Home> = {
   popout: {
     views: [['App/StandaloneRoutes', 'StandaloneFlywheelPopoutRoute']],
   },
+  // PAN-4199 restored the four v1 surfaces that still had a data source.
+  'UAT batches card': {
+    views: [['components/flywheel/FlywheelUatBatchesCard', 'FlywheelUatBatchesCard']],
+  },
+  'headline strip': {
+    views: [['components/flywheel/FlywheelHeadlineStrip', 'FlywheelHeadlineStrip']],
+  },
+  'report viewer': {
+    routes: ['GET /api/flywheel/report'],
+    views: [['components/flywheel/FlywheelStatePane', 'FlywheelReportPane']],
+  },
+  'needs-you indicator': {
+    views: [
+      ['components/flywheel/NeedsYouIndicator', 'NeedsYouIndicator'],
+      ['lib/flywheelReveal', 'requestRevealNeedsYou'],
+    ],
+  },
 };
 
 let flywheelRouteLayer: typeof import('../../../src/dashboard/server/routes/flywheel.js')['flywheelRouteLayer'];
@@ -113,8 +130,8 @@ async function routeStatus(route: string): Promise<number> {
 describe('Flywheel no-loss table (PAN-3964 FR-15)', () => {
   const skillLines = readFileSync(SKILL_FILE, 'utf8').split('\n');
 
-  it('covers all eleven v1 rows from the issue', () => {
-    expect(Object.keys(NO_LOSS)).toHaveLength(11);
+  it('covers every v1 row', () => {
+    expect(Object.keys(NO_LOSS)).toHaveLength(15);
   });
 
   it.each(Object.entries(NO_LOSS))('%s still has its home', async (_row, home) => {

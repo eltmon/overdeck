@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/core",
-  "version": "0.61.0",
+  "version": "0.62.1",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "publishConfig": {
     "access": "public"
@@ -132,7 +132,7 @@
     "lint:ratchet-audit": "bash scripts/lint-ratchet-audit.sh",
     "pretest": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli",
     "test": "vitest run --configLoader runner && npm run test:frontend-subset",
-    "test:frontend-subset": "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx src/__tests__/fr7-conversation-pending-input.test.tsx src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+    "test:frontend-subset": "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.menu-by-state.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx src/__tests__/fr7-conversation-pending-input.test.tsx src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts",
     "test:unit": "vitest run --configLoader runner tests/unit",
     "test:integration": "vitest run --configLoader runner tests/integration",
     "test:e2e": "vitest run --configLoader runner tests/e2e",
@@ -156,7 +156,6 @@
     "@effect/platform-bun": "4.0.0-beta.73",
     "@effect/platform-node": "4.0.0-beta.73",
     "@effect/platform-node-shared": "4.0.0-beta.73",
-    "@effect/vitest": "4.0.0-beta.73",
     "@google-cloud/speech": "^7.5.0",
     "@lydell/node-pty": "1.2.0-beta.15",
     "@huggingface/transformers": "^4.3.0",

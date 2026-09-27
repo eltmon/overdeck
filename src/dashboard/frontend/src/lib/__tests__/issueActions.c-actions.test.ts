@@ -1,12 +1,12 @@
 /**
- * PAN-2908 · C-ACTIONS conformance tests.
+ * PAN-2908 · C-ACTIONS conformance tests (PAN-4198 reshaped the groups).
  *
- * - six fixed groups, fixed order
+ * - four fixed groups, fixed order
  * - Merge is a first-class registry entry (phase-primary at READY_TO_MERGE)
  * - registry hygiene: no dead endpoints (each endpoint exists in the server
- *   route table), upload disabled with reason
+ *   route table)
  * - state filtering: contradictory verbs are never co-enabled, and no issue
- *   state enables more than 12 actions (the acceptance ceiling)
+ *   state puts more than 10 actions in a menu (the PAN-4198 ceiling)
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -16,6 +16,7 @@ import {
   GROUP_ORDER,
   ISSUE_ACTIONS,
   getEnabledActions,
+  getMenuActions,
   getPhasePrimaryActions,
   type IssueActionEntry,
   type IssueActionState,
@@ -23,9 +24,9 @@ import {
 
 const byKey = new Map(ISSUE_ACTIONS.map((a) => [a.key, a]));
 
-describe('C-ACTIONS · six groups', () => {
-  it('has exactly six groups in fixed order', () => {
-    expect(GROUP_ORDER).toEqual(['communicate', 'lifecycle', 'recover', 'inspect', 'navigation', 'danger']);
+describe('C-ACTIONS · four groups', () => {
+  it('has exactly four groups in fixed order', () => {
+    expect(GROUP_ORDER).toEqual(['communicate', 'lifecycle', 'inspect', 'danger']);
     expect(Object.keys(GROUP_LABELS)).toEqual(GROUP_ORDER);
   });
 
@@ -33,12 +34,13 @@ describe('C-ACTIONS · six groups', () => {
     expect(byKey.get('tell')?.group).toBe('communicate');
     expect(byKey.get('plan')?.group).toBe('lifecycle');
     expect(byKey.get('startAgent')?.group).toBe('lifecycle');
-    expect(byKey.get('syncMain')?.group).toBe('recover');
-    expect(byKey.get('recoverAgent')?.group).toBe('recover');
+    // PAN-4198: 'recover' folded into lifecycle, 'navigation' into inspect.
+    expect(byKey.get('syncMain')?.group).toBe('lifecycle');
+    expect(byKey.get('recoverAgent')?.group).toBe('lifecycle');
+    expect(byKey.get('stopAgent')?.group).toBe('lifecycle');
     expect(byKey.get('tasks')?.group).toBe('inspect');
-    expect(byKey.get('viewPr')?.group).toBe('navigation');
-    expect(byKey.get('wipe')?.group).toBe('danger');
-    expect(byKey.get('stopAgent')?.group).toBe('danger');
+    expect(byKey.get('viewPr')?.group).toBe('inspect');
+    expect(byKey.get('resetIssue')?.group).toBe('danger');
     expect(byKey.get('reopen')?.group).toBe('lifecycle');
   });
 
@@ -74,15 +76,6 @@ describe('C-ACTIONS · merge in the registry', () => {
 });
 
 describe('C-ACTIONS · registry hygiene', () => {
-  it('syncDiscussions points at the real command-deck route', () => {
-    expect(byKey.get('syncDiscussions')?.endpoint).toBe('/api/command-deck/planning/:id/sync-discussions');
-    expect(byKey.get('syncDiscussions')?.kind).toBe('safe');
-  });
-
-  it('upload is explicitly unavailable (not a stub dialog)', () => {
-    expect(byKey.get('upload')?.enabledWhen(baseState())).toBe(false);
-  });
-
   it('every registered endpoint exists in the server route table', () => {
     const routesDir = join(__dirname, '../../../../server/routes');
     const files: string[] = [];
@@ -127,24 +120,24 @@ function baseState(overrides: Partial<IssueActionState> = {}): IssueActionState 
 }
 
 const enabledKeys = (state: IssueActionState) => getEnabledActions(state).map((a) => a.key);
-const enabledNonDangerKeys = (state: IssueActionState) => getEnabledActions(state).filter((a) => a.group !== 'danger').map((a) => a.key);
-// C-ACTIONS ceiling: at most 12 enabled non-danger actions in any state.
-// Danger items sit behind their collapsed submenu with their own count.
+// PAN-4198 ceiling: a menu never lists more than 10 actions in any state.
+// Menus render only enabled, menu-placed entries, so this counts what the
+// operator actually sees, Danger rows included.
+const menuKeys = (state: IssueActionState) => getMenuActions(state).map((a) => a.key);
 
 describe('C-ACTIONS · state filtering', () => {
-  it('backlog issue: planning paths enabled, agent verbs disabled, ≤12 enabled', () => {
+  it('backlog issue: planning paths enabled, agent verbs disabled, ≤10 in the menu', () => {
     const state = baseState();
     const keys = enabledKeys(state);
     expect(keys).toContain('plan');
-    expect(keys).toContain('startSkipPlanning');
     expect(keys).not.toContain('tell');
     expect(keys).not.toContain('stopAgent');
     expect(keys).not.toContain('pause');
     expect(keys).not.toContain('merge');
-    expect(enabledNonDangerKeys(state).length).toBeLessThanOrEqual(12);
+    expect(menuKeys(state).length).toBeLessThanOrEqual(10);
   });
 
-  it('work running: agent verbs enabled, start/plan disabled, ≤12 enabled', () => {
+  it('work running: agent verbs enabled, start/plan disabled, ≤10 in the menu', () => {
     const state = baseState({
       agent: { status: 'running', role: 'work' } as IssueActionState['agent'],
       derived: { issueId: 'PAN-1', state: 'working' },
@@ -162,10 +155,10 @@ describe('C-ACTIONS · state filtering', () => {
     expect(keys).not.toContain('startAgent');
     expect(keys).not.toContain('plan');
     expect(keys).not.toContain('unpause');
-    expect(enabledNonDangerKeys(state).length).toBeLessThanOrEqual(12);
+    expect(menuKeys(state).length).toBeLessThanOrEqual(10);
   });
 
-  it('ready to merge: merge + viewPr enabled, work verbs disabled, ≤12 enabled', () => {
+  it('ready to merge: merge + viewPr enabled, work verbs disabled, ≤10 in the menu', () => {
     const state = baseState({
       derived: { issueId: 'PAN-1', state: 'ready', pr: OPEN_PR },
       hasPlan: true,
@@ -178,7 +171,7 @@ describe('C-ACTIONS · state filtering', () => {
     expect(keys).toContain('viewPr');
     expect(keys).not.toContain('doneWork');
     expect(keys).not.toContain('startAgent');
-    expect(enabledNonDangerKeys(state).length).toBeLessThanOrEqual(12);
+    expect(menuKeys(state).length).toBeLessThanOrEqual(10);
   });
 
   it('merged: closeOut offered, merge never offered twice', () => {
@@ -239,133 +232,81 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
       {
         "BACKLOG": [
           "plan",
-          "autoPlan",
-          "startSkipPlanning",
-          "resetIssue",
-          "wipe",
           "cancel",
-          "syncDiscussions",
           "createWorkspace",
         ],
         "CHANGES_REQUESTED": [
           "restartReview",
           "syncMain",
           "resetIssue",
-          "wipe",
-          "destroyWorkspace",
+          "cancel",
           "open",
           "viewPr",
-          "cancel",
           "tasks",
-          "syncDiscussions",
-          "copySettings",
-          "restartFromPlan",
         ],
         "MERGED": [
-          "syncMain",
           "reopen",
           "closeOut",
-          "resetIssue",
-          "wipe",
           "destroyWorkspace",
           "open",
-          "syncDiscussions",
-          "copySettings",
         ],
         "PLANNED": [
           "startAgent",
-          "requestReview",
           "syncMain",
           "rebuildAndStart",
           "resetIssue",
-          "wipe",
-          "destroyWorkspace",
-          "open",
           "cancel",
+          "open",
           "tasks",
-          "syncDiscussions",
-          "copySettings",
-          "restartFromPlan",
         ],
         "READY_TO_MERGE": [
           "syncMain",
           "merge",
           "resetIssue",
-          "wipe",
-          "destroyWorkspace",
+          "cancel",
           "open",
           "viewPr",
-          "cancel",
           "tasks",
-          "syncDiscussions",
-          "copySettings",
-          "restartFromPlan",
         ],
         "REVIEW_RUNNING": [
           "restartReview",
           "syncMain",
           "resetIssue",
-          "wipe",
-          "destroyWorkspace",
+          "cancel",
           "open",
           "viewPr",
-          "cancel",
           "tasks",
-          "syncDiscussions",
-          "copySettings",
-          "restartFromPlan",
         ],
         "WORK_IDLE": [
           "startAgent",
-          "requestReview",
           "recoverAgent",
+          "restartAgent",
           "syncMain",
           "rebuildAndStart",
           "resetIssue",
-          "wipe",
-          "destroyWorkspace",
-          "open",
           "cancel",
+          "open",
           "tasks",
-          "syncDiscussions",
-          "copySettings",
-          "completeWorkReset",
-          "restartFromPlan",
-          "restartAgent",
         ],
         "WORK_PAUSED": [
           "tell",
           "stopAgent",
           "unpause",
-          "syncMain",
-          "resetIssue",
-          "wipe",
-          "destroyWorkspace",
-          "open",
-          "cancel",
-          "tasks",
-          "syncDiscussions",
-          "copySettings",
-          "completeWorkReset",
-          "restartFromPlan",
           "restartAgent",
+          "resetIssue",
+          "cancel",
+          "open",
+          "tasks",
         ],
         "WORK_RUNNING": [
           "tell",
           "stopAgent",
           "pause",
-          "syncMain",
-          "resetIssue",
-          "wipe",
-          "destroyWorkspace",
-          "open",
-          "cancel",
-          "tasks",
-          "syncDiscussions",
-          "copySettings",
-          "completeWorkReset",
-          "restartFromPlan",
           "restartAgent",
+          "resetIssue",
+          "cancel",
+          "open",
+          "tasks",
         ],
       }
     `);

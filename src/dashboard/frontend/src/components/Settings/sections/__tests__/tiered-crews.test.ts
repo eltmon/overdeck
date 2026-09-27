@@ -200,3 +200,27 @@ describe('tierFitnessWarnings provider scoping', () => {
     expect(codes).not.toContain('provider-not-enabled');
   });
 });
+
+// PAN-4191: cost, harness, labels and fitness read the model a workhorse ref resolves to.
+describe('workhorse refs in crews (PAN-4191)', () => {
+  const workhorses = { expensive: 'claude-opus-5-5', mid: 'claude-sonnet-5', cheap: 'gpt-5.6-luna' };
+  const refCrew: Crew = { id: 'mid', model: 'workhorse:mid', harness: 'claude-code' };
+
+  it('resolves the ref for label, cost and provider-default harness', () => {
+    expect(crewLabel(refCrew, undefined, workhorses)).toMatch(/^workhorse:mid → Claude Sonnet 5/);
+    expect(blendedCost(refCrew, undefined, workhorses)).toBe(blendedCost({ ...refCrew, model: 'claude-sonnet-5' }));
+    expect(providerDefaultHarness('workhorse:cheap', { models: { providers: {} } as SettingsConfig['models'], workhorses })).toBe('codex');
+  });
+
+  it('judges tier fitness on the resolved model, not the ref', () => {
+    const config: TieredExecutionConfig = {
+      enabled: true,
+      tiers: { all: { model: 'workhorse:expensive', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] } },
+      supervisor: { model: 'workhorse:expensive', harness: 'claude-code', subscribe: 'flagged' },
+      replay_threshold: 0.5,
+    };
+    const warnings = tierFitnessWarnings(config, { models: { providers: { anthropic: true } } as SettingsConfig['models'], workhorses });
+    expect(warnings.map((warning) => warning.model)).not.toContain('workhorse:expensive');
+    expect(warnings.filter((warning) => warning.code === 'unknown-model')).toEqual([]);
+  });
+});
