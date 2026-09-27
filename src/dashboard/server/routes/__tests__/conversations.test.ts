@@ -47,7 +47,7 @@ import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
-  return { ...(actual as object), deliverAgentMessage: vi.fn().mockResolvedValue(undefined) };
+  return { ...(actual as object), deliverAgentMessage: vi.fn().mockResolvedValue({ ok: true, path: 'tmux' }) };
 });
 
 vi.mock('../../../../lib/agents/input-target.js', async (importOriginal) => ({

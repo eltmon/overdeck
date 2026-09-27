@@ -14,6 +14,7 @@ import { waitForManagedKimiSessionId } from '../runtimes/kimi-context-envelope.j
 import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
+import type { DeliveryResult } from '../agents/delivery.js';
 import { ensureMainInputTarget, type EnsureMainResult } from '../agents/input-target.js';
 import {
   ComposerCommandConfirmationError,
@@ -209,6 +210,8 @@ export interface ConversationMessageDependencies {
   transformMessageForHarness?(message: string, harness: RuntimeName, attachmentPaths: string[]): string;
   /** PAN-4268: move Claude Code's input to the main agent before pasting. */
   ensureMainInputTarget?: (agentId: string) => Promise<EnsureMainResult>;
+  /** PAN-4278: injectable for tests; the route inspects its DeliveryResult. */
+  deliverAgentMessage?: typeof deliverAgentMessage;
 }
 
 export function safeUploadExtension(filename: string, mimeType: string): string {
@@ -550,6 +553,8 @@ export async function handleConversationMessage(
       watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
     }
 
+    const deliver = deps.deliverAgentMessage ?? deliverAgentMessage;
+    let delivery: DeliveryResult;
     try {
       const method = resolveConversationDeliveryMethod(conv);
       // PAN-4185: a bare Kimi conversation gets the operator's text without the context envelope.
@@ -566,7 +571,7 @@ export async function handleConversationMessage(
             { status: 503 },
           );
         }
-        await deliverAgentMessage(
+        delivery = await deliver(
           conv.tmuxSession,
           deliveredMessage,
           'conversation-message',
@@ -574,7 +579,7 @@ export async function handleConversationMessage(
           { kimiContext: { workspace: conv.cwd, sessionId: kimiSessionId } },
         );
       } else {
-        await deliverAgentMessage(conv.tmuxSession, deliveredMessage, 'conversation-message', method);
+        delivery = await deliver(conv.tmuxSession, deliveredMessage, 'conversation-message', method);
       }
     } catch (deliveryErr: unknown) {
       const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
@@ -583,6 +588,19 @@ export async function handleConversationMessage(
       }
       throw deliveryErr;
     }
+    // PAN-4278: a returned failure (a Herdr refusal or throw, a guard refusal)
+    // used to be dropped here, so the composer showed "Sent" for a message
+    // nothing typed. Report it; the operator resends.
+    if (!delivery.ok) {
+      console.warn(`[conversations] ${conv.name}: not delivered via ${delivery.path}: ${delivery.failure ?? 'unknown failure'}`);
+      return jsonResponse({
+        error: `Not delivered: ${delivery.failure ?? 'the terminal refused the message'}`,
+        code: 'not-delivered',
+        deliveryUnknown: false,
+        retryable: true,
+      }, { status: 502 });
+    }
+    console.log(`[conversations] ${conv.name}: delivered via ${delivery.path}${delivery.deduplicated ? ' (deduplicated)' : ''}`);
 
     if (watchFromByteOffset !== null && conv.claudeSessionId) {
       void watchForEatenConversationMessage({

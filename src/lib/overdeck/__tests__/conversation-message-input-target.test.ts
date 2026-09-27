@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EnsureMainResult } from '../../agents/input-target.js';
 
-const deliverAgentMessage = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => undefined));
+const deliverAgentMessage = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => ({ ok: true, path: 'tmux' })));
 const callOrder = vi.hoisted(() => [] as string[]);
 
 vi.mock('../../agents.js', () => ({

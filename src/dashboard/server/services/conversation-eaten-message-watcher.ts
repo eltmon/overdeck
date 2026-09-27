@@ -80,7 +80,12 @@ export async function watchForEatenConversationMessage(
       `delivered message — submit-time compaction ate it; redelivering once (PAN-1635).`,
     );
     try {
-      await deliver(args.tmuxSession, args.message, 'conversation-message-redelivery', args.deliveryMethod);
+      const result = await deliver(args.tmuxSession, args.message, 'conversation-message-redelivery', args.deliveryMethod);
+      // PAN-4278: only a delivery that reports ok counts as a redelivery.
+      if (!result.ok) {
+        console.error(`[conversation-eaten-message-watcher] ${args.conversationName}: redelivery failed: ${result.failure ?? `not delivered via ${result.path}`}`);
+        return 'redelivery-failed';
+      }
       redelivered = true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
