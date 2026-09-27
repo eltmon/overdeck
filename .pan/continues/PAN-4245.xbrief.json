@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4245",
   "created": "2026-09-27T08:41:51.604Z",
-  "updated": "2026-09-27T09:42:43.875Z",
+  "updated": "2026-09-27T09:42:55.224Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "parser-capture-compact-summary.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T09:42:43.874Z"
+    },
+    "cache-merge-compact-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:42:55.224Z"
     }
   }
 }
