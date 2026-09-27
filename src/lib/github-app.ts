@@ -407,7 +407,7 @@ async function githubApiWithToken<T>(
   init: RequestInit = {},
   extraHeaders: Record<string, string> = {}
 ): Promise<{ data: T; headers: Headers; status: number }> {
-  const quotaCaller = beginAppRestCall();
+  const quotaCall = beginAppRestCall(path);
   return withGitHubTimeout(`${init.method || 'GET'} ${path}`, async (signal) => {
     const response = await fetch(`https://api.github.com${path}`, {
       ...init,
@@ -423,14 +423,19 @@ async function githubApiWithToken<T>(
 
     if (!response.ok) {
       const text = await response.text();
-      await finishAppRestCall(quotaCaller, response, text);
+      await finishAppRestCall(quotaCall, response, text);
       throw new Error(`GitHub API ${init.method || 'GET'} ${path} failed: ${response.status} ${text}`);
     }
-    await finishAppRestCall(quotaCaller, response);
+    await finishAppRestCall(quotaCall, response);
 
     const data = response.status === 204 ? undefined as T : await response.json() as T;
     return { data, headers: response.headers, status: response.status };
   });
+}
+
+/** PAN-4264: the App installation's `/rate_limit` (free; recorded at cost 0). */
+export function getAppRateLimit(): Promise<unknown> {
+  return githubApi<unknown>('/rate_limit');
 }
 
 async function githubApi<T>(

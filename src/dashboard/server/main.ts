@@ -62,6 +62,7 @@ import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
 import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
+import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
@@ -591,6 +592,9 @@ if (!isPeerDashboard) {
   console.log('[pr-sync] started (boot +30s, 60s sweep)');
 }
 
+// PAN-4264: sample GitHub /rate_limit into the quota ledger (boot +2 min, then every 5 min).
+const stopGitHubQuotaSampler = isPeerDashboard ? () => undefined : startGitHubQuotaSampler();
+
 let stopResourceRefreshServices = () => undefined;
 
 void (async () => {
@@ -736,6 +740,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   await stopConversationRescanScheduler();
   stopPullRequestSyncService();
+  stopGitHubQuotaSampler();
   closeConversationSearchService();
   closeMemoryFtsDatabases();
   process.exit(0);

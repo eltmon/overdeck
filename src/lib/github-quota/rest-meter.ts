@@ -55,8 +55,10 @@ export async function recordRestResponse(input: {
   pool: GitHubQuotaPool;
   response: MeteredResponse;
   errorText?: string;
+  /** Points the call spent; 0 for the free `/rate_limit` endpoint. Default 1. */
+  cost?: number;
 }): Promise<PauseRecord | null> {
-  const { caller, pool, response, errorText } = input;
+  const { caller, pool, response, errorText, cost = 1 } = input;
   let refusal: GitHubRefusal | null = null;
   let headerFields: Partial<LedgerEntry> = {};
   try {
@@ -83,7 +85,7 @@ export async function recordRestResponse(input: {
     caller,
     pool,
     bucket: 'rest',
-    cost: 1,
+    cost,
     estimated: false,
     outcome: response.ok ? 'ok' : 'error',
     ...headerFields,
@@ -96,10 +98,17 @@ export async function recordRestResponse(input: {
  * gate before the request. A non-essential caller throws
  * `GitHubQuotaPausedError` while `app:rest` is paused.
  */
-export function beginAppRestCall(): GitHubQuotaCaller {
+export function beginAppRestCall(path: string): AppRestCall {
   const caller = currentGitHubCaller() ?? 'app-rest';
   assertGitHubCallAllowed(caller, 'app', 'rest');
-  return caller;
+  // GitHub does not count `/rate_limit` against the limit it reports.
+  return { caller, cost: path.split('?')[0] === '/rate_limit' ? 0 : 1 };
+}
+
+/** One App REST call in flight: who made it and what it costs. */
+export interface AppRestCall {
+  caller: GitHubQuotaCaller;
+  cost: number;
 }
 
 /**
@@ -108,11 +117,11 @@ export function beginAppRestCall(): GitHubQuotaCaller {
  * caller's own error handling unchanged.
  */
 export async function finishAppRestCall(
-  caller: GitHubQuotaCaller,
+  call: AppRestCall,
   response: MeteredResponse,
   errorText?: string,
 ): Promise<void> {
-  const pause = await recordRestResponse({ caller, pool: 'app', response, errorText });
+  const pause = await recordRestResponse({ caller: call.caller, pool: 'app', response, errorText, cost: call.cost });
   if (pause) throw new GitHubRateLimitedError(pause);
 }
 
