@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:52:54.414Z",
+  "updated": "2026-09-27T11:53:05.221Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,10 @@
     "docs-delivery-states.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T11:52:54.414Z"
+    },
+    "docs-delivery-states.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:53:05.221Z"
     }
   }
 }
