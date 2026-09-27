@@ -33,6 +33,11 @@ import {
 import { createHostHealthCollector } from '../../../lib/system-health/collector.js';
 import { evaluateHostPressure } from '../../../lib/system-health/evaluate.js';
 import {
+  computeDarwinAvailableMemoryBytes,
+  parseDarwinSwapUsage,
+  parseDarwinVmStat,
+} from '../../../lib/system-health/darwin.js';
+import {
   createSystemHealthSampler,
   type AssessmentFreshness,
   type RawHealthAssessment,
@@ -350,35 +355,38 @@ async function readProcMemoryLinux(): Promise<ProcMemorySnapshot> {
 
 async function readProcMemoryDarwin(): Promise<ProcMemorySnapshot> {
   const memTotal = totalmem();
-  let memAvailable = freemem();
-  let memFree = freemem();
 
+  let pressureOutput: string | null = null;
+  try {
+    const { stdout } = await execAsync('memory_pressure -Q', { encoding: 'utf-8', timeout: 5_000 });
+    pressureOutput = stdout;
+  } catch { /* memory_pressure is unavailable or timed out */ }
+
+  let vmStatOutput: string | null = null;
   try {
     const { stdout } = await execAsync('vm_stat', { encoding: 'utf-8', timeout: 5_000 });
-    const pageSizeMatch = stdout.match(/page size of (\d+) bytes/);
-    const pageSize = pageSizeMatch ? Number(pageSizeMatch[1]) : 16384;
+    vmStatOutput = stdout;
+  } catch { /* vm_stat is unavailable or timed out */ }
 
-    const pages = new Map<string, number>();
-    for (const line of stdout.split('\n')) {
-      const m = line.match(/^(.+?):\s+(\d+)\./);
-      if (m) pages.set(m[1]!.trim(), Number(m[2]));
-    }
-
-    const free = (pages.get('Pages free') ?? 0) * pageSize;
-    const inactive = (pages.get('Pages inactive') ?? 0) * pageSize;
-    const speculative = (pages.get('Pages speculative') ?? 0) * pageSize;
-    memFree = free;
-    memAvailable = free + inactive + speculative;
-  } catch { /* fall back to os.freemem() values set above */ }
+  // PAN-4267: share the one available-memory calculation with the header
+  // collector (src/lib/system-health/darwin.ts) instead of a second formula.
+  const vmStat = vmStatOutput == null ? null : parseDarwinVmStat(vmStatOutput, memTotal);
+  const memAvailable = computeDarwinAvailableMemoryBytes({
+    pressureOutput,
+    vmStatOutput,
+    totalMemoryBytes: memTotal,
+  }) ?? freemem();
+  const memFree = vmStat?.availableMemoryBytes ?? freemem();
 
   let swapTotal = 0;
   let swapFree = 0;
   try {
     const { stdout } = await execAsync('sysctl -n vm.swapusage', { encoding: 'utf-8', timeout: 5_000 });
-    const totalMatch = stdout.match(/total\s*=\s*([\d.]+)M/);
-    const usedMatch = stdout.match(/used\s*=\s*([\d.]+)M/);
-    if (totalMatch) swapTotal = parseFloat(totalMatch[1] ?? '0') * 1024 * KB;
-    if (totalMatch && usedMatch) swapFree = swapTotal - parseFloat(usedMatch[1] ?? '0') * 1024 * KB;
+    const swapUsage = parseDarwinSwapUsage(stdout);
+    if (swapUsage) {
+      swapTotal = swapUsage.totalBytes;
+      swapFree = swapUsage.freeBytes;
+    }
   } catch { /* swap stats unavailable */ }
 
   return {
