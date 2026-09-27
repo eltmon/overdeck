@@ -105,6 +105,8 @@ interface PromotePlanningResult {
   workAgentSkipReason: string | null;
   /** PAN-4155: a spawn guardrail refused the start and deacon-lite retries it. */
   workAgentDeferred?: boolean;
+  /** PAN-4210: the retry above is held, not actively retrying, because the Deacon is frozen. */
+  workAgentRetryHeld?: 'deacon-paused';
 }
 
 type AutoPromotePhase = 'completePlanning' | 'terminal';
@@ -311,6 +313,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let workAgentError: string | null = null;
   let workAgentSkipReason: string | null = null;
   let workAgentDeferred = false;
+  let workAgentRetryHeld: 'deacon-paused' | undefined;
   let promotionDeferred = false;
   let promotionMarkerError: string | null = null;
 
@@ -327,6 +330,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     workAgentError = promotion.workAgentError;
     workAgentSkipReason = promotion.workAgentSkipReason;
     workAgentDeferred = promotion.workAgentDeferred === true;
+    workAgentRetryHeld = promotion.workAgentRetryHeld;
     emitAutoPromotePhase(issueId, 'completePlanning', promoted ? 'success' : 'failure', promoted ? 'complete-planning returned success' : (promoteError ?? 'complete-planning failed'), {
       workAgentSpawned,
       workAgentSkipReason,
@@ -376,6 +380,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       ...(workAgentError ? { workAgentError } : {}),
       ...(workAgentSkipReason ? { workAgentSkipReason } : {}),
       ...(workAgentDeferred ? { workAgentDeferred } : {}),
+      ...(workAgentRetryHeld ? { workAgentRetryHeld } : {}),
     }));
   } else {
     console.log(chalk.green(`✓ Finalized ${planDoc.plan.items.length} checklist item${planDoc.plan.items.length === 1 ? '' : 's'}`));
@@ -391,7 +396,9 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         console.log(chalk.green('✓ Work agent spawned — implementation in progress.'));
         if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
       } else if (autoSpawnOnFinalize && workAgentDeferred) {
-        console.log(chalk.yellow('⚠ Work agent start deferred by spawn guardrails; it is retried automatically for up to 2 hours.'));
+        console.log(chalk.yellow(workAgentRetryHeld === 'deacon-paused'
+          ? `⚠ Work agent start deferred by spawn guardrails; the retry is held while the Deacon is frozen. Unfreeze it or run pan start ${issueId}.`
+          : '⚠ Work agent start deferred by spawn guardrails; it is retried automatically for up to 2 hours.'));
         if (workAgentError) console.log(chalk.dim('  ' + workAgentError));
       } else if (autoSpawnOnFinalize) {
         console.log(chalk.yellow('⚠ Auto-promoted but work agent spawn was skipped.'));
@@ -490,6 +497,7 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
         workAgentError,
         workAgentSkipReason,
         ...(parsed?.workAgentDeferred === true ? { workAgentDeferred: true } : {}),
+        ...(parsed?.workAgentRetryHeld === 'deacon-paused' ? { workAgentRetryHeld: 'deacon-paused' as const } : {}),
       };
     } catch (err: any) {
       // A thrown fetch is a connection-level failure (dashboard unreachable /
