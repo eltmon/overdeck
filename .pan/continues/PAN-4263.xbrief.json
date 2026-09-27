@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4263",
   "created": "2026-09-27T14:44:33.622Z",
-  "updated": "2026-09-27T15:18:40.042Z",
+  "updated": "2026-09-27T15:18:50.275Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "open-first-selector.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T15:18:40.042Z"
+    },
+    "open-first-selector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:18:50.275Z"
     }
   }
 }
