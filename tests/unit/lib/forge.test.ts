@@ -89,9 +89,9 @@ describe('forge adapters', () => {
 
   it('creates GitHub review artifacts using the configured target branch', async () => {
     execMock
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockRejectedValueOnce({ stderr: 'no pull requests found for branch "feature/pan-632"\n' })
       .mockResolvedValueOnce({ stdout: 'https://github.com/org/repo/pull/42\n', stderr: '' })
-      .mockResolvedValueOnce({ stdout: '{"url":"https://github.com/org/repo/pull/42","number":42}', stderr: '' });
+      .mockResolvedValueOnce({ stdout: '{"url":"https://github.com/org/repo/pull/42","number":42,"state":"OPEN"}', stderr: '' });
 
     const result = await getForgeAdapter('github').createReviewArtifact({
       title: 'PAN-632',
@@ -208,7 +208,7 @@ describe('forge adapters', () => {
 
   it('falls back to gh for existing GitHub artifact lookup when the App is not configured', async () => {
     execMock.mockResolvedValueOnce({
-      stdout: '{"url":"https://github.com/org/repo/pull/42","number":42}',
+      stdout: '{"url":"https://github.com/org/repo/pull/42","number":42,"state":"OPEN"}',
       stderr: '',
     });
 
@@ -223,7 +223,7 @@ describe('forge adapters', () => {
 
     expect(listPullRequestsForHeadMock).not.toHaveBeenCalled();
     expect(execMock).toHaveBeenCalledWith(
-      'gh pr view feature/pan-632 --repo org/repo --json url,number 2>/dev/null || true',
+      'gh pr view feature/pan-632 --repo org/repo --json url,number,state',
       expect.objectContaining({ cwd: '/tmp/repo' }),
     );
     expect(result).toMatchObject({
@@ -231,6 +231,84 @@ describe('forge adapters', () => {
       created: false,
       url: 'https://github.com/org/repo/pull/42',
       id: '42',
+    });
+  });
+
+  describe('branch lookup: failure is not absence (PAN-4263)', () => {
+    const lookup = (forge: 'github' | 'gitlab') =>
+      getForgeAdapter(forge).createReviewArtifact({
+        title: 'PAN-4263',
+        sourceBranch: 'feature/x',
+        targetBranch: 'main',
+        cwd: '/tmp/repo',
+      });
+
+    it('rejects when gh reports a rate limit instead of reading it as no PR', async () => {
+      execMock.mockRejectedValueOnce({
+        message: 'Command failed: gh pr view feature/x --json url,number,state',
+        stderr: 'GraphQL: API rate limit already exceeded for user ID 1\n',
+      });
+
+      await expect(lookup('github')).rejects.toThrow(/rate limit/);
+      expect(execMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns null when gh reports no pull requests for the branch', async () => {
+      execMock.mockRejectedValueOnce({ stderr: 'no pull requests found for branch "feature/x"\n' });
+
+      await expect(getForgeAdapter('github').discoverArtifact({ sourceBranch: 'feature/x', cwd: '/tmp/repo' }))
+        .resolves.toBeNull();
+    });
+
+    it('returns null when the branch PR gh finds is closed', async () => {
+      execMock.mockResolvedValueOnce({
+        stdout: '{"url":"https://github.com/eltmon/overdeck/pull/3670","number":3670,"state":"CLOSED"}',
+        stderr: '',
+      });
+
+      await expect(getForgeAdapter('github').discoverArtifact({ sourceBranch: 'feature/x', cwd: '/tmp/repo' }))
+        .resolves.toBeNull();
+    });
+
+    it('rejects with a timed-out message when the gh exec is killed by its timeout', async () => {
+      execMock.mockRejectedValueOnce({ killed: true, signal: 'SIGTERM', stderr: '' });
+
+      await expect(lookup('github')).rejects.toThrow(/timed out/);
+    });
+
+    it('rejects when glab mr list fails', async () => {
+      execMock.mockRejectedValueOnce({ message: 'Command failed: glab mr list', stderr: '401 Unauthorized\n' });
+
+      await expect(lookup('gitlab')).rejects.toThrow(/401/);
+    });
+
+    it('returns null when glab lists no merge requests', async () => {
+      execMock.mockResolvedValueOnce({ stdout: '[]', stderr: '' });
+
+      await expect(getForgeAdapter('gitlab').discoverArtifact({ sourceBranch: 'feature/x', cwd: '/tmp/repo' }))
+        .resolves.toBeNull();
+    });
+
+    it('takes the PR number from the created URL when the post-create lookup fails', async () => {
+      execMock
+        .mockRejectedValueOnce({ stderr: 'no pull requests found for branch "feature/x"\n' })
+        .mockResolvedValueOnce({ stdout: 'https://github.com/org/repo/pull/4251\n', stderr: '' })
+        .mockRejectedValueOnce({ stderr: 'GraphQL: API rate limit already exceeded\n' });
+
+      const result = await getForgeAdapter('github').createReviewArtifact({
+        title: 'PAN-4263',
+        body: 'Body',
+        sourceBranch: 'feature/x',
+        targetBranch: 'main',
+        cwd: '/tmp/repo',
+      });
+
+      expect(result).toEqual({
+        forge: 'github',
+        created: true,
+        url: 'https://github.com/org/repo/pull/4251',
+        id: '4251',
+      });
     });
   });
 

@@ -171,14 +171,26 @@ async function getExistingGitHubArtifact(
     };
   }
 
-  const { stdout } = await execAsync(
-    `gh pr view ${branchName}${buildRepositoryFlag(repository)} --json url,number 2>/dev/null || true`,
-    { cwd, encoding: 'utf-8' }
-  );
+  // PAN-4263: a gh failure (rate limit, network, auth) is not "no PR". Only
+  // gh's own "no pull requests found" answer means absence; anything else throws.
+  let stdout: string;
+  try {
+    ({ stdout } = await execAsync(
+      `gh pr view ${branchName}${buildRepositoryFlag(repository)} --json url,number,state`,
+      { cwd, encoding: 'utf-8', timeout: FORGE_OBSERVATION_TIMEOUT_MS },
+    ));
+  } catch (err: any) {
+    const stderr = String(err?.stderr ?? '');
+    if (/no pull requests found for branch/i.test(stderr)) return null;
+    if (err?.killed) throw new Error(`gh pr view ${branchName} timed out after ${FORGE_OBSERVATION_TIMEOUT_MS}ms`);
+    throw new Error(`gh pr view ${branchName} failed: ${stderr.trim() || err?.message || String(err)}`);
+  }
   const trimmed = stdout.trim();
   if (!trimmed) return null;
 
-  const parsed = JSON.parse(trimmed) as { url?: string; number?: number };
+  const parsed = JSON.parse(trimmed) as { url?: string; number?: number; state?: string };
+  // discoverArtifact means "the open artifact"; closed and merged PRs belong to findMergedArtifact.
+  if (parsed.state !== 'OPEN') return null;
   return {
     forge: 'github',
     created: false,
@@ -192,10 +204,17 @@ async function getExistingGitLabArtifact(
   cwd?: string,
   repository?: string
 ): Promise<CreateReviewArtifactResult | null> {
-  const { stdout } = await execAsync(
-    `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --output json 2>/dev/null || true`,
-    { cwd, encoding: 'utf-8' }
-  );
+  // PAN-4263: a glab failure is not "no MR"; absence is an empty list.
+  let stdout: string;
+  try {
+    ({ stdout } = await execAsync(
+      `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --output json`,
+      { cwd, encoding: 'utf-8', timeout: FORGE_OBSERVATION_TIMEOUT_MS },
+    ));
+  } catch (err: any) {
+    if (err?.killed) throw new Error(`glab mr list timed out after ${FORGE_OBSERVATION_TIMEOUT_MS}ms`);
+    throw new Error(`glab mr list failed: ${String(err?.stderr ?? '').trim() || err?.message || String(err)}`);
+  }
   const trimmed = stdout.trim();
   if (!trimmed) return null;
 
@@ -363,12 +382,15 @@ const githubForgeAdapter: ForgeAdapter = {
         { cwd: input.cwd, encoding: 'utf-8' }
       );
       const url = stdout.trim().split('\n').pop()?.trim() || stdout.trim();
-      const created = await getExistingGitHubArtifact(input.sourceBranch, input.cwd, input.repository);
+      // The PR exists now; a failed follow-up lookup must not lose it (PAN-4263).
+      const created = await getExistingGitHubArtifact(input.sourceBranch, input.cwd, input.repository)
+        .catch(() => null);
+      const parsedNumber = parseArtifactRef(url)?.number;
       return {
         forge: 'github',
         created: true,
         url,
-        id: created?.id,
+        id: created?.id ?? (parsedNumber !== undefined ? String(parsedNumber) : undefined),
       };
     });
   },
