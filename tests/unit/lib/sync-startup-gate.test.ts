@@ -8,7 +8,7 @@ const dirs = vi.hoisted(() => ({
   overdeck: '',
   claude: '',
   syncSources: '',
-  projects: [] as Array<{ config: { path: string; name: string } }>,
+  projects: [] as Array<{ key: string; config: { path: string; name: string } }>,
 }));
 
 vi.mock('../../../src/lib/paths.js', () => ({
@@ -60,6 +60,8 @@ describe('isStartupSyncNeeded', () => {
 
   beforeEach(() => {
     dirs.projects = [];
+    rmSync(dirs.syncSources, { recursive: true, force: true });
+    rmSync(join(dirs.overdeck, '.sync-manifest.json'), { force: true });
     // Seed the minimal sync input tree so the gate can hash it.
     for (const subdir of ['skills', 'dev-skills', 'agents', 'rules', 'hooks', 'templates']) {
       mkdirSync(join(dirs.syncSources, subdir), { recursive: true });
@@ -114,7 +116,7 @@ describe('isStartupSyncNeeded', () => {
     const projectPath = join(dirs.base, 'project-a');
     mkdirSync(join(projectPath, '.pan', 'context'), { recursive: true });
     write(join(projectPath, '.pan', 'context', 'project.md'), '# project\n');
-    dirs.projects = [{ config: { path: projectPath, name: 'project-a' } }];
+    dirs.projects = [{ key: 'project-a', config: { path: projectPath, name: 'project-a' } }];
 
     const { isStartupSyncNeeded, writeSyncManifest } = await import('../../../src/lib/sync.js');
     writeSyncManifest();
@@ -127,7 +129,7 @@ describe('isStartupSyncNeeded', () => {
     const projectPath = join(dirs.base, 'project-skills');
     mkdirSync(join(projectPath, '.pan', 'skills', 'local-skill'), { recursive: true });
     write(join(projectPath, '.pan', 'skills', 'local-skill', 'SKILL.md'), '# local skill\n');
-    dirs.projects = [{ config: { path: projectPath, name: 'project-skills' } }];
+    dirs.projects = [{ key: 'project-skills', config: { path: projectPath, name: 'project-skills' } }];
 
     const { isStartupSyncNeeded, writeSyncManifest } = await import('../../../src/lib/sync.js');
     writeSyncManifest();
@@ -162,5 +164,75 @@ describe('isStartupSyncNeeded', () => {
     const result = isStartupSyncNeeded();
     expect(result.needed).toBe(true);
     expect(result.reason).toMatch(/hash computation failed/);
+  });
+
+  it('writes a v2 manifest with per-input digests', async () => {
+    const { writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
+    const manifest = JSON.parse(readFileSync(join(dirs.overdeck, '.sync-manifest.json'), 'utf-8'));
+    expect(manifest.version).toBe(2);
+    expect(typeof manifest.globalHash).toBe('string');
+    expect(manifest.inputs).toHaveProperty('sync-sources/skills/.gitkeep');
+  });
+
+  it('reads not needed after writing the manifest', async () => {
+    const { readSyncInputStatus, writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
+    const manifest = JSON.parse(readFileSync(join(dirs.overdeck, '.sync-manifest.json'), 'utf-8'));
+    const status = readSyncInputStatus();
+    expect(status.needed).toBe(false);
+    expect(status.attemptKey).toBe(manifest.globalHash);
+  });
+
+  it('says what changed since the last sync', async () => {
+    const { readSyncInputStatus, writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
+    write(join(dirs.syncSources, 'skills', 'foo', 'SKILL.md'), '# foo\n');
+    write(join(dirs.syncSources, 'rules', 'a.md'), '# a\n');
+    const status = readSyncInputStatus();
+    expect(status.needed).toBe(true);
+    expect(status.summary).toBe('1 skill and 1 rule changed');
+    expect(status.changedKeys).toEqual(['sync-sources/rules/a.md', 'sync-sources/skills/foo/SKILL.md']);
+  });
+
+  it('ignores the cwd in the global comparison', async () => {
+    const otherCwd = join(dirs.base, 'other-cwd');
+    mkdirSync(otherCwd, { recursive: true });
+    const { isStartupSyncNeeded, readSyncInputStatus, writeSyncManifest } = await import('../../../src/lib/sync.js');
+    writeSyncManifest();
+
+    const previousCwd = process.cwd();
+    process.chdir(otherCwd);
+    try {
+      expect(readSyncInputStatus().needed).toBe(false);
+      expect(isStartupSyncNeeded().needed).toBe(true);
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it('reads a v1 manifest as changed with no per-file record', async () => {
+    write(join(dirs.overdeck, '.sync-manifest.json'), JSON.stringify({ hash: 'abc', generatedAt: '2026-01-01T00:00:00Z' }));
+    const { readSyncInputStatus } = await import('../../../src/lib/sync.js');
+    const status = readSyncInputStatus();
+    expect(status.needed).toBe(true);
+    expect(status.summary.startsWith('Setup inputs changed since the last sync')).toBe(true);
+    expect(status.changedKeys).toEqual([]);
+  });
+
+  it('reports no recorded sync when the manifest is missing', async () => {
+    const { readSyncInputStatus } = await import('../../../src/lib/sync.js');
+    const status = readSyncInputStatus();
+    expect(status.needed).toBe(true);
+    expect(status.summary).toBe('No sync has been recorded on this machine');
+  });
+
+  it('keys the attempt on the error when a sync source is missing', async () => {
+    rmSync(join(dirs.syncSources, 'rules'), { recursive: true, force: true });
+    const { readSyncInputStatus } = await import('../../../src/lib/sync.js');
+    const status = readSyncInputStatus();
+    expect(status.needed).toBe(true);
+    expect(status.attemptKey.startsWith('error:')).toBe(true);
+    expect(status.summary).toMatch(/^Could not read sync inputs: missing sync input: rules/);
   });
 });

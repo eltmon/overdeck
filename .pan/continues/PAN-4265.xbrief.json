@@ -1,0 +1,151 @@
+{
+  "version": "1",
+  "issueId": "PAN-4265",
+  "created": "2026-09-27T15:21:17.185Z",
+  "updated": "2026-09-27T15:43:27.972Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "change-summary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:21:17.185Z",
+      "doneAt": "2026-09-27T15:22:16.752Z"
+    },
+    "manifest-v2": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:22:28.033Z",
+      "doneAt": "2026-09-27T15:24:53.155Z"
+    },
+    "config-auto-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:24:54.281Z",
+      "doneAt": "2026-09-27T15:27:04.574Z"
+    },
+    "auto-sync-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:27:09.509Z",
+      "doneAt": "2026-09-27T15:28:56.362Z"
+    },
+    "wire-service-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:29:00.445Z",
+      "doneAt": "2026-09-27T15:31:04.020Z"
+    },
+    "banner-reason": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:31:05.060Z",
+      "doneAt": "2026-09-27T15:32:29.746Z"
+    },
+    "docs-auto-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:32:30.610Z",
+      "doneAt": "2026-09-27T15:33:00.600Z"
+    },
+    "change-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:38:54.978Z"
+    },
+    "change-summary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:39:22.890Z"
+    },
+    "change-summary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:39:34.528Z"
+    },
+    "change-summary.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:39:46.514Z"
+    },
+    "manifest-v2.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:39:57.956Z"
+    },
+    "manifest-v2.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:40:10.015Z"
+    },
+    "manifest-v2.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:40:22.789Z"
+    },
+    "manifest-v2.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:40:33.504Z"
+    },
+    "config-auto-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:40:44.175Z"
+    },
+    "config-auto-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:40:55.455Z"
+    },
+    "config-auto-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:41:06.757Z"
+    },
+    "auto-sync-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:41:18.369Z"
+    },
+    "auto-sync-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:41:29.466Z"
+    },
+    "auto-sync-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:41:39.883Z"
+    },
+    "auto-sync-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:41:50.319Z"
+    },
+    "auto-sync-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:42:00.982Z"
+    },
+    "wire-service-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:42:12.606Z"
+    },
+    "wire-service-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:42:23.377Z"
+    },
+    "wire-service-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:42:34.469Z"
+    },
+    "banner-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:42:45.902Z"
+    },
+    "banner-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:42:56.512Z"
+    },
+    "banner-reason.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:43:07.219Z"
+    },
+    "docs-auto-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:43:17.782Z"
+    },
+    "docs-auto-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:43:27.972Z"
+    }
+  }
+}

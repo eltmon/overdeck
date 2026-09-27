@@ -1,4 +1,4 @@
-import { exec, execFile, spawn } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -15,6 +15,7 @@ import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
 import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import { sendKeys } from '../../../../lib/tmux.js';
 import { getRestartGate } from '../../services/restart-gate.js';
+import { getSyncStatus, runSyncNow } from '../../services/sync-auto-service.js';
 import { RESTART_GATE_CLAIMED_ENV } from '../../../../lib/restart-gate-client.js';
 import { jsonResponse } from '../../http-helpers.js';
 import {
@@ -25,7 +26,6 @@ import {
 } from './shared.js';
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 function getIssueDataService(): IssueDataService {
   const { getSharedIssueService } = require('../../services/issue-service-singleton.js');
@@ -103,26 +103,17 @@ const getSetupDiagnosticsRoute = HttpRouter.add(
 const getSyncStatusRoute = HttpRouter.add(
   'GET',
   '/api/sync-status',
-  Effect.sync(() => {
-    const { isStartupSyncNeeded } = require('../../../../lib/sync-startup-gate.js');
-    return jsonResponse(isStartupSyncNeeded());
-  }),
+  Effect.sync(() => jsonResponse(getSyncStatus())),
 );
 
 const postRunSyncRoute = HttpRouter.add(
   'POST',
   '/api/system/sync',
   Effect.promise(async () => {
-    try {
-      const invocation = panCliInvocation(['sync']);
-      // Light Herdr pass: no minutes-long update/installs that the timeout would orphan (PAN-3956).
-      const env = { ...process.env, OVERDECK_HERDR_SYNC_LIGHT: '1' };
-      const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, { encoding: 'utf-8', timeout: 180_000, env });
-      return jsonResponse({ ok: true, output: `${stdout}${stderr}`.trim() });
-    } catch (error: any) {
-      const detail = String(error?.stderr || error?.message || error);
-      return jsonResponse({ ok: false, error: `pan sync failed: ${detail}` }, { status: 500 });
-    }
+    const result = await runSyncNow('manual');
+    return result.ok
+      ? jsonResponse({ ok: true, output: result.output ?? '' })
+      : jsonResponse({ ok: false, error: result.error }, { status: 500 });
   }),
 );
 
