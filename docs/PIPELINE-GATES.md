@@ -207,6 +207,29 @@ delivery and surfaces a needs-you on the second skip, across processes
 torn by a crash is closed off before the next append, so it cannot swallow
 the entry after it.
 
+**Recording retries transient forge failures (PAN-4263).** `pan admin
+specialists done` finds the PR through `discoverArtifact` (`lib/forge.ts`),
+which retries a rate-limit, network or 502/503/504 failure twice, after 2 s
+and 8 s (`lib/forge-transient.ts`). A lookup that still fails is reported as
+`Couldn't reach <forge> to find the review artifact for <branch>: <reason>`,
+never as "No open review artifact": only gh's own "no pull requests found"
+answer (or an empty `glab mr list`) means there is no PR, and a closed PR on
+the branch reads as none. The command checks the caller's identity before it
+calls the forge. A review verdict whose lookup or post still fails for a
+transient reason is journaled as `review.verdict-deferred` (status, run id,
+notes capped at 100 000 bytes, the caller's agent id or `null` for an
+operator, and the reason), and the command exits 1. deacon-lite's
+`recoverStalledReviews` replays it while that entry is the journal's last,
+once it is at least 10 minutes old, by running
+`pan admin specialists done review` again under the original caller, so every
+guard runs again (`cloister/deferred-verdict-replay.ts`). Another transient
+failure journals a fresh deferral, which is the next cooldown. The replay
+stops with `review.verdict-replay-gave-up`: `superseded` when the review
+parent's run id has moved on, `cap` after 7 deferrals of one run (about an
+hour, with an activity warning for the operator), `failed` when the replay
+failed for another reason. Test and UAT verdicts are not deferred; they get
+the same honest error and exit 1.
+
 A failed browser UAT is observed where the test agent records it:
 `pan admin specialists done test <id> --uat-status failed` (or the `uat`
 role). After posting the verdict comment, that command relays the UAT notes
@@ -386,6 +409,13 @@ whose PR-tab cache a PR webhook invalidates at once and which otherwise
 expires after 60 seconds, like the pr-facts cache on top of it. A verdict
 posted from a CLI process therefore reaches a dashboard server's gate within
 about two minutes even with no webhook.
+
+**Which PR merges (PAN-4263).** The branch lookup ranks the head branch's PRs
+open (most recently updated) above merged above closed
+(`selectPullRequestForHead` in `lib/github-pr-selection.ts`), so an older open
+PR wins over a newer closed one. The merge then lands the PR `ensurePRExists`
+resolves (open first); a stale stored merge-set `artifact_url` is overwritten,
+never used (`routes/workspaces/merge-artifact.ts`).
 
 **Strike branches.** The merge queue used to turn a queued entry into a
 strike landing whenever `origin/strike/<issue>` existed, and skip the gate
@@ -652,6 +682,8 @@ One piece of stored pipeline state came back, and it is not a status.
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewers`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
+| `review.verdict-deferred` | `pan admin specialists done review`, when recording the verdict hits a transient forge failure (PAN-4263) |
+| `review.verdict-replay-gave-up` | deacon-lite's `recoverStalledReviews`, when a deferred verdict's replay stops: `superseded`, `cap` or `failed` |
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
@@ -676,7 +708,8 @@ observe and nudge — none reconciles a stored copy of anything:
    the selected backend's inventory.
 4. `reapClosedIssueAgents` — reaps agents for issues the tracker has closed.
 5. `recoverStalledReviews` — re-dispatches a review convoy whose reviewers
-   are all gone.
+   are all gone, and replays a deferred review verdict
+   (`cloister/deferred-verdict-replay.ts`, PAN-4263).
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
 7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,
