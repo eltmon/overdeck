@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T16:03:21.208Z",
+  "updated": "2026-09-27T16:03:32.771Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "clipped-scroll-reset.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T16:03:21.208Z"
+    },
+    "clipped-scroll-reset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:03:32.771Z"
     }
   }
 }
