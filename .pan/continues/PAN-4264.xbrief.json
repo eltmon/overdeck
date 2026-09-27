@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T16:49:54.805Z",
+  "updated": "2026-09-27T16:51:47.157Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,9 +136,10 @@
       "doneAt": "2026-09-27T16:49:50.962Z"
     },
     "telemetry-contract": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4264",
-      "claimedAt": "2026-09-27T16:49:54.805Z"
+      "claimedAt": "2026-09-27T16:49:54.805Z",
+      "doneAt": "2026-09-27T16:51:47.157Z"
     }
   }
 }
