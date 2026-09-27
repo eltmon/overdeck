@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4263",
   "created": "2026-09-27T14:44:33.622Z",
-  "updated": "2026-09-27T15:20:07.930Z",
+  "updated": "2026-09-27T15:20:19.405Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "gate-lookup-selector.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T15:20:07.930Z"
+    },
+    "gate-lookup-selector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:20:19.405Z"
     }
   }
 }
