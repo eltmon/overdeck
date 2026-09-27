@@ -27,7 +27,7 @@ import type { ComposerCommandResult } from '@overdeck/contracts';
 import { sendConversationMessage, sendFailureDetails, type SendFailureDetails } from './composerSend';
 import { reconcileComposerEchoes, type SendIdentity } from './composerEchoes';
 import { create } from 'zustand';
-import type { ChatMessage, FailedMessage } from '../components/chat/chat-types';
+import type { ChatMessage, FailedMessage, SubagentSummary } from '../components/chat/chat-types';
 import {
   ATTACHMENT_ACCEPT,
   classifyAttachmentKind,
@@ -235,8 +235,11 @@ interface ComposerStore {
 
   addOptimistic(conversationName: string, text: string, serverBaseCount: number, identity?: SendIdentity): void;
   acknowledgeOptimistic(conversationName: string, text: string, clientMessageId?: string): void;
-  reconcileEchoes(conversationName: string, messages: ChatMessage[]): void;
+  reconcileEchoes(conversationName: string, messages: ChatMessage[], subagents?: SubagentSummary[]): void;
   markDeliveryUnknown(conversationName: string, id: string): void;
+  /** An accepted bubble stayed unmatched too long while not streaming: move it
+   * to the outbox as a 'Not found in transcript' entry (PAN-4247). */
+  markNotFoundInTranscript(conversationName: string, id: string): void;
   clearOptimistic(conversationName: string): void;
 
   /** A send POST failed: preserve it in the retry outbox with its original lane. */
@@ -421,10 +424,10 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       ),
     })),
 
-  reconcileEchoes: (conversationName, messages) => {
+  reconcileEchoes: (conversationName, messages, subagents = []) => {
     const slice = get().byConversation[conversationName];
     if (!slice) return;
-    const next = reconcileComposerEchoes(slice, messages);
+    const next = reconcileComposerEchoes(slice, messages, subagents);
     if (next === slice) return;
     set((state) => ({ byConversation: mutateSlice(state.byConversation, conversationName, () => next) }));
   },
@@ -435,6 +438,26 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       optimistic: s.optimistic.map((message) => message.id === id && !message.acknowledged
         ? { ...message, deliveryState: 'unknown' } : message),
     })),
+  })),
+
+  markNotFoundInTranscript: (conversationName, id) => set((state) => ({
+    byConversation: mutateSlice(state.byConversation, conversationName, (s) => {
+      const entry = s.optimistic.find((message) => message.id === id);
+      if (!entry) return s;
+      return {
+        ...s,
+        optimistic: s.optimistic.filter((message) => message.id !== id),
+        failed: [...s.failed, {
+          ...entry,
+          id: `failed-${crypto.randomUUID()}`,
+          kind: 'prompt',
+          notFoundInTranscript: true,
+          deliveryUnknown: true,
+          retryable: true,
+          error: 'No transcript record after 4 minutes. It may still arrive; resending can duplicate it.',
+        }],
+      };
+    }),
   })),
 
   failSend: (conversationName, text, kind = 'prompt', details) =>
@@ -510,15 +533,25 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     );
     if (!failed || failed.retryable === false || text !== failed.text) return null;
     const kind = failed.kind;
-    const clientMessageId = failed.clientMessageId ?? crypto.randomUUID();
+    // A not-found-in-transcript resend gets a fresh send identity (new
+    // clientMessageId, no inherited createdAt, no retry flag): the original
+    // send may still land, so this must read as a distinct message rather
+    // than a retry of one the server might already be processing (PAN-4247).
+    // Reusing the stale createdAt would also immediately re-trip the same
+    // 4-minute stall timer on the new optimistic bubble.
+    const isFreshIdentity = failed.notFoundInTranscript === true;
+    const clientMessageId = isFreshIdentity ? crypto.randomUUID() : (failed.clientMessageId ?? crypto.randomUUID());
     if (kind === 'prompt') {
       // Preserve the ordinary prompt path byte-for-byte: move the text onto a
       // recoverable optimistic surface before clearing the outbox and POSTing.
-      addOptimistic(conversationName, text, serverBaseCount, { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds, createdAt: failed.createdAt });
+      addOptimistic(conversationName, text, serverBaseCount, isFreshIdentity
+        ? { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds }
+        : { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds, createdAt: failed.createdAt });
     }
     removeFailed(conversationName, failedId);
     try {
-      const result = await sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined, { clientMessageId, retry: true });
+      const result = await sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
+        isFreshIdentity ? { clientMessageId } : { clientMessageId, retry: true });
       if (kind === 'prompt') get().acknowledgeOptimistic(conversationName, text, clientMessageId);
       if (kind === 'command' && result && result.kind !== 'ui') {
         addCommandResult(conversationName, text, result);

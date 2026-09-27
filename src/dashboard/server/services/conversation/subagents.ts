@@ -5,7 +5,8 @@
 import { open, readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
-import type { ConversationEvent, SubagentSummary } from '@overdeck/contracts';
+import type { ConversationEvent, SubagentHumanInput, SubagentSummary } from '@overdeck/contracts';
+import { readSidechainHumanInputs } from '../../../../lib/transcript-landing.js';
 
 export type SubagentMeta = Omit<SubagentSummary, 'status'>;
 
@@ -202,6 +203,52 @@ export function createTaskNotificationScanner(
   };
 }
 
+/** Sidechain text is truncated to bound payload size (autoDecision, PAN-4247). */
+const HUMAN_INPUT_TEXT_MAX_CHARS = 2_000;
+/** Only the most recent inputs are worth surfacing; older ones are dropped. */
+const HUMAN_INPUT_MAX_COUNT = 20;
+
+/**
+ * Reads human-origin sidechain records from each subagent's own transcript,
+ * mirroring {@link createTaskNotificationScanner}: a module-level cache keyed
+ * by transcript file path holds the byte offset already scanned and the
+ * accumulated inputs, so repeat calls for the same subagent read only newly
+ * appended bytes.
+ */
+export function createSubagentHumanInputScanner(): (sessionFile: string, agentId: string) => Promise<SubagentHumanInput[]> {
+  const cache = new Map<string, { offset: number; inputs: SubagentHumanInput[] }>();
+
+  return async (sessionFile: string, agentId: string): Promise<SubagentHumanInput[]> => {
+    const transcriptPath = subagentTranscriptPath(sessionFile, agentId);
+    if (!transcriptPath) return [];
+
+    let cached = cache.get(transcriptPath);
+    let fromByteOffset = cached?.offset ?? 0;
+    try {
+      const { size } = await stat(transcriptPath);
+      if (size < fromByteOffset) {
+        // Rewritten transcript: rescan it from the start.
+        fromByteOffset = 0;
+        cached = undefined;
+      }
+    } catch {
+      // Not written yet; readSidechainHumanInputs below handles the missing file.
+    }
+
+    const { inputs: newInputs, readOffset } = await readSidechainHumanInputs(transcriptPath, fromByteOffset);
+    const truncated = newInputs.map((input) => ({ ...input, text: input.text.slice(0, HUMAN_INPUT_TEXT_MAX_CHARS) }));
+    const inputs = [...(cached?.inputs ?? []), ...truncated].slice(-HUMAN_INPUT_MAX_COUNT);
+    cache.set(transcriptPath, { offset: readOffset, inputs });
+    return inputs;
+  };
+}
+
+/** One scanner instance shared by every caller in this process, so a live WS
+ * subscription and a one-shot read of the same conversation reuse the same
+ * cached byte offsets instead of rescanning each subagent transcript from
+ * the start (PAN-4247). */
+const sharedHumanInputScanner = createSubagentHumanInputScanner();
+
 async function lastWriteMs(sessionFile: string, agentId: string): Promise<number> {
   const subagentsDir = subagentsDirFor(sessionFile);
   let latest = 0;
@@ -227,6 +274,7 @@ export async function listSubagentSummaries(
   pendingToolUseIds: ReadonlySet<string>,
   notifications: TaskNotifications,
   now: number = Date.now(),
+  scanHumanInputs: (sessionFile: string, agentId: string) => Promise<SubagentHumanInput[]> = sharedHumanInputScanner,
 ): Promise<SubagentSummary[]> {
   const subagents: SubagentSummary[] = [];
   for (const { background, ...meta } of await discoverSubagents(sessionFile)) {
@@ -239,7 +287,13 @@ export async function listSubagentSummaries(
       running = (notifiedAt === 0 || lastWrite > notifiedAt + RESUME_WRITE_SLACK_MS)
         && now - lastWrite < BACKGROUND_SUBAGENT_IDLE_MS;
     }
-    subagents.push({ ...meta, status: running ? 'running' : 'done' });
+    const humanInputs = await scanHumanInputs(sessionFile, meta.agentId);
+    subagents.push({
+      ...meta,
+      status: running ? 'running' : 'done',
+      background,
+      ...(humanInputs.length > 0 ? { humanInputs } : {}),
+    });
   }
   return subagents;
 }

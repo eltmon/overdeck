@@ -42,7 +42,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
-import { getIssueDraftPath } from '../pan-dir/drafts.js';
+import { resolvePlanningDraftPath } from '../pan-dir/drafts.js';
 import { claudeGlobalContextFile, workspaceContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import {
@@ -53,6 +53,7 @@ export {
   autoSpawnOnFinalizeFlagPath,
   claimAutoSpawnConsentForWorkStart,
   completeAutoSpawnConsentClaim,
+  readAutoSpawnConsentWorkModel,
   readAutoSpawnOnFinalizeFlagAsync,
   releaseAutoSpawnConsentClaim,
   withAutoSpawnConsentClaim,
@@ -70,6 +71,8 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
  */
 export async function resolveAutoSpawnOnFinalize(requestedAutoSpawn: unknown, issueId: string): Promise<boolean> {
   if (requestedAutoSpawn === true || requestedAutoSpawn === false) {
+    // No options: writeAutoSpawnOnFinalizeFlag preserves the current generation's
+    // workModel (PAN-3022) — this rewrite is about the auto-spawn boolean only.
     await writeAutoSpawnOnFinalizeFlag(issueId, requestedAutoSpawn);
     return requestedAutoSpawn;
   }
@@ -134,6 +137,8 @@ export interface SpawnPlanningOptions {
   probe?: boolean;
   /** Automatically start the work agent after finalize; stamped by trusted callers only. */
   autoSpawnOnFinalize?: boolean;
+  /** Operator-chosen work-agent model (PAN-2997/PAN-3022), stored on the auto-start consent. */
+  workModel?: string;
   /** Origin token for the planning agent state. */
   startedBy: string;
   /** Optional callback for streaming progress events to the client. */
@@ -263,11 +268,13 @@ ${effort === 'high'
 
 ` : '';
 
-  // Canonical PRD reference: the draft lives at `.pan/drafts/<issue-lower>.md`
-  // in the project's plan home. Reference it — never inline it; the role
-  // instructions tell the agent to read it.
-  const prdPath = projectConfig ? getIssueDraftPath(projectConfig.path, issue.identifier) : null;
-  const prdExists = prdPath !== null && existsSync(prdPath);
+  // Canonical PRD reference: the draft lives at `.pan/drafts/<issue-lower>.md`,
+  // checked in the workspace's own plan home first (where the running agent's
+  // own draft lands) and falling back to the primary checkout (a draft an
+  // earlier run already promoted there). Reference it — never inline it; the
+  // role instructions tell the agent to read it.
+  const prdPath = resolvePlanningDraftPath(workspacePath, projectConfig?.path ?? null, issue.identifier);
+  const prdExists = prdPath !== null;
   const prdReferences = prdExists
     ? `,\n      { "uri": "${prdPath}", "label": "PRD draft (.pan/drafts/${issueLower}.md)", "type": "prd" }`
     : '';
@@ -380,7 +387,7 @@ export function buildPlanningSessionEnv(startedBy: string): Record<string, strin
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, startedBy, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, workModel, startedBy, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
 
@@ -390,7 +397,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
   };
 
   try {
-    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true);
+    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, { workModel: workModel ?? null });
     console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
 
     // ── Step 1: Create workspace if needed ─────────────────────────────────

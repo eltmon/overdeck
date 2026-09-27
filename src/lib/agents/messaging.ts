@@ -67,6 +67,10 @@ export interface MessageDeliveryOutcome {
   deduplicated?: boolean;
   /** true when a transcript probe saw the message land as a new turn (Claude Code only). */
   confirmed?: boolean;
+  /** Set when Claude Code routed the message into a running subagent instead of
+   * the main conversation (PAN-4247); the caller's intent was to reach the main
+   * agent, so this is never treated as delivered. */
+  landedInSubagent?: { agentId: string; description: string };
 }
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
@@ -698,8 +702,23 @@ export async function messageAgent(
         ? 'supervisor'
         : deliveryMethod,
     });
-    queueAgentMail(normalizedId, message, 'delivered');
     await appendTellInterventionForUserSource(normalizedId, caller);
+    if (confirmedDelivery.landing.kind === 'subagent') {
+      const { agentId: subagentId, description } = confirmedDelivery.landing;
+      // The caller wanted the main agent; a retry would route into the same
+      // subagent again, so this is queued for manual delivery, not redelivered.
+      queueAgentMail(normalizedId, message, 'queued');
+      logAgentLifecycle(normalizedId, `messageAgent landed in subagent ${subagentId}`);
+      const reason = `Claude Code routed the message into running subagent "${description}" (${subagentId}), not the main conversation. Stop or finish that subagent, then resend.`;
+      return {
+        delivered: false,
+        queuedToMail: true,
+        confirmed: false,
+        landedInSubagent: { agentId: subagentId, description },
+        reason,
+      };
+    }
+    queueAgentMail(normalizedId, message, 'delivered');
     if (!confirmedDelivery.delivered) {
       const reason = `message was injected but no turn appeared in transcript ${transcriptSessionId} within the confirmation window (${confirmedDelivery.attempts} attempts)`;
       logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);

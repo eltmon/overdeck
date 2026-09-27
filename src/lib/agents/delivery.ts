@@ -29,7 +29,9 @@ import {
   supervisorInjectionBudgetMs,
 } from '../channels/injection-budget.js';
 import {
+  captureSidechainOffsets,
   captureTranscriptUserRecordSnapshot,
+  probeSidechainsSince,
   probeTranscriptSince,
   type TranscriptUserRecordSnapshot,
 } from '../transcript-landing.js';
@@ -780,25 +782,62 @@ async function assertTmuxTargetCanReceive(normalizedId: string, caller: string):
 const RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS = 30_000;
 const RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS = 100;
 
+/**
+ * Once a poll first sees a real assistant turn with no main-transcript match, that
+ * turn is ambiguous: it may be the operator's own confirmed turn, or the agent's
+ * reaction to an unrelated background subagent's `<task-notification>` wake. Hold
+ * off calling it `{kind:'main'}` for this long so a sidechain record written a
+ * moment later still wins (PAN-4247).
+ */
+const ASSISTANT_ONLY_SETTLE_MS = 3_000;
+
+/** Where a delivered message was confirmed to have landed. */
+export type TranscriptLanding =
+  | { kind: 'main' }
+  | { kind: 'subagent'; agentId: string; description: string }
+  | { kind: 'none' };
+
 async function waitForTranscriptMessageLanding(
   workspace: string,
   sessionId: string,
   before: TranscriptUserRecordSnapshot,
   message: string,
   probe: typeof probeTranscriptSince,
+  sidechainOffsets: ReadonlyMap<string, number> = new Map(),
+  probeSidechains: typeof probeSidechainsSince = probeSidechainsSince,
   timeoutMs = RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS,
   intervalMs = RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS,
-): Promise<boolean> {
+): Promise<TranscriptLanding> {
   const deadline = Date.now() + timeoutMs;
   const fromByteOffset = before.readOffset ?? before.fileSize ?? 0;
-  do {
+  let assistantOnlySince: number | null = null;
+
+  async function pollOnce(): Promise<TranscriptLanding | null> {
     const result = await probe(workspace, sessionId, fromByteOffset, message);
-    if (result.matchedUserRecord || (result.realAssistantTurnCount ?? 0) > 0) return true;
+    if (result.matchedUserRecord) return { kind: 'main' };
+
+    const sidechainHit = await probeSidechains(before.sessionFile, sidechainOffsets, message);
+    if (sidechainHit) return { kind: 'subagent', agentId: sidechainHit.agentId, description: sidechainHit.description };
+
+    if ((result.realAssistantTurnCount ?? 0) > 0) {
+      if (assistantOnlySince === null) assistantOnlySince = Date.now();
+      if (Date.now() - assistantOnlySince >= ASSISTANT_ONLY_SETTLE_MS) return { kind: 'main' };
+    }
+    return null;
+  }
+
+  do {
+    const landing = await pollOnce();
+    if (landing) return landing;
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   } while (Date.now() < deadline);
 
   const result = await probe(workspace, sessionId, fromByteOffset, message);
-  return result.matchedUserRecord || (result.realAssistantTurnCount ?? 0) > 0;
+  if (result.matchedUserRecord) return { kind: 'main' };
+  const sidechainHit = await probeSidechains(before.sessionFile, sidechainOffsets, message);
+  if (sidechainHit) return { kind: 'subagent', agentId: sidechainHit.agentId, description: sidechainHit.description };
+  if ((result.realAssistantTurnCount ?? 0) > 0) return { kind: 'main' };
+  return { kind: 'none' };
 }
 
 export async function deliverMessageWithTranscriptConfirmation(args: {
@@ -813,32 +852,46 @@ export async function deliverMessageWithTranscriptConfirmation(args: {
   deliver?: typeof deliverAgentMessage;
   snapshot?: typeof captureTranscriptUserRecordSnapshot;
   probe?: typeof probeTranscriptSince;
-}): Promise<{ delivered: boolean; attempts: number; lastDelivery?: DeliveryResult }> {
+  probeSidechains?: typeof probeSidechainsSince;
+  captureOffsets?: typeof captureSidechainOffsets;
+}): Promise<{ delivered: boolean; attempts: number; landing: TranscriptLanding; lastDelivery?: DeliveryResult }> {
   const snapshot = args.snapshot ?? captureTranscriptUserRecordSnapshot;
   const probe = args.probe ?? probeTranscriptSince;
+  const probeSidechains = args.probeSidechains ?? probeSidechainsSince;
+  const captureOffsets = args.captureOffsets ?? captureSidechainOffsets;
   const deliver = args.deliver ?? deliverAgentMessage;
   const before = await snapshot(args.workspace, args.sessionId);
+  const sidechainOffsets = await captureOffsets(before.sessionFile);
   let lastDelivery: DeliveryResult | undefined;
+  let landing: TranscriptLanding = { kind: 'none' };
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     lastDelivery = await deliver(args.agentId, args.message, args.caller, args.deliveryMethod);
-    if (lastDelivery.ok && await waitForTranscriptMessageLanding(
-      args.workspace,
-      args.sessionId,
-      before,
-      args.message,
-      probe,
-      args.timeoutMs,
-      args.intervalMs,
-    )) {
-      return { delivered: true, attempts: attempt, lastDelivery };
+    if (lastDelivery.ok) {
+      landing = await waitForTranscriptMessageLanding(
+        args.workspace,
+        args.sessionId,
+        before,
+        args.message,
+        probe,
+        sidechainOffsets,
+        probeSidechains,
+        args.timeoutMs,
+        args.intervalMs,
+      );
+      if (landing.kind === 'main') {
+        return { delivered: true, attempts: attempt, landing, lastDelivery };
+      }
+      if (landing.kind === 'subagent') {
+        return { delivered: false, attempts: attempt, landing, lastDelivery };
+      }
     }
     if (attempt < 2) {
       console.warn(`[${args.caller}] message did not land in ${args.sessionId}; redelivering once.`);
     }
   }
 
-  return { delivered: false, attempts: 2, ...(lastDelivery ? { lastDelivery } : {}) };
+  return { delivered: false, attempts: 2, landing, ...(lastDelivery ? { lastDelivery } : {}) };
 }
 
 /** Alias kept for one release; use `deliverMessageWithTranscriptConfirmation`. */
@@ -981,16 +1034,21 @@ export async function deliverInitialPromptWithRetry(
       const result = await deliver(agentId, deliveredPrompt, caller, kickoffDeliveryMethod);
       if (result.ok) {
         if (!confirmationTarget) return result;
-        const confirmed = await waitForTranscriptMessageLanding(
+        const landing = await waitForTranscriptMessageLanding(
           confirmationTarget.workspace,
           confirmationTarget.sessionId,
           confirmationTarget.before,
           deliveredPrompt,
           probe,
+          // Initial kickoff has no subagent yet to route into; keep the prior
+          // main-transcript-only semantics instead of paying a real sidechain
+          // scan on every poll (PAN-4247 W2 kept this caller type-only).
+          undefined,
+          async () => null,
           options.timeoutMs,
           options.intervalMs,
         );
-        if (confirmed) return result;
+        if (landing.kind === 'main') return result;
         lastFailure = 'kickoff-not-confirmed';
       } else {
         lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;

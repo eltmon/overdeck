@@ -290,6 +290,18 @@ door that does not exist; a real record read door would be a separate change.
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
   120 seconds, and reconciles late echoes using message identity or text/time matching.
+  A pending user bubble's `deliveryState` renders one of: `pending` ("Sending…"),
+  `unknown` ("Delivery not confirmed"), `accepted` ("Sent · waiting for transcript"), or
+  `subagent` ("Delivered to subagent · `<description>`" — Claude Code routed the message
+  into a running subagent instead of this conversation; PAN-4247). An `accepted` bubble
+  that stays unmatched for `TURN_STALL_MS` (4 minutes) **while the conversation is not
+  streaming** moves to the outbox as "Not found in transcript", with **Resend** (a fresh
+  send identity — new `clientMessageId`, no inherited `createdAt`, no `retry` flag, since
+  the original send may still land) and **Copy** (writes the text to the clipboard); while
+  streaming, the same delay proves nothing, since a message queued behind a long tool
+  call is legitimately unrendered until consumed. Two or more quick sends that Claude
+  Code joins into one queued message are reconciled together: the single transcript
+  record clears every contributing bubble at once, not just the first.
 - The PTY supervisor reports what it observes about its harness to
   `POST /api/agents/:id/lifecycle`, authenticated by the session's pty-token. It emits
   `session-started`, `turn-started` (on a confirmed injection) and `exited`. The route

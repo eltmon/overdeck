@@ -10,7 +10,7 @@ export function flywheelStatus(overrides: Partial<FlywheelDerivedStatus> = {}): 
   return {
     run: 'running',
     conversation: {
-      name: 'conv-flywheel', id: 42, title: 'Flywheel', model: 'claude-opus-5-5', harness: 'claude-code', cwd: '/repos/overdeck', sessionAlive: true,
+      name: 'conv-flywheel', id: 42, title: 'Flywheel', model: 'claude-opus-5-5', harness: 'claude-code', cwd: '/repos/overdeck', createdAt: '2026-09-23T08:00:00.000Z', sessionAlive: true,
     },
     lastTick: { tick: 3, pick: 'PAN-3964', phase: 'watch', inFlight: ['PAN-3964'], needsYou: null, at: '2026-09-23T09:59:40.000Z' },
     freshness: 'live',
@@ -18,13 +18,18 @@ export function flywheelStatus(overrides: Partial<FlywheelDerivedStatus> = {}): 
     inFlight: [
       {
         issueId: 'PAN-3964',
+        title: 'Restore the Flywheel page',
         state: 'in-review',
+        liveAgents: 1,
+        inTick: true,
         attention: 'needs-you',
         pr: { url: 'https://github.com/eltmon/overdeck/pull/4001', number: 4001, reviewState: 'review-requested', checks: 'pending', mergeable: null },
         lastJournal: { at: '2026-09-23T09:55:00.000Z', type: 'review.dispatched', source: 'pan-done' },
       },
-      { issueId: 'PAN-3920', state: 'working', lastJournal: null },
+      { issueId: 'PAN-3920', title: 'Register external agents', state: 'working', liveAgents: 0, inTick: false, lastJournal: null },
     ],
+    agents: [{ issueId: 'PAN-3964', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'working' }],
+    inFlightSource: 'tick',
     orderBook: null,
     projectRoot: '/repos/overdeck',
     generatedAt: '2026-09-23T10:00:00.000Z',

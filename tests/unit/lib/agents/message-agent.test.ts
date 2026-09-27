@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   getConversationByName: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
+  captureSidechainOffsets: vi.fn(),
+  probeSidechainsSince: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
@@ -65,6 +67,8 @@ vi.mock('../../../../src/lib/agents/delivery.js', async (importOriginal) => {
 vi.mock('../../../../src/lib/transcript-landing.js', () => ({
   captureTranscriptUserRecordSnapshot: mocks.captureTranscriptUserRecordSnapshot,
   probeTranscriptSince: mocks.probeTranscriptSince,
+  captureSidechainOffsets: mocks.captureSidechainOffsets,
+  probeSidechainsSince: mocks.probeSidechainsSince,
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
@@ -169,6 +173,8 @@ describe('messageAgent', () => {
       readOffset: 0,
     });
     mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: false, realAssistantTurnCount: 0 });
+    mocks.captureSidechainOffsets.mockResolvedValue(new Map());
+    mocks.probeSidechainsSince.mockResolvedValue(null);
     mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
     mocks.hasAgentRuntimeInSubtree.mockResolvedValue(true);
     mocks.getConversationByName.mockReturnValue(null);
@@ -584,6 +590,28 @@ describe('messageAgent', () => {
       expect(mocks.logAgentLifecycle).toHaveBeenCalledWith(
         'agent-pan-2262',
         expect.stringContaining('messageAgent NOT confirmed'),
+      );
+    });
+
+    it('returns delivered false, confirmed false, and landedInSubagent when the message routed into a subagent (PAN-4247 AC1)', async () => {
+      mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: false, realAssistantTurnCount: 0 });
+      mocks.probeSidechainsSince.mockResolvedValue({ agentId: 'agent-1', description: 'Investigate flaky test' });
+
+      const promise = messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+      await vi.advanceTimersByTimeAsync(10);
+      const outcome = await promise;
+
+      expect(outcome).toEqual({
+        delivered: false,
+        queuedToMail: true,
+        confirmed: false,
+        landedInSubagent: { agentId: 'agent-1', description: 'Investigate flaky test' },
+        reason: 'Claude Code routed the message into running subagent "Investigate flaky test" (agent-1), not the main conversation. Stop or finish that subagent, then resend.',
+      });
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+      expect(mocks.logAgentLifecycle).toHaveBeenCalledWith(
+        'agent-pan-2262',
+        expect.stringContaining('messageAgent landed in subagent agent-1'),
       );
     });
   });

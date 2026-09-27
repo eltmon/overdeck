@@ -74,6 +74,7 @@ describe('conversation subagent list emission', () => {
           toolUseId: 'toolu_done',
           spawnDepth: 1,
           status: 'done',
+          background: false,
         },
         {
           agentId: 'running',
@@ -82,6 +83,7 @@ describe('conversation subagent list emission', () => {
           toolUseId: 'toolu_running',
           spawnDepth: 1,
           status: 'running',
+          background: false,
         },
       ],
     }]);

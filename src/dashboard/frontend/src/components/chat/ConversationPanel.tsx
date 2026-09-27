@@ -1,4 +1,5 @@
 import { useComposerEchoes } from './useComposerEchoes';
+import { subagentRoutingNotice } from '../../lib/subagentRouting';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
@@ -1265,8 +1266,13 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     data?.contextUsage ?? conversation.contextUsage ?? null,
   );
 
-  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages);
+  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages, data?.subagents ?? [], data?.streaming ?? false);
   const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
+
+  const subagentNotice = useMemo(
+    () => subagentRoutingNotice(data?.subagents ?? [], serverMessages),
+    [data?.subagents, serverMessages],
+  );
 
   const handleMessageSent = useCallback((text: string, clientMessageId?: string) => {
     addOptimistic(conversation.name, text, serverMessages.length, {
@@ -1498,6 +1504,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           agentId={agentId}
           contextWindowUsage={contextWindowUsage}
           agentBusy={agentBusy}
+          subagentNotice={subagentNotice}
         />
       )}
     </div>

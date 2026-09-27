@@ -57,14 +57,18 @@ afterEach(async () => {
 
 function makeDeps(options: {
   enabled?: boolean;
-  messages?: Array<{ role: string; text?: string; completedAt?: string }>;
+  messages?: Array<{ role: string; text?: string; completedAt?: string; sequence?: number }>;
   summarizeResult?: string;
+  latestCompactSummary?: { text: string; sequence: number };
 } = {}): HandleTurnCompleteDependencies {
   const sessionFile = join(testHome, `session-${Math.random().toString(36).slice(2)}.jsonl`);
   writeFileSync(sessionFile, '{}\n');
   return {
     resolveSessionFile: async () => sessionFile,
-    getCachedMessages: vi.fn().mockResolvedValue({ messages: options.messages ?? [] }),
+    getCachedMessages: vi.fn().mockResolvedValue({
+      messages: options.messages ?? [],
+      latestCompactSummary: options.latestCompactSummary,
+    }),
     configuredTitleModel: vi.fn().mockReturnValue('claude-sonnet-5'),
     summarizeTranscriptTitle: vi.fn().mockResolvedValue(options.summarizeResult ?? 'Refined AI Title'),
     isBackgroundFeatureEnabled: vi.fn().mockReturnValue(options.enabled ?? true),
@@ -255,5 +259,45 @@ describe('handleTurnComplete', () => {
     }
 
     expect(emittedEvents).toHaveLength(0);
+  });
+
+  it('passes the latest compaction summary and only after-summary turns to summarizeTranscriptTitle', async () => {
+    const summaryText = [
+      'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
+      '',
+      'Summary:',
+      '1. Primary Request and Intent: Migrate the billing service to the new invoicing API.',
+    ].join('\n');
+
+    const deps = makeDeps({
+      messages: [
+        { role: 'user', text: 'before summary turn', sequence: 1 },
+        { role: 'assistant', text: 'before summary reply', completedAt: '2026-07-07T12:00:00Z', sequence: 2 },
+        { role: 'user', text: 'after summary turn', sequence: 10 },
+        { role: 'assistant', text: 'after summary reply', completedAt: '2026-07-07T12:05:00Z', sequence: 11 },
+      ],
+      latestCompactSummary: { text: summaryText, sequence: 5 },
+    });
+
+    createConversation({
+      name: 'refine-with-summary',
+      tmuxSession: 'tmux-refine-with-summary',
+      cwd: '/tmp',
+      title: 'original',
+      titleSource: 'auto',
+    });
+
+    const conv = getConversationByName('refine-with-summary');
+    await handleTurnComplete(conv!, deps);
+
+    const summarize = deps.summarizeTranscriptTitle as ReturnType<typeof vi.fn>;
+    expect(summarize).toHaveBeenCalledTimes(1);
+    const transcriptArg = summarize.mock.calls[0]![0] as string;
+
+    expect(transcriptArg).toContain('Primary Request and Intent');
+    expect(transcriptArg).toContain('after summary turn');
+    expect(transcriptArg).toContain('after summary reply');
+    expect(transcriptArg).not.toContain('before summary turn');
+    expect(transcriptArg).not.toContain('before summary reply');
   });
 });

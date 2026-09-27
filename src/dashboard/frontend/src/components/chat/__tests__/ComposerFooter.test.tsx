@@ -1194,3 +1194,94 @@ describe('ComposerFooter attachments', () => {
     expect(await screen.findByText('drop-image.png')).toBeInTheDocument();
   });
 });
+
+describe('ComposerFooter subagent routing notice (PAN-4247)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetComposerStore();
+    storedEffort.value = 'medium';
+    editorState.text = '';
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('blocks the first submit for a routed notice and sends only after Send anyway (AC3)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    render(
+      <ComposerFooter
+        conversation={conversation}
+        subagentNotice={{ kind: 'routed', key: 'sc-1', agentId: 'agent-1', description: 'Investigate flaky test' }}
+      />,
+    );
+
+    expect(screen.getByText(/went to subagent "Investigate flaky test"/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    expect(screen.getByRole('button', { name: 'Send anyway' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Wait' })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/conversations/test-conv/message', expect.anything());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send anyway' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/message',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/message'))).toHaveLength(1);
+  });
+
+  it('keeps the draft and shows no fetch when Wait is clicked', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    render(
+      <ComposerFooter
+        conversation={conversation}
+        subagentNotice={{ kind: 'routed', key: 'sc-1', agentId: 'agent-1', description: 'Investigate flaky test' }}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Wait' }));
+
+    expect(editorState.text).toBe('hello');
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/conversations/test-conv/message', expect.anything());
+    expect(screen.queryByRole('button', { name: 'Send anyway' })).not.toBeInTheDocument();
+  });
+
+  it('sends immediately for a running notice without blocking (AC4)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    render(
+      <ComposerFooter
+        conversation={conversation}
+        subagentNotice={{ kind: 'running', key: 'agent-1', agentId: 'agent-1', description: 'Investigate flaky test' }}
+      />,
+    );
+
+    expect(screen.getByText(/Background subagent "Investigate flaky test" is running/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/message',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    expect(screen.queryByRole('button', { name: 'Send anyway' })).not.toBeInTheDocument();
+  });
+});

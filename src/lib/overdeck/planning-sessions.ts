@@ -197,9 +197,10 @@ export function startPlanningForIssue(options: {
     // record this override persisted to, so the value is validated here and the
     // work model is named explicitly on the spawn that needs it.
     const workModelRaw = (body as any).workModel;
-    if (typeof workModelRaw === 'string' && workModelRaw.trim()) {
+    const trimmedWorkModel = typeof workModelRaw === 'string' && workModelRaw.trim() ? workModelRaw.trim() : undefined;
+    if (trimmedWorkModel) {
       try {
-        requireModelOverride(workModelRaw.trim());
+        requireModelOverride(trimmedWorkModel);
       } catch (err) {
         return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
       }
@@ -428,6 +429,7 @@ export function startPlanningForIssue(options: {
             auto: auto === true,
             probe: probe === true,
             autoSpawnOnFinalize: autoStart === true,
+            workModel: trimmedWorkModel,
             startedBy,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);

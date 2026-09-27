@@ -73,19 +73,6 @@ function providerDefaultHarnessSync(
 
 /** The implicit tier: roles.work resolution as a Staffing. Fails loudly when
  * the work role is unresolvable — never a hardcoded fallback. */
-/**
- * PAN-3917: the per-issue work-model override lived only on the deleted
- * pipeline record (Appendix A.2) with no live-derivable replacement — an
- * operator-set override, not something git/tracker/PR/liveness can
- * reconstruct. Always undefined now; kept exported (not deleted) because
- * src/dashboard/server/routes/agents/spawn.ts (W6, out of this fix's scope)
- * still imports it as a fallback before the role default. A one-off model
- * for a single session is passed at spawn time instead (`pan start --model`).
- */
-export function resolveIssueWorkModel(_issueId: string): string | undefined {
-  return undefined;
-}
-
 export function resolveImplicitStaffing(
   config: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'providerHarnesses'>,
   spawnKey?: string,

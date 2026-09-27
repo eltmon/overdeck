@@ -1,0 +1,197 @@
+{
+  "version": "1",
+  "issueId": "PAN-4247",
+  "created": "2026-09-27T09:48:45.802Z",
+  "updated": "2026-09-27T11:53:05.221Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "landing-probe": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T09:48:45.802Z",
+      "doneAt": "2026-09-27T09:57:58.438Z"
+    },
+    "delivery-landing-kind": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T09:58:50.374Z",
+      "doneAt": "2026-09-27T10:21:10.087Z"
+    },
+    "tell-subagent-outcome": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T10:21:21.597Z",
+      "doneAt": "2026-09-27T10:37:10.310Z"
+    },
+    "subagent-summary-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T10:37:18.900Z",
+      "doneAt": "2026-09-27T10:39:37.350Z"
+    },
+    "subagent-human-input-scanner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T10:39:50.928Z",
+      "doneAt": "2026-09-27T10:50:19.600Z"
+    },
+    "reconcile-sidechain": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T10:50:42.474Z",
+      "doneAt": "2026-09-27T11:01:58.882Z"
+    },
+    "reconcile-joined": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T11:02:13.748Z",
+      "doneAt": "2026-09-27T11:10:08.416Z"
+    },
+    "not-found-outbox": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T11:10:17.015Z",
+      "doneAt": "2026-09-27T11:23:32.164Z"
+    },
+    "routing-notice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T11:23:40.439Z",
+      "doneAt": "2026-09-27T11:37:35.271Z"
+    },
+    "docs-delivery-states": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4247",
+      "claimedAt": "2026-09-27T11:37:44.446Z",
+      "doneAt": "2026-09-27T11:45:11.538Z"
+    },
+    "landing-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:46:43.067Z"
+    },
+    "landing-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:46:58.580Z"
+    },
+    "landing-probe.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:47:25.809Z"
+    },
+    "landing-probe.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:47:34.870Z"
+    },
+    "delivery-landing-kind.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:48:39.599Z"
+    },
+    "delivery-landing-kind.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:48:49.711Z"
+    },
+    "delivery-landing-kind.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:48:59.844Z"
+    },
+    "delivery-landing-kind.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:49:09.745Z"
+    },
+    "tell-subagent-outcome.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:49:24.191Z"
+    },
+    "tell-subagent-outcome.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:49:32.902Z"
+    },
+    "tell-subagent-outcome.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:49:41.801Z"
+    },
+    "subagent-summary-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:49:50.891Z"
+    },
+    "subagent-summary-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:50:00.448Z"
+    },
+    "subagent-human-input-scanner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:50:10.210Z"
+    },
+    "subagent-human-input-scanner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:50:19.752Z"
+    },
+    "subagent-human-input-scanner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:50:28.913Z"
+    },
+    "reconcile-sidechain.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:50:42.983Z"
+    },
+    "reconcile-sidechain.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:50:52.887Z"
+    },
+    "reconcile-sidechain.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:51:03.848Z"
+    },
+    "reconcile-joined.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:51:12.899Z"
+    },
+    "reconcile-joined.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:51:22.198Z"
+    },
+    "not-found-outbox.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:51:31.073Z"
+    },
+    "not-found-outbox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:51:40.649Z"
+    },
+    "not-found-outbox.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:51:50.368Z"
+    },
+    "not-found-outbox.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:52:00.077Z"
+    },
+    "routing-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:52:15.143Z"
+    },
+    "routing-notice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:52:25.095Z"
+    },
+    "routing-notice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:52:35.074Z"
+    },
+    "routing-notice.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:52:44.678Z"
+    },
+    "docs-delivery-states.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:52:54.414Z"
+    },
+    "docs-delivery-states.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:53:05.221Z"
+    }
+  }
+}

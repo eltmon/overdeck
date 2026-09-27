@@ -113,7 +113,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   return withAutoSpawnConsentClaim(
     issueId,
-    (acceptConsent) => spawnRunWithoutConsentClaim(issueId, role, resolvedOptions, acceptConsent),
+    // PAN-3022: an operator start never reaches this path, so claim.workModel
+    // (the planning cycle's --model) outranks resolvedOptions.model here.
+    (acceptConsent, claim) => spawnRunWithoutConsentClaim(
+      issueId, role, { ...resolvedOptions, model: claim.workModel ?? resolvedOptions.model }, acceptConsent,
+    ),
     { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
   );
 }
@@ -605,7 +609,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   return withAutoSpawnConsentClaim(
     options.issueId,
-    (acceptConsent) => spawnAgentWithoutConsentClaim(resolvedOptions, acceptConsent),
+    // PAN-3022: an operator start never reaches this path, so claim.workModel
+    // (the planning cycle's --model) outranks resolvedOptions.model here.
+    (acceptConsent, claim) => spawnAgentWithoutConsentClaim(
+      { ...resolvedOptions, model: claim.workModel ?? resolvedOptions.model }, acceptConsent,
+    ),
     { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
   );
 }

@@ -54,6 +54,7 @@ export async function parseConversationMessages(
       mtimeMs: 0,
       permissionMode: priorState?.permissionMode,
       fileEditsByAssistantId: new Map(),
+      latestCompactSummary: priorState?.latestCompactSummary,
     };
   }
   const fileSize = fileStats.size;
@@ -158,6 +159,8 @@ export async function parseConversationMessages(
   const compactBoundaries: CompactBoundary[] = [];
   // Track permission mode across incremental parses
   let permissionMode: string | undefined = priorState?.permissionMode;
+  // Most recent compaction summary encountered (persist across incremental parses)
+  let latestCompactSummary = priorState?.latestCompactSummary;
   // Track file-modifying tool_use calls per assistant message for diff computation
   const fileEditsByAssistantId = new Map<string, Array<{ tool: string; filePath: string }>>();
   const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
@@ -197,6 +200,21 @@ export async function parseConversationMessages(
       if (pendingAssistant) {
         messages.push(pendingAssistant);
         pendingAssistant = null;
+      }
+
+      if (entry.isCompactSummary === true) {
+        let summaryText: string | null = null;
+        if (typeof rawContent === 'string') {
+          summaryText = rawContent.trim() ? rawContent : null;
+        } else if (Array.isArray(rawContent)) {
+          const blocks = (rawContent as ContentBlock[])
+            .filter(block => block.type === 'text' && typeof block.text === 'string' && block.text.trim())
+            .map(block => block.text as string);
+          summaryText = blocks.length > 0 ? blocks.join('\n') : null;
+        }
+        if (summaryText !== null) {
+          latestCompactSummary = { text: summaryText, sequence: lineSequence, uuid: entry.uuid, timestamp: entry.timestamp };
+        }
       }
 
       // Content can be a string (plain text) or array of content blocks
@@ -658,6 +676,7 @@ export async function parseConversationMessages(
     pendingAssistantId: pendingAssistant?.id ?? pendingAssistantIdForEdits,
     orphanToolUseIds: orphanToolUseIds.size > 0 ? orphanToolUseIds : undefined,
     countedUsageIds,
+    latestCompactSummary,
   };
 }
 
@@ -716,6 +735,7 @@ export async function parseEntireConversation(
       pendingAssistantId: result.pendingAssistantId,
       orphanToolUseIds: result.orphanToolUseIds,
       countedUsageIds: result.countedUsageIds,
+      latestCompactSummary: result.latestCompactSummary,
     };
   }
 

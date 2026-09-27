@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-20.
+Live landmines a change in this repo can step on. Verified 2026-09-26.
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts:88`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -74,6 +74,18 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   project's single-flight reconcile slot for hours.
 - **Single Deacon invariant** — never mount `~/.overdeck` into workspace
   containers; `OVERDECK_DISABLE_DEACON=1` belt-and-suspenders.
+- **The Deacon freeze silences every deacon-lite routine** — `deacon.globally_paused`
+  (overdeck.db `app_settings`, sidebar Snowflake toggle) makes `runDeaconLite()`
+  return before any routine: no stuck nudges, stalled-review recovery,
+  closed-issue reaping, or deferred hand-off retries. It persists across restarts
+  and "Deacon-lite started" still logs. Check it first when a patrol "never ran"
+  (PAN-4210). `CloisterService.isSpawnPaused()` / `cloister.spawns_paused` has no
+  callers; that flag gates nothing.
+- **`state.json` `status` is a spawn-time snapshot** — since PAN-3917,
+  `saveAgentStateAndEmitEvent` (`dashboard/server/services/agent-projection.ts`)
+  only appends an event, so complete-planning's "Marked planning-… as stopped"
+  never reaches `state.json`. Never gate behavior on that label; use the live
+  inventory (`liveness.ts` / `liveAgentInventory`) and `startedAt`/`stoppedAt`.
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
   dies under Bun; circular ESM imports die under tsx/Node source mode).
 - **`execSync` freezes the server** — anything reachable from the dashboard event
@@ -135,6 +147,22 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
+- **`git log --all` is not "the repository's history" here.** Overdeck keeps
+  tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and
+  work sessions snapshot their trees there). `--all` walks them, so any file a
+  session ever drafted reads as "tracked", and the walk is slow. Ask history
+  questions of `HEAD` (or a named branch) instead — PAN-4212.
+
+- **Per-issue continue/spec writers still target the primary checkout,
+  uncommitted** (PAN-4225) — unlike the plan-home push path fixed in PAN-4224
+  (`pushPlanArtifacts`, `promoteWorkspacePrdDraft`), the feedback-writer, session
+  history, and `transitionXBriefOnMain` still write per-issue `.pan/`
+  artifacts into the primary checkout instead of the issue's workspace, and
+  never commit them. `pushPlanArtifacts` tolerates the untracked collisions
+  this leaves behind (clears an identical one, backs up a differing one under
+  `.overdeck/plan-artifact-backups/<stamp>/`) — that's a safety net, not a fix
+  for the write-site bug. Don't add another primary-checkout writer without
+  routing it through the workspace like the fixed paths.
 - **A `verification.passed` journal tail is ambiguous** (PAN-4221) — quick
   review mode writes no `review.dispatched`, so the tail stays
   `verification.passed` while a healthy quick reviewer runs, AND when a
