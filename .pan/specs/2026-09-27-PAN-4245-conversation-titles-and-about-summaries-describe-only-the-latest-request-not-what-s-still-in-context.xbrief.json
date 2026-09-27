@@ -1,0 +1,660 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T08:35:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4245: Conversation titles and About summaries describe only the latest request, not what's still in context",
+    "updated": "2026-09-27T08:40:38.753Z"
+  },
+  "plan": {
+    "id": "pan-4245",
+    "title": "Conversation titles and About summaries describe only the latest request, not what's still in context",
+    "status": "proposed",
+    "uid": "7abf83ac-f312-4fba-b701-e9a6d40bce58",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-27T08:35:04Z",
+    "updated": "2026-09-27T08:40:38.753Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4245",
+        "label": "PAN-4245",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "titles",
+      "about-summary",
+      "compaction",
+      "transcript-parser",
+      "background-ai"
+    ],
+    "narratives": {
+      "Problem": "In long Claude Code conversations the AI title and About summary describe only the latest request. The parser drops the compaction summary record (isSystemInjection hides it), keeps no summary text, and the serializer sends only a head+tail excerpt, while the title prompt tells the model to favor the most recent direction. Conversation 2878 (83 MB, four compactions) was retitled after its last topic only.",
+      "Proposal": "Record the latest isCompactSummary record on the Claude parse result (latestCompactSummary, threaded through ParseState so the >10 MB chunk loop and incremental reads keep it), carry it through the getCachedMessages cache, and add a summary-aware mode to serializeConversationTranscript: the summary goes first under a fixed label, followed only by turns after it (About: up to 14,000 summary chars + recent turns to 24,000; title: 4,000 summary chars + 3,500 recent chars). Rewrite the title prompt to name the overall scope still in context, add summary guidance to the About prompt, derive the fallback title from the summary's Primary Request section, and pass the summary from auto refine, retitle and About. Without a summary, output stays byte-identical.",
+      "NonGoals": "- Do not change what the chat view shows: the compaction summary stays out of `messages`.\n- Do not add summary support for Codex, OpenCode/ACP, Pi, ohmypi, Kimi or Muse transcripts; they keep today's head+tail behavior.\n- Do not change summarizeFirstMessageTitle, the admin title backfill (routes/admin.ts), the refine cadence, or the title model.\n- Do not add latestCompactSummary to any RPC/wire schema in @overdeck/contracts or to any WebSocket payload.\n- Do not use earlier (non-latest) compaction summaries.\n- Do not modify titleTranscriptWindow.\n- Do not call retitleConversation or write any conversation title during the conversation 2878 manual check.\n- Do not add tests to src/dashboard/server/services/__tests__/conversation-service.test.ts (over the 1,000-line ceiling)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "latestCompactSummary is a ParseState field; each parse returns foundInThisRead ?? priorState.latestCompactSummary.",
+        "rationale": "The motivating 83 MB transcript goes through parseEntireConversation's 10 MB chunk loop, which returns {...last}; a per-chunk-only field would be lost whenever the summary is not in the last chunk. Threading through ParseState makes the chunk loop and incremental reads correct by construction."
+      },
+      {
+        "summary": "serializeConversationTranscript takes { compactSummary, purpose: 'about' | 'title' } instead of re-parsing markers out of a string in titleTranscriptWindow.",
+        "rationale": "A title-purpose transcript with a summary is at most ~7,700 chars, so titleTranscriptWindow (8,000) passes it through unchanged and needs no marker parsing; a summary of this very work would quote any marker and break string splitting."
+      },
+      {
+        "summary": "Strip the fixed continuation preamble paragraph from the summary before serializing.",
+        "rationale": "It carries no topic information, and removing it makes the kept text start at 'Summary:\\n1. Primary Request and Intent:', which the title head budget and fallback rely on."
+      },
+      {
+        "summary": "Messages without a sequence are kept after the summary.",
+        "rationale": "They cannot be placed relative to the summary; the Claude parser always sets sequence, so this only affects synthetic input."
+      },
+      {
+        "summary": "The structural TranscriptCompactSummary type lives in transcript-summary.ts; the parser's CompactSummaryRecord lives in conversation/types.ts; nothing goes into @overdeck/contracts.",
+        "rationale": "transcript-summary.ts is documented as a pure leaf, and contracts holds RPC schemas that must not grow a 14 KB server-only field."
+      },
+      {
+        "summary": "Export buildTranscriptTitlePrompt/buildTranscriptAboutPrompt.",
+        "rationale": "The prompt is built inside functions that spawn claude; exporting the builders makes the 'no longer contains favor the most recent direction' criterion a unit assertion."
+      },
+      {
+        "summary": "The conversation 2878 manual check uses a gitignored .tmp scratch script that prints the title and About; it never calls retitleConversation.",
+        "rationale": "Retitling would overwrite the operator's live conversation title with title_source 'ai-explicit'; printing proves the behavior without that side effect. Fallback when tsx cannot import: document post-deploy curl/UI steps in the PR."
+      },
+      {
+        "summary": "New parser and cache tests go in new files.",
+        "rationale": "conversation-service.test.ts is 1,398 lines, over the 1,000-line ceiling enforced by scripts/lint-file-size.sh."
+      }
+    ],
+    "items": [
+      {
+        "id": "parser-capture-compact-summary",
+        "title": "Claude parser records latestCompactSummary and threads it through ParseState",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T08:35:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4245",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cache-merge-compact-summary",
+            "title-refinement-passes-summary",
+            "retitle-about-pass-summary"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/conversation/types.ts",
+            "src/dashboard/server/services/conversation/parser.ts",
+            "src/dashboard/server/services/conversation/__tests__/parser-compact-summary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/parser-compact-summary.test.ts",
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "parser-compact-summary.test.ts passes all cases including the >10 MB chunk-loop case",
+            "conversation-service.test.ts stays green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. In conversation/types.ts add the exported CompactSummaryRecord {text, sequence, uuid?, timestamp?}, add latestCompactSummary?: CompactSummaryRecord to ParseResult and ParseState, and isCompactSummary?: boolean to JsonlEntry. In parser.ts initialize `let latestCompactSummary = priorState?.latestCompactSummary` next to permissionMode; in the user branch, when entry.isCompactSummary === true, set it from string content or joined text blocks (non-blank only) with sequence = lineSequence; leave the renderableUserText handling untouched. Return it from the main return object and the missing-file early return (priorState value); the truncation early return does not carry it. In parseEntireConversation add `latestCompactSummary: result.latestCompactSummary` to the priorState literal. Write the new test file with real temp files (mkdtempSync under os.tmpdir(), cleaned in afterEach)."
+        },
+        "items": [
+          {
+            "id": "parser-capture-compact-summary.ac1",
+            "title": "Given a JSONL with early turns, a compact_boundary, an isCompactSummary string record and later turns, when parseConversationMessages(file, 0) runs, then latestCompactSummary.text equals the full summary string, its sequence equals the summary line index, and no messages[].text contains the summary text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-capture-compact-summary.ac2",
+            "title": "Given a summary record whose message.content is an array of text blocks, when parsed, then latestCompactSummary.text returns the joined block text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-capture-compact-summary.ac3",
+            "title": "Given a prior parse state holding summary A, when an incremental parse reads appended lines containing summary B, then it returns summary B; when the appended lines contain no summary, then it returns summary A unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-capture-compact-summary.ac4",
+            "title": "Given a transcript whose summary sits in the first 10 MB chunk and which continues past MAX_READ_BYTES, when parseConversationMessages(file, 0) delegates to parseEntireConversation, then the result preserves the summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cache-merge-compact-summary",
+        "title": "getCachedMessages carries latestCompactSummary through its incremental cache",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T08:35:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "tests/unit/lib/overdeck/conversation-reads-compact-summary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-reads-compact-summary.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-reads-compact-summary.test.ts passes the A -> B -> B cache cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In getCachedMessages' incremental merge `parsed = { ... }` block add `latestCompactSummary: incremental.latestCompactSummary ?? cachedResult.latestCompactSummary,` after `countedUsageIds: incremental.countedUsageIds,`, and in the messagesCache.set parseState literal add `latestCompactSummary: parsed.latestCompactSummary,` after `countedUsageIds: parsed.countedUsageIds,`. Create the new test file using the OVERDECK_HOME temp-home setup from tests/unit/lib/overdeck/title-sources.test.ts and a unique transcript path per test (the cache is module-level)."
+        },
+        "items": [
+          {
+            "id": "cache-merge-compact-summary.ac1",
+            "title": "Given a transcript with summary A, when getCachedMessages(file, false) runs cold, then result.latestCompactSummary.text returns summary A",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-merge-compact-summary.ac2",
+            "title": "Given the cached result, when a boundary, summary B and a turn are appended and getCachedMessages runs again, then it returns summary B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-merge-compact-summary.ac3",
+            "title": "Given the cached result holding summary B, when only ordinary turns are appended and getCachedMessages runs again, then it preserves summary B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "serializer-summary-window",
+        "title": "serializeConversationTranscript puts the compaction summary first and keeps only later turns",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T08:35:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4245",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "context-aware-prompts",
+            "fallback-title-from-summary",
+            "title-refinement-passes-summary",
+            "retitle-about-pass-summary"
+          ],
+          "files_scope": [
+            "src/lib/conversations/transcript-summary.ts",
+            "src/lib/conversations/__tests__/transcript-summary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversations/__tests__/transcript-summary.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transcript-summary.test.ts passes, including the new compaction-summary describe block and the unchanged existing cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. Add ABOUT_SUMMARY_BUDGET=14_000, TITLE_SUMMARY_BUDGET=4_000, TITLE_RECENT_BUDGET=3_500, exported COMPACT_SUMMARY_LABEL='Summary of earlier context (written when the conversation was compacted):', RECENT_TURNS_LABEL='Recent turns after the summary:', RECENT_OMITTED_MARKER='[… earlier turns after the summary omitted for length …]', CONTINUATION_PREAMBLE_PREFIX. Widen TranscriptMessage to Pick<ChatMessage,'role'|'text'|'sequence'>, export TranscriptCompactSummary {text; sequence} and SerializeTranscriptOptions {compactSummary?; purpose?: 'about'|'title'}. Extract renderTurns() from the existing filter+map, keep the no-summary path byte-identical, and implement the summary path from the PRD pseudo-code (strip preamble up to first blank line, cap summary with slice+'…', keep only messages with sequence undefined or > summary.sequence, recent budget = TITLE_RECENT_BUDGET for title or TRANSCRIPT_BUDGET minus summary section length for about, prefix RECENT_OMITTED_MARKER when trimmed). Update the function doc comment."
+        },
+        "items": [
+          {
+            "id": "serializer-summary-window.ac1",
+            "title": "Given a >1,800-char summary plus turns before and after it, when serialized with purpose 'about', then the output starts with COMPACT_SUMMARY_LABEL, contains the 'Primary Request and Intent' text and the after-summary turns, and excludes the before-summary turn and the continuation preamble",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serializer-summary-window.ac2",
+            "title": "Given the same input serialized with purpose 'title', then the output contains the 'Primary Request and Intent' text and the after-summary turns, excludes the before-summary turn, and titleTranscriptWindow(output) returns it unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serializer-summary-window.ac3",
+            "title": "Given a 20,000-char summary, when serialized, then the summary part is cut to 14,000 chars plus '…' for 'about' and 4,000 chars plus '…' for 'title'; given long post-summary turns, then the 'about' output keeps the latest turn and includes RECENT_OMITTED_MARKER",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serializer-summary-window.ac4",
+            "title": "Given no summary (option omitted, null, or purpose title), when serialized, then the output is byte-identical to serializeConversationTranscript(messages), and each pre-existing serializer test returns its current expected output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-aware-prompts",
+        "title": "Title prompt names the overall scope still in context; About prompt treats the summary as earlier context",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T08:35:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/transcript-summary.ts",
+            "src/lib/conversations/__tests__/transcript-summary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversations/__tests__/transcript-summary.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transcript-summary.test.ts passes including the new prompt-builder cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Export buildTranscriptTitlePrompt(transcript) (applies titleTranscriptWindow, then the prompt lines) and buildTranscriptAboutPrompt(transcript); make summarizeTranscriptTitle and summarizeTranscriptAbout call them. Replace the title lines containing '*currently*' and 'favor the most recent direction' with the four PRD lines naming the overall scope of the work still in context. Insert the two PRD lines about a leading summary of earlier context into the About prompt after the user's-goal line. Keep fenceUntrustedTranscript around the transcript in both."
+        },
+        "items": [
+          {
+            "id": "context-aware-prompts.ac1",
+            "title": "Given any transcript, when buildTranscriptTitlePrompt runs, then the returned prompt contains 'overall scope' and does not contain 'favor the most recent direction'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-aware-prompts.ac2",
+            "title": "Given any transcript, when buildTranscriptAboutPrompt runs, then the returned prompt contains 'summary of earlier context'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-aware-prompts.ac3",
+            "title": "Given a transcript string, when either builder runs, then the transcript text appears between <<<UNTRUSTED_TRANSCRIPT_START>>> and <<<UNTRUSTED_TRANSCRIPT_END>>>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fallback-title-from-summary",
+        "title": "fallbackTranscriptTitle derives the title from the summary's Primary Request section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T08:35:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/transcript-summary.ts",
+            "src/lib/conversations/__tests__/transcript-summary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversations/__tests__/transcript-summary.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transcript-summary.test.ts passes including the new fallback cases and the three existing fallback cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Add primaryRequestFromSummary(text): locate /Primary Request and Intent:?/i, take the text after it up to the first /\\n\\s*2\\.\\s/, return the first non-empty trimmed line with a leading '- ', '* ' or '• ' removed, or '' when the header is absent. In fallbackTranscriptTitle, when transcript.startsWith(COMPACT_SUMMARY_LABEL), return derivePromptTitle(primaryRequestFromSummary(transcript)) if non-empty; otherwise run today's last-User-line logic unchanged. Update the doc comment."
+        },
+        "items": [
+          {
+            "id": "fallback-title-from-summary.ac1",
+            "title": "Given a title transcript built with a summary whose first Primary Request bullet is 'Orchestrate the Overdeck cut across parallel agents' and whose last User line is 'ship the intro video', when fallbackTranscriptTitle runs, then it returns 'Orchestrate the Overdeck cut across parallel agents'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fallback-title-from-summary.ac2",
+            "title": "Given a summary-labelled transcript whose summary has no Primary Request and Intent section, when fallbackTranscriptTitle runs, then it falls back to the last User line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fallback-title-from-summary.ac3",
+            "title": "Given transcripts without a summary, when fallbackTranscriptTitle runs, then the three pre-existing fallback tests return their current expected titles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "title-refinement-passes-summary",
+        "title": "Periodic title refinement sends the compaction summary to the title model",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T08:35:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/title-refinement.ts",
+            "tests/unit/lib/overdeck/title-refinement.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/title-refinement.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "title-refinement.test.ts passes including the new summary case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6. In handleTurnComplete destructure latestCompactSummary from getCachedMessages and call serializeConversationTranscript(messages, { compactSummary: latestCompactSummary, purpose: 'title' }). Add a test whose injected getCachedMessages resolves messages with sequences (before-summary user seq 1, assistant seq 2 completed, after-summary user seq 10, assistant seq 11 completed) plus latestCompactSummary { text: preamble + Primary Request section, sequence: 5 }, and assert on the summarizeTranscriptTitle mock's first argument."
+        },
+        "items": [
+          {
+            "id": "title-refinement-passes-summary.ac1",
+            "title": "Given an injected getCachedMessages that returns a summary and later turns, when handleTurnComplete runs, then the transcript passed to summarizeTranscriptTitle contains 'Primary Request and Intent' and the after-summary turn text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-refinement-passes-summary.ac2",
+            "title": "Given the same input, when handleTurnComplete runs, then the transcript passed to summarizeTranscriptTitle excludes the before-summary turn text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retitle-about-pass-summary",
+        "title": "Explicit retitle and the About drawer send the compaction summary to the model",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T08:35:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "tests/unit/lib/overdeck/title-sources.test.ts",
+            "tests/unit/lib/overdeck/conversation-reads-compact-summary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/title-sources.test.ts tests/unit/lib/overdeck/conversation-reads-compact-summary.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "title-sources.test.ts and conversation-reads-compact-summary.test.ts pass including the new retitle and About summary cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. In retitleConversation destructure latestCompactSummary and serialize with { compactSummary: latestCompactSummary, purpose: 'title' } (the timeout fallback keeps passing this same string to fallbackTranscriptTitle). In getConversationAbout destructure latestCompactSummary and serialize with { compactSummary: latestCompactSummary, purpose: 'about' }. Add a retitle case to title-sources.test.ts and an About case (getConversationAbout(name, true, deps) with summarizeTranscriptAbout spied via vi.spyOn on the transcript-summary module) to conversation-reads-compact-summary.test.ts, each using a real JSONL: before-turn, compact_boundary, isCompactSummary record, after-turn."
+        },
+        "items": [
+          {
+            "id": "retitle-about-pass-summary.ac1",
+            "title": "Given a real JSONL with a before-turn, a compaction summary and an after-turn, when retitleConversation runs, then the summarizeTranscriptTitle spy receives a transcript that contains the Primary Request text and excludes the before-turn text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retitle-about-pass-summary.ac2",
+            "title": "Given the same JSONL, when getConversationAbout(name, true, deps) runs, then the summarizeTranscriptAbout spy receives a transcript that contains the Primary Request text and the after-turn text and excludes the before-turn text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retitle-about-pass-summary.ac3",
+            "title": "Given a JSONL without a compaction summary, when retitleConversation runs, then the pre-existing title-sources.test.ts cases still persist title_source 'ai-explicit' as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-2878-check",
+        "title": "Document the summary-first title/About input and record the conversation 2878 check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T08:35:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4245",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "acJustification": "Two doc files, one module header, and one manual verification whose output lands in the PR description; the manual check needs every code item done, so it belongs on the final item.",
+          "files_scope": [
+            "docs/MODEL-CALLS.md",
+            "docs/overdeck-remodel/services/conversations.md",
+            "src/lib/conversations/transcript-summary.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'compaction summary' docs/MODEL-CALLS.md docs/overdeck-remodel/services/conversations.md src/lib/conversations/transcript-summary.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep prints matching lines in all three files",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. In docs/MODEL-CALLS.md rows conversationTitles/titleRefinement/conversationAbout (lines 57-59) replace the stale transcript-summary.ts:31/:230/:235 refs with the current line numbers of CONVERSATION_TITLE_MODEL, summarizeTranscriptTitle and summarizeTranscriptAbout, and add to titleRefinement and conversationAbout that the model sees the latest compaction summary first plus the turns after it when one exists, otherwise the head+tail excerpt. In docs/overdeck-remodel/services/conversations.md add the same one-sentence note to the GET /api/conversations/:name/about row (line 172) and the POST /api/conversations/:name/retitle row (line 183). Update the transcript-summary.ts module header (PAN-4245 note). Then run the implementation checkpoint: write gitignored .tmp/pan-4245-verify.mts importing parseConversationMessages (conversation/parser.ts) and serializeConversationTranscript/summarizeTranscriptTitle/summarizeTranscriptAbout/fallbackTranscriptTitle (transcript-summary.ts), parse ~/.claude/projects/-home-eltmon-Projects-overdeck/0974944a-eba1-43b8-9888-a2a123b5047f.jsonl, print title, fallback title and About, run with `npx tsx .tmp/pan-4245-verify.mts`, and paste the output into the PR description. Never call retitleConversation and never write to a database. Fallback if tsx cannot import: say so in the PR description and list the post-deploy check (`curl -s 'http://localhost:3011/api/conversations/<2878 name>/about?refresh=1'` plus the dashboard Regenerate-title action)."
+        },
+        "items": [
+          {
+            "id": "docs-and-2878-check.ac1",
+            "title": "Given the updated docs/MODEL-CALLS.md, when a reader opens the titleRefinement and conversationAbout rows, then each states that the model sees the latest compaction summary first plus the turns after it, and all three rows cite the current transcript-summary.ts line numbers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-2878-check.ac2",
+            "title": "Given docs/overdeck-remodel/services/conversations.md, when a reader opens the about and retitle rows, then each states that the model input is the latest compaction summary plus the turns after it when the transcript has one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-2878-check.ac3",
+            "title": "Given the transcript-summary.ts module header, when read, then it states that transcripts may open with the latest compaction summary (PAN-4245) and that titles name the overall scope still in context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-2878-check.ac4",
+            "title": "Given the verify script run against conversation 2878's transcript, when it prints the generated title and About, then the PR description contains that output showing the orchestration work (or the documented tsx-failure fallback with post-deploy commands), and conversation 2878's stored title is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "parser-capture-compact-summary",
+        "to": "cache-merge-compact-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "parser-capture-compact-summary",
+        "to": "title-refinement-passes-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "cache-merge-compact-summary",
+        "to": "retitle-about-pass-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "serializer-summary-window",
+        "to": "context-aware-prompts",
+        "type": "blocks"
+      },
+      {
+        "from": "serializer-summary-window",
+        "to": "fallback-title-from-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "context-aware-prompts",
+        "to": "fallback-title-from-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "serializer-summary-window",
+        "to": "title-refinement-passes-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "serializer-summary-window",
+        "to": "retitle-about-pass-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "fallback-title-from-summary",
+        "to": "docs-and-2878-check",
+        "type": "blocks"
+      },
+      {
+        "from": "title-refinement-passes-summary",
+        "to": "docs-and-2878-check",
+        "type": "blocks"
+      },
+      {
+        "from": "retitle-about-pass-summary",
+        "to": "docs-and-2878-check",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-27-PAN-4245-conversation-titles-and-about-summaries-describe-only-the-latest-request-not-what-s-still-in-context.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
