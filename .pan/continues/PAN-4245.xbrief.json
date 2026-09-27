@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4245",
   "created": "2026-09-27T08:41:51.604Z",
-  "updated": "2026-09-27T09:15:31.749Z",
+  "updated": "2026-09-27T09:15:35.963Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4245",
       "claimedAt": "2026-09-27T09:12:36.129Z",
       "doneAt": "2026-09-27T09:15:31.749Z"
+    },
+    "fallback-title-from-summary": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T09:15:35.963Z"
     }
   }
 }
