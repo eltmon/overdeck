@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4263",
   "created": "2026-09-27T14:44:33.622Z",
-  "updated": "2026-09-27T14:48:37.514Z",
+  "updated": "2026-09-27T14:49:20.258Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-27T14:48:25.138Z"
     },
     "discover-transient-retry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4263",
-      "claimedAt": "2026-09-27T14:48:37.514Z"
+      "claimedAt": "2026-09-27T14:48:37.514Z",
+      "doneAt": "2026-09-27T14:49:20.258Z"
     }
   }
 }
