@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4245",
   "created": "2026-09-27T08:41:51.604Z",
-  "updated": "2026-09-27T09:18:17.512Z",
+  "updated": "2026-09-27T09:18:21.894Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4245",
       "claimedAt": "2026-09-27T09:15:35.963Z",
       "doneAt": "2026-09-27T09:18:17.512Z"
+    },
+    "title-refinement-passes-summary": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4245",
+      "claimedAt": "2026-09-27T09:18:21.894Z"
     }
   }
 }
