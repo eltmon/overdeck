@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4263",
   "created": "2026-09-27T14:44:33.622Z",
-  "updated": "2026-09-27T15:20:40.759Z",
+  "updated": "2026-09-27T15:20:52.301Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "merge-lands-fresh-pr.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T15:20:40.759Z"
+    },
+    "merge-lands-fresh-pr.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:20:52.301Z"
     }
   }
 }
