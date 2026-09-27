@@ -45,25 +45,35 @@ function formatPsi(value: number | null | undefined): string {
   return value == null ? 'unavailable (pressure stall data not readable)' : value.toFixed(2);
 }
 
+/**
+ * PAN-4267: the governor only gates the automatic resume of preemptively
+ * yielded agents (resumeYieldedAgents) — never conversations, `pan start`, or
+ * dashboard Start. The activity-feed text used to imply otherwise.
+ */
+const GOVERNOR_SCOPE = 'The governor only holds the automatic resume of agents the preemptive scheduler paused; conversations, pan start, and dashboard Start are not blocked by it.';
+
 function formatTrigger(verdict: MemoryVerdict): string {
   const trigger = verdict.trigger;
   if (!trigger) {
     return verdict.band === 'hard'
       ? 'Memory critical: the governor entered shedding before trigger details were available.'
-      : 'Overdeck stopped admitting work before trigger details were available.';
+      : 'The memory governor started holding before trigger details were available.';
   }
 
   const since = new Date(trigger.at).toISOString().slice(11, 16);
   if (trigger.kind === 'soft-dip') {
-    return `Overdeck stopped admitting work at ${since} UTC when available memory dipped to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} soft reserve.`;
+    return `The memory governor started holding at ${since} UTC when available memory dipped to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} soft reserve.`;
   }
   if (trigger.kind === 'hard') {
-    return `Overdeck entered critical memory shedding at ${since} UTC when available memory fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} hard reserve.`;
+    return `The memory governor entered critical memory shedding at ${since} UTC when available memory fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} hard reserve.`;
+  }
+  if (trigger.kind === 'mac-pressure-critical') {
+    return `The memory governor entered critical memory shedding at ${since} UTC because macOS reported critical memory pressure with ${formatGib(trigger.readingBytes)} available.`;
   }
   if (trigger.kind === 'swap-psi') {
-    return `Overdeck entered critical memory shedding at ${since} UTC when swap free fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} swap runway threshold, while memory pressure stalls were active.`;
+    return `The memory governor entered critical memory shedding at ${since} UTC when swap free fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} swap runway threshold, while memory pressure stalls were active.`;
   }
-  return `Overdeck stopped admitting work at ${since} UTC when swap free fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} swap runway threshold, and memory pressure stall data was unavailable.`;
+  return `The memory governor started holding at ${since} UTC when swap free fell to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} swap runway threshold, and memory pressure stall data was unavailable.`;
 }
 
 function formatCalmWindow(windowMs: number): string {
@@ -71,11 +81,19 @@ function formatCalmWindow(windowMs: number): string {
   return Number.isInteger(minutes) ? `${minutes} minutes` : `${windowMs} ms`;
 }
 
-function formatSheddingExit(verdict: MemoryVerdict, hardBytes: number, recoveryBytes: number): string {
-  if (verdict.trigger?.kind === 'swap-psi') {
-    return `Shedding ends when live memory stalls clear or swap runway recovers. Admissions resume at the ${formatGib(recoveryBytes)} recovery reserve or through the PSI-calm condition.`;
+function formatSheddingExit(
+  verdict: MemoryVerdict,
+  hardBytes: number,
+  recoveryBytes: number,
+  psiCalmConfig: { windowMs: number },
+): string {
+  if (verdict.trigger?.kind === 'mac-pressure-critical') {
+    return `Shedding ends when macOS memory pressure leaves critical and available memory is at or above the ${formatGib(hardBytes)} hard reserve. Automatic resume returns at the ${formatGib(recoveryBytes)} recovery reserve or once macOS memory pressure stays normal for ${formatCalmWindow(psiCalmConfig.windowMs)}.`;
   }
-  return `Shedding ends when available memory reaches the ${formatGib(hardBytes)} hard reserve. Admissions resume at the ${formatGib(recoveryBytes)} recovery reserve or through the PSI-calm condition.`;
+  if (verdict.trigger?.kind === 'swap-psi') {
+    return `Shedding ends when live memory stalls clear or swap runway recovers. Automatic resume returns at the ${formatGib(recoveryBytes)} recovery reserve or through the PSI-calm condition.`;
+  }
+  return `Shedding ends when available memory reaches the ${formatGib(hardBytes)} hard reserve. Automatic resume returns at the ${formatGib(recoveryBytes)} recovery reserve or through the PSI-calm condition.`;
 }
 
 /**
@@ -91,11 +109,15 @@ function buildMemoryDetails(
   const swap = verdict.swapFreeBytes == null || verdict.swapTotalBytes == null
     ? 'Swap: unavailable'
     : `Swap: ${formatGib(verdict.swapFreeBytes)} free of ${formatGib(verdict.swapTotalBytes)}`;
+  // PAN-4267: macOS has no PSI — show its own kernel pressure level instead.
+  const pressureLine = verdict.psiFullAvg10 == null && verdict.macPressureLevel != null
+    ? `macOS memory pressure: ${verdict.macPressureLevel}`
+    : `PSI some avg10: ${formatPsi(verdict.psiSomeAvg10)} | full avg10: ${formatPsi(verdict.psiFullAvg10)}`;
   return [
     `MemAvailable: ${formatGib(verdict.availableBytes)}`,
     `Watch reserve: ${formatGib(watchBytes)} | Soft: ${formatGib(softBytes)} | Hard: ${formatGib(hardBytes)} | Recovery: ${formatGib(recoveryBytes)}`,
     swap,
-    `PSI some avg10: ${formatPsi(verdict.psiSomeAvg10)} | full avg10: ${formatPsi(verdict.psiFullAvg10)}`,
+    pressureLine,
   ].join('\n');
 }
 
@@ -284,7 +306,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
   if (level === 'watch') {
     const message =
       `Memory is getting tight — ${formatGib(verdict.availableBytes)} available, below the ${formatGib(watchBytes)} watch reserve. ` +
-      `Overdeck is still admitting new agents; it will stop admitting if available memory falls below the ${formatGib(softBytes)} soft reserve.`;
+      `The governor is not holding anything yet; it starts holding if available memory falls below the ${formatGib(softBytes)} soft reserve.`;
 
     d.emit({
       level: 'warn',
@@ -299,10 +321,13 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     actions.push(action);
     logDeaconEvent(`[deacon] ${action}`);
   } else if (level === 'holding') {
+    const calmClause = verdict.macPressureLevel != null
+      ? `macOS memory pressure stays normal for ${formatCalmWindow(psiCalmConfig.windowMs)}`
+      : `memory pressure stalls (PSI full avg10) stay below ${psiCalmConfig.readmitAvg10} for ${formatCalmWindow(psiCalmConfig.windowMs)}`;
     const message =
       `${formatTrigger(verdict)} ${formatGib(verdict.availableBytes)} is available now. ` +
-      `Admissions resume at the ${formatGib(recoveryBytes)} recovery reserve, or at the ${formatGib(softBytes)} soft reserve once memory pressure stalls (PSI full avg10) stay below ${psiCalmConfig.readmitAvg10} for ${formatCalmWindow(psiCalmConfig.windowMs)}. ` +
-      `Nothing has been stopped or killed.`;
+      `Automatic resume returns at the ${formatGib(recoveryBytes)} recovery reserve, or at the ${formatGib(softBytes)} soft reserve once ${calmClause}. ` +
+      `Nothing has been stopped or killed. ${GOVERNOR_SCOPE}`;
 
     d.emit({
       level: 'warn',
@@ -319,8 +344,8 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
   } else if (level === 'shedding') {
     const message =
       `${formatTrigger(verdict)} ${formatGib(verdict.availableBytes)} is available now. ` +
-      `Overdeck admits nothing while shedding is active. ${formatSheddingExit(verdict, hardBytes, recoveryBytes)} ` +
-      `Free memory on this host now; automatic shedding is not wired, so Overdeck will not reclaim anything on its own.`;
+      `${formatSheddingExit(verdict, hardBytes, recoveryBytes, psiCalmConfig)} ` +
+      `Free memory on this host now; automatic shedding is not wired, so Overdeck will not reclaim anything on its own. ${GOVERNOR_SCOPE}`;
 
     d.emit({
       level: 'error',
@@ -337,7 +362,7 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
   } else if (level === 'ok') {
     const message =
       `Memory pressure cleared — ${formatGib(verdict.availableBytes)} available, at or above the ${formatGib(watchBytes)} watch reserve. ` +
-      `Overdeck is admitting work again.`;
+      `The governor has released its hold.`;
 
     d.emit({
       level: 'info',
