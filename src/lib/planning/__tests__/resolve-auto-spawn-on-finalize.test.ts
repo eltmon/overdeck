@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   claimAutoSpawnConsentForWorkStart,
   completeAutoSpawnConsentClaim,
+  readAutoSpawnConsentWorkModel,
   readAutoSpawnOnFinalizeFlagAsync,
   releaseAutoSpawnConsentClaim,
   resolveAutoSpawnOnFinalize,
@@ -101,5 +102,12 @@ describe('resolveAutoSpawnOnFinalize', () => {
 
   it('omitted autoSpawn + no flag = no spawn (interactive planning, manual start)', async () => {
     await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(false);
+  });
+
+  it('preserves the work model when resolveAutoSpawnOnFinalize rewrites the generation', async () => {
+    await writeAutoSpawnOnFinalizeFlag(ISSUE, true, { workModel: 'k3' });
+
+    await expect(resolveAutoSpawnOnFinalize(true, ISSUE)).resolves.toBe(true);
+    await expect(readAutoSpawnConsentWorkModel(ISSUE)).resolves.toBe('k3');
   });
 });

@@ -1,0 +1,474 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-26T06:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3022: Work-spawn route ignores the per-issue workModel override — role default wins and then clobbers the record",
+    "updated": "2026-09-26T06:15:51.460Z"
+  },
+  "plan": {
+    "id": "pan-3022",
+    "title": "Work-spawn route ignores the per-issue workModel override — role default wins and then clobbers the record",
+    "status": "running",
+    "uid": "c8a46cfc-3d53-458a-9499-6bad05e2b5c0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-26T06:30:00.000Z",
+    "updated": "2026-09-26T06:15:51.460Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3022",
+        "label": "PAN-3022",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "model-routing",
+      "planning-handoff",
+      "auto-start-consent",
+      "spawn"
+    ],
+    "narratives": {
+      "Problem": "`pan start <id> --model X` on an unplanned issue starts planning with auto-start, but the work agent the planning handoff spawns runs on the roles.work default. start-planning validates the workModel body field and drops it; completePlanningAutoSpawn, the deferred retry, the stack-rebuild path and the reactive pickup post no model; and the route's f15697bf6c7 fallback resolveIssueWorkModel always returns undefined since the Cut deleted the per-issue record — and even a non-undefined value would not be forwarded to pan start because the explicitModel gate reads only body.model.",
+      "Proposal": "Carry the work model in the planning cycle's auto-start consent record (~/.overdeck/agents/planning-<issue>/auto-spawn-on-finalize.json). start-planning writes it into the new generation; the complete-planning rewrite preserves it; POST /api/agents reads it for consent-bearing requests without a body model, uses it for pre-flight checks and forwards it as --model; spawnAgent, spawnRun and spawnRemoteAgent apply claim.workModel inside withAutoSpawnConsentClaim so every handoff path honors it. Once the consent is spent, the model is no longer readable, so later operator starts use config routing. Delete the dead resolveIssueWorkModel. Update the pan-start skill and PIPELINE-GATES docs.",
+      "NonGoals": "- Carrying --harness or --effort to the handoff work agent\n- Any new per-issue store, .pan/ write, or revival of the deleted pipeline record\n- A dashboard UI for choosing the work model at planning start\n- Fixing readAutoSpawnOnFinalize in src/cli/commands/plan-finalize.ts (legacy-field reader; CLI messaging only)\n- Changing tier resolution semantics (an explicit model skips tiers per PAN-3857)\n- Applying the consent work model to operator-initiated starts or to spawns without autoSpawnConsentRequired"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Store the work model in the auto-start consent record rather than .pan/continues/<issue>.xbrief.json",
+        "rationale": "The issue comment accepts 'the handoff itself or a durable per-issue home'. The consent record is the handoff's own generation-scoped durable record, exists before planning starts, and every handoff path already claims it; .pan/continues does not exist at start-planning time and would need a write-door commit before any spec exists."
+      },
+      {
+        "summary": "On a consent-bearing spawn, claim.workModel outranks options.model",
+        "rationale": "Operator starts never take the consent-claim path, so options.model there is either the route's forwarded copy of the same value or pan start's prior-agent resume continuity; a stale prior model must not beat the operator's fresh --model on a re-plan."
+      },
+      {
+        "summary": "The complete-planning consent rewrite preserves workModel; a new planning cycle always sets or clears it",
+        "rationale": "resolveAutoSpawnOnFinalize writes a new generation on explicit autoSpawn booleans; without preservation it would silently drop the operator's model, while a fresh planning cycle must not inherit a stale model."
+      },
+      {
+        "summary": "Scope is the model only; --harness and --effort are not carried",
+        "rationale": "The issue title and the 2026-09-26 comment name the model; on the unplanned path those flags configure the planning agent today, and changing that is a separate behavior decision."
+      },
+      {
+        "summary": "Delete resolveIssueWorkModel instead of re-implementing it",
+        "rationale": "It is dead code (always undefined) with a single caller that this plan rewires; keeping a sync per-issue lookup would invite a second, record-like home."
+      }
+    ],
+    "items": [
+      {
+        "id": "consent-work-model",
+        "title": "Store the operator work model in the auto-start consent record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3022",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/planning/auto-spawn-consent.ts",
+            "src/lib/planning/__tests__/auto-spawn-consent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/auto-spawn-consent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "auto-spawn-consent.test.ts passes including the new workModel cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "start-planning-threads-work-model",
+            "route-forwards-consent-model",
+            "claim-applies-work-model"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In src/lib/planning/auto-spawn-consent.ts: add optional workModel to AutoSpawnConsentRecord and AutoSpawnConsentClaim; parseConsentRecord drops a non-string/empty workModel; writeAutoSpawnOnFinalizeFlag(issueId, enabled, options: { workModel?: string | null } = {}) stores a string, clears on null, and preserves the current record's workModel (read under the same lock) when undefined; claimAutoSpawnConsentForWorkStart returns workModel on the claim; add async readAutoSpawnConsentWorkModel(issueId) returning workModel only when status is not 'spent'; withAutoSpawnConsentClaim passes the claim as the operation's second argument. Exact before/after code is in .pan/drafts/PAN-3022.md W1."
+        },
+        "items": [
+          {
+            "id": "consent-work-model.ac1",
+            "title": "Given a consent written with workModel 'k3', when readAutoSpawnConsentWorkModel runs, then it returns 'k3'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consent-work-model.ac2",
+            "title": "Given a stored workModel 'k3', when writeAutoSpawnOnFinalizeFlag(issue, true) runs with no options, then a new generation is written and readAutoSpawnConsentWorkModel still returns 'k3'; with { workModel: null } it returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consent-work-model.ac3",
+            "title": "Given a claimed consent with workModel 'k3', when completeAutoSpawnConsentClaim spends it, then readAutoSpawnConsentWorkModel returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consent-work-model.ac4",
+            "title": "Given a granted consent with workModel 'k3', when withAutoSpawnConsentClaim runs its operation, then the operation receives a claim whose workModel equals 'k3'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consent-work-model.ac5",
+            "title": "Given a v2 record without workModel or a legacy { autoSpawnOnFinalize: true } record, when it is claimed, then the claim succeeds with workModel undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-planning-threads-work-model",
+        "title": "Thread start-planning workModel into the new consent generation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3022",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-sessions.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/dashboard/server/routes/__tests__/issues-start-planning.test.ts",
+            "src/lib/planning/__tests__/resolve-auto-spawn-on-finalize.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/issues-start-planning.test.ts src/lib/planning/__tests__/resolve-auto-spawn-on-finalize.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass including the new workModel cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. planning-sessions.ts ~:195-207 keeps requireModelOverride validation and binds trimmedWorkModel; pass workModel: trimmedWorkModel to spawnPlanningSession (~:417-436). spawn-planning-session.ts: add workModel?: string to SpawnPlanningOptions (~:136), destructure at ~:383, and change ~:393 to writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, { workModel: workModel ?? null }). resolveAutoSpawnOnFinalize (~:71-77) keeps calling writeAutoSpawnOnFinalizeFlag with no options so the model is preserved; add a one-line comment saying so."
+        },
+        "items": [
+          {
+            "id": "start-planning-threads-work-model.ac1",
+            "title": "Given POST start-planning with { workModel: 'k3', autoStart: true }, when the handler runs, then spawnPlanningSession is called with workModel 'k3'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-planning-threads-work-model.ac2",
+            "title": "Given POST start-planning without workModel, when the handler runs, then spawnPlanningSession is called with workModel undefined and the consent generation it writes carries no workModel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-planning-threads-work-model.ac3",
+            "title": "Given a consent stored with workModel 'k3', when resolveAutoSpawnOnFinalize(true, issue) rewrites it, then readAutoSpawnConsentWorkModel still returns 'k3'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-forwards-consent-model",
+        "title": "POST /api/agents forwards the consent work model to pan start",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3022",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/dashboard/server/routes/agents/shared.ts",
+            "tests/unit/dashboard/routes/work-spawn-requested-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/work-spawn-requested-model.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "work-spawn-requested-model.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. Add exported pure resolveWorkSpawnRequestedModel(bodyModel: unknown, consentWorkModel: string | undefined) to routes/agents/shared.ts (trimmed non-empty string body model wins, else consent model) and update the buildPanStartArgs model doc comment. In spawn.ts (~:459-477): when autoSpawnConsentRequired && !body.model, read readAutoSpawnConsentWorkModel(issueId) via Effect.promise with .catch(() => undefined); requestedModel = resolveWorkSpawnRequestedModel(body.model, consentWorkModel); determineModel({ model: requestedModel, ... }); explicitModel = requestedModel ? spawnModel : null. This widening of the old `(body as any).model ? spawnModel : null` gate is required: it is why f15697bf6c7 never reached pan start. Remove the resolveIssueWorkModel import and replace the stale PAN-3022 comment."
+        },
+        "items": [
+          {
+            "id": "route-forwards-consent-model.ac1",
+            "title": "Given a body model ' gpt-5.6-sol ' and a consent model 'k3', when resolveWorkSpawnRequestedModel runs, then it returns 'gpt-5.6-sol'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-forwards-consent-model.ac2",
+            "title": "Given no body model and a consent model 'k3', when resolveWorkSpawnRequestedModel runs, then it returns 'k3'; given '' or a non-string body model and no consent model it returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-forwards-consent-model.ac3",
+            "title": "Given spawn.ts after the change, when `grep -n \"explicitModel: string | null = requestedModel\" src/dashboard/server/routes/agents/spawn.ts` runs, then it prints exactly one match, and `git grep -n resolveIssueWorkModel src/dashboard` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claim-applies-work-model",
+        "title": "Consent-bearing spawns run on the consent work model",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3022",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/remote/remote-agents.ts",
+            "src/lib/__tests__/agents-spawn-supervisor.test.ts",
+            "tests/lib/remote/remote-agent-provenance.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agents-spawn-supervisor.test.ts tests/lib/remote/remote-agent-provenance.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass including the new consent-model cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In src/lib/agents/spawn.ts spawnRun (~:114-118) and spawnAgent (~:606-610), and in src/lib/remote/remote-agents.ts spawnRemoteAgent (~:549-553), change the withAutoSpawnConsentClaim operation to (acceptConsent, claim) => ...({ ...options, model: claim.workModel ?? options.model }, acceptConsent). Precedence is claim first (PRD D2): operator starts never take this path, so options.model here is either the route's forwarded copy of the same value or pan start's prior-agent resume continuity, which must not beat the operator's fresh --model. Add a short comment citing PAN-3022 at each site."
+        },
+        "items": [
+          {
+            "id": "claim-applies-work-model.ac1",
+            "title": "Given a granted consent with workModel B and spawnAgent called with model A, startedBy 'planning-auto-handoff' and autoSpawnConsentRequired true, when it spawns, then the persisted agent state has model B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-applies-work-model.ac2",
+            "title": "Given the same consent record and spawnAgent called with an operator startedBy and model A, when it spawns, then the agent state has model A and the consent stays granted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-applies-work-model.ac3",
+            "title": "Given a granted consent with workModel B and spawnRemoteAgent called with autoSpawnConsentRequired true and no model, when it spawns, then the remote spawn receives model B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-resolve-issue-work-model",
+        "title": "Delete the dead resolveIssueWorkModel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-3022",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/staffing.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n resolveIssueWorkModel -- src tests",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "git grep prints nothing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In src/lib/agents/staffing.ts delete resolveIssueWorkModel and its PAN-3917 doc comment (~:77-87). Keep the preceding `/** The implicit tier: ... */` comment, which documents resolveImplicitStaffing directly below."
+        },
+        "items": [
+          {
+            "id": "delete-resolve-issue-work-model.ac1",
+            "title": "Given the change, when `git grep -n resolveIssueWorkModel -- src tests` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-resolve-issue-work-model.ac2",
+            "title": "Given staffing.ts after the change, when `npm run typecheck` runs, then it completes without errors and resolveImplicitStaffing keeps its doc comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-handoff-work-model",
+        "title": "Document that the planning handoff carries pan start --model",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T06:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3022",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-start/SKILL.md",
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. sync-sources/skills/pan-start/SKILL.md ~:64-73: replace 'there is no durable per-issue override anymore' with the new behavior — when this start also kicks off planning, the auto-start handoff (including the deferred retry and stack-rebuild paths) runs the work agent on --model; it is stored with that planning cycle's auto-start consent and not reused after the handoff spends it; a later bare pan start uses config routing; --harness/--effort on that path still apply to planning. docs/PIPELINE-GATES.md: in the 'Deferred planning hand-off (PAN-4155)' bullet (~:565) and the deacon-lite retry paragraph (~:741-744) state that the retried spawn runs on the operator's pan start --model because the model lives in the consent record the retry spends. Edit sync-sources/, never .claude/skills/. No CLI flag or help-string change."
+        },
+        "items": [
+          {
+            "id": "docs-handoff-work-model.ac1",
+            "title": "Given SKILL.md after the change, when `grep -c \"auto-start consent\" sync-sources/skills/pan-start/SKILL.md` runs, then it prints at least 1, and the --model paragraph no longer contains 'no durable per-issue override'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-handoff-work-model.ac2",
+            "title": "Given docs/PIPELINE-GATES.md after the change, when `grep -n \"pan start --model\" docs/PIPELINE-GATES.md` runs, then it prints a match inside the deferred planning hand-off / deacon-lite retry text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-handoff-work-model.ac3",
+            "title": "Given the docs edits, when `npm run lint` runs, then it exits 0 with no skills-lint drift",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "consent-work-model",
+        "to": "start-planning-threads-work-model",
+        "type": "blocks"
+      },
+      {
+        "from": "consent-work-model",
+        "to": "route-forwards-consent-model",
+        "type": "blocks"
+      },
+      {
+        "from": "consent-work-model",
+        "to": "claim-applies-work-model",
+        "type": "blocks"
+      },
+      {
+        "from": "route-forwards-consent-model",
+        "to": "delete-resolve-issue-work-model",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-26-PAN-3022-work-spawn-route-ignores-the-per-issue-workmodel-override-role-default-wins-and-then-clobbers-the-record.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

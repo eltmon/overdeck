@@ -51,14 +51,28 @@ const execFileAsync = promisify(execFile);
 
 type StartAgentPhase = 'stackHealthGate' | 'guardrails' | 'spawn';
 
+/**
+ * PAN-3022: resolve the model a work spawn should use before role/tier
+ * resolution. A trimmed non-empty body model always wins (the operator's
+ * explicit choice for this request); otherwise fall back to the work model
+ * carried on a consent-bearing spawn's auto-start consent record, if any.
+ * Pure and synchronous so callers can reuse it without an Effect context.
+ */
+export function resolveWorkSpawnRequestedModel(bodyModel: unknown, consentWorkModel: string | undefined): string | undefined {
+  const trimmedBodyModel = typeof bodyModel === 'string' && bodyModel.trim() ? bodyModel.trim() : undefined;
+  return trimmedBodyModel ?? consentWorkModel;
+}
+
 export function buildPanStartArgs(input: {
   issueId: string;
   /**
-   * Explicit operator-chosen model only. When omitted, no `--model` is emitted
-   * and `pan start` resolves staffing itself (tier table / issue override /
-   * role default). Forwarding a resolved default here made `pan start` treat
-   * it as an explicit override — skipping tier resolution and stamping it as
-   * the durable per-issue `record.workModel` (PAN-3857).
+   * Explicit operator-chosen model only — either a body model or, on a
+   * consent-bearing spawn, the model carried on the auto-start consent
+   * (resolveWorkSpawnRequestedModel, PAN-3022). When omitted, no `--model` is
+   * emitted and `pan start` resolves staffing itself (tier table / issue
+   * override / role default). Forwarding a resolved default here made
+   * `pan start` treat it as an explicit override — skipping tier resolution
+   * and stamping it as the durable per-issue `record.workModel` (PAN-3857).
    */
   model?: string | null;
   harness?: RuntimeName | null;

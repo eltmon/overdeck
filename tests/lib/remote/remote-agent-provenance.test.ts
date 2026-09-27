@@ -169,6 +169,31 @@ describe('remote agent provenance', () => {
     await expect(readAutoSpawnOnFinalizeFlagAsync('PAN-3113')).resolves.toBe(false);
   });
 
+  it('applies the consent work model when a consent-bearing remote spawn sends no model (PAN-3022)', async () => {
+    const { writeAutoSpawnOnFinalizeFlag } = await import('../../../src/lib/planning/auto-spawn-consent.js');
+    const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-3115', true, { workModel: 'claude-opus-5-5' });
+
+    const state = await spawnRemoteAgent({
+      issueId: 'PAN-3115',
+      workspace: {
+        id: 'remote-pan-3115',
+        issue: 'PAN-3115',
+        provider: 'fly',
+        vmName: 'pan-3115-vm',
+        urls: {},
+        created: new Date('2026-07-26T00:00:00.000Z'),
+        location: 'remote',
+      },
+      startedBy: 'flywheel:RUN-42',
+      autoSpawnConsentRequired: true,
+      tier: 'ephemeral',
+    });
+
+    expect(mocks.determineModelCalls).toEqual([{ model: 'claude-opus-5-5', role: 'work' }]);
+    expect(state.model).toBe('claude-opus-5-5');
+  });
+
   it('exports provenance in the direct remote command without a prompt', async () => {
     const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
     await spawnRemoteAgent({
