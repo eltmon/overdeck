@@ -45,6 +45,21 @@ const TAIL_BUDGET = 15_000;
 const TITLE_TRANSCRIPT_BUDGET = 8_000;
 const TITLE_HEAD_BUDGET = 2_500;
 const TITLE_TAIL_BUDGET = 5_000;
+/** When a compaction summary is present, how much of it to keep for the About drawer. */
+const ABOUT_SUMMARY_BUDGET = 14_000;
+/** ...and for title generation, which needs far less context. */
+const TITLE_SUMMARY_BUDGET = 4_000;
+/** Post-summary turns budget for title generation. */
+const TITLE_RECENT_BUDGET = 3_500;
+
+/** Fixed label preceding the compaction summary section of a serialized transcript. */
+export const COMPACT_SUMMARY_LABEL = 'Summary of earlier context (written when the conversation was compacted):';
+/** Fixed label preceding the post-summary turns section. */
+export const RECENT_TURNS_LABEL = 'Recent turns after the summary:';
+/** Prefix marker when post-summary turns had to be trimmed to fit budget. */
+export const RECENT_OMITTED_MARKER = '[… earlier turns after the summary omitted for length …]';
+/** Prefix of the fixed continuation preamble paragraph written before a compaction summary; stripped before serializing since it carries no topic information. */
+const CONTINUATION_PREAMBLE_PREFIX = 'This session is being continued from a previous conversation';
 
 const TITLE_SCHEMA = {
   type: 'object',
@@ -58,21 +73,23 @@ const ABOUT_SCHEMA = {
   required: ['summary'],
 } as const;
 
-type TranscriptMessage = Pick<ChatMessage, 'role' | 'text'>;
+type TranscriptMessage = Pick<ChatMessage, 'role' | 'text' | 'sequence'>;
 
-/**
- * Render parsed conversation messages into a compact plain-text transcript
- * suitable for a summarization prompt.
- *
- * Tool calls/results are intentionally excluded — the parsed `messages` array
- * already holds only conversational text (tool activity lives in `workLog`).
- * Over-budget transcripts keep the head and tail so both the original intent
- * and the latest direction survive.
- */
-export function serializeConversationTranscript(
-  messages: ReadonlyArray<TranscriptMessage>,
-): string {
-  const rendered = messages
+/** A compaction summary record to prepend when serializing a transcript. */
+export interface TranscriptCompactSummary {
+  text: string;
+  sequence: number;
+}
+
+export interface SerializeTranscriptOptions {
+  /** The latest compaction summary, if any. Omitted/null means no-summary behavior. */
+  compactSummary?: TranscriptCompactSummary | null;
+  /** Which artifact this serialization feeds — narrows the summary/recent-turns budgets. Defaults to 'about'. */
+  purpose?: 'about' | 'title';
+}
+
+function renderTurns(messages: ReadonlyArray<TranscriptMessage>): string[] {
+  return messages
     .filter((m) => m.role !== 'system' && typeof m.text === 'string' && m.text.trim().length > 0)
     .map((m) => {
       const speaker = m.role === 'user' ? 'User' : 'Assistant';
@@ -82,14 +99,71 @@ export function serializeConversationTranscript(
       }
       return `${speaker}: ${text}`;
     });
+}
 
-  const joined = rendered.join('\n\n');
-  if (joined.length <= TRANSCRIPT_BUDGET) {
-    return joined;
+/** Strip the fixed continuation preamble paragraph (up to its first blank line) — it carries no topic information. */
+function stripContinuationPreamble(text: string): string {
+  if (!text.startsWith(CONTINUATION_PREAMBLE_PREFIX)) return text;
+  const blankLineIndex = text.indexOf('\n\n');
+  return blankLineIndex === -1 ? text : text.slice(blankLineIndex + 2);
+}
+
+function capSummaryText(text: string, budget: number): string {
+  return text.length <= budget ? text : `${text.slice(0, budget)}…`;
+}
+
+/**
+ * Render parsed conversation messages into a compact plain-text transcript
+ * suitable for a summarization prompt.
+ *
+ * Tool calls/results are intentionally excluded — the parsed `messages` array
+ * already holds only conversational text (tool activity lives in `workLog`).
+ * Over-budget transcripts keep the head and tail so both the original intent
+ * and the latest direction survive.
+ *
+ * When `options.compactSummary` is set, the output instead puts the (capped)
+ * compaction summary first under `COMPACT_SUMMARY_LABEL`, followed by only
+ * the turns after the summary's sequence under `RECENT_TURNS_LABEL` — turns
+ * already covered by the summary are dropped rather than re-included. Without
+ * a summary, output is byte-identical to the pre-existing head/tail behavior.
+ */
+export function serializeConversationTranscript(
+  messages: ReadonlyArray<TranscriptMessage>,
+  options?: SerializeTranscriptOptions,
+): string {
+  const compactSummary = options?.compactSummary;
+  if (!compactSummary) {
+    const joined = renderTurns(messages).join('\n\n');
+    if (joined.length <= TRANSCRIPT_BUDGET) {
+      return joined;
+    }
+    const head = joined.slice(0, HEAD_BUDGET);
+    const tail = joined.slice(joined.length - TAIL_BUDGET);
+    return `${head}\n\n[… middle of the conversation omitted for length …]\n\n${tail}`;
   }
-  const head = joined.slice(0, HEAD_BUDGET);
-  const tail = joined.slice(joined.length - TAIL_BUDGET);
-  return `${head}\n\n[… middle of the conversation omitted for length …]\n\n${tail}`;
+
+  const purpose = options?.purpose ?? 'about';
+  const strippedSummary = stripContinuationPreamble(compactSummary.text.trim());
+  const summaryBudget = purpose === 'title' ? TITLE_SUMMARY_BUDGET : ABOUT_SUMMARY_BUDGET;
+  const summarySection = `${COMPACT_SUMMARY_LABEL}\n${capSummaryText(strippedSummary, summaryBudget)}`;
+
+  const recentMessages = messages.filter((m) => m.sequence === undefined || m.sequence > compactSummary.sequence);
+  const recentJoined = renderTurns(recentMessages).join('\n\n');
+  const recentBudget = purpose === 'title'
+    ? TITLE_RECENT_BUDGET
+    : Math.max(0, TRANSCRIPT_BUDGET - summarySection.length);
+
+  let recentSection = recentJoined;
+  if (recentJoined.length > recentBudget) {
+    const tail = recentJoined.slice(recentJoined.length - recentBudget);
+    recentSection = `${RECENT_OMITTED_MARKER}\n\n${tail}`;
+  }
+
+  const parts = [summarySection];
+  if (recentSection) {
+    parts.push(`${RECENT_TURNS_LABEL}\n${recentSection}`);
+  }
+  return parts.join('\n\n');
 }
 
 /** Strip quotes, collapse whitespace, and keep the first line of a model-produced title. */
