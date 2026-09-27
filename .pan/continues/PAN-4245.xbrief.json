@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4245",
   "created": "2026-09-27T08:41:51.604Z",
-  "updated": "2026-09-27T09:45:22.495Z",
+  "updated": "2026-09-27T09:45:33.192Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "title-refinement-passes-summary.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T09:45:22.495Z"
+    },
+    "retitle-about-pass-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:45:33.192Z"
     }
   }
 }
