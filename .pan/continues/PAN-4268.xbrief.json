@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4268",
   "created": "2026-09-27T15:53:42.673Z",
-  "updated": "2026-09-27T16:45:12.268Z",
+  "updated": "2026-09-27T16:45:28.518Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,10 @@
     "docs-selector-check.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T16:45:12.268Z"
+    },
+    "pane-key-sender.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:45:28.518Z"
     }
   }
 }
