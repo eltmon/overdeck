@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4266",
+  "created": "2026-09-27T15:20:14.982Z",
+  "updated": "2026-09-27T15:20:14.982Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "clipped-scroll-reset": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:20:14.982Z"
+    }
+  }
+}
