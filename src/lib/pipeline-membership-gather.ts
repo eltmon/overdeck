@@ -14,10 +14,7 @@ import type { MembershipUnavailableReason } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
 import type { ForgeType } from './forge.js';
-import {
-  listIssuesWithAnyLabel,
-  listOpenIssuesWithLabels,
-} from './github-app.js';
+import { createAppFallbackIssueListers } from './pipeline-membership-app-fallback.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimit } from './concurrency.js';
 import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
 import { runGitHubGraphql } from './github-graphql-run.js';
@@ -324,9 +321,13 @@ export interface PipelineMembershipGatherDeps {
   run(command: string, args: string[], cwd?: string): Promise<string>;
 }
 
+// PAN-4264: App-backed issue listings fall back to the gh user token on a
+// repo where the App is not installed (a 404), and skip the App there for 6 h.
+const appFallbackListers = createAppFallbackIssueListers();
+
 const defaultDeps: PipelineMembershipGatherDeps = {
-  listOpenIssues: listOpenIssuesWithLabels,
-  listPhaseLabeledIssues: (owner, repo) => listIssuesWithAnyLabel(owner, repo, STALE_PIPELINE_LABELS),
+  listOpenIssues: appFallbackListers.listOpenIssues,
+  listPhaseLabeledIssues: appFallbackListers.listPhaseLabeledIssues,
   listOpenPullRequests: listOpenPullRequestsSnapshot,
   listOpenMergeRequests: listOpenGitLabMergeRequests,
   listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
