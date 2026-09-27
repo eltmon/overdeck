@@ -34,7 +34,8 @@ export type ActivitySource =
   | 'plan-finalize'
   | 'complete-planning'
   | 'start-agent'
-  | 'state-door';
+  | 'state-door'
+  | 'plan-artifacts';
 
 export interface EmitActivityOptions {
   id?: string;

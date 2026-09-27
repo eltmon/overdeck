@@ -42,7 +42,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
-import { getIssueDraftPath } from '../pan-dir/drafts.js';
+import { resolvePlanningDraftPath } from '../pan-dir/drafts.js';
 import { claudeGlobalContextFile, workspaceContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import {
@@ -263,11 +263,13 @@ ${effort === 'high'
 
 ` : '';
 
-  // Canonical PRD reference: the draft lives at `.pan/drafts/<issue-lower>.md`
-  // in the project's plan home. Reference it — never inline it; the role
-  // instructions tell the agent to read it.
-  const prdPath = projectConfig ? getIssueDraftPath(projectConfig.path, issue.identifier) : null;
-  const prdExists = prdPath !== null && existsSync(prdPath);
+  // Canonical PRD reference: the draft lives at `.pan/drafts/<issue-lower>.md`,
+  // checked in the workspace's own plan home first (where the running agent's
+  // own draft lands) and falling back to the primary checkout (a draft an
+  // earlier run already promoted there). Reference it — never inline it; the
+  // role instructions tell the agent to read it.
+  const prdPath = resolvePlanningDraftPath(workspacePath, projectConfig?.path ?? null, issue.identifier);
+  const prdExists = prdPath !== null;
   const prdReferences = prdExists
     ? `,\n      { "uri": "${prdPath}", "label": "PRD draft (.pan/drafts/${issueLower}.md)", "type": "prd" }`
     : '';
