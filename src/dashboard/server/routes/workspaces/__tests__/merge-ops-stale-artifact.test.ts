@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentMerge: vi.fn((..._args: unknown[]): string | null => null),
   enqueueMerge: vi.fn(() => 1),
   upsertMergeSet: vi.fn(),
+  storedUrl: '',
 }));
 
 vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperations: vi.fn(() => []) }));
@@ -92,7 +93,7 @@ vi.mock('../../../../../lib/merge-set.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../lib/merge-set.js')>();
   const storedSet = () => ({
     issueId: 'PAN-3668',
-    repos: [{ repoKey: 'overdeck', targetBranch: 'main', forge: 'github', artifactUrl: STALE_URL, artifactId: '3670' }],
+    repos: [{ repoKey: 'overdeck', targetBranch: 'main', forge: 'github', artifactUrl: mocks.storedUrl }],
   });
   return {
     ensureMergeSetForIssue: vi.fn(storedSet),
@@ -231,6 +232,7 @@ describe('triggerMerge with a stale stored merge-set artifact (PAN-4263)', () =>
     mocks.derivedState = 'ready';
     mocks.mergeRun = null;
     mocks.getCurrentMerge.mockReturnValue(null);
+    mocks.storedUrl = STALE_URL;
     mocks.mergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3668', headSha: HEAD_SHA, url: PR_URL } });
     mocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
     mocks.getPullRequestState.mockResolvedValue(pullRequestState());
@@ -261,5 +263,15 @@ describe('triggerMerge with a stale stored merge-set artifact (PAN-4263)', () =>
     expect(mocks.upsertMergeSet).toHaveBeenCalledWith(expect.objectContaining({
       repos: [expect.objectContaining({ repoKey: 'overdeck', artifactUrl: PR_URL, artifactId: '4251' })],
     }));
+  });
+
+  it('leaves a stored row alone when it already names the resolved PR', async () => {
+    mocks.storedUrl = `${PR_URL}/`;
+
+    const result = await triggerMerge('PAN-3668');
+
+    expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ url: PR_URL }));
+    expect(mocks.upsertMergeSet).not.toHaveBeenCalled();
   });
 });
