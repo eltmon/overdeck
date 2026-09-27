@@ -231,15 +231,10 @@ test.describe('PAN-4266 simple home page picker clipping', () => {
     await page.goto(BASE_URL);
     const home = page.locator('[data-component="simple-home-page"]');
 
-    // Implementation checkpoint (PRD WI-6): if the simple home page does not
-    // render under the stub in time, this case is skipped — the portal/clamp
-    // behavior for this trigger is otherwise identical to the Command Deck
-    // case above, and simple/TalkItThrough.test.tsx covers the component.
     try {
       await expect(home).toBeVisible({ timeout: 15_000 });
     } catch (cause) {
-      test.skip(true, `Simple home page never rendered under the stub. Page errors: ${pageErrors.join(' | ') || 'none'}. Cause: ${cause}`);
-      return;
+      throw new Error(`Simple home page never rendered under the stub. Page errors: ${pageErrors.join(' | ') || 'none'}`, { cause });
     }
 
     await freezeAnimations(page);
