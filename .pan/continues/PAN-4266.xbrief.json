@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T16:06:14.806Z",
+  "updated": "2026-09-27T16:06:25.325Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "picker-css-cleanup.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T16:06:14.806Z"
+    },
+    "picker-css-cleanup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:06:25.325Z"
     }
   }
 }
