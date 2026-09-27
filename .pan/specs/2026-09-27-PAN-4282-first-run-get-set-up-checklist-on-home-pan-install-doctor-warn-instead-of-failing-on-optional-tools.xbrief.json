@@ -1,0 +1,718 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T23:46:24Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4282: First-run 'Get set up' checklist on Home; pan install/doctor warn instead of failing on optional tools",
+    "updated": "2026-09-27T23:46:26.968Z"
+  },
+  "plan": {
+    "id": "pan-4282",
+    "title": "First-run 'Get set up' checklist on Home; pan install/doctor warn instead of failing on optional tools",
+    "status": "proposed",
+    "uid": "34017a49-f253-4291-9492-5f12de67f403",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-27T23:46:24Z",
+    "updated": "2026-09-27T23:46:26.968Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4282",
+        "label": "PAN-4282",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4280#issuecomment-5860876536",
+        "label": "Type-and-go shared PRD",
+        "type": "reference"
+      }
+    ],
+    "tags": [
+      "onboarding",
+      "first-run",
+      "dashboard",
+      "cli",
+      "prerequisites"
+    ],
+    "narratives": {
+      "Problem": "A fresh Mac cannot finish `pan install` without Docker running and ast-grep present, and tmux is marked required by install, doctor and the dashboard catalog even though Herdr is the default backend. Neither doctor nor the dashboard checks whether Claude or gh is logged in, and Home has no friendly first-run checklist; the only surface is an alarming banner that appears when a required tool is missing.",
+      "Proposal": "Add memoized first-run probes (Claude login, gh auth status, host backend) in src/lib/first-run-checks.ts; make tmux/Herdr required flags follow the host backend; extend GET /api/prerequisites with auth, backend and memory (from the existing system-health snapshot) and ?refresh=1; render a dismissible, never-blocking 'Get set up' card on both Homes (banner hidden on Home); move the pan install gate and the doctor core/login rows into small pure modules that forgive Docker, ast-grep and (under Herdr) tmux with warnings; update quickstart, CLI and terminal-backend docs. Full detail in .pan/drafts/pan-4282.md.",
+      "NonGoals": "- Changing memory governor thresholds (PAN-4267)\n- Moving ad-hoc/plain terminals from tmux to Herdr\n- Running any install from the dashboard\n- The Home composer, No-project deck and UI-mode default (#4280)\n- The Add-project dialog and Smart field (#4281)\n- An onboarding wizard or sidebar checklist modal\n- GitLab, Linear or Jira auth checks\n- Removing SetupChecklistBanner from non-Home tabs\n- Adding a new HTTP route"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Mount the card independently of #4280: after </header> on Advanced Home and after <TalkItThrough /> on Simple Home (after <HomeComposer> if #4280 has landed).",
+        "rationale": "The issue says the card goes under the composer, but the composer is #4280's and not merged; a one-line insert keeps this slice independently shippable and the rebase trivial."
+      },
+      {
+        "summary": "Claude login counts as a required card row; gh login, Docker, tmux-under-Herdr and memory are informational. A backend (Herdr) row is added to the card.",
+        "rationale": "An installed but logged-out Claude cannot start agents, and without a backend row a Mac missing Herdr would see nothing on Home once the banner is hidden there."
+      },
+      {
+        "summary": "Extract doctor rows into src/cli/commands/doctor-first-run.ts and the install gate into src/cli/commands/install-prereqs.ts instead of growing doctor.ts and adding an allowlist row.",
+        "rationale": "doctor.ts is at its 1034-line ceiling; pure modules are testable without importing inquirer/ora and follow the existing doctor-*.ts pattern."
+      },
+      {
+        "summary": "checkSystemPrerequisites takes an optional { backend } and defaults to hostTerminalBackendName(); required is computed at report time.",
+        "rationale": "Keeps existing callers working and lets tests pin the backend."
+      },
+      {
+        "summary": "Report composition lives in a new routes/misc/prerequisites-report.ts with injected deps; memory comes from getSystemHealthSnapshot() and is null unless fresh.",
+        "rationale": "Resolves the issue's implementation checkpoint (the spawn route uses the same getter) and makes the report shape unit-testable."
+      },
+      {
+        "summary": "Banner and card share queryKey ['prerequisites']; Re-check writes the refreshed report into the cache with setQueryData.",
+        "rationale": "Prevents the two surfaces from disagreeing after a re-check."
+      },
+      {
+        "summary": "Tests go to src/lib/__tests__/system-prerequisites.test.ts and tests/unit/cli/doctor-first-run.test.ts rather than the paths named in the issue.",
+        "rationale": "The issue's paths do not exist (tests/unit/lib/system-prerequisites.test.ts, tests/unit/cli/doctor.test.ts); the real test file and the new module are the right homes."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "24 files across lib, dashboard server, frontend, CLI and docs; each item is a small vertical slice with its own test, and the slices share one report contract so they belong to one issue (the parent PRD already split the program into three issues).",
+      "canonicalFilename": "2026-09-27-PAN-4282-first-run-get-set-up-checklist-on-home-pan-install-doctor-warn-instead-of-failing-on-optional-tools.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "first-run-checks",
+        "title": "Add src/lib/first-run-checks.ts with memoized Claude, gh and host-backend probes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4282",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/first-run-checks.ts",
+            "tests/unit/lib/first-run-checks.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/first-run-checks.test.ts",
+            "npm run typecheck",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "first-run-checks.test.ts passes",
+            "typecheck completes without errors",
+            "effect facade ratchet passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "prereq-report-route",
+            "doctor-first-run"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item A exactly: exports checkClaudeLogin, checkGhLogin, checkHostBackend, resetFirstRunCheckMemo and the three result interfaces. checkGhLogin uses promisify(execFile)('gh',['auth','status'],{timeout:5000}) (ENOENT => installed:false). checkClaudeLogin wraps Effect.runPromise(getClaudeAuthStatus()) with ok = (loggedIn && !expired) || hasAnthropicApiKey. checkHostBackend uses hostTerminalBackendName() and probeHerdrAvailability(); under tmux it trusts options.tmuxFound. A 60 s promise memo per check, bypassed by {force:true}, entry deleted on rejection. No execSync. Tests per PRD item A, fake timers only around Date.now with execFile mocked."
+        },
+        "items": [
+          {
+            "id": "first-run-checks.ac1",
+            "title": "Given execFile for `gh auth status` resolves, when checkGhLogin() runs, then it returns { installed: true, ok: true }; a non-zero exit returns { installed: true, ok: false }; an ENOENT error returns { installed: false, ok: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "first-run-checks.ac2",
+            "title": "Given a gh probe ran less than 60 s ago, when checkGhLogin() is called again, then execFile is not invoked a second time; after the clock advances 60 001 ms or with { force: true } it probes again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "first-run-checks.ac3",
+            "title": "Given getClaudeAuthStatus reports loggedIn:true, expired:false, when checkClaudeLogin() runs, then it returns ok:true; expired without ANTHROPIC_API_KEY returns ok:false; API key only returns ok:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "first-run-checks.ac4",
+            "title": "Given the host backend is herdr, when checkHostBackend() runs, then available and reason are copied from probeHerdrAvailability()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prereq-backend-required",
+        "title": "Compute tmux/Herdr required flags from the host backend in system-prerequisites.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-prerequisites.ts",
+            "src/lib/__tests__/system-prerequisites.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/system-prerequisites.test.ts src/lib/acp/__tests__/kimi.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "system-prerequisites.test.ts and kimi.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item B (decisions D2, D3): add the herdr catalog entry (install hint `pan install`, versionArgs ['--version']), update the tmux purpose, add exported requiredFor(definition, backend), and an optional { backend } options argument to checkSystemPrerequisite and checkSystemPrerequisites that defaults to await hostTerminalBackendName(). allRequiredFound uses the computed flag. Update the two existing tests that rely on tmux being required to pass { backend: 'tmux' }; add the herdr/tmux cases from the PRD. If importing select.js statically creates a load cycle, import it lazily inside the function."
+        },
+        "items": [
+          {
+            "id": "prereq-backend-required.ac1",
+            "title": "Given backend 'herdr', when checkSystemPrerequisites runs with tmux missing, then the tmux check has required:false, the herdr check has required:true, and allRequiredFound is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-backend-required.ac2",
+            "title": "Given backend 'tmux', when checkSystemPrerequisites runs with tmux missing, then the tmux check has required:true and allRequiredFound is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-backend-required.ac3",
+            "title": "Given the catalog, when the install-hint test iterates PREREQUISITES, then the herdr entry returns `pan install` for linux, mac and win",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prereq-report-route",
+        "title": "Extend GET /api/prerequisites with auth, backend and memory via a new report module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4282",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/prerequisites-report.ts",
+            "src/dashboard/server/routes/misc/meta.ts",
+            "tests/unit/dashboard/prerequisites-report.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/prerequisites-report.test.ts",
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "prerequisites-report.test.ts passes",
+            "typecheck completes without errors",
+            "build completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "get-set-up-card"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item C (decisions D4, D5, D6). New module exports buildPrerequisitesReport({ refresh }, deps?) with injectable checkPrerequisites, checkClaudeLogin, checkGhLogin, checkHostBackend and getHealth (default: dynamic import of getSystemHealthSnapshot from services/system-health-service.js). memory = { availableGb, warnGb, low } rounded to one decimal from summary.availableMemoryBytes and thresholds.memoryAvailableWarningBytes; null when freshness.status !== 'fresh' or the getter throws. meta.ts handler becomes Effect.gen reading ?refresh=1 with `new URL(request.url, 'http://localhost')` (same as meta.ts /api/metrics/tasks). No new route, so no no-loss-matrix row."
+        },
+        "items": [
+          {
+            "id": "prereq-report-route.ac1",
+            "title": "Given a fresh health snapshot with 8 GiB available and a 4 GiB warning threshold, when buildPrerequisitesReport runs, then memory equals { availableGb: 8, warnGb: 4, low: false }; at 3 GiB low is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-report-route.ac2",
+            "title": "Given the health snapshot freshness is 'measuring' or the getter throws, when buildPrerequisitesReport runs, then memory is null and auth, backend and checks are still returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-report-route.ac3",
+            "title": "Given refresh:true, when buildPrerequisitesReport runs, then all three first-run checks receive force:true; with refresh:false they receive force:false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prereq-report-route.ac4",
+            "title": "Given a dashboard built from this branch after the first fresh health sample, when `curl -s localhost:3011/api/prerequisites | jq '.auth, .backend, .memory'` runs, then it prints three non-null objects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "get-set-up-card",
+        "title": "Add the GetSetUpCard component and its Simple-mode copy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/home/GetSetUpCard.tsx",
+            "src/dashboard/frontend/src/components/home/__tests__/GetSetUpCard.test.tsx",
+            "src/dashboard/frontend/src/lib/simple/strings.ts",
+            "src/dashboard/frontend/src/components/SetupChecklistBanner.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/home/__tests__/GetSetUpCard.test.tsx src/lib/__tests__/simple-foundations.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "GetSetUpCard.test.tsx and simple-foundations.test.ts pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item D (decisions D7, D8, D10). Add SIMPLE_STRINGS.setup exactly as listed; fix the strings.ts header comment to name simple-foundations.test.ts. Advanced copy is ADVANCED_SETUP_STRINGS in the card file. Export CopyableCommand and installHintFor from SetupChecklistBanner.tsx and reuse them (do not duplicate). The card uses queryKey ['prerequisites']; Re-check fetches /api/prerequisites?refresh=1 and calls queryClient.setQueryData. Required rows = required catalog checks + backend.available + auth.claude.ok. Hide writes localStorage 'overdeck:get-set-up-dismissed'='1' (try/catch). Tolerate a report without auth/backend/memory. Follow pan-style-guide (no pills, no Inter, no decorative color)."
+        },
+        "items": [
+          {
+            "id": "get-set-up-card.ac1",
+            "title": "Given a report with auth.gh = { installed: true, ok: false }, when the card renders and the user clicks its Set up button, then 'Connect GitHub' and the command `gh auth login` are shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-set-up-card.ac2",
+            "title": "Given the card is rendered, when the user clicks Re-check, then fetch is called with '/api/prerequisites?refresh=1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-set-up-card.ac3",
+            "title": "Given localStorage overdeck:get-set-up-dismissed=1 and every required row passing (gh logged out), when the card renders, then it renders nothing; with auth.claude.ok false it renders the card",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-set-up-card.ac4",
+            "title": "Given memory = { availableGb: 3, warnGb: 4, low: true }, when the card renders, then it shows 'Free memory: 3 GB' and 'New agents may wait for memory to free up.'; with memory null the memory row is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-set-up-card.ac5",
+            "title": "Given the new SIMPLE_STRINGS.setup entries, when simple-foundations.test.ts runs, then no banned word is reported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner-hide-home",
+        "title": "Hide SetupChecklistBanner on the Home tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SetupChecklistBanner.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/components/SetupChecklistBanner.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/SetupChecklistBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SetupChecklistBanner.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item E (decision D11): SetupChecklistBanner takes an optional activeTab?: Tab prop and returns null when it is 'home' (early return placed after the hooks). AppChrome passes activeTab={activeTab} and its comment says Home shows the Get set up card instead. Add one test case."
+        },
+        "items": [
+          {
+            "id": "banner-hide-home.ac1",
+            "title": "Given tmux is reported missing and required, when SetupChecklistBanner renders with activeTab='home', then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-hide-home.ac2",
+            "title": "Given the same report, when SetupChecklistBanner renders with activeTab='command-deck', then the 'Finish setting up Overdeck' banner renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-mount-card",
+        "title": "Mount GetSetUpCard on Advanced and Simple Home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/HomePage.tsx",
+            "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/simple-foundations.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "simple-foundations.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item F (decision D12): one inserted JSX line per file. HomePage.tsx: <GetSetUpCard /> directly after </header>. SimpleHomePage.tsx: <div className=\"mt-6\"><GetSetUpCard /></div> directly after <TalkItThrough />. If #4280 has already replaced TalkItThrough with HomeComposer, insert directly after <HomeComposer .../> instead."
+        },
+        "items": [
+          {
+            "id": "home-mount-card.ac1",
+            "title": "Given the branch, when `grep -c \"<GetSetUpCard\" src/dashboard/frontend/src/pages/HomePage.tsx src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx` runs, then it prints 1 for each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-mount-card.ac2",
+            "title": "Given the Advanced Home is opened in an isolated Playwright browser with a report where gh is logged out, when the page loads, then the 'Get set up' card renders directly below the System briefing header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-mount-card.ac3",
+            "title": "Given the Simple Home is opened in an isolated Playwright browser, when the page loads, then the 'Get set up' card renders directly below the composer and uses Simple copy ('Connect GitHub')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-gate",
+        "title": "pan install gate warns instead of failing on Docker, ast-grep and (under Herdr) tmux",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/install-prereqs.ts",
+            "src/cli/commands/install.ts",
+            "tests/unit/cli/install-prereqs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/install-prereqs.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "install-prereqs.test.ts passes",
+            "typecheck completes without errors",
+            "file-size lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-23"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item G (decision D14). New pure module install-prereqs.ts exports PrereqResult, forgivenPrereqNames(backend) and evaluatePrereqGate(results, backend, platform?) -> { allPassed, warnings }. install.ts imports PrereqResult from it, checkPrerequisites(herdr, backend) spreads evaluatePrereqGate, installCommand awaits hostTerminalBackendName() (import from ../../lib/terminal-backends/select.js), and printPrereqStatus prints a yellow ⚠ for forgiven failures plus each warning line in yellow. Later install steps already tolerate Docker down (Step 3 try/catch warn, Step 6 file writes only); do not change them."
+        },
+        "items": [
+          {
+            "id": "install-gate.ac1",
+            "title": "Given Docker reports 'not running' and every other prerequisite passed under backend herdr, when evaluatePrereqGate runs, then allPassed is true and warnings contain 'Docker not running — workspace containers are unavailable until it starts.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-gate.ac2",
+            "title": "Given only ast-grep failed, when evaluatePrereqGate runs, then allPassed is true and warnings contain 'ast-grep missing — will be installed later.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-gate.ac3",
+            "title": "Given tmux failed, when evaluatePrereqGate runs under backend herdr, then allPassed is true and a warning mentions plain terminals; under backend tmux allPassed is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-gate.ac4",
+            "title": "Given Git failed, when evaluatePrereqGate runs under either backend, then allPassed is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-first-run",
+        "title": "pan doctor: tmux warns under Herdr and Claude/gh login rows, via doctor-first-run.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-first-run.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/cli/doctor-first-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/doctor-first-run.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "doctor-first-run.test.ts passes",
+            "typecheck completes without errors",
+            "file-size lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-24"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item H (decision D9). New module doctor-first-run.ts (re-declares CheckResult like doctor-herdr.ts) exports checkCoreCommands({ backend, has }) and checkFirstRunLogins({ claudeLogin, ghLogin, has }). doctor.ts replaces the requiredCommands array+loop with one checkCoreCommands call (backend from hostTerminalBackendName()) and adds checkFirstRunLogins after the optional-commands loop. doctor.ts must end at or below 1034 lines; otherwise add `<lines> src/cli/commands/doctor.ts # PAN-4282` to scripts/file-size-allowlist.txt in the same commit."
+        },
+        "items": [
+          {
+            "id": "doctor-first-run.ac1",
+            "title": "Given has('tmux') is false and backend is herdr, when checkCoreCommands runs, then the tmux row has status 'warn'; with backend tmux it has status 'error'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-first-run.ac2",
+            "title": "Given ghLogin resolves { installed: true, ok: false }, when checkFirstRunLogins runs, then a 'GitHub login' row with status 'warn' and a fix containing `gh auth login` is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-first-run.ac3",
+            "title": "Given claudeLogin resolves ok:true, when checkFirstRunLogins runs, then a 'Claude login' row with status 'ok' is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-first-run.ac4",
+            "title": "Given the branch, when `bash scripts/lint-file-size.sh` runs, then it exits 0 with doctor.ts at or below its allowlist ceiling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-first-run",
+        "title": "Document the relaxed install/doctor prerequisites and the Get set up card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4282",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "quickstart.mdx",
+            "cli/core-commands.mdx",
+            "configuration/terminal-backend.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"the only prerequisite\" quickstart.mdx || true",
+            "grep -n \"Get set up\" quickstart.mdx",
+            "grep -n \"warning, not an error\" cli/core-commands.mdx"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing",
+            "second and third greps each print a match"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-25"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item I. quickstart.mdx Requirements: replace 'the only prerequisite' with the required/optional list and the Get set up card sentence. cli/core-commands.mdx: pan install paragraph on which prerequisites fail vs warn; pan doctor list says 'tmux installation (a warning, not an error, when Herdr is the terminal backend)' and adds Claude Code / GitHub CLI login state. configuration/terminal-backend.mdx: one sentence that under Herdr tmux is optional and only plain dashboard terminals need it."
+        },
+        "items": [
+          {
+            "id": "docs-first-run.ac1",
+            "title": "Given quickstart.mdx, when `grep -n \"the only prerequisite\" quickstart.mdx` runs, then it prints nothing, and `grep -n \"Get set up\" quickstart.mdx` prints a line naming the Home card",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-first-run.ac2",
+            "title": "Given cli/core-commands.mdx, when `grep -n \"warning, not an error\" cli/core-commands.mdx` runs, then it prints the pan doctor tmux line, and the pan install section states Docker and ast-grep print a warning and installation continues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-first-run.ac3",
+            "title": "Given configuration/terminal-backend.mdx, when a reader opens the pan install section, then it states tmux is optional under Herdr and only plain dashboard terminals need it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "first-run-checks",
+        "to": "prereq-report-route",
+        "type": "blocks"
+      },
+      {
+        "from": "prereq-backend-required",
+        "to": "prereq-report-route",
+        "type": "blocks"
+      },
+      {
+        "from": "first-run-checks",
+        "to": "doctor-first-run",
+        "type": "blocks"
+      },
+      {
+        "from": "get-set-up-card",
+        "to": "banner-hide-home",
+        "type": "blocks"
+      },
+      {
+        "from": "get-set-up-card",
+        "to": "home-mount-card",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
