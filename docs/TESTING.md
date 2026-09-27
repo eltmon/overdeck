@@ -102,6 +102,23 @@ the focused file with `--detectAsyncLeaks` to verify that no work remains after
 the test finishes. Do not disable unhandled-error reporting or reduce the
 repository's two-worker CI concurrency to hide a leak.
 
+### Real-process fixtures
+
+A fixture that spawns a real child process to stand in for a target state
+(exited, zombie, alive) must construct that state deterministically instead of
+racing it. A zombie, in particular, must be built by killing the long-lived
+child only *after* its parent has exec'd into a process that will never reap
+it — never by racing a background process's own exit against the parent's
+exec, which vanishes the pid before `ps` can observe it under load (PAN-4244).
+
+Poll a real process's state against a wall-clock deadline, never an unbounded
+loop. On timeout, throw an error that names the pid, the phase that stalled,
+and the last observed state — a bare "timed out" gives the next debugger
+nothing to go on. Pace the polling with `setImmediate`, not `setTimeout`: the
+fixture should run to completion before the test calls `vi.useFakeTimers()`,
+and `setImmediate` avoids getting caught by a fake clock if that ordering ever
+shifts.
+
 ## Dashboard UI Testing
 
 ### Playwright MCP
