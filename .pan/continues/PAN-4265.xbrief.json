@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4265",
   "created": "2026-09-27T15:21:17.185Z",
-  "updated": "2026-09-27T15:21:17.185Z",
+  "updated": "2026-09-27T15:22:16.752Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "change-summary": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4265",
-      "claimedAt": "2026-09-27T15:21:17.185Z"
+      "claimedAt": "2026-09-27T15:21:17.185Z",
+      "doneAt": "2026-09-27T15:22:16.752Z"
     }
   }
 }
