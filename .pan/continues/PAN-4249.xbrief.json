@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4249",
   "created": "2026-09-27T09:56:17.310Z",
-  "updated": "2026-09-27T10:07:41.876Z",
+  "updated": "2026-09-27T10:07:52.431Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4249",
       "claimedAt": "2026-09-27T10:02:17.327Z",
       "doneAt": "2026-09-27T10:07:41.875Z"
+    },
+    "effort-support-leaf": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:07:52.430Z"
     }
   }
 }
