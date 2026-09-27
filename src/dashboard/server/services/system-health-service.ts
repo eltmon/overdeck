@@ -34,8 +34,10 @@ import { createHostHealthCollector } from '../../../lib/system-health/collector.
 import { evaluateHostPressure } from '../../../lib/system-health/evaluate.js';
 import {
   computeDarwinAvailableMemoryBytes,
+  parseDarwinPressureLevel,
   parseDarwinSwapUsage,
   parseDarwinVmStat,
+  type DarwinMemoryPressureLevel,
 } from '../../../lib/system-health/darwin.js';
 import {
   createSystemHealthSampler,
@@ -82,6 +84,10 @@ export interface ProcMemorySnapshot {
   commitLimit: number;
   psiSomeAvg10: number | null;
   psiFullAvg10: number | null;
+  /** PAN-4267: macOS's own kernel pressure level — the governor's macOS stall signal. */
+  macPressureLevel: DarwinMemoryPressureLevel | null;
+  /** PAN-4267: macOS allocates swap on demand, so a low free-swap share isn't pressure there. */
+  swapGrowsOnDemand: boolean;
 }
 
 export function parseMemoryPsi(content: string): {
@@ -350,6 +356,8 @@ async function readProcMemoryLinux(): Promise<ProcMemorySnapshot> {
     commitLimit: values.get('CommitLimit') ?? 0,
     psiSomeAvg10,
     psiFullAvg10,
+    macPressureLevel: null,
+    swapGrowsOnDemand: false,
   };
 }
 
@@ -389,6 +397,15 @@ async function readProcMemoryDarwin(): Promise<ProcMemorySnapshot> {
     }
   } catch { /* swap stats unavailable */ }
 
+  // PAN-4267: the kernel's own pressure level is the governor's macOS stall
+  // signal — macOS swap is allocated on demand, so a low free-swap share on
+  // its own is not pressure (see swapGrowsOnDemand in memory-governor.ts).
+  let macPressureLevel: DarwinMemoryPressureLevel | null = null;
+  try {
+    const { stdout } = await execAsync('sysctl -n kern.memorystatus_vm_pressure_level', { encoding: 'utf-8', timeout: 5_000 });
+    macPressureLevel = parseDarwinPressureLevel(stdout);
+  } catch { /* kern.memorystatus_vm_pressure_level is unavailable or timed out */ }
+
   return {
     memTotal,
     memAvailable,
@@ -399,6 +416,8 @@ async function readProcMemoryDarwin(): Promise<ProcMemorySnapshot> {
     commitLimit: 0,
     psiSomeAvg10: null,
     psiFullAvg10: null,
+    macPressureLevel,
+    swapGrowsOnDemand: true,
   };
 }
 
