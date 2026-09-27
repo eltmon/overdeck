@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T16:04:39.100Z",
+  "updated": "2026-09-27T16:04:49.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "floating-position-hook.ac5": {
       "status": "completed",
       "doneAt": "2026-09-27T16:04:39.100Z"
+    },
+    "model-picker-portal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:04:49.644Z"
     }
   }
 }
