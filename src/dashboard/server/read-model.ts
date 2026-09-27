@@ -390,6 +390,8 @@ export const ReadModelServiceLive = Layer.effect(
         // snapshot on connect and from restart_gate.changed events after that
         // — the frontend never polls the gate endpoints.
         restartGate: state.restartGate ?? undefined,
+        // PAN-4264: GitHub quota view, pushed by github_quota.changed (emitOnly).
+        githubQuota: state.githubQuota ?? undefined,
         // PAN-3751: in-flight deploys, derived server-side from runtime files.
         deployByProjectKey: state.deployByProjectKey,
         timestamp: new Date().toISOString(),

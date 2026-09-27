@@ -19,6 +19,7 @@ import {
   WaitingReason,
 } from "./types"
 import { DerivedIssueState } from "./derived-issue-state"
+import { GitHubQuotaSnapshot } from "./github-quota"
 import { PullRequestLink } from "./pull-request-links"
 import { BackendPane } from "./backend-pane"
 import {
@@ -127,6 +128,22 @@ export const RestartGateChangedEvent = Schema.Struct({
   payload: RestartGateSnapshot,
 })
 export type RestartGateChangedEvent = typeof RestartGateChangedEvent.Type
+
+/**
+ * The GitHub API quota view changed (PAN-4264).
+ *
+ * The payload is the complete snapshot, so the reducer is a plain replace.
+ * The server derives it from the quota ledger and pause file under
+ * `~/.overdeck/github-quota/` and emits it in-memory only, like
+ * `restart_gate.changed`: it is never persisted and never replayed at boot.
+ */
+export const GitHubQuotaChangedEvent = Schema.Struct({
+  type: Schema.Literal("github_quota.changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: GitHubQuotaSnapshot,
+})
+export type GitHubQuotaChangedEvent = typeof GitHubQuotaChangedEvent.Type
 
 /**
  * The set of in-flight project deploys changed (PAN-3751).
@@ -1518,6 +1535,7 @@ export const DomainEvent = Schema.Union([
   ProjectCiSuiteObservedEvent,
   ProjectCiHeadObservedEvent,
   RestartGateChangedEvent,
+  GitHubQuotaChangedEvent,
   ProjectDeployChangedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
