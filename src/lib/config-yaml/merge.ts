@@ -154,7 +154,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
     swarm: { ...DEFAULT_CONFIG.swarm },
-    context: { rules: { ...DEFAULT_CONFIG.context.rules } },
+    context: { ...DEFAULT_CONFIG.context, rules: { ...DEFAULT_CONFIG.context.rules } },
     tmux: {
       ...DEFAULT_CONFIG.tmux,
     },
@@ -287,7 +287,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   for (const config of validConfigs.reverse()) {
     if (config.swarm) result.swarm = { ...result.swarm, ...config.swarm };
     if (config.context?.rules) {
-      result.context = { rules: { ...result.context.rules, ...config.context.rules } };
+      result.context = { ...result.context, rules: { ...result.context.rules, ...config.context.rules } };
+    }
+    if (config.context?.auto_sync !== undefined) {
+      result.context = { ...result.context, autoSync: config.context.auto_sync };
     }
     // Merge providers
     if (config.models?.providers) {
