@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:20:01.087Z",
+  "updated": "2026-09-27T16:20:11.616Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "spawn-threshold-defaults.ac3": {
       "status": "completed",
       "doneAt": "2026-09-27T16:20:01.087Z"
+    },
+    "reserve-normalization.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:11.616Z"
     }
   }
 }
