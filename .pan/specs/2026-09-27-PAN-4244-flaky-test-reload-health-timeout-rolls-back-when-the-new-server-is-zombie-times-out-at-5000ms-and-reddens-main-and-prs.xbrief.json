@@ -4,17 +4,17 @@
     "created": "2026-09-27T08:36:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4244: Flaky test: reload-health-timeout zombie case times out at 5000ms",
-    "updated": "2026-09-27T08:36:54.636Z"
+    "updated": "2026-09-27T08:37:28.486Z"
   },
   "plan": {
     "id": "pan-4244",
     "title": "Flaky test: reload-health-timeout 'rolls back … when the new server is zombie' times out at 5000ms and reddens main and PRs",
-    "status": "proposed",
+    "status": "running",
     "uid": "dcf75559-4adb-40ae-8acb-66598951dbeb",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T08:36:54Z",
-    "updated": "2026-09-27T08:36:54.636Z",
+    "updated": "2026-09-27T08:37:28.486Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4244",
