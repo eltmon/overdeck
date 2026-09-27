@@ -48,8 +48,17 @@ export interface RunGhOptions {
   onSuccess?: (stdout: string) => Partial<LedgerEntry>;
 }
 
+/**
+ * `OVERDECK_GH_METERED=1` tells the agent `gh` shim (launcher-git-guard.ts)
+ * that this call is already metered, so a `pan` command run from an agent
+ * shell is not counted twice.
+ */
 function defaultExec(args: string[], options: GhExecOptions): Promise<{ stdout: string }> {
-  return execFileAsync('gh', args, { encoding: 'utf-8', ...options });
+  return execFileAsync('gh', args, {
+    encoding: 'utf-8',
+    ...options,
+    env: { ...process.env, OVERDECK_GH_METERED: '1' },
+  });
 }
 
 /** `gh api` flags that consume the following argument. */

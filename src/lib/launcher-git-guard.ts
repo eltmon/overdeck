@@ -25,9 +25,13 @@
  * absolute `/usr/bin/git` bypasses it, so does `OVERDECK_PAN_GIT_OP=1` (the
  * switch `pan`'s own git operations use), and file-system and network writes are
  * not restricted at all.
+ *
+ * The same guard directory also holds a count-only `gh` shim (PAN-4264) that
+ * records each agent `gh` call in the GitHub quota ledger and never blocks.
  */
 import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
+import { getGitHubQuotaDir } from './github-quota/ledger.js';
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
@@ -354,6 +358,49 @@ export function buildGitGuardLines(agentId: string, guardRoot: string, mode: Git
     ]),
     'EOF',
     `chmod 0755 ${shellQuote(guardPath)}`,
+    ...buildGhShimLines(agentId, guardDir),
     `export PATH="${pathForDoubleQuotes}:$PATH"`,
+  ];
+}
+
+/** Quote a value for a shim written through the launcher's unquoted heredoc. */
+function heredocShellQuote(value: string): string {
+  return shellQuote(value).replace(/[\\$`]/g, '\\$&');
+}
+
+/**
+ * PAN-4264: a count-only `gh` shim beside the git guard. Each agent `gh` call
+ * appends one line to the GitHub quota ledger (caller `agent`, estimated cost
+ * 1, outcome `unknown` because the shim `exec`s the real gh and never sees
+ * its exit status), then execs the real gh with the same arguments, so stdout,
+ * stderr and the exit code pass through untouched. It never blocks a call.
+ *
+ * The ledger directory is resolved here, at launch, and baked in as a literal:
+ * the shim never reads `$OVERDECK_HOME` at call time, so a polluted temp home
+ * in an agent shell cannot redirect agent counts. Emitted after the inherited
+ * guard dirs are dropped from PATH, so "real gh" is never another agent's shim.
+ */
+function buildGhShimLines(agentId: string, guardDir: string): string[] {
+  const ghPath = join(guardDir, 'gh');
+  const ledgerDir = heredocShellQuote(getGitHubQuotaDir());
+  const agentArg = heredocShellQuote(agentId.replace(/["\\]/g, ''));
+  return [
+    '_OVERDECK_REAL_GH="$(command -v gh 2>/dev/null || true)"',
+    'if [ -n "$_OVERDECK_REAL_GH" ]; then',
+    `cat > ${shellQuote(ghPath)} <<EOF`,
+    '#!/bin/sh',
+    '_OVERDECK_REAL_GH="$_OVERDECK_REAL_GH"',
+    '_overdeck_gh_bucket=graphql',
+    'if [ "\\$1" = "run" ] || { [ "\\$1" = "api" ] && [ "\\$2" != "graphql" ]; }; then _overdeck_gh_bucket=rest; fi',
+    // runGh sets OVERDECK_GH_METERED=1 on its own exec: that call is already
+    // in the ledger under its real caller, so the shim must not count it again.
+    'if [ "\\$OVERDECK_GH_METERED" != "1" ]; then',
+    `mkdir -p ${ledgerDir} 2>/dev/null`,
+    `printf '{"ts":"%s","pid":%s,"kind":"call","caller":"agent","agent":"%s","pool":"user","bucket":"%s","cost":1,"estimated":true,"outcome":"unknown"}\\n' "\\$(date -u +%Y-%m-%dT%H:%M:%SZ)" "\\$\\$" ${agentArg} "\\$_overdeck_gh_bucket" >> ${ledgerDir}/ledger-"\\$(date -u +%Y%m%d%H)".jsonl 2>/dev/null || true`,
+    'fi',
+    'exec "\\$_OVERDECK_REAL_GH" "\\$@"',
+    'EOF',
+    `chmod 0755 ${shellQuote(ghPath)}`,
+    'fi',
   ];
 }
