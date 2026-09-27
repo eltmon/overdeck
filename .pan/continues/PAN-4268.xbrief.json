@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4268",
   "created": "2026-09-27T15:53:42.673Z",
-  "updated": "2026-09-27T16:39:46.215Z",
+  "updated": "2026-09-27T16:39:57.248Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "selector-parser.ac5": {
       "status": "completed",
       "doneAt": "2026-09-27T16:39:46.214Z"
+    },
+    "pane-key-sender.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:39:57.248Z"
     }
   }
 }
