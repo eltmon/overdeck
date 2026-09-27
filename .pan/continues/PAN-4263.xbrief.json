@@ -1,0 +1,205 @@
+{
+  "version": "1",
+  "issueId": "PAN-4263",
+  "created": "2026-09-27T14:44:33.622Z",
+  "updated": "2026-09-27T15:23:49.604Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "lookup-failure-not-absence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:44:33.622Z",
+      "doneAt": "2026-09-27T14:45:58.574Z"
+    },
+    "open-first-selector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:46:03.658Z",
+      "doneAt": "2026-09-27T14:48:25.138Z"
+    },
+    "discover-transient-retry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:48:37.514Z",
+      "doneAt": "2026-09-27T14:49:20.258Z"
+    },
+    "gate-lookup-selector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:49:23.853Z",
+      "doneAt": "2026-09-27T14:50:18.885Z"
+    },
+    "merge-lands-fresh-pr": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:50:23.937Z",
+      "doneAt": "2026-09-27T14:52:48.841Z"
+    },
+    "specialists-done-honest-error": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:52:52.595Z",
+      "doneAt": "2026-09-27T14:55:27.295Z"
+    },
+    "deferred-verdict-replay": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:55:31.179Z",
+      "doneAt": "2026-09-27T14:59:38.017Z"
+    },
+    "docs-pipeline-gates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:59:41.998Z",
+      "doneAt": "2026-09-27T15:00:23.937Z"
+    },
+    "lookup-failure-not-absence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:17:30.527Z"
+    },
+    "lookup-failure-not-absence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:17:40.028Z"
+    },
+    "lookup-failure-not-absence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:17:49.844Z"
+    },
+    "lookup-failure-not-absence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:18:00.050Z"
+    },
+    "lookup-failure-not-absence.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:18:09.811Z"
+    },
+    "lookup-failure-not-absence.ac6": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:18:20.168Z"
+    },
+    "open-first-selector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:18:30.014Z"
+    },
+    "open-first-selector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:18:40.042Z"
+    },
+    "open-first-selector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:18:50.275Z"
+    },
+    "open-first-selector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:19:00.137Z"
+    },
+    "discover-transient-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:19:11.154Z"
+    },
+    "discover-transient-retry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:19:22.282Z"
+    },
+    "discover-transient-retry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:19:33.911Z"
+    },
+    "discover-transient-retry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:19:44.955Z"
+    },
+    "discover-transient-retry.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:19:56.251Z"
+    },
+    "gate-lookup-selector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:20:07.930Z"
+    },
+    "gate-lookup-selector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:20:19.405Z"
+    },
+    "gate-lookup-selector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:20:29.681Z"
+    },
+    "merge-lands-fresh-pr.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:20:40.759Z"
+    },
+    "merge-lands-fresh-pr.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:20:52.301Z"
+    },
+    "merge-lands-fresh-pr.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:21:04.175Z"
+    },
+    "merge-lands-fresh-pr.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:21:15.798Z"
+    },
+    "specialists-done-honest-error.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:21:26.227Z"
+    },
+    "specialists-done-honest-error.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:21:36.812Z"
+    },
+    "specialists-done-honest-error.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:21:47.598Z"
+    },
+    "specialists-done-honest-error.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:21:59.017Z"
+    },
+    "specialists-done-honest-error.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:22:10.717Z"
+    },
+    "deferred-verdict-replay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:22:22.618Z"
+    },
+    "deferred-verdict-replay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:22:33.756Z"
+    },
+    "deferred-verdict-replay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:22:44.836Z"
+    },
+    "deferred-verdict-replay.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:22:55.506Z"
+    },
+    "deferred-verdict-replay.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:23:06.415Z"
+    },
+    "docs-pipeline-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:23:16.925Z"
+    },
+    "docs-pipeline-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:23:27.511Z"
+    },
+    "docs-pipeline-gates.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:23:38.778Z"
+    },
+    "docs-pipeline-gates.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:23:49.604Z"
+    }
+  }
+}

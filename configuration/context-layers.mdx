@@ -104,9 +104,30 @@ create, edit, clean, back up, delete, or migrate native instruction Markdown.
 Historical managed regions remain until the user explicitly previews and
 applies `pan context detach --dry-run` / `pan context detach --apply`.
 
-When an Overdeck upgrade changes context, hooks, agents, or skills after your
-last sync, the dashboard shows a **Sync now** banner. Click it to run the host's
-`pan sync`; the banner clears once the installed package and sync manifest match.
+## Keeping the synced setup current
+
+`pan sync` records a digest for each sync input in `~/.overdeck/.sync-manifest.json`.
+When the dashboard compares, it ignores the directory `pan sync` ran from, so a
+sync run from any workspace or project counts.
+
+The dashboard runs the light `pan sync` itself. It checks the inputs when it
+starts, so after every `pan reload`, and again every 60 seconds, so a merge that
+changes the main checkout's `sync-sources/` is synced within about a minute. Each
+set of changes gets one attempt; a failed attempt waits until the inputs change
+again.
+
+The **Setup changed** banner appears only when auto-sync failed, ran but could not
+apply the change, or is turned off. It names what changed, for example
+"3 skills and 1 rule changed", and its tooltip lists the changed files. Click
+**Sync now** (or **Retry sync** after a failure) to run the sync by hand.
+
+To turn auto-sync off, set this in `~/.overdeck/config.yaml`. The banner then
+shows for every needed sync:
+
+```yaml
+context:
+  auto_sync: false   # default: true
+```
 
 ## Harness-specific blocks
 

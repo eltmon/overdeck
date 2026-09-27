@@ -30,6 +30,7 @@ import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { appendPipelineEntry, lastPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
 import { retryDeferredHandoffs } from './deferred-handoff.js';
+import { replayDeferredReviewVerdict } from './deferred-verdict-replay.js';
 import { recoverUndispatchedReviews } from './undispatched-review-recovery.js';
 
 export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews };
@@ -377,6 +378,14 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     if (!last) continue;
     if (last.type === 'review.halted') {
       const action = await rerequestHaltedReview(issueId, now);
+      if (action) actions.push(action);
+      continue;
+    }
+    // PAN-4263: a review verdict a transient forge failure kept off the PR.
+    // A paused issue holds it like every other review recovery.
+    if (last.type === 'review.verdict-deferred') {
+      if (getIssuePause(issueId).status !== 'unpaused') continue;
+      const action = await replayDeferredReviewVerdict(issueId, workspace.path, last, now);
       if (action) actions.push(action);
       continue;
     }

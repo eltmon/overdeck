@@ -174,4 +174,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `getRequestReviewStarter()` is always null — reach the review pipeline via
   `requestReviewThroughRoute`.
 
+- **Forge PR lookups: failure vs absence, and stale stored URLs** (PAN-4263) —
+  `discoverArtifact` (`src/lib/forge.ts`) is called without `repository` by
+  every production caller, so it always takes the `gh pr view` path, never the
+  GitHub App path. Before PAN-4263 that path swallowed gh errors
+  (`2>/dev/null || true`), so a rate limit read as "no PR". The merge path in
+  `routes/workspaces/merge-ops.ts` preferred the persisted
+  `merge_set_repos.artifact_url` over the freshly resolved PR, which can be a
+  long-closed first PR. Treat stored artifact URLs as hints, never as the PR the
+  gate judged.
+
 <!-- last-verified: 2026-09-27 -->

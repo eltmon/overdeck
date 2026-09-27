@@ -23,7 +23,7 @@ import {
   codexGlobalContextFile,
   claudeGlobalContextFile,
 } from './context-layers/index.js';
-export { isStartupSyncNeeded, writeSyncManifest } from './sync-startup-gate.js';
+export { isStartupSyncNeeded, readSyncInputStatus, writeSyncManifest } from './sync-startup-gate.js';
 export interface SyncItem {
   name: string;
   sourcePath: string;
