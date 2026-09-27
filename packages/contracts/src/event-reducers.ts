@@ -25,6 +25,7 @@ import type {
   TurnDiffSummary,
 } from './types'
 import type { DerivedIssueState } from './derived-issue-state'
+import type { GitHubQuotaSnapshot } from './github-quota'
 import type { BackendPane } from './backend-pane'
 import type {
   MemoryObservation,
@@ -124,6 +125,8 @@ export interface ReadModelState {
   ciByProjectKey: Record<string, ProjectCiSnapshot>
   /** PAN-3729 — voluntary-restart approval gate; null until the gate first reports. */
   restartGate: RestartGateSnapshot | null
+  /** PAN-4264 — GitHub API quota view; null until the publisher first reports. */
+  githubQuota: GitHubQuotaSnapshot | null
   /** PAN-3751 — in-flight deploys keyed by project key; derived, never stored. */
   deployByProjectKey: Record<string, ProjectDeploySnapshot>
   /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
@@ -173,6 +176,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   embedProgressBySessionId: {},
   ciByProjectKey: {},
   restartGate: null,
+  githubQuota: null,
   deployByProjectKey: {},
   agentIdBySessionId: {},
   dashboardLifecycle: {
@@ -349,6 +353,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     embedProgressBySessionId: snapshot.embedProgressBySessionId ?? {},
     ciByProjectKey: snapshot.ciByProjectKey ?? state.ciByProjectKey,
     restartGate: snapshot.restartGate ?? state.restartGate,
+    githubQuota: snapshot.githubQuota ?? state.githubQuota,
     deployByProjectKey: snapshot.deployByProjectKey ?? state.deployByProjectKey,
     agentIdBySessionId,
   }
@@ -773,6 +778,14 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           // notice. Dropping it here would silently starve the banner.
           ...(event.payload.lastOutcome === undefined ? {} : { lastOutcome: event.payload.lastOutcome }),
         },
+      }
+
+    // PAN-4264: the complete quota snapshot, plain replace — like the restart gate.
+    case 'github_quota.changed':
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        githubQuota: event.payload,
       }
 
     // PAN-3751: complete projection, plain replace — like the restart gate.

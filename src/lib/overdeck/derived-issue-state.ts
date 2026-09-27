@@ -72,6 +72,7 @@ import { findSpecByIssue } from '../xbrief/io.js';
 import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { inferProjectForge } from '../project-repos.js';
 import { cachedApprovalAtHead } from '../cloister/approval-at-head.js';
+import { runGh } from '../github-quota/run-gh.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -321,9 +322,11 @@ export async function listRepoPullRequests(projectPath: string): Promise<readonl
 export async function readRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[] | null> {
   return cachedRepoPullRequests(projectPath, async () => {
     try {
-      const { stdout } = await execFileAsync('gh', [
+      // PAN-4264: metered as caller pr-cache; a pause or refusal lands in the
+      // catch below and reads as "failed" (null), never as "no PRs".
+      const { stdout } = await runGh([
         'pr', 'list', '--state', 'all', '--limit', '200', '--json', GH_PR_FIELDS,
-      ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000 });
+      ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
       const rows = JSON.parse(stdout || '[]') as GhPrRow[];
       lastRepoPullRequests.set(projectPath, { rows, settledAt: Date.now() });
       return rows;

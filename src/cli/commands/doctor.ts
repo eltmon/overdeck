@@ -34,6 +34,7 @@ import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
+import { checkProjectTrackerConfig } from './doctor-project-config.js';
 import { checkHerdr } from './doctor-herdr.js';
 import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
@@ -870,6 +871,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   checks.push(await checkClosedIssueOrphanAgentDirs(getCachedIssueRowsForDoctor()));
   checks.push(checkTrackerRateLimits());
+  checks.push(checkProjectTrackerConfig());
   checks.push(checkStoppedListClassification({
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));

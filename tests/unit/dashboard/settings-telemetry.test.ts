@@ -93,6 +93,7 @@ describe('settings telemetry', () => {
       enabled: true,
       effectiveEnabled: true,
       installId: '123e4567-e89b-42d3-a456-426614174000',
+      operatorGrouping: false,
     });
   });
 
@@ -107,6 +108,16 @@ describe('settings telemetry', () => {
 
     useTelemetryConfig(false);
     expect(loadSettingsApi().telemetry?.enabled).toBe(false);
+  });
+
+  it('PAN-4264: persists operator grouping only once it is turned on', async () => {
+    const settings = loadSettingsApi();
+    settings.telemetry = { ...settings.telemetry!, operatorGrouping: true };
+
+    await saveSettingsApi(settings);
+
+    const writtenYaml = writeFileMock.mock.calls.at(-1)?.[1];
+    expect(parse(String(writtenYaml)).telemetry).toEqual({ enabled: true, operator_grouping: true });
   });
 
   it('stops shared Node telemetry immediately after persisting opt-out', async () => {
@@ -160,6 +171,7 @@ describe('settings telemetry', () => {
       enabled: true,
       effectiveEnabled: false,
       installId: '123e4567-e89b-42d3-a456-426614174000',
+      operatorGrouping: false,
     });
   });
 });

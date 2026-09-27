@@ -11,6 +11,8 @@ import { ConversationSearchBanner } from '../components/ConversationSearchBanner
 import { InotifyPressureBanner } from '../components/InotifyPressureBanner';
 import { LinearMcpAuthBanner } from '../components/LinearMcpAuthBanner';
 import { RestartApprovalBanner } from '../components/RestartApprovalBanner';
+import { GitHubRateLimitBanner } from '../components/GitHubRateLimitBanner';
+import { GitHubQuotaPill } from '../components/GitHubQuotaPill';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
@@ -77,6 +79,9 @@ export function AppChrome({
         {/* A deploy script, `pan reload`, or `pan restart` is blocked waiting
             for the operator to approve a dashboard restart (PAN-3729) */}
         <RestartApprovalBanner />
+
+        {/* GitHub calls are paused after a rate-limit refusal (PAN-4264) */}
+        <GitHubRateLimitBanner />
 
         {/* Setup checklist — shown while a required host tool (tmux, git, node,
             claude) is missing from the server's PATH (PAN-774) */}
@@ -235,6 +240,7 @@ export function AppChrome({
           <StoppedAgentsBanner variant="pill" />
           <LowCostModePill onOpenSettings={onOpenSettings} />
           <StaleBuildChip />
+          <GitHubQuotaPill />
           <SystemHealthPill />
           <DecisionsIndicator />
           <NeedsYouIndicator onActivate={onNavigateNeedsYou} />

@@ -34,10 +34,13 @@ const EXPECTED_EVENTS = [
   'server_boot',
   'cli_command_run',
   'pipeline_stage_changed',
+  'github_quota_sample',
+  'github_rate_limited',
+  'instance_heartbeat',
 ] as const satisfies readonly TelemetryEventName[];
 
 describe('telemetry event schema', () => {
-  it('exports all fifteen telemetry event names', () => {
+  it('exports all eighteen telemetry event names', () => {
     expect(TELEMETRY_EVENT_NAMES).toEqual(EXPECTED_EVENTS);
   });
 

@@ -26,6 +26,8 @@ import {
 import { resolvePipelineMembership } from '../../../src/lib/pipeline-membership.js';
 import type { ProjectConfig } from '../../../src/lib/projects.js';
 import type { Issue } from '../../../src/lib/tracker/interface.js';
+import { currentGitHubCaller } from '../../../src/lib/github-quota/caller-context.js';
+import { GitHubQuotaPausedError } from '../../../src/lib/github-quota/pause-gate.js';
 
 const project: ProjectConfig = {
   name: 'overdeck',
@@ -753,6 +755,32 @@ describe('gatherProjectLensSignals', () => {
     });
   });
 
+  it('PAN-4264: classifies a paused quota as forge_transient, never forge_unavailable', async () => {
+    const mocked = deps();
+    const paused = new GitHubQuotaPausedError({
+      pool: 'app', bucket: 'rest', kind: 'primary', caller: 'pipeline-membership',
+      since: new Date().toISOString(), until: new Date(Date.now() + 60_000).toISOString(),
+    });
+    // Strip the message so only the typed-error check can classify it.
+    paused.message = 'paused';
+    mocked.listOpenIssues = vi.fn().mockRejectedValue(paused);
+
+    await expect(gatherProjectLensSignals(project, mocked)).rejects.toMatchObject({ reason: 'forge_transient' });
+  });
+
+  it('PAN-4264: runs every GitHub dependency as caller pipeline-membership', async () => {
+    const mocked = deps();
+    const seen: Array<string | undefined> = [];
+    mocked.listOpenIssues = vi.fn().mockImplementation(async () => {
+      seen.push(currentGitHubCaller());
+      return [];
+    });
+
+    await gatherProjectLensSignals(project, mocked);
+    expect(seen).toEqual(['pipeline-membership']);
+    expect(currentGitHubCaller()).toBeUndefined();
+  });
+
   it('PAN-3527: keeps a forge that answered "no" as forge_unavailable', async () => {
     const mocked = deps();
     mocked.listOpenPullRequests = vi.fn().mockRejectedValue(new Error(
@@ -1177,6 +1205,17 @@ describe('gatherProjectLensSignals', () => {
     expect(runGraphql).toHaveBeenCalledTimes(3);
     expect(runGraphql.mock.calls.map(([query]) => query.match(/pullRequests\(/g)?.length))
       .toEqual([50, 50, 20]);
+  });
+
+  it('PAN-4264: selects rateLimit in both batched GraphQL queries', async () => {
+    const mergedGraphql = vi.fn().mockResolvedValue(JSON.stringify({ data: { repository: { h0: { nodes: [] } } } }));
+    await listMergedPullRequestHeadsBatched('eltmon', 'overdeck', ['feature/pan-1'], mergedGraphql);
+    const statesGraphql = vi.fn().mockResolvedValue(JSON.stringify({ data: { repository: { i0: { state: 'OPEN' } } } }));
+    await listIssueStatesBatched('eltmon', 'overdeck', [1], statesGraphql);
+
+    for (const runGraphql of [mergedGraphql, statesGraphql]) {
+      expect(runGraphql.mock.calls[0]![0]).toContain('rateLimit { cost remaining resetAt limit }');
+    }
   });
 
   it('does not attribute a fork PR with a colliding head name to the project', async () => {

@@ -5,6 +5,7 @@
  */
 
 import { Effect, Layer, Context } from 'effect';
+import { recordPatResponse } from '../../../lib/github-quota/rest-meter.js';
 import { getGitHubConfig } from './tracker-config.js';
 import {
   IssueNotFound,
@@ -168,6 +169,10 @@ function makeGitHubClientImpl(token: string): GitHubClientShape {
       if (resetAt !== null) rateLimitResetAt = parseInt(resetAt, 10);
     }
 
+    // PAN-4264: meter the PAT pool; a 403/429 rate-limit refusal also pauses
+    // the PAT REST bucket for non-essential callers.
+    const quotaPause = await recordPatResponse(res);
+
     if (res.status === 404) throw new IssueNotFound({ id: url });
     if (res.status === 429) {
       // Respect Retry-After header if present
@@ -176,6 +181,10 @@ function makeGitHubClientImpl(token: string): GitHubClientShape {
         : null;
       const retryAfterSec = retryAfter ? parseInt(retryAfter, 10) : 60;
       throw new RateLimited({ retryAfter: retryAfterSec });
+    }
+    if (quotaPause) {
+      const pauseSec = Math.ceil((Date.parse(quotaPause.until) - Date.now()) / 1000);
+      throw new RateLimited({ retryAfter: Math.max(1, pauseSec) });
     }
     if (!res.ok) {
       const body = await res.text().catch(() => '');

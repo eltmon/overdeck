@@ -198,4 +198,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   long-closed first PR. Treat stored artifact URLs as hints, never as the PR the
   gate judged.
 
+- **New GitHub callers must go through the quota meter** (PAN-4264) — exec
+  `gh` with `runGh` (`src/lib/github-quota/run-gh.ts`) and name the caller
+  with `withGitHubCaller`, or its spend only shows up as `unattributed` and it
+  keeps calling during a pause. The pause gate is per pool and bucket
+  (`user`/`pat`/`app` × `graphql`/`rest`), and only the read-model pollers
+  are paused. Agent `gh` calls are counted by a shim that lives beside the
+  git guard (`launcher-git-guard.ts`), not by `runGh`.
+
 <!-- last-verified: 2026-09-27 -->

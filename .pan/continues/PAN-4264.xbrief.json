@@ -1,0 +1,509 @@
+{
+  "version": "1",
+  "issueId": "PAN-4264",
+  "created": "2026-09-27T15:30:19.047Z",
+  "updated": "2026-09-27T17:34:37.229Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "quota-ledger": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T15:30:19.047Z",
+      "doneAt": "2026-09-27T15:40:42.002Z"
+    },
+    "pause-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T15:43:26.163Z",
+      "doneAt": "2026-09-27T15:47:34.236Z"
+    },
+    "run-gh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T15:47:38.567Z",
+      "doneAt": "2026-09-27T15:50:03.622Z"
+    },
+    "app-rest-meter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T15:50:07.703Z",
+      "doneAt": "2026-09-27T15:55:02.970Z"
+    },
+    "app-token-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T15:55:16.725Z",
+      "doneAt": "2026-09-27T15:56:09.138Z"
+    },
+    "pat-client-meter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T15:56:13.434Z",
+      "doneAt": "2026-09-27T15:58:12.981Z"
+    },
+    "issue-poller-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T15:58:17.495Z",
+      "doneAt": "2026-09-27T16:00:35.570Z"
+    },
+    "membership-meter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:00:39.549Z",
+      "doneAt": "2026-09-27T16:02:13.814Z"
+    },
+    "pr-cache-meter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:02:18.923Z",
+      "doneAt": "2026-09-27T16:04:22.522Z"
+    },
+    "pr-sync-meter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:04:27.000Z",
+      "doneAt": "2026-09-27T16:06:25.892Z"
+    },
+    "ci-repair-meter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:06:29.831Z",
+      "doneAt": "2026-09-27T16:07:47.324Z"
+    },
+    "close-out-meter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:07:51.437Z",
+      "doneAt": "2026-09-27T16:09:38.348Z"
+    },
+    "agent-gh-shim": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:09:42.556Z",
+      "doneAt": "2026-09-27T16:13:52.655Z"
+    },
+    "quota-sampler": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:13:57.123Z",
+      "doneAt": "2026-09-27T16:19:07.266Z"
+    },
+    "quota-snapshot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:19:11.991Z",
+      "doneAt": "2026-09-27T16:23:49.148Z"
+    },
+    "rate-limit-banner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:23:53.671Z",
+      "doneAt": "2026-09-27T16:26:23.595Z"
+    },
+    "quota-pill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:26:27.857Z",
+      "doneAt": "2026-09-27T16:36:36.659Z"
+    },
+    "stagger-refresh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:36:44.039Z",
+      "doneAt": "2026-09-27T16:38:52.677Z"
+    },
+    "skip-misconfigured": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:38:56.179Z",
+      "doneAt": "2026-09-27T16:42:05.565Z"
+    },
+    "app-404-fallback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:42:10.110Z",
+      "doneAt": "2026-09-27T16:43:49.225Z"
+    },
+    "doctor-github-quota": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:43:55.727Z",
+      "doneAt": "2026-09-27T16:49:50.962Z"
+    },
+    "telemetry-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:49:54.805Z",
+      "doneAt": "2026-09-27T16:51:47.157Z"
+    },
+    "quota-telemetry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:51:52.077Z",
+      "doneAt": "2026-09-27T16:54:19.059Z"
+    },
+    "instance-heartbeat": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:54:22.832Z",
+      "doneAt": "2026-09-27T16:56:29.246Z"
+    },
+    "operator-grouping": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T16:56:33.978Z",
+      "doneAt": "2026-09-27T17:01:46.999Z"
+    },
+    "doctor-remote-installs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T17:01:51.347Z",
+      "doneAt": "2026-09-27T17:03:37.345Z"
+    },
+    "privacy-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T17:03:40.889Z",
+      "doneAt": "2026-09-27T17:07:50.860Z"
+    },
+    "docs-quota-policy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4264",
+      "claimedAt": "2026-09-27T17:07:55.424Z",
+      "doneAt": "2026-09-27T17:09:03.736Z"
+    },
+    "quota-ledger.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:22:09.217Z"
+    },
+    "quota-ledger.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:22:18.751Z"
+    },
+    "quota-ledger.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:22:28.200Z"
+    },
+    "quota-ledger.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:22:37.646Z"
+    },
+    "pause-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:22:46.765Z"
+    },
+    "pause-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:22:56.036Z"
+    },
+    "pause-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:23:05.117Z"
+    },
+    "pause-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:23:14.647Z"
+    },
+    "pause-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:23:23.911Z"
+    },
+    "run-gh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:23:33.065Z"
+    },
+    "run-gh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:23:42.173Z"
+    },
+    "run-gh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:23:51.506Z"
+    },
+    "run-gh.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:24:00.630Z"
+    },
+    "app-rest-meter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:24:09.734Z"
+    },
+    "app-rest-meter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:24:19.461Z"
+    },
+    "app-rest-meter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:24:28.515Z"
+    },
+    "app-token-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:24:37.580Z"
+    },
+    "app-token-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:24:46.901Z"
+    },
+    "pat-client-meter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:24:56.118Z"
+    },
+    "pat-client-meter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:25:05.820Z"
+    },
+    "issue-poller-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:25:15.651Z"
+    },
+    "issue-poller-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:25:24.742Z"
+    },
+    "membership-meter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:25:33.646Z"
+    },
+    "membership-meter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:25:42.752Z"
+    },
+    "membership-meter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:25:52.189Z"
+    },
+    "pr-cache-meter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:26:01.574Z"
+    },
+    "pr-cache-meter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:26:11.082Z"
+    },
+    "pr-sync-meter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:26:20.133Z"
+    },
+    "pr-sync-meter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:26:29.266Z"
+    },
+    "ci-repair-meter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:26:38.558Z"
+    },
+    "ci-repair-meter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:26:47.470Z"
+    },
+    "close-out-meter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:26:56.507Z"
+    },
+    "close-out-meter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:27:05.349Z"
+    },
+    "agent-gh-shim.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:27:14.549Z"
+    },
+    "agent-gh-shim.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:27:23.751Z"
+    },
+    "agent-gh-shim.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:27:32.694Z"
+    },
+    "quota-sampler.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:27:41.648Z"
+    },
+    "quota-sampler.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:27:51.010Z"
+    },
+    "quota-sampler.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:27:59.853Z"
+    },
+    "quota-snapshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:28:09.305Z"
+    },
+    "quota-snapshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:28:18.621Z"
+    },
+    "quota-snapshot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:28:27.542Z"
+    },
+    "quota-snapshot.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:28:36.514Z"
+    },
+    "rate-limit-banner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:28:45.428Z"
+    },
+    "rate-limit-banner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:28:54.651Z"
+    },
+    "rate-limit-banner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:29:03.960Z"
+    },
+    "quota-pill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:29:13.031Z"
+    },
+    "quota-pill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:29:22.630Z"
+    },
+    "doctor-github-quota.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:29:31.890Z"
+    },
+    "doctor-github-quota.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:29:41.072Z"
+    },
+    "doctor-github-quota.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:29:50.311Z"
+    },
+    "stagger-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:29:59.646Z"
+    },
+    "stagger-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:30:10.382Z"
+    },
+    "stagger-refresh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:30:20.570Z"
+    },
+    "telemetry-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:30:29.774Z"
+    },
+    "telemetry-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:30:38.865Z"
+    },
+    "telemetry-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:30:48.175Z"
+    },
+    "skip-misconfigured.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:30:57.355Z"
+    },
+    "skip-misconfigured.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:31:06.840Z"
+    },
+    "skip-misconfigured.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:31:15.874Z"
+    },
+    "app-404-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:31:25.078Z"
+    },
+    "app-404-fallback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:31:34.284Z"
+    },
+    "app-404-fallback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:31:43.559Z"
+    },
+    "quota-telemetry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:31:52.920Z"
+    },
+    "quota-telemetry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:32:02.172Z"
+    },
+    "quota-telemetry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:32:11.459Z"
+    },
+    "instance-heartbeat.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:32:20.649Z"
+    },
+    "instance-heartbeat.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:32:29.700Z"
+    },
+    "instance-heartbeat.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:32:38.948Z"
+    },
+    "operator-grouping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:32:47.825Z"
+    },
+    "operator-grouping.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:32:56.747Z"
+    },
+    "operator-grouping.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:33:05.947Z"
+    },
+    "operator-grouping.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:33:15.129Z"
+    },
+    "doctor-remote-installs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:33:24.305Z"
+    },
+    "doctor-remote-installs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:33:33.071Z"
+    },
+    "doctor-remote-installs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:33:42.159Z"
+    },
+    "privacy-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:33:51.502Z"
+    },
+    "privacy-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:34:00.445Z"
+    },
+    "docs-quota-policy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:34:09.743Z"
+    },
+    "docs-quota-policy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:34:19.116Z"
+    },
+    "docs-quota-policy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:34:28.291Z"
+    },
+    "docs-quota-policy.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:34:37.229Z"
+    }
+  }
+}

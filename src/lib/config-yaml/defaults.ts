@@ -245,6 +245,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   },
   telemetry: {
     enabled: true,
+    operator_grouping: false,
   },
   ui: {
     openInEditorCommand: null,

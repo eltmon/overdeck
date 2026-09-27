@@ -1,7 +1,6 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
+import type { LedgerEntry } from './github-quota/ledger.js';
+import { GitHubQuotaPausedError, GitHubRateLimitedError } from './github-quota/pause-gate.js';
+import { runGh } from './github-quota/run-gh.js';
 
 export const GH_GRAPHQL_RETRY_DELAY_MS = 1000;
 export const GH_GRAPHQL_STDERR_LIMIT = 500;
@@ -16,12 +15,28 @@ interface GhExecFailure {
   stderr?: string;
 }
 
+/**
+ * PAN-4264: the real cost of a GraphQL call, from a `rateLimit { cost
+ * remaining resetAt limit }` selection in the response envelope. Returns `{}`
+ * when the query did not select it, so the ledger keeps the estimate.
+ */
+export function readGraphqlRateLimit(stdout: string): Partial<LedgerEntry> {
+  const parsed = JSON.parse(stdout) as {
+    data?: { rateLimit?: { cost?: unknown; remaining?: unknown; limit?: unknown; resetAt?: unknown } | null } | null;
+  };
+  const rateLimit = parsed.data?.rateLimit;
+  if (!rateLimit || typeof rateLimit.cost !== 'number') return {};
+  return {
+    cost: rateLimit.cost,
+    estimated: false,
+    ...(typeof rateLimit.remaining === 'number' ? { remaining: rateLimit.remaining } : {}),
+    ...(typeof rateLimit.limit === 'number' ? { limit: rateLimit.limit } : {}),
+    ...(typeof rateLimit.resetAt === 'string' ? { resetAt: rateLimit.resetAt } : {}),
+  };
+}
+
 function defaultExec(args: string[]): Promise<{ stdout: string }> {
-  return execFileAsync('gh', args, {
-    encoding: 'utf-8',
-    timeout: 30_000,
-    maxBuffer: 4 * 1024 * 1024,
-  });
+  return runGh(args, { timeout: 30_000, maxBuffer: 4 * 1024 * 1024, onSuccess: readGraphqlRateLimit });
 }
 
 function defaultDelay(ms: number): Promise<void> {
@@ -49,6 +64,9 @@ export async function runGitHubGraphql(
       const { stdout } = await exec(['api', 'graphql', '-f', `query=${query}`]);
       return stdout;
     } catch (error) {
+      // A rate-limit refusal or an active pause is already typed and recorded
+      // by the quota meter. Retrying would spend the quota it protects.
+      if (error instanceof GitHubRateLimitedError || error instanceof GitHubQuotaPausedError) throw error;
       // gh exits non-zero when the GraphQL envelope carries per-field errors
       // (e.g. `issue(number: N)` where N is a PR — strike branches can point at
       // PR numbers), but it still prints the full response with partial data to

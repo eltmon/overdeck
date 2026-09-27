@@ -23,6 +23,7 @@ import type {
   ResetMarker,
   ResourceStats,
   RestartGateSnapshot,
+  GitHubQuotaSnapshot,
 } from '@overdeck/contracts'
 import {
   type ReadModelState,
@@ -650,6 +651,13 @@ export const selectProjectDeploy = (projectKey: string) =>
  * server's gate first reports.
  */
 export const selectRestartGate = (s: DashboardState): RestartGateSnapshot | null => s.restartGate
+
+/**
+ * PAN-4264 — the GitHub API quota view, delivered by the snapshot on connect
+ * and by `github_quota.changed` events after that. Null until the server's
+ * publisher first reports (and always on a peer dashboard).
+ */
+export const selectGitHubQuota = (s: DashboardState): GitHubQuotaSnapshot | null => s.githubQuota
 
 export const selectResources = (s: DashboardState): ResourceStats | null => s.resources
 

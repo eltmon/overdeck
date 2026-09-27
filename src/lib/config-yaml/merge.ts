@@ -253,6 +253,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     telemetry: {
       enabled: DEFAULT_CONFIG.telemetry.enabled,
+      operator_grouping: DEFAULT_CONFIG.telemetry.operator_grouping,
     },
     ui: {
       openInEditorCommand: DEFAULT_CONFIG.ui.openInEditorCommand,
@@ -847,6 +848,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     if (typeof config.telemetry?.enabled === 'boolean') {
       result.telemetry.enabled = config.telemetry.enabled;
+    }
+    if (typeof config.telemetry?.operator_grouping === 'boolean') {
+      result.telemetry.operator_grouping = config.telemetry.operator_grouping;
+    }
+    if (typeof config.telemetry?.posthog_read_key === 'string' && config.telemetry.posthog_read_key.trim()) {
+      result.telemetry.posthog_read_key = config.telemetry.posthog_read_key.trim();
+    }
+    if (config.telemetry?.posthog_project_id !== undefined && String(config.telemetry.posthog_project_id).trim()) {
+      result.telemetry.posthog_project_id = String(config.telemetry.posthog_project_id).trim();
     }
 
     if (typeof config.ui?.open_in_editor_command === 'string') {
