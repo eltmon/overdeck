@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   redispatchReviewSynthesis: vi.fn(),
   emitActivityEntry: vi.fn(),
   requestReviewThroughRoute: vi.fn(),
+  replayDeferredReviewVerdict: vi.fn(),
 }));
 
 vi.mock('../../terminal-backends/inventory.js', () => ({ liveAgentInventory: mocks.liveAgentInventory }));
@@ -42,6 +43,7 @@ vi.mock('../../agents/liveness.js', async (importOriginal) => ({
 }));
 vi.mock('../review-synthesis-recovery.js', () => ({ redispatchReviewSynthesis: mocks.redispatchReviewSynthesis }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: mocks.emitActivityEntry }));
+vi.mock('../deferred-verdict-replay.js', () => ({ replayDeferredReviewVerdict: mocks.replayDeferredReviewVerdict }));
 
 const { appendPipelineEntry, readPipelineJournal } = await import('../pipeline-journal.js');
 const { recoverStalledReviews, __resetStalledReviewCooldownForTests } = await import('../deacon-lite.js');
@@ -91,6 +93,30 @@ afterEach(() => {
 });
 
 describe('recoverStalledReviews', () => {
+  describe('deferred review verdicts (PAN-4263)', () => {
+    it('hands a deferred-verdict tail to the replay and nothing else', async () => {
+      mocks.replayDeferredReviewVerdict.mockResolvedValue('recoverStalledReviews: recorded the deferred passed review verdict for PAN-3705');
+      journal([{ type: 'review.dispatched', minutesAgo: 60 }, { type: 'review.verdict-deferred', minutesAgo: 15 }]);
+
+      const actions = await recoverStalledReviews(NOW);
+
+      expect(mocks.replayDeferredReviewVerdict).toHaveBeenCalledWith(
+        'PAN-3705', workspace, expect.objectContaining({ type: 'review.verdict-deferred' }), NOW,
+      );
+      expect(actions).toEqual(['recoverStalledReviews: recorded the deferred passed review verdict for PAN-3705']);
+      expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
+    });
+
+    it('holds a deferred verdict on a paused issue', async () => {
+      mocks.getIssuePause.mockReturnValue({ status: 'paused', agentId: 'agent-pan-3705', stoppedAgents: [] });
+      journal([{ type: 'review.verdict-deferred', minutesAgo: 15 }]);
+
+      await recoverStalledReviews(NOW);
+
+      expect(mocks.replayDeferredReviewVerdict).not.toHaveBeenCalled();
+    });
+  });
+
   it('re-dispatches a stale dispatched convoy with no live reviewer, and journals it', async () => {
     journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
 
