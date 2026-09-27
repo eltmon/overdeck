@@ -38,6 +38,10 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
+- `github-quota/` (PAN-4264) — GitHub API quota metering: the per-hour ledger,
+  `runGh` (metered `gh` exec), `withGitHubCaller`, App/PAT metering
+  (`rest-meter.ts`), the cross-process pause gate, the `/rate_limit` sampler
+  and the quota snapshot. Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
   legacy `model_selection.specialist_harnesses` (PAN-636).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).

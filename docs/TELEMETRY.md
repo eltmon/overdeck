@@ -36,7 +36,42 @@ The first telemetry-capable run creates a random UUIDv4 at
 installation. Invalid or partial file content is repaired under an exclusive
 process lock with a stale-lock lease, then re-read so concurrent processes use
 the same durable UUIDv4 with mode `0600`. Overdeck does not derive identity from Claude Code,
-Codex, Git, GitHub, or any other credential or account file.
+Codex, Git, GitHub, or any other credential or account file, except the opt-in
+`operatorHash` described below, which is a salted one-way hash of the GitHub
+numeric user id.
+
+## Operator grouping (opt-in)
+
+One operator often runs several installs (a Linux workstation and a Mac, for
+example) that spend the same GitHub account's API quota. Operator grouping
+lets those installs be grouped without identifying the operator.
+
+- **Setting.** `telemetry.operator_grouping` in `~/.overdeck/config.yaml`,
+  shown as **Settings → Telemetry → Group my installs (pseudonymous)**. It is
+  off by default and disabled while telemetry is off.
+- **Construction.** `operatorHash` = HMAC-SHA256 of the GitHub numeric user id
+  under the fixed product salt `overdeck-operator-grouping-v1`, truncated to
+  16 hex characters (`src/lib/telemetry/operator-hash.ts`). The id comes from
+  `gh api user --jq .id`, once, when grouping is turned on or at dashboard
+  boot. Only the hash is cached, at `~/.overdeck/telemetry-operator-hash`
+  (mode `0600`); the raw id is never stored or sent. Without an authenticated
+  `gh`, no hash exists and the property is omitted.
+- **Salt caveat.** The salt is a pepper in the Overdeck source, not a secret.
+  The hash is pseudonymous only against parties without the Overdeck source:
+  anyone with the source and a candidate GitHub user id can recompute it.
+- **What is sent.** With grouping on, every Node and browser event carries
+  `operatorHash`. Nothing else changes: no GitHub login, email, hostname, user
+  name, filesystem path, repository name or raw user id is sent
+  (`tests/unit/lib/telemetry/github-telemetry-privacy.test.ts` enforces it).
+- **Doctor remote view.** `pan doctor github-quota` lists the other installs
+  that sent the same `operatorHash` in the last 48 hours (platform, arch,
+  version, last seen, last `github_quota_sample` GraphQL buckets). It needs a
+  PostHog personal API key with query access and the project id:
+  `telemetry.posthog_read_key` and `telemetry.posthog_project_id` in
+  `~/.overdeck/config.yaml`, or `OVERDECK_POSTHOG_READ_KEY` and
+  `OVERDECK_POSTHOG_PROJECT_ID`. The query host is `POSTHOG_HOST` with `.i.`
+  removed (default `https://us.posthog.com`). The key is never shown in the
+  Settings UI.
 
 ## Event schema
 
@@ -142,6 +177,9 @@ No production feature is controlled by a PostHog flag yet.
 - Node product events, exception capture, and flag evaluation use
   `src/lib/telemetry/service.ts`; no other production module imports
   `posthog-node` or sends directly to PostHog.
+- `src/lib/telemetry/posthog-read.ts` is the only PostHog read door (the
+  `pan doctor github-quota` remote view); it sends the `operatorHash` as a
+  HogQL placeholder value, never inside the SQL.
 - Event names and property types come from `@overdeck/contracts`.
 - The release workflow is the source-map upload owner because it rebuilds the
   dashboard bundle that is actually published.
