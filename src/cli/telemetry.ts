@@ -10,10 +10,13 @@ import {
   shutdownAnalyticsServices,
 } from '../lib/telemetry/service.js';
 import { registerCliExitFinalizer } from './exit.js';
+import { registerGitHubRateLimitedTelemetry } from '../lib/telemetry/github-quota-telemetry.js';
 
 export { exitCli } from './exit.js';
 
 setAnalyticsClientTypeForProcess('cli');
+// PAN-4264: a CLI process that records a GitHub rate-limit refusal reports it too.
+registerGitHubRateLimitedTelemetry();
 
 const TELEMETRY_CLI_VERB_SET = new Set<string>(TELEMETRY_CLI_VERBS);
 

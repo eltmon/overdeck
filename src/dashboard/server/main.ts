@@ -65,6 +65,7 @@ import { startConversationRescanScheduler, stopConversationRescanScheduler } fro
 import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
 import { startGitHubQuotaPublisher } from './services/github-quota.js';
+import { registerGitHubRateLimitedTelemetry, startGitHubQuotaTelemetry } from '../../lib/telemetry/github-quota-telemetry.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
@@ -598,6 +599,9 @@ if (!isPeerDashboard) {
 // and publish the quota snapshot to the read model every 30 s when it changes.
 const stopGitHubQuotaSampler = isPeerDashboard ? () => undefined : startGitHubQuotaSampler();
 const stopGitHubQuotaPublisher = isPeerDashboard ? () => undefined : startGitHubQuotaPublisher();
+// PAN-4264: hourly bucketed github_quota_sample, and a throttled github_rate_limited per refusal.
+const stopGitHubQuotaTelemetry = isPeerDashboard ? () => undefined : startGitHubQuotaTelemetry();
+const stopGitHubRateLimitedTelemetry = registerGitHubRateLimitedTelemetry();
 
 let stopResourceRefreshServices = () => undefined;
 
@@ -748,6 +752,8 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopPullRequestSyncService();
   stopGitHubQuotaSampler();
   stopGitHubQuotaPublisher();
+  stopGitHubQuotaTelemetry();
+  stopGitHubRateLimitedTelemetry();
   closeConversationSearchService();
   closeMemoryFtsDatabases();
   process.exit(0);
