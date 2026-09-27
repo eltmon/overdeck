@@ -181,11 +181,40 @@ export function sanitizeTitle(raw: string | null | undefined): string {
 }
 
 /**
+ * Extract the first bullet/line of a compaction summary's "Primary Request
+ * and Intent" section, with any leading bullet marker stripped. Returns ''
+ * when the summary has no such section.
+ */
+function primaryRequestFromSummary(text: string): string {
+  const headerMatch = text.match(/Primary Request and Intent:?/i);
+  if (!headerMatch || headerMatch.index === undefined) return '';
+
+  const afterHeader = text.slice(headerMatch.index + headerMatch[0].length);
+  const stopMatch = afterHeader.match(/\n\s*2\.\s/);
+  const section = stopMatch ? afterHeader.slice(0, stopMatch.index) : afterHeader;
+
+  const firstLine = section
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+
+  return firstLine ? firstLine.replace(/^[-*•]\s+/, '') : '';
+}
+
+/**
  * Generate a deterministic title from a serialized transcript when the model
- * path is unavailable. Prefer the latest user request because explicit retitle
- * should describe where the conversation currently landed.
+ * path is unavailable. When the transcript opens with a compaction summary
+ * (`COMPACT_SUMMARY_LABEL`), prefer the summary's Primary Request and Intent —
+ * it names the overall scope still in context. Otherwise prefer the latest
+ * user request, since explicit retitle should describe where the
+ * conversation currently landed.
  */
 export function fallbackTranscriptTitle(transcript: string): string {
+  if (transcript.startsWith(COMPACT_SUMMARY_LABEL)) {
+    const primaryRequest = primaryRequestFromSummary(transcript);
+    if (primaryRequest) return derivePromptTitle(primaryRequest);
+  }
+
   const lines = transcript
     .split(/\r?\n/)
     .map((line) => line.trim())

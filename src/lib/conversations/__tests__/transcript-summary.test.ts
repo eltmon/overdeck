@@ -11,6 +11,7 @@ import {
   COMPACT_SUMMARY_LABEL,
   RECENT_OMITTED_MARKER,
   RECENT_TURNS_LABEL,
+  derivePromptTitle,
   fallbackTranscriptTitle,
   sanitizeTitle,
   serializeConversationTranscript,
@@ -226,6 +227,38 @@ describe('fallbackTranscriptTitle', () => {
 
   it('returns empty for transcripts without titleable text', () => {
     expect(fallbackTranscriptTitle('[… middle of the conversation omitted for length …]')).toBe('');
+  });
+
+  it("ac1: prefers the summary's Primary Request bullet over the last user line", () => {
+    const summaryText = [
+      'Summary:',
+      '1. Primary Request and Intent:',
+      '   - Orchestrate the Overdeck cut across parallel agents',
+      '2. Key Technical Concepts:',
+      '   - something else',
+    ].join('\n');
+    const messages = [
+      { role: 'user' as const, text: 'ship the intro video', sequence: 5 },
+    ];
+    const transcript = serializeConversationTranscript(messages, {
+      compactSummary: { text: summaryText, sequence: 0 },
+      purpose: 'title',
+    });
+
+    expect(fallbackTranscriptTitle(transcript)).toBe('Orchestrate the Overdeck cut across parallel agents');
+  });
+
+  it('ac2: falls back to the last user line when the summary lacks a Primary Request section', () => {
+    const summaryText = 'Summary:\nNo structured sections here, just prose.';
+    const messages = [
+      { role: 'user' as const, text: 'ship the intro video', sequence: 5 },
+    ];
+    const transcript = serializeConversationTranscript(messages, {
+      compactSummary: { text: summaryText, sequence: 0 },
+      purpose: 'title',
+    });
+
+    expect(fallbackTranscriptTitle(transcript)).toBe(derivePromptTitle('ship the intro video'));
   });
 });
 
