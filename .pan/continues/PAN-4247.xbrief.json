@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:51:31.073Z",
+  "updated": "2026-09-27T11:51:40.649Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "not-found-outbox.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T11:51:31.073Z"
+    },
+    "not-found-outbox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:51:40.649Z"
     }
   }
 }
