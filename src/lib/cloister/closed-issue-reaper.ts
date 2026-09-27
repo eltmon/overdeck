@@ -9,6 +9,7 @@ import { listProjectsSync } from '../projects.js';
 import { resolveProjectForIssue } from '../overdeck/issue-projects.js';
 import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { isIssueClosed } from './issue-closed.js';
+import { withGitHubCaller } from '../github-quota/caller-context.js';
 import { reapIssueResidue } from './reap-issue-residue.js';
 import { listFeatureDevnetIssueIds } from './merged-docker-reconcile.js';
 
@@ -146,7 +147,17 @@ export async function handleIssueStatusChangedClosed(issueId: string): Promise<s
  * PAN-1908: keep a thin table+session safety net for dropped closed-issue
  * events. The primary path is reactive via handleIssueStatusChangedClosed.
  */
-export async function reconcileClosedIssueAgents(): Promise<string[]> {
+/**
+ * PAN-4264: the deacon's 60-second reaper is a non-essential GitHub caller
+ * (`close-out`); during a quota pause its tracker reads are skipped and the
+ * issue is treated as not closed. `closeOut()` and `pan close` call the same
+ * readers outside this context and stay essential.
+ */
+export function reconcileClosedIssueAgents(): Promise<string[]> {
+  return withGitHubCaller('close-out', reconcileClosedIssueAgentsMetered);
+}
+
+async function reconcileClosedIssueAgentsMetered(): Promise<string[]> {
   const actions: string[] = [];
   const closedChecks = new Map<string, Promise<boolean>>();
   const reapedAgentIds = new Set<string>();
