@@ -154,6 +154,8 @@ Agent-authored handoff forks use the orchestrator-injected template in `roles/ha
 
 The fork pipeline lives in `src/lib/overdeck/conversation-forks.ts`; the seed and session helpers it calls live in `src/lib/conversations/summary-fork.ts`.
 
+Every fork mode (`plain`, `summary`, `handoff`) stamps `parent_conversation_id` = the source conversation's id on the new row, in the `createConversation` call inside `handleConversationSummaryFork` (PAN-4223 WI-14). The link is a write-once launch-time fact: the successor nests under its source on the Command Deck and in the Agents History and shows `continues ← #<id>`. `fork_request` and `handoff_target_conv_id` are unchanged and keep their meaning; the three gauntlet lane columns stay null, because a successor is never a lane.
+
 Key functions:
 - `handleConversationSummaryFork()` (`src/lib/overdeck/conversation-forks.ts`) — request handler; reserves the new session with `reserveSummaryForkSession()`, then starts the pipeline with that `sessionId`
 - `runForkPipeline()` (`src/lib/overdeck/conversation-forks.ts`) — receives the reserved `sessionId` (`recoverStuckForks()` passes the persisted one after a restart) and orchestrates seed generation, spawn and summary injection
