@@ -4,17 +4,17 @@
     "created": "2026-09-27T15:46:31Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4268: Route composer and pan tell input to the main agent: read Claude Code's agent selector instead of guessing",
-    "updated": "2026-09-27T15:52:54.518Z"
+    "updated": "2026-09-27T15:53:27.833Z"
   },
   "plan": {
     "id": "pan-4268",
     "title": "Route composer and pan tell input to the main agent: read Claude Code's agent selector instead of guessing",
-    "status": "proposed",
+    "status": "running",
     "uid": "4648cae0-db79-40ad-8108-9f2107828d2e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T15:46:31Z",
-    "updated": "2026-09-27T15:52:54.518Z",
+    "updated": "2026-09-27T15:53:27.833Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4268",

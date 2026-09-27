@@ -173,6 +173,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   deacon-lite runs only in the deacon child, where
   `getRequestReviewStarter()` is always null — reach the review pipeline via
   `requestReviewThroughRoute`.
+- **Claude Code's agent selector decides where typed input goes** (PAN-4268) —
+  the `● main` / `◯ <type>  <description>` rows under the prompt box. Pasting
+  into a pane whose `●` is on a subagent misroutes; with footer focus (`❯` on a
+  row) text is swallowed and `x` stops a subagent. Only `Down/Up/Enter/Escape`.
 
 - **Forge PR lookups: failure vs absence, and stale stored URLs** (PAN-4263) —
   `discoverArtifact` (`src/lib/forge.ts`) is called without `repository` by
