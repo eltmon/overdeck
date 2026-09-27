@@ -16,6 +16,9 @@ import { ensureDefaultConversationModel, getDefaultConversationModel } from '../
 import { fetchProjects } from '../CommandDeck/projectsData';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { PrimaryButton } from './parts';
+import { seedDiscussPrompt } from '../home/homeComposerIntents';
+
+export { seedDiscussPrompt } from '../home/homeComposerIntents';
 
 const PROJECT_KEY_STORAGE = 'overdeck:talk-project';
 
@@ -34,20 +37,6 @@ export interface ConversationSpawn {
   id?: number | string;
   name: string;
   title?: string;
-}
-
-export function seedDiscussPrompt(description: string): string {
-  return [
-    'I want to discuss a possible task with you first — do not file anything yet.',
-    '',
-    'The task idea, in my words:',
-    '"""',
-    description.trim(),
-    '"""',
-    '',
-    'Discuss it with me: ask what you need to know, point out what is underspecified or wrong, and help me sharpen it.',
-    'Only when I explicitly say it is ready (e.g. "file it"), file it as an issue in the tracker with a good title and body based on our discussion, and give me the issue link (e.g. PAN-1234).',
-  ].join('\n');
 }
 
 export function TalkItThrough() {
