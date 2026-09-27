@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T15:23:08.435Z",
+  "updated": "2026-09-27T15:24:36.978Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4266",
       "claimedAt": "2026-09-27T15:20:14.982Z",
       "doneAt": "2026-09-27T15:23:08.434Z"
+    },
+    "floating-position-hook": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:24:36.978Z"
     }
   }
 }
