@@ -9,7 +9,7 @@ describe('checkSystemPrerequisites', () => {
 
   it('probes resolved absolute paths and reports their first version line', async () => {
     const probe = async (cmd: string) => `${cmd.split('/').at(-1)} 1.2.3\nextra noise\n`;
-    const report = await checkSystemPrerequisites(probe, resolveAll);
+    const report = await checkSystemPrerequisites(probe, resolveAll, { backend: 'tmux' });
 
     expect(report.allRequiredFound).toBe(true);
     expect(report.checks).toHaveLength(PREREQUISITES.length);
@@ -56,6 +56,7 @@ describe('checkSystemPrerequisites', () => {
     const report = await checkSystemPrerequisites(
       async (cmd) => `${cmd} 9.9.9`,
       missingTmuxAndDocker,
+      { backend: 'tmux' },
     );
 
     expect(report.allRequiredFound).toBe(false);
@@ -65,8 +66,32 @@ describe('checkSystemPrerequisites', () => {
     const onlyOptionalMissing = await checkSystemPrerequisites(
       async (cmd) => `${cmd} 9.9.9`,
       async (command) => command === 'docker' || command === 'codex' ? null : `/resolved/bin/${command}`,
+      { backend: 'tmux' },
     );
     expect(onlyOptionalMissing.allRequiredFound).toBe(true);
+  });
+
+  it('makes tmux optional and herdr required under the herdr backend (PAN-4282 D2)', async () => {
+    const missingTmux = async (command: string) => (command === 'tmux' ? null : `/resolved/bin/${command}`);
+    const report = await checkSystemPrerequisites(
+      async (cmd) => `${cmd} 9.9.9`,
+      missingTmux,
+      { backend: 'herdr' },
+    );
+
+    expect(report.checks.find((check) => check.id === 'tmux')).toMatchObject({ found: false, required: false });
+    expect(report.checks.find((check) => check.id === 'herdr')).toMatchObject({ required: true });
+    expect(report.allRequiredFound).toBe(true);
+  });
+
+  it('makes herdr optional under the tmux backend (PAN-4282 D2)', async () => {
+    const report = await checkSystemPrerequisites(
+      async (cmd) => `${cmd} 9.9.9`,
+      resolveAll,
+      { backend: 'tmux' },
+    );
+
+    expect(report.checks.find((check) => check.id === 'herdr')).toMatchObject({ required: false });
   });
 
   it('every prerequisite carries per-platform install hints', () => {
