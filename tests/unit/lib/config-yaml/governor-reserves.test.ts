@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   computeGovernorReserveDefaultsGb,
   computeSpawnMemoryThresholdDefaultsGb,
+  normalizeGovernorReserves,
 } from '../../../../src/lib/config-yaml/governor-reserves.js';
 
 describe('computeGovernorReserveDefaultsGb', () => {
@@ -52,4 +53,63 @@ describe('computeSpawnMemoryThresholdDefaultsGb', () => {
       expect(result.blockGb).toBeLessThan(result.warnGb);
     });
   }
+});
+
+describe('normalizeGovernorReserves', () => {
+  it('resets all four reserves to scaled defaults when one is at or above total RAM, warning once naming the offending key', () => {
+    const warn = vi.fn();
+    const result = normalizeGovernorReserves(
+      { hard: 0.5, soft: 1, watch: 1.2, recovery: 12 },
+      8,
+      warn,
+    );
+
+    const defaults = computeGovernorReserveDefaultsGb(8);
+    expect(result).toEqual(defaults);
+    expect(warn).toHaveBeenCalledTimes(1);
+    const message = warn.mock.calls[0][0] as string;
+    expect(message).toContain('governor_recovery_reserve_gb');
+    expect(message).toContain('8.0 GB');
+  });
+
+  it('lowers hard below soft and warns naming the offending key', () => {
+    const warn = vi.fn();
+    const result = normalizeGovernorReserves(
+      { hard: 4, soft: 2, watch: 10, recovery: 20 },
+      64,
+      warn,
+    );
+
+    expect(result.hard).toBeCloseTo(1, 5);
+    expect(result.soft).toBe(2);
+    expect(result.watch).toBe(10);
+    expect(result.recovery).toBe(20);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('governor_hard_reserve_gb');
+  });
+
+  it('raises watch above soft (the issue workaround) and preserves the other three', () => {
+    const warn = vi.fn();
+    const result = normalizeGovernorReserves(
+      { hard: 0.5, soft: 1, watch: 1, recovery: 1.5 },
+      16,
+      warn,
+    );
+
+    expect(result.hard).toBe(0.5);
+    expect(result.soft).toBe(1);
+    expect(result.watch).toBe(2);
+    expect(result.recovery).toBe(1.5);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('governor_watch_reserve_gb');
+  });
+
+  it('passes valid reserves through unchanged with no warn', () => {
+    const warn = vi.fn();
+    const valid = computeGovernorReserveDefaultsGb(16);
+    const result = normalizeGovernorReserves(valid, 16, warn);
+
+    expect(result).toEqual(valid);
+    expect(warn).not.toHaveBeenCalled();
+  });
 });

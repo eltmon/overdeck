@@ -45,3 +45,76 @@ export function computeSpawnMemoryThresholdDefaultsGb(totalGb: number): SpawnMem
     blockGb: Math.min(2, totalGb / 16),
   };
 }
+
+const RESERVE_YAML_KEYS: Record<keyof GovernorReservesGb, string> = {
+  hard: 'governor_hard_reserve_gb',
+  soft: 'governor_soft_reserve_gb',
+  watch: 'governor_watch_reserve_gb',
+  recovery: 'governor_recovery_reserve_gb',
+};
+
+const CANONICAL_KEY_ORDER: (keyof GovernorReservesGb)[] = ['hard', 'recovery', 'watch', 'soft'];
+
+function formatGb(n: number): string {
+  return n.toFixed(1);
+}
+
+/**
+ * PAN-4267: normalize a user-supplied set of governor reserves so ordering
+ * invariants (hard < soft < watch, soft < recovery) hold and no reserve sits
+ * at or above the host's total RAM (which would keep the governor shedding
+ * forever). Applies in order on a copy, then re-checks against totalGb.
+ */
+export function normalizeGovernorReserves(
+  input: GovernorReservesGb,
+  totalGb: number,
+  warn: (message: string) => void = console.warn,
+): GovernorReservesGb {
+  const result: GovernorReservesGb = { ...input };
+  const corrected = new Set<keyof GovernorReservesGb>();
+
+  if (result.hard >= result.soft) {
+    result.hard = result.soft * 0.5;
+    corrected.add('hard');
+  }
+  if (result.recovery <= result.soft) {
+    result.recovery = result.soft + 1;
+    corrected.add('recovery');
+  }
+  if (result.watch <= result.soft) {
+    result.watch = result.soft + 1;
+    corrected.add('watch');
+  }
+
+  const overTotal = CANONICAL_KEY_ORDER.filter((key) => result[key] >= totalGb);
+  if (overTotal.length > 0) {
+    const defaults = computeGovernorReserveDefaultsGb(totalGb);
+    result.hard = defaults.hard;
+    result.soft = defaults.soft;
+    result.watch = defaults.watch;
+    result.recovery = defaults.recovery;
+
+    const keys = overTotal.map((key) => RESERVE_YAML_KEYS[key]).join(', ');
+    warn(
+      `[config] resources governor reserves (${keys}) are at or above this host's `
+      + `${formatGb(totalGb)} GB RAM; using scaled defaults (hard ${formatGb(defaults.hard)}, `
+      + `soft ${formatGb(defaults.soft)}, watch ${formatGb(defaults.watch)}, `
+      + `recovery ${formatGb(defaults.recovery)} GB).`,
+    );
+    return result;
+  }
+
+  if (corrected.size > 0) {
+    const keys = CANONICAL_KEY_ORDER.filter((key) => corrected.has(key))
+      .map((key) => RESERVE_YAML_KEYS[key])
+      .join(', ');
+    warn(
+      `[config] resources governor reserves (${keys}) were invalid relative to `
+      + `governor_soft_reserve_gb; corrected to hard ${formatGb(result.hard)}, `
+      + `soft ${formatGb(result.soft)}, watch ${formatGb(result.watch)}, `
+      + `recovery ${formatGb(result.recovery)} GB.`,
+    );
+  }
+
+  return result;
+}
