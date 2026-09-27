@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T10:50:42.474Z",
+  "updated": "2026-09-27T11:01:58.882Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-27T10:50:19.600Z"
     },
     "reconcile-sidechain": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4247",
-      "claimedAt": "2026-09-27T10:50:42.474Z"
+      "claimedAt": "2026-09-27T10:50:42.474Z",
+      "doneAt": "2026-09-27T11:01:58.882Z"
     }
   }
 }
