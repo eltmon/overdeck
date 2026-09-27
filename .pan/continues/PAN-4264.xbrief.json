@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T17:31:15.874Z",
+  "updated": "2026-09-27T17:31:25.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -416,6 +416,10 @@
     "skip-misconfigured.ac3": {
       "status": "completed",
       "doneAt": "2026-09-27T17:31:15.874Z"
+    },
+    "app-404-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:31:25.078Z"
     }
   }
 }
