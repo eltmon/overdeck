@@ -4,17 +4,17 @@
     "created": "2026-09-27T08:35:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4245: Conversation titles and About summaries describe only the latest request, not what's still in context",
-    "updated": "2026-09-27T08:40:38.753Z"
+    "updated": "2026-09-27T08:41:18.091Z"
   },
   "plan": {
     "id": "pan-4245",
     "title": "Conversation titles and About summaries describe only the latest request, not what's still in context",
-    "status": "proposed",
+    "status": "running",
     "uid": "7abf83ac-f312-4fba-b701-e9a6d40bce58",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T08:35:04Z",
-    "updated": "2026-09-27T08:40:38.753Z",
+    "updated": "2026-09-27T08:41:18.091Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4245",
