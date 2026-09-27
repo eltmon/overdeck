@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4244",
   "created": "2026-09-27T08:41:42.862Z",
-  "updated": "2026-09-27T08:56:44.759Z",
+  "updated": "2026-09-27T08:56:49.367Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4244",
       "claimedAt": "2026-09-27T08:41:42.861Z",
       "doneAt": "2026-09-27T08:56:44.758Z"
+    },
+    "testing-doc-real-process-fixtures": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4244",
+      "claimedAt": "2026-09-27T08:56:49.367Z"
     }
   }
 }
