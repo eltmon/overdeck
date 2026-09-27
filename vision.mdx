@@ -148,10 +148,10 @@ days**:
 
 | # | Metric | Target | Anchor |
 |---|---|---|---|
-| 1 | [Substrate-bug discovery rate (per pipeline run)](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 2%** (≤ 1 per 50 runs) | Best-in-class defect escape rate (<2%, Capers Jones) |
+| 1 | [Substrate-bug discovery rate (per pipeline run)](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 2%** (≤ 1 per 50 runs) | Best-in-class defect escape rate (&lt;2%, Capers Jones) |
 | 2 | [Critical/P0 substrate bugs](./docs/FLYWHEEL.md#reading-the-stats-panel) | **0** in rolling 30-day window | DRE convention: zero critical escapes |
 | 3 | [Pipeline pass success rate (substrate-attributable failures only)](./docs/FLYWHEEL.md#reading-the-stats-panel) | **≥ 99%** | Google/Shopify CI SLO framing |
-| 4 | [MTTR for a filed substrate bug (filed → fix merged)](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 24h median, < 1 week p95** | DORA Elite (<1hr) scaled for internal tooling |
+| 4 | [MTTR for a filed substrate bug (filed → fix merged)](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 24h median, < 1 week p95** | DORA Elite (&lt;1hr) scaled for internal tooling |
 | 5 | [Operator intervention rate per pipeline run](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 5%** | Inverted from frontier agent autonomy on SWE-bench Verified |
 | 6 | [Time-in-pipeline consistency, per complexity bucket](./docs/FLYWHEEL.md#reading-the-stats-panel) | **p95 within 2× median** | Shopify CI p95 < 2.5× target |
 | 7 | [Flake rate on substrate-attributable failures](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 5%** | Tighter than Google's 16% / Microsoft's 13% |
@@ -171,12 +171,12 @@ The targets triangulate from three industry analogues, because "substrate-bug di
 per pipeline run" has no direct published benchmark:
 
 1. **Discovery rate ↔ defect escape rate.** Capers Jones' Defect Removal Efficiency: median DRE
-   ~85% (15% escape), best-in-class >95% (<2% escape). Substrate bugs surfacing during runs are
+   ~85% (15% escape), best-in-class >95% (&lt;2% escape). Substrate bugs surfacing during runs are
    the "escapes" of the substrate's manufacturing process.
 2. **Pass success rate ↔ CI/CD SLO.** Google SRE and Shopify treat CI/CD as a 99%-availability
    service with a 1% error budget; we scope the 99% to substrate-attributable failures.
 3. **Intervention rate ↔ agent-autonomy benchmarks.** Top SWE-bench Verified systems sit at
-   80–94%; our <5% intervention target is *stricter than the agent layer* because the substrate
+   80–94%; our &lt;5% intervention target is *stricter than the agent layer* because the substrate
    is supposed to be the reliable part.
 
 Sources: [DORA 2024](https://dora.dev/research/2024/dora-report/) ·
@@ -185,7 +185,7 @@ Sources: [DORA 2024](https://dora.dev/research/2024/dora-report/) ·
 [Shopify Engineering](https://shopify.engineering/faster-shopify-ci) ·
 [SWE-bench Verified](https://www.swebench.com/) ·
 [Cognition / Devin report](https://cognition.ai/blog/swe-bench-technical-report).
-Caveats: there is no published intervention-rate benchmark for internal dev tooling (the <5% is
+Caveats: there is no published intervention-rate benchmark for internal dev tooling (the &lt;5% is
 derived, not measured); DORA tier cutoffs are ±20% bands; the discovery-rate framing is novel.
 This is why the criteria are **draft** and revisited after ~1 month of data.
 

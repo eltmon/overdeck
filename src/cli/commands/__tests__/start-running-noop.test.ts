@@ -16,6 +16,7 @@ const lifecycleMocks = vi.hoisted(() => ({
 const agentMocks = vi.hoisted(() => ({
   getAgentState: vi.fn(),
   clearAgentPaused: vi.fn(),
+  clearAgentTroubled: vi.fn(),
   stopAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(async () => ({ removed: ['agent-pan-x'], path: '/tmp/agents/agent-pan-x' })),
   spawnAgent: vi.fn(async () => ({
@@ -30,6 +31,10 @@ const agentMocks = vi.hoisted(() => ({
 
 const tmuxMocks = vi.hoisted(() => ({
   sessionExistsSync: vi.fn(() => false),
+}));
+
+const interventionMocks = vi.hoisted(() => ({
+  appendOperatorInterventionEvent: vi.fn(async () => {}),
 }));
 
 const resolveProjectMock = vi.hoisted(() => vi.fn());
@@ -60,11 +65,16 @@ vi.mock('../../../lib/agents.js', async () => {
     ...actual,
     getAgentState: agentMocks.getAgentState,
     clearAgentPaused: agentMocks.clearAgentPaused,
+    clearAgentTroubled: agentMocks.clearAgentTroubled,
     stopAgent: (...args: unknown[]) => Effect.sync(() => { agentMocks.stopAgent(...args); }),
     wipeAgentStateDirs: agentMocks.wipeAgentStateDirs,
     spawnAgent: agentMocks.spawnAgent,
   };
 });
+
+vi.mock('../../../lib/operator-interventions.js', () => ({
+  appendOperatorInterventionEvent: interventionMocks.appendOperatorInterventionEvent,
+}));
 
 vi.mock('../../../lib/tmux.js', async () => {
   const actual = await vi.importActual<typeof import('../../../lib/tmux.js')>('../../../lib/tmux.js');
@@ -123,6 +133,9 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     agentMocks.getAgentState.mockReset();
     agentMocks.clearAgentPaused.mockReset();
     agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed(null));
+    agentMocks.clearAgentTroubled.mockReset();
+    agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed(null));
+    interventionMocks.appendOperatorInterventionEvent.mockClear();
     agentMocks.stopAgent.mockReset();
     agentMocks.wipeAgentStateDirs.mockReset();
     agentMocks.wipeAgentStateDirs.mockResolvedValue({ removed: ['agent-pan-x'], path: '/tmp/agents/agent-pan-x' });
@@ -257,7 +270,27 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     const written = allConsoleOutput(stderrSpy);
     expect(written).toContain('troubled');
     expect(written).toContain('pan untroubled PAN-X');
+    expect(written).toContain('pan start PAN-X --force');
     expect(lifecycleMocks.getWorkAgentLifecycleState).not.toHaveBeenCalled();
+  });
+
+  it('does not refuse a troubled agent when --force is passed', async () => {
+    agentMocks.getAgentState.mockReturnValue({
+      id: 'agent-pan-x',
+      issueId: 'PAN-X',
+      paused: false,
+      troubled: true,
+      consecutiveFailures: 3,
+      lastFailureReason: 'spawn timeout',
+    });
+    mockLifecycle({ isRunning: false, isRunningButStuck: false });
+
+    const { issueCommand } = await import('../start.js');
+    await issueCommand('PAN-X', { model: '', force: true } as any).catch(() => undefined);
+
+    const written = allConsoleOutput(stderrSpy);
+    expect(written).not.toContain('will not be started');
+    expect(lifecycleMocks.getWorkAgentLifecycleState).toHaveBeenCalled();
   });
 
   it('preserves the resume/reset refusal for a stopped agent with a resumable session', async () => {

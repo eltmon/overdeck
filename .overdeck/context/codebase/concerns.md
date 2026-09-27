@@ -141,4 +141,15 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   session ever drafted reads as "tracked", and the walk is slow. Ask history
   questions of `HEAD` (or a named branch) instead — PAN-4212.
 
-<!-- last-verified: 2026-09-25 -->
+- **A `verification.passed` journal tail is ambiguous** (PAN-4221) — quick
+  review mode writes no `review.dispatched`, so the tail stays
+  `verification.passed` while a healthy quick reviewer runs, AND when a
+  dashboard restart killed the push-and-dispatch continuation. The merge gate
+  (`merge-verify`) writes the same entry type. Any journal reader that acts on
+  this tail must check the entry `source`, the live `agent-<issue>-review`
+  parent (not only `-review-*` lanes), and the current primary head8.
+  deacon-lite runs only in the deacon child, where
+  `getRequestReviewStarter()` is always null — reach the review pipeline via
+  `requestReviewThroughRoute`.
+
+<!-- last-verified: 2026-09-26 -->

@@ -261,19 +261,36 @@ describe('conversation search watcher', () => {
     expect(fakeWatcher.close).toHaveBeenCalledTimes(1);
   });
 
-  it('uses one native recursive subscription per root instead of one watcher per path', async () => {
+  it('polls the tree and emits add, change and unlink for .jsonl transcripts only', async () => {
     const root = mkdtempSync(join(tmpdir(), 'overdeck-conversation-watch-'));
     const nested = join(root, 'session', 'subagents');
     mkdirSync(nested, { recursive: true });
-    for (let index = 0; index < 100; index += 1) {
-      writeFileSync(join(nested, `agent-${index}.jsonl`), '{}\n');
-      writeFileSync(join(nested, `metadata-${index}.json`), '{}\n');
-    }
+    const existing = join(nested, 'agent-0.jsonl');
+    writeFileSync(existing, '{}\n');
+    writeFileSync(join(nested, 'metadata-0.json'), '{}\n');
 
-    const watcher = new ConversationDirectoryWatcher([root]);
+    const watcher = new ConversationDirectoryWatcher([root], 20);
+    const events: string[] = [];
+    watcher
+      .on('add', (path) => events.push(`add ${path}`))
+      .on('change', (path) => events.push(`change ${path}`))
+      .on('unlink', (path) => events.push(`unlink ${path}`));
     try {
       await watcher.ready;
       expect(watcher.activeSubscriptionCount).toBe(1);
+
+      const added = join(nested, 'agent-1.jsonl');
+      writeFileSync(added, '{}\n');
+      writeFileSync(join(nested, 'metadata-1.json'), '{}\n');
+      await vi.waitFor(() => expect(events).toContain(`add ${added}`));
+
+      writeFileSync(existing, '{}\n{"more":true}\n');
+      await vi.waitFor(() => expect(events).toContain(`change ${existing}`));
+
+      rmSync(added);
+      await vi.waitFor(() => expect(events).toContain(`unlink ${added}`));
+
+      expect(events.some((event) => event.endsWith('.json'))).toBe(false);
       await watcher.close();
       expect(watcher.activeSubscriptionCount).toBe(0);
     } finally {

@@ -1,25 +1,17 @@
-import parcelWatcher from '@parcel/watcher';
+import { stat } from 'node:fs/promises';
+import { discoverConversationJsonlFiles } from '../../../lib/conversation-search/indexer.js';
 
 export type ConversationWatchEvent = 'add' | 'change' | 'unlink';
 
 type FileHandler = (filePath: string) => void;
 type ErrorHandler = (error: unknown) => void;
-type Subscription = Awaited<ReturnType<typeof parcelWatcher.subscribe>>;
+
+const DEFAULT_POLL_INTERVAL_MS = 15_000;
 
 /**
- * PAN-4193: true for the error a subscription dies with when a signal
- * interrupts parcel's inotify poll.
- *
- * `@parcel/watcher` 2.6.0 `src/linux/InotifyBackend.cc` (`InotifyBackend::start`,
- * ~:40-42) throws `runtime_error("Unable to poll: " + strerror(errno))` whenever
- * `poll()` returns < 0, including EINTR, instead of retrying. `Backend::handleError`
- * then sends that error to every subscription on the backend and drops it from the
- * shared map, so the inotify thread is gone and the subscriptions are dead. The
- * dashboard spawns many children, so SIGCHLD makes this routine. Nothing is wrong
- * with the watched tree: a fresh subscribe gets a fresh backend thread.
- *
- * The error reaches JS as a plain `Error` with no `code`, so the message is the
- * real signal; `code === 'EINTR'` covers any wrapper that sets one.
+ * PAN-4193: true for the error a `@parcel/watcher` subscription died with when a
+ * signal interrupted its inotify poll. The polling watcher below never raises it;
+ * the owner still classifies errors through it.
  */
 export function isInterruptedPollError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
@@ -29,27 +21,46 @@ export function isInterruptedPollError(error: unknown): boolean {
 }
 
 /**
- * Watch conversation trees through one native recursive subscription per root.
+ * Watch conversation trees by polling: every interval, walk the roots for
+ * `.jsonl` transcripts, compare each file's mtime and size with the last scan,
+ * and emit add/change/unlink.
  *
- * Node's fs.watch/chokidar implementations retain one FSEventWrap per watched
- * path on Linux. The transcript tree contains thousands of historical
- * directories, so even directory-only fs.watch recursion retained more than a
- * gigabyte of native watcher state. Parcel's native backend keeps recursive
- * watch bookkeeping outside Node's per-path FSWatcher objects.
+ * This replaced `@parcel/watcher`, which froze the dashboard. SIGCHLD from the
+ * dashboard's child processes makes parcel's inotify `poll()` fail with EINTR,
+ * and parcel does not retry it. `InotifyBackend::start` (2.6.0) then throws out of
+ * its loop without calling `mEndedSignal.notify()`. `~InotifyBackend` waits on
+ * that signal, so whichever thread drops the last reference to the dead backend
+ * blocks forever. When it was the main thread, the event loop stopped at 0% CPU.
+ * Each dead backend also leaked the thread and an unreaped `sh` from parcel's
+ * watchman probe.
+ *
+ * Node's fs.watch is not an option either: it keeps one FSEventWrap per watched
+ * path on Linux, and the transcript tree has thousands of directories, which cost
+ * more than a gigabyte of native watcher state. Polling holds only a path-to-stat
+ * map and uses no native watcher threads.
  */
 export class ConversationDirectoryWatcher {
   readonly ready: Promise<void>;
-  private readonly subscriptions = new Set<Subscription>();
   private readonly fileHandlers = new Map<ConversationWatchEvent, FileHandler[]>();
   private readonly errorHandlers: ErrorHandler[] = [];
+  private known = new Map<string, string>();
+  private timer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
 
-  constructor(roots: readonly string[]) {
-    this.ready = Promise.all(roots.map(root => this.subscribe(root))).then(() => undefined);
+  constructor(
+    private readonly roots: readonly string[],
+    private readonly pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  ) {
+    this.ready = this.scan(false).then(
+      () => this.scheduleNextScan(),
+      (error: unknown) => {
+        if (!this.stopped) this.emitError(error);
+      },
+    );
   }
 
   get activeSubscriptionCount(): number {
-    return this.subscriptions.size;
+    return this.timer ? 1 : 0;
   }
 
   on(event: ConversationWatchEvent, callback: FileHandler): this;
@@ -68,38 +79,44 @@ export class ConversationDirectoryWatcher {
   async close(): Promise<void> {
     if (this.stopped) return;
     this.stopped = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
     await this.ready.catch(() => undefined);
-    const subscriptions = [...this.subscriptions];
-    this.subscriptions.clear();
-    await Promise.allSettled(subscriptions.map(subscription => subscription.unsubscribe()));
   }
 
-  private async subscribe(root: string): Promise<void> {
-    try {
-      const subscription = await parcelWatcher.subscribe(root, (error, events) => {
-        if (this.stopped) return;
-        if (error) {
-          // An EINTR error (see isInterruptedPollError) leaves this subscription
-          // dead too. It is forwarded, not resubscribed here, so the owner can
-          // run its catch-up for events lost while the subscription was down.
-          this.emitError(error);
-          return;
-        }
-        for (const event of events) {
-          if (!event.path.endsWith('.jsonl')) continue;
-          if (event.type === 'create') this.emitFile('add', event.path);
-          else if (event.type === 'update') this.emitFile('change', event.path);
-          else this.emitFile('unlink', event.path);
-        }
-      });
-      if (this.stopped) {
-        await subscription.unsubscribe();
-      } else {
-        this.subscriptions.add(subscription);
-      }
-    } catch (error) {
-      if (!this.stopped) this.emitError(error);
+  private scheduleNextScan(): void {
+    if (this.stopped) return;
+    this.timer = setTimeout(() => {
+      this.scan(true).then(
+        () => this.scheduleNextScan(),
+        (error: unknown) => {
+          this.timer = null;
+          if (!this.stopped) this.emitError(error);
+        },
+      );
+    }, this.pollIntervalMs);
+    this.timer.unref?.();
+  }
+
+  private async scan(emit: boolean): Promise<void> {
+    const seen = new Map<string, string>();
+    for (const filePath of await discoverConversationJsonlFiles([...this.roots])) {
+      if (this.stopped) return;
+      const info = await stat(filePath).catch(() => null);
+      if (info) seen.set(filePath, `${info.mtimeMs}:${info.size}`);
     }
+    if (this.stopped) return;
+    if (emit) {
+      for (const [filePath, signature] of seen) {
+        const previous = this.known.get(filePath);
+        if (previous === undefined) this.emitFile('add', filePath);
+        else if (previous !== signature) this.emitFile('change', filePath);
+      }
+      for (const filePath of this.known.keys()) {
+        if (!seen.has(filePath)) this.emitFile('unlink', filePath);
+      }
+    }
+    this.known = seen;
   }
 
   private emitFile(event: ConversationWatchEvent, filePath: string): void {
