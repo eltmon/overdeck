@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:23:27.722Z",
+  "updated": "2026-09-27T16:23:38.404Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "governor-docs.ac3": {
       "status": "completed",
       "doneAt": "2026-09-27T16:23:27.722Z"
+    },
+    "governor-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:23:38.403Z"
     }
   }
 }
