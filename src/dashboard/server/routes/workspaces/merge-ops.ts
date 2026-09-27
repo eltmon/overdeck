@@ -41,6 +41,7 @@ import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
+import { freshMergeArtifact } from './merge-artifact.js';
 import { postInternalPipelineNotifyRoute } from './internal-pipeline-notify.js';
 import { activeStrikeMerge, advanceMergeQueue, automaticMergeHead, automaticMergeStartRefusal, forgeMergeGate, manualMergeHeadMoved, mergeHeadPin, mergeTargetRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
@@ -464,8 +465,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 400, error };
       }
-      const artifactUrl = remotePrimaryRepo?.artifactUrl || prResult.prUrl;
-      const artifactId = remotePrimaryRepo?.artifactId;
+      const { artifactUrl, artifactId } = await freshMergeArtifact(issueId, remoteMergeSet, remotePrimaryRepo, prResult.prUrl);
       const remoteTargetRefusal = mergeTargetRefusal(gate.facts, artifactUrl);
       if (remoteTargetRefusal) return refuseMerge(remoteTargetRefusal.error);
 
@@ -863,8 +863,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       return { success: false, statusCode: 400, error };
     }
 
-    const artifactUrl = primaryRepo?.artifactUrl || prResult.prUrl;
-    const artifactId = primaryRepo?.artifactId;
+    const { artifactUrl, artifactId } = await freshMergeArtifact(issueId, monorepoMergeSet, primaryRepo, prResult.prUrl);
     const githubPrRef = primaryForge === 'github' ? parseGitHubPullRequestUrl(artifactUrl) : null;
     const prNumber = githubPrRef ? String(githubPrRef.number) : undefined;
     if (primaryForge === 'github' && !prNumber) {

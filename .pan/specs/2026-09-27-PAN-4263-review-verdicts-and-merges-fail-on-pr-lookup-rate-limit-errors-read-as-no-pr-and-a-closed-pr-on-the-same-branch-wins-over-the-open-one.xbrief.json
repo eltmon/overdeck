@@ -1,0 +1,708 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T14:45:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4263: Review verdicts and merges fail on PR lookup: rate-limit errors read as 'no PR', and a closed PR on the same branch wins over the open one",
+    "updated": "2026-09-27T14:44:23.842Z"
+  },
+  "plan": {
+    "id": "pan-4263",
+    "title": "Review verdicts and merges fail on PR lookup: rate-limit errors read as 'no PR', and a closed PR on the same branch wins over the open one",
+    "status": "running",
+    "uid": "ecb13f82-c991-4a16-8abe-8ceb10c9a4ce",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-27T14:45:00Z",
+    "updated": "2026-09-27T14:44:23.842Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4263",
+        "label": "PAN-4263",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4263.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "forge",
+      "github",
+      "merge",
+      "review",
+      "deacon-lite",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "specialists done calls discoverArtifact, whose gh path runs `gh pr view <branch> ... 2>/dev/null || true`, so a GraphQL rate limit reads as 'no PR' and approved review verdicts (PAN-4222, PAN-3634) were refused and never retried. Separately, PAN-3668's merge was refused because merge-ops.ts prefers the persisted merge_set_repos.artifact_url (#3670, the first, closed PR) over the freshly resolved open PR (#4251). The App-path prs[0] the issue names is a real but dormant bug (no production caller passes repository); the merge gate's lookupPullRequestForBranch has the same prs[0]/--limit 1 shape.",
+      "Proposal": "Split failure from absence in the gh and glab lookups; make discoverArtifact return only the open artifact via a shared open-first selector that the merge gate's branch lookup also uses; retry transient forge failures in discoverArtifact (2 s, 8 s); make the merge path land the freshly resolved PR and overwrite a stale stored URL; make specialists done report forge failures honestly and journal a review.verdict-deferred entry that deacon-lite replays through the same CLI door under the original caller, with supersession and a 7-attempt cap; document it in docs/PIPELINE-GATES.md.",
+      "NonGoals": "- Deferral or replay for test and uat verdicts (they get the honest error and exit 1)\n- Changing ensurePRExists' swallowed gh pr list error in merge-ops.ts\n- Switching the gh path to gh api REST or adding GraphQL quota awareness\n- Refreshing or migrating stale merge_set_repos.artifact_url rows outside the merge path\n- Retrying createReviewArtifact, mergeReviewArtifact, commentOnArtifact or approveReviewArtifact\n- Changing merged-pr-verification.ts or merge-verification.ts\n- Weakening reviewVerdictRefusal or verdictCallerFromEnv\n- Adding a new pan CLI flag"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix PAN-3668's merge at merge-ops.ts (stale stored artifact_url wins) rather than only the forge App path the issue names",
+        "rationale": "Verified in overdeck.db that merge_set_repos.artifact_url for PAN-3668 is #3670 and that no production caller passes repository to discoverArtifact, so the App path is unreachable; the issue's requirement (merge lands the PR the gate evaluated) is unambiguous, only its named mechanism was wrong. The App-path prs[0] is still fixed as a latent bug."
+      },
+      {
+        "summary": "discoverArtifact returns only an OPEN artifact on every path",
+        "rationale": "The issue says closed/merged PRs are for findMergedArtifact callers only; the gh path previously returned closed PRs when no open one existed, which also stopped pan done from opening a fresh PR."
+      },
+      {
+        "summary": "Also fix the merge gate's lookupPullRequestForBranch prs[0]/--limit 1",
+        "rationale": "The issue requires the merge to resolve the same PR the gate evaluated; the gate has the same newest-created-wins shape, so both sides must share one selector."
+      },
+      {
+        "summary": "Include GitLab glab lookup in the failure/absence split",
+        "rationale": "getExistingGitLabArtifact has the identical 2>/dev/null || true swallow; glab mr list already returns open MRs only, so the change has no semantic side effect and protects MYN's GitLab repo."
+      },
+      {
+        "summary": "Deferred verdicts are journaled as review.verdict-deferred and replayed by deacon-lite by spawning the same pan admin specialists done command under the original caller",
+        "rationale": "Keeps one verdict door (full guard chain, journal, feedback delivery) with no new CLI flag; the journal-tail age is a restart-safe cooldown; 7 attempts at >=10-minute spacing cover GitHub's hourly GraphQL reset."
+      },
+      {
+        "summary": "Retry policy: 3 attempts, delays 2 s then 8 s, transient errors only",
+        "rationale": "Short enough to keep specialists done responsive; the replay handles longer outages such as an exhausted hourly quota."
+      }
+    ],
+    "items": [
+      {
+        "id": "lookup-failure-not-absence",
+        "title": "gh/glab artifact lookup throws on failure and returns null only on true absence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T14:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4263",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/forge.ts",
+            "tests/unit/lib/forge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/forge.test.ts tests/unit/lib/forge-merged-artifact.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "forge.test.ts and forge-merged-artifact.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-8",
+            "NFR-2"
+          ],
+          "acJustification": "Six criteria: the five lookup outcomes the PRD lists plus the exec-timeout message the transient classifier depends on; each is one test case in forge.test.ts."
+        },
+        "narrative": {
+          "Action": "PRD work item 1 (.pan/drafts/PAN-4263.md). In src/lib/forge.ts getExistingGitHubArtifact gh branch: remove `2>/dev/null || true`, request `--json url,number,state`, add timeout FORGE_OBSERVATION_TIMEOUT_MS, catch the exec error and return null only when err.stderr matches /no pull requests found for branch/i, when err.killed (exec timeout, empty stderr) throw `gh pr view <branch> timed out after <ms>ms` so the transient classifier matches it, otherwise throw `gh pr view <branch> failed: <stderr>`; return null unless state === 'OPEN' (decision D1/D2). getExistingGitLabArtifact: same removal and timeout, throw `glab mr list failed: <stderr>` on failure (`glab mr list timed out after <ms>ms` when killed), `[]`/empty stays null (D13). githubForgeAdapter.createReviewArtifact: wrap the post-create lookup in try/catch and fall back to parseArtifactRef(url)?.number for id (D5). Add the five tests listed in the PRD to tests/unit/lib/forge.test.ts (its execMock rejects with {stderr})."
+        },
+        "items": [
+          {
+            "id": "lookup-failure-not-absence.ac1",
+            "title": "Given gh pr view exits 1 with stderr 'GraphQL: API rate limit already exceeded', when the GitHub adapter looks up the branch, then it rejects with an error whose message contains 'rate limit' instead of returning null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lookup-failure-not-absence.ac2",
+            "title": "Given gh pr view exits 1 with stderr 'no pull requests found for branch \"feature/x\"', when the adapter looks up the branch, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lookup-failure-not-absence.ac3",
+            "title": "Given gh pr view returns {state:'CLOSED'} for the branch, when the adapter looks up the branch, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lookup-failure-not-absence.ac4",
+            "title": "Given glab mr list exits non-zero with stderr '401 Unauthorized', when the GitLab adapter looks up the branch, then it rejects with an error containing '401'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lookup-failure-not-absence.ac5",
+            "title": "Given gh pr create succeeds and the follow-up lookup throws, when createReviewArtifact completes, then the result id equals the PR number parsed from the created URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lookup-failure-not-absence.ac6",
+            "title": "Given the gh exec is killed by the timeout with empty stderr, when the adapter looks up the branch, then it rejects with a message containing 'timed out'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-first-selector",
+        "title": "Add selectPullRequestForHead and use it on the forge App path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T14:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4263",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-app.ts",
+            "src/lib/forge.ts",
+            "tests/unit/lib/github-app.test.ts",
+            "tests/unit/lib/forge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-app.test.ts tests/unit/lib/forge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "github-app.test.ts and forge.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 2. Add `updatedAt: string | null` to GitHubPullRequestForHead and map `updated_at` in listPullRequestsForHead (src/lib/github-app.ts). Export pure `selectPullRequestForHead(prs, { includeClosed })`: open PRs first ordered by updatedAt desc; when includeClosed, then merged ordered by mergedAt desc, then closed ordered by updatedAt desc; null when nothing qualifies. Replace `prs[0]` in forge.ts getExistingGitHubArtifact App path with `selectPullRequestForHead(prs, { includeClosed: false })`."
+        },
+        "items": [
+          {
+            "id": "open-first-selector.ac1",
+            "title": "Given a closed PR #3670 listed before an open PR #4251, when selectPullRequestForHead runs with includeClosed false, then it returns #4251",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-first-selector.ac2",
+            "title": "Given two open PRs, when the selector runs, then it returns the one with the newer updatedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-first-selector.ac3",
+            "title": "Given only a merged PR and includeClosed false, when the selector runs, then it returns null; with includeClosed true it returns the merged PR ahead of a closed one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-first-selector.ac4",
+            "title": "Given the GitHub App is configured and repository is passed with [closed #3670, open #4251], when discoverArtifact runs, then it returns id '4251'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "discover-transient-retry",
+        "title": "Retry transient forge failures in discoverArtifact with backoff",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T14:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4263",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/forge-transient.ts",
+            "src/lib/forge.ts",
+            "tests/unit/lib/forge-transient.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/forge-transient.test.ts tests/unit/lib/forge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "forge-transient.test.ts passes under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 3 and decisions D3/D4. Create src/lib/forge-transient.ts exporting isTransientForgeError(err: unknown) (matches message plus stderr against /rate limit|secondary rate|abuse detection|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|socket hang up|timed out|(?:failed: |HTTP )50[234]\\b/i — the status-code alternative is anchored so a PR number like /pull/504 never matches) and retryTransientForgeOp(op, delaysMs = [2000, 8000]) which retries only transient errors, sleeping via setTimeout promises. Wrap both adapters' discoverArtifact methods in retryTransientForgeOp. Tests MUST use vi.useFakeTimers() + vi.advanceTimersByTimeAsync() (repo rule: fake timers for retry tests)."
+        },
+        "items": [
+          {
+            "id": "discover-transient-retry.ac1",
+            "title": "Given one transient failure then success, when retryTransientForgeOp runs under fake timers, then it resolves after 2000 ms of advanced time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discover-transient-retry.ac2",
+            "title": "Given three transient failures, when retryTransientForgeOp runs, then it rejects with the last error only after 10000 ms of advanced fake time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discover-transient-retry.ac3",
+            "title": "Given a non-transient error such as 'HTTP 404', when retryTransientForgeOp runs, then it rejects immediately and calls the operation once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discover-transient-retry.ac4",
+            "title": "Given the message 'no pull requests found for branch', when isTransientForgeError classifies it, then it returns false; given 'API rate limit exceeded' it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discover-transient-retry.ac5",
+            "title": "Given 'GitHub API GET /x failed: 503 upstream' or 'HTTP 502: Bad Gateway', isTransientForgeError returns true; given 'unrecognized artifact URL https://github.com/o/r/pull/504' it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-lookup-selector",
+        "title": "Merge gate branch lookup ranks the open PR first on both paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T14:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4263",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-pr-lookup.ts",
+            "tests/unit/lib/github-pr-lookup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-pr-lookup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "github-pr-lookup.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 4. In src/lib/github-pr-lookup.ts lookupPullRequestForBranch: App path uses selectPullRequestForHead(prs, { includeClosed: true }) instead of prs[0]; gh path changes `--limit 1` to `--limit 20`, requests `number,state,mergedAt,updatedAt`, maps rows to GitHubPullRequestForHead (state OPEN→'open' else 'closed', merged = state === 'MERGED') and applies the same selector. Return shape (number, state 'OPEN'|'MERGED'|'CLOSED', mergedAt) is unchanged."
+        },
+        "items": [
+          {
+            "id": "gate-lookup-selector.ac1",
+            "title": "Given the App path lists [closed #3670, open #4251], when lookupPullRequestForBranch runs, then it returns number 4251 with state 'OPEN'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-lookup-selector.ac2",
+            "title": "Given gh pr list returns the closed PR first and the open PR second, when lookupPullRequestForBranch runs, then it returns number 4251",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-lookup-selector.ac3",
+            "title": "Given only a merged PR exists, when lookupPullRequestForBranch runs, then it returns state 'MERGED'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-lands-fresh-pr",
+        "title": "Merge path lands the freshly resolved PR and overwrites a stale stored artifact URL",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T14:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4263",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-stale-artifact.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/merge-ops-stale-artifact.test.ts src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts tests/unit/dashboard/server/routes/ensure-pr.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-ops-stale-artifact.test.ts and existing merge-ops tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 5 and decision D6. This is the ACTUAL PAN-3668 cause (stored merge_set_repos.artifact_url = #3670). In merge-ops.ts replace `const artifactUrl = primaryRepo?.artifactUrl || prResult.prUrl;` (monorepo) and `const artifactUrl = remotePrimaryRepo?.artifactUrl || prResult.prUrl;` (remote) with artifactUrl = prResult.prUrl and artifactId from parseGitHubPullRequestUrl(prResult.prUrl)?.number. When the stored artifactUrl is set and differs (case-insensitive, trailing slash ignored), rewrite the row via withRepoArtifactUrl + upsertMergeSet and log `[merge] replacing stale stored artifact <old> with <new> for <issue>`. New test modelled on merge-ops-clean-direct.test.ts."
+        },
+        "items": [
+          {
+            "id": "merge-lands-fresh-pr.ac1",
+            "title": "Given the stored merge set holds artifactUrl .../pull/3670, ensurePRExists resolves .../pull/4251 and the gate passed .../pull/4251, when the monorepo merge runs, then no 'merge would land' refusal is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-lands-fresh-pr.ac2",
+            "title": "Given the same PAN-3668 shape, when the merge runs, then the forge merge is called with url .../pull/4251",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-lands-fresh-pr.ac3",
+            "title": "Given the stored URL differs from the resolved URL, when the merge runs, then upsertMergeSet receives a repo row with artifactUrl .../pull/4251",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-lands-fresh-pr.ac4",
+            "title": "Given the stored URL equals the resolved URL, when the merge runs, then upsertMergeSet is not called for an artifact rewrite",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialists-done-honest-error",
+        "title": "specialists done reports forge failure honestly and journals a deferred review verdict",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T14:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4263",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/specialists/done.ts",
+            "src/lib/cloister/pipeline-journal.ts",
+            "src/cli/commands/__tests__/specialists-done-forge-lookup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/specialists-done-forge-lookup.test.ts src/cli/commands/__tests__/specialists-done-uat-marker.test.ts tests/unit/dashboard/server/routes/specialists-done-verdict-journal.test.ts tests/unit/dashboard/server/routes/specialists-done-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "specialists-done-forge-lookup.test.ts and existing specialists-done tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 6 and decisions D7/D8/D9. Add 'review.verdict-deferred' and 'review.verdict-replay-gave-up' to the journal type union. In done.ts, for role review compute caller (verdictCallerFromEnv) BEFORE discoverArtifact and refuse a non-review-session agent immediately through the existing refusal path. Wrap discoverArtifact in try/catch: print `Couldn't reach <forge> to find the review artifact for <branch>: <reason>` and exit 1; for role review with isTransientForgeError(reason), append review.verdict-deferred {status, runId (options.runId or review parent reviewRunId), notes capped at 100000 BYTES (Buffer.byteLength, truncated on a character boundary) with suffix, callerId, reason} and print that the verdict is saved and deacon-lite will retry. Apply the same deferral when postReviewVerdict returns posted:false with a transient reason. True null keeps the existing 'No open review artifact' message."
+        },
+        "items": [
+          {
+            "id": "specialists-done-honest-error.ac1",
+            "title": "Given discoverArtifact fails with 'GraphQL: API rate limit already exceeded', when the review agent runs specialists done --status passed, then stderr contains \"Couldn't reach github\" and 'rate limit', never contains 'No open review artifact', and the command exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialists-done-honest-error.ac2",
+            "title": "Given the same rate-limit failure, when specialists done exits, then the journal tail is review.verdict-deferred with status 'passed', the runId and callerId 'agent-pan-4222-review'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialists-done-honest-error.ac3",
+            "title": "Given discoverArtifact resolves null, when specialists done runs, then it prints 'No open review artifact' and writes no deferral",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialists-done-honest-error.ac4",
+            "title": "Given the caller is work agent agent-pan-4222, when specialists done review runs, then it journals review.verdict-refused, writes no deferral and never calls discoverArtifact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialists-done-honest-error.ac5",
+            "title": "Given postReviewVerdict returns posted:false with reason 'gh pr review failed: API rate limit exceeded', when specialists done runs, then a review.verdict-deferred entry is appended and the command exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deferred-verdict-replay",
+        "title": "deacon-lite replays deferred review verdicts through the specialists done door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T14:45:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4263",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cloister/deferred-verdict-replay.ts",
+            "src/lib/cloister/deacon-lite.ts",
+            "src/lib/cloister/__tests__/deferred-verdict-replay.test.ts",
+            "src/lib/cloister/__tests__/deacon-lite-recover-stalled-reviews.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deferred-verdict-replay.test.ts src/lib/cloister/__tests__/deacon-lite-recover-stalled-reviews.test.ts tests/unit/lib/cloister/deacon-lite.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deferred-verdict-replay.test.ts and the deacon-lite suites pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "docs-pipeline-gates"
+          ],
+          "parallelSafeReason": "Touches only the new cloister/deferred-verdict-replay.ts, one branch in deacon-lite.ts recoverStalledReviews and their tests; no other item edits these files, so it can run in its own slot once specialists-done-honest-error lands."
+        },
+        "narrative": {
+          "Action": "PRD work item 7 and decision D10/D11/D12 plus the implementation checkpoint. New module src/lib/cloister/deferred-verdict-replay.ts exporting replayDeferredReviewVerdict(issueId, workspacePath, entry, now, deps?) with injectable execFile/getAgentState. Rules: wait until the tail entry is >= 10 min old; in-flight Set guards overlapping ticks; runId differing from the review parent's reviewRunId journals review.verdict-replay-gave-up {reason:'superseded'}; >= 7 deferred entries for the run journals gave-up {reason:'cap'} plus one warn activity entry; otherwise execFile('pan', ['admin','specialists','done','review', issueId, '--status', status, '--run-id', runId, '--notes', notes]) with timeout 5 min and env OVERDECK_AGENT_ID=callerId (or OVERDECK_AGENT_ID/OVERDECK_ISSUE_ID/OVERDECK_SESSION_TYPE deleted for an operator entry); a non-zero exit with no new deferred entry journals gave-up {reason:'failed'}. In recoverStalledReviews, after the review.halted branch, route a review.verdict-deferred tail to the replay, holding while the issue is paused. Checkpoint: confirm readAncestorAgentIds() is empty in the deacon child (grep OVERDECK_AGENT_ID in /proc/<deacon-pid>/environ) and record the result in the commit body; if not empty the replay is refused, never a bypass."
+        },
+        "items": [
+          {
+            "id": "deferred-verdict-replay.ac1",
+            "title": "Given a review.verdict-deferred tail 5 minutes old, when recoverStalledReviews runs, then no pan process is spawned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferred-verdict-replay.ac2",
+            "title": "Given an 11-minute-old deferred entry with callerId 'agent-pan-4222-review', when the replay runs, then it spawns pan admin specialists done review PAN-4222 --status passed --run-id <id> with env OVERDECK_AGENT_ID 'agent-pan-4222-review'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferred-verdict-replay.ac3",
+            "title": "Given an operator deferral (callerId null), when the replay runs, then the child env has no OVERDECK_AGENT_ID, OVERDECK_ISSUE_ID or OVERDECK_SESSION_TYPE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferred-verdict-replay.ac4",
+            "title": "Given the entry runId differs from the review parent reviewRunId, or seven deferred entries exist for the run, when the replay runs, then nothing is spawned and review.verdict-replay-gave-up is journaled with reason 'superseded' or 'cap'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferred-verdict-replay.ac5",
+            "title": "Given a deferred tail on a paused issue, when recoverStalledReviews runs, then the replay is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pipeline-gates",
+        "title": "Document forge retry, deferred verdicts and fresh merge target in PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T14:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4263",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'review.verdict-deferred' docs/PIPELINE-GATES.md",
+            "grep -n 'Recording retries transient forge failures' docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "grep prints the entry-types table rows and the retry paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 8. In docs/PIPELINE-GATES.md: under 'Verdict feedback routing' add the paragraph '**Recording retries transient forge failures (PAN-4263).**' describing the 2 s / 8 s retry, the \"Couldn't reach <forge>\" message, review.verdict-deferred and the >=10-minute replay under the original caller capped at 7 attempts; add table rows for review.verdict-deferred and review.verdict-replay-gave-up in 'Entry types and who writes them'; extend routine 5 in 'Deacon-lite: seven routines' to mention the deferred-verdict replay (cloister/deferred-verdict-replay.ts); under 'The merge gate' add that the merge lands the PR ensurePRExists resolves and overwrites a stale stored merge-set artifact_url. concerns.md already carries the planner's note; touch it only if its wording is now wrong."
+        },
+        "items": [
+          {
+            "id": "docs-pipeline-gates.ac1",
+            "title": "docs/PIPELINE-GATES.md contains the paragraph headed 'Recording retries transient forge failures (PAN-4263)' stating the 2 s and 8 s retry delays and the \"Couldn't reach <forge>\" message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-gates.ac2",
+            "title": "The 'Entry types and who writes them' table renders rows for review.verdict-deferred and review.verdict-replay-gave-up naming their writers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-gates.ac3",
+            "title": "The 'Deacon-lite: seven routines' list contains cloister/deferred-verdict-replay.ts under recoverStalledReviews",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-gates.ac4",
+            "title": "The merge gate section contains a sentence that a stale stored merge-set artifact_url is overwritten and never merged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lookup-failure-not-absence",
+        "to": "open-first-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "open-first-selector",
+        "to": "discover-transient-retry",
+        "type": "blocks"
+      },
+      {
+        "from": "open-first-selector",
+        "to": "gate-lookup-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "discover-transient-retry",
+        "to": "specialists-done-honest-error",
+        "type": "blocks"
+      },
+      {
+        "from": "specialists-done-honest-error",
+        "to": "deferred-verdict-replay",
+        "type": "blocks"
+      },
+      {
+        "from": "deferred-verdict-replay",
+        "to": "docs-pipeline-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "lookup-failure-not-absence",
+        "to": "discover-transient-retry",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-27-PAN-4263-review-verdicts-and-merges-fail-on-pr-lookup-rate-limit-errors-read-as-no-pr-and-a-closed-pr-on-the-same-branch-wins-over-the-open-one.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

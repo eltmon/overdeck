@@ -371,6 +371,7 @@ describe('App REST shared helpers', () => {
           merged: true,
           merged_at: '2026-07-03T12:00:00Z',
           merge_commit_sha: 'abc123',
+          updated_at: '2026-07-03T12:00:05Z',
         },
       ]), { status: 200 }));
 
@@ -382,6 +383,7 @@ describe('App REST shared helpers', () => {
       merged: true,
       mergedAt: '2026-07-03T12:00:00Z',
       mergeCommit: 'abc123',
+      updatedAt: '2026-07-03T12:00:05Z',
       url: 'https://github.com/eltmon/overdeck/pull/123',
     }]);
     const url = new URL(String(fetchMock.mock.calls[1][0]));

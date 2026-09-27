@@ -142,6 +142,10 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `${data.verdict ?? 'unknown'}${data.subRole ? ` (${data.subRole})` : ''}`;
     case 'review.verdict-refused':
       return `${data.status ?? 'unknown'} refused${typeof data.caller === 'string' ? ` (${data.caller})` : ''}`;
+    case 'review.verdict-deferred':
+      return `${data.status ?? 'unknown'} deferred${typeof data.reason === 'string' ? ` — ${data.reason}` : ''}`;
+    case 'review.verdict-replay-gave-up':
+      return `replay gave up (${data.reason ?? 'unknown'})`;
     case 'uat.verdict':
       return `${data.status ?? 'unknown'}${typeof data.anchor === 'string' ? ` head=${shortSha(data.anchor)}` : ''}`;
     case 'feedback.delivered':
