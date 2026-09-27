@@ -15,6 +15,7 @@ import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
 import { closeAgentPane, launchAgentPane } from '../terminal-backends/launch.js';
 import { toPaneRole } from '../terminal-backends/prompt-guard.js';
+import { ensureMainInputTarget, type InputTarget } from './input-target.js';
 import { isAlive, isConfirmedDead } from './liveness.js';
 import {
   clearReadySignal,
@@ -71,6 +72,12 @@ export interface MessageDeliveryOutcome {
    * the main conversation (PAN-4247); the caller's intent was to reach the main
    * agent, so this is never treated as delivered. */
   landedInSubagent?: { agentId: string; description: string };
+  /** PAN-4268: typed input was confirmed to go to Claude Code's main agent before delivery. */
+  inputTarget?: 'main';
+  /** PAN-4268: the subagent the selector was switched away from before delivery. */
+  switchedFromSubagent?: string;
+  /** PAN-4268: delivery was refused because input could not be moved to the main agent. */
+  inputTargetRefusal?: { reason: string; inputTarget: InputTarget };
 }
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
@@ -681,6 +688,25 @@ export async function messageAgent(
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
 
+  // PAN-4268: Claude Code sends typed input to whichever agent its selector
+  // marks with ●. Move it back to main before pasting, or refuse.
+  let mainTarget: Pick<MessageDeliveryOutcome, 'inputTarget' | 'switchedFromSubagent'> = {};
+  if (expectedHarness === 'claude-code') {
+    const target = await ensureMainInputTarget(normalizedId);
+    if (!target.ok) {
+      queueAgentMail(normalizedId, message, 'queued', opts.dedupKey, caller);
+      logAgentLifecycle(normalizedId, `messageAgent refused: ${target.reason}`);
+      return {
+        delivered: false,
+        queuedToMail: true,
+        confirmed: false,
+        reason: target.reason,
+        inputTargetRefusal: { reason: target.reason, inputTarget: target.inputTarget },
+      };
+    }
+    mainTarget = { inputTarget: 'main', ...(target.switchedFromSubagent ? { switchedFromSubagent: target.switchedFromSubagent } : {}) };
+  }
+
   const deliveryMethod = resolveAgentDeliveryMethod(agentState);
   const deliveryCaller = `messageAgent:${caller}`;
   const transcriptSessionId = getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl'
@@ -722,10 +748,10 @@ export async function messageAgent(
     if (!confirmedDelivery.delivered) {
       const reason = `message was injected but no turn appeared in transcript ${transcriptSessionId} within the confirmation window (${confirmedDelivery.attempts} attempts)`;
       logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);
-      return { delivered: false, queuedToMail: true, confirmed: false, reason };
+      return { delivered: false, queuedToMail: true, confirmed: false, reason, ...mainTarget };
     }
     logAgentLifecycle(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
-    return { delivered: true, queuedToMail: true, confirmed: true };
+    return { delivered: true, queuedToMail: true, confirmed: true, ...mainTarget };
   }
 
   // Claude Code agent without an identifiable transcript: the confirmed-turn
@@ -738,7 +764,7 @@ export async function messageAgent(
     logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);
     queueAgentMail(normalizedId, message, 'queued', undefined, caller);
     await appendTellInterventionForUserSource(normalizedId, caller);
-    return { delivered: false, queuedToMail: true, confirmed: false, reason };
+    return { delivered: false, queuedToMail: true, confirmed: false, reason, ...mainTarget };
   }
 
   // Keyed deliveries and non-Claude harnesses keep the composer-level contract.
@@ -767,6 +793,7 @@ export async function messageAgent(
     confirmed: false,
     ...(delivery.failure ? { reason: delivery.failure } : {}),
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
+    ...mainTarget,
   };
 }
 

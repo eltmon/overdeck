@@ -1,0 +1,823 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T15:46:31Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4268: Route composer and pan tell input to the main agent: read Claude Code's agent selector instead of guessing",
+    "updated": "2026-09-27T15:53:27.833Z"
+  },
+  "plan": {
+    "id": "pan-4268",
+    "title": "Route composer and pan tell input to the main agent: read Claude Code's agent selector instead of guessing",
+    "status": "running",
+    "uid": "4648cae0-db79-40ad-8108-9f2107828d2e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-27T15:46:31Z",
+    "updated": "2026-09-27T15:53:27.833Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4268",
+        "label": "PAN-4268",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4247",
+        "label": "PAN-4247",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4268.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "composer",
+      "pan-tell",
+      "claude-code",
+      "subagents",
+      "delivery"
+    ],
+    "narratives": {
+      "Problem": "PAN-4247's composer notice ('Background subagent … is running. Claude Code may route typed messages to it.') is a guess, and it confused the operator while messages were in fact reaching the main agent. Claude Code's own agent selector (● on the row that receives typed input) is what decides routing; input landed in an already-completed subagent earlier the same day, so 'a subagent is running' is neither necessary nor sufficient. Composer sends and pan tell also paste blindly, so input can still go to a subagent.",
+      "Proposal": "Parse the selector from the pane (fixture-tested against Claude Code 2.1.280 captures), and before every composer send and every messageAgent delivery to a claude-code target run a closed-loop ensure-main that presses only Down/Up/Enter/Escape to put ● back on main, re-reading after every key, and refuses loudly (HTTP 409 input-target-not-main; pan tell exit 1 with the message mail-queued) when the switch cannot be confirmed. Expose inputTarget ('main' | { subagent } | 'unknown') on conversation list rows and single reads, and show a composer notice only when the selector is on a subagent, with a Send to main button. Full detail and the probe captures: .pan/drafts/PAN-4268.md.",
+      "NonGoals": "- Changing deliverAgentMessage or any kickoff/resume/fork delivery path\n- A switch-only button or any control that sends input to a subagent on purpose\n- Notices or inputTarget for agent-backed panels (agentId set)\n- Non-claude-code harnesses\n- A cross-process lock around pane keystrokes\n- Removing PAN-4247's sidechain landing probe, 'Delivered to subagent' bubble relabel, or landedInSubagent handling\n- Sending any key other than Up, Down, Enter, Escape to a pane (never x, Left, printable text or C-c)\n- Updating the OKF bundle (../overdeck-knowledge)\n- Pinning a Claude Code version in the repo"
+    },
+    "metadata": {
+      "sizeJustification": "One issue whose acceptance criteria require all of it: the detector, the switch, both delivery doors (composer route and messageAgent/pan tell), the read-model field and the composer notice that consumes it. The code touches three source trees (src/lib, src/cli, src/dashboard); the projected count exceeds 6 subsystems only because each doc file (docs/CONVERSATION-SUBAGENTS.md, docs/DASHBOARD-ARCHITECTURE.md) and the pan-tell skill count separately, and it exceeds 25 files only because 10 entries are tests or the single fixture glob. Splitting the notice into a sibling issue would ship a read-model field nothing consumes, or keep the hedged notice the issue asks to remove.",
+      "canonicalFilename": "2026-09-27-PAN-4268-route-composer-and-pan-tell-input-to-the-main-agent-read-claude-code-s-agent-selector-instead-of-guessing.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ensure-main is a new helper in src/lib/agents/input-target.ts called from the composer route and messageAgent only, not from deliverAgentMessage.",
+        "rationale": "Kickoff, resume and fork deliveries never have subagents, and delivery.ts is already at its allowlisted size ceiling (1119 lines)."
+      },
+      {
+        "summary": "A selector whose layout cannot be parsed ('unknown') refuses the send.",
+        "rationale": "The issue forbids silent misrouting; an unreadable selector is exactly the case the fixture tests exist to catch."
+      },
+      {
+        "summary": "Pane I/O follows the pane: Herdr only when Herdr holds a pane for the agent, otherwise tmux capture-pane/send-keys (the same fallback deliverAgentMessage takes); only a throwing read of a resolved pane refuses.",
+        "rationale": "On a Herdr host deliverAgentMessage falls through to the supervisor/tmux cascade for agents Herdr does not hold, so refusing on 'herdr holds no pane' would block deliveries that succeed today."
+      },
+      {
+        "summary": "No selector rows on screen means input goes to main and no keys are sent.",
+        "rationale": "The live probe showed Claude Code hides the selector when no agents are listed, and typed input then reaches main."
+      },
+      {
+        "summary": "The switch uses only Down/Up/Enter/Escape in a verified closed loop (Down until a footer cursor appears, move the cursor to main, Enter, Escape, re-read after every key).",
+        "rationale": "The probe showed Escape alone never returns to main, Left opens the fleet view, the first Down is not deterministic, and typed text or 'x' with footer focus is swallowed or stops a subagent."
+      },
+      {
+        "summary": "PAN-4247's hedged 'running' notice, evidence-based 'routed' notice and its Send anyway / Wait gate are removed; the bubble relabel and landedInSubagent handling stay.",
+        "rationale": "The issue asks to remove the hedged notice and warn only on the selector; the confirm gate guarded against re-routing, which the default switch now prevents."
+      },
+      {
+        "summary": "'Send to main' submits the current draft through the normal send path and is disabled on an empty draft; there is no switch-only button.",
+        "rationale": "Every send already switches to main; the issue's AC is 'switches, confirms and sends'."
+      },
+      {
+        "summary": "Agent-backed panels (agentId set) show no notice; their sends still switch through messageAgent.",
+        "rationale": "inputTarget lives on conversation list rows, and agents are not in that list; adding it to the agent read model is scope the issue does not ask for."
+      },
+      {
+        "summary": "Refusals answer HTTP 409 with code 'input-target-not-main', deliveryUnknown false, retryable true.",
+        "rationale": "composerSend.ts turns that into 'Failed to send message (409): <reason>', the editor keeps the draft (cleared only on success) and the failed-message outbox offers Retry."
+      },
+      {
+        "summary": "inputTarget is read in conversation list enrichment and getConversationRead, only for live claude-code conversations with a subagents/ directory.",
+        "rationale": "That is the existing liveness cadence (2 s TTL, 10 s client poll) and the gate avoids pane reads for sessions that cannot show a selector."
+      },
+      {
+        "summary": "Fixtures live in src/lib/agents/__fixtures__/claude-code-2.1.280/, named by the captured version.",
+        "rationale": "The repo pins no Claude Code version; 2.1.280 is the installed version the probe captured."
+      },
+      {
+        "summary": "The live end-to-end check (composer and pan tell landing in the main JSONL) is a test-role UAT criterion plus a work-agent checkpoint in a throwaway tmux socket.",
+        "rationale": "It needs a real Claude Code session with a background subagent, which unit tests cannot provide, and live Overdeck panes must never receive probe keystrokes."
+      }
+    ],
+    "items": [
+      {
+        "id": "selector-parser",
+        "title": "Parse Claude Code's agent selector from a pane screen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4268",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "ensure-main",
+            "read-model-input-target",
+            "composer-notice"
+          ],
+          "files_scope": [
+            "src/lib/agents/input-target.ts",
+            "src/lib/agents/__fixtures__/claude-code-2.1.280/*.txt",
+            "src/lib/agents/__tests__/input-target-parser.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/input-target-parser.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "input-target-parser.test.ts passes every fixture case",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4268.md work item W1. Create src/lib/agents/input-target.ts exporting SelectorRow, SelectorState, InputTarget ('main' | { subagent: string } | 'unknown'), parseAgentSelector(screen) and inputTargetFromSelector(state), exactly as the PRD's W1 types and parsing rules state: strip ANSI, trimEnd lines, scan only lines after the LAST /^─+$/ bottom rule, row regex /^(❯ | {2})([●◯⏺]) (.+)$/, label split on /\\s{2,}/ with ' (+N)' group count, prompt text between top and bottom rule with 'Message @<type>…' treated as empty, footerHint from 'to select · Enter to view' / 'Enter to view', and fleetView when a line after the bottom rule contains 'enter to return'. Derivation: fleetView → 'unknown'; no rows → 'main'; no main row or filledCount !== 1 → 'unknown'; filled main → 'main'; else { subagent: description }. Create the nine fixture files under src/lib/agents/__fixtures__/claude-code-2.1.280/ — four copied verbatim from the PRD's 'Captured screens' section (main-selected, footer-focused-main, footer-focused-subagent, subagent-selected) plus no-subagents, several-subagents, garbled, transcript-bullets-only and fleet-view (verbatim from the PRD) built as the PRD W1 step 1 describes. Write input-target-parser.test.ts covering the PRD's fixture table."
+        },
+        "items": [
+          {
+            "id": "selector-parser.ac1",
+            "title": "Given main-selected.txt, parseAgentSelector returns 2 rows with mainIndex 0, filledIndex 0, cursorIndex null and inputTargetFromSelector returns 'main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selector-parser.ac2",
+            "title": "Given subagent-selected.txt, inputTargetFromSelector returns { subagent: 'Counter run' } and promptText is '' because 'Message @general-purpose…' counts as an empty prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selector-parser.ac3",
+            "title": "Given several-subagents.txt, the parser returns 4 rows, the grouped row has groupCount 3 and description 'Scanning handleConversationCreate for cwd defaults', and the target resolves to { subagent: 'Map the delivery door' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selector-parser.ac4",
+            "title": "Given garbled.txt (rows without a main row), a screen with two filled rows, or fleet-view.txt (Claude Code's agents overview), inputTargetFromSelector returns 'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selector-parser.ac5",
+            "title": "Given no-subagents.txt or transcript-bullets-only.txt (● lines only above the prompt box), the parser returns zero rows and the target defaults to 'main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-key-sender",
+        "title": "Add resolveAgentPaneIo: read and key the pane on whichever backend holds it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4268",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/terminal-backends/agent-pane-io.ts",
+            "src/lib/terminal-backends/__tests__/agent-pane-io-keys.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/terminal-backends/__tests__/agent-pane-io-keys.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-pane-io-keys.test.ts passes for the tmux branch, the Herdr branch and the missing-pane case",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W2. In src/lib/terminal-backends/agent-pane-io.ts, after sendHerdrPaneKeys, export type SelectorKey = 'Up' | 'Down' | 'Enter' | 'Escape', interface AgentPaneIo { backend; read(lines); sendKey(key) } and async resolveAgentPaneIo(agentId, backend?) exactly as the PRD snippet: on a Herdr host WITH a Herdr pane for the agent → read = readHerdrPaneText(paneId, lines, 'visible'), sendKey = sendHerdrPaneKeys(paneId, [key]); otherwise (tmux host, or Herdr host whose agent Herdr does not hold — the same fallback deliverAgentMessage takes at delivery.ts:417-437) → read = capturePane(agentId, lines), sendKey = sendKeysAsync(agentId, key, 'input-target'). Never throw for a missing Herdr pane. Test with vi.mock for ../tmux.js, ./herdr.js and ./launch.js (or a fake backend object)."
+        },
+        "items": [
+          {
+            "id": "pane-key-sender.ac1",
+            "title": "Given a tmux host, resolveAgentPaneIo('conv-x') returns backend 'tmux' and sendKey('Down') calls sendKeysAsync('conv-x', 'Down', 'input-target') once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-key-sender.ac2",
+            "title": "Given a Herdr host with a pane for conv-x, resolveAgentPaneIo returns backend 'herdr', read(60) calls readHerdrPaneText(paneId, 60, 'visible'), and sendKey('Down') sends pane.send_keys with keys ['down']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-key-sender.ac3",
+            "title": "Given a Herdr host with no Herdr pane for conv-x, resolveAgentPaneIo falls back to backend 'tmux' instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ensure-main",
+        "title": "Closed-loop switch of Claude Code's input back to the main agent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4268",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "composer-route-ensure",
+            "message-agent-ensure"
+          ],
+          "files_scope": [
+            "src/lib/agents/input-target.ts",
+            "src/lib/agents/__tests__/input-target-ensure.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/input-target-ensure.test.ts src/lib/agents/__tests__/input-target-parser.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "input-target-ensure.test.ts passes every scripted fake-pane case",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Once selector-parser and pane-key-sender land, this item edits only src/lib/agents/input-target.ts and its own new test file; read-model-input-target deliberately lives in a separate file, so no other ready item touches these files."
+        },
+        "narrative": {
+          "Action": "PRD work item W3. Add EnsureMainDeps { io, sleep }, EnsureMainResult and ensureMainInputTarget(agentId, deps?) to src/lib/agents/input-target.ts. Default io = resolveAgentPaneIo (W2), resolved ONCE per call so reads and keys hit the same pane (a throw while resolving refuses like a read failure); default sleep = setTimeout promise. Follow the PRD's numbered procedure exactly: read (throw → refuse 'Could not read…'); fleetView → one Escape, settle, still fleet → refuse; no rows → ok 'no-selector'; 'unknown' → refuse; filled main with no cursor → ok 'already-main'; subagent filled with non-empty promptText and no cursor → refuse; press Down up to 4 times until a cursor row appears; move the cursor with Up/Down until it is on main (max rows.length + 1 moves); Enter and settle until filledIndex === mainIndex; Escape and settle until cursorIndex === null; final check ● on main and no cursor. Settle = poll every SELECTOR_POLL_MS = 150 up to SELECTOR_SETTLE_TIMEOUT_MS = 1500. Only Up, Down, Enter, Escape are ever sent. Use the PRD's refusal texts verbatim. Tests use a scripted fake pane built from the W1 fixtures and a no-op sleep (never real timers), including the observed path where the first Down lands the cursor on main. Then do the PRD's live implementation checkpoint in a THROWAWAY tmux socket (tmux -L pan4268verify) with an uncommitted script passing explicit io deps — never against a live Overdeck agent or conversation pane — and record the outcome (including whether Down enters the footer while main is mid-turn) in the commit message; fallback per the PRD is the bounded refusal."
+        },
+        "items": [
+          {
+            "id": "ensure-main.ac1",
+            "title": "Given subagent-selected.txt where the first Down lands the cursor on main (the live-observed path), ensureMainInputTarget sends exactly ['Down','Enter','Escape'] and returns { ok: true, check: 'switched', switchedFromSubagent: 'Counter run' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-main.ac2",
+            "title": "Given subagent-selected.txt where the first Down lands the cursor on the subagent, the procedure sends exactly ['Down','Up','Enter','Escape']; given a first Down that leaves the footer unfocused, it sends a second Down and still returns 'switched'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-main.ac3",
+            "title": "Given main-selected.txt or no-subagents.txt, ensureMainInputTarget sends zero keys and returns 'already-main' or 'no-selector'; given fleet-view.txt followed by main-selected.txt, it sends only ['Escape'] and returns 'already-main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-main.ac4",
+            "title": "Given garbled.txt, a pane read that throws, or unsent prompt text while a subagent is filled, ensureMainInputTarget refuses with ok false, a reason string and zero keys sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-main.ac5",
+            "title": "Given an Enter that leaves ● on the subagent, ensureMainInputTarget refuses with a reason naming Enter, and across every test the sent keys contain only Up, Down, Enter or Escape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-route-ensure",
+        "title": "Composer route switches input to main before pasting and refuses with 409",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4268",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/__tests__/conversation-message-input-target.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-message-input-target.test.ts src/lib/overdeck/__tests__/conversation-message-upload.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-message-input-target.test.ts passes and conversation-message-upload.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W4. Add ensureMainInputTarget?: (agentId) => Promise<EnsureMainResult> to ConversationMessageDependencies (conversation-message.ts:204). In handleConversationMessage's non-control-channel else branch, before the transcript snapshot, when harness === 'claude-code', call it with conv.tmuxSession. On ok:false return jsonResponse({ error: reason, code: 'input-target-not-main', inputTarget, deliveryUnknown: false, retryable: true }, { status: 409 }) without delivering. On success add inputTarget: 'main' and (when set) switchedFromSubagent to the final 200 body. New test file modeled on conversation-message-upload.test.ts."
+        },
+        "items": [
+          {
+            "id": "composer-route-ensure.ac1",
+            "title": "Given an ensure dep returning ok:false, POSTing a message to a claude-code conversation returns status 409 with code 'input-target-not-main' and deliverAgentMessage is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-route-ensure.ac2",
+            "title": "Given an ensure dep returning check 'switched' from 'Counter run', the route returns 200 with inputTarget 'main' and switchedFromSubagent 'Counter run', and ensure runs before deliverAgentMessage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-route-ensure.ac3",
+            "title": "Given a codex conversation, the route never calls the ensure dep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-route-ensure.ac4",
+            "title": "Given a throwaway Claude Code conversation whose pane selector shows ● on a background subagent, when the operator sends from the dashboard composer (browser checks in an isolated Playwright profile), then the text appears as a user record in the main <session>.jsonl and none under subagents/, and the pane shows ● main afterwards — or the send fails with the 409 reason in a toast and the draft stays in the editor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "message-agent-ensure",
+        "title": "messageAgent and the agent-message route refuse when input cannot reach main",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4268",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/dashboard/server/routes/agents/messaging.ts",
+            "tests/unit/lib/agents/message-agent.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/message-agent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "message-agent.test.ts passes including the new input-target cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7",
+            "FR-9"
+          ],
+          "blockedByNote": "AC5 is end-to-end and also needs tell-main-output for the printed text; the test role verifies it after both land."
+        },
+        "narrative": {
+          "Action": "PRD work item W5 steps 1, 2 and 4. Add inputTarget?: 'main', switchedFromSubagent?: string and inputTargetRefusal?: { reason; inputTarget } to MessageDeliveryOutcome (messaging.ts:63). In messageAgent, right after the waitForAgentIdle block (search 'not at idle prompt after 5s') and before resolveAgentDeliveryMethod, when expectedHarness === 'claude-code' call ensureMainInputTarget(normalizedId): on refusal queue mail as 'queued' (queueAgentMail(normalizedId, message, 'queued', opts.dedupKey, caller)), log, and return delivered:false with inputTargetRefusal; on success spread { inputTarget: 'main', switchedFromSubagent? } into every later return except landedInSubagent. In routes/agents/messaging.ts make sendAgentMessage/handleAgentMessage answer 409 { error, code: 'input-target-not-main', inputTarget, deliveryUnknown: false, retryable: true } when the outcome has inputTargetRefusal."
+        },
+        "items": [
+          {
+            "id": "message-agent-ensure.ac1",
+            "title": "Given ensureMainInputTarget refuses for a claude-code agent, messageAgent returns delivered false with inputTargetRefusal.reason set, queues the text to mail as queued, and sends nothing to the pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-agent-ensure.ac2",
+            "title": "Given ensureMainInputTarget returns check 'switched' from 'Counter run', messageAgent's outcome carries inputTarget 'main' and switchedFromSubagent 'Counter run'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-agent-ensure.ac3",
+            "title": "Given a codex target, messageAgent never calls ensureMainInputTarget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-agent-ensure.ac4",
+            "title": "When messageAgent reports inputTargetRefusal, POST /api/agents/:id/message returns status 409 with code 'input-target-not-main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-agent-ensure.ac5",
+            "title": "Given a throwaway Claude Code conversation whose pane selector shows ● on a background subagent, when pan tell conv-<name> sends a message, then the text appears as a user record in the main <session>.jsonl and none under subagents/, and pan tell prints \"'s main agent\" — or pan tell exits 1 with the refusal reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tell-main-output",
+        "title": "pan tell prints main-agent delivery or the refusal and exits 1",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4268",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/cli/commands/tell.ts",
+            "src/cli/commands/__tests__/tell.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/tell.test.ts tests/unit/cli/tell.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both tell test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W5 step 3. In tellCommand add, before the landedInSubagent branch, a refusal branch that prints in red 'Message NOT delivered to <id>: Claude Code's typed input could not be moved to the main agent.', the message, the reason and the mail location in dim, and exits 1. Change the success line to 'Message delivered to <id>'s main agent' when outcome.inputTarget === 'main' (keeping ' (turn confirmed)' when confirmed) and print a dim 'Switched Claude Code's input from subagent \"<d>\" back to the main agent first.' when switchedFromSubagent is set."
+        },
+        "items": [
+          {
+            "id": "tell-main-output.ac1",
+            "title": "Given an outcome with inputTargetRefusal, pan tell prints 'could not be moved to the main agent' to stderr and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tell-main-output.ac2",
+            "title": "Given an outcome with inputTarget 'main' and confirmed true, pan tell prints \"'s main agent (turn confirmed)\" and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tell-main-output.ac3",
+            "title": "Given an outcome with switchedFromSubagent 'Counter run', pan tell prints 'Switched Claude Code's input from subagent \"Counter run\"'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "read-model-input-target",
+        "title": "Expose inputTarget on conversation list rows and single reads",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4268",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/overdeck/conversation-input-target.ts",
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/transcript-landing.ts",
+            "src/lib/overdeck/__tests__/conversation-input-target.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-input-target.test.ts src/lib/overdeck/__tests__/conversation-list-costs.test.ts tests/unit/lib/overdeck/conversation-reads-session-file.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-input-target.test.ts passes and the existing list/reads tests still pass",
+            "typecheck and lint (file-size ratchet included) complete without errors"
+          ],
+          "traces": [
+            "FR-10",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W6. Export subagentsDirFor from src/lib/transcript-landing.ts. Create src/lib/overdeck/conversation-input-target.ts with readConversationInputTarget(conv, sessionAlive, sessionFile, deps?) returning undefined unless the session is alive, the harness is claude-code, and subagentsDirFor(sessionFile) is an existing directory (async stat); otherwise read the pane (default (await resolveAgentPaneIo(conv.tmuxSession)).read(60), W2), returning 'unknown' on a read throw, else inputTargetFromSelector(parseAgentSelector(text)). Call it in enrichConversationList (after currentTool) and getConversationRead and spread inputTarget into the row only when defined. Keep conversation-reads.ts under 1000 lines."
+        },
+        "items": [
+          {
+            "id": "read-model-input-target.ac1",
+            "title": "Given a dead session, a non-claude-code harness, or no subagents/ directory, readConversationInputTarget returns undefined and never reads the pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-model-input-target.ac2",
+            "title": "Given a live claude-code conversation with a subagents/ directory whose pane matches subagent-selected.txt, readConversationInputTarget returns { subagent: 'Counter run' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-model-input-target.ac3",
+            "title": "Given a pane read that throws, readConversationInputTarget returns 'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-model-input-target.ac4",
+            "title": "Given enrichConversationList and getConversationRead, each row includes inputTarget only when readConversationInputTarget returned a value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-notice",
+        "title": "Composer notice only when the selector shows a subagent, with Send to main",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4268",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/lib/subagentRouting.ts",
+            "src/dashboard/frontend/src/lib/__tests__/subagentRouting.test.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/subagentRouting.test.ts src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "grep -rn 'may route' src/dashboard/frontend/src"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "traces": [
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W7. Add inputTarget?: 'main' | { subagent: string } | 'unknown' to the Conversation interface (ConversationList.tsx:17). Replace subagentRouting.ts with SubagentRoutingNotice = { description } | null and inputTargetNotice(inputTarget) (object → { description: subagent }, anything else → null); delete subagentRoutingNotice and TASK_NOTIFICATION_PREFIX. In ConversationPanel use inputTargetNotice(conversation.inputTarget) (null when agentId is set) and invalidate ['conversations'] in handleMessageAcknowledged. In ComposerFooter delete confirmedRoutedKeyRef, confirmPending, the routed early return in handleSubmit, its reset effect and the Send anyway/Wait buttons; render 'Typed messages are going to subagent \"<description>\", not the main agent.' with one Send to main button calling handleSubmit, disabled under the same condition as the Send button (ComposerFooter.tsx:839). Rewrite subagentRouting.test.ts and replace the three PAN-4247 notice tests in ComposerFooter.test.tsx as the PRD lists."
+        },
+        "items": [
+          {
+            "id": "composer-notice.ac1",
+            "title": "Given inputTarget { subagent: 'Counter run' }, the composer renders 'Typed messages are going to subagent \"Counter run\", not the main agent.' with a Send to main button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-notice.ac2",
+            "title": "Given a typed draft, clicking Send to main sends the draft through the normal send function exactly once; given an empty draft the button renders disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-notice.ac3",
+            "title": "Given inputTarget 'main', 'unknown' or undefined, or an agent-backed panel, no notice renders and no 'Send anyway' button exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-notice.ac4",
+            "title": "Given the frontend source tree, grep -rn 'may route' returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-selector-check",
+        "title": "Document the agent selector check in the subagent and dashboard docs and the pan-tell skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:46:31Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4268",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "docs/CONVERSATION-SUBAGENTS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "sync-sources/skills/pan-tell/SKILL.md"
+          ],
+          "verify_commands": [
+            "grep -n 'ensureMainInputTarget' docs/CONVERSATION-SUBAGENTS.md",
+            "grep -n 'input-target-not-main' docs/CONVERSATION-SUBAGENTS.md docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'Reaches the main agent' sync-sources/skills/pan-tell/SKILL.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item W8. In docs/CONVERSATION-SUBAGENTS.md rename '## Input routed into a subagent' to '## Input routed into a subagent — the agent selector check', add the 'Selector check (PAN-4268)' bullet with the content the PRD lists (selector decides routing, parseAgentSelector/ensureMainInputTarget in src/lib/agents/input-target.ts, keys Down/Up/Enter/Escape only, re-read after each key, 409 input-target-not-main / pan tell exit 1, fixtures path), replace the Composer notice bullet with the selector-based notice and Send to main (stating the PAN-4247 routed/running notices and Send anyway gate are removed), and extend the pan tell bullet. In docs/DASHBOARD-ARCHITECTURE.md add the PRD's PAN-4268 sentence after the delivery-state sentence ending 'PAN-4247).'. In sync-sources/skills/pan-tell/SKILL.md add item 5 'Reaches the main agent' to 'Why pan tell?'."
+        },
+        "items": [
+          {
+            "id": "docs-selector-check.ac1",
+            "title": "docs/CONVERSATION-SUBAGENTS.md contains a 'Selector check (PAN-4268)' bullet that names ensureMainInputTarget, the Down/Up/Enter/Escape key set, and the 409 code input-target-not-main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-selector-check.ac2",
+            "title": "docs/CONVERSATION-SUBAGENTS.md no longer describes a 'Send anyway' confirmation and contains the text 'Send to main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-selector-check.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a PAN-4268 sentence stating the composer route answers 409 input-target-not-main and the draft stays in the editor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-selector-check.ac4",
+            "title": "sync-sources/skills/pan-tell/SKILL.md contains a 'Reaches the main agent' item under 'Why pan tell?' stating that pan tell refuses with exit 1 when the switch cannot be confirmed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "selector-parser",
+        "to": "ensure-main",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-key-sender",
+        "to": "ensure-main",
+        "type": "blocks"
+      },
+      {
+        "from": "ensure-main",
+        "to": "composer-route-ensure",
+        "type": "blocks"
+      },
+      {
+        "from": "ensure-main",
+        "to": "message-agent-ensure",
+        "type": "blocks"
+      },
+      {
+        "from": "message-agent-ensure",
+        "to": "tell-main-output",
+        "type": "blocks"
+      },
+      {
+        "from": "selector-parser",
+        "to": "read-model-input-target",
+        "type": "blocks"
+      },
+      {
+        "from": "read-model-input-target",
+        "to": "composer-notice",
+        "type": "informs"
+      },
+      {
+        "from": "composer-route-ensure",
+        "to": "docs-selector-check",
+        "type": "blocks"
+      },
+      {
+        "from": "tell-main-output",
+        "to": "docs-selector-check",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-notice",
+        "to": "docs-selector-check",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-key-sender",
+        "to": "read-model-input-target",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

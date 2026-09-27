@@ -66,8 +66,8 @@ interface ComposerFooterProps {
   contextWindowUsage?: ContextWindowSnapshot | null;
   /** True while the runtime is mid-turn. Used to choose Pi delivery defaults. */
   agentBusy?: boolean;
-  /** Claude Code may have routed (or may route) typed input into a running
-   * subagent instead of this conversation (PAN-4247). */
+  /** Claude Code's agent selector shows a subagent, not the main agent,
+   * receiving typed input (PAN-4268). */
   subagentNotice?: SubagentRoutingNotice;
 }
 
@@ -162,14 +162,6 @@ export function ComposerFooter({
   const addCommandResult = useComposerStore((s) => s.addCommandResult);
 
   const [text, setText] = useState('');
-  // Which routed-notice key the operator has already confirmed sending past
-  // (PAN-4247); a fresh key (a different subagent input, or the same one
-  // re-armed after the notice cleared and reappeared) requires reconfirming.
-  // A ref, not state: "Send anyway" must call handleSubmit synchronously in
-  // the same handler that records the confirmation, and a state setter's
-  // update would not be visible to that closure until the next render.
-  const confirmedRoutedKeyRef = useRef<string | null>(null);
-  const [confirmPending, setConfirmPending] = useState(false);
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
   const [voiceAutoStartToken, setVoiceAutoStartToken] = useState(0);
   const [voiceState, setVoiceState] = useState<{ isListening: boolean; error: string | null }>({ isListening: false, error: null });
@@ -489,14 +481,6 @@ export function ComposerFooter({
     const uploadedAttachments = currentPendingAttachments.filter((attachment) => attachment.serverPath);
     if (!messageText && uploadedAttachments.length === 0) return;
 
-    // The evidence-based routed notice proves routing only after the fact —
-    // ask before sending into what may be the same subagent again. The merely
-    // running notice is hedged (may route) and never blocks (PAN-4247).
-    if (subagentNotice?.kind === 'routed' && subagentNotice.key !== confirmedRoutedKeyRef.current) {
-      setConfirmPending(true);
-      return;
-    }
-
     setSendingFor(submitConversationName, true);
     const attachmentPrefix = uploadedAttachments
       .map((attachment) => `@${attachment.serverPath}`)
@@ -581,13 +565,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor, subagentNotice]);
-
-  // A stale confirm dialog must not survive a conversation switch or the
-  // notice's key changing to a different subagent input (PAN-4247).
-  useEffect(() => {
-    setConfirmPending(false);
-  }, [conversation.name, subagentNotice?.key]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -715,27 +693,18 @@ export function ComposerFooter({
             <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
               <span>
-                {subagentNotice.kind === 'routed'
-                  ? `Your last message went to subagent "${subagentNotice.description}", not this conversation. New messages may go there too.`
-                  : `Background subagent "${subagentNotice.description}" is running. Claude Code may route typed messages to it.`}
+                {`Typed messages are going to subagent "${subagentNotice.description}", not the main agent.`}
               </span>
-              {subagentNotice.kind === 'routed' && confirmPending && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      confirmedRoutedKeyRef.current = subagentNotice.key;
-                      setConfirmPending(false);
-                      void handleSubmit();
-                    }}
-                  >
-                    Send anyway
-                  </button>
-                  <button type="button" onClick={() => setConfirmPending(false)}>
-                    Wait
-                  </button>
-                </div>
-              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => void handleSubmit()}
+                  disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0) || isDisabled}
+                  title="Switches Claude Code back to the main agent, then sends your draft"
+                >
+                  Send to main
+                </button>
+              </div>
             </div>
           </div>
         )}

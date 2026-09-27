@@ -1,0 +1,12 @@
+✻ Waiting for 1 background agent to finish
+
+──────────────────────────────── Sleep probe ─
+❯
+────────────────────────────────────────
+  Haiku 4.5 (claude-haiku-4-5-20251001)  /tmp/probe  master
+  ctx 24%  8/200.0k  out 38  cost $0.2068
+  5h 18% (1h46m)  7d 69% (99h26m)
+  ↑/↓ to select · Enter to view
+
+❯ ● main
+  ◯ general-purpose  Counter run                                                                                                                           1m 14s · ↓ 23.8k tokens

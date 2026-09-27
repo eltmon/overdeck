@@ -50,6 +50,11 @@ vi.mock('../../../../lib/agents.js', async () => {
   return { ...(actual as object), deliverAgentMessage: vi.fn().mockResolvedValue(undefined) };
 });
 
+vi.mock('../../../../lib/agents/input-target.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/agents/input-target.js')>()),
+  ensureMainInputTarget: vi.fn(async () => ({ ok: true, check: 'no-selector' })),
+}));
+
 vi.mock('../../../../lib/tmux.js', async () => {
   const actual = await vi.importActual('../../../../lib/tmux.js');
   return { ...(actual as object), sendKeysAsync: vi.fn().mockResolvedValue(undefined) };
