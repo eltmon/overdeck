@@ -892,6 +892,8 @@ export async function handleConversationSummaryFork(
       forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
       // PAN-4185: a fork of a bare conversation stays bare.
       ...conversationLaunchContext(conv),
+      // Gauntlet lanes D3: the successor nests under its source. Launch-time fact, written once.
+      parentName: conv.name,
     });
     const forkRequest = buildForkRequest({
       parentConversationName: conv.name,
