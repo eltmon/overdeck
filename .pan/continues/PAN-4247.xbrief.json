@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:52:44.678Z",
+  "updated": "2026-09-27T11:52:54.414Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "routing-notice.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T11:52:44.678Z"
+    },
+    "docs-delivery-states.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:52:54.414Z"
     }
   }
 }
