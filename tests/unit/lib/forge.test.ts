@@ -27,15 +27,18 @@ vi.mock('child_process', () => {
   }
 
   (exec as any)[kCustom] = execMock;
-  return { exec };
+  // The real github-app module (for selectPullRequestForHead) promisifies execFile at load.
+  return { exec, execFile: vi.fn() };
 });
 
-vi.mock('../../../src/lib/github-app.js', () => ({
+vi.mock('../../../src/lib/github-app.js', async (importOriginal) => ({
   getPullRequestState: getPullRequestStateMock,
   isGitHubAppConfigured: isGitHubAppConfiguredMock,
   listPullRequestsForHead: listPullRequestsForHeadMock,
   mergePullRequestWithApp: mergePullRequestWithAppMock,
   parsePullRequestRef: parsePullRequestRefMock,
+  selectPullRequestForHead: (await importOriginal<typeof import('../../../src/lib/github-app.js')>())
+    .selectPullRequestForHead,
 }));
 
 import { getForgeAdapter, GITHUB_MERGE_TIMEOUT_MS, parseArtifactRef } from '../../../src/lib/forge.js';
@@ -204,6 +207,37 @@ describe('forge adapters', () => {
       url: 'https://github.com/org/repo/pull/42',
       id: '42',
     });
+  });
+
+  it('returns the open PR on the App path when a newer closed PR is listed first (PAN-4263)', async () => {
+    isGitHubAppConfiguredMock.mockReturnValue(true);
+    listPullRequestsForHeadMock.mockResolvedValue([
+      {
+        number: 3670,
+        state: 'closed',
+        merged: false,
+        mergedAt: null,
+        mergeCommit: null,
+        updatedAt: '2026-09-26T00:00:00Z',
+        url: 'https://github.com/eltmon/overdeck/pull/3670',
+      },
+      {
+        number: 4251,
+        state: 'open',
+        merged: false,
+        mergedAt: null,
+        mergeCommit: null,
+        updatedAt: '2026-09-20T00:00:00Z',
+        url: 'https://github.com/eltmon/overdeck/pull/4251',
+      },
+    ]);
+
+    const result = await getForgeAdapter('github').discoverArtifact({
+      sourceBranch: 'feature/pan-3668',
+      repository: 'eltmon/overdeck',
+    });
+
+    expect(result).toMatchObject({ url: 'https://github.com/eltmon/overdeck/pull/4251', id: '4251' });
   });
 
   it('falls back to gh for existing GitHub artifact lookup when the App is not configured', async () => {

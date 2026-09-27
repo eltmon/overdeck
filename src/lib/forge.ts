@@ -10,6 +10,7 @@ import {
   listPullRequestsForHead,
   mergePullRequestWithApp,
   parsePullRequestRef,
+  selectPullRequestForHead,
   type GitHubPullRequestState,
 } from './github-app.js';
 
@@ -161,7 +162,8 @@ async function getExistingGitHubArtifact(
   const parsedRepo = parseRepository(repository);
   if (isGitHubAppConfigured() && parsedRepo) {
     const prs = await listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, branchName, 'all');
-    const pr = prs[0];
+    // Open-only (PAN-4263): the REST list sorts by creation, so prs[0] could be a newer closed PR.
+    const pr = selectPullRequestForHead(prs, { includeClosed: false });
     if (!pr) return null;
     return {
       forge: 'github',

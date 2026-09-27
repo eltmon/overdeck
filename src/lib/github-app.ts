@@ -133,6 +133,7 @@ export interface GitHubPullRequestForHead {
   merged: boolean;
   mergedAt: string | null;
   mergeCommit: string | null;
+  updatedAt: string | null;
   url?: string;
 }
 
@@ -632,6 +633,7 @@ export async function listPullRequestsForHead(
     merged?: boolean;
     merged_at?: string | null;
     merge_commit_sha?: string | null;
+    updated_at?: string | null;
   }>>(`/repos/${owner}/${repo}/pulls?${params.toString()}`);
 
   return pulls.map((pull) => ({
@@ -640,8 +642,38 @@ export async function listPullRequestsForHead(
     merged: pull.merged === true || pull.merged_at != null,
     mergedAt: pull.merged_at ?? null,
     mergeCommit: pull.merge_commit_sha ?? null,
+    updatedAt: pull.updated_at ?? null,
     url: pull.html_url,
   }));
+}
+
+/** Newest timestamp first; a missing timestamp sorts last, then the higher PR number wins. */
+function byNewest(
+  timestamp: (pr: GitHubPullRequestForHead) => string | null,
+): (a: GitHubPullRequestForHead, b: GitHubPullRequestForHead) => number {
+  return (a, b) => {
+    const ta = Date.parse(timestamp(a) ?? '') || 0;
+    const tb = Date.parse(timestamp(b) ?? '') || 0;
+    return tb - ta || b.number - a.number;
+  };
+}
+
+/**
+ * The PR a head branch stands for (PAN-4263). Open PRs first, most recently
+ * updated; with `includeClosed`, then merged (most recent merge), then closed
+ * (most recently updated). `null` when nothing qualifies.
+ */
+export function selectPullRequestForHead(
+  prs: readonly GitHubPullRequestForHead[],
+  options: { includeClosed: boolean },
+): GitHubPullRequestForHead | null {
+  const open = prs.filter((pr) => pr.state === 'open').sort(byNewest((pr) => pr.updatedAt));
+  if (open[0]) return open[0];
+  if (!options.includeClosed) return null;
+  const merged = prs.filter((pr) => pr.state !== 'open' && pr.merged).sort(byNewest((pr) => pr.mergedAt));
+  if (merged[0]) return merged[0];
+  const closed = prs.filter((pr) => pr.state !== 'open' && !pr.merged).sort(byNewest((pr) => pr.updatedAt));
+  return closed[0] ?? null;
 }
 
 /** Look up an issue's state through the GitHub App REST API (no GraphQL). */
