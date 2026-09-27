@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4265",
   "created": "2026-09-27T15:21:17.185Z",
-  "updated": "2026-09-27T15:22:16.752Z",
+  "updated": "2026-09-27T15:22:28.033Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4265",
       "claimedAt": "2026-09-27T15:21:17.185Z",
       "doneAt": "2026-09-27T15:22:16.752Z"
+    },
+    "manifest-v2": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4265",
+      "claimedAt": "2026-09-27T15:22:28.033Z"
     }
   }
 }
