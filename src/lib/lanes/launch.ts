@@ -16,7 +16,7 @@
  * spawn window is refused too. All git and fs work is async (NFR-2).
  */
 import { randomUUID } from 'node:crypto';
-import { mkdir, realpath, stat, writeFile } from 'node:fs/promises';
+import { mkdir, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
@@ -50,7 +50,7 @@ import { laneContract, type LaneAnswering } from './contract.js';
 import { distinctLaneCwds, laneIterations } from './iteration.js';
 import { pairBuilder, type PairingRow } from './pairing.js';
 import { LaneLaunchError, type LaneLaunchRequest, type LaneLaunchResult } from './types.js';
-import { addBranchWorktree, addDetachedWorktree, applySparse, fetchBase, laneDirName } from './worktree.js';
+import { addBranchWorktree, addDetachedWorktree, applySparse, fetchBase, laneDirName, removeWorktree } from './worktree.js';
 
 const RUN_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const KEY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
@@ -69,6 +69,8 @@ export interface LaneGit {
   addBranchWorktree: typeof addBranchWorktree;
   addDetachedWorktree: typeof addDetachedWorktree;
   applySparse: typeof applySparse;
+  /** Optional in test fakes; defaults to the real helper. */
+  removeWorktree?: typeof removeWorktree;
 }
 
 /** Test seams; production callers use the defaults. */
@@ -209,6 +211,12 @@ function validateRequest(request: LaneLaunchRequest): void {
   }
   if (!request.brief.trim()) throw new LaneLaunchError(400, 'a lane needs a brief: pass --brief <file> or --prompt <text>');
   if (request.branch !== undefined && request.role !== 'builder') throw new LaneLaunchError(400, '--branch applies to builder lanes only');
+  // Refs reach git as positional arguments; a leading dash would parse as an option.
+  for (const [flag, value] of [['--at', request.at], ['--from', request.from], ['--branch', request.branch]] as const) {
+    if (value !== undefined && (value.startsWith('-') || value.trim() === '')) {
+      throw new LaneLaunchError(400, `${flag} ${value} is not a git ref`);
+    }
+  }
 }
 
 /**
@@ -409,10 +417,22 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
         ? await iterationBranch(rows, target, run, key, iteration, latestReport)
         : (request.branch ?? conventionBranch(run, key, iteration));
     }
+    // A launch that fails after creating the directory removes it again, so the
+    // next launch of the same lane is not refused as "exists" with nothing to reuse.
+    let created: 'dir' | 'worktree' | null = null;
+    const undoCreate = async (): Promise<void> => {
+      if (created === 'dir') await rm(target, { recursive: true, force: true }).catch(() => undefined);
+      if (created === 'worktree') {
+        await (git.removeWorktree ?? removeWorktree)(config.projectPath, target).catch((error: unknown) => {
+          warnings.push(`could not remove ${target} after a failed launch: ${error instanceof Error ? error.message : String(error)}`);
+        });
+      }
+    };
     if (!request.reuse) {
       if (await pathExists(target)) throw new LaneLaunchError(409, `${target} exists; pass --reuse to continue in it`);
       if (role === 'play') {
         await mkdir(target, { recursive: true });
+        created = 'dir';
       } else {
         const fetchWarning = await git.fetchBase(config.projectPath);
         if (fetchWarning) warnings.push(fetchWarning);
@@ -422,56 +442,64 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
               ? config.baseRef
               : await iterationBranch(rows, cwds[iteration - 2], run, key, iteration - 1, latestReport));
             await git.addBranchWorktree(config.projectPath, target, branch, base);
+            created = 'worktree';
             if (config.sparseCheckout) await git.applySparse(target, config.sparseCheckout);
           } else if (DETACHED_ROLES.has(role) && at) {
             await git.addDetachedWorktree(config.projectPath, target, at);
+            created = 'worktree';
           }
         } catch (error) {
+          await undoCreate();
           throw gitFailure(error);
         }
       }
     }
 
-    // 10-11. Name and write-once brief (FR-9, D9).
-    let name = generateConversationName();
-    for (let attempt = 0; attempt < 5 && getConversationByName(name); attempt += 1) name = generateConversationName();
-    const tmuxSession = `conv-${name}`;
-    const briefDir = workerDir(tmuxSession);
-    await mkdir(briefDir, { recursive: true });
-    const briefPath = join(briefDir, 'lane-brief.md');
-    const header = `<!-- lane ${run}/${key} ${role} i${iteration}; parent ${parent.name}; source ${request.briefSource ?? 'inline'} -->`;
-    const brief = request.brief.endsWith('\n') ? request.brief : `${request.brief}\n`;
-    await writeFile(briefPath, `${header}\n\n${brief}`, { flag: 'wx' });
+    try {
+      // 10-11. Name and write-once brief (FR-9, D9).
+      let name = generateConversationName();
+      for (let attempt = 0; attempt < 5 && getConversationByName(name); attempt += 1) name = generateConversationName();
+      const tmuxSession = `conv-${name}`;
+      const briefDir = workerDir(tmuxSession);
+      await mkdir(briefDir, { recursive: true });
+      const briefPath = join(briefDir, 'lane-brief.md');
+      const header = `<!-- lane ${run}/${key} ${role} i${iteration}; parent ${parent.name}; source ${request.briefSource ?? 'inline'} -->`;
+      const brief = request.brief.endsWith('\n') ? request.brief : `${request.brief}\n`;
+      await writeFile(briefPath, `${header}\n\n${brief}`, { flag: 'wx' });
 
-    // 12. The row: manual title (FR-10), parent link = the launching row (FR-30).
-    const launchContext = { bareContext: role === 'play', skipClaudeMd: role === 'play' };
-    const claudeSessionId = randomUUID();
-    const conversation = createConversation({
-      name,
-      tmuxSession,
-      cwd: target,
-      claudeSessionId,
-      title: request.title ?? `${run} ${key} · ${role}${iteration >= 2 ? ` i${iteration}` : ''}`,
-      titleSource: 'manual',
-      model,
-      effort,
-      harness,
-      projectKey: config.projectKey,
-      ...launchContext,
-      parentName: parent.name,
-      lane: { run, key, role, ...(criticOf ? { criticOfName: criticOf.name } : {}) },
-    });
-    emitCreated(name);
-
-    // 13. Start the runtime with the lane contract as the first message.
-    // FR-38: a builder of iteration n ≥ 2 is told which verdict it answers.
-    const answering = role === 'builder' && iteration >= 2 ? await answeredVerdict(run, key, iteration, now(), latestReport) : null;
-    const message = laneContract({ role, run, key, iteration, briefPath, cwd: target, branch, at, answering });
-    void start({ conv: conversation, tmuxSession, cwd: target, claudeSessionId, model, effort, harness, launchContext, message })
-      .catch((error: unknown) => {
-        console.error(`[lanes] runtime start failed for ${name}:`, error instanceof Error ? error.message : String(error));
+      // 12. The row: manual title (FR-10), parent link = the launching row (FR-30).
+      const launchContext = { bareContext: role === 'play', skipClaudeMd: role === 'play' };
+      const claudeSessionId = randomUUID();
+      const conversation = createConversation({
+        name,
+        tmuxSession,
+        cwd: target,
+        claudeSessionId,
+        title: request.title ?? `${run} ${key} · ${role}${iteration >= 2 ? ` i${iteration}` : ''}`,
+        titleSource: 'manual',
+        model,
+        effort,
+        harness,
+        projectKey: config.projectKey,
+        ...launchContext,
+        parentName: parent.name,
+        lane: { run, key, role, ...(criticOf ? { criticOfName: criticOf.name } : {}) },
       });
+      emitCreated(name);
 
-    return { conversation, cwd: target, branch, iteration, warnings };
+      // 13. Start the runtime with the lane contract as the first message.
+      // FR-38: a builder of iteration n ≥ 2 is told which verdict it answers.
+      const answering = role === 'builder' && iteration >= 2 ? await answeredVerdict(run, key, iteration, now(), latestReport) : null;
+      const message = laneContract({ role, run, key, iteration, briefPath, cwd: target, branch, at, answering });
+      void start({ conv: conversation, tmuxSession, cwd: target, claudeSessionId, model, effort, harness, launchContext, message })
+        .catch((error: unknown) => {
+          console.error(`[lanes] runtime start failed for ${name}:`, error instanceof Error ? error.message : String(error));
+        });
+
+      return { conversation, cwd: target, branch, iteration, warnings };
+    } catch (error) {
+      await undoCreate();
+      throw error;
+    }
   });
 }

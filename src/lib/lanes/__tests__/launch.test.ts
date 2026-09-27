@@ -312,3 +312,28 @@ describe('laneConfigFor', () => {
     expect(() => laneConfigFor('lexerra', { name: 'Lexerra', path: '/p/lexerra', gauntlet: { lanes_root: 'rel' } })).toThrow(/lanes_root/);
   });
 });
+
+describe('launchLane failure cleanup and ref checks (PAN-4223 review)', () => {
+  it('removes the worktree it created when a later step fails, so the lane can be relaunched', async () => {
+    const { deps, git } = harness(config({ sparseCheckout: ['/*'] }));
+    const removeWorktree = vi.fn(async (_project: string, path: string) => { rmSync(path, { recursive: true, force: true }); });
+    const failing = { ...deps, git: { ...git, applySparse: vi.fn(async () => { throw new Error('sparse failed'); }), removeWorktree } };
+    const parent = root();
+    const error = await rejection(launchLane(request(parent, { key: 'undo' }), failing));
+    expect(error.message).toContain('sparse failed');
+    const target = join(LANES_ROOT, 'hotel-undo');
+    expect(removeWorktree).toHaveBeenCalledWith(PROJECT_PATH, target);
+    expect(existsSync(target)).toBe(false);
+
+    const retry = await launchLane(request(parent, { key: 'undo' }), deps);
+    expect(retry).toMatchObject({ cwd: target, iteration: 1 });
+  });
+
+  it('refuses --at, --from and --branch values that start with a dash', async () => {
+    const parent = root();
+    const { deps } = harness();
+    expect((await rejection(launchLane(request(parent, { key: 'dash1', branch: '--upload-pack=x' }), deps))).status).toBe(400);
+    expect((await rejection(launchLane(request(parent, { key: 'dash2', from: '-x' }), deps))).message).toContain('--from');
+    expect((await rejection(launchLane(request(parent, { role: 'verifier', key: 'dash3', at: '--help' }), deps))).message).toContain('--at');
+  });
+});

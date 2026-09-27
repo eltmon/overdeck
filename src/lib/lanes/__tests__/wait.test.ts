@@ -105,12 +105,20 @@ describe('waitForLaneSet', () => {
     expect(injected.sleep).toHaveBeenCalledTimes(3);
   });
 
-  it('warns once per call about a stopped lane with no report since the cursor', async () => {
-    const injected = { ...deps(), listLanes: vi.fn(async () => [lane('dead-lane', 'stopped')]) };
-    const outcome = await waitForLaneSet({ parent: 'root-1' }, { timeoutMs: 6_000 }, injected);
-    expect(outcome).toEqual({ kind: 'timeout', cursor: '' });
+  it('warns once per call about a stopped lane that never reported, and not about reaped or finished lanes', async () => {
+    const injected = {
+      ...deps(),
+      listLanes: vi.fn(async () => [
+        lane('dead-lane', 'stopped'),
+        { ...lane('reaped-lane', 'stopped'), archived: true },
+        lane('b-lane', 'stopped'),
+      ]),
+    };
+    const after = `${Date.parse('2026-09-26T12:00:09.000Z')}.b-lane.1`;
+    const outcome = await waitForLaneSet({ parent: 'root-1' }, { after, timeoutMs: 6_000 }, injected);
+    expect(outcome).toEqual({ kind: 'timeout', cursor: after });
     expect(injected.warn).toHaveBeenCalledTimes(1);
-    expect(injected.warn).toHaveBeenCalledWith('lane hotel/dead-lane (dead-lane) is stopped with no report since the cursor');
+    expect(injected.warn).toHaveBeenCalledWith('lane hotel/dead-lane (dead-lane) is stopped and never reported');
   });
 
   it('rejects a set without run or parent, and a malformed cursor', async () => {

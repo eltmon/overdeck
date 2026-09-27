@@ -59,6 +59,11 @@ export async function addDetachedWorktree(projectPath: string, path: string, ref
   await git(['worktree', 'add', '--detach', path, ref], projectPath);
 }
 
+/** Removes a worktree the lane door just created (never `--force`). */
+export async function removeWorktree(projectPath: string, path: string): Promise<void> {
+  await git(['worktree', 'remove', path], projectPath);
+}
+
 /** Applies `git sparse-checkout set --no-cone <patterns…>` to the worktree at `path`. */
 export async function applySparse(path: string, patterns: string[]): Promise<void> {
   await git(['-C', path, 'sparse-checkout', 'set', '--no-cone', ...patterns], path);

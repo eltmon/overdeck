@@ -19,8 +19,9 @@ async function laneVerdictRefusal(agentId: string): Promise<string | null> {
   const { getConversationByName } = await import('../../lib/overdeck/conversations.js');
   const row = getConversationByName(agentId.slice('conv-'.length));
   if (row?.laneRole !== 'critic' && row?.laneRole !== 'verifier') return null;
-  const { latestWorkerReport } = await import('../../lib/agents/worker/report.js');
-  if ((await latestWorkerReport(agentId))?.status !== 'done') return null;
+  // Any done report counts: a later blocked report does not reopen the verdict.
+  const { listWorkerReports } = await import('../../lib/agents/worker/report.js');
+  if (!(await listWorkerReports(agentId)).some((report) => report.status === 'done')) return null;
   return `conv ${row.id} is a ${row.laneRole} lane that already filed its verdict. ` +
     `Launch a fresh one: pan lane start --role ${row.laneRole} --for ${row.laneKey} …`;
 }

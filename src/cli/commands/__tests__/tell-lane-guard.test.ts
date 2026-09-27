@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   messageAgent: vi.fn(async () => ({ delivered: true, queuedToMail: false })),
   exitCli: vi.fn(async (_code: number) => undefined as never),
   rows: {} as Record<string, { id: number; laneRole: string | null; laneKey: string | null }>,
-  reports: {} as Record<string, { status: string } | null>,
+  reports: {} as Record<string, Array<{ status: string }>>,
 }));
 
 vi.mock('../../../lib/agents.js', () => ({
@@ -23,7 +23,7 @@ vi.mock('../../../lib/overdeck/conversations.js', () => ({
   getConversationByName: (name: string) => mocks.rows[name] ?? null,
 }));
 vi.mock('../../../lib/agents/worker/report.js', () => ({
-  latestWorkerReport: async (id: string) => mocks.reports[id] ?? null,
+  listWorkerReports: async (id: string) => mocks.reports[id] ?? [],
 }));
 
 const { tellCommand } = await import('../tell.js');
@@ -38,9 +38,9 @@ beforeEach(() => {
     'builder-lane': { id: 44, laneRole: 'builder', laneKey: '663' },
   };
   mocks.reports = {
-    'conv-critic-lane': { status: 'done' },
-    'conv-verifier-lane': { status: 'done' },
-    'conv-builder-lane': { status: 'done' },
+    'conv-critic-lane': [{ status: 'done' }],
+    'conv-verifier-lane': [{ status: 'done' }, { status: 'blocked' }],
+    'conv-builder-lane': [{ status: 'done' }],
   };
 });
 
@@ -54,7 +54,7 @@ describe('pan tell lane guard (PAN-4223 FR-16)', () => {
     ));
   });
 
-  it('refuses a verifier lane the same way', async () => {
+  it('refuses a verifier lane the same way, even when a blocked report followed its done report', async () => {
     await tellCommand('conv-verifier-lane', 'look again');
     expect(mocks.messageAgent).not.toHaveBeenCalled();
     expect(mocks.exitCli).toHaveBeenCalledWith(1);
@@ -68,7 +68,7 @@ describe('pan tell lane guard (PAN-4223 FR-16)', () => {
 
   it('delivers to a builder lane with a done report, and to a critic still working', async () => {
     await tellCommand('conv-builder-lane', 'next iteration');
-    mocks.reports['conv-critic-lane'] = { status: 'blocked' };
+    mocks.reports['conv-critic-lane'] = [{ status: 'blocked' }];
     await tellCommand('conv-critic-lane', 'here is your ruling');
     expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
     expect(mocks.exitCli).not.toHaveBeenCalledWith(1);

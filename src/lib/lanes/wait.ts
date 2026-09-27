@@ -6,8 +6,9 @@
  * idleness. `waitForLaneSet` waits on every lane of a run (or of a parent) and
  * returns the next report after a cursor `<atMs>.<name>.<seq>`, oldest first,
  * so an orchestrator consumes a run's reports one by one without missing any.
- * Set waits never return reportless outcomes; a stopped lane with no report
- * since the cursor gets one warning line per call instead.
+ * Set waits never return reportless outcomes; a stopped, unarchived lane that
+ * never reported gets one warning line per call instead (a lane that reported
+ * and then stopped, or was reaped, finished its work and is not flagged).
  *
  * These run in the CLI, so lane views and transcripts come from the dashboard
  * API, never from the server modules.
@@ -19,7 +20,7 @@ import { waitForWorkerReport, WAIT_POLL_MS, type WaitDeps, type WaitOptions, typ
 import type { LaneView } from './views.js';
 
 /** The lane view fields the waits read. */
-export type LaneWaitView = Pick<LaneView, 'name' | 'run' | 'key' | 'activity' | 'lastActivityAt'>;
+export type LaneWaitView = Pick<LaneView, 'name' | 'run' | 'key' | 'activity' | 'lastActivityAt'> & { archived?: boolean };
 
 export interface LaneWaitDeps extends Pick<WaitDeps, 'now' | 'sleep' | 'listReports'> {
   harnessAlive?: (tmuxSession: string) => Promise<boolean>;
@@ -108,7 +109,7 @@ export type LaneSetOutcome =
 
 export interface LaneSetDeps extends Pick<WaitDeps, 'now' | 'sleep' | 'listReports'> {
   listLanes?: (filter: LaneSetFilter) => Promise<LaneWaitView[]>;
-  /** One stderr line per stopped, reportless lane per call. */
+  /** One stderr line per stopped, unarchived lane that never reported, per call. */
   warn?: (line: string) => void;
 }
 
@@ -159,16 +160,15 @@ export async function waitForLaneSet(filter: LaneSetFilter, options: LaneSetOpti
   for (;;) {
     let next: { lane: LaneWaitView; report: WorkerReport; cursor: Cursor } | null = null;
     for (const lane of await listLanes(filter)) {
-      let fresh = 0;
-      for (const report of await listReports(`conv-${lane.name}`)) {
+      const reports = await listReports(`conv-${lane.name}`);
+      for (const report of reports) {
         const cursor = { atMs: Date.parse(report.at), name: lane.name, seq: report.seq };
         if (after && compareCursors(cursor, after) <= 0) continue;
-        fresh += 1;
         if (!next || compareCursors(cursor, next.cursor) < 0) next = { lane, report, cursor };
       }
-      if (fresh === 0 && lane.activity === 'stopped' && !warned.has(lane.name)) {
+      if (reports.length === 0 && lane.activity === 'stopped' && !lane.archived && !warned.has(lane.name)) {
         warned.add(lane.name);
-        warn(`lane ${lane.run}/${lane.key} (${lane.name}) is stopped with no report since the cursor`);
+        warn(`lane ${lane.run}/${lane.key} (${lane.name}) is stopped and never reported`);
       }
     }
     if (next) return { kind: 'report', lane: next.lane, report: next.report, cursor: laneCursor(next.lane.name, next.report) };
