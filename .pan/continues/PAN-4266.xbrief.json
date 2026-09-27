@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T16:07:23.932Z",
+  "updated": "2026-09-27T16:07:34.093Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "style-guide-picker-rule.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T16:07:23.932Z"
+    },
+    "ci-frontend-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:07:34.092Z"
     }
   }
 }
