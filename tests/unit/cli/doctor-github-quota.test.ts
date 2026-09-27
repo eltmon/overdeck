@@ -48,13 +48,16 @@ describe('pan doctor github-quota (PAN-4264)', () => {
     expect(report.pause).toEqual([expect.objectContaining({ pool: 'user', bucket: 'graphql', kind: 'secondary' })]);
     expect(report.skippedProjects).toEqual([]);
     expect(report.appMissingRepos).toEqual([]);
+    // Operator grouping is off by default: the remote view says why it is unavailable.
+    expect(report.otherInstalls).toMatchObject({ available: false, installs: [] });
+    expect(report.otherInstalls.reason).toContain('operator_grouping');
   });
 
   it('prints the human sections without a ledger', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     await doctorGithubQuotaCommand();
     const text = log.mock.calls.map(([line]) => String(line)).join('\n');
-    for (const heading of ['Callers, last hour', 'Latest samples', 'Active pause', 'Projects skipped for tracker config', 'Repos where the GitHub App is not installed']) {
+    for (const heading of ['Callers, last hour', 'Latest samples', 'Active pause', 'Projects skipped for tracker config', 'Repos where the GitHub App is not installed', 'Other installs for this operator']) {
       expect(text).toContain(heading);
     }
   });
