@@ -49,6 +49,67 @@ describe('FlywheelConversationPane (PAN-3964 FR-13)', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it('names the live harness and model from the derived status (PAN-4199 ac1)', async () => {
+    setup('running');
+    renderWithQuery(<FlywheelConversationPane />);
+    expect(await screen.findByTestId('flywheel-live-conversation')).toHaveTextContent('claude-code · claude-opus-5-5');
+  });
+
+  it('shows no live conversation line when the flywheel is idle', async () => {
+    stubFetch((url) => {
+      if (url === '/api/flywheel/status') return Response.json(flywheelStatus({ run: 'idle', conversation: null }));
+      if (url === '/api/conversations/conv-flywheel') return Response.json({ error: 'not found' }, { status: 404 });
+      if (url === '/api/settings') return Response.json({ roles: {} });
+      return undefined;
+    });
+    renderWithQuery(<FlywheelConversationPane />);
+    await screen.findByRole('button', { name: 'Start' });
+    expect(screen.queryByTestId('flywheel-live-conversation')).toBeNull();
+  });
+
+  describe('an orphaned session offers Start fresh (PAN-4199 D9)', () => {
+    /** Idle, with POST /api/flywheel/start answering `failure` instead of success. */
+    function setupFailingStart(failure: { status: number; body: Record<string, unknown> }) {
+      return stubFetch((url, init) => {
+        if (url === '/api/flywheel/status') return Response.json(flywheelStatus({ run: 'idle' }));
+        if (url === '/api/conversations/conv-flywheel') return Response.json({ error: 'Conversation not found' }, { status: 404 });
+        if (url === '/api/settings') return Response.json({ roles: {} });
+        if (url === '/api/flywheel/start' && init?.method === 'POST') return Response.json(failure.body, { status: failure.status });
+        if (url.startsWith('/api/flywheel/') && init?.method === 'POST') return Response.json({ success: true });
+        return undefined;
+      });
+    }
+
+    it('reveals Start fresh after a 409 FlywheelOrphanSession (ac1)', async () => {
+      setupFailingStart({ status: 409, body: { error: 'A conv-flywheel session is already running', code: 'FlywheelOrphanSession' } });
+      renderWithQuery(<FlywheelConversationPane />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(labels()).toContain('Start fresh'));
+    });
+
+    it('Start fresh POSTs { fresh: true } once the confirm is accepted (ac2)', async () => {
+      const fetchMock = setupFailingStart({ status: 409, body: { error: 'orphan', code: 'FlywheelOrphanSession' } });
+      renderWithQuery(<FlywheelConversationPane />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Start fresh' }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/start', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ fresh: true }),
+      })));
+      expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+        message: expect.stringContaining('leftover conv-flywheel session'),
+      }));
+    });
+
+    it('leaves the toolbar alone when the start fails for any other reason (ac3)', async () => {
+      setupFailingStart({ status: 500, body: { error: 'boom' } });
+      renderWithQuery(<FlywheelConversationPane />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(labels()).toEqual(['Start', 'Pop out']));
+      expect(screen.queryByRole('button', { name: 'Start fresh' })).toBeNull();
+    });
+  });
+
   it('idle shows Start; clicking it POSTs /api/flywheel/start', async () => {
     const fetchMock = setup('idle', { conversation: false });
     renderWithQuery(<FlywheelConversationPane />);

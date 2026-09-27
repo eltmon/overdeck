@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, History, RefreshCw, Search, StopCircle } f
 import { DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { LowCostModePill } from '../components/LowCostModePill';
 import { DecisionsIndicator } from '../components/DecisionsIndicator';
+import { NeedsYouIndicator } from '../components/flywheel/NeedsYouIndicator';
 import { SystemMenu } from '../components/SystemMenu';
 import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
 import { RunningAgentsPill } from '../components/RunningAgentsPill';
@@ -43,6 +44,8 @@ interface AppChromeProps {
   onRestartBackend: () => void;
   onRestartCliproxy: () => void;
   onToggleSessionFeedSidebar: () => void;
+  /** Open the Flywheel page; the indicator has already asked it to reveal the block. */
+  onNavigateNeedsYou?: () => void;
 }
 
 export function AppChrome({
@@ -64,6 +67,7 @@ export function AppChrome({
   onRestartBackend,
   onRestartCliproxy,
   onToggleSessionFeedSidebar,
+  onNavigateNeedsYou,
 }: AppChromeProps) {
   return (
     <>
@@ -233,6 +237,7 @@ export function AppChrome({
           <StaleBuildChip />
           <SystemHealthPill />
           <DecisionsIndicator />
+          <NeedsYouIndicator onActivate={onNavigateNeedsYou} />
           <SystemMenu onOpenSettings={onOpenSettings} />
           {/* The Command Deck has the always-on Awareness rail, so the global
               feed toggle only appears on other pages (PAN-1591). */}
