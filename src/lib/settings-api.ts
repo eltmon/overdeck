@@ -26,10 +26,8 @@ import {
   type WorkhorseSlot,
   type TtsDaemonConfig,
   type ConversationSearchConfig,
-  type RoleEffort,
   type ProviderConfig,
   type DesignLanguage,
-  ROLE_EFFORTS,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
@@ -38,7 +36,9 @@ import { validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
-import { hasModelCapability, MODEL_DEPRECATIONS, resolveModelId, getModelEffortLevels } from './model-capabilities.js';
+import { hasModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
+import { isEffortLevel } from '@overdeck/contracts';
+import { effortConfigErrors } from './agents/effort-support.js';
 import { resolveTelemetryEnabled, telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { getOrCreateInstallId } from './telemetry/install-id.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
@@ -509,10 +509,7 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
     errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, null, or empty string`);
   }
 
-  const effort = roleConfig.effort;
-  if (effort !== undefined && !ROLE_EFFORTS.includes(effort as RoleEffort)) {
-    errors.push(`${fieldPath}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
-  }
+  errors.push(...effortConfigErrors(fieldPath, roleConfig.effort, []));
 
   const maxAgents = roleConfig.maxAgents;
   if (maxAgents !== undefined && (typeof maxAgents !== 'number' || !Number.isInteger(maxAgents) || maxAgents < 1)) {
@@ -581,31 +578,13 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
         // Model-aware effort: reject levels the role's resolved model doesn't accept.
         // For a distribution, every entry must support the effort.
         const effort = rawRoleConfig.effort;
-        if (typeof effort === 'string' && ROLE_EFFORTS.includes(effort as RoleEffort)) {
+        if (typeof effort === 'string' && isEffortLevel(effort)) {
           const modelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
-          if (Array.isArray(modelRef)) {
-            for (const entry of modelRef as WeightedModelRef[]) {
-              const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
-              if (resolvedModel) {
-                const supported = getModelEffortLevels(resolvedModel);
-                if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
-                  errors.push(
-                    `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
-                  );
-                }
-              }
-            }
-          } else {
-            const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
-            if (resolvedModel) {
-              const supported = getModelEffortLevels(resolvedModel);
-              if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
-                errors.push(
-                  `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
-                );
-              }
-            }
-          }
+          const resolvedModels = Array.isArray(modelRef)
+            ? (modelRef as WeightedModelRef[]).map((entry) => resolveModelRefToId(entry.model, effectiveWorkhorses))
+            : [resolveModelRefToId(modelRef, effectiveWorkhorses)];
+          const models = resolvedModels.filter((model): model is ModelId => model !== undefined);
+          errors.push(...effortConfigErrors(`roles.${role}`, effort, models));
         }
 
         if (rawRoleConfig.sub !== undefined) {
