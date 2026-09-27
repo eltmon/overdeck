@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4263",
   "created": "2026-09-27T14:44:33.622Z",
-  "updated": "2026-09-27T14:52:48.842Z",
+  "updated": "2026-09-27T14:52:52.595Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4263",
       "claimedAt": "2026-09-27T14:50:23.937Z",
       "doneAt": "2026-09-27T14:52:48.841Z"
+    },
+    "specialists-done-honest-error": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:52:52.595Z"
     }
   }
 }
