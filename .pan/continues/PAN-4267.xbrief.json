@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:20:43.349Z",
+  "updated": "2026-09-27T16:20:54.219Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "reserve-normalization.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T16:20:43.348Z"
+    },
+    "darwin-available-memory.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:54.219Z"
     }
   }
 }
