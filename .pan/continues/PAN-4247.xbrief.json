@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T10:39:50.928Z",
+  "updated": "2026-09-27T10:50:19.600Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-27T10:39:37.350Z"
     },
     "subagent-human-input-scanner": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4247",
-      "claimedAt": "2026-09-27T10:39:50.928Z"
+      "claimedAt": "2026-09-27T10:39:50.928Z",
+      "doneAt": "2026-09-27T10:50:19.600Z"
     }
   }
 }
