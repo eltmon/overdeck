@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:19:28.640Z",
+  "updated": "2026-09-27T16:19:39.908Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
     "governor-reserve-defaults.ac3": {
       "status": "completed",
       "doneAt": "2026-09-27T16:19:28.640Z"
+    },
+    "spawn-threshold-defaults.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:19:39.908Z"
     }
   }
 }
