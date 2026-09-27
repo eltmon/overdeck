@@ -15,6 +15,7 @@ import { classifyGitHubRefusal, type GitHubRefusal } from './classify.js';
 import { appendLedgerEntry, type LedgerEntry } from './ledger.js';
 import {
   assertGitHubCallAllowed,
+  activeGitHubPause,
   GitHubRateLimitedError,
   recordGitHubRefusal,
   type PauseRecord,
@@ -126,4 +127,51 @@ export async function recordPatResponse(response: Response): Promise<PauseRecord
     errorText = await response.clone().text().catch(() => undefined);
   }
   return recordRestResponse({ caller: 'tracker-client', pool: 'pat', response, errorText });
+}
+
+function octokitHeaders(raw: unknown): Headers {
+  const headers = new Headers();
+  if (raw && typeof raw === 'object') {
+    for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof value === 'string' || typeof value === 'number') headers.set(name, String(value));
+    }
+  }
+  return headers;
+}
+
+/** Octokit (PAT) poller: record one successful response page. Never throws. */
+export async function recordOctokitPage(caller: GitHubQuotaCaller, rawHeaders: unknown): Promise<void> {
+  try {
+    await recordRestResponse({ caller, pool: 'pat', response: { ok: true, status: 200, headers: octokitHeaders(rawHeaders) } });
+  } catch {
+    // NFR-2: metering never fails the poll.
+  }
+}
+
+/**
+ * Octokit (PAT) poller: record a failed request when it is a 403/429, so a
+ * rate-limit refusal pauses the PAT REST bucket. Never throws.
+ */
+export async function recordOctokitFailure(caller: GitHubQuotaCaller, error: unknown): Promise<void> {
+  try {
+    const { status, message, response } = (error ?? {}) as { status?: unknown; message?: unknown; response?: { headers?: unknown } };
+    if (status !== 403 && status !== 429) return;
+    await recordRestResponse({
+      caller,
+      pool: 'pat',
+      response: { ok: false, status, headers: octokitHeaders(response?.headers) },
+      errorText: typeof message === 'string' ? message : undefined,
+    });
+  } catch {
+    // NFR-2: metering never fails the poll.
+  }
+}
+
+/**
+ * Octokit (PAT) poller: milliseconds until the active `pat:rest` pause ends,
+ * capped at `capMs`; 0 when the bucket is not paused.
+ */
+export function patRestPauseDelayMs(capMs = 3_600_000, nowMs: number = Date.now()): number {
+  const pause = activeGitHubPause('pat', 'rest', nowMs);
+  return pause ? Math.min(Math.max(Date.parse(pause.until) - nowMs, 0), capMs) : 0;
 }

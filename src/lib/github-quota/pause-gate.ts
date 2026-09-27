@@ -203,6 +203,15 @@ export function readActivePause(nowMs: number = Date.now()): PauseRecord[] {
   return Object.values(readPauseFile().pauses).filter((pause) => Date.parse(pause.until) > nowMs);
 }
 
+/** The active pause on exactly `(pool, bucket)`, if any. */
+export function activeGitHubPause(
+  pool: GitHubQuotaPool,
+  bucket: GitHubQuotaBucket,
+  nowMs: number = Date.now(),
+): PauseRecord | undefined {
+  return readActivePause(nowMs).find((p) => p.pool === pool && p.bucket === bucket);
+}
+
 /**
  * Throw `GitHubQuotaPausedError` when `caller` is non-essential and a pause is
  * active on exactly `(pool, bucket)`. Essential callers always pass.
@@ -214,7 +223,7 @@ export function assertGitHubCallAllowed(
   nowMs: number = Date.now(),
 ): void {
   if (!NON_ESSENTIAL_GITHUB_CALLERS.has(caller)) return;
-  const pause = readActivePause(nowMs).find((p) => p.pool === pool && p.bucket === bucket);
+  const pause = activeGitHubPause(pool, bucket, nowMs);
   if (pause) throw new GitHubQuotaPausedError(pause);
 }
 
