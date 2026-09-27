@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4263",
   "created": "2026-09-27T14:44:33.622Z",
-  "updated": "2026-09-27T15:17:49.845Z",
+  "updated": "2026-09-27T15:18:00.051Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "lookup-failure-not-absence.ac3": {
       "status": "completed",
       "doneAt": "2026-09-27T15:17:49.844Z"
+    },
+    "lookup-failure-not-absence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:18:00.050Z"
     }
   }
 }
