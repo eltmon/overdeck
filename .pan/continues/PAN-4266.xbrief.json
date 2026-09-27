@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T15:20:14.982Z",
+  "updated": "2026-09-27T15:23:08.435Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "clipped-scroll-reset": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4266",
-      "claimedAt": "2026-09-27T15:20:14.982Z"
+      "claimedAt": "2026-09-27T15:20:14.982Z",
+      "doneAt": "2026-09-27T15:23:08.434Z"
     }
   }
 }
