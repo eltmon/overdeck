@@ -1,0 +1,936 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T23:55:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4279: Dashboard outage handling blocks the whole UI (and there are several outage screens): replace with one non-blocking degraded-mode banner",
+    "updated": "2026-09-27T23:47:12.476Z"
+  },
+  "plan": {
+    "id": "pan-4279",
+    "title": "Dashboard outage handling blocks the whole UI (and there are several outage screens): replace with one non-blocking degraded-mode banner",
+    "status": "proposed",
+    "uid": "bd547730-df9e-47f2-9156-37c536db3621",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-27T23:55:00Z",
+    "updated": "2026-09-27T23:47:12.476Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4279",
+        "label": "PAN-4279",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4279.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "resilience",
+      "ux"
+    ],
+    "metadata": {
+      "sizeJustification": "About 30 files, all under src/dashboard/frontend plus one doc and the root package.json (3 subsystems). The issue's acceptance criteria bind the banner, the removal of every blocking outage surface, disabled write actions, offline composer hold and one browser suite together; splitting would ship a banner that promises behavior a sibling issue delivers. Nine of the files are one-line guard deletions (remove-outage-guards).",
+      "canonicalFilename": "2026-09-27-PAN-4279-dashboard-outage-handling-blocks-the-whole-ui-and-there-are-several-outage-screens-replace-with-one-non-blocking-degraded-mode-banner.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "When the dashboard tab loses touch with its server, even falsely, the UI blocks: BackendConnectionBoundary hides every route with display:none, EventRouter shows a modal 'Server unreachable — Retry' overlay (after a 3-minute bootstrap window or 6 stream retries), and AppChrome renders three more restart/down/back-up banners. On 2026-09-27 ~23:30 UTC the overlay covered a conversation while the server was healthy. The code proves why it can happen: bootstrap has no timeout, a hung getSnapshot/session fetch pins bootstrapInFlight, which makes the overlay's Retry a no-op, and the poller gives up after 3 minutes.",
+      "Proposal": "Introduce one connection store (lib/connectionState.ts) that derives live/delayed/unreachable/restarting from the health poll, on-demand /api/health probes (JSON status at any HTTP status = reachable), EventRouter stream state and the restart lifecycle. Render one DegradedModeBanner ('Can't reach the Overdeck server — showing data from HH:MM · Retry', 'Live updates are delayed — reconnecting', restarting) and keep the last-known UI mounted and navigable; a full-page screen appears only on a first load with no snapshot. Bound bootstrap with a 20 s timeout, retry with backoff forever, make Retry always start a fresh attempt, delete both EventRouter overlays and the now-dead backendOutageState guards, disable server-backed issue actions with a visible reason, hold composer prompts typed while unreachable and send them on reconnect, restrict the asset-recovery overlay to React-down crashes, and prove it with an isolated-dashboard Playwright suite plus docs.",
+      "NonGoals": "- No server-side changes (health route, RPC, snapshot).\n- No persistence of held composer messages across a full page reload.\n- No offline queueing of issue actions or any non-composer mutation; they are disabled, not queued.\n- No change to XTerminal.tsx, RootErrorBoundary, or the reload circuit-breaker overlay.\n- No change to region-level boundaries (LoadingBoundary, ProjectMembershipBoundary, Flywheel unreachable chip).\n- No gating of mutations outside the issue-action registry and the composer; they keep failing with their existing toasts.\n- No replay of the live 23:30 incident; the root cause is fixed from code-provable failure modes."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the 5 s /api/version poll as the reachability source and add on-demand /api/health probes from EventRouter.",
+        "rationale": "The /api/version poll also caches supervisorUrl for Force Restart; the issue asks for an /api/health probe before claiming unreachable. Both feed one store."
+      },
+      {
+        "summary": "A response with a JSON body carrying a string status field counts as reachable at any HTTP status; non-JSON 5xx, network errors and 3 s timeouts are unreachable.",
+        "rationale": "/api/health returns 503 JSON in incoherent states while the server is up; Traefik returns HTML 502/503/504 when the backend is down."
+      },
+      {
+        "summary": "Bootstrap timeout 20 s, then endless backoff (existing 2 s doubling, 30 s cap); Retry abandons any in-flight attempt via a generation counter.",
+        "rationale": "Server logs show getSnapshot resolving in ~5 ms, so 20 s only trips on a hung request; endless backoff replaces the 3-minute give-up that caused the false alarm."
+      },
+      {
+        "summary": "Delete lib/backendOutageState.ts and all seven isBackendOutage() guards.",
+        "rationale": "They exist only because the page was hidden; with no hiding they are permanently false, and two of them would block navigation shortcuts and held sends."
+      },
+      {
+        "summary": "Offline-blocked issue actions stay visible (disabled with a tooltip) instead of vanishing from overflow.",
+        "rationale": "The issue requires actions disabled with an explanation; layout.rest otherwise filters out disabled entries."
+      },
+      {
+        "summary": "Hold composer prompts before POSTing when unreachable/restarting; /pan commands are refused with a toast and the draft kept.",
+        "rationale": "Holding before the POST makes the reconnect send a first attempt, which is safe for both the conversation and agent endpoints; commands need a live structured response."
+      },
+      {
+        "summary": "Fold AppChrome's restart, unreachable (keeping Force Restart) and back-up banners into the one DegradedModeBanner.",
+        "rationale": "The issue asks for exactly one outage indicator; Force Restart is still useful when the server is wedged."
+      },
+      {
+        "summary": "Keep the asset-recovery overlay only for the root_error_boundary trigger; keep RootErrorBoundary and the reload circuit breaker.",
+        "rationale": "Those are crash states where React may be down; chunk-load failures with React alive now poll silently behind the banner."
+      },
+      {
+        "summary": "One plan with sizeJustification instead of sibling issues.",
+        "rationale": "The issue's acceptance criteria tie banner, offline send, disabled actions and the browser suite together; the file count is inflated by nine one-line guard deletions."
+      }
+    ],
+    "items": [
+      {
+        "id": "connection-store",
+        "title": "Add the connection store that derives the live/delayed/unreachable/restarting phase",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4279",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/connectionState.ts",
+            "src/dashboard/frontend/src/lib/__tests__/connectionState.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/connectionState.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connectionState.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "eventrouter-bootstrap",
+            "degraded-banner",
+            "boundary-first-load",
+            "issue-actions-offline",
+            "composer-held-messages"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly: create src/dashboard/frontend/src/lib/connectionState.ts (Zustand, same style as lib/backendOutageState.ts) exporting ConnectionPhase, useConnectionState (inputs serverReachable=true, streamLive=false, restarting=false, hasSnapshot=false, lastLiveAt=null; setters setServerReachable, setStreamLive(v, at?), setRestarting, markSnapshotCached(timestamp), registerReconnect(fn|null), requestReconnect()), deriveConnectionPhase (precedence restarting > unreachable > delayed > live, PRD D2), useConnectionPhase, isWriteBlockedPhase (unreachable|restarting), isServerWriteBlocked, showFirstLoadScreen (no snapshot AND unreachable|restarting), OFFLINE_ACTION_REASON = \"Can't reach the Overdeck server — available again when it reconnects.\", and probeServerHealth(fetchImpl=fetch) which GETs /api/health with AbortSignal.timeout(3000) and returns true iff the body parses as JSON with a string `status` field at any HTTP status (PRD glossary 'Reachable'). Tests use vi.useFakeTimers for the timeout case."
+        },
+        "items": [
+          {
+            "id": "connection-store.ac1",
+            "title": "Given serverReachable=false and restarting=true, deriveConnectionPhase returns 'restarting'; given serverReachable=true and streamLive=false it returns 'delayed'; given serverReachable=false and restarting=false it returns 'unreachable'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection-store.ac2",
+            "title": "probeServerHealth returns true for a 503 response with JSON body {status:'incoherent'} and false for a 502 response with an HTML body.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection-store.ac3",
+            "title": "Given a fetch that never settles, probeServerHealth resolves false after 3000 ms of fake time.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection-store.ac4",
+            "title": "showFirstLoadScreen returns false whenever hasSnapshot is true and returns true for hasSnapshot=false with phase 'unreachable'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eventrouter-bootstrap",
+        "title": "Bound EventRouter bootstrap with a timeout, retry forever, and delete its overlays",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/EventRouter.tsx",
+            "src/dashboard/frontend/src/components/EventRouter.test.tsx",
+            "src/dashboard/frontend/src/lib/snapshotCache.ts",
+            "src/dashboard/frontend/src/lib/__tests__/snapshotCache.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/EventRouter.test.tsx src/lib/__tests__/snapshotCache.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "EventRouter.test.tsx and snapshotCache.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Touches only EventRouter.tsx, snapshotCache.ts and their tests; no other item edits these files."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. FIRST write the reproduction test (getSnapshot mock never settles; on unmodified code the overlay appears after 3 min and Retry issues no new getSnapshot) and record in the PR whether it reproduced. Then: add loadSnapshotCacheEntry() returning {data,timestamp} to snapshotCache.ts (keep loadSnapshotFromCache as a wrapper); on mount call markSnapshotCached(Date.parse(timestamp)); race getSnapshot against a 20_000 ms timeout (BOOTSTRAP_TIMEOUT_MS) and add a generation counter so a superseded attempt never calls syncSnapshot; on success setStreamLive(true); on failure/timeout setStreamLive(false), probeServerHealth().then(setServerReachable), schedule reconnect with eventRouterReconnectDelayMs; markBackendReconnecting also sets streamLive=false and probes health; delete SNAPSHOT_FALLBACK_WINDOW_MS, UNREACHABLE_OVERLAY_RETRY_ATTEMPTS, the fallbackTimeout branch, every showOverlay/hideOverlay call and the '../recovery' import; registerReconnect(forceReconnect) on mount (forceReconnect bumps generation, clears bootstrapInFlight/bootstrapPromise, resets reconnectAttempt, runs reconnectDomainStream({fullReset:true})) and registerReconnect(null) on cleanup. Keep dispatchBackendReconnecting/Reconnected. Rewrite the three existing overlay-asserting tests (lines ~320, ~492, ~617) to assert #pan-recovery-overlay is never created. All tests use fake timers."
+        },
+        "items": [
+          {
+            "id": "eventrouter-bootstrap.ac1",
+            "title": "Given getSnapshot never settles, after 20 s of fake time a second getSnapshot request is issued after backoff and document.getElementById('pan-recovery-overlay') returns null at every step including after 3 minutes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eventrouter-bootstrap.ac2",
+            "title": "Given a bootstrap is in flight, calling useConnectionState.getState().requestReconnect() issues a new getSnapshot immediately, and the stale attempt resolving later does not call syncSnapshot.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eventrouter-bootstrap.ac3",
+            "title": "Given the domain stream fails while /api/health answers JSON, the connection phase becomes 'delayed', not 'unreachable'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eventrouter-bootstrap.ac4",
+            "title": "grep -n \"showOverlay\\|hideOverlay\\|SNAPSHOT_FALLBACK_WINDOW_MS\\|UNREACHABLE_OVERLAY_RETRY_ATTEMPTS\" src/dashboard/frontend/src/components/EventRouter.tsx returns no matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eventrouter-bootstrap.ac5",
+            "title": "loadSnapshotCacheEntry returns the stored ISO timestamp for a valid entry and null for a corrupt entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "degraded-banner",
+        "title": "Replace the three AppChrome outage banners with one DegradedModeBanner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/DegradedModeBanner.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DegradedModeBanner.test.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/DegradedModeBanner.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "DegradedModeBanner.test.tsx passes",
+            "typecheck and lint complete without errors (file-size ratchet green)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. New components/DegradedModeBanner.tsx reads useConnectionPhase and lastLiveAt; exact copy: unreachable \"Can't reach the Overdeck server — showing data from HH:MM\" + Retry + Force Restart (onRestartBackend, 'Restarting…' while pending); restarting \"Overdeck server is restarting — showing data from HH:MM\" + lifecycle issueId/reason suffix as AppChrome.tsx:114-119 renders today; delayed \"Live updates are delayed — reconnecting · showing data from HH:MM\" + Retry; transition to live shows \"Reconnected\" for 2.5 s; live renders nothing. HH:MM = new Date(lastLiveAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); omit the ' — showing data from' clause when lastLiveAt is null. Attributes role=status aria-live=polite data-component=degraded-mode-banner data-phase={phase}; theme tokens only, pan-style-guide (no pills). Retry calls useConnectionState.getState().requestReconnect() and refetches the ['backend-health'] query. In AppChrome.tsx delete the restart/down/recovering banner blocks (lines ~108-151) and their props, render DegradedModeBanner there. In App.tsx delete bannerState/recoveryTimerRef state machine (~lines 291-320) and add an effect: setServerReachable(!(backendDown && backendFailureCount >= 2)); setRestarting(dashboardLifecycle.active). App.tsx must not grow (it is over the 1000-line ceiling)."
+        },
+        "items": [
+          {
+            "id": "degraded-banner.ac1",
+            "title": "Given phase 'unreachable' and lastLiveAt set, the banner renders text starting \"Can't reach the Overdeck server — showing data from\" with Retry and Force Restart buttons.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "degraded-banner.ac2",
+            "title": "Given phase 'delayed', the banner renders \"Live updates are delayed — reconnecting\" and never renders the text \"Server unreachable\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "degraded-banner.ac3",
+            "title": "Given the phase changes from 'unreachable' to 'live', the banner renders \"Reconnected\" and renders nothing after 2500 ms of fake time.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "degraded-banner.ac4",
+            "title": "When Retry is clicked, the banner calls the function registered with registerReconnect exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "degraded-banner.ac5",
+            "title": "wc -l src/dashboard/frontend/src/App.tsx reports a count less than or equal to the origin/main count (1019), and AppChrome.tsx no longer contains the strings 'Backend is unreachable' or 'Backend is back up'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boundary-first-load",
+        "title": "Make BackendConnectionBoundary never hide content and render a first-load screen only without a snapshot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/BackendConnectionBoundary.tsx",
+            "src/dashboard/frontend/src/App/BackendConnectionBoundary.test.tsx",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/App/BackendConnectionBoundary.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "BackendConnectionBoundary.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. BackendConnectionBoundary takes only children; reads the connection store; keeps the queryClient.invalidateQueries() call on the transition out of unreachable/restarting (PRD D7); returns <FirstLoadScreen/> (same file, centered layout of today's lines 64-76, data-component=first-load-screen, title \"Can't reach the Overdeck server\" or \"Overdeck server is restarting\", body \"The dashboard will load as soon as the server answers.\", Retry button calling requestReconnect()) when showFirstLoadScreen(inputs), else <>{children}</>. Delete the display:none wrapper, the 'Waiting for backend data' page, the reconnecting pill and its window listeners, and the useBackendOutage/useMenuOpen effect. Remove backendDown/restarting props from AppRoutes.tsx and its call site in App.tsx. Rewrite the test file per PRD WI-4."
+        },
+        "items": [
+          {
+            "id": "boundary-first-load.ac1",
+            "title": "Given hasSnapshot=true and phase 'unreachable', the children render with no ancestor whose inline style contains display: none.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boundary-first-load.ac2",
+            "title": "Given hasSnapshot=false and phase 'unreachable', the element [data-component=\"first-load-screen\"] renders and the children do not render.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boundary-first-load.ac3",
+            "title": "Given hasSnapshot=false and phase 'delayed', the children render and no first-load screen renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boundary-first-load.ac4",
+            "title": "Given the phase changes from 'unreachable' to 'live', queryClient.invalidateQueries is called once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boundary-first-load.ac5",
+            "title": "grep -rn \"display: outage\" src/dashboard/frontend/src returns no matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-outage-guards",
+        "title": "Delete backendOutageState and its seven hidden-page keyboard guards",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/backendOutageState.ts",
+            "src/dashboard/frontend/src/test-setup.ts",
+            "src/dashboard/frontend/src/components/KanbanBoard.tsx",
+            "src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/GodViewConfluence.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/Stage/useStageShortcuts.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ActivityView/index.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -rn \"isBackendOutage\\|backendOutageState\" src/dashboard/frontend/src || echo CLEAN",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep prints CLEAN",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 / D8. Delete src/dashboard/frontend/src/lib/backendOutageState.ts. Remove the isBackendOutage() condition and import at: KanbanBoard.tsx (~337 and ~615), PipelineView.tsx (~376), GodViewConfluence.tsx (~100), MessagesTimeline.tsx (~416), useStageShortcuts.ts (~29), ActivityView/index.tsx (~292), ComposerFooter.tsx (~619). Remove the useBackendOutage reset in test-setup.ts (lines ~18-19). Keep every other condition in those expressions unchanged (e.g. `if (keyboardShortcutsDisabled) return`)."
+        },
+        "items": [
+          {
+            "id": "remove-outage-guards.ac1",
+            "title": "grep -rn \"isBackendOutage\\|backendOutageState\" src/dashboard/frontend/src returns no matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-outage-guards.ac2",
+            "title": "Given the change, ls src/dashboard/frontend/src/lib/backendOutageState.ts fails because the file no longer exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-outage-guards.ac3",
+            "title": "npm run typecheck exits 0 after the removal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-actions-offline",
+        "title": "Disable server-backed issue actions while the server is unreachable, keeping them visible with a reason",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueActionMenu.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6 / D9. In useIssueActions.ts `all` memo: stateEnabled = action.enabledWhen(state); blockedOffline = stateEnabled && action.endpoint !== null && isWriteBlockedPhase(useConnectionPhase()); enabled = stateEnabled && !blockedOffline; add `blockedOffline` to IssueActionView; disabledReason = blockedOffline ? OFFLINE_ACTION_REASON : enabled ? undefined : disabledReasonForAction(action). Change layout.rest filter to view.enabled || view.blockedOffline. Add the phase to the memo deps. No menu component change is needed (IssueActionMenu.tsx:80 already sets title from disabledReason)."
+        },
+        "items": [
+          {
+            "id": "issue-actions-offline.ac1",
+            "title": "Given phase 'unreachable' and an issue with a live agent, the 'Message agent' menu item renders disabled with title \"Can't reach the Overdeck server — available again when it reconnects.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-actions-offline.ac2",
+            "title": "Given phase 'unreachable', the 'Open planning session' action (endpoint null) stays enabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-actions-offline.ac3",
+            "title": "Given phase 'delayed', 'Message agent' renders enabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-held-messages",
+        "title": "Hold composer prompts submitted while unreachable and send them on reconnect",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/chat-types.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/useComposerDeliveryState.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/composerStore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/composerStore.test.ts src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "composerStore.test.ts and ComposerFooter.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "parallelSafeReason": "Its only file overlaps (ComposerFooter.tsx, MessagesTimeline.tsx) are serialized by the remove-outage-guards edge; no other item edits the composer files."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7 / D11 / D12. chat-types.ts FailedMessage gains heldOffline?: boolean. composerStore.ts gains holdSend(conversationName, text, {clientMessageId, deliverAs}) appending a FailedMessage {heldOffline:true, retryable:true, kind:'prompt'}; retryFailed treats heldOffline as never-sent: keep clientMessageId, fresh createdAt, send options {clientMessageId} without retry:true. ComposerFooter.handleSubmit: immediately before onSend?.(...) (~line 514), if isServerWriteBlocked(): prompts -> holdSend + consumeAttachmentsForConversation + clear editor + clear sending + return; /pan commands -> toast.error(\"Can't reach the Overdeck server — commands need a live connection\"), clear sending, keep draft, return. useComposerDeliveryState: effect on useConnectionPhase() and held entries — when 'live', await retryFailed(...) for each held entry in createdAt order, guarded by a ref against double flush; held entries of an unmounted conversation flush when its panel next mounts while live. MessagesTimeline.tsx outbox label: heldOffline -> 'Waiting to send — will send when the server reconnects' (first in the chain); hide Retry while heldOffline and phase is not live. Keep ComposerFooter.tsx and MessagesTimeline.tsx under 1000 lines."
+        },
+        "items": [
+          {
+            "id": "composer-held-messages.ac1",
+            "title": "Given phase 'unreachable', submitting the prompt 'held ping' issues no POST, clears the editor, and the outbox renders 'Waiting to send — will send when the server reconnects'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-held-messages.ac2",
+            "title": "Given a held entry, when the phase becomes 'live' the entry is POSTed exactly once to /api/conversations/<name>/message with its original clientMessageId and without a retry flag, and the held label disappears.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-held-messages.ac3",
+            "title": "Given phase 'unreachable', submitting '/pan status' issues no POST, shows the toast \"Can't reach the Overdeck server — commands need a live connection\", and preserves the draft text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-held-messages.ac4",
+            "title": "Given retryFailed is called for a held entry with an agentId, the POST targets /api/agents/<agentId>/message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "asset-recovery-overlay",
+        "title": "Show the asset-recovery reload overlay only when React is down",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/recovery.tsx",
+            "src/dashboard/frontend/src/recovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/recovery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "recovery.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9 / D14: in waitForServerThenReload replace showOverlay('Reconnecting to the dashboard…') with `if (details.trigger === 'root_error_boundary') showOverlay('Reconnecting to the dashboard…')`. Leave the circuit-breaker overlay and RootErrorBoundary unchanged. Tests use fake timers for the polling sleeps."
+        },
+        "items": [
+          {
+            "id": "asset-recovery-overlay.ac1",
+            "title": "Given trigger 'vite_preload_error' and a server that fails the first poll, no element #pan-recovery-overlay exists while polling.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "asset-recovery-overlay.ac2",
+            "title": "Given trigger 'root_error_boundary', #pan-recovery-overlay renders 'Reconnecting to the dashboard…' while polling.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "asset-recovery-overlay.ac3",
+            "title": "Given four reloads within 15 s, the circuit-breaker overlay still renders 'The dashboard stopped automatic recovery'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-suite",
+        "title": "Add an isolated-dashboard Playwright suite for degraded mode with light/dark screenshots",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts",
+            "src/dashboard/frontend/tests/pan-4279-degraded-mode.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4279-degraded-mode.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "pan-4279-degraded-mode.spec.ts passes and writes test-results/pan-4279/*.png in light and dark variants"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-8",
+            "FR-9",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Touches only the Playwright fixture and a new spec; it runs after every behavior item via blocks edges."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8. Extend startIsolatedDashboard(opts?: {port?, home?}) and stop(opts?: {keepHome?}) without changing defaults for project-create-ux.spec.ts. Each test uses a fresh browser.newContext() (isolated profile; never the live 3011 dashboard or another agent's browser). Scenarios: (1) server stopped with warm cache -> banner data-phase=unreachable, navigation /pipeline -> /board -> /pipeline renders cached content, issue-action write items disabled with the offline reason, no display:none wrapper around the route view; (2) page.routeWebSocket(/\\/ws\\/rpc/, ws => ws.close()) with /api/health answering -> banner data-phase=delayed contains 'Live updates are delayed' and 'Server unreachable' appears nowhere; (3) empty localStorage + server stopped -> [data-component=first-load-screen] and no route content; restart on same port/home -> app loads; (4) held message sent once after restart (implementation checkpoint: if the fixture cannot host a conversation, page.route-intercept POST /api/conversations/*/message after restart and assert one POST with the held clientMessageId); (5) screenshots of unreachable and delayed banners in light and dark (toggle the 'light' class on <html> as tests/theme-screenshots.spec.ts does) to test-results/pan-4279/<phase>-<theme>.png. Terminal inline state: assert if the fixture exposes a terminal, otherwise note in the PR that XTerminal.tsx is unchanged. Attach screenshots and the PRD audit table to the PR body."
+        },
+        "items": [
+          {
+            "id": "browser-suite.ac1",
+            "title": "Given the isolated server is stopped after the page loaded, [data-component=\"degraded-mode-banner\"][data-phase=\"unreachable\"] renders within 20 s and navigating /pipeline -> /board -> /pipeline renders cached content.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-suite.ac2",
+            "title": "Given /ws/rpc is closed by page.routeWebSocket while /api/health answers, the banner renders data-phase=\"delayed\" containing 'Live updates are delayed' and the page text contains no 'Server unreachable'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-suite.ac3",
+            "title": "Given empty localStorage and a stopped server, the page renders [data-component=\"first-load-screen\"] and, after restart on the same port and home, renders the app.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-suite.ac4",
+            "title": "Given a prompt submitted while the server is stopped, after restart exactly one POST for that clientMessageId is observed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-suite.ac5",
+            "title": "The run produces four PNG files under test-results/pan-4279/ covering unreachable and delayed in light and dark themes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-degraded-mode",
+        "title": "Document degraded mode in docs/DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Degraded mode\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new section heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10: add a '## Degraded mode (PAN-4279)' section after the EventRouter/wsTransport bullets (~line 90) covering: the four phases and precedence; the reachability rule (JSON status at any HTTP status = reachable; non-JSON 5xx/network error/3 s timeout = unreachable); exact banner copy per phase and the 'showing data from HH:MM' source (last bootstrap/event or cache timestamp); the first-load screen as the only full-page outage state; 20 s bootstrap timeout with endless backoff; Retry semantics; write actions disabled with the offline reason; held composer messages (sent on reconnect, dropped by a full reload); the audit dispositions (RootErrorBoundary, circuit breaker and XTerminal inline status kept)."
+        },
+        "items": [
+          {
+            "id": "docs-degraded-mode.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a heading 'Degraded mode (PAN-4279)' that names the phases live, delayed, unreachable and restarting.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-degraded-mode.ac2",
+            "title": "The section contains the exact strings \"Can't reach the Overdeck server\" and \"Live updates are delayed — reconnecting\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-degraded-mode.ac3",
+            "title": "The section contains text stating that the first-load screen is the only full-page outage state and that held messages are dropped by a full page reload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-frontend-subset",
+        "title": "List the new frontend unit tests in test:frontend-subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:55:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4279",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -o \"connectionState.test.ts\\|DegradedModeBanner.test.tsx\\|BackendConnectionBoundary.test.tsx\\|EventRouter.test.tsx\" package.json"
+          ],
+          "expected_outputs": [
+            "all four test paths are printed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-11: append src/lib/__tests__/connectionState.test.ts, src/components/__tests__/DegradedModeBanner.test.tsx, src/App/BackendConnectionBoundary.test.tsx and src/components/EventRouter.test.tsx to the root package.json test:frontend-subset script (skip any already present)."
+        },
+        "items": [
+          {
+            "id": "ci-frontend-subset.ac1",
+            "title": "The root package.json test:frontend-subset script contains src/lib/__tests__/connectionState.test.ts and src/components/__tests__/DegradedModeBanner.test.tsx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-frontend-subset.ac2",
+            "title": "The root package.json test:frontend-subset script contains src/App/BackendConnectionBoundary.test.tsx and src/components/EventRouter.test.tsx.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "connection-store",
+        "to": "eventrouter-bootstrap",
+        "type": "blocks"
+      },
+      {
+        "from": "connection-store",
+        "to": "degraded-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "connection-store",
+        "to": "boundary-first-load",
+        "type": "blocks"
+      },
+      {
+        "from": "connection-store",
+        "to": "issue-actions-offline",
+        "type": "blocks"
+      },
+      {
+        "from": "connection-store",
+        "to": "composer-held-messages",
+        "type": "blocks"
+      },
+      {
+        "from": "degraded-banner",
+        "to": "boundary-first-load",
+        "type": "blocks"
+      },
+      {
+        "from": "boundary-first-load",
+        "to": "remove-outage-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-outage-guards",
+        "to": "composer-held-messages",
+        "type": "blocks"
+      },
+      {
+        "from": "connection-store",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "degraded-banner",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "eventrouter-bootstrap",
+        "to": "browser-suite",
+        "type": "blocks"
+      },
+      {
+        "from": "degraded-banner",
+        "to": "browser-suite",
+        "type": "blocks"
+      },
+      {
+        "from": "boundary-first-load",
+        "to": "browser-suite",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-actions-offline",
+        "to": "browser-suite",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-held-messages",
+        "to": "browser-suite",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
