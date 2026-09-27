@@ -16,15 +16,16 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Excluded entirely: the canonical enum definition, and the per-model/
-# per-harness CAPABILITY DATA files whose 'low'..'max' arrays are data, not
-# copies of the enum — counting them would fail this lint every time a model
-# or harness is added or dropped.
+# per-harness CAPABILITY DATA files (backend, not UI) whose 'low'..'max'
+# arrays are data, not copies of the enum — counting them would fail this
+# lint every time a model or harness is added or dropped. ModelPicker.tsx is
+# dashboard UI, not a data file, so it's baselined below instead — a new
+# match there (data row or otherwise) should still surface.
 EXCLUDE_FILES=(
   "packages/contracts/src/effort.ts"
   "src/lib/model-capabilities.ts"
   "src/lib/model-capability-additions.ts"
   "packages/contracts/src/harness-behavior.ts"
-  "src/dashboard/frontend/src/components/chat/ModelPicker.tsx"
 )
 
 # <path> => count. See the header comment above for what removes each row.
@@ -45,6 +46,7 @@ declare -A BASELINE=(
   ["src/dashboard/frontend/src/components/chat/ContextWindowMeter.tsx"]=1  # false match, not effort — see header
   ["src/dashboard/frontend/src/components/Settings/RolesPanel.tsx"]=1      # PAN-4256
   ["src/lib/overdeck/conversation-delivery.ts"]=1                # PAN-4254
+  ["src/dashboard/frontend/src/components/chat/ModelPicker.tsx"]=28  # PAN-4259
 )
 
 PATTERNS=(

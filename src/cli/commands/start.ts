@@ -747,7 +747,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   // Resolve --effort through the single resolver: explicit > roles.work.effort
   // > project > default, clamped to what the work model/harness support.
   const yamlConfig = loadYamlConfig().config;
-  const workModel = resolveRoleModel('work', spawnModel || undefined, yamlConfig);
+  const workModel = spawnModel || resolveRoleModel('work', undefined, yamlConfig);
   let resolvedEffort: RoleEffort;
   try {
     const resolved = resolveEffort({ explicit: options.effort, role: 'work', issueId: id, model: workModel, harness: requestedHarness, config: yamlConfig });

@@ -576,15 +576,17 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
         validateRoleFields(`roles.${role}`, rawRoleConfig, errors);
 
         // Model-aware effort: reject levels the role's resolved model doesn't accept.
-        // For a distribution, every entry must support the effort.
+        // For a distribution, every entry must support the effort. Also used as the
+        // sub-role effort fallback below, when a sub-role has no model of its own.
+        const roleModelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
+        const resolvedRoleModels = (Array.isArray(roleModelRef)
+          ? (roleModelRef as WeightedModelRef[]).map((entry) => resolveModelRefToId(entry.model, effectiveWorkhorses))
+          : [resolveModelRefToId(roleModelRef, effectiveWorkhorses)]
+        ).filter((model): model is ModelId => model !== undefined);
+
         const effort = rawRoleConfig.effort;
         if (typeof effort === 'string' && isEffortLevel(effort)) {
-          const modelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
-          const resolvedModels = Array.isArray(modelRef)
-            ? (modelRef as WeightedModelRef[]).map((entry) => resolveModelRefToId(entry.model, effectiveWorkhorses))
-            : [resolveModelRefToId(modelRef, effectiveWorkhorses)];
-          const models = resolvedModels.filter((model): model is ModelId => model !== undefined);
-          errors.push(...effortConfigErrors(`roles.${role}`, effort, models));
+          errors.push(...effortConfigErrors(`roles.${role}`, effort, resolvedRoleModels));
         }
 
         if (rawRoleConfig.sub !== undefined) {
@@ -610,6 +612,12 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
                 true,
                 true,
               );
+
+              // Sub-role model falls back to the role's model when unset/PARENT_MODEL_REF
+              // (resolveModelRefToId already returns undefined for both).
+              const resolvedSubModel = resolveModelRefToId(rawSubConfig.model, effectiveWorkhorses);
+              const subModels = resolvedSubModel !== undefined ? [resolvedSubModel] : resolvedRoleModels;
+              errors.push(...effortConfigErrors(`roles.${role}.sub.${subRole}`, rawSubConfig.effort, subModels));
             }
           }
         }
