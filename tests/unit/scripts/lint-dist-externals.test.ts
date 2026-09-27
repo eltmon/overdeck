@@ -264,6 +264,30 @@ describe('lint-dist-externals', () => {
     expect(output).toContain('optionalDependencies.local-thing is "file:../local-thing"');
   });
 
+  it('rejects a test framework in runtime dependencies', () => {
+    // @overdeck/core 0.60.0-0.62.0 declared "@effect/vitest" in dependencies.
+    // Its vitest peer graph crashed npm's peer-set resolver ("reading
+    // 'edgesOut'"), so `npx @overdeck/core` failed for every new user.
+    const root = makeRoot({
+      dependencies: { '@effect/vitest': '4.0.0-beta.73' },
+      optionalDependencies: { '@vitest/browser-playwright': '5.0.2' },
+    });
+    writeDistFile(root, 'dist/index.js', 'export const noop = () => {};\n');
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('dependencies.@effect/vitest is a test framework');
+    expect(output).toContain('optionalDependencies.@vitest/browser-playwright is a test framework');
+  });
+
+  it('allows test frameworks in devDependencies', () => {
+    const root = makeRoot({ devDependencies: { vitest: '^4.1.11', '@effect/vitest': 'catalog:' } });
+    writeDistFile(root, 'dist/index.js', 'export const noop = () => {};\n');
+
+    expect(run(root).ok).toBe(true);
+  });
+
   it('stays wired into npm run build', () => {
     // The guard only protects a publish/link if it actually runs during the
     // build. build-post-cli.mjs is the final step of `npm run build`, invoked

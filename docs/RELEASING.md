@@ -124,6 +124,17 @@ The public changelog is [`changelog.mdx`](../changelog.mdx) at the repo root, se
 3. Keep the `RELEASE STEP` comment above the newest block. Add the next `Unreleased` block only once it has entries; an empty one renders on the public page.
 4. Commit (`docs(infra): changelog for vX.Y.Z`), then run `pan release stable --version X.Y.Z` and push `main` and the tag. Mintlify redeploys from `main`.
 
+## Verify a clean install
+
+After npm lists the new version, run the advertised launch command with an empty cache and an empty global prefix. A global `@overdeck/core` on the release machine otherwise satisfies `npx` and hides a broken package:
+
+```bash
+T=$(mktemp -d); cd "$T"
+npm_config_prefix="$T/prefix" npx --yes --cache "$T/cache" @overdeck/core@X.Y.Z --version
+```
+
+It must print `X.Y.Z`. v0.60.0–v0.62.0 failed this check with `Cannot read properties of null (reading 'edgesOut')`, because the runtime `dependencies` listed the test library `@effect/vitest`. If the check fails, ship a patch release the same day.
+
 ## Workflow behavior
 
 The GitHub release workflow distinguishes stable vs canary tags.

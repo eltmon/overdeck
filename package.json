@@ -156,7 +156,6 @@
     "@effect/platform-bun": "4.0.0-beta.73",
     "@effect/platform-node": "4.0.0-beta.73",
     "@effect/platform-node-shared": "4.0.0-beta.73",
-    "@effect/vitest": "4.0.0-beta.73",
     "@google-cloud/speech": "^7.5.0",
     "@lydell/node-pty": "1.2.0-beta.15",
     "@huggingface/transformers": "^4.3.0",
