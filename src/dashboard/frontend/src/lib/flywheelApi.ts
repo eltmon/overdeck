@@ -42,15 +42,36 @@ export function useFlywheelRunning(): boolean {
   return data?.run === 'running';
 }
 
+/**
+ * A failed flywheel action, carrying the route's status and its typed `code`
+ * (`FlywheelOrphanSession`, `FlywheelAlreadyRunning`, …). The code is what
+ * lets a caller offer the right recovery instead of just showing the message.
+ */
+export class FlywheelActionHttpError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+
+  constructor(message: string, status: number, code: string | null) {
+    super(message);
+    this.name = 'FlywheelActionHttpError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export async function postFlywheelAction<T = unknown>(action: FlywheelAction, body: unknown = {}): Promise<T> {
   const res = await fetch(`/api/flywheel/${action}`, {
     method: 'POST',
     headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify(body),
   });
-  const payload = (await res.json().catch(() => ({}))) as { error?: unknown };
+  const payload = (await res.json().catch(() => ({}))) as { error?: unknown; code?: unknown };
   if (!res.ok) {
-    throw new Error(typeof payload.error === 'string' ? payload.error : `POST /api/flywheel/${action} → ${res.status}`);
+    throw new FlywheelActionHttpError(
+      typeof payload.error === 'string' ? payload.error : `POST /api/flywheel/${action} → ${res.status}`,
+      res.status,
+      typeof payload.code === 'string' ? payload.code : null,
+    );
   }
   return payload as T;
 }
@@ -66,6 +87,15 @@ export function useFlywheelAction(action: FlywheelAction) {
       ]);
     },
   });
+}
+
+/** A span, for the header's elapsed run time: `42m`, `2h 0m`, `3d 4h`. */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 }
 
 /** Relative age for tick/journal timestamps: `42s ago`, `7m ago`, `3h ago`. */
