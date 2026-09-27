@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T17:33:15.129Z",
+  "updated": "2026-09-27T17:33:24.305Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -468,6 +468,10 @@
     "operator-grouping.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T17:33:15.129Z"
+    },
+    "doctor-remote-installs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:33:24.305Z"
     }
   }
 }
