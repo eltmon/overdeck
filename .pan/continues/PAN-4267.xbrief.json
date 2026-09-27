@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:22:54.865Z",
+  "updated": "2026-09-27T16:23:05.862Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "truthful-patrol-messages.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T16:22:54.864Z"
+    },
+    "governor-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:23:05.862Z"
     }
   }
 }
