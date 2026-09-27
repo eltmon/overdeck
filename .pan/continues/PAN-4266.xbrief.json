@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T15:42:17.125Z",
+  "updated": "2026-09-27T15:42:47.782Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-27T15:42:10.232Z"
     },
     "style-guide-picker-rule": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4266",
-      "claimedAt": "2026-09-27T15:42:17.125Z"
+      "claimedAt": "2026-09-27T15:42:17.125Z",
+      "doneAt": "2026-09-27T15:42:47.782Z"
     }
   }
 }
