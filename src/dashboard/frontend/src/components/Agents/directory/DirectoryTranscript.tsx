@@ -129,11 +129,12 @@ export function DirectoryTranscript({ entry, onSelectEntry }: DirectoryTranscrip
           agentId={ref.agentId}
           embedded
           hideComposer={hidesComposer(entry)}
+          subagentRailCollapsed
         />
       );
     case 'conversation':
       if (!conversation) return <Placeholder>{loading ? 'Loading conversation…' : 'This conversation is no longer listed.'}</Placeholder>;
-      return <ConversationPanel key={conversation.name} conversation={conversation} embedded />;
+      return <ConversationPanel key={conversation.name} conversation={conversation} embedded subagentRailCollapsed />;
     case 'conversation-subagent':
       if (!conversation) return <Placeholder>{loading ? 'Loading conversation…' : 'This conversation is no longer listed.'}</Placeholder>;
       return (

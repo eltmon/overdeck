@@ -30,6 +30,10 @@ Sessions with nothing to wait on (idle with no known blocker, or stopped) are
 not counted. They fold into one line at the bottom, `▸ 14 idle sessions ·
 History`; click it to list them in place. The page remembers whether it is open.
 
+When nothing is running or waiting, the list is the whole page: one message,
+**Nothing is running or waiting. Finished work is in History.**, followed by
+the idle footer if any sessions are idle — never a preview pane alongside it.
+
 Each row says in words why it is where it is:
 
 | Reason | Meaning |
@@ -38,10 +42,10 @@ Each row says in words why it is where it is:
 | **permission prompt** | The agent waits for you to allow a tool. |
 | **plan approval** | The agent waits for you to approve its plan. |
 | **paused by you** | You paused it. Your reason shows under the row. |
-| **API error or usage limit** | The provider, not the agent, is failing. |
+| **API error or usage limit** | The provider, not the agent, is failing — including a conversation whose last turn ended in a provider error (billing, a usage limit) even though the session itself now looks idle. |
 | **stuck · idle `<age>`** | The issue's work agent sat idle with unpushed commits past the stuck threshold. |
 | **ready to merge** | The PR is approved with green checks and waits for you to merge. |
-| **running `<tool>`**, **thinking**, **working** | The agent is running a turn. The second line is its last output line and how long ago it wrote it; **quiet `<age>`** appears after five silent minutes. |
+| **`<tool>`**, **thinking**, **working** | The agent is running a turn: the row names the tool it is calling, with the tool's own description under it when it has one — for example, running `Bash`, the second line reads `Bash · Commit WI-7`. A working subagent keeps its parent from reading quiet: **quiet `<age>`** replaces the age, never shows alongside it, once the whole row — the agent and every subagent under it — has been silent five minutes. |
 | **running on Fly** | The agent runs on a Fly machine, whose terminal is there. |
 | **held by Overdeck** | Overdeck paused it (a scheduler yield or another machine pause). |
 | **CI failed** | The PR's checks failed. The work agent gets the failure, not you. |
@@ -61,7 +65,9 @@ selection. **Open** (on the row you hover or select), `Enter` or a
 double-click goes to the agent's live session in its project's Command Deck, or
 to the conversation. Drag the divider to resize the panes; the sizes are
 remembered. The panel button in the top bar hides the preview pane and brings
-it back.
+it back. A conversation's own Agents rail (its subagent list) starts collapsed
+in this preview, independent of whatever you left it at on the conversation's
+own page.
 
 ## What the colors mean
 
