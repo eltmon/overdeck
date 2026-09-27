@@ -284,6 +284,20 @@ describe('forge adapters', () => {
       expect(execMock).toHaveBeenCalledTimes(1);
     });
 
+    it('discoverArtifact retries a rate limit and rejects with it once the retries run out', async () => {
+      vi.useFakeTimers();
+      execMock.mockRejectedValue({ stderr: 'GraphQL: API rate limit already exceeded for user ID 1\n' });
+
+      const settled = getForgeAdapter('github')
+        .discoverArtifact({ sourceBranch: 'feature/x', cwd: '/tmp/repo' })
+        .catch((err: Error) => err);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(String(await settled)).toMatch(/rate limit/);
+      expect(execMock).toHaveBeenCalledTimes(3);
+      execMock.mockReset();
+    });
+
     it('returns null when gh reports no pull requests for the branch', async () => {
       execMock.mockRejectedValueOnce({ stderr: 'no pull requests found for branch "feature/x"\n' });
 

@@ -12,6 +12,7 @@ import {
   parsePullRequestRef,
   type GitHubPullRequestState,
 } from './github-app.js';
+import { retryTransientForgeOp } from './forge-transient.js';
 import { selectPullRequestForHead } from './github-pr-selection.js';
 
 /** A forge (GitHub or GitLab) review-artifact operation failed. */
@@ -497,7 +498,7 @@ const githubForgeAdapter: ForgeAdapter = {
   },
 
   async discoverArtifact(input) {
-    return getExistingGitHubArtifact(input.sourceBranch, input.cwd, input.repository);
+    return retryTransientForgeOp(() => getExistingGitHubArtifact(input.sourceBranch, input.cwd, input.repository));
   },
 
   async findMergedArtifact(input) {
@@ -572,7 +573,7 @@ const gitlabForgeAdapter: ForgeAdapter = {
   },
 
   async discoverArtifact(input) {
-    return getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
+    return retryTransientForgeOp(() => getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository));
   },
 
   async findMergedArtifact(input) {
