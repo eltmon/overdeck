@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T17:34:00.445Z",
+  "updated": "2026-09-27T17:34:09.743Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -488,6 +488,10 @@
     "privacy-test.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T17:34:00.445Z"
+    },
+    "docs-quota-policy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:34:09.743Z"
     }
   }
 }
