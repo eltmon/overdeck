@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T03:58:24.610375Z · model: claude-opus-5-5 · open: 771_
+_Last sequenced: 2026-09-27T04:01:11.853955Z · model: claude-opus-5-5 · open: 773_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -26,9 +26,11 @@ _Last sequenced: 2026-09-27T03:58:24.610375Z · model: claude-opus-5-5 · open: 
 | 34 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
 | 35 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
 | 36 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
+| 37 | PAN-4240 | S | critical | ok |  |  | Closed-issue reaper rm -rf's polyrepo workspaces with unmerged work: merge check runs in the non-git root and reads 'no-branch'. |
 | 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
 | 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
 | 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
+| 41 | PAN-4241 | XS | high | ok |  |  | computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done. |
 | 43 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
 | 44 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
 | 45 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
@@ -863,6 +865,10 @@ The PAN-2858 defect in a new shape: complete-planning promotes to the primary ch
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
 
+### PAN-4240 (rank 37)
+
+New this pass. The deacon closed-issue reaper gates deletion on isBranchMerged, which runs git in the polyrepo project root; that root is not a git repository, so the check silently returns no-branch and the fallback rmSync deletes a workspace holding unmerged, local-only commits, with nothing logged. It destroyed the MIN-489 workspace twice. Silent data loss in the substrate outranks routine work, and the fix is small and well specified (per-sub-repo check, unknown means skip, no rmSync over worktrees, log actions). It sits beside PAN-3657 and PAN-3708 in the same polyrepo-root-is-not-git bug class.
+
 ### PAN-3565 (rank 38)
 
 New this pass. Three review-lifecycle defects, one of them severe: when all four reviewer lanes died at spawn on a record lock, the supervisor wrote a synthesis declaring CHANGES REQUESTED with every lane marked failed — an infrastructure flake recorded as a real code verdict. It was caught only because a human was watching live. Same integrity family as PAN-3283 and PAN-2746.
@@ -874,6 +880,10 @@ New this pass. Main stayed red for about five hours because nothing owns the sta
 ### PAN-3532 (rank 40)
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
+
+### PAN-4241 (rank 41)
+
+New this pass. computeWorkspaceRepoRoots builds its fallback candidate by joining the workspace path with an absolute repoPath, so any polyrepo repo whose configured name differs from its directory is never found. That makes pan task done refuse valid Item trailers and also affects head snapshots and merge completeness for MYN. The fix is a one-line candidate change plus a test, and a symlink workaround exists, so it ranks high rather than critical.
 
 ### PAN-3085 (rank 43)
 
@@ -1071,14 +1081,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
 
 patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
 
-### PAN-3793 (rank 114)
-
-New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
-
-### PAN-2639 (rank 115)
-
-codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1086,10 +1088,10 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T03:58:24.610375Z",
+  "generatedAt": "2026-09-27T04:01:11.853955Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 771,
+  "openCount": 773,
   "nodes": [
     {
       "issue": "PAN-4224",
@@ -10626,6 +10628,32 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "rationale": "New bug: wrong GPT-5.6 price rows misstate spend for codex agents; small, well-scoped fix with a parity test, ranked with nearby cost-accuracy work.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4240",
+      "rank": 37,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Closed-issue reaper rm -rf's polyrepo workspaces with unmerged work: merge check runs in the non-git root and reads 'no-branch'.",
+      "rationale": "New this pass. The deacon closed-issue reaper gates deletion on isBranchMerged, which runs git in the polyrepo project root; that root is not a git repository, so the check silently returns no-branch and the fallback rmSync deletes a workspace holding unmerged, local-only commits, with nothing logged. It destroyed the MIN-489 workspace twice. Silent data loss in the substrate outranks routine work, and the fix is small and well specified (per-sub-repo check, unknown means skip, no rmSync over worktrees, log actions). It sits beside PAN-3657 and PAN-3708 in the same polyrepo-root-is-not-git bug class.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4241",
+      "rank": 41,
+      "size": "XS",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "computeWorkspaceRepoRoots joins an absolute repoPath, so polyrepo repos named unlike their path (fe/frontend) are skipped by pan task done.",
+      "rationale": "New this pass. computeWorkspaceRepoRoots builds its fallback candidate by joining the workspace path with an absolute repoPath, so any polyrepo repo whose configured name differs from its directory is never found. That makes pan task done refuse valid Item trailers and also affects head snapshots and merge completeness for MYN. The fix is a one-line candidate change plus a test, and a symlink workaround exists, so it ranks high rather than critical.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11685,6 +11713,20 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4241",
+      "to": "PAN-4240",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-3657",
+      "to": "PAN-4240",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
