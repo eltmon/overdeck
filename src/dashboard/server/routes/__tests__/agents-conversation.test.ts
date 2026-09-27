@@ -124,6 +124,21 @@ describe('buildConversationResponse', () => {
     expect(result.byteOffset).toBe(1024);
   });
 
+  it('strips latestCompactSummary (PAN-4245) from the HTTP response body', async () => {
+    const jsonlPath = '/some/path/session.jsonl';
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: jsonlPath }]);
+    mockAccess.mockResolvedValue(undefined);
+    mockParseEntireConversation.mockResolvedValue({
+      messages: [{ role: 'user', content: 'hello' } as never],
+      latestCompactSummary: { text: 'Summary: earlier work', sequence: 3 } as never,
+      ...PARSE_RESULT_BASE,
+    });
+
+    const result = await buildAgentConversationResult('agent-PAN-473');
+
+    expect(result.body).not.toHaveProperty('latestCompactSummary');
+  });
+
   it('returns empty result and logs error when parseEntireConversation throws', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: '/some/path/session.jsonl' }]);

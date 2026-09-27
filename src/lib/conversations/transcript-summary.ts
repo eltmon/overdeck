@@ -155,13 +155,20 @@ export function serializeConversationTranscript(
 
   const recentMessages = messages.filter((m) => m.sequence === undefined || m.sequence > compactSummary.sequence);
   const recentJoined = renderTurns(recentMessages).join('\n\n');
+  // Account for the fixed overhead this section adds around recentJoined —
+  // the join('\n\n') between summarySection and this block, plus the
+  // RECENT_TURNS_LABEL line — so the final output stays within TRANSCRIPT_BUDGET
+  // for 'about' rather than running over by that overhead's length.
+  const recentSectionOverhead = 2 + RECENT_TURNS_LABEL.length + 1;
   const recentBudget = purpose === 'title'
     ? TITLE_RECENT_BUDGET
-    : Math.max(0, TRANSCRIPT_BUDGET - summarySection.length);
+    : Math.max(0, TRANSCRIPT_BUDGET - summarySection.length - recentSectionOverhead);
 
   let recentSection = recentJoined;
   if (recentJoined.length > recentBudget) {
-    const tail = recentJoined.slice(recentJoined.length - recentBudget);
+    const markerOverhead = RECENT_OMITTED_MARKER.length + 2;
+    const tailBudget = Math.max(0, recentBudget - markerOverhead);
+    const tail = recentJoined.slice(recentJoined.length - tailBudget);
     recentSection = `${RECENT_OMITTED_MARKER}\n\n${tail}`;
   }
 
