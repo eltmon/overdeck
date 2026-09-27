@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T15:42:51.290Z",
+  "updated": "2026-09-27T15:47:04.974Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-09-27T15:42:47.782Z"
     },
     "ci-frontend-subset": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4266",
-      "claimedAt": "2026-09-27T15:42:51.290Z"
+      "claimedAt": "2026-09-27T15:42:51.290Z",
+      "doneAt": "2026-09-27T15:47:04.974Z"
     }
   }
 }
