@@ -69,6 +69,12 @@ describe('Ollama config merge', () => {
     expect(config.ollama).toEqual({ baseUrl: 'http://127.0.0.1:11500', contextLength: 32_768 });
   });
 
+  it('fills in Ollama default port when the base URL names none', () => {
+    const { config } = mergeConfigs({ ollama: { base_url: 'http://localhost' } });
+
+    expect(config.ollama.baseUrl).toBe('http://localhost:11434');
+  });
+
   it('refuses a non-localhost base URL at config load', () => {
     expect(() => mergeConfigs({ ollama: { base_url: 'https://ollama.example.com' } })).toThrow(
       /ollama\.base_url must be a localhost address/,

@@ -15,8 +15,9 @@ import {
  * names the fix, because this message is what the operator sees instead of an agent.
  *
  * The context pins come from warm-loading the tag and asking the server what window it
- * actually gave it — not from config. `OLLAMA_CONTEXT_LENGTH` only applies to a serve
- * Overdeck started itself, and Ollama silently truncates anything past the real window.
+ * actually gave it — never from config. The pin has to describe the window the harness
+ * really gets, or Claude Code lets the conversation grow past it and Ollama truncates in
+ * silence (PAN-1641 hazard H1).
  */
 export async function getOllamaLaunchEnv(
   model: string,

@@ -71,6 +71,16 @@ describe('getOllamaLaunchEnv', () => {
     expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('131072');
   });
 
+  it('warm-loads plainly, so the pin describes the window the harness really gets', async () => {
+    mocks.checkOllamaHealth.mockResolvedValue(HEALTHY);
+
+    await getOllamaLaunchEnv('ollama:gemma4:12b', OLLAMA);
+
+    // No num_ctx request: see the note in warmOllamaModel. Passing one made /api/ps
+    // report a window the harness's own requests never got.
+    expect(mocks.warmOllamaModel).toHaveBeenCalledWith('gemma4:12b', 'http://localhost:11434');
+  });
+
   it('starts the server once with knownUnhealthy when nothing answers, then re-probes', async () => {
     mocks.checkOllamaHealth
       .mockResolvedValueOnce({

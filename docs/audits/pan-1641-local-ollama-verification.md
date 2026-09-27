@@ -1,176 +1,153 @@
 # PAN-1641 — local Ollama verification
 
-**Date:** 2026-09-25
+**Date:** 2026-09-27 (supersedes the 2026-09-25 pass; both are described below)
 **Host:** Linux, NVIDIA GeForce RTX 3090 (24 GB, CUDA)
-**Ollama:** 0.19.0 (systemd service, user `ollama`, `http://localhost:11434`)
-**Harness:** Claude Code (`claude --print`)
-**Model used:** `qwen3:14b` — **not** `gemma4:12b`; see "Deviations" below.
+**Ollama:** 0.34.4, systemd service at `http://localhost:11434`, default window 32768
+**Harness:** Claude Code, spawned by Overdeck (`pan start`) from the workspace-built CLI
+**Model:** `gemma4:12b` (7.6 GB, Q4_K_M, 11.9B params), pulled into the service's store
 
-## Read this first: what was not done
+## Verdict
 
-**The planned end-to-end step — spawning an Overdeck work agent on PAN-3684 with
-`pan start PAN-3684 --model ollama:gemma4:12b` — was not run.** Three reasons, in
-order of weight:
+**Overdeck's local-model launch path is verified end to end. `gemma4:12b` is not
+capable enough to drive a work agent, so AC-10's task-completion clause is still
+unmet — for a model reason, not an Overdeck one.**
 
-1. **`gemma4:12b` cannot be pulled on this host.** Ollama 0.19.0 answers its
-   manifest request with `412: The model you are attempting to pull requires a
-   newer version of Ollama`. Upgrading Ollama restarts a service shared with the
-   conversation-search embeddings path, on a host that was running eight agents.
-   That is an operator decision, so it was not made unattended.
-2. **The host's server runs a 32768-token window**, below the 65536 floor this
-   work documents. Raising it means restarting that same shared service. A second
-   server started on port 11500 has an empty model store, and the host's disk was
-   at 100% (see "Disk"), so re-pulling 9 GB into it was not an option.
-3. The spawn also edits and closes a GitHub issue, opens and closes a PR, and
-   writes live agent state while the production dashboard still runs `origin/main`
-   — which throws `UnknownModelError` for `ollama:` ids until this branch merges
-   (hazard H2).
+AC-10 asks for two different things in one sentence: that Overdeck can launch a
+claude-code agent onto a local model with no cloud calls, and that the agent then
+finishes PAN-3684's task. The first is now proven live. The second failed on the
+model, three times, with the evidence below. Per PRD decision D12 the model was not
+silently swapped.
 
-So **AC-10 is not met**: there is no PAN-3684 agent, no committed
-`LOCAL_OLLAMA_OK.txt` on `feature/pan-3684`, and PAN-3684 is still open. What
-follows is the verification that *was* performed, against the real local server
-with the real built code. It covers every layer the spawn would have exercised
-except Overdeck's own launcher/pane plumbing.
+## What the live spawn proved
 
-## Deviations
+`node dist/cli/index.js start PAN-3684 --model ollama:gemma4:12b --harness claude-code`,
+run twice from this workspace's own build.
 
-- **Model substituted.** `qwen3:14b` replaces `gemma4:12b`: same 12–14B class, same
-  24 GB GPU, and it pulls cleanly on 0.19.0. The substitution was announced on
-  [PAN-1641](https://github.com/eltmon/overdeck/issues/1641#issuecomment-5828843991)
-  before the run, not buried here. `DEFAULT_OLLAMA_AGENT_MODEL` stays `gemma4:12b`
-  in code — it is a recommendation string, never a resolution fallback, and it
-  becomes pullable as soon as the operator upgrades Ollama.
-- **Context window 32768, not 65536**, for the same reason as above.
-- Evidence was gathered with `claude --print` driven by the exact env
-  `getOllamaLaunchEnv` returns, rather than through a spawned pane.
+**1. The whole Overdeck launch path ran.** Model routing resolved `ollama:gemma4:12b`
+to the `ollama` provider, `canUseHarness` admitted claude-code, the preflight probed
+the live server, and the launcher was generated and run in a real Herdr pane with
+`--effort high`, the hooks, and the work-role system prompt. `--effort` caused no
+error, retiring hazard H4.
 
-## What was verified
-
-### 1. Preflight against the live server (WI-1)
-
-Run through the **built** `dist/` chunk, not the source:
+**2. The launcher env is exactly D4** (`~/.overdeck/agents/agent-pan-3684/launcher.sh`):
 
 ```
-checkOllamaHealth: {"endpointReachable":true,"version":"0.19.0","versionSupported":true,"modelPresent":true}
-stripOllamaPrefix('ollama:qwen3:14b') -> qwen3:14b
-warmOllamaModel: {"contextLength":32768} (23255ms)
+export ANTHROPIC_BASE_URL="http://localhost:11434"
+export ANTHROPIC_AUTH_TOKEN="ollama"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="gemma4:12b"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="gemma4:12b"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="gemma4:12b"
+export ANTHROPIC_SMALL_FAST_MODEL="gemma4:12b"
+export CLAUDE_CODE_SUBAGENT_MODEL="gemma4:12b"
+export API_TIMEOUT_MS="600000"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS="32768"
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW="32768"
 ```
 
-The warm-load took 23 seconds cold, which is why its timeout is 120 s rather than
-the 5 s probe budget.
+`grep -c 'export ANTHROPIC_API_KEY'` is **0** — the only mention is the `unset` line.
+The launch flag is `--model 'gemma4:12b'`, so the `ollama:` prefix was stripped at the
+single launch-arg door. Exactly one pin pair is exported, confirming
+`getClaudeCodeContextPolicyForModel` correctly returns `{}` for this provider.
+**AC-10.ac2 is met.**
 
-### 2. `ensureOllamaServeRunning` really starts a server (WI-1)
+**3. Ollama really served the agent.** The agent's first turn consumed
+**16387 input tokens** and produced output, so the Messages API round-trip works
+inside a real Overdeck agent, not only under `claude --print`.
 
-Pointed at an unused port, it spawned a detached `ollama serve` with
-`OLLAMA_HOST=localhost:11500` and `OLLAMA_CONTEXT_LENGTH=65536` and polled it
-healthy in **49 ms**:
-
-```
-ensureOllamaServeRunning ok (49ms)
-health: {"endpointReachable":true,"version":"0.19.0","versionSupported":true,
-         "modelPresent":false,
-         "message":"Ollama model qwen3:14b is not pulled. Run `ollama pull qwen3:14b`."}
-```
-
-That `modelPresent:false` line is an unmocked instance of the not-pulled error
-path: a fresh server has an empty model store, and the message names the fix.
-The server was stopped afterwards.
-
-### 3. Claude Code completes a tool loop through Ollama's shim (hazard H4b — retired)
-
-This was the one genuinely unproven thing. The planning-time probe had returned
-`num_turns: 1`, so the `tool_result` round-trip had never been exercised. Driven
-with exactly the D4 env at `ANTHROPIC_BASE_URL=http://localhost:11434`:
+**4. Zero cloud model calls (NFR-5).** `strace` cannot attach to a pane that is not a
+descendant (`ptrace_scope=1`), so the PRD's documented fallback was used: a 1 Hz
+`ss -tnpH` poll over the agent's whole process tree for its entire life. All model
+traffic was loopback to `127.0.0.1:11434` / `[::1]:11434`. Three non-loopback
+destinations appeared, all on 443:
 
 ```
-num_turns: 5
-is_error: false
-terminal_reason: "completed"
-modelUsage.qwen3:14b: inputTokens 106271, outputTokens 3288, contextWindow 32768
+[2606:4700:3031::6815:363d]:443
+[2606:4700:3035::ac43:8806]:443
+[2606:4700:3035::ac43:98a5]:443
 ```
 
-The agent called the Write tool, received the `tool_result` back through Ollama's
-Anthropic endpoint, continued, and reported success. The file it wrote contains
-exactly `LOCAL_OK`:
+These are the same Cloudflare-fronted addresses the 2026-09-25 pass identified from
+the TLS SNI as **`tldraw-mcp-app.tldraw.workers.dev` and `mcp.sentry.dev`** — remote
+MCP servers from the operator's own MCP configuration, which Claude Code opens at
+startup whatever serves the model. Nothing reached `api.anthropic.com`
+(160.79.104.10), statsig, or any model provider.
+
+So AC-10's literal clause "none belongs to the claude process" is unreachable on any
+host with remote MCP servers configured, and is orthogonal to Ollama. The substantive
+requirement — no cloud *model* calls — holds.
+
+## Why the task did not complete: the model
+
+Three attempts, all on `gemma4:12b`:
+
+1. **First spawn: `Prompt is too long`.** The kickoff prompt exceeded the 32768 window
+   and the API rejected the turn outright.
+2. **Second spawn, then two explicit nudges** naming the tool, the exact absolute path
+   and the exact git command. The model answered each with a generic greeting —
+   *"I am ready. Please provide your instructions"* and *"I'm ready to help you with
+   the Overdeck project… Please provide your first task or question!"* — and made
+   **zero tool calls in 73 transcript records**.
+
+The model is not broken in general: in an isolated short-context session with the same
+harness and the same D4 env it completed the loop, `num_turns: 3`, emitting a real
+`Write` tool_use and receiving `File created successfully`. It simply loses the
+instruction inside a 16K-token agent system prompt. It also hallucinated the target
+directory there, writing `LOCAL_OK` to a flattened `/tmp/...-scratchpad/g4test/` path
+rather than its cwd, and then reported success — so even its successful loop needs
+its claims checked.
+
+For contrast, `qwen3:14b` did complete this loop in the 2026-09-25 pass
+(`num_turns: 5`, file written with exactly `LOCAL_OK`). A model swap is a deliberate
+plan change under D12, so it was not made here.
+
+## A pin bug this run found and fixed
+
+The first fix attempted was to ask for the window per request: Ollama honors
+`options.num_ctx` on `/api/generate`, and a warm-load asking for 65536 did make
+`/api/ps` report 65536 — apparently letting `ollama.context_length` work on a server
+Overdeck cannot reconfigure.
+
+**It is wrong, and the live run proved it.** The harness's own `/v1/messages` requests
+carry no `num_ctx`, so Ollama serves them at the server default; `/api/ps` fell back
+to 32768 as soon as the agent ran. Claude Code, pinned to the 65536 that was asked
+for, then let context grow past what the server would serve. The transcript shows the
+consequence exactly:
 
 ```
-$ cat LOCAL_OLLAMA_OK.txt
-LOCAL_OK
+usage in: 16387 out: 55     <- fits the real 32768 window, produced output
+usage in: 58595 out: 0      <- past it: zero output
+usage in: 61349 out: 0      <- past it: zero output
 ```
 
-(Written at
-`/tmp/claude-1000/.../scratchpad/ollama-e2e/LOCAL_OLLAMA_OK.txt`, not committed —
-there is no PAN-3684 agent run to commit it from.)
+Two turns of 58K and 61K input returning **zero** output tokens: the silent truncation
+of hazard H1, caused by a pin that over-promised. So `warmOllamaModel` stays a plain
+load with no `num_ctx`, because the window it reads back has to be the window the
+harness will actually get. `ollama.context_length` legitimately applies only to a
+server Overdeck starts itself, `pan doctor` is what tells an operator the window is
+too small, and the docs now say so. Do not re-try the `num_ctx` idea; this is the
+record of why.
 
-Claude Code's own `costUSD` field reported `0.613555` for this run. That is Claude
-Code's internal estimate against an unrecognized model id; Overdeck records `$0`
-through the null-pricing path added in the routing commit.
+The host's own window could not be raised: this agent has no passwordless sudo, so
+the systemd `OLLAMA_CONTEXT_LENGTH` override the docs recommend was not available.
 
-### 4. Hazard H1 reproduced live
+## Housekeeping
 
-A second run of the same prompt at the same 32768 window ended:
-
-> `Autocompact is thrashing: the context refilled to the limit within 3 turns of
-> the previous compact, 3 times in a row.`
-
-Two runs, same prompt, same window: one completed, one thrashed. This is direct
-evidence that 32768 is marginal for an agent turn and that the documented 65536
-floor and the `pan doctor` warning below it are correctly placed.
-
-### 5. Connection capture (NFR-5)
-
-`strace -f -e trace=connect` over the full run. **All model traffic was loopback**:
-
-```
-connect(16, {AF_INET, htons(11434), inet_addr("127.0.0.1")})
-connect(14, {AF_INET6, htons(11434), "::1"})
-```
-
-Non-loopback connections did appear, on port 443, to `104.21.54.61`,
-`104.21.80.175`, `172.67.136.6`, `172.67.152.165` and their IPv6 equivalents
-(`2606:4700:30xx::`). Extracting the TLS SNI from the ClientHello identifies them:
-
-```
-tldraw-mcp-app.tldraw.workers.dev
-mcp.sentry.dev
-```
-
-**These are remote MCP servers from the operator's own MCP configuration, not
-model calls and not Claude Code telemetry.** Claude Code opens them at startup
-regardless of which provider serves the model. No connection went to
-`api.anthropic.com` (160.79.104.10), statsig, or any model provider.
-
-Per the PRD's checkpoint rule, the documented opt-outs were tried:
-`DISABLE_TELEMETRY=1`, `DISABLE_ERROR_REPORTING=1`, `DISABLE_AUTOUPDATER=1`, and
-`CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY=1` on top of the
-`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` the launch env already exports. The
-connections were unchanged, which is consistent with their being MCP sessions
-rather than telemetry. **None of the four was added to the launch env**: they do
-not affect what was observed, and adding them would be the same footgun hazard
-H10 describes for `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` — a privacy opt-out
-an operator may set globally must not be handed to `PROVIDER_ENV_KEYS`, which
-would `unset` it on every other provider's launch.
-
-**Conclusion on NFR-5:** zero cloud *model* calls, confirmed. AC-10's literal
-wording — no non-loopback connection at all from the claude process — is not
-achievable while remote MCP servers are configured, and that is orthogonal to
-Ollama.
-
-## Disk
-
-Probing for a pullable substitute pulled three models (~26 GB) onto a host whose
-root filesystem was already near full; free space reached 3.2 GB. `qwen2.5-coder:14b`
-and `gemma3:12b` were removed immediately afterwards, restoring free space to
-20 GB. **`qwen3:14b` (9.3 GB) was left in place** because it is the model this
-audit refers to and the only locally usable agent model on the host; remove it
-with `ollama rm qwen3:14b` to reclaim that space.
+- Both PAN-3684 agents were killed as soon as their evidence was captured. No Herdr
+  pane was left behind, and `/api/ps` reports no resident model.
+- PAN-3684's body was corrected from "Pi work agent" to "claude-code work agent".
+- No model was pulled during this pass. `gemma4:12b` was already in the service store.
+- PAN-3684 is **left open** with no `LOCAL_OLLAMA_OK.txt` commit, because its task was
+  not completed.
 
 ## What the operator needs to decide
 
-1. Upgrade Ollama past 0.19.0 if `gemma4:12b` is wanted. That restarts the shared
-   service.
-2. Set `OLLAMA_CONTEXT_LENGTH=65536` on the systemd unit (see
-   `configuration/local-models.mdx`), or let `pan up` own the server.
-3. Re-run the PAN-3684 spawn once this branch is merged — before merge the
-   production dashboard and Deacon throw `UnknownModelError` for `ollama:` ids on
-   any recovery or resume (hazard H2).
+1. **Accept a capable local model for AC-10**, or accept the launch-path proof above
+   and retire the task-completion clause to a follow-up. `gemma4:12b` cannot drive a
+   work agent on this host; `qwen3:14b` demonstrably can drive a short tool loop.
+2. **Set `OLLAMA_CONTEXT_LENGTH=65536`** on the systemd unit (root needed). At the
+   default 32768 a work-agent kickoff prompt is at the edge: 16387 tokens fit, and one
+   larger sync made the first spawn fail outright.
+3. Re-run PAN-3684 after this branch merges. Before merge the production dashboard and
+   Deacon still throw `UnknownModelError` for `ollama:` ids on any recovery or resume
+   (hazard H2).

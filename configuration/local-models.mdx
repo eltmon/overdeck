@@ -17,11 +17,17 @@ id to your local endpoint instead of a cloud provider.
 
 ## Requirements
 
-- **Ollama 0.14.0 or newer.** Earlier releases do not serve the Anthropic Messages
-  API, and Overdeck refuses to launch against them rather than failing mid-turn.
-- **About 24 GB of GPU memory** for the recommended model. Verified shapes: an
-  RTX 3090 Ti (24 GB, CUDA) on Linux, and an Apple M4 with 24 GB of unified memory
-  (Metal).
+- **Ollama 0.14.0 or newer** is the floor Overdeck enforces: earlier releases do not
+  serve the Anthropic Messages API, and the preflight refuses to launch against them
+  rather than failing mid-turn. **Individual models need more.** A model's manifest
+  can require a newer Ollama than 0.14, and the pull then fails with
+  `412: The model you are attempting to pull requires a newer version of Ollama` —
+  `gemma4:12b` did exactly that on 0.19.0. Run the newest Ollama you can; upgrade if
+  a pull returns 412.
+- **About 24 GB of GPU memory** for the recommended model. Verified on an RTX 3090
+  (24 GB, CUDA) on Linux with `gemma4:12b`, which used 9.2 GB of VRAM at a 64K
+  window. Apple Silicon with 24 GB of unified memory (Metal) is a target shape, not
+  yet verified.
 - **Disk for the model.** `gemma4:12b` is roughly 8 GB at Q4 quantization.
 - The **claude-code harness**. Other harnesses are refused for `ollama:` models in
   this release.
@@ -62,7 +68,10 @@ is no error, the agent simply stops seeing the beginning of its own instructions
 An Overdeck work agent's first prompt alone runs to tens of thousands of tokens,
 so the default window is far too small.
 
-Set `OLLAMA_CONTEXT_LENGTH=65536` on the server:
+**The window is the server's to set, so you have to set it on the server.** Overdeck
+reads back whatever window the server gave the model and pins Claude Code to that
+number, so the harness's own compaction agrees with reality — but it cannot raise
+the window for a server it did not start. Set `OLLAMA_CONTEXT_LENGTH`:
 
 ```bash
 # Linux (systemd)
@@ -77,13 +86,18 @@ launchctl setenv OLLAMA_CONTEXT_LENGTH 65536
 # then quit and reopen the Ollama app
 ```
 
-When Overdeck starts the server itself (see [pan up](#what-pan-up-does) below) it
-passes `OLLAMA_CONTEXT_LENGTH` from your config, so you do not need the steps
-above on a host where `pan up` owns the server.
+On a host where Overdeck starts the server itself (see [pan up](#what-pan-up-does)
+below) it passes `OLLAMA_CONTEXT_LENGTH` from `ollama.context_length`, so the config
+value is enough and the steps above are unnecessary.
 
-Either way, Overdeck asks the server what window it actually gave the model and
-pins Claude Code to that number, rather than trusting the config. `pan doctor`
-warns about any loaded model under 64K.
+`pan doctor` warns about any loaded model whose window is under 64K, which is the
+check to run after changing this.
+
+<Warning>
+Getting this wrong is not a loud failure. Below about 32K a work agent's first
+prompt either gets silently truncated or is rejected outright with
+`Prompt is too long`, and the agent dies on its first turn.
+</Warning>
 
 ## Configure Overdeck
 
@@ -102,6 +116,8 @@ ollama:
   base_url: http://localhost:11434   # default; must be a localhost address
   context_length: 65536              # default; used when Overdeck starts the server
 ```
+
+A `base_url` with no port gets Ollama's default `11434`.
 
 A non-localhost `base_url` is refused at config load. The point of a local model is
 that nothing leaves the machine, so a remote endpoint is a configuration error

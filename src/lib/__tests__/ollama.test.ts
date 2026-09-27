@@ -390,6 +390,8 @@ describe('warmOllamaModel', () => {
 
     await warmOllamaModel('ollama:gemma4:12b', BASE_URL, { fetchImpl });
 
+    // A plain load with no options block: the warm-load must mirror what the harness
+    // sends, so the window it reads back is the window the harness will really get.
     expect(JSON.parse(body ?? '{}')).toEqual({ model: 'gemma4:12b', prompt: '' });
   });
 

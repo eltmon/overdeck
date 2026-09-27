@@ -188,8 +188,18 @@ export async function ensureOllamaServeRunning(options: EnsureOllamaServeOptions
 }
 
 /**
- * Load a tag into VRAM and report the context window the server actually gave it. The server is
- * the authority here: `OLLAMA_CONTEXT_LENGTH` only applies to a serve Overdeck started itself.
+ * Load a tag into VRAM and report the context window the server actually gave it.
+ *
+ * Deliberately a PLAIN load with no `options.num_ctx`: it has to mirror what the harness
+ * itself sends, because the harness's window is what the pin has to describe. Asking for a
+ * bigger window here was tried and rejected (PAN-1641) — `/api/ps` does report the requested
+ * window afterwards, but the harness's own `/v1/messages` requests carry no `num_ctx`, so
+ * Ollama serves them at the server default and the pin silently over-promises. Verified live
+ * on 0.34.4: a 65536 warm-load read back 65536, then dropped to 32768 once the agent ran.
+ *
+ * So the server is the authority twice over: `OLLAMA_CONTEXT_LENGTH` (a server-launch setting
+ * Overdeck passes only to a serve it starts itself) decides the window, and this function
+ * reports it. `pan doctor` is what tells an operator the window is too small.
  */
 export async function warmOllamaModel(
   tag: string,
