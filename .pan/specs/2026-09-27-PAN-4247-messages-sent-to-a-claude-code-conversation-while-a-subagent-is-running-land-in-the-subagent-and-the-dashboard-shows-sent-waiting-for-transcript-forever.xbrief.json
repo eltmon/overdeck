@@ -4,17 +4,17 @@
     "created": "2026-09-27T09:38:43Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4247: Messages sent to a Claude Code conversation while a subagent is running land in the subagent, and the dashboard shows 'Sent · waiting for transcript' forever",
-    "updated": "2026-09-27T09:41:03.120Z"
+    "updated": "2026-09-27T09:41:50.026Z"
   },
   "plan": {
     "id": "pan-4247",
     "title": "Messages sent to a Claude Code conversation while a subagent is running land in the subagent, and the dashboard shows 'Sent · waiting for transcript' forever",
-    "status": "proposed",
+    "status": "running",
     "uid": "86776b50-a461-4744-b652-502466ddb0a9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T09:38:43Z",
-    "updated": "2026-09-27T09:41:03.120Z",
+    "updated": "2026-09-27T09:41:50.026Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4247",
