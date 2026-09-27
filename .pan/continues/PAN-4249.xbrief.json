@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4249",
   "created": "2026-09-27T09:56:17.310Z",
-  "updated": "2026-09-27T11:30:20.799Z",
+  "updated": "2026-09-27T11:30:29.967Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "effort-config-types.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T11:30:20.799Z"
+    },
+    "effort-support-leaf.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:29.966Z"
     }
   }
 }
