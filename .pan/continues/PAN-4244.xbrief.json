@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4244",
   "created": "2026-09-27T08:41:42.862Z",
-  "updated": "2026-09-27T09:02:09.457Z",
+  "updated": "2026-09-27T09:02:19.624Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
     "deterministic-zombie-fixture.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T09:02:09.457Z"
+    },
+    "deterministic-zombie-fixture.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:02:19.624Z"
     }
   }
 }
