@@ -61,7 +61,7 @@ describe('PipelineView', () => {
         issue({ identifier: 'PAN-2', title: 'Active work', priority: 2, status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' }, updatedAt: '2026-05-18T02:00:00.000Z' }),
         issue({ identifier: 'PAN-6', title: 'Urgent active work', priority: 1, status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' }, updatedAt: '2026-05-18T00:30:00.000Z' }),
         issue({ identifier: 'PAN-7', title: 'Newer active work', priority: 2, status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' }, updatedAt: '2026-05-18T03:00:00.000Z' }),
-        issue({ identifier: 'PAN-3', title: 'Planned work', priority: 3, hasPlan: true, project: { id: 'pan', name: 'Overdeck', color: '#fff' } }),
+        issue({ identifier: 'PAN-3', title: 'Planned work', priority: 3, hasPlan: true, hasTasks: true, project: { id: 'pan', name: 'Overdeck', color: '#fff' } }),
         issue({ identifier: 'PAN-4', title: 'Blocked merge', priority: 2, project: { id: 'ops', name: 'Operations', color: '#fff' } }),
         issue({ identifier: 'PAN-5', title: 'Open PR', priority: 2, project: { id: 'ops', name: 'Operations', color: '#fff' } }),
       ],
@@ -338,7 +338,7 @@ describe('PipelineView', () => {
     fireEvent.contextMenu(row);
 
     const menu = screen.getByTestId('issue-action-overflow-menu');
-    expect(within(menu).getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
+    expect(within(menu).getByTestId('issue-action-startAgent')).toHaveTextContent('Start work');
   });
 
   it('opens the issue drawer from a Pipeline row without disturbing scroll position', () => {
