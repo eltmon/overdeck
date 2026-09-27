@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T15:56:02.090Z",
+  "updated": "2026-09-27T15:56:06.516Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4267",
       "claimedAt": "2026-09-27T15:49:27.344Z",
       "doneAt": "2026-09-27T15:56:02.090Z"
+    },
+    "darwin-stall-signal": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4267",
+      "claimedAt": "2026-09-27T15:56:06.516Z"
     }
   }
 }
