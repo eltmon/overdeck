@@ -476,6 +476,30 @@ and notes) and raised as a warning in the activity feed. The agent is told to
 record no verdict, post its findings as a plain PR comment for the operator,
 and exit.
 
+## Plan-freshness preflight (PAN-3917, PAN-4212)
+
+Right before `pan start` spawns a work agent, it reads the workspace xBRIEF
+plan and checks every non-glob `metadata.files_scope` path across the plan's
+items. A work agent spawned against paths the codebase moved on since
+planning — a file renamed, moved, or deleted — spins on paths that no longer
+exist, so this preflight refuses the spawn instead: `The plan for <ID>
+references files that no longer exist`.
+
+A missing path is refused only when a commit on the workspace `HEAD` deleted
+it *after* `plan.created`. A path that never existed on `HEAD`, or that `HEAD`
+deleted *before* the plan was written, is a file the plan intends to create or
+deliberately restore, and passes the check.
+
+History comes from `HEAD` only, never `--all`. The `--all` form walks the
+`refs/pan/turn/*` checkpoint refs Overdeck writes every turn — tens of
+thousands of them on a long-lived repo — so any file a session ever drafted
+would count as "tracked," flagging every real creation as drift.
+
+`--skip-freshness` bypasses the check entirely and spawns anyway; the fix for
+a genuine refusal is `pan plan <ID>` to re-plan against the current tree. On
+the dashboard's auto-start path the refusal is not surfaced in the UI — it
+lands only in `spawn.log`.
+
 ## Agent Auto-Resume Gates
 
 Auto-resume is intentionally suppressible:
