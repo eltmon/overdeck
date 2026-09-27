@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4245",
   "created": "2026-09-27T08:41:51.604Z",
-  "updated": "2026-09-27T09:35:33.552Z",
+  "updated": "2026-09-27T09:41:47.647Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
       "claimedBy": "agent-pan-4245",
       "claimedAt": "2026-09-27T09:28:57.469Z",
       "doneAt": "2026-09-27T09:35:33.552Z"
+    },
+    "parser-capture-compact-summary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:41:47.647Z"
     }
   }
 }
