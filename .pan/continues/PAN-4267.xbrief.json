@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:22:00.727Z",
+  "updated": "2026-09-27T16:22:11.481Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "darwin-stall-signal.ac3": {
       "status": "completed",
       "doneAt": "2026-09-27T16:22:00.727Z"
+    },
+    "darwin-stall-signal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:22:11.480Z"
     }
   }
 }
