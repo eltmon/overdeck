@@ -4,17 +4,17 @@
     "created": "2026-09-27T23:46:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4280: Type and go: start a conversation or terminal from Home with no project, and fix Simple/Advanced defaulting",
-    "updated": "2026-09-27T23:49:03.546Z"
+    "updated": "2026-09-27T23:49:41.963Z"
   },
   "plan": {
     "id": "pan-4280",
     "title": "Type and go: start a conversation or terminal from Home with no project, and fix Simple/Advanced defaulting",
-    "status": "proposed",
+    "status": "running",
     "uid": "5e3d80c6-fdd5-4b34-857d-233fffacf98c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T23:46:39Z",
-    "updated": "2026-09-27T23:49:03.546Z",
+    "updated": "2026-09-27T23:49:41.963Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4280",
