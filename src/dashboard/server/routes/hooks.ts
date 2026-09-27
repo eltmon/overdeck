@@ -11,8 +11,8 @@
  * emit an in-memory-only event via emitOnly().
  */
 
-import { stat } from 'fs/promises';
-import { basename, dirname, resolve } from 'path';
+import { readFile, stat } from 'fs/promises';
+import { basename, dirname, join, resolve } from 'path';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { Effect, Layer, Result, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -29,6 +29,8 @@ import { getWorkspaceById } from '../../../lib/workspaces/resolver.js';
 import { derivePromptTitle } from '../../../lib/conversations/transcript-summary.js';
 import { generateAiTitle, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { handleTurnComplete } from '../../../lib/overdeck/title-refinement.js';
+import { clearPermissionRequest, listPermissionRequests, recordPermissionRequest } from '../../../lib/overdeck/conversation-permission-registry.js';
+import { subagentsDirFor } from '../../../lib/transcript-landing.js';
 import { appendFreshBriefingUpdate, recordBriefingSessionStart } from '../../../lib/briefing-freshness.js';
 import {
   claimSessionBriefing,
@@ -525,39 +527,85 @@ const postPermissionEventRoute = HttpRouter.add(
       return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
     }
 
-    const sessionId = typeof body.session_id === 'string' ? body.session_id : null;
-    const hookEvent = typeof body.hook_event_name === 'string' ? body.hook_event_name : null;
-    const toolName = typeof body.tool_name === 'string' ? body.tool_name : undefined;
-
-    if (!sessionId || !hookEvent) {
-      return jsonResponse({ ok: true });
-    }
-
-    const conv = getConversationByClaudeSessionId(sessionId);
-    if (!conv) {
-      return jsonResponse({ ok: true });
-    }
-
-    healFailedForkVerdictOnLiveActivity(conv);
-
-    const waiting = hookEvent === 'PermissionRequest';
-    const clearing = CLEAR_ON.has(hookEvent);
-
-    if (!waiting && !clearing) {
-      return jsonResponse({ ok: true });
-    }
-
-    console.log(`[hooks] ${hookEvent} session=${sessionId} conv=${conv.name} waiting=${waiting}${toolName ? ` tool=${toolName}` : ''}`);
-
-    getEventStore().emitOnly({
-      type: 'conversation.permission_changed',
-      timestamp: new Date().toISOString(),
-      payload: { conversationName: conv.name, waiting, toolName },
-    });
-
-    return jsonResponse({ ok: true, conversationName: conv.name, waiting });
+    return jsonResponse(yield* Effect.promise(() => handlePermissionEventBody(body)));
   })),
 );
+
+const PERMISSION_INPUT_PREVIEW_CHARS = 200;
+
+function permissionToolInputPreview(toolName: string, toolInput: unknown): string {
+  if (toolInput === undefined || toolInput === null) return '';
+  const input = typeof toolInput === 'object' ? toolInput as Record<string, unknown> : {};
+  let preview: string;
+  if (toolName === 'Bash' && typeof input.command === 'string') preview = input.command;
+  else if (['Edit', 'Write', 'Read'].includes(toolName) && typeof input.file_path === 'string') preview = input.file_path;
+  else preview = JSON.stringify(toolInput);
+  return preview.slice(0, PERMISSION_INPUT_PREVIEW_CHARS);
+}
+
+async function subagentDescription(transcriptPath: unknown, agentId: string): Promise<string | null> {
+  if (typeof transcriptPath !== 'string' || !transcriptPath) return null;
+  try {
+    const meta = JSON.parse(await readFile(join(subagentsDirFor(transcriptPath), `agent-${agentId}.meta.json`), 'utf8')) as { description?: unknown };
+    return typeof meta.description === 'string' && meta.description ? meta.description : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface HandlePermissionEventBodyOptions {
+  now?: () => Date;
+}
+
+/**
+ * PAN-4278: record or clear one agent's PermissionRequest in the conversation
+ * permission registry, then emit `conversation.permission_changed` with
+ * `waiting` true while ANY agent of the conversation still has an entry. A
+ * main-thread PostToolUse therefore no longer clears a subagent's prompt.
+ */
+export async function handlePermissionEventBody(
+  body: Record<string, unknown>,
+  options: HandlePermissionEventBodyOptions = {},
+): Promise<{ ok: true; conversationName?: string; waiting?: boolean }> {
+  const sessionId = typeof body.session_id === 'string' ? body.session_id : null;
+  const hookEvent = typeof body.hook_event_name === 'string' ? body.hook_event_name : null;
+  const toolName = typeof body.tool_name === 'string' ? body.tool_name : undefined;
+  if (!sessionId || !hookEvent) return { ok: true };
+
+  const conv = getConversationByClaudeSessionId(sessionId);
+  if (!conv) return { ok: true };
+
+  healFailedForkVerdictOnLiveActivity(conv);
+
+  const agentId = typeof body.agent_id === 'string' && body.agent_id ? body.agent_id : null;
+  const agentKey = agentId ?? 'main';
+  if (hookEvent === 'PermissionRequest') {
+    recordPermissionRequest(conv.name, {
+      agentKey,
+      agentId,
+      agentType: typeof body.agent_type === 'string' && body.agent_type ? body.agent_type : null,
+      agentDescription: agentId ? await subagentDescription(body.transcript_path, agentId) : null,
+      toolName: toolName ?? '',
+      toolInputPreview: permissionToolInputPreview(toolName ?? '', body.tool_input),
+      requestedAt: (options.now?.() ?? new Date()).toISOString(),
+    });
+  } else if (CLEAR_ON.has(hookEvent)) {
+    clearPermissionRequest(conv.name, agentKey);
+  } else {
+    return { ok: true };
+  }
+
+  const waiting = listPermissionRequests(conv.name).length > 0;
+  console.log(`[hooks] ${hookEvent} session=${sessionId} conv=${conv.name} agent=${agentKey} waiting=${waiting}${toolName ? ` tool=${toolName}` : ''}`);
+
+  getEventStore().emitOnly({
+    type: 'conversation.permission_changed',
+    timestamp: new Date().toISOString(),
+    payload: { conversationName: conv.name, waiting, toolName },
+  });
+
+  return { ok: true, conversationName: conv.name, waiting };
+}
 
 export interface HandleUserPromptSubmitBodyOptions {
   resolveSessionFile?: (conv: LegacyConversation) => Promise<string | null>;
