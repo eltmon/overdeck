@@ -66,6 +66,7 @@ import { startPullRequestSyncService, stopPullRequestSyncService } from './servi
 import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
 import { startGitHubQuotaPublisher } from './services/github-quota.js';
 import { registerGitHubRateLimitedTelemetry, startGitHubQuotaTelemetry } from '../../lib/telemetry/github-quota-telemetry.js';
+import { ensureOperatorHash } from '../../lib/telemetry/operator-hash.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
@@ -602,6 +603,8 @@ const stopGitHubQuotaPublisher = isPeerDashboard ? () => undefined : startGitHub
 // PAN-4264: hourly bucketed github_quota_sample, and a throttled github_rate_limited per refusal.
 const stopGitHubQuotaTelemetry = isPeerDashboard ? () => undefined : startGitHubQuotaTelemetry();
 const stopGitHubRateLimitedTelemetry = registerGitHubRateLimitedTelemetry();
+// PAN-4264: derive the opt-in operatorHash once, when operator grouping is on.
+void ensureOperatorHash();
 
 let stopResourceRefreshServices = () => undefined;
 

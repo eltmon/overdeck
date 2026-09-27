@@ -80,4 +80,34 @@ describe('TelemetrySection', () => {
     expect(screen.getByText(/Source code, prompts, conversation content/)).toBeTruthy();
     expect(screen.getByText(/Changes apply on the next dashboard load/)).toBeTruthy();
   });
+
+  // PAN-4264: the opt-in operator grouping switch.
+  it('shows operator grouping off by default and sends operatorGrouping: true when clicked', () => {
+    const onSettingsChange = vi.fn();
+    render(
+      <TelemetrySection
+        formData={settings(true)}
+        saveStatus="idle"
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    const toggle = screen.getByTestId('telemetry-operator-grouping-toggle');
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(toggle);
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    expect(onSettingsChange.mock.calls[0][0].telemetry).toMatchObject({ enabled: true, operatorGrouping: true });
+  });
+
+  it('disables operator grouping while telemetry is off', () => {
+    render(
+      <TelemetrySection
+        formData={settings(false)}
+        saveStatus="idle"
+        onSettingsChange={vi.fn()}
+      />,
+    );
+    expect((screen.getByTestId('telemetry-operator-grouping-toggle') as HTMLButtonElement).disabled).toBe(true);
+  });
 });
