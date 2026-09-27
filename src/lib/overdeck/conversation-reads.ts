@@ -312,6 +312,7 @@ export async function getCachedMessages(
         permissionMode: incremental.permissionMode ?? cachedResult.permissionMode,
         fileEditsByAssistantId: mergedFileEdits,
         countedUsageIds: incremental.countedUsageIds,
+        latestCompactSummary: incremental.latestCompactSummary ?? cachedResult.latestCompactSummary,
       };
     }
   } else {
@@ -333,6 +334,7 @@ export async function getCachedMessages(
       contextBoundaryOffset: parsed.contextBoundaryOffset,
       permissionMode: parsed.permissionMode,
       countedUsageIds: parsed.countedUsageIds,
+      latestCompactSummary: parsed.latestCompactSummary,
     },
   });
   if (messagesCache.size > MESSAGES_CACHE_MAX) {
