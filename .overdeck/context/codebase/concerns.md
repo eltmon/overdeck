@@ -147,6 +147,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
+- **The memory governor gates almost nothing** (PAN-4267) — the governor band
+  (`assessMemoryPressure`, `cloister/memory-governor.ts`) is read only by the
+  memory-pressure patrol (activity feed) and `preemption.ts resumeYieldedAgents`;
+  `shed()` has no callers. Conversations and `POST /api/agents` never read it —
+  agent starts are gated by `evaluateSpawnGuardrails` (`routes/agents/shared.ts`)
+  against `memoryWarnGb`/`memoryBlockGb`, a separate threshold pair. On macOS the
+  governor reader (`readProcMemoryDarwin`, `system-health-service.ts`) and the
+  header collector (`system-health/darwin.ts`) measured available memory with
+  different formulas until PAN-4267 unified them.
+
 - **`git log --all` is not "the repository's history" here.** Overdeck keeps
   tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and
   work sessions snapshot their trees there). `--all` walks them, so any file a
