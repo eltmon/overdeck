@@ -297,7 +297,7 @@ async function indexBatch(input: {
   input.result.chunksIndexed += input.batch.length;
 }
 
-async function discoverConversationJsonlFiles(roots: string[], signal?: AbortSignal): Promise<string[]> {
+export async function discoverConversationJsonlFiles(roots: string[], signal?: AbortSignal): Promise<string[]> {
   const files: string[] = [];
   for (const root of roots) await collectJsonlFiles(root, files, signal);
   return files.sort();

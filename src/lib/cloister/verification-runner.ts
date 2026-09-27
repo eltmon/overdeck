@@ -54,7 +54,8 @@ import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItems } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
-import { parseCompositeSnapshot, snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
+import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
+import { primaryShaFromAnchor } from './verified-head.js';
 
 const execAsync = promisify(exec);
 
@@ -889,13 +890,7 @@ export async function runVerificationForIssueInProcess(
     // The verified sha. A polyrepo anchor is a COMPOSITE snapshot string, so
     // slicing it yields garbage — resolve the primary repo's sha out of it,
     // the same way the `overdeck/tests` stamp below does.
-    const verifiedSha = (() => {
-      if (!lastVerifiedCommit) return undefined;
-      const composite = parseCompositeSnapshot(lastVerifiedCommit);
-      if (composite.size === 0) return lastVerifiedCommit as string;
-      const primary = repoRoots[0]?.repoKey;
-      return (primary && composite.get(primary)) ?? [...composite.values()][0];
-    })();
+    const verifiedSha = primaryShaFromAnchor(lastVerifiedCommit, repoRoots[0]?.repoKey);
     const passedHead8 = verifiedSha?.slice(0, 8) ?? headShort;
     appendPipelineEntry(workspacePath, {
       type: 'verification.passed',
