@@ -14,6 +14,7 @@ import {
   GROUP_ORDER,
   ISSUE_ACTIONS,
   deriveIssueActionPhase,
+  getMenuActions,
   getPhasePrimaryActions,
   type IssueActionEntry,
   type IssueActionKey,
@@ -24,11 +25,12 @@ import { useDashboardStore } from '../store';
 import type { Agent, Issue } from '../../types';
 
 export const ISSUE_SCOPED_PAN_VERBS = [
+  // PAN-4198 D6: 'plan --auto' (autoPlan), 'start --auto' (startSkipPlanning)
+  // and 'wipe' left the registry with their UI entries. `pan plan --auto`,
+  // `pan start --auto` and `pan wipe` remain CLI verbs.
   'plan',
-  'plan --auto',
   'plan finalize',
   'start',
-  'start --auto',
   'tell',
   'done',
   'review request',
@@ -41,7 +43,6 @@ export const ISSUE_SCOPED_PAN_VERBS = [
   'sync-main',
   'reopen',
   'close',
-  'wipe',
   'destroy',
   'open',
 ] as const;
@@ -91,6 +92,72 @@ const AUDITED_REGISTRY_KEYS = [
 
 export const RETIREMENT_AUDIT = [
   {
+    retiredKey: 'autoPlan',
+    consumer: 'issue menu Auto-plan',
+    successorKeys: ['plan'],
+  },
+  {
+    retiredKey: 'startSkipPlanning',
+    consumer: 'issue menu Start without planning',
+    successorKeys: ['plan'],
+  },
+  {
+    retiredKey: 'wipe',
+    consumer: 'issue menu Wipe',
+    successorKeys: ['resetIssue'],
+  },
+  {
+    retiredKey: 'inference',
+    consumer: 'issue menu Inference',
+    successorKeys: [],
+    newHome: 'src/dashboard/frontend/src/components/Stage/panes/DocsPane.tsx',
+  },
+  {
+    retiredKey: 'discussions',
+    consumer: 'issue menu Discussions',
+    successorKeys: [],
+    newHome: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueDigTabs.tsx',
+  },
+  {
+    retiredKey: 'transcripts',
+    consumer: 'issue menu Transcripts',
+    successorKeys: [],
+    newHome: 'src/dashboard/frontend/src/lib/store.ts',
+  },
+  {
+    retiredKey: 'upload',
+    consumer: 'issue menu Upload transcript',
+    successorKeys: [],
+    dropped: 'Hard-disabled since it was added, with no handler behind it.',
+  },
+  {
+    retiredKey: 'syncDiscussions',
+    consumer: 'issue menu Sync discussions',
+    successorKeys: [],
+    dropped: 'Rare enough to be automation-only; POST /api/command-deck/planning/:id/sync-discussions stays.',
+  },
+  {
+    retiredKey: 'copySettings',
+    consumer: 'issue menu Copy settings',
+    successorKeys: [],
+    dropped: 'Rare enough to be automation-only; POST /api/issues/:id/copy-settings stays.',
+  },
+  {
+    retiredKey: 'resetSession',
+    consumer: 'issue menu Reset session',
+    successorKeys: ['restartAgent'],
+  },
+  {
+    retiredKey: 'completeWorkReset',
+    consumer: 'issue menu Complete work reset',
+    successorKeys: ['restartAgent'],
+  },
+  {
+    retiredKey: 'restartFromPlan',
+    consumer: 'issue menu Restart from plan',
+    successorKeys: ['restartAgent'],
+  },
+  {
     retiredKey: 'reviewTest',
     consumer: 'ReviewVerificationCard',
     successorKeys: ['restartReview'],
@@ -108,26 +175,27 @@ export const RETIREMENT_AUDIT = [
 ] as const satisfies ReadonlyArray<{
   retiredKey: string;
   consumer: string;
+  /** Live keys that took the work over. Empty when the action moved or was dropped. */
   successorKeys: readonly IssueActionKey[];
+  /** Repository-relative file that now owns the behavior (PAN-4198 D7). */
+  newHome?: string;
+  /** Why the action went away with no replacement (PAN-4198 D7). */
+  dropped?: string;
 }>;
 
 const DESTRUCTIVE_ACTION_KEYS = [
   'closeOut',
   'resetIssue',
-  'wipe',
   'destroyWorkspace',
   'cancel',
-  'resetSession',
-  'completeWorkReset',
-  'restartFromPlan',
-  'restartAgent',
 ] as const satisfies readonly IssueActionKey[];
 
 vi.mock('../../components/PanOpenInPicker', () => ({
   PanOpenInPicker: ({ openInCwd }: { openInCwd: string | null }) => <div data-testid="pan-open-picker">Open {openInCwd ?? ''}</div>,
 }));
 
-const commandFilesDir = resolve(process.cwd(), '../../../src/cli/commands');
+const repositoryRoot = resolve(process.cwd(), '../../..');
+const commandFilesDir = resolve(repositoryRoot, 'src/cli/commands');
 const commandFiles = new Set(readdirSync(commandFilesDir).filter((entry) => entry.endsWith('.ts')));
 
 function commandFileForPanVerb(panVerb: string) {
@@ -339,6 +407,32 @@ function mockFetch() {
   });
 }
 
+/**
+ * The `beforeEach` store fixture as `useIssueActions` derives it: a running,
+ * paused work agent on a ready PR with a workspace.
+ */
+function hookStateForFixture(): IssueActionState {
+  return {
+    derived: {
+      issueId: 'PAN-1331',
+      state: 'ready',
+      pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'approved', checks: 'green', mergeable: true },
+    },
+    panes: [],
+    agent: { status: 'running', role: 'work', paused: true },
+    lifecycle: null,
+    workspace: { exists: true, issueId: 'PAN-1331', path: '/tmp/feature-pan-1331' } as IssueActionState['workspace'],
+    hasPlan: true,
+    hasTasks: true,
+    issueCanonicalState: 'in_progress',
+    isMerged: false,
+    hasPr: true,
+    prUrl: 'https://example.test/pr/1331',
+    orderBooksLoaded: true,
+    isInActiveOrderBook: false,
+  };
+}
+
 function registryEntriesForVerb(verb: string) {
   return ISSUE_ACTIONS.filter((action) => action.panVerb === verb);
 }
@@ -382,18 +476,28 @@ describe('issue action CLI ↔ dashboard parity', () => {
     }
   });
 
-  it('renders every registry entry label through the shared drawer action menu surface', () => {
+  it('renders every enabled menu-placed label through the shared drawer action menu surface', () => {
     renderMenu();
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
 
     const menu = screen.getByTestId('issue-action-menu');
+    const state = hookStateForFixture();
+    const expected = new Set(getMenuActions(state).map((action) => action.key));
+    // PAN-4198 (FR-1): the menu is the enabled, menu-placed set — no more, no less.
     for (const action of ISSUE_ACTIONS) {
-      expect(menu, action.key).toHaveTextContent(action.label);
+      if (expected.has(action.key)) expect(menu, action.key).toHaveTextContent(action.label);
+      else expect(menu, action.key).not.toHaveTextContent(action.label);
     }
   });
 
   it('renders the order-book submenu from the shared issue action registry', async () => {
+    // PAN-4198 tightened canAddToOrderBook: an order book queues work that has
+    // not started, so the issue needs no live agent and a pre-work state.
+    useDashboardStore.setState({
+      agentsById: {},
+      derivedIssueStateByIssueId: { 'PAN-1331': { issueId: 'PAN-1331', state: 'planned' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
     renderLiveGroupedMenu();
 
     await screen.findByTestId('issue-action-addToOrderBook');
@@ -418,15 +522,7 @@ describe('issue action CLI ↔ dashboard parity', () => {
       'viewPr',
       'resetIssue',
       'tasks',
-      'inference',
-      'discussions',
-      'transcripts',
-      'upload',
-      'syncDiscussions',
       'createWorkspace',
-      'copySettings',
-      'resetSession',
-      'restartFromPlan',
       'restartAgent',
       'addToOrderBook',
       'cancel',
@@ -436,19 +532,26 @@ describe('issue action CLI ↔ dashboard parity', () => {
   it.each(PHASE_FIXTURES)('preserves grouped-menu parity for $phase', (fixture) => {
     expect(deriveIssueActionPhase(fixture.state)).toBe(fixture.phase);
     const menu = renderGroupedMenu(fixture);
+    const menuKeys = new Set(getMenuActions(fixture.state).map((action) => action.key));
     const enabledPrimaryKeys = new Set(
       getPhasePrimaryActions(fixture.state, fixture.phase)
-        .filter((action) => action.enabledWhen(fixture.state))
+        .filter((action) => action.enabledWhen(fixture.state) && action.placement === 'menu')
         .map((action) => action.key),
     );
+    // FR-3/FR-4: a group renders only when it has an enabled, non-primary row.
+    const groupsWithRows = GROUP_ORDER.filter((group) => ISSUE_ACTIONS.some((action) => (
+      action.group === group && menuKeys.has(action.key) && !enabledPrimaryKeys.has(action.key)
+    )));
 
     const sectionsBeforeDanger = Array.from(menu.querySelectorAll<HTMLElement>('[data-issue-action-section]'))
       .map((section) => section.dataset.issueActionSection)
       .filter((section) => section !== 'phase');
-    expect(sectionsBeforeDanger).toEqual(GROUP_ORDER.filter((group) => group !== 'danger'));
+    expect(sectionsBeforeDanger).toEqual(groupsWithRows.filter((group) => group !== 'danger'));
 
-    const dangerDisclosure = screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ });
-    const lastSemanticSection = menu.querySelector<HTMLElement>(`[data-issue-action-section="${GROUP_ORDER.at(-2)}"]`);
+    const dangerDisclosure = screen.getByRole('menuitem', { name: 'Danger' });
+    const lastSemanticSection = menu.querySelector<HTMLElement>(
+      `[data-issue-action-section="${groupsWithRows.filter((group) => group !== 'danger').at(-1)}"]`,
+    );
     expect(lastSemanticSection).not.toBeNull();
     expect(lastSemanticSection!.compareDocumentPosition(dangerDisclosure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(dangerDisclosure).toHaveAttribute('aria-expanded', 'false');
@@ -458,26 +561,26 @@ describe('issue action CLI ↔ dashboard parity', () => {
     const semanticSections = Array.from(menu.querySelectorAll<HTMLElement>('[data-issue-action-section]'))
       .map((section) => section.dataset.issueActionSection)
       .filter((section) => section !== 'phase');
-    expect(semanticSections).toEqual(GROUP_ORDER);
+    expect(semanticSections).toEqual(groupsWithRows);
 
     for (const action of ISSUE_ACTIONS) {
-      const enabled = action.enabledWhen(fixture.state);
-      const expectedCount = enabledPrimaryKeys.has(action.key) ? 2 : 1;
-      const testId = enabled ? `issue-action-${action.key}` : `issue-action-disabled-${action.key}`;
-      expect(screen.getAllByTestId(testId), `${fixture.phase}:${action.key}`).toHaveLength(expectedCount);
-
-      const homeSection = menu.querySelector<HTMLElement>(`[data-issue-action-section="${action.group}"]`);
-      expect(homeSection, `${fixture.phase}:${action.group}`).not.toBeNull();
-      const homeRow = within(homeSection!).getByTestId(testId);
-      const homeMenuItem = homeRow.matches('[role="menuitem"]') ? homeRow : within(homeRow).getByRole('menuitem');
-      if (enabled) {
-        expect(homeMenuItem, `${fixture.phase}:${action.key}`).not.toHaveAttribute('data-disabled');
-      } else {
-        expect(homeMenuItem, `${fixture.phase}:${action.key}`).toHaveAttribute('data-disabled');
+      // FR-1: gated and contextual entries render nowhere.
+      if (!menuKeys.has(action.key)) {
+        expect(screen.queryAllByTestId(`issue-action-${action.key}`), `${fixture.phase}:${action.key}`).toHaveLength(0);
+        expect(screen.queryAllByTestId(`issue-action-disabled-${action.key}`), `${fixture.phase}:${action.key}`).toHaveLength(0);
+        continue;
       }
-    }
 
-    expect(screen.getAllByTestId('issue-action-wipe')).toHaveLength(1);
+      // FR-3: exactly one row, in the phase section for a primary and in its
+      // own group for everything else.
+      const rows = screen.getAllByTestId(`issue-action-${action.key}`);
+      expect(rows, `${fixture.phase}:${action.key}`).toHaveLength(1);
+      const homeSelector = enabledPrimaryKeys.has(action.key) ? 'phase' : action.group;
+      const homeSection = menu.querySelector<HTMLElement>(`[data-issue-action-section="${homeSelector}"]`);
+      expect(homeSection, `${fixture.phase}:${homeSelector}`).not.toBeNull();
+      expect(within(homeSection!).getByTestId(`issue-action-${action.key}`)).toBe(rows[0]);
+      expect(rows[0], `${fixture.phase}:${action.key}`).not.toHaveAttribute('data-disabled');
+    }
   });
 
   it('requires an explicit retirement audit for every registry key that disappears', () => {
@@ -490,9 +593,18 @@ describe('issue action CLI ↔ dashboard parity', () => {
     expect(activeKeys).not.toContain('reviewTest');
 
     for (const row of RETIREMENT_AUDIT) {
-      expect(row.successorKeys, row.consumer).not.toEqual([]);
+      const hasSuccessor = row.successorKeys.length > 0;
+      const hasNewHome = 'newHome' in row && !!row.newHome;
+      const hasDroppedReason = 'dropped' in row && !!row.dropped?.trim();
+      expect(
+        hasSuccessor || hasNewHome || hasDroppedReason,
+        `${row.retiredKey} (${row.consumer}) needs a successor, a new home, or a dropped reason`,
+      ).toBe(true);
       for (const successorKey of row.successorKeys) {
         expect(activeKeys, `${row.consumer} → ${successorKey}`).toContain(successorKey);
+      }
+      if (hasNewHome) {
+        expect(existsSync(resolve(repositoryRoot, row.newHome!)), `${row.retiredKey} → ${row.newHome}`).toBe(true);
       }
     }
   });
@@ -504,12 +616,12 @@ describe('issue action CLI ↔ dashboard parity', () => {
     renderLiveGroupedMenu();
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/orders'));
     const callsBeforeSelection = fetchMock.mock.calls.length;
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
-    fireEvent.click(screen.getByTestId('issue-action-wipe'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger' }));
+    fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
 
     expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByLabelText('Confirmation text')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Wipe' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reset to Todo' })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledTimes(callsBeforeSelection);
   });
 });

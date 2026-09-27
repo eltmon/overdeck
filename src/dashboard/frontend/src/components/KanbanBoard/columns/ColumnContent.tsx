@@ -42,7 +42,7 @@ export function ColumnContent({
   focusedIssueId?: string | null;
   onSelectIssue: (id: string | null) => void;
   onOpenIssue: (id: string) => void;
-  onPlan: (issue: Issue, autoStart?: boolean) => void;
+  onPlan: (issue: Issue) => void;
   onViewTasks: (issue: Issue) => void;
   onViewXBrief?: (issue: Issue) => void;
   collapsedFeatures: Set<string>;
@@ -82,7 +82,7 @@ export function ColumnContent({
         isSelected={selectedIssue === issue.identifier}
         isFocused={focusedIssueId === issue.identifier}
         onSelect={() => onOpenIssue(issue.identifier)}
-        onPlan={(autoStart) => onPlan(issue, autoStart)}
+        onPlan={() => onPlan(issue)}
         onViewTasks={(i) => onViewTasks(i)}
         onViewXBrief={onViewXBrief ? (i) => onViewXBrief(i) : undefined}
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
