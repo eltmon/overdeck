@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T16:23:53.671Z",
+  "updated": "2026-09-27T16:26:23.595Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,9 +100,10 @@
       "doneAt": "2026-09-27T16:23:49.148Z"
     },
     "rate-limit-banner": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4264",
-      "claimedAt": "2026-09-27T16:23:53.671Z"
+      "claimedAt": "2026-09-27T16:23:53.671Z",
+      "doneAt": "2026-09-27T16:26:23.595Z"
     }
   }
 }
