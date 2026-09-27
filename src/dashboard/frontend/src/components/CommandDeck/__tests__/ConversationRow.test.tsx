@@ -240,3 +240,89 @@ describe('ConversationRow pull request badge (PAN-3822)', () => {
     expect(mutations.unlinkPullRequest).toHaveBeenCalledWith({ name: 'test-conversation', ref: 'https://github.com/eltmon/overdeck/pull/42' });
   });
 });
+
+describe('ConversationRow lanes and successors (PAN-4223 WI-10)', () => {
+  function renderLineage(overrides: Partial<Conversation>, props: { variant?: 'flat' | 'nested'; orphanOf?: number | null; flattenedFrom?: number | null } = {}) {
+    render(
+      <ConversationRow
+        conv={{ ...conversation, ...overrides }}
+        isSelected={false}
+        onSelect={vi.fn()}
+        mutations={mutations}
+        {...props}
+      />,
+    );
+  }
+
+  it('labels a nested critic lane and shows its DONE report badge', () => {
+    renderLineage(
+      { parentConversationId: 7, gauntletRun: 'hotel', laneKey: '663', laneRole: 'critic', laneIteration: 1, laneReport: { seq: 1, at: 'x', status: 'done' } },
+      { variant: 'nested' },
+    );
+    expect(screen.getByText('C 663 i1')).toBeInTheDocument();
+    const badge = screen.getByText('DONE');
+    expect(badge.className).toContain('badge-bg-state-done');
+    expect(screen.queryByText(/continues ←/)).not.toBeInTheDocument();
+  });
+
+  it('links a successor back to its predecessor', () => {
+    renderLineage({ parentConversationId: 42 });
+    const link = screen.getByRole('link', { name: 'continues ← #42' });
+    expect(link).toHaveAttribute('href', '/conv/42');
+  });
+
+  it('marks a flattened successor and a flattened lane with their real parent', () => {
+    renderLineage({ parentConversationId: 9 }, { variant: 'nested', flattenedFrom: 9 });
+    expect(screen.getByRole('link', { name: '↳ continued from #9' })).toHaveAttribute('href', '/conv/9');
+    expect(screen.queryByText(/continues ←/)).not.toBeInTheDocument();
+  });
+
+  it('marks a flattened lane and an orphan lane as lanes of their parent', () => {
+    renderLineage({ parentConversationId: 15, gauntletRun: 'hotel', laneKey: 'n1', laneRole: 'builder' }, { variant: 'nested', flattenedFrom: 15 });
+    expect(screen.getByText('lane of #15 · hotel')).toBeInTheDocument();
+  });
+
+  it('marks an orphan lane rendered at top level', () => {
+    renderLineage({ parentConversationId: 99, gauntletRun: 'hotel', laneKey: 'lost', laneRole: 'builder' }, { orphanOf: 99 });
+    expect(screen.getByText('lane of #99 · hotel')).toBeInTheDocument();
+  });
+});
+
+describe('ConversationRow verdict badges (PAN-4223 WI-22)', () => {
+  function renderVerdict(overrides: Partial<Conversation>, props: { variant?: 'flat' | 'nested'; flattenedFrom?: number | null; criticOf?: number | null } = {}) {
+    render(
+      <ConversationRow
+        conv={{ ...conversation, parentConversationId: 1, gauntletRun: 'hotel', laneKey: '663', laneIteration: 1, ...overrides }}
+        isSelected={false}
+        onSelect={vi.fn()}
+        mutations={mutations}
+        {...props}
+      />,
+    );
+  }
+
+  it('shows a critic verdict with its defect count, neutral for NOT_YET', () => {
+    renderVerdict({ laneRole: 'critic', laneVerdict: { value: 'NOT_YET', defects: 7 }, laneReport: { seq: 1, at: 'x', status: 'done' } }, { variant: 'nested' });
+    const badge = screen.getByText('NOT_YET 7');
+    expect(badge.className).not.toContain('badge-bg-state');
+    expect(screen.queryByText('DONE')).not.toBeInTheDocument();
+  });
+
+  it('shows PENDING for a critic without a verdict yet', () => {
+    renderVerdict({ laneRole: 'verifier', laneVerdict: { value: 'pending', defects: null } }, { variant: 'nested' });
+    expect(screen.getByText('PENDING')).toBeInTheDocument();
+  });
+
+  it('links a builder\'s latest verdict to its critic, in the done tone for WOWED', () => {
+    renderVerdict({ laneRole: 'builder', laneLatestVerdict: { value: 'WOWED', defects: null, criticId: 42 } }, { variant: 'nested' });
+    const link = screen.getByRole('link', { name: 'open critic #42' });
+    expect(link).toHaveAttribute('href', '/conv/42');
+    expect(link).toHaveTextContent('WOWED');
+    expect(link.className).toContain('badge-bg-state-done');
+  });
+
+  it('marks a flattened critic as the critic of its builder', () => {
+    renderVerdict({ laneRole: 'critic', criticOfConversationId: 9 }, { variant: 'nested', flattenedFrom: 9, criticOf: 9 });
+    expect(screen.getByText('critic of #9 · hotel')).toBeInTheDocument();
+  });
+});
