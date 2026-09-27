@@ -414,8 +414,8 @@ about two minutes even with no webhook.
 open (most recently updated) above merged above closed
 (`selectPullRequestForHead` in `lib/github-pr-selection.ts`), so an older open
 PR wins over a newer closed one. The merge then lands the PR `ensurePRExists`
-resolves (open first); a stale stored merge-set `artifact_url` is overwritten,
-never used (`routes/workspaces/merge-artifact.ts`).
+resolves (open first); a stale stored merge-set `artifact_url` is overwritten
+and never merged (`routes/workspaces/merge-artifact.ts`).
 
 **Strike branches.** The merge queue used to turn a queued entry into a
 strike landing whenever `origin/strike/<issue>` existed, and skip the gate
