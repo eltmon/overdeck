@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4264",
   "created": "2026-09-27T15:30:19.047Z",
-  "updated": "2026-09-27T17:32:11.460Z",
+  "updated": "2026-09-27T17:32:20.649Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -440,6 +440,10 @@
     "quota-telemetry.ac3": {
       "status": "completed",
       "doneAt": "2026-09-27T17:32:11.459Z"
+    },
+    "instance-heartbeat.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T17:32:20.649Z"
     }
   }
 }
