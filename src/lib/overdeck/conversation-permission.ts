@@ -12,10 +12,22 @@
  *    the agent that asked and when. A registry entry with no prompt on screen
  *    yields an `answerable: false` row — the dialog then offers only "Open
  *    terminal", never keys.
+ *
+ * `handleConversationPermissionAnswer` answers an on-screen prompt with arrows
+ * + Enter after verifying the prompt's signature.
  */
-import type { LegacyConversation as Conversation } from './conversations.js';
-import { parsePermissionPrompt, type PermissionChoice, type PermissionPrompt } from '../agents/permission-prompt.js';
-import { resolveAgentPaneIo } from '../terminal-backends/agent-pane-io.js';
+import {
+  getConversationById,
+  getConversationByName,
+  type LegacyConversation as Conversation,
+} from './conversations.js';
+import {
+  parsePermissionPrompt,
+  permissionKeystrokes,
+  type PermissionChoice,
+  type PermissionPrompt,
+} from '../agents/permission-prompt.js';
+import { resolveAgentPaneIo, type AgentPaneIo } from '../terminal-backends/agent-pane-io.js';
 import { PANE_CAPTURE_LINES } from '../session-pane-choice.js';
 import {
   firstSeenAt,
@@ -156,4 +168,75 @@ export async function conversationPendingPermission(
   deps: ConversationPermissionDeps = {},
 ): Promise<PendingPermission | null> {
   return (await readConversationPermission(conv, deps)).pendingPermission;
+}
+
+export interface ConversationPermissionAnswerDeps {
+  io?: Pick<AgentPaneIo, 'read' | 'sendKey'>;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const PERMISSION_CHOICES: readonly PermissionChoice[] = ['allow-once', 'allow-always', 'deny'];
+const KEYSTROKE_GAP_MS = 60;
+const DELIVERY_CONFIRM_WAIT_MS = 700;
+
+/**
+ * POST /api/conversations/:id/permission — answer the permission prompt on
+ * the conversation's pane. Re-reads the pane and refuses, sending no keys,
+ * when the prompt is gone or is not the one the dialog rendered; after the
+ * keys it re-reads and succeeds only when that prompt left the screen.
+ */
+export async function handleConversationPermissionAnswer(
+  rawId: string,
+  body: Record<string, unknown>,
+  deps: ConversationPermissionAnswerDeps = {},
+): Promise<{ body: Record<string, unknown>; status?: number }> {
+  try {
+    const choice = body['choice'];
+    const signature = typeof body['signature'] === 'string' ? body['signature'] : '';
+    if (typeof choice !== 'string' || !PERMISSION_CHOICES.includes(choice as PermissionChoice)) {
+      return { body: { error: 'choice must be allow-once, allow-always or deny' }, status: 400 };
+    }
+    if (!signature) {
+      return { body: { error: 'signature is required' }, status: 400 };
+    }
+    const conv = /^\d+$/.test(rawId) ? getConversationById(Number(rawId)) : getConversationByName(rawId);
+    if (!conv) {
+      return { body: { error: 'Conversation not found' }, status: 404 };
+    }
+    if (!isClaudeCodeConversation(conv)) {
+      return { body: { error: 'Not a Claude Code conversation' }, status: 400 };
+    }
+
+    const io = deps.io ?? await resolveAgentPaneIo(conv.tmuxSession);
+    const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+    const prompt = parsePermissionPrompt(await io.read(PANE_CAPTURE_LINES));
+    if (!prompt) {
+      return { body: { error: 'The permission prompt is no longer on screen', code: 'prompt-gone' }, status: 409 };
+    }
+    if (prompt.signature !== signature) {
+      return { body: { error: 'The permission prompt changed since the dialog was rendered — refresh and re-answer', code: 'prompt-changed' }, status: 409 };
+    }
+    const keys = permissionKeystrokes(prompt, choice as PermissionChoice);
+    if (!keys) {
+      return { body: { error: `This prompt does not offer ${choice}`, code: 'choice-not-offered' }, status: 400 };
+    }
+
+    for (const key of keys) {
+      await io.sendKey(key);
+      await sleep(KEYSTROKE_GAP_MS);
+    }
+
+    await sleep(DELIVERY_CONFIRM_WAIT_MS);
+    const after = parsePermissionPrompt(await io.read(PANE_CAPTURE_LINES));
+    if (after && after.signature === signature) {
+      return { body: { error: 'The keys were sent but the prompt is still up — answer it in the terminal', code: 'delivery-unconfirmed' }, status: 409 };
+    }
+    console.log(`[conversations] ${conv.name}: permission answered ${choice}`);
+    return { body: { ok: true, answered: choice } };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[conversations] permission answer failed:', message);
+    return { body: { error: 'Internal server error' }, status: 500 };
+  }
 }

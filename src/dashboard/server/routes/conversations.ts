@@ -80,6 +80,7 @@ import {
   validateConversationControlAckOrigin,
 } from '../../../lib/overdeck/conversation-delivery.js';
 import { handleConversationPaneChoiceAnswer } from '../../../lib/overdeck/conversation-pane-choice.js';
+import { handleConversationPermissionAnswer } from '../../../lib/overdeck/conversation-permission.js';
 import {
   checkConversationUploadRateLimit,
   handleConversationImageDelete,
@@ -658,6 +659,28 @@ const postConversationPaneChoiceRoute = HttpRouter.add(
   }),
 );
 //
+// PAN-4278 — answer a Claude Code terminal permission prompt (main thread or
+// subagent) from the dashboard dialog. Verifies the on-screen prompt still
+// carries the dialog's signature before sending arrows + Enter.
+const postConversationPermissionRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:id/permission',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const rawId = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      const result = await handleConversationPermissionAnswer(rawId, body);
+      return jsonResponse(result.body, { status: result.status });
+    });
+  }),
+);
+//
 // PAN-3766 — answer an ohmypi conversation's `ask` modal from the dashboard.
 // The message route cannot: pi queues the steer behind the modal and the agent
 // never sees it. This route drives the modal with keystrokes after verifying
@@ -1056,6 +1079,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   conversationSubagentInputRoutes,
   postConversationCodexApprovalRoute,
   postConversationPaneChoiceRoute,
+  postConversationPermissionRoute,
   postConversationPiAskAnswerRoute,
   postConversationDeliveryMethodRoute,
   postConversationControlAckRoute,
