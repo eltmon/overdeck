@@ -229,9 +229,11 @@ export class PrimeAgentHost {
     const previousSessionId = (await readFile(this.path(hostSessionIdFile(TRANSPORT)), 'utf8').catch(() => '')).trim();
     await mkdir(this.agentDir, { recursive: true, mode: 0o700 });
     await mkdir(join(this.home, 'sockets'), { recursive: true, mode: 0o700 });
+    // The session-id file is the readiness key, so a relaunch clears it. The
+    // session-file pointer stays: it is the only link from the agent to its
+    // transcript, and a successful launch overwrites it below.
     await Promise.all([
       rm(this.path(hostSessionIdFile(TRANSPORT)), { force: true }),
-      rm(this.pointerPath(), { force: true }),
       rm(this.path(hostLaunchErrorFile(TRANSPORT)), { force: true }),
       rm(this.socketPath(), { force: true }),
     ]);
@@ -295,7 +297,7 @@ export class PrimeAgentHost {
       });
       this.paneLine(`[prime-agent] ready session=${sessionId}`);
     } catch (error) {
-      await this.failLaunch(errorMessage(error));
+      await this.failLaunch(errorMessage(error), previousSessionId);
       throw error;
     }
   }
@@ -457,13 +459,22 @@ export class PrimeAgentHost {
     await this.statsWrite;
   }
 
-  private async failLaunch(message: string): Promise<void> {
+  /**
+   * Record the launch error, stop, and put back the session id the pointer was
+   * recorded with, so a failed launch leaves the previous session resumable and
+   * its transcript visible. Readiness waiters see the launch-error file first.
+   */
+  private async failLaunch(message: string, previousSessionId: string): Promise<void> {
     const stderr = this.stderrTail.trim().slice(-LAUNCH_ERROR_STDERR_BYTES);
     const launchError = stderr && this.childExited ? `${message}\n${stderr}` : message;
     this.paneLine(`[error] ${launchError}`);
     await writeFile(this.path(hostLaunchErrorFile(TRANSPORT)), `${launchError}\n`, { mode: FILE_MODE }).catch(() => undefined);
     await this.stop(1);
-    await rm(this.path(hostSessionIdFile(TRANSPORT)), { force: true });
+    if (previousSessionId) {
+      await writeFile(this.path(hostSessionIdFile(TRANSPORT)), `${previousSessionId}\n`, { mode: FILE_MODE });
+    } else {
+      await rm(this.path(hostSessionIdFile(TRANSPORT)), { force: true });
+    }
   }
 
   private async shutdown(exitCode: number): Promise<void> {

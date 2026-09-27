@@ -283,15 +283,68 @@ describe('Prime Agent host (PAN-3668 WI-11)', () => {
     mkdirSync(join(agentDir, 'prime-sessions'), { recursive: true });
     writeFileSync(sessionFile, '{"type":"session"}\n');
     writeFileSync(join(agentDir, 'prime-agent-session-id'), 'id-old\n');
+    writeFileSync(join(agentDir, 'prime-agent-session-file'), `${sessionFile}\n`);
     const child = new FakePrimeChild(standardResponder({ sessionFile, sessionId: 'id-new' }));
     const ctx = deps(child);
 
     await expect(startPrimeAgentHost(options({ resumeSessionFile: sessionFile }), ctx.deps)).rejects.toThrow(/id-new.*id-old/);
     expect(readFileSync(join(agentDir, 'prime-agent-launch-error'), 'utf8')).toContain('The replacement session was stopped');
-    expect(existsSync(join(agentDir, 'prime-agent-session-id'))).toBe(false);
+    expect(readFileSync(join(agentDir, 'prime-agent-session-id'), 'utf8').trim()).toBe('id-old');
+    expect(readFileSync(join(agentDir, 'prime-agent-session-file'), 'utf8').trim()).toBe(sessionFile);
     expect(ctx.reapDaemon).toHaveBeenCalledTimes(2);
     expect(child.exitCode).not.toBeNull();
     expect(existsSync(socketPath())).toBe(false);
+  });
+
+  describe('a failed resume keeps the recorded session resumable', () => {
+    let sessionFile: string;
+
+    beforeEach(() => {
+      sessionFile = join(agentDir, 'prime-sessions', 'resume.jsonl');
+      mkdirSync(join(agentDir, 'prime-sessions'), { recursive: true });
+      writeFileSync(sessionFile, '{"type":"session"}\n');
+      writeFileSync(join(agentDir, 'prime-agent-session-id'), 'id-recorded\n');
+      writeFileSync(join(agentDir, 'prime-agent-session-file'), `${sessionFile}\n`);
+    });
+
+    function expectRecordedSessionKept(): void {
+      expect(readFileSync(join(agentDir, 'prime-agent-session-file'), 'utf8').trim()).toBe(sessionFile);
+      expect(readFileSync(join(agentDir, 'prime-agent-session-id'), 'utf8').trim()).toBe('id-recorded');
+      expect(existsSync(join(agentDir, 'prime-agent-launch-error'))).toBe(true);
+    }
+
+    it('when the Prime version is out of range', async () => {
+      const child = new FakePrimeChild(standardResponder({ sessionFile, sessionId: 'id-recorded' }));
+      const ctx = deps(child, { readVersion: async () => 'prime-agent 0.9.0\n' });
+
+      await expect(startPrimeAgentHost(options({ resumeSessionFile: sessionFile }), ctx.deps)).rejects.toThrow('0.8.0 – <0.9.0');
+      expect(ctx.spawnChild).not.toHaveBeenCalled();
+      expectRecordedSessionKept();
+    });
+
+    it('when the child exits before get_state answers', async () => {
+      const child = new FakePrimeChild(() => null);
+      const ctx = deps(child, {
+        spawnChild: () => {
+          setImmediate(() => child.exit(1));
+          return child;
+        },
+      });
+
+      await expect(startPrimeAgentHost(options({ resumeSessionFile: sessionFile }), ctx.deps)).rejects.toThrow('Prime Agent exited with code 1');
+      expectRecordedSessionKept();
+    });
+
+    it('and a resume after the failure still checks the recorded id', async () => {
+      const failing = new FakePrimeChild(standardResponder({ sessionFile, sessionId: 'id-recorded' }));
+      await expect(startPrimeAgentHost(options({ resumeSessionFile: sessionFile }), deps(failing, { readVersion: async () => '0.7.2\n' }).deps)).rejects.toThrow();
+      rmSync(join(agentDir, 'prime-agent-launch-error'), { force: true });
+
+      const child = new FakePrimeChild(standardResponder({ sessionFile, sessionId: 'id-recorded' }));
+      await start(options({ resumeSessionFile: sessionFile }), deps(child).deps);
+      expect(readFileSync(join(agentDir, 'prime-agent-session-id'), 'utf8').trim()).toBe('id-recorded');
+      expect(readFileSync(join(agentDir, 'prime-agent-session-file'), 'utf8').trim()).toBe(sessionFile);
+    });
   });
 
   it('refuses a Prime version outside the supported range before spawning', async () => {

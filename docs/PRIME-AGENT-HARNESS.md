@@ -12,9 +12,12 @@ Every Prime launch runs one Overdeck **host** process in the agent's terminal
 pane: `node dist/prime-agent-host.js` (source `src/lib/prime-agent/host.ts`,
 tsdown entry `prime-agent-host`). The host:
 
-1. reads the recorded `prime-agent-session-id`, then clears the ready files
-   (`prime-agent-session-id`, `prime-agent-session-file`,
-   `prime-agent-launch-error`) and its socket;
+1. reads the recorded `prime-agent-session-id`, then clears
+   `prime-agent-session-id` (the readiness key), `prime-agent-launch-error` and
+   its socket. It keeps `prime-agent-session-file`, the only link to the
+   transcript; step 8 overwrites it on success. When any later step fails, the
+   host writes the launch error, stops, and writes the recorded session id
+   back, so the previous session stays visible and resumable;
 2. checks `prime-agent --version` against `compat.ts` (0.8.0 prints the
    version on **stderr**; `readPrimeAgentVersionOutput` reads both streams);
 3. reaps any supervisor left on the agent's daemon socket, or removes a leftover
