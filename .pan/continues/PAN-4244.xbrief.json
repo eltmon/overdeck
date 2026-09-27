@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4244",
   "created": "2026-09-27T08:41:42.862Z",
-  "updated": "2026-09-27T09:02:29.813Z",
+  "updated": "2026-09-27T09:02:41.826Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "testing-doc-real-process-fixtures.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T09:02:29.813Z"
+    },
+    "testing-doc-real-process-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T09:02:41.826Z"
     }
   }
 }
