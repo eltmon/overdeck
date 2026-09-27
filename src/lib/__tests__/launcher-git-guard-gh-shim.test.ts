@@ -101,4 +101,15 @@ describe('agent gh shim (PAN-4264)', () => {
     expect(error?.stdout).toBe('real-gh pr list\n');
     expect(ledgerLines()).toHaveLength(before);
   });
+
+  it('writes to the launch-time ledger directory even when OVERDECK_HOME changes at call time', async () => {
+    const before = ledgerLines().length;
+    const elsewhere = join(home, 'polluted-home');
+    await execFileAsync('sh', [ghShim, 'api', 'repos/o/r'], {
+      env: { ...process.env, OVERDECK_HOME: elsewhere },
+    }).catch(() => undefined);
+    expect(ledgerLines()).toHaveLength(before + 1);
+    expect(ledgerLines().at(-1)).toMatchObject({ caller: 'agent', bucket: 'rest' });
+    expect(existsSync(join(elsewhere, 'github-quota'))).toBe(false);
+  });
 });

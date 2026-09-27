@@ -16,7 +16,8 @@ const { octokitConstructed, getGitHubConfigMock } = vi.hoisted(() => ({
 vi.mock('@octokit/rest', () => ({
   Octokit: class {
     issues = { listForRepo: vi.fn() };
-    paginate = vi.fn(async () => []);
+    paginate = vi.fn(async (_fn: unknown, _params: unknown, mapFn?: (response: unknown) => unknown[]) =>
+      mapFn ? mapFn({ headers: { 'x-ratelimit-remaining': '4999', 'x-ratelimit-limit': '5000', 'x-ratelimit-reset': '1790000000' }, data: [] }) : []);
     constructor() {
       octokitConstructed();
     }
@@ -35,6 +36,7 @@ vi.mock('../issue-title-fallback.js', () => ({
 
 import { IssueDataService } from '../issue-data-service.js';
 import { recordGitHubRefusal } from '../../../../lib/github-quota/pause-gate.js';
+import { flushLedgerWrites, readLedgerWindow } from '../../../../lib/github-quota/ledger.js';
 
 describe('IssueDataService GitHub poll during a quota pause (PAN-4264)', () => {
   const originalHome = process.env.OVERDECK_HOME;
@@ -48,8 +50,9 @@ describe('IssueDataService GitHub poll during a quota pause (PAN-4264)', () => {
     octokitConstructed.mockClear();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.useRealTimers();
+    await flushLedgerWrites();
     vi.restoreAllMocks();
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
@@ -93,6 +96,17 @@ describe('IssueDataService GitHub poll during a quota pause (PAN-4264)', () => {
     (svc as any).started = true;
     (svc as any).scheduleNext('github');
     expect((svc as any).trackers.github.currentInterval).toBe(30_000);
+    svc.stop();
+  });
+
+  it('records each Octokit page as an issue-poller ledger line in the pat pool', async () => {
+    const svc = makeService();
+    await (svc as any).pollGitHub();
+    await flushLedgerWrites();
+    const lines = readLedgerWindow(Date.now());
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.every((line) => line.caller === 'issue-poller' && line.pool === 'pat' && line.bucket === 'rest')).toBe(true);
+    expect(lines[0]).toMatchObject({ remaining: 4999, limit: 5000 });
     svc.stop();
   });
 

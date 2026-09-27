@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { listProjectsSync, type ProjectConfig } from '../projects.js';
-import { runGh } from '../github-quota/run-gh.js';
+import { projectCiGhApi } from '../ci/project-ci-github.js';
 
 export interface ReleaseWorkflowJob {
   name: string;
@@ -93,14 +93,8 @@ function inferReleaseWorkflow(config: ProjectConfig): string | null {
 
 type GhApi = (path: string) => Promise<unknown>;
 
-/** PAN-4264: metered as caller ci-repair, skipped during a user REST pause. */
-const defaultGhApi: GhApi = async (path) => {
-  const { stdout } = await runGh(
-    ['api', path, '-H', 'Accept: application/vnd.github+json'],
-    { caller: 'ci-repair', timeout: 15_000, maxBuffer: 8 * 1024 * 1024 },
-  );
-  return JSON.parse(stdout);
-};
+/** PAN-4264: the same metered `gh api` read as CI repair (caller ci-repair). */
+const defaultGhApi: GhApi = projectCiGhApi;
 
 type FetchJson = (url: string) => Promise<unknown>;
 

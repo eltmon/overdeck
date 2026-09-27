@@ -59,6 +59,24 @@ describe('membership refresh skips projects with no tracker (PAN-4264)', () => {
     expect(result?.unavailableReason).toBe('tracker_unconfigured');
   });
 
+  it('logs the skip again once after projects.yaml changes', async () => {
+    const { utimesSync, writeFileSync } = await import('node:fs');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const projectsYaml = join(home, 'projects.yaml');
+    writeFileSync(projectsYaml, 'projects: {}\n');
+    utimesSync(projectsYaml, 1_000, 1_000);
+    const skipLines = () => log.mock.calls.filter(([line]) => String(line).includes('skipping membership for papers-please')).length;
+
+    await refreshMembershipSnapshotsForProjects([unresolvable], membershipLookup());
+    await refreshMembershipSnapshotsForProjects([unresolvable], membershipLookup());
+    expect(skipLines()).toBe(1);
+
+    utimesSync(projectsYaml, 2_000, 2_000);
+    await refreshMembershipSnapshotsForProjects([unresolvable], membershipLookup());
+    await refreshMembershipSnapshotsForProjects([unresolvable], membershipLookup());
+    expect(skipLines()).toBe(2);
+  });
+
   it('writes the skipped list for pan doctor github-quota', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     await refreshMembershipSnapshotsForProjects([unresolvable], membershipLookup());

@@ -9,6 +9,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { flushLedgerWrites, readLedgerWindow } from '../../../../src/lib/github-quota/ledger.js';
+import { recordGitHubRefusal } from '../../../../src/lib/github-quota/pause-gate.js';
 import { LOGIN_RETRY_MS, getGitHubLogin, resetGitHubLoginForTests } from '../../../../src/lib/github-quota/identity.js';
 import {
   QUOTA_SAMPLER_INITIAL_DELAY_MS,
@@ -90,6 +91,14 @@ describe('GitHub quota sampler (PAN-4264)', () => {
     stop();
     await vi.advanceTimersByTimeAsync(QUOTA_SAMPLER_INTERVAL_MS * 3);
     expect(exec).toHaveBeenCalledTimes(2);
+  });
+
+  it('still samples during a pause (quota-sampler is essential)', async () => {
+    await recordGitHubRefusal({ pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' } });
+    await recordGitHubRefusal({ pool: 'user', bucket: 'rest', caller: 'ci-repair', refusal: { kind: 'primary' } });
+    const exec = vi.fn().mockResolvedValue({ stdout: RATE_LIMIT_FIXTURE });
+    await sampleGitHubRateLimits({ exec, isAppConfigured: () => false });
+    expect(exec).toHaveBeenCalledTimes(1);
   });
 
   it('never throws when gh fails', async () => {

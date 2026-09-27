@@ -21,8 +21,9 @@ vi.mock('../../../../src/lib/telemetry/config.js', () => ({
 vi.mock('../../../../src/lib/telemetry/install-id.js', () => ({
   getOrCreateInstallId: vi.fn(() => '123e4567-e89b-42d3-a456-426614174000'),
 }));
+const grouping = vi.hoisted(() => ({ on: true }));
 vi.mock('../../../../src/lib/config-yaml.js', () => ({
-  loadConfigSync: () => ({ config: { telemetry: { enabled: true, operator_grouping: true } } }),
+  loadConfigSync: () => ({ config: { telemetry: { enabled: true, operator_grouping: grouping.on } } }),
 }));
 
 import { appendLedgerEntry } from '../../../../src/lib/github-quota/ledger.js';
@@ -48,6 +49,7 @@ describe('GitHub telemetry privacy (PAN-4264)', () => {
     delete process.env.VITEST;
     delete process.env.NODE_ENV;
     captureMock.mockClear();
+    grouping.on = true;
   });
 
   afterEach(() => {
@@ -83,5 +85,12 @@ describe('GitHub telemetry privacy (PAN-4264)', () => {
       expect(serialized).not.toMatch(/\/(home|Users)\//);
       expect(payload.properties.operatorHash).toMatch(/^[0-9a-f]{16}$/);
     }
+  });
+
+  it('omits operatorHash while operator grouping is off, even with a cached hash', () => {
+    grouping.on = false;
+    new AnalyticsService('cli').capture('server_boot', { project_count: '0', active_agent_count: '0' });
+    const [payload] = captureMock.mock.calls.at(-1) as [{ properties: Record<string, unknown> }];
+    expect(payload.properties).not.toHaveProperty('operatorHash');
   });
 });

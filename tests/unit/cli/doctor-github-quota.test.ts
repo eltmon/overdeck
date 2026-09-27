@@ -53,6 +53,21 @@ describe('pan doctor github-quota (PAN-4264)', () => {
     expect(report.otherInstalls.reason).toContain('operator_grouping');
   });
 
+  it('names the skipped project and the repo without the App in the text output', async () => {
+    const { mkdirSync, writeFileSync } = await import('node:fs');
+    const dir = join(home, 'github-quota');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'skipped-projects.json'), JSON.stringify({ projects: [{ name: 'papers-please', path: '/p/papers-please' }] }));
+    const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+    writeFileSync(join(dir, 'repo-notes.json'), JSON.stringify({ repos: { 'eltmon/krux': { appInstalled: false, checkedAt: new Date().toISOString(), expiresAt } } }));
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    await doctorGithubQuotaCommand();
+    const text = log.mock.calls.map(([line]) => String(line)).join('\n');
+    expect(text).toContain('papers-please');
+    expect(text).toContain('eltmon/krux');
+  });
+
   it('prints the human sections without a ledger', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     await doctorGithubQuotaCommand();
