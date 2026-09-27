@@ -33,3 +33,15 @@ export function computeGovernorReserveDefaultsGb(totalGb: number): GovernorReser
   }
   return result;
 }
+
+export interface SpawnMemoryThresholdDefaultsGb {
+  warnGb: number;
+  blockGb: number;
+}
+
+export function computeSpawnMemoryThresholdDefaultsGb(totalGb: number): SpawnMemoryThresholdDefaultsGb {
+  return {
+    warnGb: Math.min(4, totalGb / 8),
+    blockGb: Math.min(2, totalGb / 16),
+  };
+}

@@ -4,7 +4,7 @@ import { defaultBackgroundAiFeatures } from '../background-ai/registry.js';
 import { OVERDECK_HOME } from '../paths.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG } from '../agents/tier-table.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES } from './roles.js';
-import { computeGovernorReserveDefaultsGb } from './governor-reserves.js';
+import { computeGovernorReserveDefaultsGb, computeSpawnMemoryThresholdDefaultsGb } from './governor-reserves.js';
 import type { NormalizedConfig } from './schema.js';
 
 /**
@@ -15,6 +15,10 @@ import type { NormalizedConfig } from './schema.js';
  * Computed once at module load — totalmem() is stable for the process lifetime.
  */
 const GOVERNOR_RESERVE_DEFAULTS_GB = computeGovernorReserveDefaultsGb(totalmem() / (1024 ** 3));
+
+// PAN-4267: spawn guardrail memory thresholds scaled the same way so a small
+// host doesn't get a permanent "RAM tight" warning that blocks agent starts.
+const SPAWN_MEMORY_THRESHOLD_DEFAULTS_GB = computeSpawnMemoryThresholdDefaultsGb(totalmem() / (1024 ** 3));
 
 export const DEFAULT_DOCS_TRIGGER_REGEXES = [
   'pan',
@@ -215,8 +219,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     batchWindowSeconds: 15,
   },
   resources: {
-    memoryWarnGb: 4,
-    memoryBlockGb: 2,
+    memoryWarnGb: SPAWN_MEMORY_THRESHOLD_DEFAULTS_GB.warnGb,
+    memoryBlockGb: SPAWN_MEMORY_THRESHOLD_DEFAULTS_GB.blockGb,
     agentWarnCount: 8,
     agentBlockCount: 10,
     governorSoftReserveGb: GOVERNOR_RESERVE_DEFAULTS_GB.soft,
