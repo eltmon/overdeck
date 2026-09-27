@@ -1,0 +1,1494 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T23:46:39Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4280: Type and go: start a conversation or terminal from Home with no project, and fix Simple/Advanced defaulting",
+    "updated": "2026-09-27T23:49:03.546Z"
+  },
+  "plan": {
+    "id": "pan-4280",
+    "title": "Type and go: start a conversation or terminal from Home with no project, and fix Simple/Advanced defaulting",
+    "status": "proposed",
+    "uid": "5e3d80c6-fdd5-4b34-857d-233fffacf98c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-27T23:46:39Z",
+    "updated": "2026-09-27T23:49:03.546Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4280",
+        "label": "PAN-4280",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4281",
+        "label": "PAN-4281 (Slice B)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4282",
+        "label": "PAN-4282 (Slice C)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4280.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "onboarding",
+      "simple-mode",
+      "home",
+      "terminal",
+      "frontend"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator already split the type-and-go program into three sibling issues (#4280, #4281, #4282); this is Slice A, the smallest coherent vertical slice. Its ~40 files are mostly new small modules under components/home/ and their co-located tests; production edits outside those are one- to ten-line changes in existing files. Splitting further would separate the composer from the terminal hand-off it depends on and leave an unusable Home.",
+      "canonicalFilename": "2026-09-27-PAN-4280-type-and-go-start-a-conversation-or-terminal-from-home-with-no-project-and-fix-simple-advanced-defaulting.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A fresh install shows Simple Home only on the first load: initialMode() in uiMode.ts never saves its answer and App writes overdeck:last-tab on every load, so load 2 resolves Advanced. Neither Home can start a conversation or terminal without a project even though the server can (getDefaultCwd); Simple Home's TalkItThrough only starts a discuss-then-file conversation and Advanced Home has no input. The Command Deck hides the No-project deck until an unscoped conversation exists, and the deck Launcher's 'Run in terminal:' row opens a dead pane and drops the typed text.",
+      "Proposal": "Save the resolved UI mode on first load. Build a HomeComposer from the existing Launcher and mount it on both Homes: Enter asks the default agent the raw text, Ctrl+Enter runs it in a terminal, Simple adds 'Talk it through first:', and a project chip defaults to no project when none exist. Carry typed terminal commands through a sessionStorage hand-off that Stage and TerminalDrawer consume, and let POST /api/terminals type a single-line command into the new shell. Always show the No-project deck, select it when zero projects exist, fix the deck Launcher's terminal row, add a Move-to-project chip on unscoped conversations, and document it all.",
+      "NonGoals": "- The Add-project modal dialog, repo-root snapping, nested-repo import, repo suggestions, and the New Workspace Smart field (Slice B, #4281)\n- The first-run 'Get set up' checklist, /api/prerequisites auth/backend/memory additions, and pan install / pan doctor changes (Slice C, #4282)\n- CLAUDE.md and docs/WORKSPACES-AND-PROJECTS.md project-creation doc changes (Slice B)\n- Memory-governor thresholds or macOS memory accounting (PAN-4267)\n- A Herdr-backed ad-hoc terminal; the terminal drawer stays on tmux\n- A first-launch preferences wizard\n- Native OS folder picker or folder drag-and-drop\n- Global quick-create shortcuts (PAN-701)\n- Any edit to src/lib/tmux.ts or src/dashboard/frontend/src/App.tsx\n- Moving existing Advanced users to Simple\n- A web-search intent on Home"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope W13 docs to Slice A surfaces only (quickstart.mdx, features/conversations.mdx, DASHBOARD-ARCHITECTURE.md, TERMINAL-BACKENDS.md, strings.ts comment); drop CLAUDE.md and WORKSPACES-AND-PROJECTS.md edits and the 'Get set up' card mention.",
+        "rationale": "The shared-context comment says each slice updates the docs it touches; documenting the Add-project dialog, suggestions route, or checklist before #4281/#4282 ship would describe features that do not exist."
+      },
+      {
+        "summary": "Carry only ACs for W1-W5 and W13; AC-6..AC-12 of the issue body belong to W6-W12 in the sibling issues.",
+        "rationale": "The issue title and description scope this issue to W1-W5 and W13."
+      },
+      {
+        "summary": "'Add a project…' in the composer chip navigates to /projects/new (pushState {tab:'project-new'} + popstate) instead of opening the W7 modal.",
+        "rationale": "The modal is Slice B (#4281); the full-page route exists today and #4281 swaps the handler."
+      },
+      {
+        "summary": "codexAvailable comes from GET /api/prerequisites (checks[id='codex'].found) via the shared ['prerequisites'] query.",
+        "rationale": "It is the existing PATH-detection surface (system-prerequisites.ts:169) and SetupChecklistBanner already caches it under that key."
+      },
+      {
+        "summary": "Harness display labels live in a new HOME_AGENT_LABELS map copied from ProviderManagementSection.tsx HARNESS_LABELS; the Settings file is not refactored.",
+        "rationale": "Surgical-change rule; the map is seven entries."
+      },
+      {
+        "summary": "Terminal hand-off consumption is split: TerminalDrawer's bootstrap effect passes a pending command into its single create call, and a second effect (only when a real terminal exists) creates an extra terminal; a same-tab CustomEvent wakes an already-mounted drawer. Both consumers use the consuming take, so a hand-off runs exactly once.",
+        "rationale": "The issue's 'read it in createTerminalSession' leaves the already-open-drawer case (deck Launcher) dead and risks two sessions on a fresh drawer."
+      },
+      {
+        "summary": "POST /api/terminals validates command before createSession and returns commandSent; a send-keys failure still returns 200 with commandSent:false.",
+        "rationale": "A rejected request should not leave an orphan tmux session, and a live shell is still useful if typing the command failed."
+      },
+      {
+        "summary": "The Simple placeholder keeps the words 'in plain words' ('Ask for anything, or describe what you want built, in plain words…').",
+        "rationale": "usability-core-loop.spec.ts:88 asserts /plain words/; keeping the phrase avoids changing that assertion and keeps the plain-language promise."
+      },
+      {
+        "summary": "TalkItThrough.tsx remains as a seedDiscussPrompt re-export; the component and its component tests are deleted.",
+        "rationale": "The issue body's W3 decision; keeps existing imports working."
+      },
+      {
+        "summary": "The Move-to-project chip renders in Stage/panes/AgentPane.tsx, self-gated, with a ConversationPanel-header fallback if the flex wrapper breaks layout.",
+        "rationale": "AgentPane wraps every deck conversation and is 60 lines; ConversationPanel is 1524 lines near its allowlist ceiling."
+      },
+      {
+        "summary": "CommandDeck/index.tsx must not grow past its origin/main count (1609); the empty state moves to DeckEmptyState.tsx.",
+        "rationale": "The file-size ratchet compares with origin/main; the 1612 allowlist row should not be consumed by this change."
+      },
+      {
+        "summary": "Tests extend existing files (Launcher.test.tsx, launcherActions.test.ts, ProjectHome.test.tsx, Stage.test.tsx, Sidebar.test.tsx, AgentPane.test.tsx, HomePage.test.tsx, simple-pages.test.tsx) instead of creating __tests__ siblings the issue named.",
+        "rationale": "Those test files already exist at those paths."
+      },
+      {
+        "summary": "New frontend tests are registered in root package.json test:frontend-subset in one trailing item.",
+        "rationale": "CI runs only listed frontend tests (conventions.md); the script is one shared line, so a single item avoids edit conflicts."
+      },
+      {
+        "summary": "The Playwright spec home-type-and-go.spec.ts is authored by the work agent and executed by the test role in an isolated browser against a dashboard built from this branch.",
+        "rationale": "Port 3011 serves main's deployment build, so the work agent cannot exercise branch code there."
+      }
+    ],
+    "items": [
+      {
+        "id": "ui-mode-default",
+        "title": "Save the resolved UI mode on first load so fresh installs stay in Simple",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/simple/uiMode.ts",
+            "src/dashboard/frontend/src/lib/simple/uiMode.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/simple/uiMode.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "uiMode.test.ts: 4 tests pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 / D1. In src/dashboard/frontend/src/lib/simple/uiMode.ts export initialMode(storage?) exactly as the PRD's 'After' snippet: fresh storage resolves 'simple' and writes it to overdeck:ui-mode; overdeck:last-tab without ui-mode resolves 'advanced' and writes it; missing/throwing storage returns 'simple'. Update the header comment. Add lib/simple/uiMode.test.ts with an in-memory Storage stub (never window.localStorage: test-setup.ts:8 presets advanced)."
+        },
+        "items": [
+          {
+            "id": "ui-mode-default.ac1",
+            "title": "Given empty storage, when initialMode(storage) runs, then it returns 'simple' and persists overdeck:ui-mode='simple' (test 'fresh storage resolves simple and saves it')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-mode-default.ac2",
+            "title": "Given initialMode already ran on empty storage, when overdeck:last-tab is then written and initialMode runs again, then it still returns 'simple' (test 'simple survives a later last-tab write')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-mode-default.ac3",
+            "title": "Given storage with overdeck:last-tab and no ui-mode, when initialMode runs, then it returns 'advanced' and persists overdeck:ui-mode='advanced'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-mode-default.ac4",
+            "title": "Given a storage whose getItem throws, when initialMode runs, then it returns 'simple' without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-talk-props",
+        "title": "Launcher: add the 'talk' intent kind plus inputRef/autoFocus/inputTestId props",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/launcherActions.ts",
+            "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/launcherActions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Stage/HomePane/Launcher.test.tsx src/components/Stage/HomePane/launcherActions.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "Launcher and launcherActions tests pass including the new cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 / D2, D10. Launcher.tsx: LauncherIntentKind gains 'talk'; intentLabel returns 'Talk it through first:'; IntentIcon renders lucide MessagesSquare for talk; new optional props inputRef, autoFocus, inputTestId forwarded to the <input> (ref, autoFocus, data-testid). launcherActions.ts: optional openTalk handler and case 'talk'. Extend the existing Launcher.test.tsx and launcherActions.test.ts. ProjectHome behavior must not change."
+        },
+        "items": [
+          {
+            "id": "launcher-talk-props.ac1",
+            "title": "Given a talk intent and a typed query, when the Launcher dropdown renders, then the row label reads 'Talk it through first:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-talk-props.ac2",
+            "title": "Given inputTestId='x' and an inputRef, when the Launcher renders, then the input carries data-testid='x' and the ref points at that input element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-talk-props.ac3",
+            "title": "Given a talk intent, when dispatchLauncherIntent runs, then it calls handlers.openTalk with the query and calls no other handler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-intents",
+        "title": "Home intent builder, harness labels, and seedDiscussPrompt move",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/home/homeComposerIntents.ts",
+            "src/dashboard/frontend/src/components/home/__tests__/homeComposerIntents.test.ts",
+            "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/home/__tests__/homeComposerIntents.test.ts src/components/simple/TalkItThrough.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "homeComposerIntents.test.ts passes; TalkItThrough.test.tsx still passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 / D2, D2b, D8. New components/home/homeComposerIntents.ts exporting HOME_AGENT_LABELS (values copied from ProviderManagementSection.tsx:50-58), buildHomeIntents({mode, harness, codexAvailable}) in D2's exact order, and seedDiscussPrompt moved verbatim from TalkItThrough.tsx:39-51. TalkItThrough.tsx imports it from the new module and re-exports it (component still works). New components/home/__tests__/homeComposerIntents.test.ts."
+        },
+        "items": [
+          {
+            "id": "home-intents.ac1",
+            "title": "Given mode 'advanced', harness 'claude-code', codexAvailable true, when buildHomeIntents runs, then it returns agent(claude-code, 'Claude Code'), terminal, codex in that order with no talk or web intent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-intents.ac2",
+            "title": "Given harness 'codex' and codexAvailable true, when buildHomeIntents runs, then it returns exactly one codex agent row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-intents.ac3",
+            "title": "Given mode 'simple', when buildHomeIntents runs, then the last intent has kind 'talk'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-intents.ac4",
+            "title": "Given harness undefined, when buildHomeIntents runs, then the first intent has id 'agent' and no agentName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending-terminal",
+        "title": "Terminal hand-off module (sessionStorage overdeck:pending-terminal + same-tab event)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/home/pendingTerminal.ts",
+            "src/dashboard/frontend/src/components/home/__tests__/pendingTerminal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/home/__tests__/pendingTerminal.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pendingTerminal.test.ts: 6 tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-11"
+          ],
+          "foundationFor": [
+            "drawer-pending-consumer",
+            "stage-terminal-open",
+            "home-composer",
+            "projecthome-terminal-row"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 / D5. New components/home/pendingTerminal.ts with PENDING_TERMINAL_KEY, PENDING_TERMINAL_EVENT, PENDING_TERMINAL_MAX_AGE_MS=30000, writePendingTerminal({deckKey, command}) (stores {deckKey, command, at} and dispatches CustomEvent with detail {deckKey}), peekPendingTerminal(deckKey) (never deletes), takePendingTerminal(deckKey) (deletes on match; deletes stale). All storage access in try/catch. Tests use vi.useFakeTimers + vi.setSystemTime for staleness."
+        },
+        "items": [
+          {
+            "id": "pending-terminal.ac1",
+            "title": "Given writePendingTerminal({deckKey:'a',command:'ls'}), when takePendingTerminal('a') runs, then it returns 'ls' and a second take returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-terminal.ac2",
+            "title": "Given a written hand-off, when peekPendingTerminal runs twice, then both calls return the command (peek never deletes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-terminal.ac3",
+            "title": "Given a hand-off for deck 'a', when takePendingTerminal('b') runs, then it returns null and the record for 'a' persists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-terminal.ac4",
+            "title": "Given a hand-off written more than 30 s ago (fake timers), when take or peek runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-terminal.ac5",
+            "title": "Given a window listener for 'overdeck:pending-terminal', when writePendingTerminal runs, then the listener receives detail.deckKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terminals-command-route",
+        "title": "POST /api/terminals accepts an optional single-line command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/terminals.ts",
+            "tests/unit/dashboard/terminals-command.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/terminals-command.test.ts tests/unit/dashboard/terminals-delete-idempotent.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both terminals route test files pass",
+            "git diff origin/main -- src/lib/tmux.ts is empty"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-11",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 / D6. In src/dashboard/server/routes/terminals.ts validate body.command before createSession (trim; reject \\n/\\r with 400 'command must be a single line'; reject >2000 chars with 400; ignore empty), then send it with the module-local sendLiteralLine helper (tmuxExecAsync send-keys -t exactPaneTarget(name) -l <text>, then send-keys Enter). Response adds commandSent. Do not edit src/lib/tmux.ts. New tests/unit/dashboard/terminals-command.test.ts modeled on terminals-delete-idempotent.test.ts (add tmuxExecAsync and exactPaneTarget to the tmux mock). Update the module header route list."
+        },
+        "items": [
+          {
+            "id": "terminals-command-route.ac1",
+            "title": "Given body {command:'echo hi'}, when POST /api/terminals runs, then tmuxExecAsync receives ['send-keys','-t','=<name>:','-l','echo hi'] then ['send-keys','-t','=<name>:','Enter'] and the response has commandSent: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminals-command-route.ac2",
+            "title": "Given a command containing a newline, when POST /api/terminals runs, then it returns 400 {error:'command must be a single line'} and createSession is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminals-command-route.ac3",
+            "title": "Given a 2001-character command, when POST /api/terminals runs, then it returns 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminals-command-route.ac4",
+            "title": "Given no command, when POST /api/terminals runs, then it creates the session and makes no send-keys call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-pending-consumer",
+        "title": "TerminalDrawer consumes the hand-off and passes command to /api/terminals",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/terminal/TerminalDrawer.tsx",
+            "src/dashboard/frontend/src/components/terminal/TerminalDrawer.pending.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/terminal/TerminalDrawer.pending.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "TerminalDrawer.pending.test.tsx: 4 tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 / D5b. TerminalDrawer.tsx: createTerminalSession(cwd?, command?) includes command in the POST body; the bootstrap effect takes the pending command for threadId and passes it into its single create call; a new effect (deps [hasReal, pendingNonce, threadId, cwd]) runs only when a real terminal exists, takes any pending command, creates a session and calls newTerminal; a window listener for PENDING_TERMINAL_EVENT bumps pendingNonce for its own threadId. New components/terminal/TerminalDrawer.pending.test.tsx (mock ../XTerminal and fetch)."
+        },
+        "items": [
+          {
+            "id": "drawer-pending-consumer.ac1",
+            "title": "Given a pending hand-off for the deck and no real terminal, when the drawer mounts, then it sends exactly one POST /api/terminals whose body includes the command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-pending-consumer.ac2",
+            "title": "Given a drawer that already shows a real terminal, when a hand-off is written for its deck, then it creates a second terminal session with that command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-pending-consumer.ac3",
+            "title": "Given a hand-off for another deck, when the drawer mounts or receives the event, then its POST bodies carry no command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-terminal-open",
+        "title": "Stage opens the drawer for a pending hand-off and exposes openTerminalDrawer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/types.ts",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/Stage.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Stage/Stage.test.tsx src/components/Stage/IssueOverview.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "Stage.test.tsx and IssueOverview.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 / D5a. Stage/types.ts: add openTerminalDrawer: () => void to StageApi. Stage/index.tsx: openTerminalDrawer = setTerminalOpen(deckKey, true) added to the api memo; an effect keyed on deckKey calls setTerminalOpen(deckKey, true) when peekPendingTerminal(deckKey) returns a command, on mount and on each PENDING_TERMINAL_EVENT for this deck. Add openTerminalDrawer: vi.fn() beside every 'toggleTerminal: vi.fn()' test mock (ProjectHome.test.tsx, IssueOverview.test.tsx). Extend Stage.test.tsx."
+        },
+        "items": [
+          {
+            "id": "stage-terminal-open.ac1",
+            "title": "Given a pending hand-off for deck 'p', when <Stage deckKey='p'> mounts, then the terminal store reports terminalOpen true for 'p' and the TerminalDrawer renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-terminal-open.ac2",
+            "title": "Given a pending hand-off for deck 'q', when <Stage deckKey='p'> mounts, then terminalOpen stays false for 'p'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-terminal-open.ac3",
+            "title": "Given the StageApi passed to renderHome, when openTerminalDrawer is called, then terminalOpen becomes true for that deck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-project-chip",
+        "title": "Home composer project chip and its Simple strings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/home/HomeComposerProjectChip.tsx",
+            "src/dashboard/frontend/src/components/home/__tests__/HomeComposerProjectChip.test.tsx",
+            "src/dashboard/frontend/src/lib/simple/strings.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/home/__tests__/HomeComposerProjectChip.test.tsx src/lib/__tests__/simple-foundations.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "chip test and simple-foundations.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 / D4, D4a, D9. New components/home/HomeComposerProjectChip.tsx (button data-testid='home-composer-project', role=menu with projects, a no-project choice, and 'Add a project…' which does history.pushState({tab:'project-new'},'', '/projects/new') + popstate). lib/simple/strings.ts: composerPlaceholder -> 'Ask for anything, or describe what you want built, in plain words…'; add home.chipIn, home.chipNoProject 'Not in a project', home.chipAddProject 'Add a project…'; fix the header comment to name src/dashboard/frontend/src/lib/__tests__/simple-foundations.test.ts. New components/home/__tests__/HomeComposerProjectChip.test.tsx."
+        },
+        "items": [
+          {
+            "id": "composer-project-chip.ac1",
+            "title": "Given two registered projects, when the chip menu opens, then it renders both project names, the no-project choice, and 'Add a project…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-project-chip.ac2",
+            "title": "Given the menu is open, when the no-project choice is clicked, then onChange receives undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-project-chip.ac3",
+            "title": "Given mode 'simple' and no project selected, when the chip renders, then its text reads 'Not in a project' from SIMPLE_STRINGS.home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-project-chip.ac4",
+            "title": "Given the menu is open, when 'Add a project…' is clicked, then window.location.pathname becomes /projects/new",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "type-to-focus",
+        "title": "useTypeToFocus: printable keys on the page body focus the composer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/home/useTypeToFocus.ts",
+            "src/dashboard/frontend/src/components/home/__tests__/useTypeToFocus.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/home/__tests__/useTypeToFocus.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "useTypeToFocus.test.tsx: 4 tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 / FR-4. New components/home/useTypeToFocus.ts: document keydown listener that focuses ref.current only for a single-character key with no Ctrl/Meta/Alt, not defaultPrevented, activeElement is body or null, and no [role=\"dialog\"] present; does not preventDefault. Cleans up on unmount. Checkpoint + fallback (native value setter + input event) as in the PRD. New components/home/__tests__/useTypeToFocus.test.tsx."
+        },
+        "items": [
+          {
+            "id": "type-to-focus.ac1",
+            "title": "Given focus on document.body, when the key 'h' is pressed, then the composer input becomes document.activeElement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "type-to-focus.ac2",
+            "title": "Given focus on body, when Ctrl+K is pressed, then focus stays on body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "type-to-focus.ac3",
+            "title": "Given a focused textarea, when a printable key is pressed, then focus stays on the textarea",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "type-to-focus.ac4",
+            "title": "Given an element with role='dialog' in the document, when a printable key is pressed on body, then the composer input does not receive focus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-composer",
+        "title": "HomeComposer: type-and-go input for both Homes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/home/HomeComposer.tsx",
+            "src/dashboard/frontend/src/components/home/__tests__/HomeComposer.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/home/__tests__",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all components/home tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ],
+          "foundationFor": [
+            "mount-simple-home",
+            "mount-advanced-home",
+            "home-e2e-spec"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 / D2-D5, D9. New components/home/HomeComposer.tsx ({mode}). Model/harness state as TalkItThrough.tsx:54-68 with ModelPicker; registered-projects query ['registered-projects'] for the chip (D4 initial selection); prerequisites query ['prerequisites'] for codexAvailable (D2a); renders Launcher with buildHomeIntents, inputRef, autoFocus (unless another input is focused), inputTestId='home-composer-input'; useTypeToFocus. openAgent posts {model, harness (codex row -> 'codex'), message: raw trimmed text, projectKey only when chosen} then window.location.assign('/conv/<name>') and saves/removes overdeck:talk-project; openTalk posts seedDiscussPrompt(text); openTerminal writes the hand-off for projectKey ?? NO_PROJECT_KEY then assigns /command-deck/<encoded deckKey>. Server errors show via errorText and keep the text. New components/home/__tests__/HomeComposer.test.tsx mocking every fetch (registered-projects, prerequisites, conversations, ModelPicker catalog calls)."
+        },
+        "items": [
+          {
+            "id": "home-composer.ac1",
+            "title": "Given zero registered projects, when 'hello' is typed and Enter pressed, then POST /api/conversations receives message 'hello' with no projectKey and the browser is sent to /conv/<name>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-composer.ac2",
+            "title": "Given mode 'simple', when the 'Talk it through first:' row is chosen, then the POST message equals seedDiscussPrompt(text)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-composer.ac3",
+            "title": "Given the POST returns 503 with an error, when Enter is pressed, then the error text renders under the input and the input keeps the typed text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-composer.ac4",
+            "title": "Given no project selected, when Ctrl+Enter is pressed on 'ls', then takePendingTerminal('__no-project__') returns 'ls' and the browser is sent to /command-deck/__no-project__",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-simple-home",
+        "title": "Mount HomeComposer on Simple Home and retire the TalkItThrough component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx",
+            "src/dashboard/frontend/src/components/simple/TalkItThrough.tsx",
+            "src/dashboard/frontend/src/components/simple/TalkItThrough.test.tsx",
+            "src/dashboard/frontend/src/components/simple/simple-pages.test.tsx",
+            "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
+            "src/dashboard/frontend/src/lib/simple/strings.ts",
+            "src/dashboard/frontend/tests/talk-it-through.spec.ts",
+            "src/dashboard/frontend/tests/usability-core-loop.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/simple/simple-pages.test.tsx src/components/simple/TalkItThrough.test.tsx src/__tests__/fr7-conversation-pending-input.test.tsx src/lib/__tests__/simple-foundations.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the four listed test files pass",
+            "grep -c '<TalkItThrough' SimpleHomePage.tsx prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 / D8. SimpleHomePage.tsx: replace TalkItThrough import/usage (:19, :259) with <HomeComposer mode=\"simple\" /> and update the header comment. TalkItThrough.tsx becomes only the seedDiscussPrompt re-export. TalkItThrough.test.tsx keeps only the seedDiscussPrompt case. simple-pages.test.tsx adds 'simple home renders the composer with the talk row'. src/__tests__/fr7-conversation-pending-input.test.tsx mocks ../components/home/HomeComposer instead of TalkItThrough. Remove home.composerButton from strings.ts if unreferenced. Update Playwright specs tests/talk-it-through.spec.ts and tests/usability-core-loop.spec.ts to the home-composer-input / home-composer-project selectors and the talk row."
+        },
+        "items": [
+          {
+            "id": "mount-simple-home.ac1",
+            "title": "Given mode 'simple', when SimpleHomePage renders, then exactly one Home composer input with data-testid 'home-composer-input' is present and no talk-it-through-input exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-simple-home.ac2",
+            "title": "Given the SimpleHomePage source, when grep -c '<TalkItThrough' runs on it, then it prints 0 and grep -c '<HomeComposer' prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-simple-home.ac3",
+            "title": "Given the frontend test suite, when fr7-conversation-pending-input.test.tsx and simple-foundations.test.ts run, then both pass with no unexpected-request errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-advanced-home",
+        "title": "Mount HomeComposer on Advanced Home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/HomePage.tsx",
+            "src/dashboard/frontend/src/pages/HomePage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/pages/HomePage.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "HomePage.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. pages/HomePage.tsx: inside the header after the description <p> (:148-150) add <div className=\"mt-4\"><HomeComposer mode=\"advanced\" /></div>. pages/HomePage.test.tsx: mock components/home/HomeComposer to a test-id stub and add 'renders the home composer'."
+        },
+        "items": [
+          {
+            "id": "mount-advanced-home.ac1",
+            "title": "Given the Advanced Home renders, when the header is inspected, then it contains the Home composer below the 'System briefing' description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-advanced-home.ac2",
+            "title": "Given the HomePage source, when grep -c '<HomeComposer' runs on it, then it prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sidebar-no-project-row",
+        "title": "Sidebar always shows the No-project row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/Sidebar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Sidebar.test.tsx src/components/__tests__/Sidebar.workspaces.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "Sidebar tests pass",
+            "grep hasUnscopedConversations Sidebar.tsx matches nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 / D7a. Sidebar.tsx: remove the {hasUnscopedConversations && ( ... )} wrapper at :714 so the No-project button always renders in the Projects section; delete hasUnscopedConversations (:241-244) and any import/query only it used. Sidebar.test.tsx: add 'renders the No-project row with zero conversations'."
+        },
+        "items": [
+          {
+            "id": "sidebar-no-project-row.ac1",
+            "title": "Given zero conversations and zero projects, when the Sidebar renders expanded, then a button with data-testid 'sidebar-project-no-project' is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-no-project-row.ac2",
+            "title": "Given the row is clicked, when onSelectProject is observed, then it receives '__no-project__'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-e2e-spec",
+        "title": "Playwright spec for fresh-profile Simple mode and type-and-go",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/home-type-and-go.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test --list tests/home-type-and-go.spec.ts"
+          ],
+          "expected_outputs": [
+            "playwright lists 3 tests in home-type-and-go.spec.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. New src/dashboard/frontend/tests/home-type-and-go.spec.ts with three tests: fresh profile stays simple across a reload; typing 'hello' without clicking lands in home-composer-input; Enter posts message 'hello' with no projectKey (routes GET /api/registered-projects to [] and fulfils POST /api/conversations) and navigates to /conv/type-and-go-e2e. BASE from OVERDECK_DASHBOARD_URL. Browser verification runs in the test role against a dashboard built from this branch, in an isolated browser context."
+        },
+        "items": [
+          {
+            "id": "home-e2e-spec.ac1",
+            "title": "Given a fresh browser context with no localStorage, when / loads and then reloads, then [data-component='simple-home-page'] renders both times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-e2e-spec.ac2",
+            "title": "Given Simple Home with nothing focused, when the keys h,e,l,l,o are pressed, then home-composer-input has value 'hello'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-e2e-spec.ac3",
+            "title": "Given zero registered projects, when 'hello' is typed and Enter pressed, then the intercepted POST /api/conversations body has message 'hello' and no projectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deck-default-no-project",
+        "title": "Command Deck falls back to the No-project deck and offers 'Start without a project'",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/useDefaultDeckSelection.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/DeckEmptyState.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/DeckEmptyState.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts src/components/CommandDeck/__tests__/DeckEmptyState.test.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both new tests pass",
+            "lint-file-size passes",
+            "wc -l CommandDeck/index.tsx <= 1609"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15 / D7. New CommandDeck/useDefaultDeckSelection.ts (fires onSelectProject(NO_PROJECT_KEY) at most once when loaded && !selectedProject && zero registered projects) and CommandDeck/DeckEmptyState.tsx (existing Compass + 'Select a project to open its deck' markup plus a 'Start without a project' button). CommandDeck/index.tsx: call the hook with loaded=registeredProjectsFetched and the existing onSelectProject prop; replace the empty-state block at :1549-1556 with <DeckEmptyState>. index.tsx must stay at or below 1609 lines (origin/main count). Tests: __tests__/useDefaultDeckSelection.test.ts, __tests__/DeckEmptyState.test.tsx. Two D7 bullets share one file (index.tsx), so they ship as one item."
+        },
+        "items": [
+          {
+            "id": "deck-default-no-project.ac1",
+            "title": "Given registered projects loaded and empty and no selection, when the hook runs (including re-renders), then onSelectProject is called exactly once with '__no-project__'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-default-no-project.ac2",
+            "title": "Given projects still loading, or one project registered, or a project already selected, when the hook runs, then onSelectProject is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-default-no-project.ac3",
+            "title": "Given the empty state renders, when 'Start without a project' is clicked, then onStartWithoutProject fires and the text 'Select a project to open its deck' is still shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deck-default-no-project.ac4",
+            "title": "Given the change, when wc -l runs on CommandDeck/index.tsx, then it prints a number no greater than 1609",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "projecthome-terminal-row",
+        "title": "Deck Launcher 'Run in terminal:' row runs the typed command in the drawer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Stage/ProjectHome.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ProjectHome.test.tsx passes",
+            "grep \"openTypedPane('terminal')\" ProjectHome.tsx matches nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16 / D5a. ProjectHome.tsx:120: openTerminal: (query) => { writePendingTerminal({ deckKey: api.deckKey, command: query.trim() }); api.openTerminalDrawer() }. Extend ProjectHome.test.tsx with 'the terminal row writes the hand-off and opens the drawer'."
+        },
+        "items": [
+          {
+            "id": "projecthome-terminal-row.ac1",
+            "title": "Given a deck Launcher with query 'npm test', when 'Run in terminal:' is chosen, then api.openTerminalDrawer is called once and takePendingTerminal(api.deckKey) returns 'npm test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "projecthome-terminal-row.ac2",
+            "title": "Given the ProjectHome source, when grep \"openTypedPane('terminal')\" runs, then it matches nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unscoped-move-chip",
+        "title": "'Not in a project · Move to project…' chip on unscoped conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/UnscopedConversationChip.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/UnscopedConversationChip.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/AgentPane.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/AgentPane.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/CommandDeck/__tests__/UnscopedConversationChip.test.tsx src/components/Stage/panes/AgentPane.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "chip and AgentPane tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 / D11. New CommandDeck/UnscopedConversationChip.tsx ({conversation}); reads ['registered-projects'] and useConversationMutations(null, () => {}); renders nothing unless isUnscopedConversation(conversation, projects) and >=1 project; menu of projects calls mutations.move({name, projectKey, projectName}). Render in Stage/panes/AgentPane.tsx for non-readOnly conversation panes inside a flex column wrapper (layout checkpoint + ConversationPanel-header fallback per D11). New __tests__/UnscopedConversationChip.test.tsx; keep AgentPane.test.tsx green (mock the chip or its fetch)."
+        },
+        "items": [
+          {
+            "id": "unscoped-move-chip.ac1",
+            "title": "Given a conversation whose projectKey matches a registered project, when the chip renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unscoped-move-chip.ac2",
+            "title": "Given an unscoped conversation and one registered project, when the chip renders, then the text 'Not in a project · Move to project…' is visible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unscoped-move-chip.ac3",
+            "title": "Given the chip menu is open, when a project is chosen, then PATCH /api/conversations/<name>/move is sent with body {projectKey: <key>}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-slice-a",
+        "title": "Document the Home composer, no-project start, and terminal command hand-off",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "quickstart.mdx",
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'the only prerequisite' quickstart.mdx || true",
+            "grep -n 'Starting from Home' features/conversations.mdx",
+            "grep -n 'Ad-hoc terminals' docs/TERMINAL-BACKENDS.md",
+            "grep -n 'HomeComposer' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing; the other three each print a match"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-25"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18. quickstart.mdx: replace 'Node.js 22+ — the only prerequisite' with the real list and rewrite 'What Happens Next' per the PRD. features/conversations.mdx: add '### Starting from Home' after '### Starting a bare conversation'. docs/DASHBOARD-ARCHITECTURE.md: replace the TalkItThrough paragraph (lines 92-99) with a Home composer paragraph and document command/commandSent on POST /api/terminals. docs/TERMINAL-BACKENDS.md: add '## Ad-hoc terminals' before '## Companion terminals (PAN-3974)'."
+        },
+        "items": [
+          {
+            "id": "docs-slice-a.ac1",
+            "title": "Given quickstart.mdx, when grep 'the only prerequisite' runs, then it matches nothing and the Requirements list names Node.js 22+, the Claude Code CLI, and tmux for plain terminals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-slice-a.ac2",
+            "title": "Given features/conversations.mdx, when the 'Starting from Home' section is read, then it explains Enter, Ctrl+Enter, the project chip's no-project choice, and 'Move to project…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-slice-a.ac3",
+            "title": "Given docs/TERMINAL-BACKENDS.md, when grep 'Ad-hoc terminals' runs, then it matches a section stating the drawer always uses tmux and POST /api/terminals accepts {cwd?, command?}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-slice-a.ac4",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when grep 'TalkItThrough.tsx' runs, then it matches nothing and grep 'HomeComposer' matches the new paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-frontend-subset",
+        "title": "Register the new frontend tests in the CI frontend subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:46:39Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4280",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'components/home/__tests__/HomeComposer.test.tsx' package.json",
+            "npm run test:frontend-subset"
+          ],
+          "expected_outputs": [
+            "grep prints 1",
+            "the frontend subset run passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19. Append the ten new frontend test paths listed in the PRD to root package.json script test:frontend-subset (paths relative to src/dashboard/frontend). One shared line, so this item runs after every test-producing item."
+        },
+        "items": [
+          {
+            "id": "ci-frontend-subset.ac1",
+            "title": "Given package.json, when grep -c runs for each of the ten new test paths, then each prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-frontend-subset.ac2",
+            "title": "Given the updated script, when npm run test:frontend-subset runs, then every listed file is found and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "launcher-talk-props",
+        "to": "home-intents",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-talk-props",
+        "to": "home-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "home-intents",
+        "to": "home-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-terminal",
+        "to": "home-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-project-chip",
+        "to": "home-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "type-to-focus",
+        "to": "home-composer",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-terminal",
+        "to": "drawer-pending-consumer",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-terminal",
+        "to": "stage-terminal-open",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-terminal",
+        "to": "projecthome-terminal-row",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-terminal-open",
+        "to": "projecthome-terminal-row",
+        "type": "blocks"
+      },
+      {
+        "from": "home-composer",
+        "to": "mount-simple-home",
+        "type": "blocks"
+      },
+      {
+        "from": "home-composer",
+        "to": "mount-advanced-home",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-simple-home",
+        "to": "home-e2e-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-advanced-home",
+        "to": "home-e2e-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "terminals-command-route",
+        "to": "drawer-pending-consumer",
+        "type": "informs"
+      },
+      {
+        "from": "ui-mode-default",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "home-intents",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-terminal",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-pending-consumer",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-project-chip",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "type-to-focus",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "home-composer",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "deck-default-no-project",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "unscoped-move-chip",
+        "to": "ci-frontend-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "home-composer",
+        "to": "docs-slice-a",
+        "type": "informs"
+      },
+      {
+        "from": "terminals-command-route",
+        "to": "docs-slice-a",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
