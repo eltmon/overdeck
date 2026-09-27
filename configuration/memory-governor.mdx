@@ -1,0 +1,103 @@
+---
+title: Memory governor
+description: Reserve and spawn-threshold defaults scale with RAM, and how available memory and stall are measured on Linux vs macOS
+---
+
+# Memory governor
+
+The deacon's memory governor (`assessMemoryPressure` in
+`src/lib/cloister/memory-governor.ts`) watches available RAM and holds back
+one thing: the preemptive scheduler's automatic resume of agents it
+previously yielded (`preemption.ts:resumeYieldedAgents`). It also feeds the
+activity-feed memory-pressure patrol, which only reports the band — its
+`shed()` reclaim function (stopping merged Docker stacks, pausing idle work
+agents) has no caller anywhere in the codebase.
+
+**The governor never blocks conversations, `pan start`, or dashboard Start.**
+A separate, unrelated check — `evaluateSpawnGuardrails` in
+`routes/agents/shared.ts` — is what actually gates `POST /api/agents` (the
+operator's start button, the planning auto-handoff, and its deferred retry).
+
+## Reserve defaults
+
+Four reserves, in `resources.governor_{hard,soft,watch,recovery}_reserve_gb`,
+each computed as `min(max(pct × totalGb, floorGb), cap × totalGb)` — a
+percentage of total RAM, with an absolute floor for small hosts and a cap so
+the floor never swallows a small host whole:
+
+| Reserve | pct | floor | cap | 8 GB | 16 GB | 32 GB | 64 GB |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `governor_hard_reserve_gb` | 8% | 4 GB | 10% | 0.8 | 1.6 | 3.2 | 5.12 |
+| `governor_soft_reserve_gb` | 15% | 8 GB | 20% | 1.6 | 3.2 | 6.4 | 9.6 |
+| `governor_watch_reserve_gb` | 20% | 10 GB | 25% | 2.0 | 4.0 | 8.0 | 12.8 |
+| `governor_recovery_reserve_gb` | 25% | 12 GB | 35% | 2.8 | 5.6 | 11.2 | 16.0 |
+
+At or above 40 GB, the cap and floor never bind and these match the
+pre-scaling (PAN-2500) values, so nothing changes on large hosts.
+
+The `POST /api/agents` spawn guardrail has its own pair,
+`resources.memory_warn_gb` / `resources.memory_block_gb`, scaled the same way
+but simpler — `min(4, totalGb / 8)` and `min(2, totalGb / 16)`:
+
+| | 8 GB | 16 GB | 32 GB | 64 GB |
+| --- | --- | --- | --- | --- |
+| `memory_warn_gb` | 1.0 | 2.0 | 4.0 | 4.0 |
+| `memory_block_gb` | 0.5 | 1.0 | 2.0 | 2.0 |
+
+Both tables come from `src/lib/config-yaml/governor-reserves.ts`
+(`computeGovernorReserveDefaultsGb`, `computeSpawnMemoryThresholdDefaultsGb`).
+
+## Normalizing a user-set config
+
+If a `config.yaml` override breaks the reserves' ordering invariants,
+`normalizeGovernorReserves` (same module, called from
+`config-yaml/merge.ts`) corrects it and logs one warning naming the key it
+changed:
+
+1. `hard >= soft` → `hard = soft × 0.5`.
+2. `recovery <= soft` → `recovery = soft + 1`.
+3. `watch <= soft` → `watch = soft + 1`.
+4. Any of the four at or above this host's total RAM → all four reset to
+   the scaled defaults above (a recovery reserve at or above total RAM can
+   never be reached, which is what locked the governor into permanent
+   shedding before PAN-4267).
+
+## Linux vs macOS measurement
+
+**Linux** reads `/proc/meminfo`'s `MemAvailable` and `/proc/pressure/memory`
+for PSI (pressure stall information); a swap-free-percent hold applies when
+PSI shows live stalls.
+
+**macOS** has neither. `computeDarwinAvailableMemoryBytes`
+(`src/lib/system-health/darwin.ts`) is the one available-memory calculation
+shared by the header collector and the governor's reader
+(`readProcMemoryDarwin` in `src/dashboard/server/services/proc-memory.ts`):
+it prefers `memory_pressure -Q`'s free percentage of total RAM, falling back
+to the Activity Monitor `vm_stat` formula (`total - (anonymous - purgeable +
+wired + compressor) × page size`) when `memory_pressure` is unavailable.
+
+macOS also allocates swap on demand, so a low free-swap share is not
+pressure there — the governor ignores swap runway on darwin
+(`swapGrowsOnDemand`). Its stall signal instead is the kernel's own
+`kern.memorystatus_vm_pressure_level` sysctl: level `4` (critical) sheds
+immediately regardless of the memory reserves, and level `1` (normal) counts
+as calm for the holding re-admit window — the same role Linux's PSI plays.
+
+## Small Macs
+
+Before PAN-4267, an 8-16 GB Mac could get a recovery reserve at or above its
+total RAM, so the governor never cleared HARD. The scaled defaults above fix
+this for a fresh install. If you still need to override the reserves by hand
+(e.g. on a host between the documented sizes), add to
+`~/.overdeck/config.yaml`:
+
+```yaml
+resources:
+  governor_hard_reserve_gb: 0.5
+  governor_soft_reserve_gb: 1
+  governor_watch_reserve_gb: 1
+  governor_recovery_reserve_gb: 1.5
+```
+
+Then `pan restart`. `normalizeGovernorReserves` will correct anything in this
+override that violates the ordering invariants above and log why.
