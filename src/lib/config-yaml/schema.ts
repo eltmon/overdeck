@@ -157,10 +157,13 @@ export interface ContextConfig {
    * dashboard Context-page preview), so toggling needs a sync + new session.
    */
   rules?: Record<string, boolean>;
+  /** PAN-4265: dashboard runs the light `pan sync` itself when sync inputs change (default true). */
+  auto_sync?: boolean;
 }
 
 export interface NormalizedContextConfig {
   rules: Record<string, boolean>;
+  autoSync: boolean;
 }
 
 export type ManualCompactMode = 'claude-code' | 'overdeck-native';
