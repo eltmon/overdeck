@@ -4,17 +4,17 @@
     "created": "2026-09-27T15:16:16Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4266: Command Deck model picker is clipped and shifts the conversation column left (dropdown inside overflow-hidden column; focus scrolls it)",
-    "updated": "2026-09-27T15:19:18.549Z"
+    "updated": "2026-09-27T15:19:57.776Z"
   },
   "plan": {
     "id": "pan-4266",
     "title": "Command Deck model picker is clipped and shifts the conversation column left (dropdown inside overflow-hidden column; focus scrolls it)",
-    "status": "proposed",
+    "status": "running",
     "uid": "17c073d9-8e9f-4f85-8bae-49dc760c9d8e",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T15:16:16Z",
-    "updated": "2026-09-27T15:19:18.549Z",
+    "updated": "2026-09-27T15:19:57.776Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4266",
