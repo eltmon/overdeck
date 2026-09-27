@@ -27,6 +27,8 @@ export interface Conversation {
   /** Transcript mtime from the list enrichment. Null until a transcript exists. */
   lastActivityAt?: string | null;
   sessionAlive: boolean;
+  /** PAN-4268: where Claude Code sends typed input, read from its agent selector. Absent when not checked. */
+  inputTarget?: 'main' | { subagent: string } | 'unknown';
   isWorking?: boolean;
   /** Tool name currently executing (e.g. "Bash", "Read"). Null when idle or not in a tool call. */
   currentTool?: string | null;

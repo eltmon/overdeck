@@ -1,5 +1,5 @@
 import { useComposerEchoes } from './useComposerEchoes';
-import { subagentRoutingNotice } from '../../lib/subagentRouting';
+import { inputTargetNotice } from '../../lib/subagentRouting';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
@@ -1277,9 +1277,11 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages, data?.subagents ?? [], data?.streaming ?? false);
   const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
 
+  // PAN-4268: only Claude Code's agent selector says where typed input goes.
+  // Agent-backed panels carry no inputTarget; their sends still switch.
   const subagentNotice = useMemo(
-    () => subagentRoutingNotice(data?.subagents ?? [], serverMessages),
-    [data?.subagents, serverMessages],
+    () => (agentId ? null : inputTargetNotice(conversation.inputTarget)),
+    [agentId, conversation.inputTarget],
   );
 
   const handleMessageSent = useCallback((text: string, clientMessageId?: string) => {
@@ -1290,7 +1292,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
 
   const handleMessageAcknowledged = useCallback((text: string, clientMessageId?: string) => {
     acknowledgeOptimistic(conversation.name, text, clientMessageId);
-  }, [acknowledgeOptimistic, conversation.name]);
+    // The send may have switched the selector back to main (PAN-4268).
+    void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+  }, [acknowledgeOptimistic, conversation.name, queryClient]);
 
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
