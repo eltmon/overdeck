@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-27T23:51:35.372Z",
+  "updated": "2026-09-27T23:52:09.800Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4280",
       "claimedAt": "2026-09-27T23:49:56.773Z",
       "doneAt": "2026-09-27T23:51:35.372Z"
+    },
+    "launcher-talk-props": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-27T23:52:09.800Z"
     }
   }
 }
