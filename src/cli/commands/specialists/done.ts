@@ -23,8 +23,11 @@ import { Effect } from 'effect';
 import {
   commentOnArtifact,
   discoverArtifact,
+  type CreateReviewArtifactResult,
   type ForgeType,
 } from '../../../lib/forge.js';
+import { isTransientForgeError } from '../../../lib/forge-transient.js';
+import { deferReviewVerdict } from '../../../lib/cloister/deferred-verdict.js';
 import { forgeApprovalAtHead, getPrFacts, resetPrFactsCache, type PrFacts } from '../../../lib/cloister/pr-facts.js';
 import { getAgentState } from '../../../lib/agents/agent-state-read.js';
 import { formatUatMarker } from '../../../lib/cloister/uat-verdict-marker.js';
@@ -158,11 +161,87 @@ export async function doneCommand(
     return exitCli(1);
   }
 
+  // #4066 review: an agent's harness ancestors name it even when its own
+  // environment dropped or faked OVERDECK_AGENT_ID. PAN-4263: identity is
+  // checked before any forge call, so only a caller that may record this
+  // verdict can leave a deferred one behind.
+  const caller = role === 'review' ? verdictCallerFromEnv(process.env, readAncestorAgentIds) : null;
+  const refuseReviewVerdict = (refusal: string, prUrl?: string): Promise<never> => {
+    // A refusal is a pipeline fact the operator must be able to find later:
+    // journal it (append-only, fires `pipeline.entry`) and raise it in the
+    // activity feed. Never steer the agent to record `passed` instead — when
+    // the refusal is wrong, that turns a real blocker into an approval.
+    appendPipelineEntry(workspacePath, {
+      type: 'review.verdict-refused',
+      issueId: normalizedIssueId,
+      source: 'pan-specialists-done',
+      data: {
+        status: options.status,
+        reason: refusal,
+        caller: caller?.id ?? null,
+        ...(options.runId ? { runId: options.runId } : {}),
+        ...(options.notes ? { notes: options.notes } : {}),
+      },
+    });
+    emitActivityEntry({
+      source: 'review',
+      level: 'warn',
+      issueId: normalizedIssueId,
+      message: `${normalizedIssueId} review verdict (${options.status}) refused: ${refusal}`,
+    });
+    console.error(chalk.red(`Refusing the review verdict: ${refusal}`));
+    console.error(chalk.dim(
+      `Stop here and record no verdict. Post your findings as a plain PR comment for the operator `
+      + `(\`gh pr comment ${prUrl ?? '<PR>'} --body-file <your report>\`), then exit.`,
+    ));
+    return exitCli(1);
+  };
+  const callerRefusal = caller
+    ? reviewVerdictRefusal({ caller, issueId: normalizedIssueId, status: options.status, facts: null })
+    : null;
+  if (callerRefusal) return refuseReviewVerdict(callerRefusal);
+
+  // #3853: the marker's `sha=` must name the commit this run reviewed, not
+  // whatever the head is when the verdict is posted. The run id carries the
+  // reviewed head; without `--run-id`, the review parent's current run.
+  let runId = options.runId;
+  if (role === 'review' && !runId) {
+    try {
+      runId = getAgentState(`agent-${normalizedIssueId.toLowerCase()}-review`)?.reviewRunId;
+    } catch {
+      // No readable run: the reviewed commit is unknown and the marker
+      // carries no sha, so it proves nothing.
+    }
+  }
+
   const forge = await forgeForWorkspace(workspacePath);
   const sourceBranch = `feature/${normalizedIssueId.toLowerCase()}`;
-  const artifact = await Effect.runPromise(
-    discoverArtifact(forge, { sourceBranch, cwd: workspacePath }),
-  );
+  // PAN-4263: a transient forge failure on a review verdict is saved for
+  // deacon-lite to replay under the same caller (`deferred-verdict-replay.ts`).
+  const deferIfTransient = (reason: string): boolean => {
+    if (!caller || !isTransientForgeError(reason)) return false;
+    deferReviewVerdict(workspacePath, normalizedIssueId, {
+      status: options.status,
+      runId,
+      notes: options.notes,
+      callerId: caller.kind === 'agent' ? caller.id : null,
+      reason,
+    });
+    console.error(chalk.yellow(
+      `Couldn't reach ${forge}: ${reason}. The verdict is saved and deacon-lite will retry recording it.`,
+    ));
+    return true;
+  };
+  let artifact: CreateReviewArtifactResult | null;
+  try {
+    artifact = await Effect.runPromise(discoverArtifact(forge, { sourceBranch, cwd: workspacePath }));
+  } catch (err) {
+    // A failed lookup is not an absent PR: say which, so nobody opens a second PR.
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(chalk.red(`Couldn't reach ${forge} to find the review artifact for ${sourceBranch}: ${reason}`));
+    if (!deferIfTransient(reason)) console.error(chalk.dim('Retry this command once the forge is reachable.'));
+    return exitCli(1);
+  }
   if (!artifact?.url) {
     console.error(chalk.red(
       `No open review artifact for ${sourceBranch}; run \`pan done ${normalizedIssueId}\` to open one before recording a verdict.`,
@@ -207,15 +286,12 @@ export async function doneCommand(
   // keep reading the branch as merely unapproved and every reader that keys off
   // `CHANGES_REQUESTED` (rework delivery, the review-stale gate) sees nothing.
   // Completion fails when the post fails: an unrecorded verdict is not done.
-  if (role === 'review') {
+  if (role === 'review' && caller) {
     // #3853: the operator's override shares this door with the review agent's
     // verdict. An agent session may not use the override half: it records a
     // verdict only as the issue's review session, and never reverses an
     // approval proven to stand on the exact head, unless the operator asked
     // for this run. Unproven means the verdict goes through.
-    // #4066 review: an agent's harness ancestors name it even when its own
-    // environment dropped or faked OVERDECK_AGENT_ID.
-    const caller = verdictCallerFromEnv(process.env, readAncestorAgentIds);
     const facts = caller.kind === 'agent' ? await getPrFacts(normalizedIssueId) : undefined;
     let guardFacts: Pick<PrFacts, 'approved' | 'approvedAtHead' | 'headSha'> | null = facts ?? null;
     let operatorRequested = false;
@@ -241,48 +317,7 @@ export async function doneCommand(
       facts: guardFacts,
       operatorRequested,
     });
-    if (refusal) {
-      // A refusal is a pipeline fact the operator must be able to find later:
-      // journal it (append-only, fires `pipeline.entry`) and raise it in the
-      // activity feed. Never steer the agent to record `passed` instead — when
-      // the refusal is wrong, that turns a real blocker into an approval.
-      appendPipelineEntry(workspacePath, {
-        type: 'review.verdict-refused',
-        issueId: normalizedIssueId,
-        source: 'pan-specialists-done',
-        data: {
-          status: options.status,
-          reason: refusal,
-          caller: caller.id,
-          ...(options.runId ? { runId: options.runId } : {}),
-          ...(options.notes ? { notes: options.notes } : {}),
-        },
-      });
-      emitActivityEntry({
-        source: 'review',
-        level: 'warn',
-        issueId: normalizedIssueId,
-        message: `${normalizedIssueId} review verdict (${options.status}) refused: ${refusal}`,
-      });
-      console.error(chalk.red(`Refusing the review verdict: ${refusal}`));
-      console.error(chalk.dim(
-        `Stop here and record no verdict. Post your findings as a plain PR comment for the operator `
-        + `(\`gh pr comment ${artifact.url} --body-file <your report>\`), then exit.`,
-      ));
-      return exitCli(1);
-    }
-    // #3853: the marker's `sha=` must name the commit this run reviewed, not
-    // whatever the head is when the verdict is posted. The run id carries the
-    // reviewed head; without `--run-id`, the review parent's current run.
-    let runId = options.runId;
-    if (!runId) {
-      try {
-        runId = getAgentState(`agent-${normalizedIssueId.toLowerCase()}-review`)?.reviewRunId;
-      } catch {
-        // No readable run: the reviewed commit is unknown and the marker
-        // carries no sha, so it proves nothing.
-      }
-    }
+    if (refusal) return refuseReviewVerdict(refusal, artifact.url);
     const reviewedHead = reviewedHeadFromRunId(runId, normalizedIssueId);
     const result = await postReviewVerdict({
       issueId: normalizedIssueId,
@@ -295,6 +330,7 @@ export async function doneCommand(
       console.error(chalk.red(
         `Could not post the review verdict on ${artifact.url}: ${result.reason}`,
       ));
+      deferIfTransient(result.reason);
       return exitCli(1);
     }
     // The verdict is on the forge; record that Overdeck posted it. This runs
