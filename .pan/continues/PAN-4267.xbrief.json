@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4267",
   "created": "2026-09-27T15:34:04.785Z",
-  "updated": "2026-09-27T16:21:27.859Z",
+  "updated": "2026-09-27T16:21:38.700Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "darwin-available-memory.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T16:21:27.859Z"
+    },
+    "darwin-stall-signal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:21:38.700Z"
     }
   }
 }
