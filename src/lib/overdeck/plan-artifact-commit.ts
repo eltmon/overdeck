@@ -132,39 +132,18 @@ type FollowTipResult =
  * tracking (PAN-4224: origin gained a `.pan/` file through a merge the
  * checkout never staged, e.g. a promoted draft). Any such colliding file is
  * moved aside first: deleted afterward if its bytes matched what's now
- * tracked, kept and reported in `backedUp` otherwise. If the reset still
- * fails for an unrelated reason, every moved-aside file is restored to where
- * it was. Never `git stash`, never `git clean`.
+ * tracked, kept and reported in `backedUp` otherwise. Every git call this
+ * makes — including detecting collisions and staging them, not just the
+ * `reset --keep` itself — is covered by one failure path: on any error,
+ * every file moved aside so far (even a partial set-aside, e.g. a second
+ * `rename` failing after the first succeeded) is restored to where it was,
+ * and this function reports the failure as a result instead of throwing.
+ * Never `git stash`, never `git clean`.
  */
 async function followTip(cwd: string, head: string, tip: string): Promise<FollowTipResult> {
-  if ((await git(cwd, ['rev-parse', 'HEAD'])) !== head) return { moved: false, headMoved: true };
-
-  const added = (
-    await git(cwd, ['diff', '--name-only', '--no-renames', '--diff-filter=A', '-z', 'HEAD', tip, '--', '.pan/'])
-  )
-    .split('\0')
-    .filter(Boolean);
-  const untracked = new Set(
-    (await git(cwd, ['ls-files', '--others', '--exclude-standard', '-z', '--', '.pan/'])).split('\0').filter(Boolean),
-  );
-  const collisions = added.filter((path) => untracked.has(path));
-
   const backupRoot = join(cwd, '.overdeck', 'plan-artifact-backups');
   const stampDir = join(backupRoot, new Date().toISOString().replace(/[:.]/g, '-'));
   const staged: { readonly path: string; readonly backup: string; readonly identical: boolean }[] = [];
-
-  for (const path of collisions) {
-    const identical =
-      (await git(cwd, ['hash-object', join(cwd, path)])) === (await git(cwd, ['rev-parse', `${tip}:${path}`]).catch(() => ''));
-    const backup = join(stampDir, path);
-    await mkdir(dirname(backup), { recursive: true });
-    await rename(join(cwd, path), backup);
-    staged.push({ path, backup, identical });
-  }
-  if (staged.length > 0) {
-    const gitignore = join(backupRoot, '.gitignore');
-    await access(gitignore).catch(() => writeFile(gitignore, '*\n', 'utf8'));
-  }
 
   // rmdir only ever removes an empty directory, so walking up from a removed
   // file's directory and stopping at the first non-empty one is safe even
@@ -180,12 +159,40 @@ async function followTip(cwd: string, head: string, tip: string): Promise<Follow
   };
 
   try {
+    if ((await git(cwd, ['rev-parse', 'HEAD'])) !== head) return { moved: false, headMoved: true };
+
+    const added = (
+      await git(cwd, ['diff', '--name-only', '--no-renames', '--diff-filter=A', '-z', 'HEAD', tip, '--', '.pan/'])
+    )
+      .split('\0')
+      .filter(Boolean);
+    // No --exclude-standard: an ignored file at a path origin newly tracks is
+    // still a collision `reset --keep` would clobber without a backup.
+    const untracked = new Set(
+      (await git(cwd, ['ls-files', '--others', '-z', '--', '.pan/'])).split('\0').filter(Boolean),
+    );
+    const collisions = added.filter((path) => untracked.has(path));
+
+    for (const path of collisions) {
+      const identical =
+        (await git(cwd, ['hash-object', join(cwd, path)])) === (await git(cwd, ['rev-parse', `${tip}:${path}`]).catch(() => ''));
+      const backup = join(stampDir, path);
+      await mkdir(dirname(backup), { recursive: true });
+      await rename(join(cwd, path), backup);
+      staged.push({ path, backup, identical });
+    }
+    if (staged.length > 0) {
+      const gitignore = join(backupRoot, '.gitignore');
+      await access(gitignore).catch(() => writeFile(gitignore, '*\n', 'utf8'));
+    }
+
     await git(cwd, ['reset', '--quiet', '--keep', tip]);
   } catch (cause) {
     for (const { path, backup } of staged) {
       await rename(backup, join(cwd, path)).catch(() => {});
       await removeEmptyAncestors(dirname(backup));
     }
+    await rmdir(stampDir).catch(() => {});
     return { moved: false, headMoved: false, cause: firstLine(cause) };
   }
 

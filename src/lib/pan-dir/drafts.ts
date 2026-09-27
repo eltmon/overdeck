@@ -303,6 +303,11 @@ export function promoteWorkspacePrdDraft(args: {
         })
       }
     }
+    // Unreachable when projectRoot === workspacePath (e.g. complete-planning's
+    // call, or a monorepo): the canonical-draft check above already returned
+    // above for any file this branch would find, since it scans the same
+    // directory. Its rmSync(source) below is still safe if that ever changes —
+    // it only ever deletes a workspace copy already promoted to the target.
     const wsDrafts = join(workspacePath, '.pan', 'drafts')
     const source = [join(wsDrafts, upperFile), join(wsDrafts, lowerFile)].find((p) => existsSync(p))
     if (!source) {

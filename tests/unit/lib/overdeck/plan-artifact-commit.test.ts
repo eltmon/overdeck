@@ -369,4 +369,30 @@ describe('pushPlanArtifacts', () => {
     expect(at(home, 'status', '--porcelain', '--', '.pan/continues/PAN-1.xbrief.json')).toContain('??');
     expect(readFileSync(join(home, '.pan', 'state.md'), 'utf8')).toBe('v1-local\n');
   });
+
+  /**
+   * PAN-4224 review: `ls-files --others --exclude-standard` omits ignored
+   * files, and `reset --keep` treats an ignored file as expendable — so a
+   * gitignored local file at a path origin newly tracks would have been
+   * silently clobbered instead of backed up. Dropping `--exclude-standard`
+   * closes that gap.
+   */
+  it('clears an identical untracked collision even when a .gitignore rule covers it', async () => {
+    const content = '{"issue":"PAN-1"}\n';
+    commitFile(other, '.pan/continues/PAN-1.xbrief.json', content, 'chore(workspace): continue PAN-1');
+    at(other, 'push', '-q', 'origin', 'main');
+
+    commitFile(home, '.pan/backlog/sequence.md', 'pass 1\n', 'chore(workspace): backlog sequence');
+    writeFileSync(join(home, '.gitignore'), '.pan/continues/\n', 'utf8');
+    writeUntracked(home, '.pan/continues/PAN-1.xbrief.json', content);
+
+    const result = await pushPlanArtifacts(home);
+
+    expect(result).toMatchObject({ pushed: true, rebased: true });
+    expect(result.pushed && result.backedUp).toBeFalsy();
+    const tip = originMain();
+    expect(at(home, 'rev-parse', 'HEAD')).toBe(tip);
+    expect(at(home, 'ls-files', '--', '.pan/continues/PAN-1.xbrief.json')).toContain('PAN-1.xbrief.json');
+    expect(readFileSync(join(home, '.pan', 'continues', 'PAN-1.xbrief.json'), 'utf8')).toBe(content);
+  });
 });
