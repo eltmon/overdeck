@@ -1,0 +1,210 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T08:36:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4244: Flaky test: reload-health-timeout zombie case times out at 5000ms",
+    "updated": "2026-09-27T08:37:28.486Z"
+  },
+  "plan": {
+    "id": "pan-4244",
+    "title": "Flaky test: reload-health-timeout 'rolls back … when the new server is zombie' times out at 5000ms and reddens main and PRs",
+    "status": "running",
+    "uid": "dcf75559-4adb-40ae-8acb-66598951dbeb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-27T08:36:54Z",
+    "updated": "2026-09-27T08:37:28.486Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4244",
+        "label": "PAN-4244",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flaky-test",
+      "test",
+      "ci"
+    ],
+    "narratives": {
+      "Problem": "The zombie fixture in spawnedServerPid (src/cli/commands/__tests__/reload-health-timeout.integration.test.ts lines 252-266) spawns `sh -c 'sh -c \"exit 1\" & echo $!; exec sleep 60'` and polls ps for state Z in an unbounded loop. When the inner child exits before the outer dash execs into sleep, dash reaps it and the pid vanishes, so the loop spins until Vitest kills the test at 5000ms. Measured: 18/300 attempts vanished under 24-core busy-loop load, 1/300 idle. The reload health-wait path is not the cause: run() already uses fake timers (line 334).",
+      "Proposal": "Rewrite only the zombie branch of spawnedServerPid: spawn `sh -c 'sleep 60 & echo $!; exec sleep 60'`, wait until the outer pid's comm ends with sleep (exec done), SIGKILL the inner pid, then poll ps stat for Z. One 2000ms wall-clock deadline covers both polls, pacing uses setImmediate, and the deadline throws a descriptive error. Verified 600/600 zombies, worst case 441ms under load. Document the real-process fixture pattern in docs/TESTING.md. Full detail with before/after code: .pan/drafts/pan-4244.md.",
+      "NonGoals": "- Changing src/cli/commands/reload.ts, src/lib/platform-lifecycle.ts, or the spawned-pid liveness probe\n- Changing the exited/alive fixtures, setUpTimedOutReload, run(), or any test name or assertion\n- Raising Vitest global testTimeout, maxForks, retries, or quarantining the test\n- Adding real setTimeout delays to the test file\n- Installing stress-ng or committing a soak script"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the fixture only; no production code changes",
+        "rationale": "An empirical probe proved the unbounded zombie poll is the hang; the reload health-wait already runs under vi.useFakeTimers in run() (line 334), so the issue's second guessed cause does not apply."
+      },
+      {
+        "summary": "Build the zombie by SIGKILLing a long-lived child after the parent execs into sleep",
+        "rationale": "This removes the reap race entirely; 600/600 zombies in probes idle and under full-core load, worst case 441ms."
+      },
+      {
+        "summary": "Keep the default 5000ms it timeout, with checkpoint CP-1 allowing a 10_000 timeout on the zombie it.each only if the soak shows Vitest timeouts",
+        "rationale": "The fixed fixture needs under 0.5s; a bigger timeout would mask regressions. The issue lists an explicit timeout only as a fallback."
+      },
+      {
+        "summary": "Soak with 8 busy sh loops (killed by pid) and OVERDECK_GATE_ADMISSION=0 instead of stress-ng",
+        "rationale": "stress-ng is not installed on the host; 8 loops match the issue's stress-ng --cpu 8 example without starving the other agents on the 24-core host; a pkill -f pattern would also kill the shell running the soak; without the admission bypass every npx vitest run waits for a CPU lease the synthetic load prevents."
+      },
+      {
+        "summary": "Match the exec by comm basename (endsWith sleep) and use a 2000ms deadline",
+        "rationale": "macOS ps comm may print a full path; 2000ms is about 4.5x the measured worst case and still leaves the 5000ms test budget for the reload itself."
+      }
+    ],
+    "items": [
+      {
+        "id": "deterministic-zombie-fixture",
+        "title": "Make the zombie fixture deterministic with a bounded deadline",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T08:36:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/__tests__/reload-health-timeout.integration.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/reload-health-timeout.integration.test.ts",
+            "npm run lint",
+            "git diff $(git merge-base origin/main HEAD) --stat -- src/cli/commands/reload.ts src/lib/platform-lifecycle.ts",
+            "pids=''; for i in $(seq 8); do timeout 900 sh -c 'while :; do :; done' & pids=\"$pids $!\"; done; pass=0; for i in $(seq 50); do OVERDECK_GATE_ADMISSION=0 npx vitest run src/cli/commands/__tests__/reload-health-timeout.integration.test.ts >/tmp/pan-4244-soak.log 2>&1 && pass=$((pass+1)) || { echo \"run $i FAILED\"; tail -40 /tmp/pan-4244-soak.log; break; }; done; echo \"passed $pass/50\"; kill $pids 2>/dev/null"
+          ],
+          "expected_outputs": [
+            "vitest reports 6 passed tests in reload-health-timeout.integration.test.ts and exits 0",
+            "npm run lint exits 0",
+            "the git diff --stat command prints nothing",
+            "the soak prints passed 50/50"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/__tests__/reload-health-timeout.integration.test.ts, add a psField(pid, field) helper and replace ONLY the zombie branch of spawnedServerPid (lines 252-266) with the exact code in .pan/drafts/pan-4244.md WI-1 step 2: spawn `sh -c 'sleep 60 & echo $!; exec sleep 60'`, read the inner pid from stdout, poll `ps -p <child.pid> -o comm=` until it endsWith('sleep'), then process.kill(innerPid, 'SIGKILL'), then poll `ps -p <innerPid> -o stat=` until it startsWith('Z'). One Date.now()+2000 deadline covers both phases; pace with setImmediate (no setTimeout); on deadline throw an Error whose message starts with 'zombie fixture: pid <pid> (outer <child.pid>) stalled in phase <phase> after 2000ms; last ps output: <last>'. Do not touch the exited/alive branches, setUpTimedOutReload, run(), or any it body. Then run the soak (verify_commands[3]). Checkpoint CP-1: if the zombie case fails with Vitest's own 'Test timed out in 5000ms', add a third argument 10_000 to the PAN-3899 rolls-back it.each call only (with a PAN-4244 comment) and re-soak; if the fixture's own deadline error fires, stop and pan tell the orchestrator instead of raising the deadline. Record the soak result line in the commit body."
+        },
+        "items": [
+          {
+            "id": "deterministic-zombie-fixture.ac1",
+            "title": "Given spawnedServerPid('zombie'), when it returns, then the returned pid reports a ps stat starting with Z and the zombie case's `pid <n>) exited before it became healthy` assertion passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deterministic-zombie-fixture.ac2",
+            "title": "The zombie branch contains no setTimeout and no for (;;) loop, and throws an Error containing `zombie fixture: pid` when its 2000ms deadline passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deterministic-zombie-fixture.ac3",
+            "title": "npx vitest run on the test file exits 0 and reports 6 passed tests with the same test names as origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deterministic-zombie-fixture.ac4",
+            "title": "Under 8 busy sh loops with OVERDECK_GATE_ADMISSION=0, the 50-run soak loop prints `passed 50/50`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deterministic-zombie-fixture.ac5",
+            "title": "git diff $(git merge-base origin/main HEAD) --stat produces no entries for src/cli/commands/reload.ts or src/lib/platform-lifecycle.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "testing-doc-real-process-fixtures",
+        "title": "Document real-process fixture rules in docs/TESTING.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T08:36:54Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4244",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^### Real-process fixtures' docs/TESTING.md",
+            "grep -n 'setImmediate' docs/TESTING.md",
+            "grep -n -i 'deadline' docs/TESTING.md"
+          ],
+          "expected_outputs": [
+            "grep prints one heading line located after `### Mocking` and before `## Dashboard UI Testing`",
+            "grep finds setImmediate in the new subsection",
+            "grep finds deadline in the new subsection"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/TESTING.md add a `### Real-process fixtures` subsection under `## Writing Tests`, directly after the `### Mocking` subsection (it ends with the paragraph about not reducing two-worker CI concurrency to hide a leak) and before `## Dashboard UI Testing`. Use the content in .pan/drafts/pan-4244.md WI-2: deterministic construction (a zombie = kill the long-lived child only after its parent execs into a non-reaping process, citing PAN-4244), a wall-clock deadline with an error naming pid, phase, and last observed state (never an unbounded for (;;) poll), and setImmediate pacing with the fixture running before vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "testing-doc-real-process-fixtures.ac1",
+            "title": "docs/TESTING.md renders a `### Real-process fixtures` heading between the `### Mocking` subsection and `## Dashboard UI Testing`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "testing-doc-real-process-fixtures.ac2",
+            "title": "The subsection contains the rule that a zombie fixture kills the long-lived child only after its parent has exec'd into a non-reaping process, and cites PAN-4244",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "testing-doc-real-process-fixtures.ac3",
+            "title": "The subsection states that real-process polls use a wall-clock deadline that throws an error naming the pid, phase, and last observed state, and are paced with setImmediate instead of setTimeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-09-27-PAN-4244-flaky-test-reload-health-timeout-rolls-back-when-the-new-server-is-zombie-times-out-at-5000ms-and-reddens-main-and-prs.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

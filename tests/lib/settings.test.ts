@@ -271,6 +271,8 @@ describe('settings', () => {
         'gpt-5.6-sol[372k]',
         'gpt-5.6-terra[372k]',
         'gpt-5.6-luna[372k]',
+        'gpt-6-sol',
+        'gpt-6-luna',
       ]);
     });
 

@@ -580,6 +580,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       try {
         result.tieredExecution = validateTieredExecutionConfig(config.tiered_execution, {
           providerAuth: result.providerAuth,
+          workhorses: result.workhorses,
         });
         result.tieredExecutionInvalid = undefined;
       } catch (err) {
@@ -934,8 +935,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   validateRoleModelRefs(result);
   if (!result.tieredExecutionInvalid) {
     try {
+      // PAN-4191: re-deref tier workhorse refs against the final merged slots.
       result.tieredExecution = validateTieredExecutionConfig(result.tieredExecution, {
         providerAuth: result.providerAuth,
+        workhorses: result.workhorses,
       });
     } catch (err) {
       degradeInvalidTieredExecution(result, err);

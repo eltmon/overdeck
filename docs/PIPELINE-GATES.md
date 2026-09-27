@@ -617,7 +617,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | --- | --- |
 | `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
 | `verification.failed` (`failedCheck: 'test'`, `cycleCount`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
-| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through |
+| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through; also reached over that same door by deacon-lite's `recoverUndispatchedReviews` (source `deacon-lite`), re-requesting a review a dashboard restart left undispatched |
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewers`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
@@ -630,9 +630,9 @@ One piece of stored pipeline state came back, and it is not a status.
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
 
-## Deacon-lite: six routines
+## Deacon-lite: seven routines
 
-`runDeaconLite()` runs on a 60s tick and holds six routines, all of which only
+`runDeaconLite()` runs on a 60s tick and holds seven routines, all of which only
 observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
@@ -648,6 +648,8 @@ observe and nudge — none reconciles a stored copy of anything:
    are all gone.
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
+7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,
+   PAN-4221) — re-requests a review a dashboard restart left undispatched.
 
 `recoverStalledReviews` reads the journal and the issue pause gate
 (`getIssuePause`, see "Manual pause" above), with no GitHub call and no tracker
@@ -730,9 +732,45 @@ the journal's last, so the patrol leaves the issue to the operator.
 where some reviewers posted a verdict and one died is not recovered, because the
 last entry is then `review.verdict` — `review.dispatched.data.reviewers` carries
 enough to count verdicts later. A quick-mode review writes no `review.dispatched`
-entry, so a dead quick reviewer is not recovered either. And a server death
-between `verification.started` and its outcome leaves `verification.*` last,
-which the rule above deliberately skips.
+entry, so a dead quick reviewer is not recovered either. A server death between
+`verification.started` and its outcome still leaves `verification.started` or
+`verification.failed` last, and both are still skipped by `recoverStalledReviews`
+above (an agent that owes rework must not have verification re-run every hour).
+A `verification.passed` tail whose source is `request-review`, though, is now
+recovered — by `recoverUndispatchedReviews`, below.
+
+`recoverUndispatchedReviews` (PAN-4221) closes the one `verification.*` tail
+`recoverStalledReviews` deliberately leaves alone: a dashboard restart while a
+detached verification worker runs kills the push-and-dispatch continuation that
+lived in the dead process, so the worker's own `verification.passed` write
+becomes a permanent tail with nobody left to dispatch the review (PAN-4198..4201
+sat about 15 hours on 2026-09-25). It acts only when every one of these holds:
+the workspace's **last** journal entry is `verification.passed` with
+`source: 'request-review'` — a `review` (dashboard `/trigger`) or `merge-verify`
+pass belongs to a different door and is left alone, since a `/trigger` run may
+carry a per-run review mode this routine cannot reproduce, and a merge-gate pass
+belongs to the merge door; the entry is at least 5 minutes old
+(`UNDISPATCHED_REVIEW_MIN_AGE_MS`) — past a normal push-and-dispatch, so a runner
+still mid-push is not mistaken for dead; no verification worker is active for the
+issue (`isVerificationWorkerActive`); no pane equal to `agent-<issue>-review` or
+starting with `agent-<issue>-review-` is live — the parent counts, not just the
+sub-reviewer lanes, because quick mode (the default) writes no
+`review.dispatched`, so a healthy quick reviewer's tail stays
+`verification.passed` for its whole life; the issue is unpaused
+(`getIssuePause`); review mode is not `none`; and the primary repo's current
+head, read fresh through `verified-head.ts`'s `readPrimaryHead8`, still matches
+the head the pass stamped. A per-issue hourly cooldown
+(`UNDISPATCHED_REVIEW_COOLDOWN_MS`, set *before* the request so a refused or
+unreachable route is not retried every tick) and a cap of 3 deacon-lite
+`review.requested` entries since the last `review.requested` from any other
+source (`UNDISPATCHED_REVIEW_ATTEMPT_CAP`) stop an hourly re-verify loop once
+each dispatch keeps coming back gated — the cap is logged once, not every tick.
+Recovery goes through the same guarded route `rerequestHaltedReview` uses
+(`requestReviewThroughRoute`, source `deacon-lite`), never a skip-verification
+door: the route re-verifies against current main and journals
+`review.requested` itself, which moves the tail and makes the recovery
+exactly-once. The first deacon-lite patrol runs at deacon start, so a stall that
+began before a restart is covered as soon as the process comes back up.
 
 `retryDeferredHandoffs` acts only when an issue's last `handoff.*` entry is
 `handoff.deferred` or `handoff.retried`. Each of those entries carries the

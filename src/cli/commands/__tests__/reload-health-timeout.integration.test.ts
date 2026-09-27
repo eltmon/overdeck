@@ -249,21 +249,42 @@ async function spawnedServerPid(fate: SpawnedServerFate): Promise<number> {
     await once(child, 'spawn');
     return child.pid!;
   }
-  // A zombie: `sleep` inherits the exited background shell and never reaps it,
-  // so kill(0) still succeeds and only ps's `Z` state shows the server is dead.
-  const child = spawn('sh', ['-c', 'sh -c "exit 1" & echo $!; exec sleep 60'], {
+  // A zombie: the outer shell execs into `sleep`, which never reaps its
+  // background child, so SIGKILLing that child once the exec has happened
+  // leaves it a zombie that kill(0) still finds while ps reports state Z.
+  // Killing it ourselves (instead of racing the background shell's own exit
+  // against the parent's exec, PAN-4244) makes the fixture deterministic.
+  const child = spawn('sh', ['-c', 'sleep 60 & echo $!; exec sleep 60'], {
     stdio: ['ignore', 'pipe', 'ignore'],
   });
   children.push(child);
   const [chunk] = await once(child.stdout!, 'data') as [Buffer];
-  const pid = Number(chunk.toString().trim());
-  for (;;) {
-    const state = await new Promise<string>((resolve) => {
-      execFile('ps', ['-p', String(pid), '-o', 'stat='], (_error, stdout) => resolve(String(stdout).trim()));
-    });
-    if (state.startsWith('Z')) return pid;
-    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  const innerPid = Number(chunk.toString().trim());
+  const deadline = Date.now() + 2000;
+  let phase = 'exec';
+  let last = '';
+  const fail = (): never => {
+    throw new Error(
+      `zombie fixture: pid ${innerPid} (outer ${child.pid}) stalled in phase ${phase} after 2000ms; last ps output: ${last}`,
+    );
+  };
+  while (!(last = await psField(child.pid!, 'comm')).endsWith('sleep')) {
+    if (Date.now() >= deadline) fail();
+    await new Promise<void>((resolve) => setImmediate(resolve));
   }
+  process.kill(innerPid, 'SIGKILL');
+  phase = 'zombie';
+  while (!(last = await psField(innerPid, 'stat')).startsWith('Z')) {
+    if (Date.now() >= deadline) fail();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  return innerPid;
+}
+
+function psField(pid: number, field: string): Promise<string> {
+  return new Promise<string>((resolve) => {
+    execFile('ps', ['-p', String(pid), '-o', `${field}=`], (_error, stdout) => resolve(String(stdout).trim()));
+  });
 }
 
 /** Put a `ps` that always fails first on PATH, as when fork/exec fails under memory pressure. */

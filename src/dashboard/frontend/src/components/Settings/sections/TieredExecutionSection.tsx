@@ -4,20 +4,23 @@ import { type Harness, type SettingsConfig, type TieredExecutionConfig } from '.
 import type { SaveStatus } from '../hooks/useAutosavePipeline';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import {
-  blendedCost,
-  crewLabel,
+  blendedCost as blendedCostFor,
+  crewLabel as crewLabelFor,
   deriveTierName,
+  effectiveWorkModel,
   DIFFICULTIES,
   importCrews,
   providerDefaultHarness,
   renderYamlPreview,
   serializeCrews,
   tierFitnessWarnings,
+  resolveWorkhorseModel,
+  withRefsAsModels,
   type Crew,
   type CrewAssignments,
   type CrewRest,
 } from './tiered-crews';
-import { CrewRow } from './CrewRow';
+import { CrewRow, WorkhorseOptions } from './CrewRow';
 
 interface TieredExecutionSectionProps {
   formData: SettingsConfig;
@@ -62,13 +65,14 @@ function normalizeTieredExecution(
   enabled = config?.enabled ?? false,
 ): TieredExecutionConfig {
   const { byKind: _byKind, ...canonical } = config ?? {};
-  return {
+  // PAN-4191: the form edits `workhorse:` refs, not their dereffed models.
+  return withRefsAsModels({
     ...defaultTieredExecution(enabled),
     ...canonical,
     enabled,
     tiers: { ...(config?.tiers ?? {}) },
     by_kind: config?.by_kind ?? config?.byKind ?? {},
-  };
+  });
 }
 
 function configKey(config: TieredExecutionConfig): string {
@@ -163,8 +167,13 @@ export function TieredExecutionSection({
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const byKind = rest.by_kind;
   const supervisor = rest.supervisor;
-  const supervisorModelName = Object.values(MODELS_BY_PROVIDER).flatMap((provider) => provider.models)
-    .find((model) => model.id === (supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL))?.name ?? supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL;
+  const crewLabel = (crew: Crew) => crewLabelFor(crew, MODELS_BY_PROVIDER, formData.workhorses);
+  const blendedCost = (crew: Crew) => blendedCostFor(crew, MODELS_BY_PROVIDER, formData.workhorses);
+  const supervisorRef = supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL;
+  const supervisorResolved = resolveWorkhorseModel(supervisorRef, formData.workhorses);
+  const supervisorResolvedName = Object.values(MODELS_BY_PROVIDER).flatMap((provider) => provider.models)
+    .find((model) => model.id === supervisorResolved)?.name ?? supervisorResolved;
+  const supervisorModelName = supervisorRef === supervisorResolved ? supervisorResolvedName : `${supervisorRef} → ${supervisorResolvedName}`;
   const crewName = (crewId: string | undefined) => {
     const crew = crews.find((entry) => entry.id === crewId);
     return crew ? crewLabel(crew) : crewId ?? 'Unknown crew';
@@ -524,6 +533,7 @@ export function TieredExecutionSection({
                 onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
                 onChange={(nextCrew) => writeCrews(crews.map((entry) => entry.id === crew.id ? nextCrew : entry), assign)}
                 warnings={fitness.filter((w) => w.tierName === deriveTierName(ownedDifficulties))}
+                workModel={enabled ? effectiveWorkModel(formData) : undefined}
                 onRequestRemove={() => handleRequestRemove(crew.id)}
               />
               {removeError?.crewId === crew.id && (
@@ -586,9 +596,11 @@ export function TieredExecutionSection({
               <span className="text-xs font-medium text-foreground">Model</span>
               <select
                 value={supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL}
+                title={supervisorModelName}
                 onChange={(event) => handleSupervisorPatch({ model: event.target.value })}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
               >
+                <WorkhorseOptions workhorses={formData.workhorses} />
                 {Object.entries(MODELS_BY_PROVIDER).map(([providerId, provider]) => (
                   <optgroup key={providerId} label={provider.name}>
                     {provider.models.map((model) => (

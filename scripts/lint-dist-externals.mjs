@@ -132,6 +132,20 @@ const unresolvableSpecs = CONSUMER_INSTALLED_FIELDS.flatMap((field) =>
     .map(([name, spec]) => ({ field, name, spec })),
 );
 
+// Test frameworks are never runtime dependencies. @overdeck/core 0.60.0-0.62.0
+// shipped "@effect/vitest" in dependencies, which dragged vitest's optional peer
+// graph into every consumer install. Once @vitest/browser-playwright 5.0.2
+// asked for vitest@*, npm's peer-set resolver crashed with "Cannot read
+// properties of null (reading 'edgesOut')", so `npx @overdeck/core` failed for
+// every new user. A consumer never runs our tests, so these belong in
+// devDependencies only.
+const TEST_FRAMEWORK = /^(vitest|@vitest\/.+|@effect\/vitest|jest|@jest\/.+|@playwright\/test)$/;
+const testFrameworkDeps = ['dependencies', 'optionalDependencies'].flatMap((field) =>
+  Object.keys(pkg[field] ?? {})
+    .filter((name) => TEST_FRAMEWORK.test(name))
+    .map((name) => ({ field, name })),
+);
+
 const { allowed, malformed } = readAllowlist();
 
 const files = collectJsFiles(distDir);
@@ -189,6 +203,10 @@ const errors = [
   ...unresolvableSpecs.map(
     ({ field, name, spec }) =>
       `${field}.${name} is "${spec}" — a consumer installing from the registry cannot resolve that protocol, so \`npm install\` fails outright with EUNSUPPORTEDPROTOCOL. Move it to devDependencies if it is a build-time workspace input, or give it a published version range.`,
+  ),
+  ...testFrameworkDeps.map(
+    ({ field, name }) =>
+      `${field}.${name} is a test framework — every consumer install would pull it and its peer graph, which crashed \`npx @overdeck/core\` with "reading 'edgesOut'". Move it to devDependencies.`,
   ),
   ...missing.map((name) => {
     const importers = [...externals.get(name)].sort().slice(0, 3).join(', ');
