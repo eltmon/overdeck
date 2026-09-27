@@ -79,8 +79,9 @@ function withDefaultOllamaPort(baseUrl: string): string {
     }
     return baseUrl;
   } catch {
-    // SAFE_OLLAMA_HOST_RE admits a bare `http://::1`, which the URL parser rejects.
-    // Leave it as the operator wrote it rather than guessing at a rewrite.
+    // SAFE_OLLAMA_HOST_RE only admits URLs the parser accepts, so this is unreachable
+    // today. Left as a guard rather than a throw: a future regex relaxation should not
+    // turn into a crash at config load.
     return baseUrl;
   }
 }

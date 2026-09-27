@@ -41,7 +41,13 @@ describe('checkOllama', () => {
     expect(checkHealth).not.toHaveBeenCalled();
   });
 
-  it('warns with install guidance when a local model is configured but Ollama is missing', async () => {
+  it('warns with install guidance when a local model is configured, Ollama is missing, and nothing answers', async () => {
+    checkHealth.mockResolvedValue({
+      endpointReachable: false,
+      versionSupported: false,
+      modelPresent: false,
+    });
+
     const checks = await checkOllama({
       config: configWith('ollama:gemma4:12b'),
       detectInstalled: async () => false,
@@ -130,6 +136,47 @@ describe('checkOllama', () => {
     expect(checks.map((c) => c.status)).toEqual(['ok', 'warn']);
     expect(checks[1].message).toContain('8192');
     expect(checks[1].fix).toContain('OLLAMA_CONTEXT_LENGTH=65536');
+  });
+
+  it('reports a reachable endpoint with no host binary, rather than "not installed"', async () => {
+    // Ollama in a container with 11434 published is a working local endpoint.
+    const checks = await checkOllama({
+      config: configWith('ollama:gemma4:12b'),
+      detectInstalled: async () => false,
+      checkHealth: checkHealth as never,
+      fetchImpl: psFetch([{ name: 'gemma4:12b', context_length: 65_536 }]),
+    });
+
+    expect(checks).toHaveLength(1);
+    expect(checks[0].status).toBe('ok');
+    expect(checks[0].message).toContain('no host binary');
+  });
+
+  it('gives up on a stalled /api/ps instead of hanging, and still reports the ok row', async () => {
+    vi.useFakeTimers();
+    try {
+      let seenSignal: AbortSignal | undefined;
+      const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+        seenSignal = init?.signal ?? undefined;
+        // Headers arrive, body never resolves.
+        return { ok: true, status: 200, json: () => new Promise(() => {}) } as unknown as Response;
+      }) as unknown as typeof fetch;
+
+      const pending = checkOllama({
+        config: configWith('ollama:gemma4:12b'),
+        detectInstalled: async () => true,
+        checkHealth: checkHealth as never,
+        fetchImpl,
+      });
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      const checks = await pending;
+
+      expect(checks.map((c) => c.status)).toEqual(['ok']);
+      expect(seenSignal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('never warm-loads a model: it only reads /api/ps', async () => {

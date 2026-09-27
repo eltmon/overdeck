@@ -49,7 +49,9 @@ export async function getOllamaLaunchEnv(
     CLAUDE_CODE_SUBAGENT_MODEL: tag,
     // A 12B model on one consumer GPU is far slower per turn than a cloud endpoint.
     API_TIMEOUT_MS: '600000',
-    // The point of a local model is that nothing leaves the machine.
+    // The point of a local model is that no prompt leaves the machine. Note this only
+    // disables Claude Code's own nonessential traffic; configured remote MCP servers are
+    // a separate egress path the harness still opens (PAN-1641 audit).
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
     CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(contextLength),
     CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(contextLength),

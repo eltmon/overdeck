@@ -5,8 +5,10 @@ export const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 export const DEFAULT_OLLAMA_MODEL = 'nomic-embed-text';
 
 /**
- * Recommended pull target for local agent work. This is a recommendation only:
- * model resolution never falls back to it (no-hardcoded-model-fallbacks).
+ * The tag `pan install` offers and the local-model docs are written against. It is a
+ * documentation anchor, NOT an endorsement: PAN-1641's live E2E got zero tool calls out
+ * of it in a work agent, and no local model has driven one yet. Model resolution never
+ * falls back to it either (no-hardcoded-model-fallbacks).
  */
 export const DEFAULT_OLLAMA_AGENT_MODEL = 'gemma4:12b';
 
@@ -16,7 +18,14 @@ export const MIN_OLLAMA_VERSION = '0.14.0';
 /** Overdeck addresses local tags as `ollama:<tag>`. */
 export const OLLAMA_MODEL_PREFIX = 'ollama:';
 
-export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
+/**
+ * Localhost-only guard for a configured Ollama endpoint.
+ *
+ * IPv6 must be bracketed: a bare `http://::1` is not a URL the WHATWG parser accepts, so
+ * it could never produce a usable probe target — admitting it only bought a confusing
+ * timeout later instead of a clear config error at load (PAN-1641 review).
+ */
+export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\])(:\d+)?\/?$/;
 
 const OLLAMA_PROBE_TIMEOUT_MS = 5_000;
 const OLLAMA_START_DEADLINE_MS = 30_000;

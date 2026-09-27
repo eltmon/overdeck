@@ -11,6 +11,7 @@ import {
   MIN_OLLAMA_VERSION,
   OLLAMA_MODEL_PREFIX,
   OllamaEnsureError,
+  SAFE_OLLAMA_HOST_RE,
   stripOllamaPrefix,
   warmOllamaModel,
 } from '../ollama.js';
@@ -184,6 +185,26 @@ describe('stripOllamaPrefix', () => {
     expect(stripOllamaPrefix('gemma4:12b')).toBe('gemma4:12b');
     expect(stripOllamaPrefix('claude-opus-5')).toBe('claude-opus-5');
     expect(DEFAULT_OLLAMA_AGENT_MODEL).toBe('gemma4:12b');
+  });
+});
+
+describe('SAFE_OLLAMA_HOST_RE', () => {
+  it('accepts the localhost forms the URL parser can actually use', () => {
+    for (const url of ['http://localhost', 'http://localhost:11434', 'http://127.0.0.1:11434', 'http://[::1]:11434']) {
+      expect(SAFE_OLLAMA_HOST_RE.test(url)).toBe(true);
+      expect(() => new URL(url)).not.toThrow();
+    }
+  });
+
+  it('rejects a bare unbracketed ::1, which is not a parseable URL', () => {
+    expect(SAFE_OLLAMA_HOST_RE.test('http://::1')).toBe(false);
+    expect(SAFE_OLLAMA_HOST_RE.test('http://::1:11434')).toBe(false);
+  });
+
+  it('still rejects non-localhost hosts', () => {
+    for (const url of ['https://ollama.example.com', 'http://10.0.0.5:11434', 'http://192.168.1.4']) {
+      expect(SAFE_OLLAMA_HOST_RE.test(url)).toBe(false);
+    }
   });
 });
 

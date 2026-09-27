@@ -87,6 +87,22 @@ describe('setupOllamaForInstall', () => {
     expect(spinner.succeed).toHaveBeenCalledWith('Pulled gemma4:12b');
   });
 
+  it('never tells the operator the model works as an agent', async () => {
+    // PAN-1641: the live E2E got zero tool calls out of gemma4:12b, so no install
+    // surface may call it recommended for agent work. This has to stay in step with
+    // configuration/local-models.mdx and sync-sources/skills/pan-install/SKILL.md.
+    await setupOllamaForInstall({
+      platform: 'linux', spinner, isTty: false, detectInstalled, confirmPull, pullModel,
+    });
+    await setupOllamaForInstall({
+      platform: 'linux', spinner, isTty: true, detectInstalled, confirmPull, pullModel,
+    });
+
+    const said = allMessages(spinner).toLowerCase();
+    expect(said).not.toContain('recommended local agent model');
+    expect(said).toContain('experiment');
+  });
+
   it('does not pull when the operator declines', async () => {
     confirmPull.mockResolvedValue(false);
 

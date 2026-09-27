@@ -34,10 +34,14 @@ export function getOllamaInstallGuidance(platform: Platform): string {
 }
 
 /**
- * Detect Ollama during `pan install` and, on an interactive terminal, offer the
- * recommended local agent model. The offer defaults to No: gemma4:12b is an 8 GB
- * download that most operators do not want mid-install. Nothing here can fail the
- * install — a missing binary or a failed pull is guidance, not an error.
+ * Detect Ollama during `pan install` and, on an interactive terminal, offer the tag the
+ * local-model docs are written against. The offer defaults to No for two reasons: it is an
+ * 8 GB download nobody asked for mid-install, and gemma4:12b is NOT a working work-agent
+ * model — PAN-1641's live E2E got zero tool calls out of it. The wording here has to stay
+ * in step with configuration/local-models.mdx and sync-sources/skills/pan-install/SKILL.md,
+ * so an operator is never told a model works when the audit says it does not.
+ *
+ * Nothing here can fail the install — a missing binary or a failed pull is guidance.
  */
 export async function setupOllamaForInstall(options: SetupOllamaOptions): Promise<void> {
   if (options.skip) {
@@ -54,7 +58,8 @@ export async function setupOllamaForInstall(options: SetupOllamaOptions): Promis
 
   if (!options.isTty) {
     options.spinner.info(
-      `To run agents on a local model, pull it with \`ollama pull ${DEFAULT_OLLAMA_AGENT_MODEL}\`.`,
+      `To experiment with local models, pull one with \`ollama pull ${DEFAULT_OLLAMA_AGENT_MODEL}\` `
+      + '(no local model has completed a work-agent task yet — see configuration/local-models).',
     );
     return;
   }
@@ -80,7 +85,7 @@ async function defaultConfirmPull(model: string): Promise<boolean> {
   const answer = await inquirer.prompt([{
     type: 'confirm',
     name: 'pull',
-    message: `Pull the recommended local agent model ${model} now? (about 8 GB)`,
+    message: `Pull ${model} for local-model experiments now? (about 8 GB; not yet proven as a work agent)`,
     default: false,
   }]);
   return Boolean(answer.pull);

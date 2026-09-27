@@ -19,6 +19,9 @@ import {
 import { detectPlatform } from '../../lib/platform.js';
 import { Effect } from 'effect';
 
+/** Bound on the diagnostic `/api/ps` read; same budget as the health probe. */
+const PS_TIMEOUT_MS = 5_000;
+
 /** Smallest window a work agent's first prompt reliably fits in (D5). */
 const RECOMMENDED_CONTEXT_LENGTH = 65_536;
 
@@ -47,7 +50,18 @@ export async function checkOllama(options: CheckOllamaOptions): Promise<CheckRes
 
   if (models.length === 0 && !installed) return [];
 
-  if (!installed) {
+  const { baseUrl } = options.config.ollama;
+  const tags = models.map(stripOllamaPrefix);
+  const checkHealth = options.checkHealth ?? checkOllamaHealth;
+  // Probing with one configured tag (or a placeholder) answers reachability and
+  // version in one round trip; per-tag presence is resolved below.
+  //
+  // The probe runs even with no host binary: Ollama in a container with 11434
+  // published is a working local endpoint, and reporting "not installed" without
+  // looking would be wrong for that host.
+  const health: OllamaHealth = await checkHealth(tags[0] ?? '', baseUrl, { fetchImpl: options.fetchImpl });
+
+  if (!installed && !health.endpointReachable) {
     const platform = await Effect.runPromise(detectPlatform());
     return [{
       name: 'Ollama',
@@ -56,13 +70,6 @@ export async function checkOllama(options: CheckOllamaOptions): Promise<CheckRes
       fix: getOllamaInstallGuidance(platform),
     }];
   }
-
-  const { baseUrl } = options.config.ollama;
-  const tags = models.map(stripOllamaPrefix);
-  const checkHealth = options.checkHealth ?? checkOllamaHealth;
-  // Probing with one configured tag (or a placeholder) answers reachability and
-  // version in one round trip; per-tag presence is resolved below.
-  const health: OllamaHealth = await checkHealth(tags[0] ?? '', baseUrl, { fetchImpl: options.fetchImpl });
 
   if (!health.endpointReachable) {
     return [{
@@ -85,7 +92,9 @@ export async function checkOllama(options: CheckOllamaOptions): Promise<CheckRes
   const checks: CheckResult[] = [{
     name: 'Ollama',
     status: 'ok',
-    message: `${health.version ?? 'reachable'} at ${baseUrl}`,
+    message: installed
+      ? `${health.version ?? 'reachable'} at ${baseUrl}`
+      : `${health.version ?? 'reachable'} at ${baseUrl} (no host binary — served from elsewhere, e.g. a container)`,
   }];
 
   for (const tag of tags) {
@@ -114,16 +123,24 @@ export async function checkOllama(options: CheckOllamaOptions): Promise<CheckRes
   return checks;
 }
 
-/** Windows of the tags already resident, from `/api/ps`. A failure here is silence, not a row. */
+/**
+ * Windows of the tags already resident, from `/api/ps`. A failure here is silence, not a row.
+ *
+ * Bounded by its own AbortController: a server that answers the health probes and then
+ * stalls on `/api/ps` would otherwise hang `pan doctor` forever, since this read has no
+ * other timeout. The abort also rejects the body read, not just the headers.
+ */
 async function loadedContextLengths(
   baseUrl: string,
   tags: string[],
   fetchImpl: typeof fetch = fetch,
 ): Promise<Array<[string, number]>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PS_TIMEOUT_MS);
   try {
-    const response = await fetchImpl(`${baseUrl}/api/ps`, { method: 'GET' });
+    const response = await fetchImpl(`${baseUrl}/api/ps`, { method: 'GET', signal: controller.signal });
     if (!response.ok) return [];
-    const body = await response.json() as OllamaPsResponse;
+    const body = await readJsonWithin<OllamaPsResponse>(response, controller.signal);
     const found: Array<[string, number]> = [];
     for (const tag of tags) {
       const entry = body.models?.find((model) => model.name === tag || model.model === tag);
@@ -132,5 +149,18 @@ async function loadedContextLengths(
     return found;
   } catch {
     return [];
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/** Reject on abort as well as on the body's own failure, so a stalled body cannot hang. */
+function readJsonWithin<T>(response: Response, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    (response.json() as Promise<T>).then(resolve, reject)
+      .finally(() => signal.removeEventListener('abort', onAbort));
+  });
 }

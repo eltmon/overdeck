@@ -350,7 +350,7 @@ ollama:
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `base_url` | `http://localhost:11434` | Where the Ollama server listens; a URL with no port gets `11434`. **Must be a localhost address** (`localhost`, `127.x.x.x`, or `::1`); anything else is a config-load error, because the point of a local model is that nothing leaves the machine. A trailing slash is stripped. No `/v1` suffix — Claude Code appends `/v1/messages` itself. |
+| `base_url` | `http://localhost:11434` | Where the Ollama server listens; a URL with no port gets `11434`. **Must be a localhost address** (`localhost`, `127.x.x.x`, or `[::1]` — bracketed, since a bare `::1` is not a parseable URL); anything else is a config-load error, because the point of a local model is that no prompt leaves the machine. A trailing slash is stripped. No `/v1` suffix — Claude Code appends `/v1/messages` itself. |
 | `context_length` | `65536` | The window Overdeck asks for as `OLLAMA_CONTEXT_LENGTH` when **it** starts `ollama serve`. It cannot change a server someone else started — set `OLLAMA_CONTEXT_LENGTH` on that server yourself and let `pan doctor` check it. Must be an integer of at least 2048. |
 
 The server, not this setting, is the authority on the window. Overdeck warm-loads the
