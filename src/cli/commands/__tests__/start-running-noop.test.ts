@@ -126,6 +126,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
   beforeEach(() => {
     delete process.env['OVERDECK_AGENT_STARTED_BY'];
     delete process.env['OVERDECK_FLYWHEEL_RUN_ID'];
+    delete process.env['OVERDECK_CONVERSATION'];
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-2407-running-'));
 
     lifecycleMocks.getWorkAgentLifecycleState.mockReset();
@@ -214,7 +215,21 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     expect(written).toContain(`tmux -L ${getManagedTmuxSocketName()} attach -t agent-pan-x`);
   });
 
-  it('derives flywheel provenance from an inherited run id', async () => {
+  // PAN-3634: run ids are retired. resolveCliStartedBy mints the Flywheel
+  // token from OVERDECK_CONVERSATION=conv-flywheel, not from a run id, so a
+  // stale OVERDECK_FLYWHEEL_RUN_ID is no longer read at all.
+  it('derives flywheel provenance from the inherited Flywheel conversation', async () => {
+    process.env['OVERDECK_CONVERSATION'] = 'conv-flywheel';
+    agentMocks.getAgentState.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paused: false, troubled: false });
+    mockLifecycle({ isRunning: true, isRunningButStuck: false });
+
+    const { issueCommand } = await import('../start.js');
+    await issueCommand('PAN-X', { model: '' } as any);
+
+    expect(process.env['OVERDECK_AGENT_STARTED_BY']).toBe('flywheel:conv-flywheel');
+  });
+
+  it('no longer reads a legacy OVERDECK_FLYWHEEL_RUN_ID for provenance', async () => {
     process.env['OVERDECK_FLYWHEEL_RUN_ID'] = 'RUN-82';
     agentMocks.getAgentState.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paused: false, troubled: false });
     mockLifecycle({ isRunning: true, isRunningButStuck: false });
@@ -222,7 +237,7 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     const { issueCommand } = await import('../start.js');
     await issueCommand('PAN-X', { model: '' } as any);
 
-    expect(process.env['OVERDECK_AGENT_STARTED_BY']).toBe('flywheel:RUN-82');
+    expect(process.env['OVERDECK_AGENT_STARTED_BY']).toBe('operator:cli:pan-start');
   });
 
   it('preserves inherited route provenance', async () => {
