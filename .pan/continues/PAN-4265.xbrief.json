@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4265",
   "created": "2026-09-27T15:21:17.185Z",
-  "updated": "2026-09-27T15:42:56.512Z",
+  "updated": "2026-09-27T15:43:07.219Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "banner-reason.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T15:42:56.512Z"
+    },
+    "banner-reason.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:43:07.219Z"
     }
   }
 }
