@@ -5,7 +5,7 @@ import type { EffortLevel } from '../model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
-import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table.js';
+import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table-types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
 
 export type { SubscriptionPlan, AuthMode };

@@ -11,6 +11,7 @@ const running = {
     model: "claude-opus-5-5",
     harness: "claude-code",
     cwd: "/repos/overdeck",
+    createdAt: "2026-09-23T08:00:00.000Z",
     sessionAlive: true,
   },
   lastTick: {
@@ -26,12 +27,17 @@ const running = {
   inFlight: [
     {
       issueId: "PAN-3964",
+      title: "The flywheel page",
       state: "in-review",
+      liveAgents: 1,
+      inTick: true,
       pr: { url: "https://github.com/eltmon/overdeck/pull/1", number: 1, reviewState: "review-requested", checks: "pending", mergeable: null },
       lastJournal: { at: "2026-09-23T09:59:00.000Z", type: "review.dispatched", source: "pan-done" },
     },
-    { issueId: "PAN-3920", state: "working", lastJournal: null },
+    { issueId: "PAN-3920", title: null, trackerUnknown: true, state: "working", liveAgents: 0, inTick: false, lastJournal: null },
   ],
+  agents: [{ issueId: "PAN-3964", role: "work", harness: "claude-code", model: "claude-opus-5-5", state: "working" }],
+  inFlightSource: "tick",
   orderBook: { id: "book-1", name: "September", status: "running", landed: 2, total: 5 },
   projectRoot: "/repos/overdeck",
   generatedAt: "2026-09-23T10:00:05.000Z",
@@ -47,6 +53,11 @@ describe("FlywheelDerivedStatus (PAN-3964 FR-1)", () => {
   it("decodes the idle shape (no conversation, no tick, no book)", () => {
     const idle = { ...running, run: "idle", conversation: null, lastTick: null, freshness: null, inFlight: [], orderBook: null }
     expect(decodeFlywheelDerivedStatus(idle).conversation).toBeNull()
+  })
+
+  it("rejects a running conversation with no createdAt (PAN-4199 ac2)", () => {
+    const { createdAt: _dropped, ...conversation } = running.conversation
+    expect(() => decodeFlywheelDerivedStatus({ ...running, conversation })).toThrow()
   })
 
   it("rejects a stored-run shape", () => {

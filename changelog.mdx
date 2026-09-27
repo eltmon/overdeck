@@ -10,6 +10,14 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". */}
 
+<Update label="v0.62.1" description="2026-09-27">
+  #### Fixed
+
+  - **`npx @overdeck/core` works again.** Since 0.60.0 the package listed the test library `@effect/vitest` as a runtime dependency, which pulled vitest's optional peer packages into every install. After `@vitest/browser-playwright` 5.0.2 was published, npm crashed while resolving them with `Cannot read properties of null (reading 'edgesOut')`, so a fresh `npx @overdeck/core` or `npm install -g @overdeck/core` failed before Overdeck started. The dependency is removed, and the build now refuses to publish a test framework as a runtime dependency. If you still see the error, clear the stale npx cache with `rm -rf ~/.npm/_npx` and run the command again.
+
+  [Compare v0.62.0...v0.62.1](https://github.com/eltmon/overdeck/compare/v0.62.0...v0.62.1)
+</Update>
+
 <Update label="v0.62.0" description="2026-09-26">
   #### New
 

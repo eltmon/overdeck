@@ -884,6 +884,7 @@ export default function App() {
           onRestartBackend={() => restartBackendMutation.mutate()}
           onRestartCliproxy={() => restartCliproxyMutation.mutate()}
           onToggleSessionFeedSidebar={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
+          onNavigateNeedsYou={() => setActiveTab('flywheel')}
         />
 
         <div className="min-h-0 flex flex-1 overflow-hidden">
