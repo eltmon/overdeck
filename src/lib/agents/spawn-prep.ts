@@ -8,7 +8,6 @@ import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { loadConfigSync } from '../config.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
-import { getFlywheelActiveRunId } from '../overdeck/control-settings.js';
 import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
@@ -24,7 +23,6 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
 import type { XBriefDocument, XBriefDifficulty, XBriefItem, XBriefItemStatus } from '../xbrief/types.js';
 import { type Role } from './agent-state.js';
-import { normalizeFlywheelRunId } from './provenance.js';
 import { resolveStaffing } from './staffing.js';
 import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { checkStaffingFitness } from './tier-fitness.js';
@@ -48,33 +46,13 @@ import {
   roleSystemPromptInjection,
 } from './runtime-command.js';
 
-export type FlywheelSpawnEnv = {
-  OVERDECK_FLYWHEEL_RUN_ID?: string;
-  OVERDECK_FLYWHEEL_AGENT_ROLE?: Role;
-};
-
-export function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
-  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunId());
-  return runId
-    ? { OVERDECK_FLYWHEEL_RUN_ID: runId, OVERDECK_FLYWHEEL_AGENT_ROLE: role }
-    : {};
-}
-
 export function resolveAgentStartedBy(
   explicit: string | undefined,
-  flywheelRunId: string | undefined,
   environmentToken = process.env['OVERDECK_AGENT_STARTED_BY'],
 ): string {
-  const resolved = explicit?.trim() || environmentToken?.trim() || (flywheelRunId ? `flywheel:${flywheelRunId}` : '');
+  const resolved = explicit?.trim() || environmentToken?.trim() || '';
   if (!resolved) throw new Error('Agent spawn provenance is required: pass startedBy at the launch entry point.');
   return resolved;
-}
-
-export function flywheelEnvExports(env: FlywheelSpawnEnv): string[] {
-  return [
-    env.OVERDECK_FLYWHEEL_RUN_ID ? `export OVERDECK_FLYWHEEL_RUN_ID=${env.OVERDECK_FLYWHEEL_RUN_ID}` : undefined,
-    env.OVERDECK_FLYWHEEL_AGENT_ROLE ? `export OVERDECK_FLYWHEEL_AGENT_ROLE=${env.OVERDECK_FLYWHEEL_AGENT_ROLE}` : undefined,
-  ].filter((value): value is string => value !== undefined);
 }
 
 export interface SpawnOptions {
@@ -110,7 +88,6 @@ export interface SpawnOptions {
   /** Marks the bare parent work agent as the swarm foreman. */
   foreman?: boolean;
   allowHost?: boolean;
-  flywheelRunId?: string;
   startedBy: string;
   /** True only when planning consent was the release authority for this autonomous work launch. */
   autoSpawnConsentRequired?: boolean;
@@ -147,7 +124,6 @@ export interface SpawnRunOptions {
   effort?: RoleEffort;
   extraEnvExports?: string[];
   resumeSessionId?: string;
-  flywheelRunId?: string;
   startedBy: string;
   /** True only when planning consent was the release authority for this autonomous work launch. */
   autoSpawnConsentRequired?: boolean;

@@ -30,6 +30,10 @@ Sessions with nothing to wait on (idle with no known blocker, or stopped) are
 not counted. They fold into one line at the bottom, `▸ 14 idle sessions ·
 History`; click it to list them in place. The page remembers whether it is open.
 
+When nothing is running or waiting, the list is the whole page: one message,
+**Nothing is running or waiting. Finished work is in History.**, followed by
+the idle footer if any sessions are idle — never a preview pane alongside it.
+
 Each row says in words why it is where it is:
 
 | Reason | Meaning |
@@ -38,10 +42,10 @@ Each row says in words why it is where it is:
 | **permission prompt** | The agent waits for you to allow a tool. |
 | **plan approval** | The agent waits for you to approve its plan. |
 | **paused by you** | You paused it. Your reason shows under the row. |
-| **API error or usage limit** | The provider, not the agent, is failing. |
+| **API error or usage limit** | The provider, not the agent, is failing — including a conversation whose last turn ended in a provider error (billing, a usage limit) even though the session itself now looks idle. |
 | **stuck · idle `<age>`** | The issue's work agent sat idle with unpushed commits past the stuck threshold. |
 | **ready to merge** | The PR is approved with green checks and waits for you to merge. |
-| **running `<tool>`**, **thinking**, **working** | The agent is running a turn. The second line is its last output line and how long ago it wrote it; **quiet `<age>`** appears after five silent minutes. |
+| **`<tool>`**, **thinking**, **working** | The agent is running a turn: the row names the tool it is calling, with the tool's own description under it when it has one — for example, running `Bash`, the second line reads `Bash · Commit WI-7`. A working subagent keeps its parent from reading quiet: **quiet `<age>`** replaces the age, never shows alongside it, once the whole row — the agent and every subagent under it — has been silent five minutes. |
 | **running on Fly** | The agent runs on a Fly machine, whose terminal is there. |
 | **held by Overdeck** | Overdeck paused it (a scheduler yield or another machine pause). |
 | **CI failed** | The PR's checks failed. The work agent gets the failure, not you. |
@@ -55,13 +59,26 @@ or waiting on, then how long ago. A subagent shows as a `↳` line under the
 agent that started it, with `●` while it works; after three, the row says
 `+N more`.
 
+A gauntlet [lane](/reference/lanes) shows as a `↳` line under the
+conversation that launched it: `↳ <role letter> <lane key> i<n> · <state>`,
+with its report badge (`DONE`, `BLOCKED` or `FAILED`), under a lanes toggle on
+that row. Every lane line shows; the three-line cap applies to subagents only.
+A critic or verifier lane shows one indent deeper, directly under the builder
+it judges, with its verdict badge (`PENDING` until it files one). A lane that
+needs you also gets its own row in **Needs you**. A lane whose
+launcher is not on the page keeps its own row. A handoff or fork successor
+always keeps its own row, with a `continues ← #<id>` link to the conversation
+it continues, so a live successor never hides under an ended predecessor.
+
 Click a row to preview it: the right pane shows its header, its issue and PR,
 and its live transcript, and the list stays in view. Use `↑` / `↓` to move the
 selection. **Open** (on the row you hover or select), `Enter` or a
 double-click goes to the agent's live session in its project's Command Deck, or
 to the conversation. Drag the divider to resize the panes; the sizes are
 remembered. The panel button in the top bar hides the preview pane and brings
-it back.
+it back. A conversation's own Agents rail (its subagent list) starts collapsed
+in this preview, independent of whatever you left it at on the conversation's
+own page.
 
 ## What the colors mean
 
@@ -92,6 +109,15 @@ left pane closed to hide it. **Live** in the top bar goes back.
 | **Locations** (left) | **Local** and, when an agent runs on Fly, **Remote (Fly)**. Under each: your projects, then each issue (newest number first) and one **Conversations** group for work that has no issue. The numbers on the right are live agents of all shown (hover for the words). |
 | **Agents** (middle) | Every entry under the selected place. A subagent or worker sits indented under the agent or conversation that spawned it. When its parent lives somewhere else, the row says **spawned by** that parent instead. Each row shows the id, role, harness and model, last activity and age. |
 | **Detail** (right) | The entry's header (id, harness, model, state, when it started and was last active, cost when known, and a **Spawned by** link), the issue's state, PR, checks and branch with the issue's actions, and the transcript. |
+
+Lanes nest under the conversation that launched them, and handoff and fork
+successors nest under their predecessor; a lane shows `<role letter> <lane key>
+i<n>` before its label and a successor shows a `continues ← #<id>` link.
+A critic or verifier lane nests under the builder it judges, not under the
+conversation that launched it, and carries its verdict. History shows at most
+two levels of nesting. A deeper row keeps its place
+under its real parent's group but renders at the second level, with the
+marker `↳ continued from <parent>` naming its real parent.
 
 Conversations keep their composer in the detail pane. A subagent's transcript
 is read-only: it has no input channel of its own. So is an external agent's:

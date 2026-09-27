@@ -145,3 +145,35 @@ describe('SubagentRail collapse (Awareness-rail pattern)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('SubagentRail defaultCollapsed (PAN-4222 embedded previews)', () => {
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/conv/42');
+    localStorage.removeItem('overdeck.ui.agentsRailCollapsed');
+  });
+
+  it('starts collapsed from defaultCollapsed even though localStorage says expanded (ac1)', () => {
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+
+    render(
+      <SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} defaultCollapsed />,
+    );
+
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+  });
+
+  it('expands on click but never writes localStorage while defaultCollapsed is set (ac2)', async () => {
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'false');
+    const user = userEvent.setup();
+
+    render(
+      <SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} defaultCollapsed />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Show agents rail' }));
+
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
+  });
+});

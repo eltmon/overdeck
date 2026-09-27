@@ -118,6 +118,16 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // pull-request sync sweep). Mirrors the init migration for existing DBs.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_pull_requests` (`conversation_id` text NOT NULL, `host` text NOT NULL, `repository` text NOT NULL, `number` integer NOT NULL, `url` text NOT NULL, `source` text NOT NULL, `linked_at` integer NOT NULL, `dismissed_at` integer, `snapshot_json` text, PRIMARY KEY(`conversation_id`, `host`, `repository`, `number`), FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_pull_requests_key` ON `conversation_pull_requests` (`host`, `repository`, `number`)');
+  // Gauntlet lanes: launch-time facts written once by the lane door (.pan/drafts/pan-4223.md).
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `parent_conversation_id` text REFERENCES `conversations`(`id`)');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `gauntlet_run` text');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `lane_key` text');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `lane_role` text');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_parent_idx` ON `conversations` (`parent_conversation_id`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_gauntlet_run_idx` ON `conversations` (`gauntlet_run`)');
+  // The critic link: the builder row a critic or verifier lane judges (D26).
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `critic_of_conversation_id` text REFERENCES `conversations`(`id`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_critic_of_idx` ON `conversations` (`critic_of_conversation_id`)');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

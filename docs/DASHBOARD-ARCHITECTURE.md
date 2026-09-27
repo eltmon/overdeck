@@ -407,6 +407,29 @@ than `live` answers 400, and `windowHours` is ignored with `scope=live`. The win
 `scheduler` for `yieldedByScheduler`, else `machine`; `reason` is `pausedReason`; `since` is
 `pausedAt`, else `yieldedAt`.
 
+**Lanes and successors (PAN-4223).** A conversation entry's `parentId` is `conv:<parent name>`
+whenever its row has a parent link (`parent_conversation_id`), so gauntlet lanes nest under the
+conversation that launched them and handoff/fork successors under their predecessor. A lane entry
+carries `lane: { run, key, role, iteration, reportStatus }`; a successor carries `continuesFrom`
+(the predecessor's legacy conversation id, linked as `/conv/<id>`). `keepWithAncestors` never
+climbs a **succession edge** (a conversation entry with a `parentId` and no `lane`): a live
+successor keeps its own row and does not pull its ended predecessor into the live scope, while a
+live lane still pulls in its ended launcher. In the Live view a lane with its parent on the page is
+a child line of the parent row (a needs-you lane also keeps its own row), and a successor always
+keeps its own row with its `continues ←` link. History nests both by `parentId`, capped at two
+levels; a deeper row renders at the second level with `flattenedFrom` naming its real parent.
+
+**Command Deck conversation groups (PAN-4223).** `conversation-tree.ts` nests every conversation
+whose parent link names a row in the rendered list, lanes and successors alike, in pre-order at
+display depth `min(natural depth, 2)`; a deeper row keeps its pre-order place and shows a marker
+naming its real parent (`↳ continued from #<id>` or `lane of #<id> · <run>`), and a row whose
+parent is not in the list renders at top level with the same kind of marker. A top-level group
+ranks where its best member would sit in the flat active-then-inactive order, so an ended
+predecessor with a live successor ranks with the successor. Only top-level rows carry a collapse
+toggle, which lists the group's non-zero counts. A group defaults to expanded while any descendant
+is active and collapsed otherwise; the viewer's collapsed groups persist in localStorage under
+`commandDeck.groups.collapsed` (a JSON array of top-level conversation names).
+
 **Reasons.** `live-model.ts` classifies each row on the client from the entry plus real-time store
 facts: the issue's derived state, the agent snapshot's pending inputs, and the runtime snapshot.
 The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `work` or `strike`.
@@ -415,10 +438,10 @@ The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `w
 | --- | --- | --- | --- | --- |
 | 1 | `blocked` | question waiting / permission prompt / plan approval | Needs you | needs-you |
 | 2 | operator pause | paused by you | Needs you | needs-you |
-| 3 | issue agent, attention `api-error` | API error or usage limit | Needs you | stuck |
+| 3 | issue agent, attention `api-error`, or any entry with `providerError` | API error or usage limit | Needs you | stuck |
 | 4 | issue agent, attention `stuck`, `idle` | stuck · idle `<age>` | Needs you | stuck |
 | 5 | issue agent, issue `ready` | ready to merge | Needs you | needs-you |
-| 6 | `working` | running `<tool>` / thinking / working | Live | live |
+| 6 | `working` | `<tool>` / thinking / working | Live | live |
 | 7 | remote and `unknown` | running on Fly | Live | live |
 | 8 | scheduler or machine pause | held by Overdeck | Waiting | waiting |
 | 9 | issue agent, PR checks red | CI failed | Waiting | stuck |
@@ -433,10 +456,31 @@ pointer as agents write output; Waiting and Idle sort most recent activity first
 nests under its parent row (at most three lines, then `+N more`, each with its state glyph). A
 row's first line is the issue id and title (the role only when it is not `work`); its second
 line is the reason, then what it is doing or waiting on, then the age. For a live agent that is
-its last output line, streamed through `useAgentOutputSubscription` while the row is mounted,
-and `quiet <age>` in the stuck tone past five minutes. Tones are the `--state-*` tokens in `index.css` (live blue and
+its runtime snapshot's tool name (`currentTool`, bare, no longer `running <tool>`) and, when the
+hook reported one, the tool's own description (`currentToolDescription`, e.g. `Bash · Commit
+WI-7`) — never the agent's raw pane output; there is no output subscription on this row anymore.
+A row's `since` (and its quiet age) is the newest activity across the row and every one of its
+subagents, not just its own: an orchestrator with a working subagent is never quiet just because
+it made no tool call itself. `quiet <age>` replaces the age in the stuck tone past five silent
+minutes — the two never render together. Tones are the `--state-*` tokens in `index.css` (live blue and
 never green, needs-you amber, stuck red, waiting warm neutral, done emerald); see the style
 guide's "State Tokens". The same tokens tone the History row badge.
+
+A conversation entry is keyed in the directory by `conv:<name>`, but its runtime facts
+(`agentRuntimeById`) are keyed by its tmux session — `DirectoryEntry.runtimeId` carries that
+session id when it differs from `id`, and the Live view looks runtime facts up by
+`runtimeId ?? id`. `DirectoryEntry.providerError` (`{ message, at }`) is set on a conversation
+whose transcript's last turn ended in a provider error (billing, a usage limit) while the
+session otherwise looks idle (`readConversationProviderError`, `src/lib/overdeck/`) — reason 3
+above fires on it exactly like an issue agent's `api-error` attention, with the error's own
+message and timestamp.
+
+When there are no visible rows, the Live view renders one column, never the two-panel layout: the
+loading/error status or the empty message (`Nothing is running or waiting. Finished work is in
+History.`), followed by the Idle footer when there are idle sessions — no preview pane, so there
+is never a second, contradictory "Select an agent…" message alongside it. The preview's own
+Agents rail (a conversation's subagent list, `SubagentRail`) starts collapsed there regardless of
+what the user left it at on the conversation's own page — see `docs/CONVERSATION-SUBAGENTS.md`.
 
 ### History: the Agents Directory
 

@@ -28,6 +28,7 @@ describe('planCommand', () => {
     vi.clearAllMocks();
     delete process.env['OVERDECK_AGENT_STARTED_BY'];
     delete process.env['OVERDECK_FLYWHEEL_RUN_ID'];
+    delete process.env['OVERDECK_CONVERSATION'];
     spinner.text = '';
     global.fetch = vi.fn(async () => ({
       ok: true,
@@ -72,25 +73,38 @@ describe('planCommand', () => {
     consoleWarnSpy.mockRestore();
   });
 
-  it('stamps flywheel planning provenance when a run id is inherited', async () => {
+  // PAN-3634: run ids are retired. resolveCliStartedBy mints the Flywheel
+  // token from OVERDECK_CONVERSATION=conv-flywheel, not from a run id, so a
+  // stale OVERDECK_FLYWHEEL_RUN_ID is no longer read at all.
+  it('stamps flywheel planning provenance when the Flywheel conversation is inherited', async () => {
+    process.env['OVERDECK_CONVERSATION'] = 'conv-flywheel';
+    const { planCommand } = await import('../plan.js');
+
+    await planCommand('PAN-123', { auto: true });
+
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(body.startedBy).toBe('flywheel:conv-flywheel');
+  });
+
+  it('ignores blank inherited provenance and uses the Flywheel origin', async () => {
+    process.env['OVERDECK_AGENT_STARTED_BY'] = '   ';
+    process.env['OVERDECK_CONVERSATION'] = 'conv-flywheel';
+    const { planCommand } = await import('../plan.js');
+
+    await planCommand('PAN-123', { auto: true });
+
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(body.startedBy).toBe('flywheel:conv-flywheel');
+  });
+
+  it('no longer reads a legacy OVERDECK_FLYWHEEL_RUN_ID for planning provenance', async () => {
     process.env['OVERDECK_FLYWHEEL_RUN_ID'] = 'RUN-81';
     const { planCommand } = await import('../plan.js');
 
     await planCommand('PAN-123', { auto: true });
 
     const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
-    expect(body.startedBy).toBe('flywheel:RUN-81');
-  });
-
-  it('ignores blank inherited provenance and uses the Flywheel origin', async () => {
-    process.env['OVERDECK_AGENT_STARTED_BY'] = '   ';
-    process.env['OVERDECK_FLYWHEEL_RUN_ID'] = ' RUN-82 ';
-    const { planCommand } = await import('../plan.js');
-
-    await planCommand('PAN-123', { auto: true });
-
-    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
-    expect(body.startedBy).toBe('flywheel:RUN-82');
+    expect(body.startedBy).toBe('operator:cli:pan-plan');
   });
 
   it('sends probe when --probe is provided', async () => {

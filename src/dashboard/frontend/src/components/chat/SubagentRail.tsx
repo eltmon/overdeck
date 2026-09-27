@@ -11,6 +11,13 @@ interface SubagentRailProps {
   subagents: SubagentSummary[];
   /** Currently selected subagent, or null while the main agent is shown. */
   selectedAgentId: string | null;
+  /**
+   * When set, the rail starts at this collapsed state instead of reading
+   * localStorage, and toggling it never persists to localStorage (PAN-4222).
+   * Used by embedded previews (Live, History) that should not fight the
+   * user's own conversation-page rail preference.
+   */
+  defaultCollapsed?: boolean;
 }
 
 function readSelectedSubagent(): string | null {
@@ -43,15 +50,16 @@ export function useSubagentSelection(subagents: readonly SubagentSummary[]) {
   return { selectedAgentId, selectedSubagent, clearSelection };
 }
 
-export function SubagentRail({ conversation, subagents, selectedAgentId }: SubagentRailProps) {
+export function SubagentRail({ conversation, subagents, selectedAgentId, defaultCollapsed }: SubagentRailProps) {
   const select = useCallback((agentId: string | null) => updateSelectedSubagent(agentId), []);
   const [collapsed, setCollapsed] = useState(
-    () => typeof window !== 'undefined' && localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) === 'true',
+    () => defaultCollapsed ?? (typeof window !== 'undefined' && localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) === 'true'),
   );
   const toggleCollapsed = useCallback((next: boolean) => {
     setCollapsed(next);
+    if (defaultCollapsed !== undefined) return;
     try { localStorage.setItem(AGENTS_RAIL_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
-  }, []);
+  }, [defaultCollapsed]);
 
   if (subagents.length === 0) return null;
 

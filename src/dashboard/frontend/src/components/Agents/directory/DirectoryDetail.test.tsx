@@ -71,7 +71,7 @@ describe('DirectoryDetail', () => {
     renderDetail(entry({ id: 'agent-pan-1', transcript: { route: 'agent', agentId: 'agent-pan-1' } }));
     expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
     const props = conversationPanel.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    expect(props).toMatchObject({ agentId: 'agent-pan-1', embedded: true, hideComposer: false });
+    expect(props).toMatchObject({ agentId: 'agent-pan-1', embedded: true, hideComposer: false, subagentRailCollapsed: true });
     expect(props.conversation).toMatchObject({ name: 'agent-pan-1', status: 'active', sessionAlive: true });
   });
 
@@ -121,7 +121,7 @@ describe('DirectoryDetail', () => {
     renderDetail(entry({ id: 'conv:orchestrator', kind: 'conversation', transcript: { route: 'conversation', conversationName: 'orchestrator' } }));
     expect(document.querySelector('[data-component="directory-issue-context"]')).toBeNull();
     expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
-    expect(conversationPanel.mock.calls.at(-1)?.[0]).toMatchObject({ conversation: { name: 'orchestrator' } });
+    expect(conversationPanel.mock.calls.at(-1)?.[0]).toMatchObject({ conversation: { name: 'orchestrator' }, subagentRailCollapsed: true });
     expect((conversationPanel.mock.calls.at(-1)?.[0] as Record<string, unknown>).hideComposer).toBeUndefined();
   });
 

@@ -120,6 +120,8 @@ interface ConversationPanelProps {
   hideComposer?: boolean;
   /** Called when a message POST fails. */
   onSendFailed?: () => void;
+  /** Passed through to SubagentRail — starts the rail at this collapsed state instead of localStorage (PAN-4222). */
+  subagentRailCollapsed?: boolean;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -161,6 +163,7 @@ export function ConversationPanel({
   embeddedResumeLabel,
   hideComposer = false,
   onSendFailed,
+  subagentRailCollapsed,
 }: ConversationPanelProps) {
   // Resume-click latch: bridges the gap between a successful resume POST and
   // the conversations poll reporting the session alive (up to one poll tick).
@@ -1106,7 +1109,12 @@ export function ConversationPanel({
             />
           </DiffWorkerPoolProvider>
         )}
-        <SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={selectedSubagentId} />
+        <SubagentRail
+          conversation={conversation}
+          subagents={subagents}
+          selectedAgentId={selectedSubagentId}
+          defaultCollapsed={subagentRailCollapsed}
+        />
       </div>
 
       {convMutations.forkTarget && (

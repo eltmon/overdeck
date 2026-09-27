@@ -342,6 +342,7 @@ planCmd
 program
   .command('tell <id> <message>')
   .description('Send message to running agent')
+  .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
   .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
 program
   .command('answer <id> [option]')
@@ -516,6 +517,7 @@ await groups.register('caveman');
 await groups.register('scope');
 await groups.register('spawn');
 await groups.register('worker');
+await groups.register('lane');
 await groups.register('flywheel');
 await groups.register('merge');
 await groups.register('artifacts');

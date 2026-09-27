@@ -10,11 +10,6 @@ vi.mock('../directory/DirectoryDetail', () => ({
   ),
 }));
 
-const subscribed = vi.fn();
-vi.mock('../../../hooks/useAgentOutputSubscription', () => ({
-  useAgentOutputSubscription: (agentId: string, enabled = true) => { if (enabled) subscribed(agentId); },
-}));
-
 import { usePanesStore } from '../../../lib/panesStore';
 import { useDashboardStore } from '../../../lib/store';
 import { LiveAgentsView } from './LiveAgentsView';
@@ -47,7 +42,7 @@ const ENTRIES: DirectoryEntry[] = [
   entry({ id: 'agent-pan-1', issueId: 'PAN-1', label: 'work · PAN-1', issueTitle: 'First issue', state: 'blocked' }),
   entry({ id: 'agent-pan-2', issueId: 'PAN-2', label: 'work · PAN-2', state: 'working', startedAt: '2026-09-25T09:00:00.000Z' }),
   entry({ id: 'agent-pan-3', issueId: 'PAN-3', label: 'work · PAN-3', state: 'idle' }),
-  entry({ id: 'conv:foo', kind: 'conversation', label: 'Foo', role: null, state: 'working', startedAt: '2026-09-25T10:30:00.000Z' }),
+  entry({ id: 'conv:foo', kind: 'conversation', label: 'Foo', role: null, state: 'working', startedAt: '2026-09-25T10:30:00.000Z', runtimeId: 'conv-foo-session' }),
   entry({ id: 'agent-pan-9', issueId: 'PAN-9', label: 'work · PAN-9', state: 'idle' }),
 ];
 
@@ -73,7 +68,6 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   window.history.replaceState(null, '', '/agents');
   window.localStorage.clear();
-  subscribed.mockReset();
   response = { generatedAt: '', windowHours: 0, scope: 'live', entries: ENTRIES };
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url !== '/api/agent-directory?scope=live') throw new Error(`unexpected fetch ${url}`);
@@ -83,9 +77,15 @@ beforeEach(() => {
     derivedIssueStateByIssueId: { 'PAN-3': { issueId: 'PAN-3', state: 'in-review' } },
     agentsById: {},
     agentRuntimeById: {
-      'agent-pan-2': { id: 'agent-pan-2', activity: 'working', currentTool: 'Bash', lastActivity: '2026-09-25T11:59:50.000Z' },
+      'agent-pan-2': {
+        id: 'agent-pan-2',
+        activity: 'working',
+        currentTool: 'Bash',
+        currentToolDescription: 'Commit WI-7',
+        lastActivity: '2026-09-25T11:59:50.000Z',
+      },
+      'conv-foo-session': { id: 'conv-foo-session', activity: 'working', currentTool: 'Read', lastActivity: '2026-09-25T11:59:50.000Z' },
     },
-    agentOutputById: { 'agent-pan-2': ['$ npm run lint', '\x1b[32mnpm run build\x1b[0m', ''] },
   } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
 });
 
@@ -134,20 +134,47 @@ describe('LiveAgentsView', () => {
     expect(name).not.toHaveTextContent('work');
   });
 
-  it("streams a live agent's output: tool, last output line, age, then quiet past five minutes", async () => {
+  it('shows a live agent\'s tool, description, age, then quiet past five minutes', async () => {
     renderView();
     await flush();
-    expect(subscribed).toHaveBeenCalledWith('agent-pan-2');
-    expect(subscribed).not.toHaveBeenCalledWith('agent-pan-1');
     expect(row('agent-pan-2')).toHaveAttribute('data-tone', 'live');
-    expect(part('agent-pan-2', 'agents-live-reason')).toHaveTextContent('running Bash');
-    expect(part('agent-pan-2', 'agents-live-activity')).toHaveTextContent('· npm run build');
+    expect(part('agent-pan-2', 'agents-live-reason')).toHaveTextContent('Bash');
+    expect(part('agent-pan-2', 'agents-live-activity')).toHaveTextContent('· Commit WI-7');
     expect(part('agent-pan-2', 'agents-live-age')).toHaveTextContent('10s');
     expect(part('agent-pan-2', 'agents-live-quiet')).toBeNull();
 
     await act(async () => { await vi.advanceTimersByTimeAsync(6 * 60_000); });
     expect(part('agent-pan-2', 'agents-live-quiet')).toHaveTextContent('quiet 6m');
     expect(part('agent-pan-2', 'agents-live-quiet')).toHaveClass('text-state-stuck');
+    expect(part('agent-pan-2', 'agents-live-age')).toBeNull();
+  });
+
+  it("shows no quiet age when a subagent has been active in the last five minutes (PAN-4222 ac1)", async () => {
+    response = { ...response, entries: [
+      ...ENTRIES,
+      entry({
+        id: 'sub:agent-pan-2:a', kind: 'subagent', parentId: 'agent-pan-2', state: 'working',
+        lastActivityAt: '2026-09-25T11:59:30.000Z',
+      }),
+    ] };
+    useDashboardStore.setState({
+      agentRuntimeById: {
+        'agent-pan-2': {
+          id: 'agent-pan-2', activity: 'working', currentTool: 'Bash', currentToolDescription: 'Commit WI-7',
+          lastActivity: '2026-09-25T11:52:00.000Z',
+        },
+      },
+    } as unknown as Parameters<typeof useDashboardStore.setState>[0]);
+    renderView();
+    await flush();
+    expect(part('agent-pan-2', 'agents-live-quiet')).toBeNull();
+    expect(part('agent-pan-2', 'agents-live-age')).toHaveTextContent('30s');
+  });
+
+  it("reads a conversation row's runtime facts by its runtimeId, not its directory id (PAN-4222 ac2)", async () => {
+    renderView();
+    await flush();
+    expect(part('conv:foo', 'agents-live-reason')).toHaveTextContent('Read');
   });
 
   it('orders Live by start time, so output does not reshuffle it', async () => {
@@ -245,13 +272,27 @@ describe('LiveAgentsView', () => {
     expect(part('agent-pan-2', 'agents-live-subagent-more')).toHaveTextContent('↳ +2 more');
   });
 
-  it('shows the empty state with a History link when nothing is live', async () => {
+  it('shows one empty state with a History link when nothing is live, with no preview region (PAN-4222 ac1)', async () => {
     response = { ...response, entries: [] };
     renderView();
     await flush();
     const empty = document.querySelector('[data-component="agents-live-empty"]') as HTMLElement;
     expect(empty).toHaveTextContent('Nothing is running or waiting. Finished work is in History.');
-    expect(within(empty).getByRole('link', { name: 'History' })).toHaveAttribute('href', '/agents?view=history');
+    const historyLink = within(empty).getByRole('link', { name: 'History' });
+    expect(historyLink).toHaveAttribute('href', '/agents?view=history');
+    expect(historyLink).toHaveClass('underline');
+    expect(screen.queryByRole('region', { name: 'Agent preview' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Select an agent to see its transcript.')).not.toBeInTheDocument();
+  });
+
+  it('shows the single empty message and the idle toggle, with no preview, when only idle entries are collapsed (PAN-4222 ac2)', async () => {
+    response = { ...response, entries: [entry({ id: 'agent-pan-9', issueId: 'PAN-9', label: 'work · PAN-9', state: 'idle' })] };
+    renderView();
+    await flush();
+    expect(document.querySelector('[data-component="agents-live-empty"]')).not.toBeNull();
+    expect(screen.getByTestId('agents-live-idle-toggle')).toHaveTextContent('▸ 1 idle session');
+    expect(row('agent-pan-9')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Agent preview' })).not.toBeInTheDocument();
   });
 
   it('collapses and expands the preview panel when the header toggles previewHidden', async () => {

@@ -151,6 +151,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/worker.js'),
     register: (mod, program) => mod.registerWorkerCommands(program),
   }),
+  lane: group({
+    names: ['lane'],
+    load: () => import('./commands/lane.js'),
+    register: (mod, program) => mod.registerLaneCommands(program),
+  }),
   flywheel: group({
     names: ['flywheel'],
     load: () => import('./commands/flywheel.js'),

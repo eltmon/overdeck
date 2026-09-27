@@ -99,11 +99,16 @@
 <script>
 // Live gauntlet progress page. Renders entirely from status.json (+ optional
 // media-manifest.json); copied verbatim into each project's gauntlet/ dir.
+// Frozen board vocabulary: IN PROGRESS, AWAITING CRITIQUE, UNDER CRITIQUE,
+// WOWED, NOT_YET, ACCEPTED, SHIPPED, FOLDED, OPERATOR HOLD.
 const badge = (a) => {
+  if (a.status === 'ACCEPTED') return ['b-wowed', 'ACCEPTED'];
   if (a.verdict === 'WOWED')  return ['b-wowed', 'WOWED'];
   if (a.verdict === 'NOT_YET') return ['b-notyet', 'NOT YET · iter ' + a.iteration];
   if (a.status === 'IN PROGRESS' || /ITER \d+ IN PROGRESS/.test(a.status || '')) return ['b-inprogress', a.status];
   if (a.status === 'AWAITING CRITIQUE') return ['b-critique', 'AWAITING CRITIQUE'];
+  if (a.status === 'UNDER CRITIQUE') return ['b-critique', 'UNDER CRITIQUE'];
+  if (a.status === 'FOLDED' || a.status === 'OPERATOR HOLD') return ['b-notstarted', a.status];
   if ((a.status || '').match(/DELIVERED|SHIPPED|WIRED/)) return ['b-delivered', a.status];
   return ['b-notstarted', a.status || 'NOT STARTED'];
 };
@@ -146,7 +151,10 @@ function updateCard(key, a) {
   const ul = c.el.querySelector('.defects');
   const want = defects.map(d => '<li>' + d + '</li>').join('');
   if (ul.innerHTML !== want) ul.innerHTML = want;
-  setText(c.el, '.f-iter', 'iteration ' + (a.iteration || 0));
+  // Optional lane fields: the builder lane and critic conversation (or Agent) ids.
+  const ids = [a.lane ? 'lane #' + a.lane : '', a.critic ? 'critic ' + (/^\d+$/.test(String(a.critic)) ? '#' : '') + a.critic : '']
+    .filter(Boolean).join(' · ');
+  setText(c.el, '.f-iter', 'iteration ' + (a.iteration || 0) + (ids ? ' · ' + ids : ''));
   setText(c.el, '.f-time', a.updated ? new Date(a.updated).toLocaleTimeString() : '');
 
   // Screenshot: reload only when the area's timestamp changes (or first pass).

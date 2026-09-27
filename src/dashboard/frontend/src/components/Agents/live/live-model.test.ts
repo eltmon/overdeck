@@ -6,7 +6,6 @@ import {
   activityLabel,
   buildLiveSections,
   classifyEntry,
-  lastOutputLine,
   type LiveFacts,
 } from './live-model';
 
@@ -53,8 +52,8 @@ describe('classifyEntry — one case per precedence row', () => {
       { kind: 'stuck', section: 'needs-you', tone: 'stuck', label: 'stuck · idle 3h' }],
     ['5 ready to merge', entry({ id: 'a', state: 'stopped' }), { derived: derived({ state: 'ready' }) },
       { kind: 'ready-to-merge', section: 'needs-you', tone: 'needs-you', label: 'ready to merge' }],
-    ['6 working', entry({ id: 'a', state: 'working' }), { runtime: { currentTool: 'Bash' } },
-      { kind: 'working', section: 'live', tone: 'live', label: 'running Bash' }],
+    ['6 working', entry({ id: 'a', state: 'working' }), { runtime: { currentTool: 'Bash', currentToolDescription: 'Commit WI-7' } },
+      { kind: 'working', section: 'live', tone: 'live', label: 'Bash', detail: 'Commit WI-7' }],
     ['7 remote', entry({ id: 'a', state: 'unknown', location: 'remote' }), {},
       { kind: 'remote', section: 'live', tone: 'live', label: 'running on Fly' }],
     ['8 held', entry({ id: 'a', state: 'stopped', pause: { by: 'scheduler', reason: 'yielded', since: null } }), {},
@@ -113,6 +112,33 @@ describe('classifyEntry — precedence conflicts', () => {
   });
 });
 
+describe('classifyEntry — conversation provider error (PAN-4222)', () => {
+  it('ac2: an idle conversation with providerError classifies into Needs you, since the error time', () => {
+    const subject = entry({
+      id: 'conv:a', kind: 'conversation', role: null, state: 'idle',
+      providerError: { message: 'Your account has insufficient credits.', at: '2026-09-25T11:55:00.000Z' },
+    });
+    expect(classifyEntry(subject, {}, NOW)).toMatchObject({
+      section: 'needs-you', kind: 'api-error', tone: 'stuck', detail: 'Your account has insufficient credits.',
+    });
+    const sections = buildLiveSections([subject], () => ({}), NOW);
+    expect(sections.needsYou[0]!.since).toBe('2026-09-25T11:55:00.000Z');
+  });
+
+  it('ac3: the same entry without providerError classifies into idle', () => {
+    const subject = entry({ id: 'conv:a', kind: 'conversation', role: null, state: 'idle' });
+    expect(classifyEntry(subject, {}, NOW).section).toBe('idle');
+  });
+
+  it('ac4: a blocked conversation with providerError still reads question waiting', () => {
+    const subject = entry({
+      id: 'conv:a', kind: 'conversation', role: null, state: 'blocked',
+      providerError: { message: 'Your account has insufficient credits.', at: '2026-09-25T11:55:00.000Z' },
+    });
+    expect(classifyEntry(subject, {}, NOW)).toMatchObject({ kind: 'question', label: 'question waiting' });
+  });
+});
+
 describe('buildLiveSections', () => {
   it('nests a subagent under its parent row and drops one whose parent is absent', () => {
     const sections = buildLiveSections([
@@ -157,24 +183,113 @@ describe('buildLiveSections', () => {
     expect(sections.live[0]!.since).toBe('2026-09-25T11:59:00.000Z');
     expect(sections.waiting[0]!.since).toBe('2026-09-25T07:00:00.000Z');
   });
+
+  it("a Live row's since is the newest of itself and its children, not just its own activity (PAN-4222 ac1)", () => {
+    const sections = buildLiveSections([
+      entry({ id: 'orchestrator', kind: 'conversation', role: null, state: 'working' }),
+      entry({
+        id: 'sub:orchestrator:a', kind: 'subagent', parentId: 'orchestrator', state: 'working',
+        lastActivityAt: '2026-09-25T11:59:30.000Z',
+      }),
+    ], (subject) => (subject.id === 'orchestrator' ? { runtime: { lastActivity: '2026-09-25T11:52:00.000Z' } } : {}), NOW);
+    expect(sections.live[0]!.since).toBe('2026-09-25T11:59:30.000Z');
+  });
+
+  it("a Waiting row's since ignores its children (PAN-4222 ac2)", () => {
+    const sections = buildLiveSections([
+      entry({ id: 'w', state: 'stopped', pause: { by: 'machine', reason: null, since: '2026-09-25T07:00:00.000Z' } }),
+      entry({
+        id: 'sub:w:a', kind: 'subagent', parentId: 'w', state: 'working',
+        lastActivityAt: '2026-09-25T11:59:30.000Z',
+      }),
+    ], () => ({}), NOW);
+    expect(sections.waiting[0]!.since).toBe('2026-09-25T07:00:00.000Z');
+  });
 });
 
 describe('activityLabel', () => {
-  it('names the running tool, then thinking, else working', () => {
-    expect(activityLabel({ activity: 'working', currentTool: 'Edit' })).toBe('running Edit');
+  it('names the bare tool, then thinking, else working', () => {
+    expect(activityLabel({ activity: 'working', currentTool: 'Edit' })).toBe('Edit');
     expect(activityLabel({ activity: 'thinking' })).toBe('thinking');
     expect(activityLabel(undefined)).toBe('working');
   });
 });
 
-describe('lastOutputLine', () => {
-  it('returns the last non-empty line without escape codes, truncated to 160 characters', () => {
-    const long = 'x'.repeat(200);
-    const line = lastOutputLine(['first', `\x1b[31m${long}\x1b[0m`, '', '   ']);
-    expect(line).toHaveLength(160);
-    expect(line).toBe(`${'x'.repeat(159)}…`);
-    expect(lastOutputLine(['\x1b[32mdone\x1b[0m', ''])).toBe('done');
-    expect(lastOutputLine(undefined)).toBeNull();
-    expect(lastOutputLine(['', ''])).toBeNull();
+
+describe('buildLiveSections — gauntlet lanes and successors (PAN-4223 FR-19, FR-29)', () => {
+  const conversation = (id: string, overrides: Partial<DirectoryEntry> = {}) =>
+    entry({ id, kind: 'conversation', label: id, issueId: null, role: null, source: 'conversation', state: 'working', ...overrides });
+  const laneFacts = { run: 'hotel', key: '663', role: 'builder', iteration: 1, reportStatus: null } as const;
+  const noFacts = () => ({});
+  const factsFor = (asking: string) => (e: DirectoryEntry): LiveFacts => (e.id === asking ? { pendingInputKinds: ['askUserQuestion'] } : {});
+  const rowIds = (sections: ReturnType<typeof buildLiveSections>) =>
+    [...sections.needsYou, ...sections.live, ...sections.waiting, ...sections.idle].map((row) => row.entry.id);
+
+  it('nests a working lane under its parent row and gives it no row of its own', () => {
+    const sections = buildLiveSections([
+      conversation('conv:root'),
+      conversation('conv:lane', { parentId: 'conv:root', lane: laneFacts }),
+    ], noFacts, NOW);
+    expect(rowIds(sections)).toEqual(['conv:root']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:lane']);
+  });
+
+  it('shows a needs-you lane both in Needs you and under its parent', () => {
+    const sections = buildLiveSections([
+      conversation('conv:root'),
+      conversation('conv:lane', { parentId: 'conv:root', lane: laneFacts, state: 'blocked' }),
+    ], factsFor('conv:lane'), NOW);
+    expect(sections.needsYou.map((row) => row.entry.id)).toEqual(['conv:lane']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:lane']);
+  });
+
+  it('keeps a lane whose parent is absent as a top-level row', () => {
+    const sections = buildLiveSections([conversation('conv:lane', { parentId: 'conv:gone', lane: laneFacts })], noFacts, NOW);
+    expect(rowIds(sections)).toEqual(['conv:lane']);
+  });
+
+  it('keeps a successor as its own row, not a child of its predecessor', () => {
+    const sections = buildLiveSections([
+      conversation('conv:root'),
+      conversation('conv:next', { parentId: 'conv:root', continuesFrom: 10 }),
+    ], noFacts, NOW);
+    expect(rowIds(sections).sort()).toEqual(['conv:next', 'conv:root']);
+    expect(sections.live.find((row) => row.entry.id === 'conv:root')?.children).toEqual([]);
+  });
+
+  it('hosts an orchestrator lane\'s builders on the root row, one level deep', () => {
+    const sections = buildLiveSections([
+      conversation('conv:root'),
+      conversation('conv:orch', { parentId: 'conv:root', lane: { ...laneFacts, role: 'orchestrator' } }),
+      conversation('conv:b1', { parentId: 'conv:orch', lane: laneFacts }),
+    ], noFacts, NOW);
+    expect(rowIds(sections)).toEqual(['conv:root']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:orch', 'conv:b1']);
+  });
+});
+
+describe('buildLiveSections — critics under builders (PAN-4223 WI-23)', () => {
+  const conversation = (id: string, overrides: Partial<DirectoryEntry> = {}) =>
+    entry({ id, kind: 'conversation', label: id, issueId: null, role: null, source: 'conversation', state: 'working', ...overrides });
+  const laneOf = (role: string, extra: Record<string, unknown> = {}) => ({ run: 'hotel', key: '663', role, iteration: 1, reportStatus: null, ...extra });
+
+  it('follows a builder child line with its critic inside the orchestrator row', () => {
+    const sections = buildLiveSections([
+      conversation('conv:orch'),
+      conversation('conv:critic', { parentId: 'conv:b1', lane: laneOf('critic', { criticOf: 2, verdict: 'NOT_YET' }) }),
+      conversation('conv:b2', { parentId: 'conv:orch', lane: laneOf('builder', { key: '664' }) }),
+      conversation('conv:b1', { parentId: 'conv:orch', lane: laneOf('builder') }),
+    ], () => ({}), NOW);
+    expect(sections.live.map((row) => row.entry.id)).toEqual(['conv:orch']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:b2', 'conv:b1', 'conv:critic']);
+  });
+
+  it('makes a critic of a builder with its own row that row\'s child line', () => {
+    const sections = buildLiveSections([
+      conversation('conv:b1', { parentId: 'conv:gone', lane: laneOf('builder') }),
+      conversation('conv:critic', { parentId: 'conv:b1', lane: laneOf('critic', { criticOf: 2 }) }),
+    ], () => ({}), NOW);
+    expect(sections.live.map((row) => row.entry.id)).toEqual(['conv:b1']);
+    expect(sections.live[0]?.children.map((child) => child.id)).toEqual(['conv:critic']);
   });
 });
