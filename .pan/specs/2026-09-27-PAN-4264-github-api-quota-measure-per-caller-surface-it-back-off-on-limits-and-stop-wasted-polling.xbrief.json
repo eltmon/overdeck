@@ -4,17 +4,17 @@
     "created": "2026-09-27T15:23:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4264: GitHub API quota: measure per caller, surface it, back off on limits, and stop wasted polling",
-    "updated": "2026-09-27T15:29:13.598Z"
+    "updated": "2026-09-27T15:30:02.942Z"
   },
   "plan": {
     "id": "pan-4264",
     "title": "GitHub API quota: measure per caller, surface it, back off on limits, and stop wasted polling",
-    "status": "proposed",
+    "status": "running",
     "uid": "df685094-3878-4760-a2d8-621d2a5353b0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T15:23:45Z",
-    "updated": "2026-09-27T15:29:13.598Z",
+    "updated": "2026-09-27T15:30:02.942Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4264",
