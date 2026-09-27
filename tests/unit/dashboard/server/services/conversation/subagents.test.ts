@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BACKGROUND_SUBAGENT_IDLE_MS,
+  createSubagentHumanInputScanner,
   createTaskNotificationScanner,
   listSubagentMetas,
   listSubagentSummaries,
@@ -269,5 +270,89 @@ describe('conversation subagent status', () => {
   it('returns no ids for a missing transcript', async () => {
     await rm(sessionFile);
     expect((await createTaskNotificationScanner(sessionFile)()).size).toBe(0);
+  });
+});
+
+describe('conversation subagent human inputs (PAN-4247)', () => {
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'overdeck-subagent-human-inputs-'));
+    sessionFile = join(tempDir, 'session.jsonl');
+    await writeFile(sessionFile, '');
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  function sidechainLine(text: string, uuid: string, kind: string): string {
+    return `${JSON.stringify({
+      type: 'user',
+      isSidechain: true,
+      uuid,
+      timestamp: `2026-09-24T11:00:0${uuid.slice(-1)}.000Z`,
+      origin: { kind },
+      message: { role: 'user', content: text },
+    })}\n`;
+  }
+
+  async function writeBackgroundSubagent(agentId: string, description: string): Promise<string> {
+    await writeMeta(agentId, {
+      agentType: 'general-purpose',
+      description,
+      toolUseId: `toolu_${agentId}`,
+      spawnDepth: 1,
+      requestShape: 'background',
+    });
+    const transcriptPath = join(subagentsDirFor(sessionFile), `agent-${agentId}.jsonl`);
+    await writeFile(transcriptPath, '');
+    return transcriptPath;
+  }
+
+  it('surfaces background:true and the unwrapped human sidechain text (AC1)', async () => {
+    const transcriptPath = await writeBackgroundSubagent('agent-1', 'Investigate flaky test');
+    const wrapped = 'The user sent a new message while you were working:\n'
+      + 'please pause and check the logs'
+      + '\n\nThis is how Claude Code surfaces a message sent mid-turn.';
+    await appendFile(transcriptPath, sidechainLine(wrapped, 'u1', 'human'));
+
+    const summaries = await listSubagentSummaries(sessionFile, new Set(), new Map());
+
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({
+      agentId: 'agent-1',
+      background: true,
+      humanInputs: [{ id: 'u1', text: 'please pause and check the logs', createdAt: '2026-09-24T11:00:01.000Z' }],
+    });
+  });
+
+  it('omits humanInputs when the only sidechain record is coordinator-origin (AC2)', async () => {
+    const transcriptPath = await writeBackgroundSubagent('agent-2', 'Coordinator chatter');
+    await appendFile(transcriptPath, sidechainLine('coordinator message', 'u1', 'coordinator'));
+
+    const [summary] = await listSubagentSummaries(sessionFile, new Set(), new Map());
+
+    expect(summary.background).toBe(true);
+    expect(summary.humanInputs).toBeUndefined();
+  });
+
+  it('reads only newly appended bytes from the cached offset on the next listing (AC3)', async () => {
+    const transcriptPath = await writeBackgroundSubagent('agent-3', 'Two human inputs');
+    await appendFile(transcriptPath, sidechainLine('first message', 'u1', 'human'));
+    const scanHumanInputs = createSubagentHumanInputScanner();
+
+    const first = await listSubagentSummaries(sessionFile, new Set(), new Map(), Date.now(), scanHumanInputs);
+    expect(first[0].humanInputs).toEqual([
+      { id: 'u1', text: 'first message', createdAt: '2026-09-24T11:00:01.000Z' },
+    ]);
+
+    await appendFile(transcriptPath, sidechainLine('second message', 'u2', 'human'));
+    const second = await listSubagentSummaries(sessionFile, new Set(), new Map(), Date.now(), scanHumanInputs);
+
+    // Re-reading from byte 0 would duplicate the first record; exactly two
+    // proves the scanner resumed from its cached offset.
+    expect(second[0].humanInputs).toEqual([
+      { id: 'u1', text: 'first message', createdAt: '2026-09-24T11:00:01.000Z' },
+      { id: 'u2', text: 'second message', createdAt: '2026-09-24T11:00:02.000Z' },
+    ]);
   });
 });

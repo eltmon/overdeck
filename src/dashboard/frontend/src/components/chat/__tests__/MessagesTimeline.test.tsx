@@ -96,16 +96,59 @@ describe('MessagesTimeline — search', () => {
     expect(discard).toHaveBeenCalledWith('unknown');
   });
 
+  it('renders a not-found outbox entry with Resend and copies its text to the clipboard (PAN-4247 AC4)', () => {
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    try {
+      const retry = vi.fn();
+      render(<MessagesTimeline messages={[]} workLog={[]} streaming={false}
+        failedMessages={[
+          { id: 'not-found', text: 'Are you still there?', kind: 'prompt', createdAt: '', notFoundInTranscript: true, deliveryUnknown: true, retryable: true },
+        ]} onRetryFailed={retry} />);
+
+      expect(screen.getByText('Not found in transcript')).toBeInTheDocument();
+      expect(screen.queryByText('Delivery not confirmed')).not.toBeInTheDocument();
+      const resend = screen.getByRole('button', { name: 'Resend' });
+      fireEvent.click(resend);
+      expect(retry).toHaveBeenCalledWith('not-found', 'Are you still there?');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Are you still there?');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: originalClipboard });
+    }
+  });
+
   it.each([
-    ['pending', false, 'Sending…'],
-    ['accepted', true, 'Sent · waiting for transcript'],
-    ['unknown', false, 'Delivery not confirmed'],
-  ] as const)('renders the %s delivery state without losing the message text', (deliveryState, acknowledged, label) => {
+    ['pending', false, 'Sending…', {}],
+    ['accepted', true, 'Sent · waiting for transcript', {}],
+    ['unknown', false, 'Delivery not confirmed', {}],
+    ['subagent', true, 'Delivered to subagent · Investigate flaky test', {
+      deliveredToSubagent: { agentId: 'agent-1', description: 'Investigate flaky test' },
+    }],
+  ] as const)('renders the %s delivery state without losing the message text', (deliveryState, acknowledged, label, extra) => {
     render(<MessagesTimeline messages={[{
-      ...makeMessage('optimistic-id', 'user', 0, 'Preserved prompt'), deliveryState, acknowledged,
+      ...makeMessage('optimistic-id', 'user', 0, 'Preserved prompt'), deliveryState, acknowledged, ...extra,
     }]} workLog={[]} streaming={false} />);
     expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.getByText('Preserved prompt')).toBeInTheDocument();
+  });
+
+  it('renders a subagent landing at full opacity with no spinner and no waiting-for-transcript label (PAN-4247 AC3)', () => {
+    render(<MessagesTimeline messages={[{
+      ...makeMessage('optimistic-id', 'user', 0, 'Preserved prompt'),
+      deliveryState: 'subagent',
+      acknowledged: true,
+      deliveredToSubagent: { agentId: 'agent-1', description: 'Investigate flaky test' },
+    }]} workLog={[]} streaming={false} />);
+    expect(screen.getByText('Delivered to subagent · Investigate flaky test')).toBeInTheDocument();
+    expect(screen.queryByText('Sent · waiting for transcript')).not.toBeInTheDocument();
+    const bubble = screen.getByTitle(/routed this message to running subagent agent-1/);
+    expect(bubble.querySelector('svg')).toBeNull();
+    expect(bubble).not.toHaveStyle({ opacity: '0.6' });
   });
 
   it('handles target-message scroll requests once per target key', async () => {

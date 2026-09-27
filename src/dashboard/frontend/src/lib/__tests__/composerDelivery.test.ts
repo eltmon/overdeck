@@ -88,6 +88,35 @@ describe('composer delivery and echo identity', () => {
   });
 });
 
+describe('not-found outbox (PAN-4247)', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); resetComposerStore(); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it('clears a not-found outbox entry once a matching main-transcript echo arrives (AC2)', () => {
+    send('send-1', 'hello');
+    store().markNotFoundInTranscript(CONV, slice().optimistic[0]!.id);
+    expect(slice().failed[0]).toMatchObject({ notFoundInTranscript: true, text: 'hello' });
+
+    store().reconcileEchoes(CONV, [echo('late-arrival', 'hello', 1000)]);
+
+    expect(slice()?.failed ?? []).toEqual([]);
+  });
+
+  it('uses a fresh clientMessageId and omits the retry flag when resending a not-found entry (AC3)', async () => {
+    send('send-1', 'hello');
+    store().markNotFoundInTranscript(CONV, slice().optimistic[0]!.id);
+    const failed = slice().failed[0]!;
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"ok":true}'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await store().retryFailed(CONV, failed.id, 'hello', 2);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.clientMessageId).not.toBe('send-1');
+    expect(body).not.toHaveProperty('retry');
+  });
+});
+
 describe('delivery response classification', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });

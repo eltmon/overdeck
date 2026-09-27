@@ -38,6 +38,21 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
     return <ReviewerContextBlock message={message} cwd={cwd} issueId={issueId} />;
   }
 
+  if (message.deliveryState === 'subagent') {
+    const { agentId, description } = message.deliveredToSubagent ?? { agentId: '', description: '' };
+    return (
+      <div className={styles.userMessageRow}>
+        <div
+          className={styles.userMessageBubble}
+          title={`Claude Code routed this message to running subagent ${agentId}, not the main conversation.`}
+        >
+          <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+          <span className={styles.messageTimestamp}>{`Delivered to subagent · ${description}`}</span>
+        </div>
+      </div>
+    );
+  }
+
   const isPending = message.id.startsWith('optimistic-') && !message.acknowledged;
   return (
     <div className={styles.userMessageRow}>

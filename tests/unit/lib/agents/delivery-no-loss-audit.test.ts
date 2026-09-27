@@ -120,6 +120,8 @@ const mocks = vi.hoisted(() => ({
   getLatestSessionId: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
+  captureSidechainOffsets: vi.fn(),
+  probeSidechainsSince: vi.fn(),
   hasAgentRuntimeInSubtree: vi.fn(),
   surfaceIssueFeedbackNeedsYou: vi.fn(),
   resolveIssueFeedbackTarget: vi.fn(),
@@ -195,6 +197,8 @@ vi.mock('../../../../src/lib/agents/delivery.js', async (importOriginal) => {
 vi.mock('../../../../src/lib/transcript-landing.js', () => ({
   captureTranscriptUserRecordSnapshot: mocks.captureTranscriptUserRecordSnapshot,
   probeTranscriptSince: mocks.probeTranscriptSince,
+  captureSidechainOffsets: mocks.captureSidechainOffsets,
+  probeSidechainsSince: mocks.probeSidechainsSince,
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
@@ -320,6 +324,8 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
       readOffset: 0,
     });
     mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: false, realAssistantTurnCount: 0 });
+    mocks.captureSidechainOffsets.mockResolvedValue(new Map());
+    mocks.probeSidechainsSince.mockResolvedValue(null);
     mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
     mocks.hasAgentRuntimeInSubtree.mockResolvedValue(true);
   });
