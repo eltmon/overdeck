@@ -375,6 +375,7 @@ export type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
 
 export interface RoleSubConfig {
   model: ModelRef;
+  effort?: RoleEffort;
 }
 
 export type RoleEffort = EffortLevel;
