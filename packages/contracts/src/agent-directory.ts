@@ -48,6 +48,13 @@ export const DirectoryPause = Schema.Struct({
 })
 export type DirectoryPause = typeof DirectoryPause.Type
 
+/** A provider error (billing, usage limit, ...) detected at the end of a transcript (PAN-4222). */
+export const DirectoryProviderError = Schema.Struct({
+  message: Schema.String,
+  at: Schema.String,
+})
+export type DirectoryProviderError = typeof DirectoryProviderError.Type
+
 export const DirectoryEntry = Schema.Struct({
   id: Schema.String,
   kind: DirectoryEntryKind,
@@ -87,6 +94,10 @@ export const DirectoryEntry = Schema.Struct({
   })),
   /** PAN-4223: the predecessor's legacy conversation id; successors only (links to /conv/<id>). */
   continuesFrom: Schema.optional(Schema.Number),
+  /** The id runtime events (agentRuntimeById) are keyed under, when it differs from `id` (PAN-4222). */
+  runtimeId: Schema.optional(Schema.String),
+  /** A provider error detected at the transcript's end, conversations only (PAN-4222). */
+  providerError: Schema.optional(DirectoryProviderError),
 })
 export type DirectoryEntry = typeof DirectoryEntry.Type
 

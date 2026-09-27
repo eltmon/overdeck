@@ -39,6 +39,24 @@ describe('agent spawn provenance boundary', () => {
     );
   });
 
+  it('accepts the flywheel:conv-flywheel provenance token for internal callers', () => {
+    expect(resolveRequestedStartedBy('flywheel:conv-flywheel', true)).toBe('flywheel:conv-flywheel');
+  });
+
+  it('still accepts the legacy flywheel:RUN-<n> token for internal callers', () => {
+    expect(resolveRequestedStartedBy('flywheel:RUN-42', true)).toBe('flywheel:RUN-42');
+  });
+
+  it('rejects an unrecognized flywheel: token for internal callers', () => {
+    expect(() => resolveRequestedStartedBy('flywheel:bogus', true)).toThrow(
+      'Invalid internal startedBy provenance token.',
+    );
+  });
+
+  it('derives operator:dashboard for a non-internal request even with a flywheel token', () => {
+    expect(resolveRequestedStartedBy('flywheel:conv-flywheel', false)).toBe('operator:dashboard');
+  });
+
   it('recognizes internal callers only when the internal token matches', async () => {
     const request = (token: string) => HttpServerRequest.fromWeb(new Request('http://localhost/api/agents', {
       method: 'POST',

@@ -109,6 +109,8 @@ export interface DirectoryConversationRow {
   readonly criticOfConversationName?: string | null;
   readonly laneVerdict?: { readonly value: string } | null;
   readonly laneLatestVerdict?: { readonly value: string } | null;
+  /** A provider error detected at the transcript's end (PAN-4222). */
+  readonly providerError?: { readonly message: string; readonly at: string } | null;
 }
 
 /** One subagent as a directory source reports it. */
@@ -582,6 +584,10 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
           }
         : {}),
       ...(!row.laneKey && row.parentConversationId != null ? { continuesFrom: row.parentConversationId } : {}),
+      runtimeId: row.tmuxSession,
+      ...(row.providerError
+        ? { providerError: { message: row.providerError.message, at: row.providerError.at } }
+        : {}),
     };
     candidates.push({ entry, cwd: row.cwd || null, explicitProjectKey: row.projectKey });
     if (entry.state !== 'stopped') conversationParents.push({ entry, row });

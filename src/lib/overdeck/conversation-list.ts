@@ -20,6 +20,7 @@ import {
   conversationSessionAliveFromState,
 } from './conversation-runtime.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
+import { readConversationProviderError } from './conversation-provider-error.js';
 import { listPullRequestLinksForConversations } from './conversation-pull-requests.js';
 import {
   type LegacyConversation,
@@ -251,6 +252,11 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
           if (codex.approval) pendingAskUserQuestion = codex.approval;
         }
       }
+      let providerError = null;
+      if (sessionAlive && !isWorking && pendingInputCount === 0 && convSf) {
+        const transcriptKind = getHarnessBehavior(row.harness).transcriptKind;
+        if (transcriptKind === 'claude-jsonl') providerError = await readConversationProviderError(convSf);
+      }
       const ledger = ledgerCosts.get(String(row.id));
       return {
         ...row,
@@ -274,6 +280,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         transcriptMissing: conversationTranscriptMissing(row, sessionAlive, convSf),
         needsTerminal: await conversationNeedsTerminal(row, sessionAlive, convSf),
         ...(lanes.get(row.name) ?? {}),
+        providerError,
       };
     }),
     CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
