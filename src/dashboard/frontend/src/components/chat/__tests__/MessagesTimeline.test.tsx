@@ -96,6 +96,32 @@ describe('MessagesTimeline — search', () => {
     expect(discard).toHaveBeenCalledWith('unknown');
   });
 
+  it('renders a not-found outbox entry with Resend and copies its text to the clipboard (PAN-4247 AC4)', () => {
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    try {
+      const retry = vi.fn();
+      render(<MessagesTimeline messages={[]} workLog={[]} streaming={false}
+        failedMessages={[
+          { id: 'not-found', text: 'Are you still there?', kind: 'prompt', createdAt: '', notFoundInTranscript: true, deliveryUnknown: true, retryable: true },
+        ]} onRetryFailed={retry} />);
+
+      expect(screen.getByText('Not found in transcript')).toBeInTheDocument();
+      expect(screen.queryByText('Delivery not confirmed')).not.toBeInTheDocument();
+      const resend = screen.getByRole('button', { name: 'Resend' });
+      fireEvent.click(resend);
+      expect(retry).toHaveBeenCalledWith('not-found', 'Are you still there?');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Are you still there?');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: originalClipboard });
+    }
+  });
+
   it.each([
     ['pending', false, 'Sending…', {}],
     ['accepted', true, 'Sent · waiting for transcript', {}],
