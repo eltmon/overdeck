@@ -11,6 +11,7 @@ import { usePendingInputSubjects } from '../../lib/useDecisions';
 import { navigateToDecisionSubject } from '../../lib/navigateToDecision';
 import { DecisionsPanel } from '../DecisionsPanel';
 import { describePendingInput } from '../../lib/pendingInput';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
@@ -138,7 +139,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         // decision, which is the whole point of having somewhere to find it again.
         <DecisionsPanel />
       ) : (
-        <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} />
+        <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} now={now} />
       )}
 
       {showFeed && (
@@ -184,7 +185,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
  * ChannelPermissionDialog — is reachable). Scoped to `issueIds` (Project
  * Activity) unless `unscoped` (home Activity Feed). PAN-1395 / PAN-1520.
  */
-function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?: readonly string[]; unscoped?: boolean; showEmpty?: boolean }) {
+function NeedsYouSection({ issueIds, unscoped, showEmpty = false, now = new Date() }: { issueIds?: readonly string[]; unscoped?: boolean; showEmpty?: boolean; now?: Date }) {
   const subjects = usePendingInputSubjects();
   const issues = useDashboardStore(selectIssues);
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
@@ -232,6 +233,7 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
       detail: string;
       count: number;
       title: string;
+      since: string;
     }> = [];
     for (const subject of scoped) {
       const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
@@ -248,6 +250,7 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
       const detail =
         (!auqResolved ? q?.questions?.[0]?.question : undefined) ??
         (!planResolved && planToolUseId ? 'Plan awaiting your approval — click to review' : undefined) ??
+        subject.permissionSummary ??
         describePendingInput(subject.kinds);
       const label = formatIssueRef(
         subject.issueId,
@@ -265,9 +268,11 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
         detail,
         count,
         title: describePendingInput(subject.kinds),
+        since: subject.since,
       });
     }
-    return out;
+    // PAN-4278 — oldest wait first; rows without a timestamp keep their order after.
+    return out.sort((a, b) => (a.since && b.since ? a.since.localeCompare(b.since) : Number(!a.since) - Number(!b.since)));
   }, [scoped, answeredToolUseIds, dismissedSubjectIds, resolvedPlanToolUseIds, dismissedPlanSubjectIds, titleByIssueId]);
 
   // Keep the section mounted while any raw subject exists so AnimatePresence can
@@ -318,6 +323,9 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
                 {row.count > 1 ? ` · ${row.count} questions` : ''}
               </span>
               <span className="w-full truncate text-xs text-muted-foreground">{row.detail}</span>
+              {row.since && (
+                <span className="text-[10px] text-muted-foreground">waiting {formatRelativeTime(row.since, now)}</span>
+              )}
             </motion.button>
           ))}
         </AnimatePresence>

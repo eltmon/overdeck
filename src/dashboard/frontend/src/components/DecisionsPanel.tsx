@@ -33,7 +33,7 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
     : undefined;
   const prompt =
     decision.pendingAskUserQuestion?.questions?.[0]?.question ??
-    (decision.pendingProposedPlan ? 'A plan is ready for your review.' : enrichmentTitle ?? describePendingInput(decision.kinds));
+    (decision.pendingProposedPlan ? 'A plan is ready for your review.' : enrichmentTitle ?? decision.permissionSummary ?? describePendingInput(decision.kinds));
   const issueRef = formatIssueRef(decision.issueId, decision.issueTitle);
 
   return (

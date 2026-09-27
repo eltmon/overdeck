@@ -476,6 +476,8 @@ export interface PendingInputSubject {
   pendingProposedPlan?: AgentSnapshot['pendingProposedPlan']
   /** Outstanding permission requests for this agent (for routing/labels). */
   permissionRequestIds: string[]
+  /** PAN-4278 — "<agent> · <tool>" for a conversation's terminal permission prompt. */
+  permissionSummary?: string
   /** Oldest blocking timestamp for stable ordering. */
   since: string
   /** The pending input prompt from the agent enrichment (for pending-input display). */
