@@ -1,0 +1,360 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-26T00:33:33Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4221: Review never dispatches when the dashboard restarts during verification (verification.passed is the last journal entry forever)",
+    "updated": "2026-09-26T00:40:14.207Z"
+  },
+  "plan": {
+    "id": "pan-4221",
+    "title": "Review never dispatches when the dashboard restarts during verification (verification.passed is the last journal entry forever)",
+    "status": "running",
+    "uid": "d4ab0f44-6952-486a-9b14-093df20b8c95",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-26T00:33:33Z",
+    "updated": "2026-09-26T00:40:14.207Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4221",
+        "label": "PAN-4221",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4221.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "deacon-lite",
+      "review",
+      "verification",
+      "recovery"
+    ],
+    "narratives": {
+      "Problem": "When the dashboard restarts while a detached verification worker runs, the worker still journals verification.passed, but the push-and-dispatch continuation that lived in the dead dashboard process is gone. deacon-lite deliberately skips every verification.* tail, so the review is never dispatched and the green PR sits forever (PAN-4198..4201 sat about 15 hours on 2026-09-25).",
+      "Proposal": "Add a deacon-lite routine, recoverUndispatchedReviews (new module undispatched-review-recovery.ts), that re-requests the review through the guarded review route (requestReviewThroughRoute, source deacon-lite) when the journal tail is verification.passed from the request-review door, at least 5 minutes old, at the workspace's current primary head8, with no active verification worker, no live agent-<issue>-review parent or lane, no issue pause, review mode not none, the 1-hour cooldown passed, and fewer than 3 prior deacon-lite requests since the last request from another source. The route re-verifies against current main, journals review.requested (moving the tail), pushes and dispatches. The first deacon-lite patrol runs at deacon start, which covers boot. Supporting changes: extract the runner's primary-sha derivation into verified-head.ts so both sides compare the same head, and make readVerificationWorkerState match the issue id case-insensitively. docs/PIPELINE-GATES.md documents the seventh routine and drops the claim that the verification.passed skip is deliberate.",
+      "NonGoals": "- No skip-verification dispatch door: recovery goes through the guarded route, which re-runs verification on purpose.\n- No re-attachment of the dashboard supervisor to a still-running verification worker after boot; the journal-driven routine covers it once the worker finishes.\n- No recovery of a verification.passed tail whose source is review (dashboard /trigger button) or merge-verify (merge gate).\n- No recovery of verification.failed or verification.started tails.\n- No change to recoverStalledReviews, including its dead getRequestReviewStarter() fallback in the deacon child (follow-up issue).\n- No recovery of a dead quick-mode reviewer or a partly-verdicted convoy.\n- No new pipeline journal entry type and no new stored state."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Dispatch through the guarded review route (requestReviewThroughRoute, source deacon-lite), which re-runs verification.",
+        "rationale": "deacon-lite runs only in the deacon child, where the in-process review starter is null; the route is the established child-safe door (rerequestHaltedReview uses it). After hours of stall main has moved, so re-verifying with target-branch sync is correct. The route journals review.requested, which moves the tail and gives exactly-once. Workers queue through CPU admission, so boot recovery of several issues is not a CPU storm."
+      },
+      {
+        "summary": "One journal-driven mechanism covers both fix bullets of the issue (boot + deacon-lite, and re-reading worker results).",
+        "rationale": "The first deacon-lite patrol runs at deacon start. The worker writes verification.passed in the same run just before result-<runId>.json, and isVerificationWorkerActive reads the supervisor's state.json and result file. A worker that fails after the restart delivers its own feedback. A second dispatch path would make exactly-once harder."
+      },
+      {
+        "summary": "Recover only verification.passed tails whose source is request-review.",
+        "rationale": "merge-verify passes belong to the merge door; a review (/trigger) pass may carry a per-run review mode the guarded route cannot reproduce, and that path is operator-driven and visible."
+      },
+      {
+        "summary": "A live agent-<issue>-review parent pane blocks recovery, not only agent-<issue>-review-* lanes.",
+        "rationale": "Quick review mode (the default) writes no review.dispatched, so the tail stays verification.passed for the whole life of a healthy quick reviewer."
+      },
+      {
+        "summary": "Minimum tail age 5 minutes, per-issue cooldown 1 hour, cap of 3 deacon-lite requests since the last request from any other source.",
+        "rationale": "Five minutes is 'older than a few minutes' and past a normal push+dispatch; 1 hour matches STALLED_REVIEW_COOLDOWN_MS; the cap matches SYNTHESIS_REDISPATCH_CAP and stops an hourly re-verify loop when each dispatch comes back gated."
+      },
+      {
+        "summary": "Review mode none skips recovery.",
+        "rationale": "Mode none spawns nothing and journals nothing, so the tail stays verification.passed forever and recovery would re-verify hourly until the cap."
+      },
+      {
+        "summary": "Compare data.head against the primary-repo head8 via a shared helper extracted from the runner.",
+        "rationale": "The wrapper-repo HEAD never matches on polyrepo; one helper keeps the runner's stamp and the recovery's comparison from drifting."
+      }
+    ],
+    "items": [
+      {
+        "id": "verified-head",
+        "title": "Extract the primary-repo head8 derivation into verified-head.ts and use it in the runner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T00:33:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4221",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verified-head.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/__tests__/verified-head.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verified-head.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "verified-head.test.ts passes with the monorepo, composite-primary, composite-unknown-primary and undefined cases",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4221.md). Create src/lib/cloister/verified-head.ts exporting primaryShaFromAnchor(anchor, primaryRepoKey) (pure: undefined -> undefined; parseCompositeSnapshot size 0 -> anchor itself; else composite.get(primaryRepoKey) ?? first value) and async readPrimaryHead8(issueId, workspacePath) (snapshotWorkspaceHeads, dynamic import of ../project-repos.js for resolveWorkspaceRepoRoots(...)[0]?.repoKey, slice(0, 8), any throw -> undefined). In verification-runner.ts replace the IIFE at lines 892-898 (grep 'const verifiedSha = (() => {') with `const verifiedSha = primaryShaFromAnchor(lastVerifiedCommit, repoRoots[0]?.repoKey);` and drop parseCompositeSnapshot from the line-57 git-utils import (its only use was line 894). Add verified-head.test.ts covering the four cases."
+        },
+        "items": [
+          {
+            "id": "verified-head.ac1",
+            "title": "Given a composite anchor 'fe@aaa… api@bbb…' and primary key 'api', when primaryShaFromAnchor is called, then it returns the api sha; given a plain monorepo sha it returns that sha; given undefined it returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verified-head.ac2",
+            "title": "verification-runner.ts contains 'primaryShaFromAnchor(' and no longer contains 'const verifiedSha = (() => {' or an import of parseCompositeSnapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verified-head.ac3",
+            "title": "When npx vitest run src/lib/cloister/__tests__/verified-head.test.ts and npm run typecheck run, then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "worker-state-case",
+        "title": "Match the verification worker state issueId case-insensitively",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:33:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4221",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-worker-supervisor.ts",
+            "src/lib/cloister/__tests__/verification-worker-supervisor-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verification-worker-supervisor-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-worker-supervisor-state.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In verification-worker-supervisor.ts readVerificationWorkerState (line 77, grep 'parsed.issueId !== issueId') replace the exact compare with `typeof parsed.issueId !== 'string' || parsed.issueId.toUpperCase() !== issueId.toUpperCase()`; the returned object keeps the caller's issueId. New test file sets process.env.OVERDECK_HOME to a mkdtempSync dir (restored in afterEach), writes verification-workers/pan-1/state.json with issueId 'pan-1', pid process.pid and a missing resultPath, and asserts the lookups below."
+        },
+        "items": [
+          {
+            "id": "worker-state-case.ac1",
+            "title": "Given state.json with issueId 'pan-1', when readVerificationWorkerState('PAN-1') is called, then it returns a non-null state with issueId 'PAN-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-state-case.ac2",
+            "title": "Given that state with a live pid and no result file, isVerificationWorkerActive('PAN-1') returns true; after the result file is created it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "worker-state-case.ac3",
+            "title": "Given state.json whose issueId is 'pan-2' in the pan-1 directory, readVerificationWorkerState('PAN-1') returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "undispatched-recovery",
+        "title": "Add deacon-lite recoverUndispatchedReviews for a verification.passed tail with no review",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T00:33:33Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4221",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/undispatched-review-recovery.ts",
+            "src/lib/cloister/deacon-lite.ts",
+            "src/lib/cloister/__tests__/deacon-lite-recover-undispatched-review.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-lite-recover-undispatched-review.test.ts src/lib/cloister/__tests__/deacon-lite-recover-stalled-reviews.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "deacon-lite-recover-undispatched-review.test.ts passes every case listed in PRD WI-3 step 4",
+            "deacon-lite-recover-stalled-reviews.test.ts still passes (a vi.mock for the new module's imports may be added to it; its existing cases are not changed)",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New module src/lib/cloister/undispatched-review-recovery.ts exporting UNDISPATCHED_REVIEW_MIN_AGE_MS (5 min), UNDISPATCHED_REVIEW_COOLDOWN_MS (1 h), UNDISPATCHED_REVIEW_ATTEMPT_CAP (3), __resetUndispatchedReviewStateForTests(), and recoverUndispatchedReviews(now). Follow the loop in PRD WI-3 step 2 exactly: null inventory -> no action; per workspace, act only when the tail is verification.passed with source 'request-review', aged >= 5 min, cooldown passed, data.head a non-empty string, !isVerificationWorkerActive(issueId), no live pane equal to agent-<issue>-review or starting with agent-<issue>-review-, getIssuePause unpaused, fewer than 3 deacon-lite review.requested entries since the last review.requested from another source (else warn once + emitActivityEntry once), resolveReviewMode (dynamic import of ./review-agent.js) not 'none', and readPrimaryHead8 equal to data.head. Set the cooldown BEFORE calling requestReviewThroughRoute(issueId, { message, source: 'deacon-lite' }); push an action on requested, console.log on noReviewNeeded, console.warn otherwise. In deacon-lite.ts: import and re-export it, call `await recoverUndispatchedReviews();` right after `await recoverStalledReviews();` in runDeaconLite, rewrite the third ACCEPTED v1 GAPS bullet (lines 187-193) and the header routine list per PRD WI-3 step 3. Tests use vi.useFakeTimers/vi.setSystemTime and a real journal in a mkdtempSync workspace; mocks per PRD WI-3 step 4."
+        },
+        "items": [
+          {
+            "id": "undispatched-recovery.ac1",
+            "title": "Given a 10-minute-old verification.passed tail (source request-review, data.head equal to the mocked readPrimaryHead8), no active worker, no review pane and an unpaused issue, when recoverUndispatchedReviews runs twice one minute apart, then requestReviewThroughRoute is called exactly once with source 'deacon-lite'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "undispatched-recovery.ac2",
+            "title": "Given a verification.failed tail, or a verification.passed tail whose source is merge-verify or review, when the routine runs, then requestReviewThroughRoute is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "undispatched-recovery.ac3",
+            "title": "Given a live agent-pan-4221-review pane, a live agent-pan-4221-review-security pane, an active verification worker, a head mismatch, a missing data.head, a 3-minute-old tail, a paused issue, or review mode none, when the routine runs, then requestReviewThroughRoute is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "undispatched-recovery.ac4",
+            "title": "Given the route refuses with { requested: false }, when the routine runs again 30 minutes later it does not call the route, and 61 minutes after the first call it calls the route again; given three prior deacon-lite review.requested entries before the passed tail, the route is never called and emitActivityEntry is called once across two ticks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "undispatched-recovery.ac5",
+            "title": "runDeaconLite in deacon-lite.ts awaits recoverUndispatchedReviews() immediately after recoverStalledReviews(), and the ACCEPTED v1 GAPS comment no longer says a verification.passed tail stays unrecovered on purpose",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-gates-docs",
+        "title": "Document recoverUndispatchedReviews as the seventh deacon-lite routine in PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T00:33:33Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4221",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Deacon-lite: seven routines' docs/PIPELINE-GATES.md",
+            "grep -n 'recoverUndispatchedReviews' docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "the seven-routines heading is found",
+            "recoverUndispatchedReviews appears in the routine list, the routine paragraph, the accepted-gaps paragraph and the review.requested table row"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In docs/PIPELINE-GATES.md: rename '## Deacon-lite: six routines' (line 626) to seven and 'holds six routines' to seven; add list item 7 for recoverUndispatchedReviews (cloister/undispatched-review-recovery.ts, PAN-4221); add a prose paragraph after the recoverStalledReviews block covering the nine conditions, the 5-minute / 1-hour / cap-3 constants, the request-review-only source allowlist and why review and merge-verify are excluded, why a live agent-<issue>-review parent counts (quick mode writes no review.dispatched), the guarded route over the internal token (verification re-runs against current main), and that the first patrol at deacon start covers pre-restart stalls; in the accepted-gaps paragraph (line ~727) say verification.started and verification.failed tails are still skipped while a request-review verification.passed tail is now recovered; extend the review.requested row of the entry-type table with deacon-lite's recoverUndispatchedReviews (source deacon-lite)."
+        },
+        "items": [
+          {
+            "id": "pipeline-gates-docs.ac1",
+            "title": "When grep runs on docs/PIPELINE-GATES.md, then it returns the heading '## Deacon-lite: seven routines' and a numbered item 7 naming recoverUndispatchedReviews and cloister/undispatched-review-recovery.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-gates-docs.ac2",
+            "title": "Given the new recoverUndispatchedReviews paragraph, when a reader checks it, then it contains the 5-minute minimum age, the 1-hour cooldown, the cap of 3, the request-review-only source allowlist, and the rule that a live agent-<issue>-review parent blocks recovery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-gates-docs.ac3",
+            "title": "Given the accepted-gaps paragraph, when a reader checks it, then it contains the statement that verification.started and verification.failed tails are still skipped and a request-review verification.passed tail is recovered, and the review.requested table row contains recoverUndispatchedReviews",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "verified-head",
+        "to": "undispatched-recovery",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-26-PAN-4221-review-never-dispatches-when-the-dashboard-restarts-during-verification-verification-passed-is-the-last-journal-entry-forever.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
