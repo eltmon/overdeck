@@ -155,7 +155,8 @@ vi.mock('../../../lib/config.js', async (importActual) => ({
   getDashboardApiUrl: vi.fn(() => 'http://dashboard.test'),
 }));
 
-vi.mock('@overdeck/contracts', () => ({
+vi.mock('@overdeck/contracts', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   EDITORS: [{ id: 'code', label: 'VS Code', command: 'code' }],
 }));
 

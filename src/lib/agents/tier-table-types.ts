@@ -7,6 +7,7 @@
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelId } from '../settings.js';
 import type { XBriefDifficulty, XBriefItemKind } from '../xbrief/types.js';
+import type { EffortLevel } from '@overdeck/contracts';
 
 export const TIERED_EXECUTION_DIFFICULTIES: readonly XBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
@@ -39,6 +40,12 @@ export interface TierDefinition {
   modelRef?: string;
   harness: RuntimeName;
   difficulties: XBriefDifficulty[];
+  /**
+   * Reasoning effort this tier launches its agents at. Overrides the role's
+   * (and sub-role's) effort for a bead dispatched into this tier; falls back
+   * through the normal precedence when unset.
+   */
+  effort?: EffortLevel;
   /**
    * PAN-2391: weighted model+harness entries this tier spreads its beads
    * across (to consume multiple subscription plans). When present, the raw

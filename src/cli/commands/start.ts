@@ -15,8 +15,9 @@ import { attachHintLines, resolveAttach } from '../../lib/terminal-backends/atta
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
-import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
-import { getModelEffortLevels } from '../../lib/model-capabilities.js';
+import { resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
+import { resolveEffort, InvalidEffortError } from '../../lib/agents/resolve-effort.js';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveWorkspaceRepoRoots } from '../../lib/project-repos.js';
 import { resolveProjectFromIssueSync, hasProjects, type ResolvedProject } from '../../lib/projects.js';
@@ -743,23 +744,19 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     return exitCli(1);
   }
 
-  // Resolve the Claude Code --effort level for this spawn: explicit --effort
-  // wins, otherwise fall back to roles.work.effort from config. The flag
-  // bypasses config-load validation, so validate it here (base enum + the
-  // resolved model's supported levels) before any workspace setup.
+  // Resolve --effort through the single resolver: explicit > roles.work.effort
+  // > project > default, clamped to what the work model/harness support.
   const yamlConfig = loadYamlConfig().config;
-  const resolvedEffort: RoleEffort | undefined = options.effort ?? yamlConfig.roles?.work?.effort;
-  if (resolvedEffort !== undefined) {
-    if (!ROLE_EFFORTS.includes(resolvedEffort)) {
-      process.stderr.write(`Invalid --effort value: ${resolvedEffort}. Expected one of ${ROLE_EFFORTS.join(', ')}.\n`);
-      return exitCli(1);
-    }
-    const workModel = resolveRoleModel('work', spawnModel || undefined, yamlConfig);
-    const supportedEfforts = getModelEffortLevels(workModel);
-    if (supportedEfforts !== undefined && !supportedEfforts.includes(resolvedEffort)) {
-      process.stderr.write(`Effort '${resolvedEffort}' is not supported by ${workModel} (supported: ${supportedEfforts.join(', ')}).\n`);
-      return exitCli(1);
-    }
+  const workModel = spawnModel || resolveRoleModel('work', undefined, yamlConfig);
+  let resolvedEffort: RoleEffort;
+  try {
+    const resolved = resolveEffort({ explicit: options.effort, role: 'work', issueId: id, model: workModel, harness: requestedHarness, config: yamlConfig });
+    resolvedEffort = resolved.effort;
+    if (resolved.warning) process.stderr.write(`${resolved.warning}\n`);
+  } catch (error) {
+    if (!(error instanceof InvalidEffortError)) throw error;
+    process.stderr.write(`Invalid --effort value: ${options.effort}. Expected one of ${EFFORT_LEVELS.join(', ')}.\n`);
+    return exitCli(1);
   }
 
   // Resolve planning mode for pan start (PAN-2407): explicit --plan wins over

@@ -1,0 +1,211 @@
+{
+  "version": "1",
+  "issueId": "PAN-4249",
+  "created": "2026-09-27T09:56:17.310Z",
+  "updated": "2026-09-27T11:34:40.599Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-effort-enum": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T09:56:17.309Z",
+      "doneAt": "2026-09-27T10:02:06.215Z"
+    },
+    "effort-config-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:02:17.327Z",
+      "doneAt": "2026-09-27T10:07:41.875Z"
+    },
+    "effort-support-leaf": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:07:52.430Z",
+      "doneAt": "2026-09-27T10:22:04.824Z"
+    },
+    "resolve-effort-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:22:14.975Z",
+      "doneAt": "2026-09-27T10:30:59.385Z"
+    },
+    "sub-role-effort-validation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:31:08.873Z",
+      "doneAt": "2026-09-27T10:44:35.751Z"
+    },
+    "tier-effort-validation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:44:40.261Z",
+      "doneAt": "2026-09-27T10:52:15.663Z"
+    },
+    "settings-api-effort-validation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:52:21.105Z",
+      "doneAt": "2026-09-27T10:55:17.252Z"
+    },
+    "pan-start-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T10:55:25.253Z",
+      "doneAt": "2026-09-27T11:00:22.362Z"
+    },
+    "runtime-command-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T11:00:31.272Z",
+      "doneAt": "2026-09-27T11:10:02.615Z"
+    },
+    "effort-lint-ratchet": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T11:10:08.297Z",
+      "doneAt": "2026-09-27T11:19:02.869Z"
+    },
+    "effort-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4249",
+      "claimedAt": "2026-09-27T11:19:10.899Z",
+      "doneAt": "2026-09-27T11:24:57.189Z"
+    },
+    "contracts-effort-enum.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:29:41.734Z"
+    },
+    "contracts-effort-enum.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:29:50.888Z"
+    },
+    "contracts-effort-enum.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:00.002Z"
+    },
+    "effort-config-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:10.475Z"
+    },
+    "effort-config-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:20.799Z"
+    },
+    "effort-support-leaf.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:29.966Z"
+    },
+    "effort-support-leaf.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:38.987Z"
+    },
+    "effort-support-leaf.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:48.293Z"
+    },
+    "resolve-effort-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:30:57.411Z"
+    },
+    "resolve-effort-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:31:06.728Z"
+    },
+    "resolve-effort-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:31:16.359Z"
+    },
+    "resolve-effort-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:31:25.331Z"
+    },
+    "sub-role-effort-validation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:31:34.314Z"
+    },
+    "sub-role-effort-validation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:31:43.378Z"
+    },
+    "sub-role-effort-validation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:31:52.575Z"
+    },
+    "tier-effort-validation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:32:01.745Z"
+    },
+    "tier-effort-validation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:32:11.200Z"
+    },
+    "tier-effort-validation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:32:20.417Z"
+    },
+    "settings-api-effort-validation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:32:30.522Z"
+    },
+    "settings-api-effort-validation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:32:40.655Z"
+    },
+    "pan-start-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:32:50.588Z"
+    },
+    "pan-start-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:33:00.910Z"
+    },
+    "pan-start-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:33:11.081Z"
+    },
+    "runtime-command-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:33:20.861Z"
+    },
+    "runtime-command-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:33:29.840Z"
+    },
+    "runtime-command-effort.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:33:38.705Z"
+    },
+    "effort-lint-ratchet.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:33:47.443Z"
+    },
+    "effort-lint-ratchet.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:33:56.367Z"
+    },
+    "effort-lint-ratchet.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:34:05.267Z"
+    },
+    "effort-lint-ratchet.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:34:14.315Z"
+    },
+    "effort-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:34:23.060Z"
+    },
+    "effort-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:34:31.993Z"
+    },
+    "effort-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:34:40.598Z"
+    }
+  }
+}

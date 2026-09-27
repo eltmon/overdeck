@@ -34,7 +34,7 @@ Anthropic badges use the published equal input/output average: Fable $30/M, Opus
 
 ## Effort
 
-Managed Codex configuration and app-server turns explicitly default to High. The selected effort is passed through conversation, work, specialist, and planning launches. A live app-server picker change is acknowledged before conversation metadata is updated and applies to later turns. It cannot change a turn already running. Old hosts must be restarted to load the new control operation.
+Managed Codex configuration and app-server turns explicitly default to High. `resolveEffort()` (`src/lib/agents/resolve-effort.ts`) resolves the selected effort for `pan start` work-agent spawns and for definition-less role runs (review sub-roles, the standing supervisor) and their codex/omp launcher fields; see [Reasoning effort](../configuration/effort.mdx). Conversation, specialist, and planning launches still resolve effort ad hoc, pending #4254/#4256/#4258. A live app-server picker change is acknowledged before conversation metadata is updated and applies to later turns. It cannot change a turn already running. Old hosts must be restarted to load the new control operation.
 
 Managed omp launches explicitly supply `--thinking high` unless an effort was chosen. Native Kimi and ACP launches initialize the chosen effort. K3 supports Low/High/Max; saved Medium maps to High and Extra High maps to Max. K2.7 Code has no adjustable effort, so its picker does not advertise one. ACP live updates wait for provider acceptance. Terminal-only sessions use launch settings and their native terminal controls; a dashboard-only label change is not treated as a runtime update.
 
