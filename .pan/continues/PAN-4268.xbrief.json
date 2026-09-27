@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4268",
   "created": "2026-09-27T15:53:42.673Z",
-  "updated": "2026-09-27T16:01:49.821Z",
+  "updated": "2026-09-27T16:03:41.261Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-09-27T16:01:44.846Z"
     },
     "composer-route-ensure": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4268",
-      "claimedAt": "2026-09-27T16:01:49.821Z"
+      "claimedAt": "2026-09-27T16:01:49.821Z",
+      "doneAt": "2026-09-27T16:03:41.260Z"
     }
   }
 }
