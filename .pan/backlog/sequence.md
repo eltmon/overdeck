@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T15:30:17.299178Z · model: claude-opus-5-5 · open: 778_
+_Last sequenced: 2026-09-27T15:31:51.166078Z · model: claude-opus-5-5 · open: 780_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,6 +10,7 @@ _Last sequenced: 2026-09-27T15:30:17.299178Z · model: claude-opus-5-5 · open: 
 | 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
 | 19 | PAN-4263 | M | critical | ok |  |  | In-pipeline: PR lookup reads rate limits as 'no PR' and picks a closed PR, so approved verdicts are lost and merges fail |
 | 20 | PAN-4266 | S | medium | ok |  |  | In-pipeline: Command Deck model picker dropdown clipped by overflow-hidden column; focus scroll shifts the column left |
+| 21 | PAN-4264 | L | high | ok |  |  | In-pipeline: GraphQL quota exhaustion stalls verdicts, close-outs and merges; measure per caller, surface, back off, stop waste. |
 | 22 | PAN-4268 | M | high | ok |  |  | In-pipeline: composer and pan tell guess subagent routing; parse Claude Code's agent selector and deliver to main or fail loudly. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
@@ -72,6 +73,7 @@ _Last sequenced: 2026-09-27T15:30:17.299178Z · model: claude-opus-5-5 · open: 
 | 96 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
 | 97 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
 | 98 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
+| 99 | PAN-4269 | M | high | ok |  |  | macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find). |
 | 100 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
 | 101 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
 | 102 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
@@ -806,6 +808,10 @@ New in-pipeline issue, pinned in the top tier at a free rank. One function (getE
 
 New in-pipeline issue with a measured cause and mechanical Playwright AC; pinned into the free in-pipeline slot at rank 20 without moving any other node, medium importance because it is dashboard UX rather than pipeline substrate.
 
+### PAN-4264 (rank 21)
+
+New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the free rank 21 beside PAN-4263, which it generalizes. Rate-limit refusals several times a day stall review verdicts, close-outs and merges, so importance is high; the body gives a five-part fix with mechanically checkable acceptance criteria, so condition is ok.
+
 ### PAN-4268 (rank 22)
 
 New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 22, the free slot between PAN-4264 and PAN-4217. Messages silently landing in a subagent is a delivery-correctness bug on the operator's main input path, so importance is high; the body gives a five-step fix, captured pane evidence and fixture-testable acceptance criteria, so condition is ok. Its predecessor PAN-4247 is closed, so no dependency edge is emitted.
@@ -1054,6 +1060,10 @@ Verification/review feedback silently queued to stopped-by-user agents, never re
 
 Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.
 
+### PAN-4269 (rank 99)
+
+New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.
+
 ### PAN-3811 (rank 100)
 
 New this pass. Code inspection at the strike head shows disk-pressure-patrol.ts shelling straight to docker builder prune --all --force, with no BuildKit bytes in the canonical inventory, no candidate through the resource reclaim door and no age or size floor. The partial strike is a fine urgent backstop, but closing PAN-3809 on it would quietly drop requirements 1-3. Ranked directly behind its parent so the completion work is not forgotten once the emergency lands. Dropped dependsOn PAN-3809 (closed since the prior run).
@@ -1078,14 +1088,6 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 
 Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
 
-### PAN-3900 (rank 113)
-
-patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
-
-### PAN-3793 (rank 114)
-
-New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1093,10 +1095,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T15:30:17.299178Z",
+  "generatedAt": "2026-09-27T15:31:51.166078Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 778,
+  "openCount": 780,
   "nodes": [
     {
       "issue": "PAN-4267",
@@ -10728,6 +10730,32 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4264",
+      "rank": 21,
+      "size": "L",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: GraphQL quota exhaustion stalls verdicts, close-outs and merges; measure per caller, surface, back off, stop waste.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the free rank 21 beside PAN-4263, which it generalizes. Rate-limit refusals several times a day stall review verdicts, close-outs and merges, so importance is high; the body gives a five-part fix with mechanically checkable acceptance criteria, so condition is ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4269",
+      "rank": 99,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find).",
+      "rationale": "New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11759,6 +11787,20 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-4264",
+      "to": "PAN-4263",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4267",
+      "to": "PAN-4269",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
