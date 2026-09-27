@@ -43,7 +43,10 @@ An expanded `Agent` or legacy `Task` row uses this join to show **Open subagent 
 
 ## Transport
 
-`SubagentSummary` is the shared server/frontend shape. It contains the metadata fields, derived `agentId`, and a status of `running` or `done`.
+`SubagentSummary` is the shared server/frontend shape. It contains the metadata fields, derived `agentId`, and a status of `running` or `done`. Two more fields, both optional:
+
+- `background: boolean` — true for a subagent launched with `requestShape: "background"` (the same flag `## Status derivation` below uses to pick a status rule).
+- `humanInputs: SubagentHumanInput[]` — recent human-origin sidechain records this subagent's own transcript received, each `{id, text, createdAt}`. `createSubagentHumanInputScanner()` (`src/dashboard/server/services/conversation/subagents.ts`) reads them incrementally: a module-level cache keyed by transcript file path holds the byte offset already scanned, so a repeat call reads only newly appended bytes, mirroring `createTaskNotificationScanner`. Text is truncated to 2000 characters and only the most recent 20 inputs per subagent are kept; a transcript rewritten shorter than the cached offset resets that entry to scratch. One `sharedHumanInputScanner` instance serves every `listSubagentSummaries` call in the process, so repeat calls for the same conversation reuse cached offsets instead of rescanning each subagent transcript from the start. The one-shot `GET /api/conversations/:name/messages` snapshot builds its `subagents` list via `listSubagentMetas` instead, which does not carry `background` or `humanInputs` — both fields arrive with the first two-second `{ kind: "subagents" }` event, not in the initial payload.
 
 The existing conversation transport carries subagent data:
 
@@ -52,6 +55,15 @@ The existing conversation transport carries subagent data:
 - `GET /api/conversations/:name/messages` includes `subagents` for the parent response. `?agentId=<id>` returns one subagent transcript for ended conversations and other one-shot reads. `GET /api/conversations/:name/message-locator?byteOffset=N` accepts the same `?agentId=<id>` and resolves the offset against that subagent's transcript.
 
 The frontend keeps parent and subagent transcripts in separate React Query cache keys, so opening a subagent cannot replace the parent timeline.
+
+## Input routed into a subagent
+
+Claude Code can deliver typed input — the dashboard composer or `pan tell` — into a running subagent's sidechain instead of the main conversation. The main transcript never shows it, so three things detect and surface the misrouting (PAN-4247):
+
+- **Detection.** A subagent records a human-origin message as a `user` record with `isSidechain: true` and `origin.kind: "human"`, its content wrapped in Claude Code's own preamble (`The user sent a new message while you were working:\n<text>\n\nThis is how Claude Code surfaces…`). `extractSidechainHumanText` (`src/lib/transcript-landing.ts`) strips that wrapper down to the operator's own text. `probeSidechainsSince` scans every subagent transcript for a matching human input newer than the delivery attempt; `deliverMessageWithTranscriptConfirmation` checks it on every poll, ahead of a bare assistant-turn fallback, so a same-window subagent record always wins over a false "confirmed" reading of an unrelated assistant reaction.
+- **Composer label.** Once a message lands in a subagent, `reconcileComposerEchoes` (`src/dashboard/frontend/src/lib/composerEchoes.ts`) relabels the pending bubble in place — `acknowledged: true`, `deliveryState: 'subagent'`, `deliveredToSubagent: {agentId, description}` — and the timeline renders it "Delivered to subagent · `<description>`" at full opacity with no spinner. The bubble is never removed from the pending list, so a later real main-transcript echo can still reclaim it.
+- **Composer notice.** Before the fact, `subagentRoutingNotice` (`src/dashboard/frontend/src/lib/subagentRouting.ts`) computes one of two states from the conversation's subagents and main messages: a **routed** notice (evidence-based — the newest human sidechain input is newer than the newest real main-transcript user turn) blocks the next send with "Send anyway" / "Wait" until the operator confirms sending into the same subagent again; a **running** notice (a background subagent is merely still running) is informational only and never blocks sending.
+- **`pan tell`.** When `deliverMessageWithTranscriptConfirmation` reports a subagent landing, `messageAgent` queues the message for manual delivery instead of retrying (a retry would route into the same subagent again) and returns `landedInSubagent: {agentId, description}`. `tellCommand` prints the subagent's name and reason in red and exits **1** — it never prints "turn confirmed" for a message that never reached the main conversation.
 
 ## Opening a subagent from search
 
