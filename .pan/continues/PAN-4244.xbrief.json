@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4244",
+  "created": "2026-09-27T08:41:42.862Z",
+  "updated": "2026-09-27T08:41:42.862Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "deterministic-zombie-fixture": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4244",
+      "claimedAt": "2026-09-27T08:41:42.861Z"
+    }
+  }
+}
