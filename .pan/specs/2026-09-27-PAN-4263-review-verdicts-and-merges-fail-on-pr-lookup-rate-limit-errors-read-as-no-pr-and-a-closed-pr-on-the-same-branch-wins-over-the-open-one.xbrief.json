@@ -4,17 +4,17 @@
     "created": "2026-09-27T14:45:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4263: Review verdicts and merges fail on PR lookup: rate-limit errors read as 'no PR', and a closed PR on the same branch wins over the open one",
-    "updated": "2026-09-27T14:43:50.233Z"
+    "updated": "2026-09-27T14:44:23.842Z"
   },
   "plan": {
     "id": "pan-4263",
     "title": "Review verdicts and merges fail on PR lookup: rate-limit errors read as 'no PR', and a closed PR on the same branch wins over the open one",
-    "status": "proposed",
+    "status": "running",
     "uid": "ecb13f82-c991-4a16-8abe-8ceb10c9a4ce",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T14:45:00Z",
-    "updated": "2026-09-27T14:43:50.233Z",
+    "updated": "2026-09-27T14:44:23.842Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4263",
