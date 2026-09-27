@@ -9,7 +9,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { flushLedgerWrites, readLedgerWindow } from '../../../../src/lib/github-quota/ledger.js';
-import { getGitHubLogin, resetGitHubLoginForTests } from '../../../../src/lib/github-quota/identity.js';
+import { LOGIN_RETRY_MS, getGitHubLogin, resetGitHubLoginForTests } from '../../../../src/lib/github-quota/identity.js';
 import {
   QUOTA_SAMPLER_INITIAL_DELAY_MS,
   QUOTA_SAMPLER_INTERVAL_MS,
@@ -97,11 +97,18 @@ describe('GitHub quota sampler (PAN-4264)', () => {
     await expect(sampleGitHubRateLimits({ exec, isAppConfigured: () => false })).resolves.toBeUndefined();
   });
 
-  it('memoizes the login and retries after a failure', async () => {
+  it('memoizes the login, and retries a failure only after 10 minutes', async () => {
     const failing = vi.fn().mockRejectedValue(Object.assign(new Error('offline'), { stderr: 'offline' }));
     await expect(getGitHubLogin(failing)).resolves.toBeNull();
+    await expect(getGitHubLogin(failing)).resolves.toBeNull();
+    expect(failing).toHaveBeenCalledTimes(1);
 
     const exec = vi.fn().mockResolvedValue({ stdout: 'octo-login\n' });
+    await vi.advanceTimersByTimeAsync(LOGIN_RETRY_MS - 1_000);
+    await expect(getGitHubLogin(exec)).resolves.toBeNull();
+    expect(exec).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_000);
     await expect(getGitHubLogin(exec)).resolves.toBe('octo-login');
     await expect(getGitHubLogin(exec)).resolves.toBe('octo-login');
     expect(exec).toHaveBeenCalledTimes(1);
