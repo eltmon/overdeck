@@ -1,0 +1,165 @@
+{
+  "version": "1",
+  "issueId": "PAN-4266",
+  "created": "2026-09-27T15:20:14.982Z",
+  "updated": "2026-09-27T16:07:43.974Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "clipped-scroll-reset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:20:14.982Z",
+      "doneAt": "2026-09-27T15:23:08.434Z"
+    },
+    "floating-position-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:24:36.978Z",
+      "doneAt": "2026-09-27T15:28:13.304Z"
+    },
+    "model-picker-portal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:28:19.386Z",
+      "doneAt": "2026-09-27T15:33:16.179Z"
+    },
+    "effort-picker-portal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:33:19.469Z",
+      "doneAt": "2026-09-27T15:40:46.739Z"
+    },
+    "picker-css-cleanup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:40:53.135Z",
+      "doneAt": "2026-09-27T15:42:10.232Z"
+    },
+    "style-guide-picker-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:42:17.125Z",
+      "doneAt": "2026-09-27T15:42:47.782Z"
+    },
+    "ci-frontend-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:42:51.290Z",
+      "doneAt": "2026-09-27T15:47:04.974Z"
+    },
+    "playwright-clipping-spec": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4266",
+      "claimedAt": "2026-09-27T15:47:11.348Z",
+      "doneAt": "2026-09-27T15:56:44.744Z"
+    },
+    "clipped-scroll-reset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:03:21.208Z"
+    },
+    "clipped-scroll-reset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:03:32.771Z"
+    },
+    "clipped-scroll-reset.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:03:43.989Z"
+    },
+    "floating-position-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:03:55.044Z"
+    },
+    "floating-position-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:04:06.171Z"
+    },
+    "floating-position-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:04:16.914Z"
+    },
+    "floating-position-hook.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:04:27.975Z"
+    },
+    "floating-position-hook.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:04:39.100Z"
+    },
+    "model-picker-portal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:04:49.644Z"
+    },
+    "model-picker-portal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:04:59.283Z"
+    },
+    "model-picker-portal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:05:09.738Z"
+    },
+    "model-picker-portal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:05:20.646Z"
+    },
+    "effort-picker-portal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:05:31.047Z"
+    },
+    "effort-picker-portal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:05:41.798Z"
+    },
+    "effort-picker-portal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:05:52.957Z"
+    },
+    "effort-picker-portal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:06:04.233Z"
+    },
+    "picker-css-cleanup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:06:14.806Z"
+    },
+    "picker-css-cleanup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:06:25.325Z"
+    },
+    "playwright-clipping-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:06:36.019Z"
+    },
+    "playwright-clipping-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:06:45.828Z"
+    },
+    "playwright-clipping-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:06:55.499Z"
+    },
+    "playwright-clipping-spec.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:07:04.764Z"
+    },
+    "style-guide-picker-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:07:14.621Z"
+    },
+    "style-guide-picker-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:07:23.932Z"
+    },
+    "ci-frontend-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:07:34.092Z"
+    },
+    "ci-frontend-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:07:43.974Z"
+    }
+  }
+}
