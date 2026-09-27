@@ -149,6 +149,36 @@ describe('serializeConversationTranscript — compaction summary', () => {
   });
 });
 
+describe('buildTranscriptTitlePrompt / buildTranscriptAboutPrompt', () => {
+  it('ac1: the title prompt names the overall scope and drops the recency-favoring instruction', async () => {
+    const { buildTranscriptTitlePrompt } = await import('../transcript-summary.js');
+    const prompt = buildTranscriptTitlePrompt('User: do the thing\n\nAssistant: done');
+    expect(prompt).toContain('overall scope');
+    expect(prompt).not.toContain('favor the most recent direction');
+  });
+
+  it('ac2: the About prompt mentions a leading summary of earlier context', async () => {
+    const { buildTranscriptAboutPrompt } = await import('../transcript-summary.js');
+    const prompt = buildTranscriptAboutPrompt('User: do the thing\n\nAssistant: done');
+    expect(prompt).toContain('summary of earlier context');
+  });
+
+  it('ac3: both builders fence the transcript text as untrusted data', async () => {
+    const { buildTranscriptTitlePrompt, buildTranscriptAboutPrompt } = await import('../transcript-summary.js');
+    const transcript = 'User: unique-marker-12345\n\nAssistant: ok';
+
+    for (const prompt of [buildTranscriptTitlePrompt(transcript), buildTranscriptAboutPrompt(transcript)]) {
+      const start = prompt.indexOf('<<<UNTRUSTED_TRANSCRIPT_START>>>');
+      const end = prompt.indexOf('<<<UNTRUSTED_TRANSCRIPT_END>>>');
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      const markerIndex = prompt.indexOf('unique-marker-12345');
+      expect(markerIndex).toBeGreaterThan(start);
+      expect(markerIndex).toBeLessThan(end);
+    }
+  });
+});
+
 describe('sanitizeTitle', () => {
   it('strips surrounding quotes', () => {
     expect(sanitizeTitle('"Refactor the auth flow"')).toBe('Refactor the auth flow');

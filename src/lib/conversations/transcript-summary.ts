@@ -423,23 +423,53 @@ export async function summarizeFirstMessageTitle(
   return sanitizeTitle(typeof result['title'] === 'string' ? (result['title'] as string) : '');
 }
 
+/**
+ * Build the prompt for `summarizeTranscriptTitle`. Exported so the prompt
+ * wording — in particular that it asks for the overall scope still in
+ * context rather than only the most recent direction — is unit-testable
+ * without spawning `claude`.
+ */
+export function buildTranscriptTitlePrompt(transcript: string): string {
+  const titleTranscript = titleTranscriptWindow(transcript);
+  return [
+    'You write concise thread titles for coding conversations.',
+    'Read the conversation excerpts below and write a 3-8 word title.',
+    'Name the overall scope of the work still in context — not just the latest message.',
+    'If the excerpts open with a summary of earlier context, that summary is fact: treat its scope as part of the conversation.',
+    'Combine the summarized scope with anything new since it into one description of the whole thread.',
+    'If the topic has moved on entirely since the summary, name the current scope instead.',
+    'Avoid quotes, filler, prefixes, and trailing punctuation.',
+    '',
+    fenceUntrustedTranscript('conversation excerpts', titleTranscript),
+  ].join('\n');
+}
+
 /** Generate a fresh 3-8 word title from bounded conversation excerpts (explicit retitle action). */
 export async function summarizeTranscriptTitle(
   transcript: string,
   model = CONVERSATION_TITLE_MODEL,
   timeoutMs = 30_000,
 ): Promise<string> {
-  const titleTranscript = titleTranscriptWindow(transcript);
-  const prompt = [
-    'You write concise thread titles for coding conversations.',
-    'Read the conversation excerpts below and write a 3-8 word title that captures',
-    'what it is *currently* about. If the topic shifted, favor the most recent direction.',
-    'Avoid quotes, filler, prefixes, and trailing punctuation.',
-    '',
-    fenceUntrustedTranscript('conversation excerpts', titleTranscript),
-  ].join('\n');
+  const prompt = buildTranscriptTitlePrompt(transcript);
   const result = await invokeClaudeStructured(model, prompt, TITLE_SCHEMA, timeoutMs, 'titleRefinement');
   return sanitizeTitle(typeof result['title'] === 'string' ? (result['title'] as string) : '');
+}
+
+/**
+ * Build the prompt for `summarizeTranscriptAbout`. Exported so the prompt
+ * wording is unit-testable without spawning `claude`.
+ */
+export function buildTranscriptAboutPrompt(transcript: string): string {
+  return [
+    'You summarize coding conversations for a quick-reference panel.',
+    'In 2-4 plain sentences, describe what this conversation has been about:',
+    "the user's goal, the main things explored or done, and where it currently stands.",
+    'If the excerpts open with a summary of earlier context, treat it as fact about what already happened.',
+    'Describe the conversation as a whole — the earlier summarized work plus anything since — not only the most recent turns.',
+    'Be specific and factual. No preamble, no lists, no markdown.',
+    '',
+    fenceUntrustedTranscript('conversation', transcript),
+  ].join('\n');
 }
 
 /** Generate a 2-4 sentence description of what the conversation has been about. */
@@ -447,14 +477,7 @@ export async function summarizeTranscriptAbout(
   transcript: string,
   model = CONVERSATION_TITLE_MODEL,
 ): Promise<string> {
-  const prompt = [
-    'You summarize coding conversations for a quick-reference panel.',
-    'In 2-4 plain sentences, describe what this conversation has been about:',
-    "the user's goal, the main things explored or done, and where it currently stands.",
-    'Be specific and factual. No preamble, no lists, no markdown.',
-    '',
-    fenceUntrustedTranscript('conversation', transcript),
-  ].join('\n');
+  const prompt = buildTranscriptAboutPrompt(transcript);
   const result = await invokeClaudeStructured(model, prompt, ABOUT_SCHEMA, 45_000);
   return typeof result['summary'] === 'string' ? (result['summary'] as string).trim() : '';
 }
