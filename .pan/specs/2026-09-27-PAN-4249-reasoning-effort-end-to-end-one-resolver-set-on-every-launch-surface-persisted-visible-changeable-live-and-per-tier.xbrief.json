@@ -4,17 +4,17 @@
     "created": "2026-09-27T09:50:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4249: Reasoning effort, end to end: one resolver, set on every launch surface, persisted, visible, changeable live, and per-tier",
-    "updated": "2026-09-27T09:54:25.649Z"
+    "updated": "2026-09-27T09:55:18.736Z"
   },
   "plan": {
     "id": "pan-4249",
     "title": "Reasoning effort, end to end: one resolver, set on every launch surface, persisted, visible, changeable live, and per-tier",
-    "status": "proposed",
+    "status": "running",
     "uid": "b8715cd0-519d-4f6b-a848-ce174cac1b58",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T09:50:35Z",
-    "updated": "2026-09-27T09:54:25.649Z",
+    "updated": "2026-09-27T09:55:18.736Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4249",
