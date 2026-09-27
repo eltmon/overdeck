@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4266",
   "created": "2026-09-27T15:20:14.982Z",
-  "updated": "2026-09-27T16:05:20.646Z",
+  "updated": "2026-09-27T16:05:31.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "model-picker-portal.ac4": {
       "status": "completed",
       "doneAt": "2026-09-27T16:05:20.646Z"
+    },
+    "effort-picker-portal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:05:31.047Z"
     }
   }
 }
