@@ -58,6 +58,7 @@ export {
   MIN_PRD_LINES,
   promoteWorkspacePrdDraft,
   readIssueDraft,
+  resolvePlanningDraftPath,
   writeIssueDraft,
   type PrdGateResult,
   type PromoteWorkspacePrdDraftResult,
