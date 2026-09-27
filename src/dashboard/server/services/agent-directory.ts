@@ -543,7 +543,9 @@ async function buildDirectoryEntries(now: number, deps: AgentDirectoryDeps): Pro
       source: 'conversation',
       transcript: { route: 'conversation', conversationName: row.name },
       runtimeId: row.tmuxSession,
-      ...(row.providerError ? { providerError: row.providerError } : {}),
+      ...(row.providerError
+        ? { providerError: { message: row.providerError.message, at: row.providerError.at } }
+        : {}),
     };
     candidates.push({ entry, cwd: row.cwd || null, explicitProjectKey: row.projectKey });
     if (entry.state !== 'stopped') conversationParents.push({ entry, row });

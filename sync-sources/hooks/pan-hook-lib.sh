@@ -307,11 +307,12 @@ pan_tool_description() {
   local tool_info="$1"
   command -v jq >/dev/null 2>&1 || { printf ''; return 0; }
   printf '%s' "$tool_info" | jq -r '
-    (.tool_input.description // "") as $d |
-    (.tool_input.file_path // "") as $f |
-    (.tool_input.pattern // "") as $p |
-    (.tool_input.url // "") as $u |
-    (.tool_input.skill // "") as $s |
+    def asString: if type == "string" then . else "" end;
+    (.tool_input.description | asString) as $d |
+    (.tool_input.file_path | asString) as $f |
+    (.tool_input.pattern | asString) as $p |
+    (.tool_input.url | asString) as $u |
+    (.tool_input.skill | asString) as $s |
     (if $d != "" then $d
      elif $f != "" then ($f | split("/") | last)
      elif $p != "" then $p
