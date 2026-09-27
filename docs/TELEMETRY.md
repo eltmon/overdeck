@@ -64,6 +64,9 @@ the public contract and lists every allowed value.
 | `server_boot` | `project_count=count_bucket; active_agent_count=count_bucket` | A dashboard server reached the listening state. |
 | `cli_command_run` | `verb=cli_verb; ok=boolean; duration_ms=duration_bucket` | A CLI command completed. |
 | `pipeline_stage_changed` | `stage=pipeline_stage; harness=harness; model=model_family` | An issue crossed a pipeline funnel stage. |
+| `github_quota_sample` | `graphql_pipeline_membership=quota_points_bucket; rest_pipeline_membership=quota_points_bucket; graphql_pr_cache=quota_points_bucket; rest_pr_cache=quota_points_bucket; graphql_pr_sync=quota_points_bucket; rest_pr_sync=quota_points_bucket; graphql_ci_repair=quota_points_bucket; rest_ci_repair=quota_points_bucket; graphql_issue_poller=quota_points_bucket; rest_issue_poller=quota_points_bucket; graphql_close_out=quota_points_bucket; rest_close_out=quota_points_bucket; graphql_tracker_client=quota_points_bucket; rest_tracker_client=quota_points_bucket; graphql_app_rest=quota_points_bucket; rest_app_rest=quota_points_bucket; graphql_agent=quota_points_bucket; rest_agent=quota_points_bucket; graphql_other=quota_points_bucket; rest_other=quota_points_bucket; graphql_unattributed=quota_points_bucket; min_remaining_graphql=quota_remaining_bucket; min_remaining_rest=quota_remaining_bucket; primary_limit_errors=count_bucket; secondary_limit_errors=count_bucket` | Hourly: this install's GitHub API points per caller in the last hour, the lowest remaining GraphQL and REST budget, and refusals, all bucketed. |
+| `github_rate_limited` | `caller=github_caller; kind=rate_limit_kind; own_usage_low=boolean` | GitHub refused a call for a rate limit (at most one per 10 minutes per install). |
+| `instance_heartbeat` | `project_count=count_bucket; active_agent_count=count_bucket; dashboard_running=boolean` | At most once per 24 hours: this install is in use, and whether a dashboard sent it. |
 
 | Domain | Allowed values |
 | --- | --- |
@@ -79,13 +82,18 @@ the public contract and lists every allowed value.
 | `duration_bucket` | `under_100ms`, `100ms-999ms`, `1s-9s`, `10s+` |
 | `forge` | `github`, `gitlab` |
 | `fork_kind` | `summary`, `handoff`, `plain` |
+| `github_caller` | `pipeline_membership`, `pr_cache`, `pr_sync`, `ci_repair`, `issue_poller`, `close_out`, `tracker_client`, `app_rest`, `quota_sampler`, `agent`, `other` |
 | `harness` | `claude-code`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse` |
 | `merge_kind` | `pipeline` |
 | `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
 | `pipeline_stage` | `work_done`, `review_passed`, `verification_passed`, `merged`, `closed_out` |
 | `project_mode` | `clone`, `existing`, `new` |
+| `quota_points_bucket` | `0`, `1-49`, `50-199`, `200-499`, `500-999`, `1000-2499`, `2500+` |
+| `quota_remaining_bucket` | `0`, `1-99`, `100-499`, `500-999`, `1000-2499`, `2500+`, `unknown` |
+| `rate_limit_kind` | `primary`, `secondary` |
 
-Raw counts and timings are never sent. Pipeline attribution is emitted only
+Raw counts and timings are never sent; GitHub quota points and remaining
+values are sent only as the buckets above. Pipeline attribution is emitted only
 after the canonical pipeline-membership resolver confirms that the issue is in
 the pipeline, so a stale or orphaned agent's on-disk state cannot supply
 harness or model metadata for an issue that already left the pipeline.
