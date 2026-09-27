@@ -4660,9 +4660,8 @@
 
 /* Two-panel picker: provider sidebar (left) + main panel (right) */
 .pickerDropdown {
-  position: absolute;
-  left: 0;
-  top: calc(100% + 4px);
+  /* PAN-4266: portaled to <body>; useFloatingPickerPosition sets top/left inline. */
+  position: fixed;
   z-index: 9999;
   background: var(--background);
   border: 1px solid var(--border);
@@ -4673,11 +4672,6 @@
   display: flex;
   flex-direction: row;
   overflow: hidden;
-}
-
-.pickerDropdownUp {
-  top: auto;
-  bottom: calc(100% + 4px);
 }
 
 /* ── Provider filter sidebar ── */
