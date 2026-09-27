@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   deliverControl: vi.fn().mockResolvedValue(undefined),
   getAgentState: vi.fn(),
   getConversationByName: vi.fn(),
-  messageAgent: vi.fn().mockResolvedValue(undefined),
+  messageAgent: vi.fn().mockResolvedValue({ delivered: true, queuedToMail: true }),
   runDetachedCommand: vi.fn(async (argv: readonly string[]) => ({
     kind: 'activity' as const,
     status: 'accepted' as const,

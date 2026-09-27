@@ -93,6 +93,11 @@ vi.mock('../tmux-dedup.js', () => ({
   completeKeyedSubmit: vi.fn(async () => undefined),
 }));
 
+// PAN-4268: the selector check reads a real pane; these fixtures have none.
+vi.mock('../agents/input-target.js', () => ({
+  ensureMainInputTarget: vi.fn(async () => ({ ok: true, check: 'no-selector' })),
+}));
+
 // Resume is mocked at its source module so the agents barrel re-exports the
 // mock to messaging.ts's dynamic import.
 vi.mock('../agents/resume.js', () => ({
