@@ -46,6 +46,7 @@ pan tell ISSUE-123 "Your message here"
 2. **Properly escapes quotes** - Handles special characters
 3. **Saves to mail queue** - Backup if agent misses the message
 4. **Validates session exists** - Fails fast if agent not running
+5. **Reaches the main agent** - for Claude Code targets it checks the agent selector and switches input back to the main agent before sending; it refuses (exit 1, message saved to mail) when it cannot confirm the switch.
 
 ## Workflow
 
