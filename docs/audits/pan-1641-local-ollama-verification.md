@@ -144,6 +144,13 @@ the systemd `OLLAMA_CONTEXT_LENGTH` override the docs recommend was not availabl
 - PAN-3684 is **left open** with no `LOCAL_OLLAMA_OK.txt` commit, because its task was
   not completed.
 
+## Status of the work item
+
+`ollama-e2e-acceptance` is **cancelled** in this PR, not completed: its own title asks for
+an agent to complete PAN-3684 on `gemma4:12b`, and that did not happen. The verified half
+is recorded as `ac2` = completed; `ac1`, `ac3` and `ac4` are cancelled. The unfinished half
+is tracked in [PAN-4275](https://github.com/eltmon/overdeck/issues/4275).
+
 ## What the operator needs to decide
 
 1. **Accept a capable local model for AC-10**, or accept the launch-path proof above
