@@ -103,3 +103,63 @@ describe('reconcileComposerEchoes subagent matching (PAN-4247)', () => {
     expect(clearedByMain.optimistic).toEqual([]);
   });
 });
+
+describe('reconcileComposerEchoes joined-message matching (PAN-4247)', () => {
+  it('clears both bubbles and consumes the message id when two quick sends were joined with no separator (AC1)', () => {
+    const first = optimisticMessage({
+      id: 'optimistic-1',
+      text: 'Ah ok that was it',
+      createdAt: '2026-09-27T10:00:00.000Z',
+    });
+    const second = optimisticMessage({
+      id: 'optimistic-2',
+      text: 'I was sending to a subagent wasnt I?',
+      createdAt: '2026-09-27T10:00:01.000Z',
+    });
+    const joined: ChatMessage = {
+      id: 'main-joined',
+      role: 'user',
+      text: 'Ah ok that was itI was sending to a subagent wasnt I?',
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([first, second]), [joined]);
+
+    expect(result.optimistic).toEqual([]);
+    expect(result.consumedEchoIds).toContain('main-joined');
+  });
+
+  it('leaves the state unchanged when the message matches no contiguous concatenation of pending bubbles (AC2)', () => {
+    const first = optimisticMessage({ id: 'optimistic-1', text: 'first message', createdAt: '2026-09-27T10:00:00.000Z' });
+    const second = optimisticMessage({ id: 'optimistic-2', text: 'second message', createdAt: '2026-09-27T10:00:01.000Z' });
+    const unrelated: ChatMessage = {
+      id: 'main-unrelated',
+      role: 'user',
+      text: 'totally unrelated text',
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+    const input = makeState([first, second]);
+
+    const result = reconcileComposerEchoes(input, [unrelated]);
+
+    expect(result).toBe(input);
+    expect(result.optimistic).toEqual([first, second]);
+  });
+
+  it('joins with a newline or space separator, and only consumes entries and the message once', () => {
+    const first = optimisticMessage({ id: 'optimistic-1', text: 'part one', createdAt: '2026-09-27T10:00:00.000Z' });
+    const second = optimisticMessage({ id: 'optimistic-2', text: 'part two', createdAt: '2026-09-27T10:00:01.000Z' });
+    const joinedWithSpace: ChatMessage = {
+      id: 'main-joined-space',
+      role: 'user',
+      text: 'part one part two',
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([first, second]), [joinedWithSpace]);
+
+    expect(result.optimistic).toEqual([]);
+    expect(result.failed).toEqual([]);
+    expect(result.consumedEchoIds).toEqual(expect.arrayContaining(['main-joined-space']));
+  });
+});
