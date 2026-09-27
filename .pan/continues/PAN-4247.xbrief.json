@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:45:11.538Z",
+  "updated": "2026-09-27T11:46:43.067Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
       "claimedBy": "agent-pan-4247",
       "claimedAt": "2026-09-27T11:37:44.446Z",
       "doneAt": "2026-09-27T11:45:11.538Z"
+    },
+    "landing-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:46:43.067Z"
     }
   }
 }
