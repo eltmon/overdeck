@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4249",
   "created": "2026-09-27T09:56:17.310Z",
-  "updated": "2026-09-27T11:31:43.379Z",
+  "updated": "2026-09-27T11:31:52.575Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "sub-role-effort-validation.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T11:31:43.378Z"
+    },
+    "sub-role-effort-validation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:31:52.575Z"
     }
   }
 }
