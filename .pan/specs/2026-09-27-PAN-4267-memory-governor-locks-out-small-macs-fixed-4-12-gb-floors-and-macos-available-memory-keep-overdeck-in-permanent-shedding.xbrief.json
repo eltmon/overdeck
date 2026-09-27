@@ -1,0 +1,587 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T15:27:41Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4267: Memory governor locks out small Macs: fixed 4/12 GB floors and macOS 'available' memory keep Overdeck in permanent shedding",
+    "updated": "2026-09-27T15:32:40.189Z"
+  },
+  "plan": {
+    "id": "pan-4267",
+    "title": "Memory governor locks out small Macs: fixed 4/12 GB floors and macOS 'available' memory keep Overdeck in permanent shedding",
+    "status": "proposed",
+    "uid": "62650d69-6492-4a3e-b6f6-d636b4bc2c5e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-27T15:27:41Z",
+    "updated": "2026-09-27T15:32:40.189Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4267",
+        "label": "PAN-4267",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4267.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "memory-governor",
+      "macos",
+      "resources",
+      "system-health",
+      "config"
+    ],
+    "narratives": {
+      "Problem": "On a 16 GB Mac the memory governor reports critical shedding and never recovers. Its reserve defaults have fixed floors (hard 4, soft 8, watch 10, recovery 12 GB) sized for a large Linux host; on 8 GB the recovery reserve exceeds total RAM. The governor reader (readProcMemoryDarwin) and the header collector (createDarwinHostHealthCollector) measure macOS available memory with different formulas (1.0 GiB vs 2.4 GB). macOS has no PSI and its swap grows on demand, so the psi-unavailable swap hold fires routinely and the PSI-calm re-admit never fires. The spawn guardrail on POST /api/agents has the same fixed-floor problem (memoryWarnGb 4, memoryBlockGb 2), which is what actually blocks agent starts. The activity-feed text 'Overdeck admits nothing while shedding is active' is false: the governor band only gates resumeYieldedAgents and the feed, never conversations or spawns.",
+      "Proposal": "Cap every governor reserve default at a share of RAM (hard 10%, soft 20%, watch 25%, recovery 35%) and scale the spawn guardrail defaults to min(4, RAM/8) and min(2, RAM/16), in a new pure module src/lib/config-yaml/governor-reserves.ts. Normalize user-set reserves against RAM and ordering in the same module, called from merge.ts. Give macOS one available-memory function in src/lib/system-health/darwin.ts (memory_pressure -Q first, Activity Monitor vm_stat formula as fallback) used by both the header collector and the governor reader. Feed the macOS kernel pressure level (sysctl kern.memorystatus_vm_pressure_level) into the governor as its stall signal and ignore swap runway on macOS. Rewrite the activity-feed governor messages so they state what the governor holds. Document the scaled defaults and macOS measures in docs/PIPELINE-GATES.md and a new configuration/memory-governor.mdx.",
+      "NonGoals": "- Adding any memory gate to conversation creation or conversation message delivery\n- Diagnosing the macOS 'Working…' / 'Sent · waiting for transcript' conversation symptom (follow-up PAN-4269)\n- Wiring shed() into the deacon or any other caller\n- Exposing governor reserves in the Settings UI\n- Changing Linux PSI, swap-percent, or CPU load thresholds or their defaults\n- A time-based lockout breaker that admits one conversation at a time\n- Feeding the macOS pressure level into the spawn guardrail (evaluateSpawnGuardrails)\n- Changing reserve or spawn-threshold defaults on hosts with 40 GB (governor) / 32 GB (guardrail) RAM or more"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Do not add a conversation memory gate; deliver the issue's 'Tell the user' item as truthful activity-feed text.",
+        "rationale": "Verified in code that no conversation or spawn path reads the governor verdict (getCachedMemoryVerdict has no spawn readers; shed() has no callers; docs/PIPELINE-GATES.md says the same). Adding a new gate would introduce a lockout path the issue is trying to remove. The false 'admits nothing' text is what misled the operator."
+      },
+      {
+        "summary": "Use the issue's example caps (hard 10%, soft 20%, watch 25%, recovery 35%) on top of today's pct/floor formula; accept that hosts under ~40 GB, including 32 GB hosts, get lower reserves.",
+        "rationale": "The issue names these caps as the fix and asks to keep today's values on large hosts; hosts at or above 40 GB are unchanged. The 32 GB change is intended and asserted with exact values in tests."
+      },
+      {
+        "summary": "Also scale the spawn guardrail defaults memoryWarnGb = min(4, RAM/8) and memoryBlockGb = min(2, RAM/16).",
+        "rationale": "evaluateSpawnGuardrails, not the governor, gates POST /api/agents; the deferred planning hand-off retry sends no acknowledgement, so a permanent 'RAM tight' warning on a small Mac blocks autonomous starts forever. Hosts at or above 32 GB keep 4/2."
+      },
+      {
+        "summary": "macOS available memory = memory_pressure -Q free% x total, falling back to the Activity Monitor vm_stat formula, then to free+inactive+speculative; one exported function used by both header and governor.",
+        "rationale": "The header already uses memory_pressure; making the governor call the same function removes the 1.0 vs 2.4 GB disagreement by construction. Purgeable pages are not added to the free sum because they overlap the active/inactive queues."
+      },
+      {
+        "summary": "macOS stall signal = sysctl kern.memorystatus_vm_pressure_level (1 normal, 2 warn, 4 critical); critical sheds, normal counts as calm; macOS swap runway is ignored.",
+        "rationale": "It is the kernel's own pressure state and a cheap sysctl. macOS swap is allocated on demand, so vm.swapusage free share is not a runway signal and currently parks the governor in a psi-unavailable hold."
+      },
+      {
+        "summary": "'Never lock out for good' is delivered by the caps, the config normalization and the working calm re-admit on macOS, not by a new N-minute timer.",
+        "rationale": "With capped defaults recovery is always below RAM; normalization handles user configs at or above RAM; the existing calm re-admit path then works on macOS. A timer would add untested state for no remaining failure mode."
+      },
+      {
+        "summary": "The recorded vm_stat sample is a synthesized fixture in real macOS line format; live-Mac verification is an implementation checkpoint with the fixture test as fallback.",
+        "rationale": "Planner and work agent both run on Linux with no Mac available; the fixture reproduces the reported 1.0 GiB vs 2.4 GiB split exactly."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-27-PAN-4267-memory-governor-locks-out-small-macs-fixed-4-12-gb-floors-and-macos-available-memory-keep-overdeck-in-permanent-shedding.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "governor-reserve-defaults",
+        "title": "Cap governor reserve defaults at a share of RAM",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:27:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4267",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/governor-reserves.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "tests/unit/lib/config-yaml/governor-reserves.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/config-yaml/governor-reserves.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "governor-reserves.test.ts passes the 8/16/32/64 GB computeGovernorReserveDefaultsGb table",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/config-yaml/governor-reserves.ts (no imports from defaults.ts or merge.ts) exporting computeGovernorReserveDefaultsGb(totalGb) = min(max(pct*total, floor), cap*total) with rules hard {0.08, 4, 0.10}, soft {0.15, 8, 0.20}, watch {0.20, 10, 0.25}, recovery {0.25, 12, 0.35}. In defaults.ts delete the local computeGovernorReserveDefaultsGb (lines 9-22, anchor 'function computeGovernorReserveDefaultsGb()') and compute GOVERNOR_RESERVE_DEFAULTS_GB = computeGovernorReserveDefaultsGb(totalmem() / 1024**3); update the PAN-2500 comment to mention the PAN-4267 caps. Add tests/unit/lib/config-yaml/governor-reserves.test.ts with the exact table from the PRD (8: 0.8/1.6/2.0/2.8; 16: 1.6/3.2/4.0/5.6; 32: 3.2/6.4/8.0/11.2; 64: 5.12/9.6/12.8/16.0 for hard/soft/watch/recovery) using toBeCloseTo(x, 5)."
+        },
+        "items": [
+          {
+            "id": "governor-reserve-defaults.ac1",
+            "title": "Given totals of 8, 16, 32 and 64 GB, computeGovernorReserveDefaultsGb returns exactly the PRD WI-1 table values (e.g. 16 GB returns hard 1.6, soft 3.2, watch 4.0, recovery 5.6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-reserve-defaults.ac2",
+            "title": "Given each tested total, governor-reserves.test.ts asserts the returned reserves respect hard <= 10%, soft <= 20%, watch <= 25%, recovery <= 35% of total and the ordering hard < soft < watch, soft < recovery < total",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-reserve-defaults.ac3",
+            "title": "defaults.ts contains no local computeGovernorReserveDefaultsGb, and DEFAULT_CONFIG.resources.governor*ReserveGb defaults to the imported function's result for totalmem()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-threshold-defaults",
+        "title": "Scale spawn guardrail memory_warn_gb / memory_block_gb defaults with RAM",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:27:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4267",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/governor-reserves.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "tests/unit/lib/config-yaml/governor-reserves.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/config-yaml/governor-reserves.test.ts src/lib/system-health/__tests__/config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "governor-reserves.test.ts passes the computeSpawnMemoryThresholdDefaultsGb table",
+            "src/lib/system-health/__tests__/config.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add computeSpawnMemoryThresholdDefaultsGb(totalGb) = { warnGb: Math.min(4, totalGb / 8), blockGb: Math.min(2, totalGb / 16) } to governor-reserves.ts. In defaults.ts compute SPAWN_MEMORY_THRESHOLD_DEFAULTS_GB once from totalmem() and set resources.memoryWarnGb / memoryBlockGb from it (replacing the literals at lines 225-226, anchors 'memoryWarnGb: 4,' and 'memoryBlockGb: 2,'). SYSTEM_HEALTH_DEFAULTS in src/lib/system-health/config.ts already reads DEFAULT_CONFIG.resources, so it needs no change. Add a describe block to governor-reserves.test.ts for the table 8: 1.0/0.5, 16: 2.0/1.0, 32: 4.0/2.0, 64: 4.0/2.0."
+        },
+        "items": [
+          {
+            "id": "spawn-threshold-defaults.ac1",
+            "title": "Given totals of 8, 16, 32 and 64 GB, computeSpawnMemoryThresholdDefaultsGb returns warnGb 1/2/4/4 and blockGb 0.5/1/2/2, with blockGb < warnGb in every case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-threshold-defaults.ac2",
+            "title": "defaults.ts contains no 'memoryWarnGb: 4,' or 'memoryBlockGb: 2,' literal and DEFAULT_CONFIG.resources.memoryWarnGb equals computeSpawnMemoryThresholdDefaultsGb(totalmem()/GiB).warnGb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-threshold-defaults.ac3",
+            "title": "src/lib/system-health/__tests__/config.test.ts passes unchanged against the scaled SYSTEM_HEALTH_DEFAULTS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reserve-normalization",
+        "title": "Normalize user-set governor reserves against RAM and ordering",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:27:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4267",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/governor-reserves.ts",
+            "src/lib/config-yaml/merge.ts",
+            "tests/unit/lib/config-yaml/governor-reserves.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/config-yaml/governor-reserves.test.ts tests/unit/lib/config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "normalizeGovernorReserves tests pass",
+            "tests/unit/lib/config.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add normalizeGovernorReserves(input: GovernorReservesGb, totalGb, warn = console.warn) to governor-reserves.ts. Rules in order on a copy: (1) hard >= soft => hard = soft * 0.5; (2) recovery <= soft => recovery = soft + 1; (3) watch <= soft => watch = soft + 1; (4) any of the four >= totalGb => all four = computeGovernorReserveDefaultsGb(totalGb). Emit ONE warn per call listing every corrected YAML key (governor_hard_reserve_gb, governor_recovery_reserve_gb, governor_watch_reserve_gb, governor_soft_reserve_gb); rule 4's message reads '[config] resources governor reserves (<keys>) are at or above this host's <T> GB RAM; using scaled defaults (hard <h>, soft <s>, watch <w>, recovery <r> GB).' with toFixed(1). In merge.ts replace the two blocks at lines 814-822 (anchors 'PAN-2500: RECOVERY must exceed SOFT' and 'PAN-3550: WATCH must exceed SOFT') with one Object.assign(result.resources, normalizeGovernorReserves({...}, totalmem() / 1024**3)) call; leave the swap-percent and CPU checks after it untouched. Tests per PRD WI-3: recovery 12 on 8 GB resets all four with one warn naming governor_recovery_reserve_gb and '8 GB'; hard 4/soft 2 on 64 GB gives hard 1; the issue workaround (0.5/1/1/1.5 on 16 GB) gives watch 2 and keeps recovery 1.5; valid input returns unchanged with no warn."
+        },
+        "items": [
+          {
+            "id": "reserve-normalization.ac1",
+            "title": "Given recovery 12 GB on an 8 GB host, normalizeGovernorReserves returns computeGovernorReserveDefaultsGb(8) for all four reserves and calls warn exactly once with a message containing 'governor_recovery_reserve_gb' and '8 GB'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reserve-normalization.ac2",
+            "title": "Given hard 4 and soft 2 on a 64 GB host, normalizeGovernorReserves returns hard 1 and warns naming 'governor_hard_reserve_gb'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reserve-normalization.ac3",
+            "title": "Given the issue workaround (hard 0.5, soft 1, watch 1, recovery 1.5) on 16 GB, normalizeGovernorReserves returns watch 2 and preserves hard 0.5, soft 1, recovery 1.5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reserve-normalization.ac4",
+            "title": "merge.ts no longer contains the inline 'PAN-2500: RECOVERY must exceed SOFT' block and calls normalizeGovernorReserves exactly once; valid reserves pass through unchanged with no warn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "darwin-available-memory",
+        "title": "One macOS available-memory function shared by header and governor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:27:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4267",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "darwin-stall-signal"
+          ],
+          "files_scope": [
+            "src/lib/system-health/darwin.ts",
+            "src/lib/system-health/__tests__/darwin.test.ts",
+            "src/lib/system-health/__tests__/fixtures/vm-stat-16gb-mac.txt",
+            "src/dashboard/server/services/system-health-service.ts",
+            "tests/unit/dashboard/server/services/system-health-service-psi.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/system-health/__tests__/darwin.test.ts tests/unit/dashboard/server/services/system-health-service-psi.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "darwin.test.ts passes the fixture test (2,576,973,824 bytes activity-monitor, 1 GiB legacy)",
+            "system-health-service-psi.test.ts darwin parity case passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/system-health/darwin.ts: extend parseDarwinVmStat(content, totalMemoryBytes?) so that with a positive total and all of 'Anonymous pages', 'Pages purgeable', 'Pages wired down', 'Pages occupied by compressor' present, availableMemoryBytes = max(0, total - (anon - purgeable + wired + compressor) * pageSize) with availableSource 'activity-monitor'; otherwise keep free+inactive+speculative with availableSource 'free-inactive-speculative'. Export computeDarwinAvailableMemoryBytes({ pressureOutput, vmStatOutput, totalMemoryBytes }) (memory_pressure free% x total first, vm_stat second, else null) and parseDarwinPressureLevel(content) ('1' normal, '2' warn, '4' critical, else null). createDarwinHostHealthCollector computes availableMemoryBytes via computeDarwinAvailableMemoryBytes (replacing lines 203-205). In system-health-service.ts rewrite readProcMemoryDarwin to run 'memory_pressure -Q', 'vm_stat', 'sysctl -n vm.swapusage' via execAsync (5 s timeout, each in its own try/catch) and use computeDarwinAvailableMemoryBytes (fallback freemem()), parseDarwinVmStat for memFree, parseDarwinSwapUsage for swap. Add the PRD's synthesized fixture file verbatim. Tests: darwin.test.ts fixture assertions and pressure-level table; system-health-service-psi.test.ts darwin case whose exec mock answers per command string with callback(null, { stdout }) and asserts readProcMemory().memAvailable equals the collector's availableMemoryBytes for the same outputs. Implementation checkpoint: confirm vm_stat line names on a real Mac if one is reachable; otherwise the fixture test is the verification of record. Never use execSync."
+        },
+        "items": [
+          {
+            "id": "darwin-available-memory.ac1",
+            "title": "Given the vm-stat-16gb-mac.txt fixture and a 16 GiB total, parseDarwinVmStat returns availableMemoryBytes 2576973824 with availableSource 'activity-monitor'; without a total it returns 1073741824 with 'free-inactive-speculative'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "darwin-available-memory.ac2",
+            "title": "computeDarwinAvailableMemoryBytes returns Math.round(total x 15/100) for 'System-wide memory free percentage: 15%', falls back to the vm_stat value when the pressure output is null, and returns null when both outputs are null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "darwin-available-memory.ac3",
+            "title": "Given identical memory_pressure and vm_stat outputs on darwin, readProcMemory().memAvailable returns the same bytes as createDarwinHostHealthCollector's availableMemoryBytes, asserted in system-health-service-psi.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "darwin-available-memory.ac4",
+            "title": "parseDarwinPressureLevel returns normal for '1\\n', warn for '2', critical for '4', and null for '0' or ''",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "darwin-stall-signal",
+        "title": "Use macOS memory pressure as the governor stall signal and ignore macOS swap runway",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T15:27:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4267",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/system-health-service.ts",
+            "src/lib/cloister/memory-verdict-cache.ts",
+            "src/lib/cloister/memory-governor.ts",
+            "tests/unit/lib/cloister/memory-governor.test.ts",
+            "tests/unit/dashboard/server/services/system-health-service-psi.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-governor.test.ts tests/unit/dashboard/server/services/system-health-service-psi.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-governor.test.ts passes including the three new darwin cases and all existing Linux cases",
+            "system-health-service-psi.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. ProcMemorySnapshot gains macPressureLevel ('normal'|'warn'|'critical'|null) and swapGrowsOnDemand (boolean); Linux sets null/false; darwin reads 'sysctl -n kern.memorystatus_vm_pressure_level' via execAsync (5 s, try/catch => null), parses with parseDarwinPressureLevel, and sets swapGrowsOnDemand true. memory-verdict-cache.ts: add 'mac-pressure-critical' to GovernorTriggerKind and macPressureLevel to MemoryVerdict. memory-governor.ts: GovernorRunway gains both fields; line 180 becomes 'const swapEnabled = runway.swapTotalBytes > 0 && !runway.swapGrowsOnDemand;'; right after the memoryMode === 'shedding' return (line 192) add a critical-pressure shed returning trigger { kind: 'mac-pressure-critical', readingBytes: availableBytes, thresholdBytes: reserves.hardBytes }; psiIsCalm (line 237) also true when snapshot.macPressureLevel === 'normal'; copy macPressureLevel into the verdict; update the header comment (lines 55-62). Tests in memory-governor.test.ts: darwin normal pressure with low swap and available above SOFT => band ok; critical pressure above HARD => band hard with mac-pressure-critical; darwin holding + normal pressure past the calm window under vi.useFakeTimers()/vi.setSystemTime => band ok. Existing Linux fixtures get macPressureLevel null and swapGrowsOnDemand false. Fake timers are mandatory for the calm-window test."
+        },
+        "items": [
+          {
+            "id": "darwin-stall-signal.ac1",
+            "title": "Given a darwin snapshot with swap 0.5 of 4 GiB free, null PSI, macPressureLevel 'normal' and available above SOFT, assessMemoryPressure returns band 'ok' with no 'psi-unavailable' trigger",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "darwin-stall-signal.ac2",
+            "title": "Given macPressureLevel 'critical' with available above HARD, assessMemoryPressure returns band 'hard' and trigger kind 'mac-pressure-critical'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "darwin-stall-signal.ac3",
+            "title": "Given a holding darwin governor with available between SOFT and RECOVERY and macPressureLevel 'normal', after the calm window elapses under fake timers assessMemoryPressure returns band 'ok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "darwin-stall-signal.ac4",
+            "title": "Every pre-existing Linux case in memory-governor.test.ts passes with macPressureLevel null and swapGrowsOnDemand false, preserving Linux swap-psi and psi-unavailable behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "truthful-patrol-messages",
+        "title": "Make governor activity-feed messages state what the governor actually holds",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:27:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4267",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-pressure-patrol.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "memory-pressure-patrol.test.ts passes including the new truthful-text and darwin cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In memory-pressure-patrol.ts: formatTrigger soft-dip => 'The memory governor started holding at HH:MM UTC when available memory dipped to X, under the Y soft reserve.'; hard => 'The memory governor entered critical memory shedding at HH:MM UTC when available memory fell to X, under the Y hard reserve.'; new mac-pressure-critical => 'The memory governor entered critical memory shedding at HH:MM UTC because macOS reported critical memory pressure with X available.'; swap texts and no-trigger fallbacks replace 'Overdeck stopped admitting work' with 'The memory governor started holding'. Add const GOVERNOR_SCOPE = 'The governor only holds the automatic resume of agents the preemptive scheduler paused; conversations, pan start, and dashboard Start are not blocked by it.' and append it to holding and shedding messages. Delete 'Overdeck admits nothing while shedding is active.'. formatSheddingExit for mac-pressure-critical returns the PRD text; other exits say 'Automatic resume returns at …' instead of 'Admissions resume at …'. Holding calm clause reads 'once macOS memory pressure stays normal for <window>' when verdict.macPressureLevel != null. buildMemoryDetails replaces the PSI line with 'macOS memory pressure: <level>' when PSI is null and macPressureLevel is set. ok message => 'The governor has released its hold.'; watch message => 'The governor is not holding anything yet; it starts holding if …'. Update test line 124 ('stopped admitting' => 'started holding') and add the three PRD tests."
+        },
+        "items": [
+          {
+            "id": "truthful-patrol-messages.ac1",
+            "title": "A shedding verdict emits a message that does not contain 'admits nothing' and does contain 'conversations, pan start, and dashboard Start are not blocked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "truthful-patrol-messages.ac2",
+            "title": "A verdict with trigger kind 'mac-pressure-critical' emits 'macOS reported critical memory pressure' and details containing 'macOS memory pressure: critical'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "truthful-patrol-messages.ac3",
+            "title": "A darwin holding verdict with macPressureLevel 'normal' emits 'macOS memory pressure stays normal for 10 minutes' and its message does not contain 'PSI full avg10'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "truthful-patrol-messages.ac4",
+            "title": "A soft-dip holding verdict emits 'started holding' and no emitted governor message contains 'stopped admitting' or 'Admissions resume'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "governor-docs",
+        "title": "Document scaled defaults, macOS measures, and governor scope",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:27:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4267",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "configuration/memory-governor.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '\"configuration/memory-governor\"' docs.json",
+            "grep -n 'shed()' docs/PIPELINE-GATES.md",
+            "grep -n 'kern.memorystatus_vm_pressure_level' configuration/memory-governor.mdx docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "docs.json lists configuration/memory-governor in the Configuration group",
+            "PIPELINE-GATES.md memory gate bullet states shed() has no caller",
+            "both docs name kern.memorystatus_vm_pressure_level"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. (1) docs/PIPELINE-GATES.md '**Memory gate (PAN-2500):**' bullet (lines 575-588): state the share-of-RAM defaults with caps (hard <= 10%, soft <= 20%, watch <= 25%, recovery <= 35%; unchanged at >= 40 GB); correct the drift that 'below HARD the patrol sheds' — shed() has no caller and the patrol only reports; state the governor gates only resumeYieldedAgents and never conversations, pan start or dashboard Start; state spawn guardrail defaults min(4, RAM/8) / min(2, RAM/16); state the macOS available measure (memory_pressure -Q, Activity Monitor vm_stat fallback), the macOS stall signal (kern.memorystatus_vm_pressure_level) and that swap runway is ignored on macOS. (2) New configuration/memory-governor.mdx with frontmatter 'title: Memory governor' and a description: a table of resources.governor_{hard,soft,watch,recovery}_reserve_gb and resources.memory_warn_gb / memory_block_gb with formulas and the 8/16/32/64 GB values; the normalization rules; Linux vs macOS measurement; what the governor holds and does not hold; a 'Small Macs' section with the issue's config.yaml override. (3) docs.json: add \"configuration/memory-governor\" after \"configuration/terminal-backend\" in the Configuration group."
+        },
+        "items": [
+          {
+            "id": "governor-docs.ac1",
+            "title": "configuration/memory-governor.mdx exists and renders a table listing governor_hard/soft/watch/recovery_reserve_gb and memory_warn_gb/memory_block_gb with their 8, 16, 32 and 64 GB default values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-docs.ac2",
+            "title": "docs.json contains \"configuration/memory-governor\" in the Configuration group directly after \"configuration/terminal-backend\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-docs.ac3",
+            "title": "The PIPELINE-GATES.md memory gate bullet contains the statements that shed() has no caller and that the governor never blocks conversations, pan start or dashboard Start, plus the four reserve caps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-docs.ac4",
+            "title": "Each of configuration/memory-governor.mdx and PIPELINE-GATES.md contains the macOS available measure (memory_pressure -Q with the Activity Monitor vm_stat fallback) and name kern.memorystatus_vm_pressure_level as the macOS stall signal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "governor-reserve-defaults",
+        "to": "spawn-threshold-defaults",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-threshold-defaults",
+        "to": "reserve-normalization",
+        "type": "blocks"
+      },
+      {
+        "from": "darwin-available-memory",
+        "to": "darwin-stall-signal",
+        "type": "blocks"
+      },
+      {
+        "from": "darwin-stall-signal",
+        "to": "truthful-patrol-messages",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
