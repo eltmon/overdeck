@@ -377,12 +377,27 @@ async function generateInstallationTokenBody(
   };
 }
 
+/** PAN-4264: a minted installation token is reused until 5 minutes before it expires. */
+const INSTALLATION_TOKEN_REUSE_MARGIN_MS = 5 * 60_000;
+let installationTokenMemo: { installationId: string; token: string; expiresAtMs: number } | null = null;
+
+/** Drop the memoized installation token (tests only). */
+export function resetInstallationTokenCacheForTests(): void {
+  installationTokenMemo = null;
+}
+
 async function getInstallationAccessToken(): Promise<string> {
   const config = loadGitHubAppConfig();
   if (!config) {
     throw new Error('GitHub App not configured. Run: node scripts/create-github-app.mjs');
   }
-  const { token } = await Effect.runPromise(generateInstallationToken(config));
+  const memo = installationTokenMemo;
+  if (memo?.installationId === config.installationId && Date.now() < memo.expiresAtMs - INSTALLATION_TOKEN_REUSE_MARGIN_MS) {
+    return memo.token;
+  }
+  const { token, expiresAt } = await Effect.runPromise(generateInstallationToken(config));
+  const expiresAtMs = Date.parse(expiresAt);
+  installationTokenMemo = Number.isFinite(expiresAtMs) ? { installationId: config.installationId, token, expiresAtMs } : null;
   return token;
 }
 

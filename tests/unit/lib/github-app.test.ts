@@ -50,9 +50,16 @@ import {
   mergePullRequestWithApp,
   postOverdeckTestsStatus,
   resetAppBotLoginCache,
+  resetInstallationTokenCacheForTests,
   resolveAppBotLogin,
   verifyAppCanMerge,
 } from '../../../src/lib/github-app.js';
+
+// PAN-4264: installation tokens are memoized per process; every test starts
+// without one so its fetch mock sees the mint it expects.
+beforeEach(() => {
+  resetInstallationTokenCacheForTests();
+});
 
 // #4066 review (R3-2): the bot whose reviews approve a merge is the installed
 // App's (here `overdeck-agent`, App 4205044), never a hard-coded login.
@@ -748,5 +755,51 @@ describe('App REST quota metering (PAN-4264)', () => {
     await expect(getIssueState('eltmon', 'overdeck', 4264))
       .rejects.toThrow('GitHub API GET /repos/eltmon/overdeck/issues/4264 failed: 404 Not Found');
     expect((await readLedgerLines()).map((l) => l.outcome)).toEqual(['error']);
+  });
+});
+
+// PAN-4264 Work Item 5: one installation token serves every App call until
+// 5 minutes before it expires.
+describe('installation token cache (PAN-4264)', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 8, 27, 15, 0));
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/access_tokens')) {
+        const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+        return new Response(JSON.stringify({ token: 'token', expires_at: expiresAt }), { status: 201 });
+      }
+      return new Response(JSON.stringify({ state: 'open' }), { status: 200 });
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function mintCount(): number {
+    return fetchMock.mock.calls.filter((call) => String(call[0]).endsWith('/access_tokens')).length;
+  }
+
+  it('mints one token for two App calls within its lifetime', async () => {
+    await getIssueState('eltmon', 'overdeck', 1);
+    await getIssueState('eltmon', 'overdeck', 2);
+    expect(mintCount()).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('mints again 56 minutes after a 60-minute token was minted', async () => {
+    await getIssueState('eltmon', 'overdeck', 1);
+    await vi.advanceTimersByTimeAsync(54 * 60_000);
+    await getIssueState('eltmon', 'overdeck', 2);
+    expect(mintCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
+    await getIssueState('eltmon', 'overdeck', 3);
+    expect(mintCount()).toBe(2);
   });
 });
