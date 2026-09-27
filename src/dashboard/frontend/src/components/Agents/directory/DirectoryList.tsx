@@ -61,7 +61,7 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
         : `No agents here in the last ${windowLabel}.`;
 
   return (
-    <div className="flex min-h-0 flex-col border-r border-border" data-component="directory-list-pane">
+    <div className="flex min-h-0 flex-1 flex-col" data-component="directory-list-pane">
       <div className="flex h-11 shrink-0 items-center border-b border-border px-3">
         <input
           ref={filterRef}

@@ -85,13 +85,13 @@ export async function handleTurnComplete(
     const sessionFile = await deps.resolveSessionFile(conv);
     if (!sessionFile || !existsSync(sessionFile)) return;
 
-    const { messages } = await getCachedMessages(sessionFile, false);
+    const { messages, latestCompactSummary } = await getCachedMessages(sessionFile, false);
     const firstCompleteAssistant = messages.find(
       (m) => m.role === 'assistant' && m.completedAt,
     );
     if (!firstCompleteAssistant) return;
 
-    const transcript = serializeConversationTranscript(messages);
+    const transcript = serializeConversationTranscript(messages, { compactSummary: latestCompactSummary, purpose: 'title' });
     if (!transcript.trim()) return;
 
     console.log(`[claude-invoke] purpose=conversation-title-refine | model=${configuredTitleModel()} | conversation=${name} | transcriptChars=${transcript.length}`);

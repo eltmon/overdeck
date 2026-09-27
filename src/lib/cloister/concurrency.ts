@@ -24,6 +24,7 @@ import {
   getAgentRuntimeStateSync,
 } from '../agents.js';
 import { isIdle } from '../agents/liveness.js';
+import { isFlywheelStartedBy } from '../agents/provenance.js';
 import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 
@@ -278,10 +279,11 @@ export async function emergencyBrake(): Promise<BrakeResult> {
     return { before: runningWork.length, cap: maxWorkAgents, stopped: [], remaining: runningWork.length };
   }
 
-  // PAN-1812: operator-started work agents (no flywheelRunId) are exempt from
-  // automatic governor reaping when the config flag is enabled.
+  // PAN-1812/PAN-3634: operator-started work agents (startedBy not
+  // 'flywheel:'-provenanced) are exempt from automatic governor reaping when
+  // the config flag is enabled.
   const candidates = exemptOperatorStarted
-    ? runningWork.filter(a => a.flywheelRunId !== undefined && a.flywheelRunId !== null && a.flywheelRunId !== '')
+    ? runningWork.filter(a => isFlywheelStartedBy(a.startedBy))
     : runningWork;
 
   // Stop the least-productive first: idle agents ahead of active ones, and among

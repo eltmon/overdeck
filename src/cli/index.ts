@@ -295,6 +295,7 @@ backlog
     writeSequenceMd(projectRoot, result.doc);
     // Whoever writes a .pan/ artifact commits it; the sequence commit is pushed too (PAN-3923).
     const { commitPlanArtifacts, pushPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
+    const { surfacePlanArtifactPush } = await import('../lib/overdeck/plan-artifact-push-report.js');
     const planHome = (await import('../lib/pan-dir/paths.js')).resolvePlanHome(projectRoot);
     const commit = await commitPlanArtifacts({ cwd: planHome, paths: ['.pan/backlog'], message: 'chore(workspace): backlog sequence' });
     console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
@@ -302,8 +303,8 @@ backlog
       console.error(chalk.yellow(`  ⚠ Could not commit the sequence: ${commit.reason}`));
     } else {
       const push = await pushPlanArtifacts(planHome);
-      const warning = push.pushed ? push.warning : push.skipped ? undefined : push.reason;
-      if (warning) console.error(chalk.yellow(`  ⚠ Sequence push: ${warning}`));
+      const description = await surfacePlanArtifactPush(push, { planHome, command: 'pan backlog write-sequence' });
+      if (description) console.error(chalk.yellow(`  ⚠ Sequence push: ${description.message}`));
     }
   });
 
@@ -364,6 +365,11 @@ program
   .command('unpause <id>')
   .description('Clear an agent pause gate without spawning it')
   .action(lazyAction(() => import('./commands/unpause.js'), 'unpauseCommand'));
+
+program
+  .command('untroubled <id>')
+  .description('Clear an agent troubled gate without spawning it')
+  .action(lazyAction(() => import('./commands/untroubled.js'), 'untroubledCommand'));
 
 program
   .command('fork [conv]')
@@ -461,11 +467,11 @@ program
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
   .option('--plan-model <model>', 'Planning model override when this start auto-plans (defaults to roles.plan.model); the work model stays --model')
   .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal xBRIEF from the issue title/body')
-  .option('--force', 'Clear paused and pending-operator-decision gates and start anyway')
+  .option('--force', 'Clear paused, troubled, and pending-operator-decision gates and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
-  .option('--skip-freshness', 'Bypass the plan-freshness preflight and spawn even if the plan names files that no longer exist')
+  .option('--skip-freshness', 'Bypass the plan-freshness preflight and spawn even if the plan names files deleted since it was written')
   .action(lazyAction(() => import('./commands/start.js'), 'issueCommand'));
 
 program

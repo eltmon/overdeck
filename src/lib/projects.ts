@@ -75,6 +75,7 @@ import { extractPrefix, parseIssueId } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
 import { findContainingProject, findContainingProjectAsync } from './projects/path-containment.js';
 import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
+import type { EffortLevel } from '@overdeck/contracts';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
 
@@ -450,6 +451,13 @@ export interface ProjectConfig {
    * Defaults to the project repo itself (monorepo) when absent.
    */
   pan_records?: PanRecordsConfig;
+  /**
+   * Per-project default reasoning effort, below role/sub-role/tier/plan/item
+   * in resolveEffort's precedence but above the global default. resolveEffort
+   * ignores a non-canonical value here with a warning rather than failing —
+   * this is config, not a validated schema.
+   */
+  effort?: EffortLevel;
 }
 
 /** Resolve the issue prefix for a project. */

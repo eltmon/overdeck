@@ -24,6 +24,7 @@ import type { DomainEvent } from '@overdeck/contracts';
 
 import { emitActivityEntry } from '../activity-logger.js';
 import { getAgentState } from '../agents/agent-state-read.js';
+import { planningHandoffStartedBy } from '../agents/provenance.js';
 import { readAutoSpawnOnFinalizeFlagAsync } from '../planning/auto-spawn-consent.js';
 import { liveAgentInventory } from '../terminal-backends/inventory.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
@@ -58,6 +59,8 @@ export function recordHandoffDeferred(options: {
   error: string;
   httpStatus?: number;
   now?: number;
+  /** True when the Deacon was frozen at the moment of the deferral (PAN-4210): the retry is journaled but held until it thaws. */
+  deaconPaused?: boolean;
 }): PipelineJournalEntry {
   const now = options.now ?? Date.now();
   const schedule: DeferredHandoffSchedule = {
@@ -74,6 +77,7 @@ export function recordHandoffDeferred(options: {
       reason: 'guardrails',
       error: options.error,
       ...(options.httpStatus !== undefined ? { httpStatus: options.httpStatus } : {}),
+      ...(options.deaconPaused === true ? { deaconPaused: true } : {}),
     },
   });
 }
@@ -104,13 +108,14 @@ function operatorStandDownReason(
   const work = readAgentState(workAgentId);
   if (work) {
     if (work.paused === true) return 'the issue is paused';
-    if (work.status === 'running' || work.status === 'starting') return 'a work agent already exists';
     if (after(work.startedAt)) return 'the work agent was started after the deferral';
     if (after(work.stoppedAt)) return 'the work agent was stopped after the deferral';
   }
-  // A new planning cycle does its own hand-off when it finalizes.
+  // The status label is a spawn-time snapshot: since PAN-3917 complete-planning's
+  // stop projection writes no state.json, so it never reads anything but
+  // 'running' — only startedAt tells us whether this is a new cycle.
   const planning = readAgentState(`planning-${issueLower}`);
-  if (planning && (planning.status === 'running' || planning.status === 'starting' || after(planning.startedAt))) {
+  if (planning && after(planning.startedAt)) {
     return 'planning was restarted after the deferral';
   }
   return null;
@@ -121,20 +126,20 @@ export interface RetryDeferredHandoffsDeps {
   liveAgentInventory?: typeof liveAgentInventory;
   getAgentState?: typeof getAgentState;
   readConsent?: (issueId: string) => Promise<boolean>;
-  spawn?: (issueId: string) => Promise<SpawnWorkAgentResult>;
+  spawn?: (issueId: string, startedBy: string) => Promise<SpawnWorkAgentResult>;
   emitActivity?: typeof emitActivityEntry;
 }
 
 const inFlight = new Set<string>();
 
-function defaultSpawn(issueId: string): Promise<SpawnWorkAgentResult> {
+function defaultSpawn(issueId: string, startedBy: string): Promise<SpawnWorkAgentResult> {
   // No acknowledgement: `spawnWorkAgentThroughAgentsEndpoint` sends none, so
   // every guardrail warning still refuses the retry.
-  return spawnWorkAgentThroughAgentsEndpoint(issueId, undefined, true, 'planning-auto-handoff');
+  return spawnWorkAgentThroughAgentsEndpoint(issueId, undefined, true, startedBy);
 }
 
 /** Skip reasons that end the retries without calling it a failure: the operator or the tracker decided. */
-const STAND_DOWN_SKIP_REASONS = new Set(['paused', 'troubled', 'closed-issue']);
+const STAND_DOWN_SKIP_REASONS = new Set(['paused', 'troubled', 'closed-issue', 'already-running']);
 /** Skip reasons no amount of waiting fixes. */
 const GIVE_UP_SKIP_REASONS = new Set(['unauthorized']);
 
@@ -215,9 +220,12 @@ async function retryOne(input: {
   if (now < Date.parse(schedule.nextRetryAt)) return null;
 
   const attempt = schedule.attempt + 1;
+  const startedBy = planningHandoffStartedBy(
+    input.readAgentState(`planning-${issueId.toLowerCase()}`)?.startedBy,
+  );
   let result: SpawnWorkAgentResult;
   try {
-    result = await (deps.spawn ?? defaultSpawn)(issueId);
+    result = await (deps.spawn ?? defaultSpawn)(issueId, startedBy);
   } catch (err) {
     result = { spawned: false, skippedReason: 'unreachable', error: err instanceof Error ? err.message : String(err) };
   }

@@ -476,6 +476,30 @@ and notes) and raised as a warning in the activity feed. The agent is told to
 record no verdict, post its findings as a plain PR comment for the operator,
 and exit.
 
+## Plan-freshness preflight (PAN-3917, PAN-4212)
+
+Right before `pan start` spawns a work agent, it reads the workspace xBRIEF
+plan and checks every non-glob `metadata.files_scope` path across the plan's
+items. A work agent spawned against paths the codebase moved on since
+planning — a file renamed, moved, or deleted — spins on paths that no longer
+exist, so this preflight refuses the spawn instead: `The plan for <ID>
+references files that no longer exist`.
+
+A missing path is refused only when a commit on the workspace `HEAD` deleted
+it *after* `plan.created`. A path that never existed on `HEAD`, or that `HEAD`
+deleted *before* the plan was written, is a file the plan intends to create or
+deliberately restore, and passes the check.
+
+History comes from `HEAD` only, never `--all`. The `--all` form walks the
+`refs/pan/turn/*` checkpoint refs Overdeck writes every turn — tens of
+thousands of them on a long-lived repo — so any file a session ever drafted
+would count as "tracked," flagging every real creation as drift.
+
+`--skip-freshness` bypasses the check entirely and spawns anyway; the fix for
+a genuine refusal is `pan plan <ID>` to re-plan against the current tree. On
+the dashboard's auto-start path the refusal is not surfaced in the UI — it
+lands only in `spawn.log`.
+
 ## Agent Auto-Resume Gates
 
 Auto-resume is intentionally suppressible:
@@ -533,6 +557,13 @@ Auto-resume is intentionally suppressible:
     owed. Stalled-review recovery re-requests it (see below), which covers an
     unpause whose re-request failed, an unpause while the dashboard was down,
     `pan start --force`, and dashboard Start with `clearGates`.
+- **Troubled gate (PAN-4211):** `applyAgentFailure` sets `troubled` (plus
+  `troubledAt` and the failure-tracking fields) after three consecutive
+  resume/start failures within ten minutes. It blocks `pan start`, `pan
+  resume`, dashboard Start and MERGE until cleared. `pan untroubled <id>`
+  clears the flag and the failure counters without spawning. `pan start
+  <id> --force` (and dashboard Start with `clearGates`) clears it and starts
+  in one step. Both doors record an `untroubled` operator intervention.
 - **Operator-stop gate:** `stoppedByUser` blocks autonomous re-drive when no
   completed handoff exists and emits one durable needs-you trip. Only an
   operator-initiated stop sets the flag (PAN-3324) — `pan kill`, `pan
@@ -555,6 +586,19 @@ Auto-resume is intentionally suppressible:
   `memoryWarnGb`/`memoryBlockGb` thresholds with no hysteresis. This is
   separate from `--no-resume`, which suppresses resume outright regardless
   of memory.
+- **Operator-started exemption (PAN-1812, PAN-3634):** when
+  `exempt_operator_started` is on, the emergency brake
+  (`concurrency.ts:emergencyBrake`) and the memory governor's shed
+  (`memory-governor.ts:selectAgentToPause`) reap only agents whose
+  `startedBy` starts with `flywheel:` (`isFlywheelStartedBy` in
+  `agents/provenance.js`) — never on a stale `flywheelRunId` field, which is
+  inert legacy data. The Flywheel conversation mints `flywheel:conv-flywheel`
+  from `OVERDECK_CONVERSATION`; the planning auto-handoff and its deferred
+  retry copy that token only when the planning session it hands off from was
+  itself Flywheel-started, and send `planning-auto-handoff` (an operator
+  origin) otherwise. Every other origin — an operator's `pan start`, a
+  worker, a reconciler — is exempt, which is what lets a deliberate operator
+  spawn survive the cap.
 - **Deferred planning hand-off (PAN-4155):** when planning finalizes with
   auto-start, the first POST `/api/agents` acknowledges tight RAM and a high
   agent count only (PAN-3977). If a guardrail still refuses it (the agent
@@ -564,7 +608,14 @@ Auto-resume is intentionally suppressible:
   acknowledgement at all, so a machine never waives a health warning on a
   retry. Only a refusal whose response carries a guardrail decision is
   deferred; the start gate and the dirty-tree guard also answer 409 and stay
-  failures. See "Deacon-lite" below for the schedule and stop conditions.
+  failures. The retried spawn still runs on the operator's `pan start --model`
+  from planning time (PAN-3022): the model lives in the auto-start consent
+  record the retry spends, not on the deferred request itself. A deferral
+  recorded while the Deacon is frozen (`deacon.globally_paused`, the dashboard
+  sidebar's Snowflake toggle) is journaled the same way but held, not
+  retried, until the freeze thaws — the warn activity line, `pan plan
+  finalize`/`pan plan done`'s output, and `pan show` all say so (PAN-4210).
+  See "Deacon-lite" below for the schedule and stop conditions.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -610,7 +661,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | --- | --- |
 | `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
 | `verification.failed` (`failedCheck: 'test'`, `cycleCount`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
-| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through |
+| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through; also reached over that same door by deacon-lite's `recoverUndispatchedReviews` (source `deacon-lite`), re-requesting a review a dashboard restart left undispatched |
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewers`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
@@ -623,9 +674,9 @@ One piece of stored pipeline state came back, and it is not a status.
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
 
-## Deacon-lite: six routines
+## Deacon-lite: seven routines
 
-`runDeaconLite()` runs on a 60s tick and holds six routines, all of which only
+`runDeaconLite()` runs on a 60s tick and holds seven routines, all of which only
 observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
@@ -641,6 +692,12 @@ observe and nudge — none reconciles a stored copy of anything:
    are all gone.
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
+7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,
+   PAN-4221) — re-requests a review a dashboard restart left undispatched.
+
+While the Deacon is frozen (`deacon.globally_paused`), `runDeaconLite()`
+returns before any of the seven routines run — none of them fires at all
+until it thaws (PAN-4210).
 
 `recoverStalledReviews` reads the journal and the issue pause gate
 (`getIssuePause`, see "Manual pause" above), with no GitHub call and no tracker
@@ -723,9 +780,45 @@ the journal's last, so the patrol leaves the issue to the operator.
 where some reviewers posted a verdict and one died is not recovered, because the
 last entry is then `review.verdict` — `review.dispatched.data.reviewers` carries
 enough to count verdicts later. A quick-mode review writes no `review.dispatched`
-entry, so a dead quick reviewer is not recovered either. And a server death
-between `verification.started` and its outcome leaves `verification.*` last,
-which the rule above deliberately skips.
+entry, so a dead quick reviewer is not recovered either. A server death between
+`verification.started` and its outcome still leaves `verification.started` or
+`verification.failed` last, and both are still skipped by `recoverStalledReviews`
+above (an agent that owes rework must not have verification re-run every hour).
+A `verification.passed` tail whose source is `request-review`, though, is now
+recovered — by `recoverUndispatchedReviews`, below.
+
+`recoverUndispatchedReviews` (PAN-4221) closes the one `verification.*` tail
+`recoverStalledReviews` deliberately leaves alone: a dashboard restart while a
+detached verification worker runs kills the push-and-dispatch continuation that
+lived in the dead process, so the worker's own `verification.passed` write
+becomes a permanent tail with nobody left to dispatch the review (PAN-4198..4201
+sat about 15 hours on 2026-09-25). It acts only when every one of these holds:
+the workspace's **last** journal entry is `verification.passed` with
+`source: 'request-review'` — a `review` (dashboard `/trigger`) or `merge-verify`
+pass belongs to a different door and is left alone, since a `/trigger` run may
+carry a per-run review mode this routine cannot reproduce, and a merge-gate pass
+belongs to the merge door; the entry is at least 5 minutes old
+(`UNDISPATCHED_REVIEW_MIN_AGE_MS`) — past a normal push-and-dispatch, so a runner
+still mid-push is not mistaken for dead; no verification worker is active for the
+issue (`isVerificationWorkerActive`); no pane equal to `agent-<issue>-review` or
+starting with `agent-<issue>-review-` is live — the parent counts, not just the
+sub-reviewer lanes, because quick mode (the default) writes no
+`review.dispatched`, so a healthy quick reviewer's tail stays
+`verification.passed` for its whole life; the issue is unpaused
+(`getIssuePause`); review mode is not `none`; and the primary repo's current
+head, read fresh through `verified-head.ts`'s `readPrimaryHead8`, still matches
+the head the pass stamped. A per-issue hourly cooldown
+(`UNDISPATCHED_REVIEW_COOLDOWN_MS`, set *before* the request so a refused or
+unreachable route is not retried every tick) and a cap of 3 deacon-lite
+`review.requested` entries since the last `review.requested` from any other
+source (`UNDISPATCHED_REVIEW_ATTEMPT_CAP`) stop an hourly re-verify loop once
+each dispatch keeps coming back gated — the cap is logged once, not every tick.
+Recovery goes through the same guarded route `rerequestHaltedReview` uses
+(`requestReviewThroughRoute`, source `deacon-lite`), never a skip-verification
+door: the route re-verifies against current main and journals
+`review.requested` itself, which moves the tail and makes the recovery
+exactly-once. The first deacon-lite patrol runs at deacon start, so a stall that
+began before a restart is covered as soon as the process comes back up.
 
 `retryDeferredHandoffs` acts only when an issue's last `handoff.*` entry is
 `handoff.deferred` or `handoff.retried`. Each of those entries carries the
@@ -735,13 +828,26 @@ run 2, 4, 8 and 16 minutes apart, then every 20 minutes. Each one POSTs
 `/api/agents` through `spawnWorkAgentThroughAgentsEndpoint` with
 `autoSpawnConsentRequired: true` and no acknowledgement, so a success spends
 the operator's auto-start consent exactly as the first attempt would have.
+The retried spawn runs on the operator's `pan start --model` from planning
+time (PAN-3022) — the retry carries no model of its own, so it reads the
+consent record's `workModel` and spends it along with the rest of the claim.
+While the Deacon is frozen, `runDeaconLite()` returns before
+`retryDeferredHandoffs` ever runs, so no retry is attempted at all; the
+schedule stays exactly as journaled and resumes on the first tick after the
+freeze lifts. The two-hour window keeps counting the whole time it is frozen,
+so a deferral that was already old enough can give up on that very first
+post-thaw tick.
 
 It stands down (a `handoff.abandoned` entry with `outcome: 'stood-down'` and an
 info activity line, no failure) when the operator already acted: an
-`agent-<issue>` pane is live, the work agent is paused, running or starting,
-it was started or stopped after the deferral, planning was restarted, the
+`agent-<issue>` pane is live, the work agent is paused, it was started or
+stopped after the deferral, planning was restarted (its `startedAt` is later
+than the deferral — the `status` label itself is never read, since PAN-3917
+complete-planning's stop projection appends an event but writes no
+`state.json`, so that label would otherwise read `running` forever), the
 auto-start consent is no longer `granted`, or the retried spawn answers
-`paused`, `troubled` or closed-issue. Two hours after the first refusal, or on
-an `unauthorized` answer, it gives up: a `handoff.abandoned` entry with
-`outcome: 'gave-up'`, a `planning.failed` event with `stage: 'auto-handoff'`,
-and a warn-level activity line that tells the operator to run `pan start`.
+`paused`, `troubled`, `closed-issue` or (PAN-4210) `already-running`. Two
+hours after the first refusal, or on an `unauthorized` answer, it gives up: a
+`handoff.abandoned` entry with `outcome: 'gave-up'`, a `planning.failed` event
+with `stage: 'auto-handoff'`, and a warn-level activity line that tells the
+operator to run `pan start`.

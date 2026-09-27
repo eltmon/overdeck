@@ -38,6 +38,23 @@ export type DirectoryTranscriptRef = typeof DirectoryTranscriptRef.Type
 export const DirectoryEntryLocation = Schema.Literals(["local", "remote"])
 export type DirectoryEntryLocation = typeof DirectoryEntryLocation.Type
 
+export const DirectoryPauseBy = Schema.Literals(["operator", "scheduler", "machine"])
+export type DirectoryPauseBy = typeof DirectoryPauseBy.Type
+
+export const DirectoryPause = Schema.Struct({
+  by: DirectoryPauseBy,
+  reason: Schema.NullOr(Schema.String),
+  since: Schema.NullOr(Schema.String),
+})
+export type DirectoryPause = typeof DirectoryPause.Type
+
+/** A provider error (billing, usage limit, ...) detected at the end of a transcript (PAN-4222). */
+export const DirectoryProviderError = Schema.Struct({
+  message: Schema.String,
+  at: Schema.String,
+})
+export type DirectoryProviderError = typeof DirectoryProviderError.Type
+
 export const DirectoryEntry = Schema.Struct({
   id: Schema.String,
   kind: DirectoryEntryKind,
@@ -61,12 +78,26 @@ export const DirectoryEntry = Schema.Struct({
   costUsd: Schema.NullOr(Schema.Number),
   source: DirectoryEntrySource,
   transcript: Schema.NullOr(DirectoryTranscriptRef),
+  /** The pause gate from state.json, native agents only (PAN-4197). */
+  pause: Schema.optional(DirectoryPause),
+  /** The id runtime events (agentRuntimeById) are keyed under, when it differs from `id` (PAN-4222). */
+  runtimeId: Schema.optional(Schema.String),
+  /** A provider error detected at the transcript's end, conversations only (PAN-4222). */
+  providerError: Schema.optional(DirectoryProviderError),
 })
 export type DirectoryEntry = typeof DirectoryEntry.Type
+
+/**
+ * `window`: live entries plus finished ones active inside `windowHours`.
+ * `live` (PAN-4197): what is running or waiting now; `windowHours` is 0.
+ */
+export const DirectoryScope = Schema.Literals(["window", "live"])
+export type DirectoryScope = typeof DirectoryScope.Type
 
 export const AgentDirectoryResponse = Schema.Struct({
   generatedAt: Schema.String,
   windowHours: Schema.Number,
+  scope: Schema.optional(DirectoryScope),
   entries: Schema.Array(DirectoryEntry),
 })
 export type AgentDirectoryResponse = typeof AgentDirectoryResponse.Type

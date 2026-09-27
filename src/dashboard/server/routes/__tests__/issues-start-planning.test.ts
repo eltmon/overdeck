@@ -324,6 +324,40 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
     }));
   });
 
+  it('forwards an explicit workModel to spawnPlanningSession (PAN-3022)', async () => {
+    mockGitHubGetIssue.mockReturnValue(Effect.succeed({
+      number: 1993,
+      title: 'Work model threading',
+      body: 'Operator picked a work model at planning start.',
+      state: 'open',
+      labels: [],
+      htmlUrl: 'https://github.com/eltmon/overdeck/issues/1993',
+    }));
+
+    await postStartPlanning('PAN-1993', { workModel: 'k3' });
+
+    expect(mockSpawnPlanningSession).toHaveBeenCalledWith(expect.objectContaining({
+      workModel: 'k3',
+    }));
+  });
+
+  it('passes workModel undefined to spawnPlanningSession when the request omits it', async () => {
+    mockGitHubGetIssue.mockReturnValue(Effect.succeed({
+      number: 1993,
+      title: 'Work model threading',
+      body: 'No operator work model on this request.',
+      state: 'open',
+      labels: [],
+      htmlUrl: 'https://github.com/eltmon/overdeck/issues/1993',
+    }));
+
+    await postStartPlanning('PAN-1993');
+
+    expect(mockSpawnPlanningSession).toHaveBeenCalledWith(expect.objectContaining({
+      workModel: undefined,
+    }));
+  });
+
   it('returns a descriptive error after GitHub issue fetch retries are exhausted', async () => {
     mockGitHubGetIssue.mockReturnValue(Effect.fail(new IssueNotFound({ id: 'PAN-1993' })));
 

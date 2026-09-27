@@ -2,11 +2,10 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
-  ChevronRight, ChevronDown, FolderOpen, GitBranch,
-  BookText, Bug, Container, FileText, Radio, Workflow, MessageSquare,
+  ChevronRight, ChevronDown, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
-import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
+import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
 import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
@@ -23,6 +22,10 @@ import {
 import { IssuePeek } from '../../issue-detail/IssuePeek';
 import { useConvoDock } from '../../../lib/convoDock';
 import { useDerivedIssueState } from '../../../lib/store';
+import { resolveFeatureStateBadge } from './featureStateBadge';
+import { StatusDot } from '../StatusDot';
+import { PIPE_ORDER, PIPE_CLASS, PIPE_STEP_LABELS, derivePipeline, describePipeline, describePipeSegment } from './pipelineStrip';
+import { ResourceCluster } from './ResourceCluster';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -56,265 +59,6 @@ interface FeatureItemProps {
   onCleanupOrphanedResources?: (issueId: string) => void;
   onOpenPlanDialog?: (issueId: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
-}
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'prd', 'tasks', 'pr', 'docker'];
-
-function resourceColor(_feature: ProjectFeature): string {
-  // v1.2 color restraint: resources are infrastructure facts, not status —
-  // always neutral. Exceptional states (CI failing) color individual chips.
-  return 'var(--muted-foreground)';
-}
-
-function formatPrState(pr: { number: number; title: string; state: string; isDraft: boolean }): string {
-  const normalizedState = pr.state.toLowerCase();
-  return pr.isDraft ? `${normalizedState}, draft` : normalizedState;
-}
-
-function resourceSummary(feature: ProjectFeature, source: ResourceSource): { label: string; detail: string } | null {
-  const details = feature.resourceDetails;
-  if (!details) return null;
-  switch (source) {
-    case 'workspace':
-      return details.hasWorkspace ? { label: 'workspace', detail: 'allocated' } : null;
-    case 'branch': {
-      const parts: string[] = [];
-      if (details.localBranchCount > 0) parts.push(`local ${details.localBranchCount}`);
-      if (details.remoteBranchCount > 0) parts.push(`remote ${details.remoteBranchCount}`);
-      return parts.length > 0 ? { label: 'branch', detail: parts.join(' · ') } : null;
-    }
-    case 'tmux':
-      return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
-    case 'vbrief':
-      return details.hasXbrief ? { label: 'xBRIEF', detail: 'present' } : null;
-    case 'prd':
-      return details.hasPrd ? { label: 'PRD', detail: 'present' } : null;
-    case 'tasks':
-      return details.hasTasks ? { label: 'tasks', detail: 'present' } : null;
-    case 'pr':
-      return details.prs.length > 0
-        ? {
-            label: 'PR',
-            detail: details.prs.map((pr) => `#${pr.number} (${formatPrState(pr)})`).join(' · '),
-          }
-        : null;
-    case 'docker':
-      return details.dockerContainerCount > 0 ? { label: 'docker', detail: `${details.dockerContainerCount} container${details.dockerContainerCount === 1 ? '' : 's'}` } : null;
-    case 'remote-agent':
-      return details.remoteAgent ? { label: 'fly.io', detail: `${details.remoteAgent.vmName} (${details.remoteAgent.status})` } : null;
-    default:
-      return null;
-  }
-}
-
-function isOrphanedFeature(feature: ProjectFeature): boolean {
-  const state = feature.stateLabel.toLowerCase();
-  const rawState = feature.rawTrackerState?.toLowerCase() ?? '';
-  return state.includes('closed') || state.includes('done') || rawState.includes('closed') || rawState.includes('done');
-}
-
-function ResourceIcon({
-  source,
-  feature,
-  onActivate,
-}: {
-  source: ResourceSource;
-  feature: ProjectFeature;
-  onActivate?: () => void;
-}) {
-  const color = resourceColor(feature);
-  const summary = resourceSummary(feature, source);
-  if (!summary) return null;
-  const props = { size: 12, color, 'aria-hidden': true as const };
-  const icon = source === 'workspace' ? <FolderOpen {...props} />
-    : source === 'branch' ? <GitBranch {...props} />
-      : source === 'tmux' ? <Radio {...props} />
-        : source === 'vbrief' ? <BookText {...props} />
-          : source === 'prd' ? <FileText {...props} />
-            : source === 'tasks' ? <Bug {...props} />
-            : source === 'pr' ? <Workflow {...props} />
-              : <Container {...props} />;
-  const label = source === 'pr' ? summary.detail.split(' ')[0]
-    : source === 'branch' ? `branch ${summary.detail}`
-      : source === 'docker' ? `stack ${summary.detail.split(' ')[0]}`
-        : summary.label;
-  const content = <>{icon}<span>{label}</span></>;
-
-  if (onActivate) {
-    return (
-      <button
-        type="button"
-        className={styles.featureResourceChip}
-        title={`${summary.label}: ${summary.detail}`}
-        aria-label={`Open ${summary.label} for ${feature.issueId}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onActivate();
-        }}
-        onFocus={(event) => event.stopPropagation()}
-        onBlur={(event) => event.stopPropagation()}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <span className={styles.featureResourceChip} title={`${summary.label}: ${summary.detail}`}>
-      {content}
-    </span>
-  );
-}
-
-function ResourceStrip({
-  feature,
-  onCleanupOrphanedResources,
-}: {
-  feature: ProjectFeature;
-  onCleanupOrphanedResources?: (issueId: string) => void;
-}) {
-  const details = feature.resourceDetails;
-  const openTasksViewer = useDashboardStore((state) => state.openTasksViewer);
-  const openPrdViewer = useDashboardStore((state) => state.openPrdViewer);
-  const openXbriefViewer = useDashboardStore((state) => state.openXbriefViewer);
-  const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
-  const orphaned = isOrphanedFeature(feature);
-  const shouldRender = resources.length > 0;
-
-  useEffect(() => {
-    if (!shouldRender) return;
-    if (!popoverOpen) return;
-    if (!details) return;
-    if (!feature.issueId) return;
-    if (detailIdentifiers) return;
-
-    let cancelled = false;
-    void fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/resource-details`)
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<ProjectFeatureResourceIdentifiers>;
-      })
-      .then((payload) => {
-        if (cancelled || !payload) return;
-        setDetailIdentifiers(payload);
-      })
-      .catch(() => {
-        // Fall back to summary-only rows when detail fetch fails.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [shouldRender, popoverOpen, details, feature.issueId, detailIdentifiers]);
-
-  const resourceRows = useMemo(() => {
-    if (!details) return [] as Array<{ key: string; label: string }>;
-
-    const identifiers = detailIdentifiers;
-    const rows: Array<{ key: string; label: string }> = [];
-
-    if ((identifiers?.workspacePaths.length ?? 0) > 0) {
-      for (const workspacePath of identifiers?.workspacePaths ?? []) {
-        rows.push({ key: `workspace-${workspacePath}`, label: `workspace: ${workspacePath}` });
-      }
-    } else if (details.hasWorkspace) {
-      rows.push({ key: 'workspace', label: 'workspace allocated' });
-    }
-
-    if ((identifiers?.localBranchNames.length ?? 0) > 0 || (identifiers?.remoteBranchNames.length ?? 0) > 0) {
-      for (const branchName of identifiers?.localBranchNames ?? []) {
-        rows.push({ key: `local-branch-${branchName}`, label: `branch (local): ${branchName}` });
-      }
-      for (const branchName of identifiers?.remoteBranchNames ?? []) {
-        rows.push({ key: `remote-branch-${branchName}`, label: `branch (remote): ${branchName}` });
-      }
-    } else if (details.localBranchCount > 0 || details.remoteBranchCount > 0) {
-      rows.push({ key: 'branch', label: `branches: ${details.localBranchCount} local · ${details.remoteBranchCount} remote` });
-    }
-
-    if ((identifiers?.tmuxSessionNames.length ?? 0) > 0) {
-      for (const sessionName of identifiers?.tmuxSessionNames ?? []) {
-        rows.push({ key: `tmux-${sessionName}`, label: `tmux: ${sessionName}` });
-      }
-    } else if (details.tmuxSessionCount > 0) {
-      rows.push({ key: 'tmux', label: `tmux: ${details.tmuxSessionCount} active session${details.tmuxSessionCount === 1 ? '' : 's'}` });
-    }
-
-    if (details.remoteAgent) {
-      rows.push({ key: 'remote-agent', label: `fly.io: ${details.remoteAgent.vmName} · ${details.remoteAgent.status} · ${details.remoteAgent.model}` });
-    }
-
-    if (details.hasXbrief) rows.push({ key: 'vbrief', label: 'xBRIEF present' });
-    if (details.hasPrd) rows.push({ key: 'prd', label: 'PRD present' });
-    if (details.hasTasks) rows.push({ key: 'tasks', label: 'tasks present' });
-    for (const pr of identifiers?.prs ?? details.prs) {
-      rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
-    }
-
-    if ((identifiers?.dockerContainerNames.length ?? 0) > 0) {
-      for (const containerName of identifiers?.dockerContainerNames ?? []) {
-        rows.push({ key: `docker-${containerName}`, label: `docker: ${containerName}` });
-      }
-    } else if (details.dockerContainerCount > 0) {
-      rows.push({ key: 'docker', label: `docker: ${details.dockerContainerCount} running container${details.dockerContainerCount === 1 ? '' : 's'}` });
-    }
-
-    return rows;
-  }, [details, detailIdentifiers]);
-
-  if (!shouldRender) return null;
-
-  return (
-    <span
-      className={`${styles.featureResourceStrip} ${styles.featureResourceLine}`}
-      onMouseEnter={() => setPopoverOpen(true)}
-      onMouseLeave={() => setPopoverOpen(false)}
-      onFocus={() => setPopoverOpen(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setPopoverOpen(false);
-        }
-      }}
-    >
-      {resources.map((source) => (
-        <ResourceIcon
-          key={source}
-          source={source}
-          feature={feature}
-          onActivate={source === 'vbrief'
-            ? () => openXbriefViewer(feature.issueId)
-            : source === 'tasks'
-              ? () => openTasksViewer(feature.issueId)
-              : source === 'prd'
-                ? () => openPrdViewer(feature.issueId)
-                : undefined}
-        />
-      ))}
-      {details && popoverOpen && (
-        <span className={styles.featureResourcePopover}>
-          {resourceRows.map((row) => (
-            <span key={row.key} className={styles.featureResourceRow}>
-              <span>{row.label}</span>
-              {orphaned && onCleanupOrphanedResources && !row.key.startsWith('pr-') && (
-                <button
-                  type="button"
-                  className={styles.featureResourceCleanupButton}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onCleanupOrphanedResources(feature.issueId);
-                  }}
-                  title={`Clean up orphaned ${row.key} resources`}
-                >
-                  Cleanup
-                </button>
-              )}
-            </span>
-          ))}
-        </span>
-      )}
-    </span>
-  );
 }
 
 function StatusIcon({ status, agentStatus, stateLabel, isRally, isReady }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; isReady?: boolean }) {
@@ -503,16 +247,6 @@ function getAggregateBadges(sessions: readonly SessionNodeType[]): AggregateBadg
   return badges;
 }
 
-function getFeatureStateTone(stateLabel: string): 'done' | 'progress' | 'review' | 'context' | 'planning' | 'todo' {
-  const normalized = stateLabel.trim().toLowerCase();
-  if (normalized === 'done') return 'done';
-  if (normalized === 'in progress' || normalized === 'active') return 'progress';
-  if (normalized.includes('close-out') || normalized === 'in review' || normalized === 'review' || normalized === 'verifying' || normalized === 'verifying on main') return 'review';
-  if (normalized === 'has context') return 'context';
-  if (normalized === 'planning') return 'planning';
-  return 'todo';
-}
-
 function getAggregateBadgeTitle(badge: AggregateBadge, sessions: readonly SessionNodeType[]): string {
   if (badge.key === 'input') {
     const waiting = sessions.find((session) => session.awaitingInput === true);
@@ -573,38 +307,6 @@ function getAggregateBadgeTitle(badge: AggregateBadge, sessions: readonly Sessio
     parts.push(`Affected roles: ${formatRoleList(failingRoles)}.`);
   }
   return parts.join(' ');
-}
-
-function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readonly SessionNodeType[], isReady: boolean): string | undefined {
-  const normalized = feature.stateLabel.trim().toLowerCase();
-  const contextParts = [
-    feature.hasPrd ? 'PRD' : null,
-    feature.hasState ? 'continue file' : null,
-    feature.resourceDetails?.hasXbrief ? 'xBRIEF' : null,
-    feature.resourceDetails?.hasTasks ? 'tasks' : null,
-  ].filter((part): part is string => part !== null);
-  const contextSuffix = contextParts.length > 0 ? ` Context present: ${contextParts.join(', ')}.` : '';
-
-  if (normalized === 'planning') {
-    return `Planning context is being prepared for this issue.${contextSuffix}`;
-  }
-  if (normalized === 'has context') {
-    return `Planning artifacts exist for this issue, but active implementation or review has not started yet.${contextSuffix}`;
-  }
-  if (normalized === 'in review' || normalized === 'review') {
-    return isReady
-      ? 'The pull request is approved, green, and mergeable — awaiting your merge.'
-      : 'Implementation has moved into review.';
-  }
-  if (normalized === 'in progress' || normalized === 'active') {
-    return aggregateSessions.length > 0
-      ? `Implementation work is active or resumable for this issue. ${buildActivitySummary(aggregateSessions)}.`
-      : `Implementation work is active for this issue.${contextSuffix}`;
-  }
-  if (normalized === 'done') {
-    return 'Tracker state is done for this issue.';
-  }
-  return `Tracker state: ${feature.stateLabel}.${contextSuffix}`;
 }
 
 const TYPE_PRIORITY: Record<string, number> = {
@@ -843,49 +545,6 @@ function useUatTrainMembership(): Map<string, UatTrainBadgeInfo> {
   }, [data]);
 }
 
-type PipeSegState = 'none' | 'done' | 'working' | 'paused' | 'error' | 'merged';
-const PIPE_ORDER = ['planning', 'work', 'review', 'test', 'ship'] as const;
-
-/** Per-issue plan→work→review→test→ship strip. Earlier phases read done;
- *  only the live phase carries a signal color (v1.2 color restraint). */
-export function derivePipeline(feature: ProjectFeature, sessions: readonly SessionNodeType[], isReady = false): PipeSegState[] {
-  const isDone = feature.stateLabel.toLowerCase().includes('done');
-  if (isDone) return ['done', 'done', 'done', 'done', 'merged'];
-
-  const byPhase = PIPE_ORDER.map((phase) =>
-    sessions.filter((s) => s.type === phase || (phase === 'planning' && s.type === 'legacy') || (phase === 'review' && s.type === 'reviewer')),
-  );
-  if (feature.hasPlanning && byPhase[0].length === 0) {
-    byPhase[0] = [{ status: 'stopped' } as SessionNodeType];
-  }
-  let lastIdx = -1;
-  for (let i = 0; i < byPhase.length; i++) {
-    if (byPhase[i].length > 0) lastIdx = i;
-  }
-  if (isReady) lastIdx = 4;
-
-  return PIPE_ORDER.map((_, i) => {
-    if (lastIdx === -1) return 'none';
-    if (i < lastIdx) return 'done';
-    if (i > lastIdx) return 'none';
-    if (isReady && i === 4) return 'done';
-    const phaseSessions = byPhase[i];
-    if (phaseSessions.length === 0) return 'done';
-    if (phaseSessions.some((s) => s.status === 'error')) return 'error';
-    if (phaseSessions.some((s) => s.status === 'running' || s.status === 'starting')) return 'working';
-    return 'done';
-  });
-}
-
-const PIPE_CLASS: Record<PipeSegState, string> = {
-  none: '',
-  done: 'pipeDone',
-  working: 'pipeWorking',
-  paused: 'pipePaused',
-  error: 'pipeError',
-  merged: 'pipeMerged',
-};
-
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const queryClient = useQueryClient();
   const openIssue = useDashboardStore((state) => state.openIssue);
@@ -926,13 +585,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     };
   }, [expanded, feature.issueId, detailIdentifiers]);
 
-  const hasResources = feature.resourceDetails && (
-    feature.resourceDetails.dockerContainerCount > 0 ||
-    feature.resourceDetails.prs.length > 0 ||
-    feature.resourceDetails.localBranchCount > 0 ||
-    feature.resourceDetails.remoteBranchCount > 0 ||
-    Boolean(feature.resourceDetails.remoteAgent)
-  );
+  // PAN-4201: docker is the one fact both the resource cluster and the
+  // expanded Containers group could show — omit it from the cluster exactly
+  // when the group renders, so it appears once per render.
+  const showContainersGroup = expanded && (detailIdentifiers?.dockerContainerNames?.length ?? 0) > 0;
 
   const visibleSessions = useMemo(
     () => feature.sessions?.filter((session) => sessionMatchesFilter(session, filter)) ?? [],
@@ -958,39 +614,37 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   // PAN-3917: "ready to merge" is derived from the forge (approved, green,
   // mergeable), never a stored isReadyToMerge flag.
-  const isReady = useDerivedIssueState(feature.issueId)?.state === 'ready';
+  const storeDerived = useDerivedIssueState(feature.issueId);
+  const resolvedState = storeDerived?.state ?? feature.state ?? null;
+  const isReady = resolvedState === 'ready';
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
   const activitySummary = buildActivitySummary(aggregateSessions);
   const aggregateBadges = getAggregateBadges(aggregateSessions);
-  const featureStateTone = getFeatureStateTone(feature.stateLabel);
+  const stateBadge = resolveFeatureStateBadge({
+    storeState: storeDerived?.state,
+    restState: feature.state,
+    sessions: feature.sessions,
+    pipelineBucket: feature.pipelineBucket,
+    rawTrackerState: feature.rawTrackerState,
+  });
 
   // Dominant session state for the feature row StatusDot (blocker-7)
   const dominantStatus = feature.sessions && feature.sessions.length > 0
     ? computeDominantStatus(feature.sessions)
     : null;
 
-  // PAN-1779 redesign: the wrapper edge bar is the row's one colored signal.
-  // Priority: error (red) > paused/ready (amber human gates) > done (emerald)
-  // > working (blue machine activity).
-  const isDoneState = feature.stateLabel.toLowerCase().includes('done');
+  // PAN-4201: the state badge is the row's one colored status signal; the
+  // wrapper edge bar keeps only the error variant (red = broken).
   const hasErrorSession = aggregateSessions.some(isErrorSession);
-  const hasRunningSession = aggregateSessions.some(isRunningSession);
-  const edgeClass = (hasErrorSession
-    ? styles.featureItemWrapperError
-    : isReady
-        ? styles.featureItemWrapperReady
-        : isDoneState
-          ? styles.featureItemWrapperMerged
-          : hasRunningSession
-            ? styles.featureItemWrapperWorking
-            : '') ?? '';
+  const edgeClass = hasErrorSession ? styles.featureItemWrapperError : '';
 
   const pipeline = useMemo(
     () => derivePipeline(feature, feature.sessions ?? [], isReady),
     [feature, isReady],
   );
+  const pipelineLabel = useMemo(() => describePipeline(pipeline), [pipeline]);
   const trainInfo = useUatTrainMembership().get(feature.issueId.toUpperCase());
   const shouldShowUatStack = expanded && isReady && Boolean(feature.resourceDetails?.hasWorkspace);
   // Any expanded row with a workspace queries (not just merge-ready), so
@@ -1089,12 +743,15 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           {/* PAN-2975: the resume affordance lives INSIDE the row's meta line
               as a badge-like chip — never a detached block above the card. */}
           <StartAgentCta issueId={feature.issueId} density="rail" surface="chip" />
+          {dominantStatus && ['active', 'thinking', 'waiting'].includes(dominantStatus) && (
+            <StatusDot status={dominantStatus} title={activitySummary} />
+          )}
           {!feature.isRally && aggregateBadges.length > 0 && (
             <span data-section="Badges" className={styles.featureBadgeGroup}>
               {aggregateBadges.map((badge) => (
                 <span
                   key={badge.key}
-                  className={`${styles.featureBadge} ${styles[`featureBadge_${badge.tone}` as keyof typeof styles]}`}
+                  className={`${styles.featureBadge} ${styles[`featureBadge_${badge.tone === 'running' ? 'stopped' : badge.tone}` as keyof typeof styles]}`}
                   title={getAggregateBadgeTitle(badge, aggregateSessions)}
                 >
                   {badge.label}
@@ -1103,7 +760,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             </span>
           )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
-            <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}${progressPct !== null ? ` (${progressPct}% complete)` : ''}`}>
+            <span className={`${styles.featureStateBadge} ${styles.featureStateBadge_rest}`} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}${progressPct !== null ? ` (${progressPct}% complete)` : ''}`}>
               {feature.completedCount || 0}/{feature.childCount}
               {progressPct !== null && (
                 <span style={{
@@ -1126,23 +783,16 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                 </span>
               )}
             </span>
-          ) : (
+          ) : stateBadge ? (
             <span
-              className={`${styles.featureState} ${styles[`featureState_${featureStateTone}` as keyof typeof styles]}`}
-              title={getFeatureStateTitle(feature, aggregateSessions, isReady)}
+              className={`${styles.featureStateBadge} ${styles[`featureStateBadge_${stateBadge.tone}` as keyof typeof styles]}`}
+              data-testid="feature-state"
+              data-state={stateBadge.key}
+              title={stateBadge.key === 'working' && aggregateSessions.length > 0 ? `${stateBadge.title} ${buildActivitySummary(aggregateSessions)}.` : stateBadge.title}
             >
-              {feature.stateLabel}
+              {stateBadge.label}
             </span>
-          )}
-          {isReady && (
-            <span
-              className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
-              data-testid="feature-ready"
-              title="All gates passed — awaiting your merge"
-            >
-              Ready · awaiting merge
-            </span>
-          )}
+          ) : null}
           {isReady && (
             <span data-section="MergeButton"><MergeButton
               issueId={feature.issueId}
@@ -1162,9 +812,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           <FeatureAppLink frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} />
           {/* Merge-ready only — earlier phases have no stack, and a cached workspace query rendered a bogus chip for planning-phase issues (PAN-2996). */}
           {isReady && <FeatureUatChip summary={uatStackSummary} />}
-          <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
+          <span data-section="ResourceStrip"><ResourceCluster feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} omit={showContainersGroup ? ['docker'] : undefined} /></span>
+          <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe"
+            role="img" title={pipelineLabel} aria-label={pipelineLabel}>
             {pipeline.map((seg, i) => (
-              <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />
+              <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} title={`${PIPE_STEP_LABELS[i]}: ${describePipeSegment(seg)}`} />
             ))}
           </span>
           </span>
@@ -1173,12 +825,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       </div>
         </IssuePeek>
       </div>
-      <div data-section="ResourceStrip"><ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></div>
-      {feature.resourceDetails?.hasTasks && feature.taskTotals && (
-        <button type="button" data-section="Tasks summary" className={styles.featureBadge} onClick={(event) => { event.stopPropagation(); onSelect?.(); }} title="Open issue tasks">
-          tasks {feature.taskTotals.closed}/{feature.taskTotals.total}</button>
-      )}
-
       {expanded && (
         <div data-section="ShipDoorTreeRow"><RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} /></div>
       )}
@@ -1265,11 +911,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         /></div>
       )}
 
-      {expanded && hasResources && detailIdentifiers && (
+      {showContainersGroup && (
         <div data-section="ResourcesGroup"><ResourcesGroup
           issueId={feature.issueId}
           defaultExpanded={aggregateSessions.length > 0 && activityState !== 'stopped'}
-          containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => {
+          containers={(detailIdentifiers?.dockerContainerNames ?? []).map((name) => {
             const stats = containerStats?.[name];
             return {
               name,
@@ -1280,16 +926,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               id: stats?.id,
             };
           })}
-          branches={[
-            ...(detailIdentifiers.localBranchNames ?? []).map((name) => ({ name, isLocal: true as const })),
-            ...(detailIdentifiers.remoteBranchNames ?? []).map((name) => ({ name, isLocal: false as const })),
-          ]}
-          prs={(detailIdentifiers.prs ?? feature.resourceDetails?.prs ?? []).map((pr) => ({
-            number: pr.number,
-            title: pr.title,
-            state: pr.state,
-            isDraft: pr.isDraft,
-          }))}
         /></div>
       )}
     </IssueView>

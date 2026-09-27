@@ -208,6 +208,7 @@ export async function getWorkAgentLifecycleState(agentOrIssueId: string): Promis
 
 interface StartFreshOptions {
   allowPausedForce?: boolean;
+  allowTroubledForce?: boolean;
   allowLiveSessionReplacement?: boolean;
   /** True only when the caller carries an explicit operator `--fresh` intent.
    * PAN-3555: without it, a handed-off agent that owes rework and has a
@@ -220,14 +221,16 @@ interface StartFreshOptions {
 /** Assert the agent can start fresh; rejects with an Error naming the reason when it cannot. */
 export async function assertCanStartFresh(agentOrIssueId: string, options: StartFreshOptions = {}): Promise<WorkAgentLifecycleState> {
   const lifecycle = await getWorkAgentLifecycleState(agentOrIssueId);
-  const pausedForceOverride = options.allowPausedForce === true
-    && lifecycle.requiresSessionResetBeforeFreshStart
-    && getAgentState(lifecycle.agentId)?.paused === true;
+  const gateState = getAgentState(lifecycle.agentId);
+  const gateForceOverride = lifecycle.requiresSessionResetBeforeFreshStart && (
+    (options.allowPausedForce === true && gateState?.paused === true)
+    || (options.allowTroubledForce === true && gateState?.troubled === true)
+  );
   const liveSessionReplacement = options.allowLiveSessionReplacement === true && lifecycle.isRunning;
   if (liveSessionReplacement && lifecycle.canResetSession) {
     throw new Error(sessionResetRequiredReason(lifecycle.agentId, agentOrIssueId));
   }
-  if (!canStartFresh(lifecycle, options.explicitFresh === true) && !pausedForceOverride && !liveSessionReplacement) {
+  if (!canStartFresh(lifecycle, options.explicitFresh === true) && !gateForceOverride && !liveSessionReplacement) {
     throw new Error(lifecycle.reason || `Cannot start fresh for ${lifecycle.agentId}`);
   }
   return lifecycle;

@@ -10,6 +10,7 @@ import { XTerminal } from './XTerminal';
 import { TasksPanel } from './TasksPanel';
 import { useConfirm } from './DialogProvider';
 import { PlanSetupScreen, type SetupProgressEvent } from './PlanSetupScreen';
+import { PlanOptionCheckbox } from './PlanOptionCheckbox';
 import { canUsePickerHarness, ModelHarnessPicker, type Harness, type HarnessPolicyDecisions, type ModelGroup } from './shared/ModelPicker';
 
 interface PlanDialogProps {
@@ -18,7 +19,6 @@ interface PlanDialogProps {
   onClose: () => void;
   onComplete: () => void;
   onTerminalReleased?: () => void;
-  autoStart?: boolean;
 }
 
 interface StartPlanningResult {
@@ -88,7 +88,7 @@ const getDefaultWorkspaceLocation = (): 'local' | 'remote' => {
   return stored === 'remote' ? 'remote' : 'local'; // Default to local
 };
 
-export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalReleased, autoStart = false }: PlanDialogProps) {
+export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalReleased }: PlanDialogProps) {
   const [step, setStep] = useState<Step>('checking');
   const [result, setResult] = useState<StartPlanningResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +108,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const [showTasksPanel, setShowTasksPanel] = useState(false);
   const [setupSteps, setSetupSteps] = useState<SetupProgressEvent[]>([]);
   const [setupSessionName, setSetupSessionName] = useState<string | null>(null);
-  const autoStartTriggered = useRef(false);
+  // PAN-4198 (D8): what "start without planning" actually meant. The old
+  // startSkipPlanning entry auto-clicked Auto-plan and never sent the server's
+  // autoStart field, so nothing started; this checkbox sends it.
+  const [startAfterPlanning, setStartAfterPlanning] = useState(false);
 
   // Track if we've actually connected to a planning session in THIS dialog instance.
   const hasConnectedToSession = useRef(false);
@@ -213,7 +216,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, harness: effectivePlanningHarness, effort, auto }),
+        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, harness: effectivePlanningHarness, effort, auto, autoStart: startAfterPlanning }),
       });
 
       if (!res.ok) {
@@ -314,7 +317,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       setError(err.message || 'Connection failed');
       setStep('error');
     }
-  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, modelOverride, effectivePlanningHarness, effort, queryClient, onClose]);
+  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, modelOverride, effectivePlanningHarness, effort, startAfterPlanning, queryClient, onClose]);
 
   // Legacy mutation wrapper — keeps the same handleStartPlanning interface
   const startPlanningMutation = {
@@ -502,15 +505,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   // Previous attempts to auto-detect session ending via polling caused persistent
   // premature transitions due to stale cache, Docker network disruption
   // (PAN-207), and PTY disconnect race conditions.
-
-  useEffect(() => {
-    if (!autoStart || autoStartTriggered.current || step !== 'ready' || settingsQuery.isPending) return;
-    if (!harnessOverrideTouched.current && defaultPlanningHarness && KNOWN_HARNESSES.has(defaultPlanningHarness) && harnessOverride !== defaultPlanningHarness) return;
-    autoStartTriggered.current = true;
-    setWatchPlanning(false);
-    watchPlanningRef.current = false;
-    void startPlanningViaSSE(true);
-  }, [autoStart, step, startPlanningViaSSE, settingsQuery.isPending, defaultPlanningHarness, harnessOverride]);
 
   const handleStartPlanning = (auto = false) => {
     startPlanningViaSSE(auto);
@@ -813,47 +807,37 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         </div>
 
                         {/* Checkboxes */}
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={watchPlanning}
-                            onChange={(e) => { setWatchPlanning(e.target.checked); watchPlanningRef.current = e.target.checked; }}
-                            className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
-                          />
-                          <span className="text-sm text-foreground">
-                            Stay and watch planning
-                            <span className="text-muted-foreground ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
-                          </span>
-                        </label>
+                        <PlanOptionCheckbox
+                          checked={startAfterPlanning}
+                          onChange={setStartAfterPlanning}
+                          label="Start work as soon as the plan is ready"
+                          hint="(a work agent picks it up the moment planning finalizes)"
+                        />
 
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={shadowMode}
-                            onChange={(e) => setShadowMode(e.target.checked)}
-                            className="w-4 h-4 rounded border-border bg-popover text-primary focus:ring-primary focus:ring-offset-background"
-                          />
-                          <span className="text-sm text-foreground">
-                            Shadow Engineering
-                            <span className="text-muted-foreground ml-1">(AI observes your workflow, doesn&apos;t modify code)</span>
-                          </span>
-                        </label>
+                        <PlanOptionCheckbox
+                          checked={watchPlanning}
+                          onChange={(next) => { setWatchPlanning(next); watchPlanningRef.current = next; }}
+                          label="Stay and watch planning"
+                          hint="(keep dialog open; you'll see INPUT when agent needs you)"
+                        />
 
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={startDocker}
-                            onChange={(e) => {
-                              setStartDocker(e.target.checked);
-                              localStorage.setItem('overdeck.planning.startDocker', String(e.target.checked));
-                            }}
-                            className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
-                          />
-                          <span className="text-sm text-foreground">
-                            Start Docker containers
-                            <span className="text-muted-foreground ml-1">(dev environment ready for testing)</span>
-                          </span>
-                        </label>
+                        <PlanOptionCheckbox
+                          checked={shadowMode}
+                          onChange={setShadowMode}
+                          accent="primary"
+                          label="Shadow Engineering"
+                          hint="(AI observes your workflow, doesn't modify code)"
+                        />
+
+                        <PlanOptionCheckbox
+                          checked={startDocker}
+                          onChange={(next) => {
+                            setStartDocker(next);
+                            localStorage.setItem('overdeck.planning.startDocker', String(next));
+                          }}
+                          label="Start Docker containers"
+                          hint="(dev environment ready for testing)"
+                        />
 
                         <ModelHarnessPicker
                           model={effectivePlanningModel}
@@ -911,7 +895,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                           className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground rounded-lg transition-colors font-medium"
                         >
                           <Play className="w-5 h-5" />
-                          Start Planning
+                          Plan with me
                         </button>
                         <button
                           onClick={() => handleStartPlanning(true)}
@@ -919,7 +903,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                           title="Run planning without interactive questions"
                         >
                           <Sparkles className="w-5 h-5" />
-                          Auto-plan
+                          Plan automatically
                         </button>
                       </div>
                     </>

@@ -6,16 +6,18 @@ import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
-import { exec, execFile, execFileSync, execSync } from 'child_process';
+import { exec, execFile, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
+import { clearAgentPaused, clearAgentTroubled, getAgentState, spawnAgent } from '../../lib/agents.js';
+import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 import { attachHintLines, resolveAttach } from '../../lib/terminal-backends/attach-hint.js';
 import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
 import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
-import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
-import { getModelEffortLevels } from '../../lib/model-capabilities.js';
+import { resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
+import { resolveEffort, InvalidEffortError } from '../../lib/agents/resolve-effort.js';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveWorkspaceRepoRoots } from '../../lib/project-repos.js';
 import { resolveProjectFromIssueSync, hasProjects, type ResolvedProject } from '../../lib/projects.js';
@@ -31,6 +33,7 @@ import { checkPlanFreshness, formatPlanFreshnessRefusal } from '../../lib/xbrief
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
 import { transitionStartedXBrief, updateWorkspaceDraftPlanStatus } from './start-status.js';
+import { headDeletionEpoch } from './start-freshness.js';
 import {
   buildStartPlanningBody,
   printPlanningConnectionError,
@@ -299,6 +302,12 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
   return { issueId, title: issueId, body: '' };
 }
 
+/** PAN-4211: `--force` clears the troubled gate the way dashboard `clearGates` does. */
+async function clearTroubledForForce(agentId: string, issueId: string): Promise<void> {
+  await Effect.runPromise(clearAgentTroubled(agentId));
+  await appendOperatorInterventionEvent({ issueId, kind: 'untroubled', source: 'pan start --force' });
+}
+
 /**
  * Handle remote workspace agent spawning
  */
@@ -307,6 +316,7 @@ async function handleRemoteWorkspace(
   options: IssueOptions,
   spinner: Ora,
   clearPauseBeforeSpawn: boolean,
+  clearTroubledBeforeSpawn: boolean,
   resolved?: ResolvedProject,
 ): Promise<void> {
   const config = loadConfigSync();
@@ -418,6 +428,9 @@ async function handleRemoteWorkspace(
   try {
     if (clearPauseBeforeSpawn) {
       await Effect.runPromise(clearAgentPaused(agentId));
+    }
+    if (clearTroubledBeforeSpawn) {
+      await clearTroubledForForce(agentId, issueId);
     }
 
     const remoteAgent = await spawnRemoteAgent({
@@ -731,23 +744,19 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     return exitCli(1);
   }
 
-  // Resolve the Claude Code --effort level for this spawn: explicit --effort
-  // wins, otherwise fall back to roles.work.effort from config. The flag
-  // bypasses config-load validation, so validate it here (base enum + the
-  // resolved model's supported levels) before any workspace setup.
+  // Resolve --effort through the single resolver: explicit > roles.work.effort
+  // > project > default, clamped to what the work model/harness support.
   const yamlConfig = loadYamlConfig().config;
-  const resolvedEffort: RoleEffort | undefined = options.effort ?? yamlConfig.roles?.work?.effort;
-  if (resolvedEffort !== undefined) {
-    if (!ROLE_EFFORTS.includes(resolvedEffort)) {
-      process.stderr.write(`Invalid --effort value: ${resolvedEffort}. Expected one of ${ROLE_EFFORTS.join(', ')}.\n`);
-      return exitCli(1);
-    }
-    const workModel = resolveRoleModel('work', spawnModel || undefined, yamlConfig);
-    const supportedEfforts = getModelEffortLevels(workModel);
-    if (supportedEfforts !== undefined && !supportedEfforts.includes(resolvedEffort)) {
-      process.stderr.write(`Effort '${resolvedEffort}' is not supported by ${workModel} (supported: ${supportedEfforts.join(', ')}).\n`);
-      return exitCli(1);
-    }
+  const workModel = spawnModel || resolveRoleModel('work', undefined, yamlConfig);
+  let resolvedEffort: RoleEffort;
+  try {
+    const resolved = resolveEffort({ explicit: options.effort, role: 'work', issueId: id, model: workModel, harness: requestedHarness, config: yamlConfig });
+    resolvedEffort = resolved.effort;
+    if (resolved.warning) process.stderr.write(`${resolved.warning}\n`);
+  } catch (error) {
+    if (!(error instanceof InvalidEffortError)) throw error;
+    process.stderr.write(`Invalid --effort value: ${options.effort}. Expected one of ${EFFORT_LEVELS.join(', ')}.\n`);
+    return exitCli(1);
   }
 
   // Resolve planning mode for pan start (PAN-2407): explicit --plan wins over
@@ -781,13 +790,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
     return exitCli(1);
   }
-  if (existingAgentState?.troubled === true) {
+  const shouldClearTroubledBeforeSpawn = existingAgentState?.troubled === true && options.force === true;
+  if (existingAgentState?.troubled === true && !options.force) {
     const failures = existingAgentState.consecutiveFailures ?? 0;
     process.stderr.write(chalk.red(`Agent ${agentId} is troubled (${failures} failure${failures === 1 ? '' : 's'}) and will not be started.\n`));
     if (existingAgentState.lastFailureReason) {
       process.stderr.write(chalk.red(`Last failure: ${existingAgentState.lastFailureReason}\n`));
     }
-    process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} before starting.\n`));
+    process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} to clear the gate, or pan start ${id} --force to clear it and start now.\n`));
     return exitCli(1);
   }
 
@@ -937,7 +947,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     } else if (!swarmActive) {
       try {
-        await assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
+        await assertCanStartFresh(id, {
+          allowPausedForce: shouldClearPauseBeforeSpawn,
+          allowTroubledForce: shouldClearTroubledBeforeSpawn,
+        });
       } catch (error) {
         if (workspacePath || isRemote) {
           throw error;
@@ -947,7 +960,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Handle remote workspace
     if (effectiveRemote) {
-      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn, resolved ?? undefined);
+      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn, shouldClearTroubledBeforeSpawn, resolved ?? undefined);
       return;
     }
 
@@ -1156,13 +1169,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.log(chalk.yellow('⚠ Skipping plan-freshness preflight (--skip-freshness)'));
     } else {
       const plan = readWorkspacePlanSync(workspace);
-      // A missing path with no git history is a file the plan creates, not drift.
-      const everTracked = (scope: string): boolean => {
-        try {
-          return execFileSync('git', ['log', '--all', '--oneline', '-1', '--', scope], { cwd: workspace, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().length > 0;
-        } catch { return false; }
-      };
-      const freshness = plan ? checkPlanFreshness(plan, workspace, existsSync, (scope) => !everTracked(scope)) : null;
+      // Only paths HEAD deleted after the plan was written are drift (PAN-4212).
+      const freshness = plan ? checkPlanFreshness(plan, workspace, existsSync, headDeletionEpoch(workspace)) : null;
       if (freshness && freshness.missing.length > 0) {
         await failPostCreateValidation({
           spinner,
@@ -1188,6 +1196,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // details below and exits; any remaining pre-spawn delay is tracker/prompt work.
     if (shouldClearPauseBeforeSpawn) {
       await Effect.runPromise(clearAgentPaused(agentId));
+    }
+    if (shouldClearTroubledBeforeSpawn) {
+      await clearTroubledForForce(agentId, id);
     }
     const agent = await runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
       issueId: id,

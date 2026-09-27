@@ -1,0 +1,132 @@
+---
+title: Reasoning effort
+description: The canonical effort-level enum, how it's resolved, and where it's honored today
+---
+
+# Reasoning effort
+
+**Reasoning effort** is the `--effort` level a coding-agent harness launches
+at (Claude Code's `low`/`medium`/`high`/`xhigh`/`max`, and the nearest
+equivalent on every other harness). Overdeck resolves it through one function,
+`resolveEffort()` (`src/lib/agents/resolve-effort.ts`), on top of one enum,
+`EFFORT_LEVELS` (`packages/contracts/src/effort.ts`) — instead of the ad hoc
+`effort ?? 'high'` fallbacks and copied `'low' | 'medium' | 'high'` unions
+scattered through earlier code.
+
+## Levels
+
+```ts
+EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max']
+```
+
+`xhigh` was added in Opus 4.7 (between `high` and `max`); `max` predates it
+(Opus 4.6+/Sonnet 4.6). The default is **`high`** — nothing resolves to
+`xhigh` or `max` unless something explicitly asked for it.
+
+## Where effort comes from
+
+`resolveEffort()` walks a fixed precedence chain and returns the first layer
+that supplies a valid level, plus which layer won:
+
+| Precedence | Source | Config key |
+| --- | --- | --- |
+| 1 (highest) | Explicit override (a `--effort` flag, an API/RPC field) | n/a — passed directly |
+| 2 | xBRIEF item | item `metadata.effort` |
+| 3 | xBRIEF plan | plan `metadata.effort` |
+| 4 | Tier | `tiered_execution.tiers.<name>.effort` |
+| 5 | Sub-role | `roles.<role>.sub.<name>.effort` |
+| 6 | Role | `roles.<role>.effort` |
+| 7 | Project | `projects.yaml` project entry's `effort` |
+| 8 (lowest) | Default | `high` |
+
+An invalid **explicit** value throws `InvalidEffortError`. An invalid item,
+plan, or project value is skipped silently (a project value also adds a
+warning) and resolution falls through to the next layer — configuration typos
+degrade rather than crash a spawn.
+
+## Config keys
+
+```yaml
+# config.yaml
+roles:
+  work:
+    model: workhorse:mid
+    effort: high
+    sub:
+      security:
+        model: claude-opus-5-5
+        effort: max
+
+tiered_execution:
+  tiers:
+    frontier:
+      model: claude-opus-5-5
+      harness: claude-code
+      difficulties: [expert]
+      effort: xhigh
+```
+
+```yaml
+# projects.yaml
+projects:
+  myproject:
+    path: /home/user/Projects/myproject
+    effort: medium
+```
+
+```json
+// an xBRIEF plan or item's metadata (free-form key, like metadata.difficulty)
+{ "metadata": { "effort": "high" } }
+```
+
+## Clamping
+
+Once a level is resolved, `clampEffort()` checks it against what the target
+model and harness actually support (`supportedEffortLevels()` intersects the
+model's `effortLevels` from `model-capabilities.ts` with the harness's
+`effortLevels` from `harness-behavior.ts`; either side being unrestricted
+contributes all five levels):
+
+- If the resolved level is supported, it's used as-is.
+- If not, the highest supported level *below* it is used instead (`max`
+  requested on a harness with no `max` falls to `xhigh`).
+- If nothing supported ranks below it, the lowest supported level is used
+  (`low` requested against a model that only supports `high`/`max` becomes
+  `high`).
+- If the model and harness restrictions don't overlap at all, the requested
+  level is kept as-is and flagged with a warning rather than dropped.
+
+Pi (`ohmypi`) and Muse Code never accept `max` — their `effortLevels` stop at
+`xhigh`.
+
+**Config validation rejects; a resolved flag clamps.** Setting an
+unsupported level in `config.yaml` (`roles.<role>.effort`,
+`roles.<role>.sub.<name>.effort`, or `tiered_execution.tiers.<name>.effort`)
+fails config load with `effortConfigErrors()`'s `is not supported by <model>`
+message — you have to fix the file. An explicit `--effort` flag or a
+resolved runtime value that turns out unsupported is clamped instead, with a
+warning printed to stderr — a spawn never hard-fails over it.
+
+## What honors it today
+
+- `pan start <id>` for work-agent spawns.
+- Definition-less role runs (review sub-roles, the standing supervisor) and
+  their codex/omp launcher fields (`getRoleRuntimeBaseCommand`,
+  `getCodexLauncherFields`, `getOhmypiLauncherFields` in
+  `src/lib/agents/runtime-command.ts`).
+
+Everything else — conversations, specialist/review-parent/test/worker
+launches, the Flywheel orchestrator, remote Fly workspaces, per-slot tier
+staffing, planning, and dashboard-wide display — still resolves effort ad
+hoc and is tracked in sibling issues:
+
+| Surface | Issue |
+| --- | --- |
+| Persisting effort across relaunch, resume, recovery, rotation, crash respawn | [#4253](https://github.com/eltmon/overdeck/issues/4253) |
+| Conversations (creation, switch-model, `pan handoff`/`fork`) | [#4254](https://github.com/eltmon/overdeck/issues/4254) |
+| Live effort change on claude-code sessions, "Effort unverified" display | [#4255](https://github.com/eltmon/overdeck/issues/4255) |
+| Review parent, test, `pan worker run`, `pan spawn`, Flywheel, dashboard agent actions, remote Fly | [#4256](https://github.com/eltmon/overdeck/issues/4256) |
+| Per-slot tier effort and escalation | [#4257](https://github.com/eltmon/overdeck/issues/4257) |
+| Planning (`pan plan`, PlanDialog) | [#4258](https://github.com/eltmon/overdeck/issues/4258) |
+| Display everywhere and cost-ledger recording | [#4259](https://github.com/eltmon/overdeck/issues/4259) |
+| Per-harness mapping/clamping correctness | [#4260](https://github.com/eltmon/overdeck/issues/4260) |

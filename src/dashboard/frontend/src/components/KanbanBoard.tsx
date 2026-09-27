@@ -109,9 +109,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [focusedIssueId, setFocusedIssueId] = useState<string | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null); // Lifted dialog state
-  const [planDialogAutoStart, setPlanDialogAutoStart] = useState(false);
-  const openPlanDialog = useCallback((issue: Issue, autoStart = false) => {
-    setPlanDialogAutoStart(autoStart);
+  // PAN-4198 (D8): one Plan dialog, and the operator picks interview vs
+  // automatic inside it, so the board no longer pre-answers that.
+  const openPlanDialog = useCallback((issue: Issue) => {
     setPlanDialogIssue(issue);
   }, []);
 
@@ -923,15 +923,12 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           isOpen={true}
           onClose={() => {
             setPlanDialogIssue(null);
-            setPlanDialogAutoStart(false);
           }}
           onComplete={async () => {
             setPlanDialogIssue(null);
-            setPlanDialogAutoStart(false);
             await refreshDashboardState(queryClient);
           }}
           onTerminalReleased={() => onPlanDialogChange?.(null)}
-          autoStart={planDialogAutoStart}
         />
       )}
 

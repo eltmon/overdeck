@@ -193,3 +193,70 @@ describe("scripts/smoke-appimage-cli.mjs", () => {
     expect(script).toContain('[cliEntry, "--version"]');
   });
 });
+
+describe("desktop packaging dependencies (PAN-4200)", () => {
+  it("pins electron-builder to the 26.x line", () => {
+    const pkg = readPkg();
+    const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+    expect(devDeps?.["electron-builder"]).toMatch(/^\^26\./);
+  });
+
+  it("pins @electron/notarize to the 3.x line", () => {
+    const pkg = readPkg();
+    const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+    expect(devDeps?.["@electron/notarize"]).toMatch(/^\^3\./);
+  });
+
+  it("pins electron to the exact version 40.10.6", () => {
+    const pkg = readPkg();
+    const devDeps = pkg.devDependencies as Record<string, string> | undefined;
+    expect(devDeps?.electron).toBe("40.10.6");
+  });
+
+  it("keeps built-in notarization off in favor of the afterSign hook", () => {
+    const pkg = readPkg();
+    const build = pkg.build as Record<string, unknown> | undefined;
+    const mac = build?.mac as Record<string, unknown> | undefined;
+    expect(mac?.notarize).toBe(false);
+    expect(build?.afterSign).toBe("scripts/notarize.cjs");
+  });
+
+  it("has no notarize-2-only tool option and still passes the API-key fields", () => {
+    const script = FS.readFileSync(Path.join(desktopDir, "scripts/notarize.cjs"), "utf8");
+    expect(script).not.toContain('tool: "notarytool"');
+    expect(script).toContain("appleApiKey: APPLE_API_KEY");
+  });
+
+  it("sets a path-safe build.linux.executableName without touching mac/Windows naming", () => {
+    // electron-builder 26's AppImage target rejects the scoped package name
+    // ("@overdeck/desktop" sanitizes to "@overdeckdesktop"), but a top-level
+    // build.executableName renames the mac .app bundle and the Windows
+    // exe/install dir too (AppInfo applies it to every platform). Scoping it
+    // to build.linux keeps the Linux fix without touching the other targets.
+    const pkg = readPkg();
+    const build = pkg.build as Record<string, unknown> | undefined;
+    const linux = build?.linux as Record<string, unknown> | undefined;
+    expect(linux?.executableName).toMatch(/^[a-zA-Z0-9._ -]+$/);
+    expect(build?.executableName).toBeUndefined();
+  });
+
+  it("ships cli/node_modules and server/node_modules as their own extraResources entries", () => {
+    // electron-builder's file matcher special-cases a directory literally
+    // named "node_modules" sitting at the root of an extraResources "from"
+    // and silently drops it, so "cli" -> "dist" and "server" -> "server"
+    // alone never ship their node_modules. Each needs its own entry with
+    // "node_modules" as the "from" root instead of a child of it.
+    const pkg = readPkg();
+    const build = pkg.build as Record<string, unknown> | undefined;
+    const extraResources = build?.extraResources as
+      | Array<{ from?: string; to?: string }>
+      | undefined;
+
+    expect(extraResources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: "cli/node_modules", to: "dist/node_modules" }),
+        expect.objectContaining({ from: "server/node_modules", to: "server/node_modules" }),
+      ]),
+    );
+  });
+});

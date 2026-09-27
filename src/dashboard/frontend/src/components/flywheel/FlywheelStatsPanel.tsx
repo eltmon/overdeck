@@ -27,10 +27,17 @@ const STATUS_LABEL: Record<FlywheelStatsCriterionStatus, string> = {
 
 const TREND_LABEL: Record<FlywheelStatsTrend, string> = { up: '↗ up', down: '↘ down', flat: '→ flat' };
 
-async function fetchStats(windowDays: number): Promise<FlywheelStats> {
+export async function fetchFlywheelStats(windowDays: number): Promise<FlywheelStats> {
   const res = await fetch(`/api/flywheel/stats?window=${windowDays}`);
   if (!res.ok) throw new Error(`GET /api/flywheel/stats → ${res.status}`);
-  return res.json() as Promise<FlywheelStats>;
+  const stats = (await res.json()) as FlywheelStats;
+  // A 200 carrying something else is a failed read, not data: the panel and
+  // the headline strip share this query, so one bad body would otherwise
+  // crash whichever of them rendered next (PAN-4199).
+  if (!stats?.window?.since || !stats.criteria?.c1_bugRate) {
+    throw new Error('GET /api/flywheel/stats returned a body without window/criteria');
+  }
+  return stats;
 }
 
 function StatCard({ label, value, status, trend, dataSufficient, since, detail, explanation }: {
@@ -66,7 +73,7 @@ export function FlywheelStatsPanel() {
   const [windowDays, setWindowDays] = useState<number>(30);
   const { data, error, isLoading } = useQuery({
     queryKey: ['flywheel', 'stats', windowDays],
-    queryFn: () => fetchStats(windowDays),
+    queryFn: () => fetchFlywheelStats(windowDays),
     refetchInterval: 60_000,
   });
 

@@ -247,7 +247,7 @@ keys do nothing.
 |---|---|---|
 | `models.preset` (`premium` / `balanced` / `budget`) | Picked a curated model per work type | `workhorses.expensive` / `mid` / `cheap`, which the role defaults reference as `workhorse:<slot>` |
 | `models.overrides` (`issue-agent:*`, `review:*`, `specialist-*`, `subagent:*`, `cli:*` keys) | Pinned a model to one work type | `roles.<role>.model`, and `roles.review.sub.<lane>.model` for review lanes (see [Review Mode and Reviewer Models](#review-mode-and-reviewer-models)) |
-| `models.thinking` | Set a Gemini thinking level per work type | dropped; per-role reasoning effort is `roles.<role>.effort` |
+| `models.thinking` | Set a Gemini thinking level per work type | dropped; see [Reasoning effort](../configuration/effort.mdx) for `roles.<role>.effort` and the rest of the precedence chain |
 
 Nothing reads `models.overrides` (#4131). If your config still carries it,
 config load ignores it and logs one warning per process. Loading never rewrites

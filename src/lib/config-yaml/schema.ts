@@ -2,10 +2,11 @@ import type { ConfigurableProvider } from '../configurable-providers.js';
 import type { ModelId } from '../settings.js';
 import type { ModelProvider } from '../model-fallback.js';
 import type { EffortLevel } from '../model-capabilities.js';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
 import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
-import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table.js';
+import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table-types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
 import type { NormalizedOllamaConfig, YamlOllamaConfig } from './ollama.js';
 
@@ -375,10 +376,12 @@ export type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
 
 export interface RoleSubConfig {
   model: ModelRef;
+  effort?: RoleEffort;
 }
 
 export type RoleEffort = EffortLevel;
-export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+/** @deprecated use EFFORT_LEVELS from @overdeck/contracts */
+export const ROLE_EFFORTS: readonly RoleEffort[] = EFFORT_LEVELS;
 export type ReviewMode = 'quick' | 'full' | 'none';
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 

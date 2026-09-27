@@ -102,6 +102,7 @@
               "configuration/knowledge",
               "configuration/harnesses",
               "configuration/local-models",
+              "configuration/effort",
               "configuration/terminal-backend",
               "configuration/context-layers",
               "configuration/appearance",
@@ -144,6 +145,17 @@
               "reference/prompts",
               "reference/troubleshooting",
               "reference/token-spend-report"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "groups": [
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog"
             ]
           }
         ]

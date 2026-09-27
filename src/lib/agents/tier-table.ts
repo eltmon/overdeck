@@ -6,92 +6,38 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelId } from '../model-capabilities.js';
 import { getProviderForModel, PROVIDERS } from '../providers.js';
 import { canUseHarness } from '../harness-policy.js';
+import { derefWorkhorse } from '../config-yaml/roles.js';
+import type { WorkhorsesConfig } from '../config-yaml/schema.js';
+import { effortConfigErrors } from './effort-support.js';
+import {
+  TIERED_EXECUTION_CALLOUT_POLICIES,
+  TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES,
+  TIERED_EXECUTION_DIFFICULTIES,
+  TIERED_EXECUTION_ITEM_KINDS,
+  TIERED_EXECUTION_SUBSCRIPTIONS,
+  type TierDefinition,
+  type TierDistributionEntry,
+  type TieredEscalationConfig,
+  type TieredExecutionCalloutPolicy,
+  type TieredExecutionCompactionReroutePolicy,
+  type TieredExecutionConfig,
+  type TieredExecutionFeedConfig,
+  type TieredExecutionSubscription,
+  type ValidatedEscalationConfig,
+  type ValidatedTieredExecutionConfig,
+  type ValidatedTieredExecutionFeedConfig,
+} from './tier-table-types.js';
 
-export const TIERED_EXECUTION_DIFFICULTIES: readonly XBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
-export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
-export const TIERED_EXECUTION_ITEM_KINDS: readonly XBriefItemKind[] = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
-export const TIERED_EXECUTION_CALLOUT_POLICIES = ['off', 'notify', 'corroborate'] as const;
-export const TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES = ['off', 'on'] as const;
-
-export type TieredExecutionSubscription = typeof TIERED_EXECUTION_SUBSCRIPTIONS[number];
-export type TieredExecutionCalloutPolicy = typeof TIERED_EXECUTION_CALLOUT_POLICIES[number];
-export type TieredExecutionCompactionReroutePolicy = typeof TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES[number];
-
-export interface TierDistributionEntry {
-  model: ModelId | string;
-  harness: RuntimeName;
-  /** Integer percentage; a tier's entries must total exactly 100. */
-  weight: number;
-}
-
-export interface TierDefinition {
-  model: ModelId | string;
-  harness: RuntimeName;
-  difficulties: XBriefDifficulty[];
-  /**
-   * PAN-2391: weighted model+harness entries this tier spreads its beads
-   * across (to consume multiple subscription plans). When present, the raw
-   * config declared `distribution` INSTEAD of model/harness; the normalized
-   * model/harness above are the max-weight representative so distribution-
-   * unaware readers degrade safely. Selection is deterministic per bead
-   * (see pickDistributionEntry).
-   */
-  distribution?: TierDistributionEntry[];
-}
-
-export interface TieredExecutionSupervisorConfig {
-  model: ModelId | string;
-  harness: RuntimeName;
-  subscribe: TieredExecutionSubscription;
-}
-
-export interface TieredExecutionFeedConfig {
-  callouts?: TieredExecutionCalloutPolicy;
-  exclude?: string[];
-  exclude_subjects?: string[];
-  max_diff_bytes?: number | null;
-}
-
-export interface ValidatedTieredExecutionFeedConfig {
-  callouts: TieredExecutionCalloutPolicy;
-  exclude: string[];
-  exclude_subjects: string[];
-  max_diff_bytes: number | null;
-}
-
-export interface TieredEscalationConfig {
-  enabled?: boolean;
-  retries_at_tier?: number;
-  max_promotions?: number;
-}
-
-export interface ValidatedEscalationConfig {
-  enabled: boolean;
-  retries_at_tier: number;
-  max_promotions: number;
-}
-
-export interface TieredExecutionConfig {
-  enabled: boolean;
-  tiers: Record<string, TierDefinition>;
-  supervisor?: TieredExecutionSupervisorConfig;
-  by_kind?: Partial<Record<XBriefItemKind, string>>;
-  feed?: TieredExecutionFeedConfig;
-  escalation?: TieredEscalationConfig;
-  compaction_reroute?: TieredExecutionCompactionReroutePolicy;
-  replay_threshold: number;
-}
-
-export interface ValidatedTieredExecutionConfig extends TieredExecutionConfig {
-  difficultyToTier: Partial<Record<XBriefDifficulty, string>>;
-  byKind: Partial<Record<XBriefItemKind, string>>;
-  feed: ValidatedTieredExecutionFeedConfig;
-  escalation: ValidatedEscalationConfig;
-  compaction_reroute: TieredExecutionCompactionReroutePolicy;
-}
+export * from './tier-table-types.js';
 
 export interface TieredExecutionValidationContext {
   providerAuth?: Partial<Record<ModelProvider, AuthMode>>;
+  /**
+   * PAN-4191: the effective workhorse slots a tier `model: workhorse:<slot>`
+   * resolves through (the same `derefWorkhorse` that `roles.*` refs use).
+   * Without them every workhorse ref fails as undefined.
+   */
+  workhorses?: WorkhorsesConfig;
 }
 
 export class TieredExecutionConfigError extends Error {
@@ -243,12 +189,46 @@ function validateHarness(harness: string, path: string): asserts harness is Runt
   }
 }
 
-function validateModel(model: string, path: string): ModelId {
-  const resolved = resolveModelId(model);
-  if (!knownModelIds().has(resolved) && !resolved.includes('/')) {
-    throw new TieredExecutionConfigError(`${path}.model '${model}' is unknown`);
+interface ResolvedTierModel {
+  model: ModelId;
+  /** Set when the configured value was a `workhorse:<slot>` ref. */
+  modelRef?: string;
+}
+
+/**
+ * The ref a tier/distribution/supervisor entry declares. A normalized entry
+ * carries the dereffed `model` next to its `modelRef`; the ref is the source,
+ * so re-validating a normalized config re-derefs it against the current slots.
+ */
+function declaredModelRef(entry: { model?: unknown; modelRef?: unknown }): string {
+  if (typeof entry.modelRef === 'string' && entry.modelRef.startsWith('workhorse:')) return entry.modelRef;
+  return entry.model as string;
+}
+
+function validateModel(
+  entry: { model?: unknown; modelRef?: unknown },
+  path: string,
+  context: TieredExecutionValidationContext,
+): ResolvedTierModel {
+  const ref = declaredModelRef(entry);
+  if (typeof ref !== 'string' || ref.length === 0) {
+    throw new TieredExecutionConfigError(`${path}.model is required`);
   }
-  return resolved as ModelId;
+  let resolved: string;
+  try {
+    // PAN-4191: the same ModelRef resolver roles.* use. It throws a plain
+    // Error for an undefined slot or the `parent` sentinel; rethrow it as a
+    // config error so the load path degrades instead of crashing loadConfig.
+    resolved = derefWorkhorse(ref, { workhorses: context.workhorses ?? {} }, `${path}.model`);
+  } catch (err) {
+    throw new TieredExecutionConfigError(err instanceof Error ? err.message.replace(/^config\.yaml: /, '') : String(err));
+  }
+  if (!knownModelIds().has(resolved) && !resolved.includes('/')) {
+    throw new TieredExecutionConfigError(
+      ref === resolved ? `${path}.model '${ref}' is unknown` : `${path}.model '${ref}' resolves to unknown model '${resolved}'`,
+    );
+  }
+  return ref.startsWith('workhorse:') ? { model: resolved as ModelId, modelRef: ref } : { model: resolved as ModelId };
 }
 
 function validateModelHarnessPolicy(
@@ -356,6 +336,7 @@ export function validateTieredExecutionConfig(
     const rawDistribution = (tier as { distribution?: unknown }).distribution;
     let normalizedDistribution: TierDistributionEntry[] | undefined;
     let model: string;
+    let modelRef: string | undefined;
     let harness: RuntimeName;
     if (rawDistribution !== undefined) {
       if (!Array.isArray(rawDistribution) || rawDistribution.length === 0) {
@@ -365,12 +346,12 @@ export function validateTieredExecutionConfig(
         const entryPath = `${path}.distribution[${index}]`;
         const candidate = entry as Partial<TierDistributionEntry>;
         validateHarness(candidate.harness as RuntimeName, entryPath);
-        const entryModel = validateModel(candidate.model as string, entryPath);
-        validateModelHarnessPolicy(entryModel, candidate.harness as RuntimeName, entryPath, context);
+        const entryModel = validateModel(candidate, entryPath, context);
+        validateModelHarnessPolicy(entryModel.model, candidate.harness as RuntimeName, entryPath, context);
         if (!Number.isInteger(candidate.weight) || (candidate.weight as number) <= 0) {
           throw new TieredExecutionConfigError(`${entryPath}.weight must be a positive integer`);
         }
-        return { model: entryModel, harness: candidate.harness as RuntimeName, weight: candidate.weight as number };
+        return { ...entryModel, harness: candidate.harness as RuntimeName, weight: candidate.weight as number };
       });
       const total = normalizedDistribution.reduce((sum, entry) => sum + entry.weight, 0);
       if (total !== 100) {
@@ -380,18 +361,20 @@ export function validateTieredExecutionConfig(
       // Idempotent re-validation: a normalized config carries the max-weight
       // representative as model/harness alongside the distribution. Accept
       // model/harness that MATCH the representative; reject a genuine
-      // conflicting declaration of both.
+      // conflicting declaration of both. Compare the declared refs, so a
+      // workhorse-backed representative matches after its slot re-derefs.
       if (
-        (tier.model !== undefined && tier.model !== representative.model)
+        (tier.model !== undefined && declaredModelRef(tier) !== (representative.modelRef ?? representative.model))
         || (tier.harness !== undefined && tier.harness !== representative.harness)
       ) {
         throw new TieredExecutionConfigError(`${path} must declare either model/harness or distribution, not both`);
       }
       model = representative.model;
+      modelRef = representative.modelRef;
       harness = representative.harness;
     } else {
       validateHarness(tier.harness, path);
-      model = validateModel(tier.model, path);
+      ({ model, modelRef } = validateModel(tier, path, context));
       validateModelHarnessPolicy(model, tier.harness, path, context);
       harness = tier.harness;
     }
@@ -409,7 +392,15 @@ export function validateTieredExecutionConfig(
       difficultyOwners[difficulty] = [...(difficultyOwners[difficulty] ?? []), tierName];
     }
 
-    normalizedTiers[tierName] = { model, harness, difficulties, ...(normalizedDistribution ? { distribution: normalizedDistribution } : {}) };
+    if (tier.effort !== undefined) {
+      const effortModels = normalizedDistribution ? normalizedDistribution.map((entry) => entry.model) : [model];
+      const effortErrors = effortConfigErrors(path, tier.effort, effortModels);
+      if (effortErrors.length > 0) {
+        throw new TieredExecutionConfigError(effortErrors[0]);
+      }
+    }
+
+    normalizedTiers[tierName] = { model, ...(modelRef ? { modelRef } : {}), harness, difficulties, ...(tier.effort ? { effort: tier.effort } : {}), ...(normalizedDistribution ? { distribution: normalizedDistribution } : {}) };
   }
 
   const difficultyToTier: Partial<Record<XBriefDifficulty, string>> = {};
@@ -440,8 +431,8 @@ export function validateTieredExecutionConfig(
   }
 
   validateHarness(config.supervisor.harness, 'tiered_execution.supervisor');
-  const supervisorModel = validateModel(config.supervisor.model, 'tiered_execution.supervisor');
-  validateModelHarnessPolicy(supervisorModel, config.supervisor.harness, 'tiered_execution.supervisor', context);
+  const supervisorModel = validateModel(config.supervisor, 'tiered_execution.supervisor', context);
+  validateModelHarnessPolicy(supervisorModel.model, config.supervisor.harness, 'tiered_execution.supervisor', context);
   if (!isSubscription(config.supervisor.subscribe)) {
     throw new TieredExecutionConfigError(`tiered_execution.supervisor.subscribe must be one of ${TIERED_EXECUTION_SUBSCRIPTIONS.join(', ')}`);
   }
@@ -450,7 +441,7 @@ export function validateTieredExecutionConfig(
     enabled: config.enabled,
     tiers: normalizedTiers,
     supervisor: {
-      model: supervisorModel,
+      ...supervisorModel,
       harness: config.supervisor.harness,
       subscribe: config.supervisor.subscribe,
       // supervisor.owns_inspection was retired with the inspect gate (#3927).
@@ -465,4 +456,55 @@ export function validateTieredExecutionConfig(
     replay_threshold: config.replay_threshold,
     difficultyToTier,
   };
+}
+
+/** PAN-4191: one tier (or distribution entry) with its declared ref and the model it launches. */
+export interface EffectiveTierRow {
+  tierName: string;
+  /** What config.yaml declares: a `workhorse:<slot>` ref or a literal model id. */
+  ref: string;
+  /** The concrete model the tier launches. */
+  model: string;
+  harness: RuntimeName;
+  difficulties: XBriefDifficulty[];
+  /** Distribution weight, when the row is one entry of a distribution tier. */
+  weight?: number;
+  /** True when tiered execution is on and this row launches a different model than roles.work. */
+  overridesWork: boolean;
+}
+
+export interface EffectiveTierTable {
+  enabled: boolean;
+  /** roles.work's effective model (representative pick of a distribution). */
+  workModel: string;
+  rows: EffectiveTierRow[];
+}
+
+/**
+ * PAN-4191: the effective model per tier, and whether the tier table shadows
+ * roles.work. While tiered execution is on, a planned issue's work agent takes
+ * its tier's model, not roles.work; `pan admin config tiers` prints this so
+ * that precedence is visible.
+ */
+export function effectiveTierTable(
+  tiered: Pick<TieredExecutionConfig, 'enabled' | 'tiers'>,
+  workModel: string,
+): EffectiveTierTable {
+  const rows: EffectiveTierRow[] = [];
+  for (const [tierName, tier] of Object.entries(tiered.tiers)) {
+    const entries: Array<{ model: string; modelRef?: string; harness: RuntimeName; weight?: number }> =
+      tier.distribution ?? [{ model: tier.model, modelRef: tier.modelRef, harness: tier.harness }];
+    for (const entry of entries) {
+      rows.push({
+        tierName,
+        ref: entry.modelRef ?? entry.model,
+        model: entry.model,
+        harness: entry.harness,
+        difficulties: tier.difficulties,
+        ...(entry.weight !== undefined ? { weight: entry.weight } : {}),
+        overridesWork: tiered.enabled && entry.model !== workModel,
+      });
+    }
+  }
+  return { enabled: tiered.enabled, workModel, rows };
 }

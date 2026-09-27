@@ -1,0 +1,1394 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-25T05:57:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4199: Flywheel page: closed issues derive 'working' (tracker state never loaded), no titles, and restore the pre-Cut features that still have data sources",
+    "updated": "2026-09-25T06:43:19.618Z"
+  },
+  "plan": {
+    "id": "pan-4199",
+    "title": "Flywheel page: closed issues derive 'working' (tracker state never loaded), no titles, and restore the pre-Cut features that still have data sources",
+    "status": "running",
+    "uid": "5072c37d-7b94-474d-8c7f-4d717cc18c6b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 3,
+    "created": "2026-09-25T05:57:04Z",
+    "updated": "2026-09-25T06:43:19.618Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4199",
+        "label": "PAN-4199",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4199.md",
+        "label": "PRD draft (.pan/drafts/PAN-4199.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "dashboard",
+      "derived-state",
+      "frontend",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator filed PAN-4199 as one issue with 15 numbered acceptance criteria that review.requirements verifies against the issue body; AC-14 (one no-loss table) and AC-15 (one docs Sources table) straddle any seam, and the items share derive-status.ts, the contract, and FlywheelPage.tsx. The projected surface is ~31 small files within the 6-subsystem ceiling (packages/contracts, src/lib, src/cli, src/dashboard, tests/unit, docs). The alternative seam (ACs 8-13 as a sibling issue) was considered and not taken in auto mode.",
+      "canonicalFilename": "2026-09-25-PAN-4199-flywheel-page-closed-issues-derive-working-tracker-state-never-loaded-no-titles-and-restore-the-pre-cut-features-that-still-have-data-sources.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The restored Flywheel page (PAN-3964) lists closed issues as working: deriveFlywheelStatus's default loadStates passes no tracker rows, so closed is unreachable and a leftover feature branch derives working; the route bypasses the server adapter that holds the cached tracker state. Rows have no titles, drop trackerUnknown, do not say whether an agent is live, and ignore the loop's own tick in-flight list. The idle copy points to a Start button that is not below, an orphan session leaves only an error toast, and several v1 surfaces that still have data sources (UAT batches, headline tiles, live agents, report viewer, header needs-you indicator, elapsed time, live harness/model) are gone.",
+      "Proposal": "Add two injectable deriver seams — readTrackerIssues (tracker facts with titles; CLI default readIssueFromTracker x4 parallel, server injects the IssueDataService cache) and listPanes (CLI default listPanesWithBackend, server injects getBackendPanes) — and widen loadStates to take them, so closed rows drop and rows carry title, trackerUnknown, liveAgents, inTick, plus status.agents, inFlightSource, and conversation.createdAt, all derived on read. The CLI formatter prints the same facts. The page renders them, fixes the idle copy, offers Start fresh on an orphan 409, and restores the UAT batches card, headline strip, live agents list, Report tab, header needs-you indicator with reveal, elapsed time, and live harness/model. The no-loss test and docs/FLYWHEEL.md cover every restored surface.",
+      "NonGoals": "- Stats c3, c4 (MTTR), c5, c6, c7.\n- Any run id, run record, stored status field, or new SQLite table/column.\n- Moving the merge-train toggle or MergePolicySection off Awaiting Merge.\n- Fixing the prByIssue newest-first overwrite (derived-issue-state.ts:783) or the 200-PR listing window.\n- System RAM/swap/main-HEAD card, suggestions list, substrate-bug commit links, configured-vs-live mismatch warning, resolved defaults in the run-config footer.\n- Distinguishing \"no journal file\" from \"empty journal\".\n- A second Start button in the Status pane.\n- src/lib importing any src/dashboard module.\n- Decorative colored icons (the v1 emerald GitMerge icon)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "One plan with plan.metadata.sizeJustification instead of splitting ACs 8-13 into a sibling issue",
+        "rationale": "The operator filed one issue with 15 numbered ACs that review.requirements verifies; AC-14 (no-loss table) and AC-15 (docs Sources table) straddle any seam. Subsystems stay at the lint ceiling of 6."
+      },
+      {
+        "summary": "Two deriver seams: readTrackerIssues (facts incl. title) and listPanes; loadStates widened to (projectPath, ids, { issues, panes })",
+        "rationale": "One tracker read and one pane read serve closed-drop, titles, trackerUnknown, no-agent, and live agents; the route injects cache-backed versions so src/lib never imports server code."
+      },
+      {
+        "summary": "CLI tracker reads use readIssueFromTracker under withConcurrencyLimit(tasks, 4)",
+        "rationale": "AC-2 asks for batched or concurrency-limited reads; src/lib/concurrency.ts already provides the helper."
+      },
+      {
+        "summary": "Title rides on TrackerIssueFacts as optional title",
+        "rationale": "Both tracker sources (IssueDataService cache, readIssueFromTracker) already hold the title; the FR-6 derivation ignores it."
+      },
+      {
+        "summary": "No agent = working state with zero live backend panes (state not exited/done) for the issue",
+        "rationale": "Matches the liveness the FR-6 derivation already uses; per-agent liveness.ts probes would add subprocess calls per status read."
+      },
+      {
+        "summary": "Tick-only ids load against the flywheel projectRoot and pass the same closed/merged filter",
+        "rationale": "The flywheel works on one project (docs/FLYWHEEL.md); a closed tick id is stale and should not show."
+      },
+      {
+        "summary": "inFlightSource is tick when a conversation row and a tick exist, else census",
+        "rationale": "AC-5 says the count follows the loop when a run exists; without a tick there is no loop list to count."
+      },
+      {
+        "summary": "Headline strip computed client-side; substrate fixed = stats bugs filed in the window that are closed",
+        "rationale": "Uses the existing /api/flywheel/stats, order book, and merge-train totals; no new route or contract. The tile title states the exact meaning."
+      },
+      {
+        "summary": "Idle copy fixed; no second Start button",
+        "rationale": "AC-6 allows either; a copy fix is the smallest change and keeps one Start control."
+      },
+      {
+        "summary": "Report viewer is a fourth rail tab via a generalized FlywheelFilePane",
+        "rationale": "Reuses the State pane's markdown/path/mtime rendering exactly."
+      },
+      {
+        "summary": "Agent link opens the issue view via onNavigateIssue",
+        "rationale": "The issue view is the agent tree plus conversation; no separate agent route exists on the page."
+      },
+      {
+        "summary": "Needs-you indicator reuses the sidebar's 30 s flywheel status query",
+        "rationale": "Same query key means no extra polling."
+      },
+      {
+        "summary": "Elapsed = now minus the conv-flywheel row createdAt",
+        "rationale": "AC-13 names this source; there is no run record (NFR-1)."
+      },
+      {
+        "summary": "Out-of-inventory items not in the 15 ACs (system card, suggestions, commit links, mismatch warning, prByIssue overwrite, 200-PR window) are NonGoals",
+        "rationale": "The issue's Acceptance criteria section is the definition of done; the inventory lists them only as context."
+      },
+      {
+        "summary": "AC-14's default-server-path exclusion test lives in tests/unit/dashboard/server/routes/flywheel-status.test.ts (wi2); derive-status.test.ts gains the lib-default closed-drop case (wi1.ac1)",
+        "rationale": "derive-status.ts has no server path — the route injects the IssueDataService cache — so only a route-level test can exercise the default server deps without stubbing loadStates. Deliberate deviation from the literal file named in AC-14."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-tracker-facts",
+        "title": "Deriver reads tracker facts so closed rows drop and rows carry title and trackerUnknown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "packages/contracts/src/flywheel-derived.test.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/fixtures.tsx",
+            "tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts packages/contracts/src/flywheel-derived.test.ts tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "derive-status.test.ts passes including the closed-drop, trackerUnknown, and title cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "wi2-server-cache",
+            "wi3-panes-agents",
+            "wi4-tick-inflight",
+            "wi6-cli-format",
+            "wi7-ui-title"
+          ],
+          "parallelSafeReason": "It is a DAG root: no other item runs until it lands, and the frontend items that do not touch its files (wi9, wi10, wi12) share none of its files_scope."
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-1. Add title (NullOr String) and optional trackerUnknown to FlywheelInFlightRow; add optional title to TrackerIssueFacts and fill it in readIssueFromTracker; add DeriveFlywheelStatusDeps.readTrackerIssues with a lazy default that calls readIssueFromTracker per upper-cased id through withConcurrencyLimit(tasks, 4) from src/lib/concurrency.ts; widen loadStates to (projectPath, issueIds, { issues }) and pass issues to the lib loadIssueStatesForProject; copy title and trackerUnknown onto rows. Update fixtures.tsx, the contract test fixture, and the CLI test fixture with title."
+        },
+        "items": [
+          {
+            "id": "wi1-tracker-facts.ac1",
+            "title": "Given readTrackerIssues returns { PAN-1: { open: false } } and loadStates is left at its default, when deriveFlywheelStatus runs, then the lib loadIssueStatesForProject receives that issues map and PAN-1 is absent from inFlight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-tracker-facts.ac2",
+            "title": "Given readTrackerIssues returns null for PAN-2, when deriveFlywheelStatus runs, then the PAN-2 row is present with trackerUnknown: true and title: null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-tracker-facts.ac3",
+            "title": "Given readTrackerIssues returns title \"Fix the thing\" for PAN-3, when deriveFlywheelStatus runs, then the PAN-3 row has title \"Fix the thing\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-tracker-facts.ac4",
+            "title": "Given no readTrackerIssues dep, when the default runs for 10 ids, then readIssueFromTracker is called once per id with at most 4 calls in flight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-server-cache",
+        "title": "GET /api/flywheel/status feeds the deriver from the IssueDataService cache",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/routes/flywheel.ts",
+            "tests/unit/dashboard/server/routes/flywheel-status.test.ts",
+            "tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/dashboard/server/routes/flywheel-status.test.ts",
+            "npx vitest run tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "flywheel-status.test.ts passes",
+            "no-loss.test.ts still passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-2. getTrackerIssue returns title; routes/flywheel.ts exports serverFlywheelStatusDeps() injecting readTrackerIssues from getSharedIssueService().getTrackerIssue and loadStates from the server adapter services/derived-issue-state.ts loadIssueStatesForProject; getFlywheelStatusPayload(deps = serverFlywheelStatusDeps()). New route test runs the real adapter against a mkdtemp dir with the issue cache, backend inventory, and listRepoPullRequestsStaleOk mocked; it never stubs loadStates. If the route import now fails in tests/unit/flywheel/no-loss.test.ts, add vi.mock stubs for services/issue-service-singleton.js and services/backend-inventory.js there in this commit; wi17 only adds rows."
+        },
+        "items": [
+          {
+            "id": "wi2-server-cache.ac1",
+            "title": "Given the issue cache answers open: false for PAN-7 and open: true with title \"Open thing\" for PAN-8, when getFlywheelStatusPayload runs with default server deps, then it returns 200 and inFlight contains only PAN-8",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-server-cache.ac2",
+            "title": "Given the same cache, when the payload is read, then the PAN-8 row title equals \"Open thing\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-server-cache.ac3",
+            "title": "Given src/lib/flywheel/derive-status.ts, when grep searches it for \"dashboard/server\", then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-panes-agents",
+        "title": "Deriver reads backend panes once and reports liveAgents per row and agents on the status",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "packages/contracts/src/flywheel-derived.test.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/lib/flywheel/derive-status.ts",
+            "src/dashboard/server/routes/flywheel.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/fixtures.tsx",
+            "tests/unit/cli/commands/flywheel.test.ts",
+            "tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts packages/contracts/src/flywheel-derived.test.ts tests/unit/cli/commands/flywheel.test.ts",
+            "npx vitest run tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "derive-status.test.ts passes including liveAgents and agents cases",
+            "no-loss.test.ts still passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-3. Add FlywheelAgentSummary, row liveAgents: number, status agents array; export listPanesWithBackend from derived-issue-state.ts; add DeriveFlywheelStatusDeps.listPanes (lazy default listPanesWithBackend(Date.now())); pass panes to loadStates; live = state not exited and not done; agents = live panes of in-flight issues sorted by issueId then role; serverFlywheelStatusDeps adds listPanes: getBackendPanes."
+        },
+        "items": [
+          {
+            "id": "wi3-panes-agents.ac1",
+            "title": "Given loadStates returns state working for PAN-1 and listPanes returns [], when deriveFlywheelStatus runs, then the PAN-1 row has liveAgents 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-panes-agents.ac2",
+            "title": "Given panes for PAN-1 (working), PAN-1 (exited), and PAN-9 (not in flight), when deriveFlywheelStatus runs, then agents contains exactly one entry with issueId PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-panes-agents.ac3",
+            "title": "Given the default deps, when deriveFlywheelStatus runs with at least one issue, then listPanes is called exactly once and its panes are passed to loadStates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-tick-inflight",
+        "title": "Deriver merges the tick in-flight list: inTick per row, tick-only rows, inFlightSource",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "packages/contracts/src/flywheel-derived.test.ts",
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/fixtures.tsx",
+            "tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts packages/contracts/src/flywheel-derived.test.ts tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "derive-status.test.ts passes including tick cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-4. Add row inTick: boolean and status inFlightSource: tick | census. Union tick ids (upper-cased, de-duplicated) with census workspaces; tick-only ids get workspacePath null and lastJournal null and load against projectRoot; the closed/merged filter applies to every row; inFlightSource = conversation and lastTick present ? tick : census."
+        },
+        "items": [
+          {
+            "id": "wi4-tick-inflight.ac1",
+            "title": "Given lastTick.inFlight is [PAN-5] and no PAN-5 workspace exists, when deriveFlywheelStatus runs, then inFlight contains a PAN-5 row with inTick true and lastJournal null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-tick-inflight.ac2",
+            "title": "Given a census workspace PAN-6 not in the tick list, when deriveFlywheelStatus runs, then the PAN-6 row has inTick false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-tick-inflight.ac3",
+            "title": "Given no conversation row, when deriveFlywheelStatus runs, then inFlightSource is census; given a conversation and a tick, then inFlightSource is tick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-tick-inflight.ac4",
+            "title": "Given a tick id whose derived state is closed, when deriveFlywheelStatus runs, then that id is absent from inFlight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-conv-created",
+        "title": "Conversation summary carries createdAt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel-derived.ts",
+            "packages/contracts/src/flywheel-derived.test.ts",
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/fixtures.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts packages/contracts/src/flywheel-derived.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "derive-status.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-5. Add createdAt: String to FlywheelConversationSummary and copy conv.createdAt in the deriver."
+        },
+        "items": [
+          {
+            "id": "wi5-conv-created.ac1",
+            "title": "Given a conversation row with createdAt 2026-09-23T08:00:00.000Z, when deriveFlywheelStatus runs, then status.conversation.createdAt equals that value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-conv-created.ac2",
+            "title": "Given the contract test fixture, when decodeFlywheelDerivedStatus decodes a running status without createdAt, then it throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-cli-format",
+        "title": "pan flywheel status prints title, tracker-unknown, no-agent, loop marker, and in-flight source",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel.ts",
+            "tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/commands/flywheel.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-6. formatFlywheelStatus header reads \"in flight (loop) N\" (N = rows with inTick) when inFlightSource is tick, else \"feature workspaces N\"; each row prints the id with a * suffix when inTick, the state plus \" · no agent\" when state is working and liveAgents is 0, the title truncated to 48 chars or \"(tracker unknown)\", then PR and journal."
+        },
+        "items": [
+          {
+            "id": "wi6-cli-format.ac1",
+            "title": "Given a status with one inTick working row with liveAgents 0 titled \"Fix the thing\", when pan flywheel status prints, then the output contains \"no agent\", \"Fix the thing\", and \"in flight (loop) 1\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-cli-format.ac2",
+            "title": "Given a row with trackerUnknown true, when pan flywheel status prints, then that row line contains \"(tracker unknown)\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-cli-format.ac3",
+            "title": "Given inFlightSource census with 3 rows, when pan flywheel status prints, then the output contains \"feature workspaces 3\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-ui-idle-copy",
+        "title": "Idle empty state names the conversation pane toolbar instead of \"Start below\"",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-9 / D10. Replace the idle EmptyState title at FlywheelStatusPane.tsx:83 with \"No flywheel running — Start it from the conversation pane's toolbar, or run pan flywheel start\" (pan flywheel start stays in a <code>)."
+        },
+        "items": [
+          {
+            "id": "wi9-ui-idle-copy.ac1",
+            "title": "Given status.run is idle, when FlywheelStatusPane renders, then the text \"conversation pane's toolbar\" is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-ui-idle-copy.ac2",
+            "title": "Given status.run is idle, when FlywheelStatusPane renders, then the text \"Start below\" is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-ui-title",
+        "title": "In-flight table renders the title and a tracker-unknown marker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-7. Under the id button render the title (block, max-w-[18rem], truncate, title attribute = full title) when row.title; render StatusBadge tone neutral \"tracker unknown\" with testId flywheel-tracker-unknown-<id> when row.trackerUnknown."
+        },
+        "items": [
+          {
+            "id": "wi7-ui-title.ac1",
+            "title": "Given a row with title \"Fix the thing\", when the Status pane renders, then that text is shown and its element has title=\"Fix the thing\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ui-title.ac2",
+            "title": "Given a row with trackerUnknown true, when the Status pane renders, then an element with testid flywheel-tracker-unknown-<id> shows \"tracker unknown\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-ui-title.ac3",
+            "title": "Given a row with title null and no trackerUnknown, when the Status pane renders, then no title element and no tracker-unknown marker render for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-ui-noagent-tick",
+        "title": "In-flight table shows no-agent and loop markers; header count follows inFlightSource",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx",
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx and FlywheelPage.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-8. State cell: neutral StatusBadge \"no agent\" (testid flywheel-no-agent-<id>) when state is working and liveAgents is 0; info StatusBadge \"flywheel\" (testid flywheel-in-tick-<id>) when inTick; each <tr> gets data-attention. Section heading and FlywheelPage header count (testid flywheel-inflight-count) read \"in flight (loop)\" with the inTick count when inFlightSource is tick, else \"feature workspaces\" with the row count."
+        },
+        "items": [
+          {
+            "id": "wi8-ui-noagent-tick.ac1",
+            "title": "Given a working row with liveAgents 0, when the Status pane renders, then testid flywheel-no-agent-<id> shows \"no agent\"; given liveAgents 1, then it is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-ui-noagent-tick.ac2",
+            "title": "Given a row with inTick true, when the Status pane renders, then testid flywheel-in-tick-<id> shows \"flywheel\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-ui-noagent-tick.ac3",
+            "title": "Given inFlightSource tick with 2 of 3 rows inTick, when FlywheelPage renders, then flywheel-inflight-count reads \"2 in flight (loop)\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-ui-noagent-tick.ac4",
+            "title": "Given inFlightSource census with 3 rows, when FlywheelPage renders, then flywheel-inflight-count reads \"3 feature workspaces\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-ui-agents",
+        "title": "Status tab lists live agents for the in-flight issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-14. Section aria-label \"Live agents\", heading \"Agents · N\"; one row per status.agents entry: issue button calling onNavigateIssue, role, model (mono), pane state StatusBadge (working info, blocked warning, else neutral). Empty text \"No agent panes are live for these issues.\""
+        },
+        "items": [
+          {
+            "id": "wi14-ui-agents.ac1",
+            "title": "Given status.agents has two entries, when the Status pane renders, then the Live agents section shows both issue ids, roles, models, and states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-ui-agents.ac2",
+            "title": "Given an agent row, when its issue button is clicked, then onNavigateIssue is called with that issue id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-ui-agents.ac3",
+            "title": "Given status.agents is empty, when the Status pane renders, then the text \"No agent panes are live for these issues.\" is shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-ui-orphan-start-fresh",
+        "title": "A 409 FlywheelOrphanSession on Start offers Start fresh in the idle toolbar",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/flywheelApi.ts",
+            "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelConversationPane.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-10 / D9. flywheelApi.ts exports FlywheelActionHttpError(message, status, code) and postFlywheelAction throws it with payload.code. The pane keeps orphanDetected state: set when start fails with code FlywheelOrphanSession (toast names the leftover session), cleared when run leaves idle; while set, the idle toolbar shows Start fresh, whose confirm message says a leftover conv-flywheel session is replaced, and posts { fresh: true }."
+        },
+        "items": [
+          {
+            "id": "wi10-ui-orphan-start-fresh.ac1",
+            "title": "Given run idle and POST /api/flywheel/start answering 409 { code: \"FlywheelOrphanSession\" }, when Start is clicked, then a Start fresh button appears in the Flywheel controls toolbar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-ui-orphan-start-fresh.ac2",
+            "title": "Given that Start fresh button, when it is clicked and the confirm dialog is accepted, then POST /api/flywheel/start is sent with body { fresh: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-ui-orphan-start-fresh.ac3",
+            "title": "Given a start that fails with a 500, when Start is clicked, then no Start fresh button appears in the idle toolbar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-ui-live-conv-elapsed",
+        "title": "Conversation-pane header shows live harness and model; page header shows elapsed run time",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx",
+            "src/dashboard/frontend/src/lib/flywheelApi.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelConversationPane.test.tsx and FlywheelPage.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-11. Conversation pane header renders testid flywheel-live-conversation \"<harness> · <model>\" from status.conversation. flywheelApi.ts adds formatDuration(ms) → \"Xm\", \"Xh Ym\", \"Xd Yh\". FlywheelPage header renders testid flywheel-elapsed \"running <duration>\" from nowMs - Date.parse(conversation.createdAt) while run is running."
+        },
+        "items": [
+          {
+            "id": "wi11-ui-live-conv-elapsed.ac1",
+            "title": "Given a running status whose conversation has harness claude-code and model claude-opus-5-5, when the conversation pane renders, then flywheel-live-conversation reads \"claude-code · claude-opus-5-5\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-ui-live-conv-elapsed.ac2",
+            "title": "Given a running status whose conversation createdAt is two hours before now, when FlywheelPage renders, then flywheel-elapsed reads \"running 2h 0m\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-ui-live-conv-elapsed.ac3",
+            "title": "Given run paused, when FlywheelPage renders, then flywheel-elapsed is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-ui-uat-batches",
+        "title": "Left rail shows the UAT batches card over MergeTrainView",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelUatBatchesCard.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelUatBatchesCard.test.tsx",
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelUatBatchesCard.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelUatBatchesCard.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-12. New FlywheelUatBatchesCard ports v1 MergeQueueCard onto primitives.tsx RailCard (label \"UAT batches\", count in actions with testid flywheel-uat-batches-count, no decorative icon color) wrapping <MergeTrainView active showProjectFilter={false} onNavigateIssue>; mount it in FlywheelPage between PendingAutoMergesCard and FlywheelOrderBookCard."
+        },
+        "items": [
+          {
+            "id": "wi12-ui-uat-batches.ac1",
+            "title": "Given /api/merge-train/queues returns 2 queued features and /generations 1 ready batch, when FlywheelUatBatchesCard renders, then the card label \"UAT batches\" and count \"2 features · 1 batch\" are shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-ui-uat-batches.ac2",
+            "title": "Given empty queues and generations, when the card renders, then the label renders and flywheel-uat-batches-count is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-ui-uat-batches.ac3",
+            "title": "Given run idle, when FlywheelPage renders, then a region labelled \"UAT batches\" is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-ui-headline",
+        "title": "Status tab shows the derived headline strip",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelHeadlineStrip.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelHeadlineStrip.test.tsx",
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatsPanel.tsx",
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelHeadlineStrip.test.tsx src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatsPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelHeadlineStrip.test.tsx and FlywheelStatsPanel.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-13 / D8. Export FlywheelStatsPanel fetchStats as fetchFlywheelStats. New FlywheelHeadlineStrip({ orderBook }) reads query [\"flywheel\",\"stats\",30] and useMergeTrainData(true); tiles with testids flywheel-headline-prs (c1 denominator), flywheel-headline-fixed (bugs with closedAt; title attribute explains filed-in-window-and-closed), flywheel-headline-orderbook (landed/total, only with a book), flywheel-headline-uat (mergeTrainTotals features); a failed query shows \"—\". Mount at the top of the Status tabpanel in FlywheelPage."
+        },
+        "items": [
+          {
+            "id": "wi13-ui-headline.ac1",
+            "title": "Given stats with c1 denominator 12 and 3 bugs of which 2 have closedAt, when the strip renders, then flywheel-headline-prs shows 12 and flywheel-headline-fixed shows 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-ui-headline.ac2",
+            "title": "Given orderBook { landed: 4, total: 9 }, when the strip renders, then flywheel-headline-orderbook shows \"4/9\"; given orderBook null, then it is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-ui-headline.ac3",
+            "title": "Given /api/flywheel/stats answering 500, when the strip renders, then flywheel-headline-prs shows \"—\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-ui-headline.ac4",
+            "title": "Given merge-train queues with 3 features, when the strip renders, then flywheel-headline-uat shows 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-ui-report-tab",
+        "title": "Rail gains a Report tab rendering .pan/flywheel/report.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatePane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatePane.test.tsx",
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatePane.test.tsx src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatePane.test.tsx and FlywheelPage.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-15 / D11. Generalize FlywheelStatePane into an internal FlywheelFilePane; export FlywheelStatePane (unchanged behaviour) and FlywheelReportPane (endpoint /api/flywheel/report, query key [\"flywheel\",\"report\"], empty title \"No report yet\", testid flywheel-report-markdown). FlywheelPage RailTab adds report between state and stats."
+        },
+        "items": [
+          {
+            "id": "wi15-ui-report-tab.ac1",
+            "title": "Given GET /api/flywheel/report returns exists true with markdown \"# Run report\", when FlywheelReportPane renders, then the heading \"Run report\" and the path .pan/flywheel/report.md are shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-ui-report-tab.ac2",
+            "title": "Given GET /api/flywheel/report returns exists false, when FlywheelReportPane renders, then \"No report yet\" is shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-ui-report-tab.ac3",
+            "title": "Given FlywheelPage, when the rail tablist renders, then it has four tabs: status, state, report, stats",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-ui-needs-you",
+        "title": "App header needs-you indicator reveals the Status tab needs-you block",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/flywheelReveal.ts",
+            "src/dashboard/frontend/src/components/flywheel/NeedsYouIndicator.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/NeedsYouIndicator.test.tsx src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx"
+          ],
+          "expected_outputs": [
+            "NeedsYouIndicator.test.tsx and FlywheelPage.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-16 / D13. Restore lib/flywheelReveal.ts from git show 3fb710042dd^ with requestRevealNeedsYou / subscribeRevealNeedsYou / consumePendingReveal. NeedsYouIndicator uses useFlywheelStatus({ refetchInterval: 30_000 }); count = (lastTick.needsYou ? 1 : 0) + rows with attention needs-you; hidden at 0; click → requestRevealNeedsYou() then onActivate(). AppChrome gets prop onNavigateNeedsYou and mounts the indicator after DecisionsIndicator; App.tsx passes () => setActiveTab(\"flywheel\"). FlywheelPage consumes the pending reveal on mount and on subscription: setTab(\"status\") then scrolls [data-testid=flywheel-needs-you] or the first [data-attention=needs-you] row into view. The row fallback attribute data-attention is added by wi8 (which lands after this item); the tick-line target [data-testid=flywheel-needs-you] is sufficient for this item's tests."
+        },
+        "items": [
+          {
+            "id": "wi16-ui-needs-you.ac1",
+            "title": "Given a status with no tick needs-you and no needs-you rows, when NeedsYouIndicator renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-ui-needs-you.ac2",
+            "title": "Given a tick needs-you and one row with attention needs-you, when NeedsYouIndicator renders, then it shows the count 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-ui-needs-you.ac3",
+            "title": "Given the indicator, when it is clicked, then onActivate is called and consumePendingReveal() returns true once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-ui-needs-you.ac4",
+            "title": "Given a pending reveal and FlywheelPage showing the state tab, when the reveal fires, then the status tab is selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-no-loss",
+        "title": "No-loss table asserts every restored affordance",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "no-loss.test.ts passes with 15 rows"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-17. Add rows \"UAT batches card\", \"headline strip\", \"report viewer\" (route GET /api/flywheel/report + FlywheelStatePane#FlywheelReportPane), and \"needs-you indicator\" (NeedsYouIndicator#NeedsYouIndicator + lib/flywheelReveal#requestRevealNeedsYou); change the length assertion to the new row count and retitle it \"covers every v1 row\". Add vi.mock stubs for services/issue-service-singleton.js and services/backend-inventory.js only if the route import now fails without them."
+        },
+        "items": [
+          {
+            "id": "wi17-no-loss.ac1",
+            "title": "Given the no-loss table, when vitest runs it, then every row including \"UAT batches card\", \"headline strip\", \"report viewer\", and \"needs-you indicator\" resolves its view export as a function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-no-loss.ac2",
+            "title": "Given the no-loss table, when vitest runs it, then the row-count assertion equals the number of NO_LOSS entries (15)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-docs",
+        "title": "docs/FLYWHEEL.md documents every new derived field and restored surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T05:57:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4199",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cE \"^\\| (Title|No agent|Loop in-flight|Live agents|Headline strip|UAT batches|Report tab|Needs-you indicator|Elapsed)\" docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "grep prints 9"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4199.md WI-18. Update the Sources table (rows starting Title, Tracker unknown, No agent, Loop in-flight, Live agents, Headline strip, UAT batches, Report tab, Needs-you indicator, Elapsed; revise the In-flight issues row to say closed issues drop via tracker facts from the cache on the dashboard and readIssueFromTracker in the CLI), the Verb → route table (report control adds the Report tab; start mentions orphan 409 → Start fresh), and Known limits (elapsed is conversation age; tick-only ids load against the flywheel project)."
+        },
+        "items": [
+          {
+            "id": "wi18-docs.ac1",
+            "title": "Given docs/FLYWHEEL.md, when grep counts Sources rows starting with Title, No agent, Loop in-flight, Live agents, Headline strip, UAT batches, Report tab, Needs-you indicator, and Elapsed, then it returns 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac2",
+            "title": "Given docs/FLYWHEEL.md, when the In-flight issues row is read, then it names the IssueDataService cache (dashboard) and readIssueFromTracker (CLI) as the tracker sources",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-docs.ac3",
+            "title": "Given docs/FLYWHEEL.md Known limits, when read, then it states that elapsed counts from the conversation creation time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-tracker-facts",
+        "to": "wi2-server-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-tracker-facts",
+        "to": "wi3-panes-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-server-cache",
+        "to": "wi3-panes-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-panes-agents",
+        "to": "wi4-tick-inflight",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-tick-inflight",
+        "to": "wi5-conv-created",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-tick-inflight",
+        "to": "wi6-cli-format",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-ui-idle-copy",
+        "to": "wi7-ui-title",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-conv-created",
+        "to": "wi7-ui-title",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-ui-title",
+        "to": "wi8-ui-noagent-tick",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-ui-noagent-tick",
+        "to": "wi14-ui-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-ui-uat-batches",
+        "to": "wi13-ui-headline",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-ui-headline",
+        "to": "wi15-ui-report-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-ui-report-tab",
+        "to": "wi16-ui-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-ui-needs-you",
+        "to": "wi8-ui-noagent-tick",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-ui-noagent-tick",
+        "to": "wi11-ui-live-conv-elapsed",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-ui-orphan-start-fresh",
+        "to": "wi11-ui-live-conv-elapsed",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-ui-uat-batches",
+        "to": "wi17-no-loss",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-ui-headline",
+        "to": "wi17-no-loss",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-ui-report-tab",
+        "to": "wi17-no-loss",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-ui-needs-you",
+        "to": "wi17-no-loss",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-panes-agents",
+        "to": "wi17-no-loss",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-conv-created",
+        "to": "wi18-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-server-cache",
+        "to": "wi17-no-loss",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

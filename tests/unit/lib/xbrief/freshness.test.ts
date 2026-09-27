@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { checkPlanFreshness, formatPlanFreshnessRefusal } from '../../../../src/lib/xbrief/freshness.js';
+import { checkPlanFreshness, formatPlanFreshnessRefusal, isDriftedPath, planCreatedEpoch } from '../../../../src/lib/xbrief/freshness.js';
 import type { XBriefDocument, XBriefItemStatus } from '../../../../src/lib/xbrief/types.js';
 
-function makeDoc(items: Array<{ id: string; status?: XBriefItemStatus; files_scope?: string[] }>): XBriefDocument {
+function makeDoc(items: Array<{ id: string; status?: XBriefItemStatus; files_scope?: string[] }>, created?: string): XBriefDocument {
   return {
     xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {
       id: 'PAN-1',
       title: 'Test Plan',
       status: 'approved',
+      created,
       items: items.map((item) => ({
         id: item.id,
         title: item.id,
@@ -73,6 +74,74 @@ describe('checkPlanFreshness', () => {
     let calls = 0;
     checkPlanFreshness(doc, '/ws', () => { calls += 1; return true; });
     expect(calls).toBe(1);
+  });
+
+  it('does not report a missing path whose probe returns null, but still counts it', () => {
+    const doc = makeDoc([{ id: 'a', files_scope: ['src/created.ts'] }], '2026-09-20T00:00:00Z');
+    const result = checkPlanFreshness(doc, '/ws', () => false, () => null);
+    expect(result.missing).toEqual([]);
+    expect(result.checked).toBe(1);
+  });
+
+  it('does not report a missing path deleted before the plan was created (restore case)', () => {
+    const created = '2026-09-20T00:00:00Z';
+    const deletedBefore = Math.floor(Date.parse(created) / 1000) - 1000;
+    const doc = makeDoc([{ id: 'a', files_scope: ['src/restored.ts'] }], created);
+    const result = checkPlanFreshness(doc, '/ws', () => false, () => deletedBefore);
+    expect(result.missing).toEqual([]);
+  });
+
+  it('reports a missing path deleted after the plan was created', () => {
+    const created = '2026-09-20T00:00:00Z';
+    const deletedAfter = Math.floor(Date.parse(created) / 1000) + 1000;
+    const doc = makeDoc([{ id: 'a', files_scope: ['src/drifted.ts'] }], created);
+    const result = checkPlanFreshness(doc, '/ws', () => false, () => deletedAfter);
+    expect(result.missing).toEqual(['src/drifted.ts']);
+  });
+
+  it('with no plan baseline, reports a missing path the probe reports as deleted', () => {
+    const doc = makeDoc([{ id: 'a', files_scope: ['src/drifted.ts'] }]);
+    const result = checkPlanFreshness(doc, '/ws', () => false, () => 12345);
+    expect(result.missing).toEqual(['src/drifted.ts']);
+  });
+
+  it('calls the probe only for missing paths', () => {
+    const doc = makeDoc([{ id: 'a', files_scope: ['src/exists.ts', 'src/gone.ts'] }]);
+    const probed: string[] = [];
+    checkPlanFreshness(
+      doc,
+      '/ws',
+      (path) => path.endsWith('exists.ts'),
+      (scope) => { probed.push(scope); return null; },
+    );
+    expect(probed).toEqual(['src/gone.ts']);
+  });
+});
+
+describe('isDriftedPath', () => {
+  it('is false when the path was never deleted', () => {
+    expect(isDriftedPath(null, 100)).toBe(false);
+  });
+
+  it('is false when the deletion is before or at the baseline', () => {
+    expect(isDriftedPath(50, 100)).toBe(false);
+    expect(isDriftedPath(100, 100)).toBe(false);
+  });
+
+  it('is true when the deletion is after the baseline, or there is no baseline', () => {
+    expect(isDriftedPath(150, 100)).toBe(true);
+    expect(isDriftedPath(150, null)).toBe(true);
+  });
+});
+
+describe('planCreatedEpoch', () => {
+  it('parses an ISO 8601 created timestamp to epoch seconds', () => {
+    expect(planCreatedEpoch(makeDoc([], '2026-09-20T00:00:00Z'))).toBe(1789862400);
+  });
+
+  it('returns null when created is missing or unparseable', () => {
+    expect(planCreatedEpoch(makeDoc([]))).toBeNull();
+    expect(planCreatedEpoch(makeDoc([], 'not-a-date'))).toBeNull();
   });
 });
 

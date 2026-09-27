@@ -97,7 +97,7 @@ vi.mock('../styles/command-deck.module.css', () => ({
     spinning: 'spinning',
     featureItemWrapper: 'featureItemWrapper',
     featureItemWrapperSelected: 'featureItemWrapperSelected',
-    featureItemWrapperPaused: 'featureItemWrapperPaused',
+    featureItemWrapperError: 'featureItemWrapperError',
     featureBadge_paused: 'featureBadge_paused',
     unpauseBtn: 'unpauseBtn',
     featureItemRow: 'featureItemRow',
@@ -115,13 +115,12 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureBadge_stopped: 'featureBadge_stopped',
     featureBadge_error: 'featureBadge_error',
     featureActivityError: 'featureActivityError',
-    featureState: 'featureState',
-    featureState_done: 'featureState_done',
-    featureState_progress: 'featureState_progress',
-    featureState_review: 'featureState_review',
-    featureState_context: 'featureState_context',
-    featureState_planning: 'featureState_planning',
-    featureState_todo: 'featureState_todo',
+    featureStateBadge: 'featureStateBadge',
+    featureStateBadge_rest: 'featureStateBadge_rest',
+    featureStateBadge_machine: 'featureStateBadge_machine',
+    featureStateBadge_specialist: 'featureStateBadge_specialist',
+    featureStateBadge_human: 'featureStateBadge_human',
+    featureStateBadge_outcome: 'featureStateBadge_outcome',
     featureCost: 'featureCost',
     featureResourceStrip: 'featureResourceStrip',
     featureResourceIcon: 'featureResourceIcon',
@@ -394,7 +393,24 @@ describe('FeatureItem', () => {
     expect(screen.queryByTestId('chevron-down')).not.toBeInTheDocument();
   });
 
-  it('renders the grouped issue menu and routes the single Wipe action through typed confirmation', async () => {
+  it('carries the full title in the title attribute for a 120-character title', () => {
+    const longTitle = 'A'.repeat(120);
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature()}
+        title={longTitle}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText(longTitle)).toHaveAttribute('title', longTitle);
+  });
+
+  // PAN-4198 D6: the registry's `wipe` entry is retired (RETIREMENT_AUDIT row
+  // "wipe" → resetIssue). Cancel issue now carries what this case checks: a
+  // Danger row appears once, and it goes through the typed-confirmation dialog
+  // rather than the legacy window.confirm / onDeepWipe path.
+  it('renders the grouped issue menu and routes a Danger action through typed confirmation', async () => {
     const onDeepWipe = vi.fn();
     const windowConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderFeature(
@@ -411,23 +427,26 @@ describe('FeatureItem', () => {
     expect(menu).toHaveAttribute('data-section', 'FeatureContextMenu (issue-row right-click)');
     expect(screen.getByText('Issue actions')).toBeInTheDocument();
     expect(screen.getByText('Queued for plan')).toBeInTheDocument();
-    expect(screen.getByText('For this phase')).toBeInTheDocument();
-    for (const section of ['Communicate', 'Lifecycle', 'Recover', 'Inspect', 'Navigate']) {
-      expect(within(menu).getByText(section)).toBeInTheDocument();
+    expect(screen.getByText('Next step')).toBeInTheDocument();
+    // PAN-4198 (FR-1/FR-4): only sections with an enabled row render. A queued
+    // issue with no workspace offers Plan… as its Next step and Cancel issue in
+    // Danger, so every semantic group section is empty.
+    for (const section of ['Communicate', 'Actions', 'Inspect']) {
+      expect(within(menu).queryByText(section), section).not.toBeInTheDocument();
     }
 
-    const danger = screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ });
+    const danger = screen.getByRole('menuitem', { name: 'Danger' });
     expect(danger).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-cancel')).not.toBeInTheDocument();
 
     fireEvent.click(danger);
     expect(danger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getAllByRole('menuitem', { name: 'Wipe' })).toHaveLength(1);
+    expect(screen.getAllByRole('menuitem', { name: 'Cancel issue' })).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Wipe' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cancel issue' }));
     expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByLabelText('Confirmation text')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Wipe' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel issue' })).toBeDisabled();
     expect(windowConfirm).not.toHaveBeenCalled();
     expect(onDeepWipe).not.toHaveBeenCalled();
   });
@@ -447,13 +466,16 @@ describe('FeatureItem', () => {
     );
 
     openFeatureContextMenu();
-    expect(screen.getByText('This session')).toBeInTheDocument();
+    // PAN-4198 (D13): session utilities live behind a collapsed Debug disclosure.
+    expect(screen.queryByTestId('non-issue-action-openStateDir')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Debug' }));
     expect(screen.getByTestId('non-issue-action-openStateDir')).toBeInTheDocument();
     expect(screen.getByTestId('non-issue-action-viewJsonl')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
     expect(onOpenStateDir).toHaveBeenCalledWith('agent-pan-821');
 
     openFeatureContextMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Debug' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'View JSONL' }));
     expect(onViewJsonl).toHaveBeenCalledWith('agent-pan-821');
 
@@ -469,6 +491,7 @@ describe('FeatureItem', () => {
       />,
     );
     openFeatureContextMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Debug' }));
     expect(screen.getByTestId('non-issue-action-openStateDir')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Open State Dir' })).toBeInTheDocument();
     expect(screen.queryByTestId('non-issue-action-viewJsonl')).not.toBeInTheDocument();
@@ -486,7 +509,7 @@ describe('FeatureItem', () => {
       />,
     );
     openFeatureContextMenu();
-    expect(screen.queryByText('This session')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Debug' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('non-issue-action-openStateDir')).not.toBeInTheDocument();
     expect(screen.queryByTestId('non-issue-action-viewJsonl')).not.toBeInTheDocument();
   });
@@ -547,8 +570,9 @@ describe('FeatureItem', () => {
       />,
     );
     // Redesign (PAN-1779): the aggregate activity tooltip lives on the issue
-    // id — the row status dot was replaced by the wrapper edge bar.
-    expect(screen.getByTitle('1 work agent running 38m, 1 review error, 1 reviewer stopped')).toBeInTheDocument();
+    // id. PAN-4201 reintroduces the row status dot with the same summary.
+    expect(screen.getByText('PAN-821')).toHaveAttribute('title', '1 work agent running 38m, 1 review error, 1 reviewer stopped');
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('title', '1 work agent running 38m, 1 review error, 1 reviewer stopped');
   });
 
   it('shows work and review badges on the parent row', () => {
@@ -567,6 +591,51 @@ describe('FeatureItem', () => {
     );
     expect(screen.getByText('▸ work')).toHaveAttribute('title', 'Work agent sessions for this issue: 1 total. 1 running.');
     expect(screen.getByText('●●● 2')).toHaveAttribute('title', 'Review pipeline sessions for this issue: 2 total. 1 active, 0 queued or starting, 1 stopped. Roles present: correctness and security.');
+    // PAN-4201: aggregate badges go neutral — the state badge is the row's
+    // one colored status signal.
+    expect(screen.getByText('▸ work')).not.toHaveClass('featureBadge_running');
+    expect(screen.getByText('▸ work')).toHaveClass('featureBadge_stopped');
+  });
+
+  it('shows exactly one status dot for a row with an active work session', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ sessionId: 'work-1', type: 'work', status: 'running', presence: 'active' })],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    const dots = screen.getAllByTestId('status-dot');
+    expect(dots).toHaveLength(1);
+    expect(dots[0]).toHaveAttribute('data-status', 'active');
+  });
+
+  it('shows no status dot for a row with only ended sessions', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ sessionId: 'work-1', type: 'work', status: 'stopped', presence: 'ended' })],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('status-dot')).toBeNull();
+  });
+
+  it('labels the pipeline pips with the current step', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ sessionId: 'work-1', type: 'work', status: 'running', presence: 'active' })],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-pipe').getAttribute('aria-label')).toMatch(/^Step /);
   });
 
   it('shows a review error badge when a review session failed', () => {
@@ -582,40 +651,43 @@ describe('FeatureItem', () => {
     expect(screen.getByText('✕ review')).toHaveAttribute('title', 'Review pipeline has 1 failing session. Affected roles: security.');
   });
 
-  it('applies the colored kanban state pill class', () => {
+  it('renders the derived state badge and never the raw Allocated stateLabel', () => {
     renderFeature(
       <FeatureItem
-        feature={makeFeature({ stateLabel: 'Planning' })}
+        feature={makeFeature({ stateLabel: 'Allocated', state: 'working' })}
         isSelected={false}
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('Planning')).toHaveClass('featureState_planning');
+    expect(screen.getByText('Working')).toBeInTheDocument();
+    expect(screen.queryByText('Allocated')).not.toBeInTheDocument();
   });
 
-  it('uses the review tone for merged work that needs close-out', () => {
-    renderFeature(
-      <FeatureItem
-        feature={makeFeature({ stateLabel: 'Merged — Needs Close-Out' })}
-        isSelected={false}
-        onSelect={() => {}}
-      />,
-    );
-
-    expect(screen.getByText('Merged — Needs Close-Out')).toHaveClass('featureState_review');
-    expect(screen.getByText('Merged — Needs Close-Out')).not.toHaveClass('featureState_planning', 'featureState_todo');
-  });
-
-  it('adds contextual tooltip text to the feature state pill', () => {
+  it('renders the Ready state badge, the merge button, and no separate feature-ready badge', () => {
     markReady();
     renderFeature(
       <FeatureItem
-        feature={makeFeature({ stateLabel: 'In Review' })}
+        feature={makeFeature({ state: 'ready' })}
         isSelected={false}
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('In Review')).toHaveAttribute('title', 'The pull request is approved, green, and mergeable — awaiting your merge.');
+    const badge = screen.getByTestId('feature-state');
+    expect(badge).toHaveAttribute('data-state', 'ready');
+    expect(badge).toHaveTextContent('Ready');
+    expect(screen.getByTitle('Merge')).toBeInTheDocument();
+    expect(screen.queryByTestId('feature-ready')).toBeNull();
+  });
+
+  it('falls back to Merged for a null state with pipelineBucket post_merge_limbo', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({ state: null, pipelineBucket: 'post_merge_limbo' })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feature-state')).toHaveTextContent('Merged');
   });
 
   it('adds richer progress tooltip text for rally progress pills', () => {
@@ -911,6 +983,137 @@ describe('FeatureItem', () => {
     expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
+  });
+
+  it('shows no visible workspace/branch label text — resource facts live in title/aria-label', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['workspace', 'branch'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 1,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText('workspace')).toBeNull();
+    expect(screen.queryByText('branch local 1')).toBeNull();
+    expect(screen.getByTitle('workspace: allocated')).toBeInTheDocument();
+    expect(screen.getByTitle('branch: local 1')).toBeInTheDocument();
+  });
+
+  it('never nests a resource cluster button inside the row button', () => {
+    const { container } = renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['workspace', 'vbrief', 'tasks', 'prd'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: true,
+            hasTasks: true,
+            hasPrd: true,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    const rowButton = container.querySelector('[data-section="ResourceStrip"]')?.closest('button');
+    expect(rowButton).not.toBeNull();
+    expect(rowButton?.querySelector('button')).toBeNull();
+  });
+
+  it('renders no Resources/Containers header for a branch and a PR with no containers', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: ['feature/pan-821'],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [{ number: 123, title: 'Test PR', state: 'OPEN', isDraft: false }],
+        dockerContainerNames: [],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    })));
+
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['branch', 'pr'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 1,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [{ number: 123, title: 'Test PR', state: 'OPEN', isDraft: false }],
+            hasXbrief: false,
+            hasTasks: false,
+            hasPrd: false,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByText('Containers')).toBeNull());
+    expect(screen.queryByText('Resources')).toBeNull();
+    expect(screen.queryByText(/\(local\)/)).toBeNull();
+  });
+
+  it('shows the Containers group and no docker icon in the cluster for a feature with two containers', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: [],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [],
+        dockerContainerNames: ['pan-821-db', 'pan-821-cache'],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    })));
+
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['docker'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            hasPrd: false,
+            dockerContainerCount: 2,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Containers')).toBeInTheDocument());
+    expect(screen.queryByTitle(/^docker:/)).toBeNull();
   });
 
   it('opens the xBRIEF viewer from keyboard-accessible chip without selecting the row', async () => {

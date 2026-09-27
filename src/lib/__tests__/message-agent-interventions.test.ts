@@ -70,7 +70,12 @@ vi.mock('../agents/delivery.js', async (importOriginal) => {
     ...actual,
     deliverMessageWithTranscriptConfirmation: async (args: { agentId: string; message: string; caller: string; deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux' }) => {
       const delivery = await actual.deliverAgentMessage(args.agentId, args.message, args.caller, args.deliveryMethod);
-      return { delivered: delivery.ok, attempts: 1, lastDelivery: delivery };
+      return {
+        delivered: delivery.ok,
+        attempts: 1,
+        lastDelivery: delivery,
+        landing: { kind: delivery.ok ? 'main' as const : 'none' as const },
+      };
     },
   };
 });

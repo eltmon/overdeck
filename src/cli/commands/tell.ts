@@ -37,6 +37,15 @@ export async function tellCommand(id: string, message: string): Promise<void> {
     const outcome = await messageAgent(agentId, message, 'pan-tell', {
       owesRework: await issueOwesRework(issueId),
     });
+    if (outcome.landedInSubagent) {
+      const { agentId: subagentId, description } = outcome.landedInSubagent;
+      console.error(chalk.red(
+        `Message NOT delivered to ${agentId}'s main conversation — it went to running subagent "${description}" (${subagentId})`,
+      ));
+      console.error(chalk.dim(`  "${message}"`));
+      console.error(chalk.dim(`  ${outcome.reason ?? 'no reason reported'}`));
+      return exitCli(1);
+    }
     if (!outcome.delivered) {
       console.error(chalk.red(`Message NOT delivered to ${agentId}`));
       console.error(chalk.dim(`  "${message}"`));

@@ -1,7 +1,8 @@
 # Architecture
 
 Overdeck is a multi-agent orchestrator for AI coding work: a CLI (`pan`), a
-dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
+dashboard server, a React frontend, and a fleet of coding agents hosted on a
+terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 
 ## Top-level layout
 
@@ -60,8 +61,11 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 
 Issue → `pan plan` (xBRIEF plan + item checklist) → `pan start` (work agent in a git worktree
 `workspaces/feature-<issue>/`) → verification gate → review convoy → test/UAT →
-server-side rebase/merge → close-out. Spawned agents live in tmux sessions
-(`tmux -L overdeck`), with state in `~/.overdeck/agents/<id>/state.json`.
+server-side rebase/merge → close-out. Spawned agents live in terminal-backend
+panes (Herdr default; legacy tmux on `tmux -L overdeck`), with state in
+`~/.overdeck/agents/<id>/state.json`. Liveness is answered only by
+`src/lib/agents/liveness.ts`; the dashboard's live pane list is
+`services/backend-inventory.ts` (`backendPanesById` in the read model).
 
 ## Spawn sites (harness decision points)
 
@@ -69,13 +73,22 @@ server-side rebase/merge → close-out. Spawned agents live in tmux sessions
 2. Work agent — `agents/spawn.ts` `spawnAgent` (~:600; single-work tier staffing ~:629)
 3. Role runs — `agents/spawn.ts` `spawnRun` (~:120; slot tier staffing ~:137)
 4. Restart — `agents/resume.ts` / `agents/recovery.ts`
-5. Dashboard start route — `dashboard/server/routes/agents.ts` (~:3156, shells to `pan start`)
+5. Dashboard start route — `POST /api/agents`, `postAgentsRoute` in
+   `dashboard/server/routes/agents/spawn.ts` (~:263, shells to `pan start` via
+   `buildPanStartArgs` in `routes/agents/shared.ts`)
 
 Conversations pin harness at creation in `handleConversationCreate`
 (`src/lib/overdeck/conversation-runtime.ts` ~:918, called from `POST /api/conversations` in
 `routes/conversations.ts` ~:303) — not a spawn site. Conversation kickoff templates read at
 request time live in `roles/` (`handoff.md`, `retrospective.md`); `src/lib/cloister/prompts/*.md`
 are build-copied to `dist/dashboard/prompts/` and cached by `renderPrompt`.
+
+Planning auto-start consent lives in
+`~/.overdeck/agents/planning-<issue>/auto-spawn-on-finalize.json`
+(`planning/auto-spawn-consent.ts`): one generation per planning cycle, claimed
+and spent by the first consent-bearing work spawn (`withAutoSpawnConsentClaim`
+in `agents/spawn.ts` `spawnAgent`/`spawnRun` and `remote/remote-agents.ts`).
+There is no per-issue pipeline record since the Cut (PAN-3917).
 
 ## Projects and workspaces domain (PAN-1990, PAN-3330)
 
@@ -107,4 +120,23 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
 
-<!-- last-verified: 2026-09-16 -->
+## Dashboard Agents page (`/agents`)
+
+`components/Agents/FleetAgentsView.tsx` hosts it. Data is
+`GET /api/agent-directory` (`services/agent-directory.ts`, derived on read,
+memoized 3 s); entry `state` comes from the pane inventory, never stored
+status. PAN-4197 makes the Live view (`?scope=live`) the default and keeps the
+Directory as `?view=history`.
+
+## Flywheel (PAN-3964, derived view)
+
+The flywheel is the `/pan-flywheel` skill running in conversation `conv-flywheel`; it has
+no run record. `src/lib/flywheel/derive-status.ts` `deriveFlywheelStatus()` computes the
+status on read for `pan flywheel status`, `GET /api/flywheel/status`
+(`dashboard/server/routes/flywheel.ts`), and the `/flywheel` page
+(`frontend/src/pages/FlywheelPage.tsx`, `components/flywheel/`). Every source is an
+injectable dep: the lib defaults serve the CLI; the route must inject the server's cached
+facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
+imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
+
+<!-- last-verified: 2026-09-26 -->

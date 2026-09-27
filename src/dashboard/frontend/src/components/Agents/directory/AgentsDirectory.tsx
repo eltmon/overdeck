@@ -1,8 +1,10 @@
 /**
- * The Agents Directory (PAN-3920 W6): a three-pane view of every agent,
- * conversation and subagent — tree (location → project → issue /
- * Conversations), list, and detail. Data comes from GET /api/agent-directory,
- * which recomputes on read and stores nothing.
+ * The Agents Directory (PAN-3920 W6), the Agents page's History view
+ * (PAN-4197): a three-pane view of every agent, conversation and subagent —
+ * tree (location → project → issue / Conversations), list, and detail. Data
+ * comes from GET /api/agent-directory, which recomputes on read and stores
+ * nothing. The panes are resizable (react-resizable-panels, layout saved in
+ * localStorage under `agents-directory`); the tree pane collapses.
  *
  * Keyboard (FR-6): ↑/↓ move the selection inside the focused pane; ←/→ and
  * Tab/Shift+Tab move focus between panes; Enter on a node focuses the list,
@@ -10,6 +12,9 @@
  * in the URL (`node`, `entry`, `window`).
  */
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
+
+import { PANEL_SEPARATOR_CLASS, guardedLayoutStorage } from '../panel-layout-storage';
 
 import { DirectoryDetail } from './DirectoryDetail';
 import { DirectoryList } from './DirectoryList';
@@ -34,6 +39,7 @@ export function AgentsDirectory() {
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: 'agents-directory', storage: guardedLayoutStorage });
 
   const entries = useMemo(() => data?.entries ?? [], [data]);
   const entriesById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
@@ -151,45 +157,59 @@ export function AgentsDirectory() {
     <div
       data-component="agents-directory"
       onKeyDown={onRootKeyDown}
-      className="@container h-full min-h-0 w-full"
+      className="h-full min-h-0 w-full"
     >
-      <div className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)] grid-rows-[minmax(200px,2fr)_minmax(0,3fr)] @[960px]:grid-cols-[minmax(200px,240px)_minmax(300px,1fr)_minmax(400px,1.3fr)] @[960px]:grid-rows-1">
-        <DirectoryTree
-          ref={treeRef}
-          nodes={nodes}
-          selectedNodeId={selectedNodeId}
-          collapsed={collapsed}
-          windowHours={url.windowHours}
-          onSelect={url.setNode}
-          onToggle={toggleNode}
-          onWindowChange={url.setWindow}
-          onKeyDown={onTreeKeyDown}
-        />
-        <DirectoryList
-          ref={listRef}
-          rows={rows}
-          selectedEntryId={selectedEntryId}
-          query={query}
-          windowHours={url.windowHours}
-          loading={isLoading}
-          error={isError}
-          filterRef={filterRef}
-          onQueryChange={setQuery}
-          onFilterKeyDown={onFilterKeyDown}
-          onSelect={url.setEntry}
-          onKeyDown={onListKeyDown}
-        />
-        <div
-          ref={detailRef}
-          role="region"
-          aria-label="Agent detail"
-          tabIndex={0}
-          onKeyDown={onDetailKeyDown}
-          className="col-span-2 min-h-0 min-w-0 overflow-hidden border-t border-border outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring @[960px]:col-span-1 @[960px]:border-t-0"
-        >
-          <DirectoryDetail entry={selectedEntry} entriesById={entriesById} onSelectEntry={selectEntry} />
-        </div>
-      </div>
+      <Group
+        orientation="horizontal"
+        defaultLayout={defaultLayout}
+        onLayoutChanged={onLayoutChanged}
+        id="agents-directory"
+        className="h-full min-h-0"
+      >
+        <Panel id="tree" defaultSize="20%" minSize="12%" collapsible collapsedSize="0%" className="flex h-full min-w-0 flex-col overflow-hidden">
+          <DirectoryTree
+            ref={treeRef}
+            nodes={nodes}
+            selectedNodeId={selectedNodeId}
+            collapsed={collapsed}
+            windowHours={url.windowHours}
+            onSelect={url.setNode}
+            onToggle={toggleNode}
+            onWindowChange={url.setWindow}
+            onKeyDown={onTreeKeyDown}
+          />
+        </Panel>
+        <Separator className={PANEL_SEPARATOR_CLASS} />
+        <Panel id="list" defaultSize="35%" minSize="20%" className="flex h-full min-w-0 flex-col overflow-hidden">
+          <DirectoryList
+            ref={listRef}
+            rows={rows}
+            selectedEntryId={selectedEntryId}
+            query={query}
+            windowHours={url.windowHours}
+            loading={isLoading}
+            error={isError}
+            filterRef={filterRef}
+            onQueryChange={setQuery}
+            onFilterKeyDown={onFilterKeyDown}
+            onSelect={url.setEntry}
+            onKeyDown={onListKeyDown}
+          />
+        </Panel>
+        <Separator className={PANEL_SEPARATOR_CLASS} />
+        <Panel id="detail" defaultSize="45%" minSize="25%" className="flex h-full min-w-0 flex-col overflow-hidden">
+          <div
+            ref={detailRef}
+            role="region"
+            aria-label="Agent detail"
+            tabIndex={0}
+            onKeyDown={onDetailKeyDown}
+            className="min-h-0 min-w-0 flex-1 overflow-hidden outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            <DirectoryDetail entry={selectedEntry} entriesById={entriesById} onSelectEntry={selectEntry} />
+          </div>
+        </Panel>
+      </Group>
     </div>
   );
 }

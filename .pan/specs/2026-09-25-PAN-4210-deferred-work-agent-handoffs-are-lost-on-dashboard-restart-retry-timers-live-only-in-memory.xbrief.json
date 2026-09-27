@@ -1,0 +1,526 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-25T06:54:25Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4210: Deferred work-agent handoffs are lost on dashboard restart (retry timers live only in memory)",
+    "updated": "2026-09-26T01:32:36.653Z"
+  },
+  "plan": {
+    "id": "pan-4210",
+    "title": "Deferred work-agent handoffs are lost on dashboard restart (retry timers live only in memory)",
+    "status": "running",
+    "uid": "6c15f688-83bc-4e7e-97aa-589f44d591b2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 3,
+    "created": "2026-09-25T06:54:25Z",
+    "updated": "2026-09-26T01:32:36.653Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4210",
+        "label": "PAN-4210",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4210.md",
+        "label": "PRD draft (.pan/drafts/PAN-4210.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4155",
+        "label": "PAN-4155",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "deacon-lite",
+      "pipeline-journal",
+      "planning-handoff",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "Guardrail-deferred planning hand-offs for PAN-4197..4201 were never retried. The issue blames in-memory timers, but PAN-4155 already keeps the schedule in the pipeline journal and re-reads it on every deacon-lite tick, including at boot. Verified causes: (1) deacon.globally_paused has been 'true' in overdeck.db since 2026-09-18T11:11Z, so runDeaconLite() returns before retryDeferredHandoffs runs; (2) even unfrozen, operatorStandDownReason would abandon every deferral as 'planning was restarted' because the planning agent's state.json status label stays 'running' forever (post-PAN-3917 saveAgentStateAndEmitEvent writes no state.json). Deferral messages also promise a two-hour retry that the freeze silently prevents.",
+      "Proposal": "Make the stand-down read facts (live inventory, paused, startedAt/stoppedAt) instead of status labels. Prove boot-time re-derivation and freeze hold/resume with a startDeaconLite()-level test on the incident's exact shape. Keep honoring the Deacon freeze as the operator's emergency stop, but record deaconPaused in the deferral journal entry and say the retry is held in activity, the complete-planning response, pan plan finalize/done output, and pan show. Document the rules in docs/PIPELINE-GATES.md.",
+      "NonGoals": "- Exempting retryDeferredHandoffs from the Deacon freeze\n- Pausing or extending the two-hour retry window while the Deacon is frozen\n- Making the planning stop projection write state.json, or fixing status-label staleness outside deferred-handoff.ts\n- Detecting remote (Fly) work agents in the stand-down beyond the AGENT_START_IN_FLIGHT refusal\n- Changing guardrail acknowledgement on the first attempt or on retries\n- Flipping deacon.globally_paused or cloister.spawns_paused on any machine\n- Removing the dead CloisterService.isSpawnPaused() or the cloister.spawns_paused flag\n- Adding any new stored status for hand-offs"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan the verified causes (Deacon freeze + stale planning status label) instead of the issue's in-memory-timer hypothesis",
+        "rationale": "The retry schedule is already journal-backed and re-derived on every tick including boot (deferred-handoff.ts header; existing test 'resumes the schedule from the journal after a restart'). Implementing the literal ask would ship nothing. This is a wrong diagnosis, not a contradiction between authoritative inputs, so auto-planning proceeds."
+      },
+      {
+        "summary": "The deferred-handoff retry keeps honoring the Deacon freeze; the hold is made visible instead",
+        "rationale": "The freeze is the operator's emergency stop (Snowflake toggle + banner); an automated spawn must not bypass it. Alternative for the operator to flip: move retryDeferredHandoffs out from under the isDeaconGloballyPaused() early return, since consent was granted and guardrails still apply on retry."
+      },
+      {
+        "summary": "The two-hour retry window keeps counting while frozen",
+        "rationale": "On unfreeze an older deferral gives up with planning.failed and a warn line naming pan start, which is already loud and actionable; freeze-aware clock math adds stored state for little value."
+      },
+      {
+        "summary": "Drop status-label checks from operatorStandDownReason for both planning and work agents",
+        "rationale": "state.json status is a spawn-time snapshot; agent state is written only after the pane exists, so a live agent is in the inventory or has startedAt later than the deferral. Keeping the label check makes every deferral stand down."
+      },
+      {
+        "summary": "Surface the hold via a response field workAgentRetryHeld: 'deacon-paused' rather than having the CLI read the flag itself",
+        "rationale": "The server decides once at deferral time and the CLI renders it, keeping one source for the message."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-25-PAN-4210-deferred-work-agent-handoffs-are-lost-on-dashboard-restart-retry-timers-live-only-in-memory.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "stand-down-facts",
+        "title": "Stop the deferred-handoff stand-down from trusting state.json status labels",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:54:25Z",
+        "metadata": {
+          "issueLabel": "pan-4210",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/deferred-handoff.ts",
+            "src/lib/cloister/work-agent-start.ts",
+            "src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-lite-retry-deferred-handoff.test.ts passes including the new label cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-2a",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In operatorStandDownReason (src/lib/cloister/deferred-handoff.ts, search `function operatorStandDownReason`): delete the line `if (work.status === 'running' || work.status === 'starting') return 'a work agent already exists';` and change the planning condition to `if (planning && after(planning.startedAt))`. Keep the liveAgentIds check, the paused check, and the startedAt/stoppedAt checks. Add a one-line comment: the status label is a spawn-time snapshot because complete-planning's stop projection writes no state.json. In the existing test file add: (a) 'retries when the planning label still reads running from before the deferral' (planning state {status:'running', startedAt: T0-30min}; after tick(2) spawn called once, last handoff entry handoff.retried); (b) 'retries when a work label reads running with no live pane and an older start' (work state {status:'running', startedAt: T0-60min}; after tick(2) spawn called once); (c) a new it.each stand-down row 'a planning session restarted after the deferral' (planning {status:'running', startedAt: T0+1min}). Use the file's existing fake timers and tick helper. Also (PRD WI-1, FR-2a): in classifySpawnSkip (src/lib/cloister/work-agent-start.ts:16-26) add `if (body['code'] === 'AGENT_START_IN_FLIGHT') return 'already-running';` before the 409 guardrails line, and add 'already-running' to STAND_DOWN_SKIP_REASONS in deferred-handoff.ts. Add a fetch-stub test next to 're-sends the spawn with no guardrail acknowledgement': fetch answers 409 { error: 'Agent agent-pan-4155 is already starting or running.', code: 'AGENT_START_IN_FLIGHT' }; after the due retry the last handoff entry is handoff.abandoned with outcome 'stood-down'."
+        },
+        "items": [
+          {
+            "id": "stand-down-facts.ac1",
+            "title": "Given a planning-<issue> state with status 'running' and startedAt before deferredAt, when the retry is due, then retryDeferredHandoffs calls the spawn once and appends handoff.retried, not handoff.abandoned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stand-down-facts.ac2",
+            "title": "Given a work agent state with status 'running', startedAt before deferredAt, and no live pane, when the retry is due, then retryDeferredHandoffs calls the spawn once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stand-down-facts.ac3",
+            "title": "Given a planning state whose startedAt is later than deferredAt, when the retry is due, then it appends handoff.abandoned with outcome 'stood-down' and does not call the spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stand-down-facts.ac4",
+            "title": "Given each existing stand-down arrangement (live work pane, work started or stopped after the deferral, paused issue, spent consent), when the retry is due, then retryDeferredHandoffs records handoff.abandoned with outcome 'stood-down'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stand-down-facts.ac5",
+            "title": "Given the agents route answers the retried spawn with 409 and code 'AGENT_START_IN_FLIGHT', when the retry runs, then it records handoff.abandoned with outcome 'stood-down' instead of handoff.retried",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-scheduler-test",
+        "title": "Add a deacon-lite boot test that re-attempts an overdue deferral and holds it while frozen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:54:25Z",
+        "metadata": {
+          "issueLabel": "pan-4210",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/__tests__/deacon-lite-boot-deferred-handoff.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-lite-boot-deferred-handoff.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-lite-boot-deferred-handoff.test.ts passes with both cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. New file src/lib/cloister/__tests__/deacon-lite-boot-deferred-handoff.test.ts. Fake timers at T0; OVERDECK_HOME set to a mkdtemp dir (restored in afterEach). Seed <OVERDECK_HOME>/agents/planning-pan-4210/state.json with id, issueId 'PAN-4210', role 'plan', status 'running', startedAt T0-13min, workspace (the fields parseAgentState needs to return non-null; role must pass isRole). Seed the journal with recordHandoffDeferred({ workspacePath, issueId:'PAN-4210', error:'Work agent count is at the configured ceiling (14/10).', httpStatus:409, now: T0-45min }). vi.mock: ../../workspaces/resolver.js (listWorkspaces -> one workspace), ../../terminal-backends/inventory.js (liveAgentInventory -> {backend:'herdr', panes:[]}), ../../planning/auto-spawn-consent.js (readAutoSpawnOnFinalizeFlagAsync -> true), ../work-agent-start.js (spawnWorkAgentThroughAgentsEndpoint vi.fn -> {spawned:true, agentId:'agent-pan-4210'}), ../../overdeck/control-settings.js (isDeaconGloballyPaused vi.fn), ../closed-issue-reaper.js (reconcileClosedIssueAgents -> []), ../deacon-api-recovery.js (checkApiErrorAgents -> []), ../../activity-logger.js, ../../agents.js (listAgentStates -> [] so checkStuckWorkAgents and reconcileAgentLiveness never touch the seeded planning state), ../../pipeline-notifier.js. Keep deferred-handoff.ts, pipeline-journal.ts and agent-state-read.ts real; mock any further module that reaches a real terminal backend, tracker or network. stopDeaconLite() in afterEach. Case 1: freeze false; startDeaconLite(); await vi.advanceTimersByTimeAsync(0); spawn called once with 'PAN-4210'; last handoff entry handoff.started with source 'deacon-lite'. Case 2: freeze true; boot; advance 3 x DEACON_LITE_INTERVAL_MS; no spawn call, journal still only the handoff.deferred line; flip freeze to false; advance one interval; spawn called once and handoff.started appended."
+        },
+        "items": [
+          {
+            "id": "boot-scheduler-test.ac1",
+            "title": "Given an overdue handoff.deferred in the journal and a planning state.json reading 'running', when startDeaconLite() boots with the freeze off, then the spawn mock is called once with 'PAN-4210' and the journal gains handoff.started from source 'deacon-lite'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-scheduler-test.ac2",
+            "title": "Given the same seed with isDeaconGloballyPaused returning true, when three 60-second intervals elapse, then the spawn mock is never called and the journal still holds exactly one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-scheduler-test.ac3",
+            "title": "Given the frozen case, when the freeze flag flips to false and one more interval elapses, then the spawn mock is called once and handoff.started is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-scheduler-test.ac4",
+            "title": "Given the test file runs under vi.useFakeTimers, when it advances time, then it uses vi.advanceTimersByTimeAsync only and passes without any real-time wait",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deferral-reports-freeze",
+        "title": "Journal and announce a frozen-Deacon hold when complete-planning defers a hand-off",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:54:25Z",
+        "metadata": {
+          "issueLabel": "pan-4210",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "cli-reports-freeze"
+          ],
+          "files_scope": [
+            "src/lib/cloister/deferred-handoff.ts",
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "complete-planning.test.ts passes including the frozen-Deacon case",
+            "typecheck completes without errors",
+            "lint completes without errors, including the file-size ratchet"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. (1) recordHandoffDeferred in src/lib/cloister/deferred-handoff.ts gains optional deaconPaused?: boolean; when true the journal data gets deaconPaused: true (schedule fields unchanged). (2) recordPlanningAutoHandoffDeferred (src/lib/overdeck/planning-promotion.ts:370) gains optional readDeaconPaused?: () => boolean, defaulting to a try/catch wrapper around isDeaconGloballyPaused() (from ./control-settings.js) that returns false on error; passes it to recordHandoffDeferred; return type becomes { error: string; deaconPaused: boolean }; update the single caller at planning-promotion.ts:864. (3) When paused, the warn activity message is `${issueId} planning complete; work-agent start deferred by spawn guardrails. The retry is held while the Deacon is frozen: unfreeze it, or run pan start ${issueId}. ${error}`; otherwise unchanged. (4) Response: when autoHandoffDeferred and deaconPaused, add workAgentRetryHeld: 'deacon-paused' and message `Planning complete; work-agent start deferred by spawn guardrails and held while the Deacon is frozen (unfreeze it or run pan start ${id}): ${error}`; otherwise unchanged. (5) Replace the stale comment paragraph starting 'Routed through the canonical transactional write door' (planning-promotion.ts:774-796) with: the projection appends an agent.status_changed event via saveAgentStateAndEmitEvent and writes no state.json, so the planning agent's status label keeps its spawn-time value. (6) If planning-promotion.ts grows past its origin/main line count, replace its row in scripts/file-size-allowlist.txt with `<lines> src/lib/overdeck/planning-promotion.ts # PAN-4210` in the same commit. Tests: update 'journals a guardrail-deferred handoff for deacon-lite and records no planning failure' for the new return shape with readDeaconPaused: () => false; add 'journals a frozen-Deacon hold and says the retry is held' with readDeaconPaused: () => true."
+        },
+        "items": [
+          {
+            "id": "deferral-reports-freeze.ac1",
+            "title": "Given readDeaconPaused returns true, when recordPlanningAutoHandoffDeferred runs, then the handoff.deferred journal entry carries data.deaconPaused: true and the same attempt/nextRetryAt schedule as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-reports-freeze.ac2",
+            "title": "Given readDeaconPaused returns true, when recordPlanningAutoHandoffDeferred runs, then the warn activity message contains 'held while the Deacon is frozen' and 'pan start PAN-4155'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-reports-freeze.ac3",
+            "title": "Given readDeaconPaused returns false, when recordPlanningAutoHandoffDeferred runs, then it returns { error, deaconPaused: false }, writes no deaconPaused field, and keeps the 'retried for up to 2 hours' activity message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-reports-freeze.ac4",
+            "title": "Given a journaled deferral while frozen, when complete-planning responds, then the JSON response carries workAgentRetryHeld: 'deacon-paused' and a message saying the retry is held while the Deacon is frozen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferral-reports-freeze.ac5",
+            "title": "Given a reader opens planning-promotion.ts at projectPlanningAgentStopped, when they read its comment, then it contains the statement that no state.json is written and no longer mentions a transactional agents-table row write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-reports-freeze",
+        "title": "Print the frozen-Deacon hold in pan plan finalize and pan plan done",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:54:25Z",
+        "metadata": {
+          "issueLabel": "pan-4210",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/plan-finalize.ts",
+            "src/cli/commands/plan-done.ts",
+            "tests/unit/cli/plan-finalize-promote-deferred.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/plan-finalize-promote-deferred.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-finalize-promote-deferred.test.ts passes including the held case",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. PromotePlanningResult (src/cli/commands/plan-finalize.ts:100-108) gains workAgentRetryHeld?: 'deacon-paused'. promotePlanning's response parse (plan-finalize.ts:492) copies it when parsed?.workAgentRetryHeld === 'deacon-paused'. Thread it like workAgentDeferred (plan-finalize.ts:313, :329, :378). At plan-finalize.ts:393-395 print `⚠ Work agent start deferred by spawn guardrails; the retry is held while the Deacon is frozen. Unfreeze it or run pan start <ISSUE>.` when held, else the existing line. Same branch in src/cli/commands/plan-done.ts:40-41 in its dim style. Tests in tests/unit/cli/plan-finalize-promote-deferred.test.ts: a held response returns workAgentRetryHeld 'deacon-paused'; the existing deferred case returns no workAgentRetryHeld."
+        },
+        "items": [
+          {
+            "id": "cli-reports-freeze.ac1",
+            "title": "Given a complete-planning response with workAgentDeferred true and workAgentRetryHeld 'deacon-paused', when promotePlanning parses it, then the result carries workAgentRetryHeld: 'deacon-paused'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-reports-freeze.ac2",
+            "title": "Given a deferred response without workAgentRetryHeld, when promotePlanning parses it, then the result has no workAgentRetryHeld field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-reports-freeze.ac3",
+            "title": "Given a held result, when pan plan finalize or pan plan done reports it, then it prints the line naming the Deacon freeze and 'pan start <ISSUE>' instead of 'retried automatically for up to 2 hours'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "show-freeze-hold",
+        "title": "Show a frozen-Deacon hold for a pending deferral in pan show",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:54:25Z",
+        "metadata": {
+          "issueLabel": "pan-4210",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/show.ts",
+            "src/cli/commands/__tests__/show-pipeline-journal.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/show-pipeline-journal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "show-pipeline-journal.test.ts passes including describe('pendingHandoffHold')",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Export from src/cli/commands/show.ts a pure helper `pendingHandoffHold(journal: PipelineJournalEntry[], deaconPaused: boolean, issueId: string): string | null`: take the last entry whose type starts with 'handoff.'; if it is handoff.deferred or handoff.retried and deaconPaused is true, return `Deferred work-agent start is held: the Deacon is frozen. Unfreeze it or run pan start ${issueId}.`; else null. In showCommand, after the pipeline block (show.ts:251-261), read isDeaconGloballyPaused() from ../../lib/overdeck/control-settings.js inside try/catch (false on error) and print a non-null line with chalk.yellow, indented two spaces. --json output unchanged. Add describe('pendingHandoffHold') with three cases to show-pipeline-journal.test.ts."
+        },
+        "items": [
+          {
+            "id": "show-freeze-hold.ac1",
+            "title": "Given a journal whose last handoff.* entry is handoff.deferred and deaconPaused true, when pendingHandoffHold runs, then it returns the hold line naming 'pan start <ISSUE>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "show-freeze-hold.ac2",
+            "title": "Given the same journal and deaconPaused false, when pendingHandoffHold runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "show-freeze-hold.ac3",
+            "title": "Given a journal whose last handoff.* entry is handoff.started and deaconPaused true, when pendingHandoffHold runs, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "show-freeze-hold.ac4",
+            "title": "pan show --json output is unchanged; the hold line renders only in the text view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-freeze-hold",
+        "title": "Document the freeze hold and timestamp stand-down rule in PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-25T06:54:25Z",
+        "metadata": {
+          "issueLabel": "pan-4210",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "verify_commands": [
+            "grep -n 'Deacon is frozen' docs/PIPELINE-GATES.md",
+            "grep -n 'startedAt' docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "grep finds the freeze-hold sentence in the deferred hand-off section",
+            "grep finds the startedAt-based planning-restart rule"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In docs/PIPELINE-GATES.md: (1) in the '**Deferred planning hand-off (PAN-4155):**' bullet add that the Deacon freeze (deacon.globally_paused, sidebar Snowflake toggle) holds the retry and that a deferral made while frozen says so in activity, finalize output, and pan show; (2) in the paragraph starting '`retryDeferredHandoffs` acts only when an issue's last' add that while frozen the retry does not run, the schedule stays in the journal and resumes on the first tick after unfreeze, and the two-hour window keeps counting so an older deferral gives up on that tick with planning.failed and the pan start warning; in the stand-down list change 'planning was restarted' to 'planning was restarted (its startedAt is later than the deferral)' and state that state.json status labels are never read because complete-planning's stop projection writes no state.json; (3) under '## Deacon-lite: six routines' add one sentence that every routine is skipped while the Deacon is frozen."
+        },
+        "items": [
+          {
+            "id": "docs-freeze-hold.ac1",
+            "title": "Given a reader opens docs/PIPELINE-GATES.md, when they reach the deferred planning hand-off bullet, then it contains the rule that the Deacon freeze holds the retry and that activity, finalize output, and pan show report the hold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-freeze-hold.ac2",
+            "title": "Given a reader opens the retryDeferredHandoffs paragraph, when they read it, then it contains the unfreeze behavior: the retry resumes from the journal and a deferral older than two hours gives up with planning.failed and the pan start warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-freeze-hold.ac3",
+            "title": "Given a reader opens the stand-down list, when they read the planning condition, then it contains the startedAt-later-than-deferral rule and the note that state.json status labels are not read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-freeze-hold.ac4",
+            "title": "Given a reader opens '## Deacon-lite: six routines', when they read past the list, then it contains the sentence that every routine is skipped while the Deacon is frozen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stand-down-facts",
+        "to": "boot-scheduler-test",
+        "type": "blocks"
+      },
+      {
+        "from": "stand-down-facts",
+        "to": "deferral-reports-freeze",
+        "type": "blocks"
+      },
+      {
+        "from": "deferral-reports-freeze",
+        "to": "cli-reports-freeze",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

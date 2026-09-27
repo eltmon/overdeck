@@ -7,7 +7,7 @@ vi.mock('./useAgentDirectory', () => ({
   useAgentDirectory: (windowHours: number) => useAgentDirectory(windowHours),
 }));
 vi.mock('./DirectoryDetail', () => ({
-  DirectoryDetail: ({ entry }: { entry: DirectoryEntry | null }) => <div data-testid="detail">{entry?.id ?? 'none'}</div>,
+  DirectoryDetail: ({ entry }: { entry: DirectoryEntry | null }) => <div data-testid="directory-detail">{entry?.id ?? 'none'}</div>,
 }));
 
 import { useDashboardStore } from '../../../lib/store';
@@ -61,22 +61,55 @@ describe('AgentsDirectory', () => {
     expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
   });
 
+  it('renders the tree, list and detail as resizable panels in one group', () => {
+    render(<AgentsDirectory />);
+    const group = document.querySelector('[data-group]') as HTMLElement;
+    expect(group).not.toBeNull();
+    expect([...group.querySelectorAll('[data-panel]')].map((panel) => panel.id)).toEqual(['tree', 'list', 'detail']);
+  });
+
+  it('explains the window under the toggle: 24 hours by default, 7 days after choosing 7d', () => {
+    render(<AgentsDirectory />);
+    const note = () => document.querySelector('[data-component="directory-window-note"]');
+    expect(note()).toHaveTextContent('Live agents always show. Finished ones show if active in the last 24 hours.');
+    fireEvent.click(screen.getByRole('tab', { name: '7d' }));
+    expect(note()).toHaveTextContent('Finished ones show if active in the last 7 days.');
+  });
+
+  it('labels a node count as live of shown', () => {
+    useAgentDirectory.mockReturnValue({
+      data: {
+        generatedAt: '', windowHours: 24, entries: [
+          entry({ id: 'agent-pan-3', issueId: 'PAN-3', state: 'working' }),
+          entry({ id: 'agent-pan-4', issueId: 'PAN-4', state: 'stopped' }),
+          entry({ id: 'agent-pan-5', issueId: 'PAN-5', state: 'done' }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(<AgentsDirectory />);
+    const count = document.querySelector('[title="1 live of 3 shown"]');
+    expect(count).toHaveTextContent('1/3');
+    expect(count).toHaveAttribute('aria-label', '1 live of 3 shown');
+  });
+
   it("selecting an issue node lists only that issue's entries", () => {
     render(<AgentsDirectory />);
     expect(rowIds()).toEqual(['agent-pan-2', 'conv:notes', 'agent-pan-1']);
     fireEvent.click(screen.getByText('PAN-1', { selector: 'span' }));
     expect(rowIds()).toEqual(['agent-pan-1']);
     expect(new URLSearchParams(window.location.search).get('node')).toBe('issue:local:PAN-1');
-    expect(screen.getByTestId('detail')).toHaveTextContent('agent-pan-1');
+    expect(screen.getByTestId('directory-detail')).toHaveTextContent('agent-pan-1');
   });
 
   it('ArrowDown moves the list selection and updates ?entry=', () => {
     render(<AgentsDirectory />);
     const grid = screen.getByRole('grid', { name: 'Agents' });
-    expect(screen.getByTestId('detail')).toHaveTextContent('agent-pan-2');
+    expect(screen.getByTestId('directory-detail')).toHaveTextContent('agent-pan-2');
     fireEvent.keyDown(grid, { key: 'ArrowDown' });
     expect(new URLSearchParams(window.location.search).get('entry')).toBe('conv:notes');
-    expect(screen.getByTestId('detail')).toHaveTextContent('conv:notes');
+    expect(screen.getByTestId('directory-detail')).toHaveTextContent('conv:notes');
     expect(grid).toHaveAttribute('aria-activedescendant', 'directory-row-conv_notes');
   });
 
@@ -102,12 +135,14 @@ describe('AgentsDirectory', () => {
     expect(new URLSearchParams(window.location.search).get('window')).toBe('168');
   });
 
-  it('renders a working agent with the info badge and a stopped one with the muted badge', () => {
+  it('renders a working agent with the live state badge and a stopped one with the muted badge', () => {
     render(<AgentsDirectory />);
     const badge = (id: string) => within(document.querySelector(`[data-entry-id="${id}"]`) as HTMLElement)
       .getByText((_, node) => node?.getAttribute('data-component') === 'directory-state-badge');
     expect(badge('agent-pan-2')).toHaveTextContent('working');
-    expect(badge('agent-pan-2').className).toContain('badge-bg-info');
+    expect(badge('agent-pan-2').className).toContain('badge-bg-state-live');
+    expect(badge('agent-pan-2').className).toContain('text-state-live');
+    expect(badge('agent-pan-2').className).not.toContain('badge-bg-info');
     expect(badge('agent-pan-1')).toHaveTextContent('stopped');
     expect(badge('agent-pan-1').className).toContain('text-muted-foreground');
   });
@@ -126,7 +161,7 @@ describe('AgentsDirectory', () => {
     expect(row).toHaveAttribute('data-state', 'stuck');
     const badge = row.querySelector('[data-component="directory-state-badge"]') as HTMLElement;
     expect(badge).toHaveTextContent(/^stuck · \d+h$/);
-    expect(badge.className).toContain('badge-bg-destructive');
+    expect(badge.className).toContain('badge-bg-state-stuck');
   });
 
   it("shows an agent's issue title after its label and never the word unknown", () => {
@@ -150,7 +185,7 @@ describe('AgentsDirectory', () => {
   it('collapsing an ancestor of the selected node moves the selection to that ancestor', () => {
     render(<AgentsDirectory />);
     fireEvent.click(screen.getByText('PAN-1', { selector: 'span' }));
-    expect(screen.getByTestId('detail')).toHaveTextContent('agent-pan-1');
+    expect(screen.getByTestId('directory-detail')).toHaveTextContent('agent-pan-1');
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse overdeck' }));
 
@@ -161,7 +196,7 @@ describe('AgentsDirectory', () => {
     const tree = screen.getByRole('tree');
     expect(within(tree).getByRole('treeitem', { selected: true })).toHaveAttribute('data-node-id', 'proj:local:overdeck');
     expect(rowIds()).toEqual(['agent-pan-2', 'conv:notes', 'agent-pan-1']);
-    expect(screen.getByTestId('detail')).toHaveTextContent('agent-pan-1');
+    expect(screen.getByTestId('directory-detail')).toHaveTextContent('agent-pan-1');
   });
 
   it('collapsing a node that does not contain the selection leaves the selection alone', () => {

@@ -172,6 +172,14 @@ export const WorkLogEntry = Schema.Struct({
 })
 export type WorkLogEntry = typeof WorkLogEntry.Type
 
+/** A human-origin message read from a subagent's own sidechain transcript (PAN-4247). */
+export const SubagentHumanInput = Schema.Struct({
+  id: Schema.String,
+  text: Schema.String,
+  createdAt: Schema.String,
+})
+export type SubagentHumanInput = typeof SubagentHumanInput.Type
+
 export const SubagentSummary = Schema.Struct({
   agentId: Schema.String,
   agentType: Schema.String,
@@ -179,6 +187,10 @@ export const SubagentSummary = Schema.Struct({
   toolUseId: Schema.String,
   spawnDepth: Schema.Number,
   status: Schema.Literals(['running', 'done']),
+  /** True for a background subagent, launched with `requestShape: "background"` (PAN-4247). */
+  background: Schema.optional(Schema.Boolean),
+  /** Recent human-origin sidechain inputs, most useful when a message routed into this subagent instead of the main conversation (PAN-4247). */
+  humanInputs: Schema.optional(Schema.Array(SubagentHumanInput)),
 })
 export type SubagentSummary = typeof SubagentSummary.Type
 

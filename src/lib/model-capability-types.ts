@@ -1,5 +1,8 @@
 import type { ModelId } from './settings.js';
 import type { SubscriptionPlan } from './subscription-types.js';
+import type { EffortLevel } from '@overdeck/contracts';
+
+export type { EffortLevel };
 
 /**
  * Skill dimensions that models are evaluated on
@@ -16,14 +19,6 @@ export type SkillDimension =
   | 'synthesis' // Combining information
   | 'speed' // Response latency
   | 'context-length'; // Max context window
-
-/**
- * Canonical effort/reasoning levels accepted by Claude Code's `--effort` flag.
- * `xhigh` was added in Opus 4.7 (between `high` and `max`); `max` predates it
- * (Opus 4.6+/Sonnet 4.6). This is the single source of truth for the union —
- * `RoleEffort` in config-yaml.ts aliases it.
- */
-export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 /**
  * Capability profile for a single model

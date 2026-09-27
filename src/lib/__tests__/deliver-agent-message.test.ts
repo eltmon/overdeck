@@ -194,8 +194,10 @@ describe('resume auto-continue transcript confirmation', () => {
     vi.useFakeTimers();
     const probe = vi.fn(async () => ({ matchedUserRecord: false, compactBoundaryCount: 1 }));
     const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+    const captureOffsets = vi.fn(async () => new Map<string, number>());
+    const probeSidechains = vi.fn(async () => null);
 
-    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot, probe });
+    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot, probe, captureOffsets, probeSidechains });
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(300);
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
@@ -227,8 +229,10 @@ describe('resume auto-continue transcript confirmation', () => {
       if (deliver.mock.calls.length === 2) landed = true;
       return { ok: true, path: 'supervisor' as const };
     });
+    const captureOffsets = vi.fn(async () => new Map<string, number>());
+    const probeSidechains = vi.fn(async () => null);
 
-    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot, probe });
+    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot, probe, captureOffsets, probeSidechains });
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(300);
     await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));

@@ -1,0 +1,800 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T09:38:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4247: Messages sent to a Claude Code conversation while a subagent is running land in the subagent, and the dashboard shows 'Sent · waiting for transcript' forever",
+    "updated": "2026-09-27T09:41:50.026Z"
+  },
+  "plan": {
+    "id": "pan-4247",
+    "title": "Messages sent to a Claude Code conversation while a subagent is running land in the subagent, and the dashboard shows 'Sent · waiting for transcript' forever",
+    "status": "running",
+    "uid": "86776b50-a461-4744-b652-502466ddb0a9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-27T09:38:43Z",
+    "updated": "2026-09-27T09:41:50.026Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4247",
+        "label": "PAN-4247",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "composer",
+      "subagents",
+      "pan-tell",
+      "delivery-confirmation",
+      "dashboard"
+    ],
+    "metadata": {
+      "sizeJustification": "One operator-visible defect (input silently lost to a subagent) spans the delivery chain: the shared sidechain reader in src/lib/transcript-landing.ts feeds both the pan tell confirmation and the dashboard subagent list, so the two halves are not independently shippable without duplicating that reader. The lint counts 8 path groups (src/lib, src/cli, src/dashboard, packages/contracts, tests/unit, scripts, and two docs files) and 29 files, of which 13 are named test files or the file-size allowlist. Items are small, DAG-ordered, and each has its own test command.",
+      "canonicalFilename": "2026-09-27-PAN-4247-messages-sent-to-a-claude-code-conversation-while-a-subagent-is-running-land-in-the-subagent-and-the-dashboard-shows-sent-waiting-for-transcript-forever.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "When a Claude Code conversation has a background subagent, typed input (dashboard composer or pan tell) can be routed by Claude Code into the subagent sidechain. The main transcript never shows it, the dashboard bubble stays 'Sent · waiting for transcript' forever, and pan tell reports 'turn confirmed' because any assistant record in the main transcript (here a reaction to the subagent's task-notification) counts as confirmation. Separately, two quick sends can be joined by Claude Code into one queued message that matches neither bubble, and accepted bubbles that never match have no timeout.",
+      "Proposal": "Teach transcript confirmation to read main queue records, to ignore assistant turns caused by task-notification wakes, and to probe subagent sidechains for human-origin records (landing kind main/subagent/none; no redelivery into a subagent; pan tell exits 1 naming the subagent). Surface each subagent's recent human inputs and background flag on SubagentSummary via an incremental scanner. In the composer, relabel bubbles that landed in a subagent, clear bubbles joined into one message, move long-unmatched accepted bubbles (only while not streaming) to a 'Not found in transcript' outbox with Resend (fresh identity) and Copy, and show a routed/running subagent notice with a Send anyway / Wait confirmation for the evidence-based case. Full detail: .pan/drafts/PAN-4247.md.",
+      "NonGoals": "- Changing pane injection (PTY supervisor, tmux, Herdr) to stop Claude Code from joining queued messages\n- Sending keystrokes to move Claude Code's input focus back from a subagent to the main agent\n- Direct composer input to Claude Code subagents (the direct child composer stays Codex-only)\n- Making the eaten-message watcher (conversation-eaten-message-watcher.ts) sidechain-aware\n- Rendering sidechain human inputs as permanent rows in the parent conversation timeline\n- Persisting any delivery status in a database or state file\n- Non-claude-code harnesses\n- Updating the OKF bundle (../overdeck-knowledge) inside this PR"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Joined messages are fixed by reconciliation only; injection is unchanged",
+        "rationale": "The composer already serializes sends per conversation and the transcript shows one Claude Code enqueue with the combined text, so the join mechanism is inside Claude Code and cannot be named from evidence. Matching the concatenation clears the bubbles without guessing."
+      },
+      {
+        "summary": "pan tell treats a subagent landing as not delivered (exit 1, mail kind 'queued', no second attempt)",
+        "rationale": "The caller's intent was to reach the main agent; a retry would land in the subagent again, and 'queued' keeps the text for manual delivery."
+      },
+      {
+        "summary": "Human sidechain inputs travel on the existing SubagentSummary (background, humanInputs) instead of a new ConversationEvent kind",
+        "rationale": "The 2 s subagent poll already emits change-only lists on both the live stream and the one-shot GET, so no new transport or contract kind is needed."
+      },
+      {
+        "summary": "The 'running background subagent' notice is hedged ('may route') and informational; only the evidence-based 'routed' notice asks Send anyway / Wait",
+        "rationale": "The evidence proves routing only after the fact; Claude Code's exact routing rule is not established, so blocking on a mere running subagent would produce false alarms."
+      },
+      {
+        "summary": "Unmatched accepted bubbles move to the outbox after TURN_STALL_MS (4 min) only while the conversation is not streaming",
+        "rationale": "A message queued behind a long tool call is legitimately unrendered until consumed; gating on streaming avoids false 'not found' labels and duplicate resends."
+      },
+      {
+        "summary": "Sidechain matching uses whitespace-normalized includes, and each subagent keeps at most 20 inputs of 2000 characters",
+        "rationale": "Delivered text can carry @attachment prefixes or envelopes; the caps bound payload size while covering realistic sends."
+      },
+      {
+        "summary": "Plan kept as one issue with sizeJustification instead of sibling issues",
+        "rationale": "The pan tell and dashboard halves share the sidechain reader built in the first item and together fix one operator-visible defect; the file count is inflated by per-item test files."
+      }
+    ],
+    "items": [
+      {
+        "id": "landing-probe",
+        "title": "Landing probe: match main queue records, skip task-notification wakes, probe subagent sidechains",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4247",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/transcript-landing.ts",
+            "src/lib/__tests__/transcript-landing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/transcript-landing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "transcript-landing.test.ts passes including the new queue-operation, queued_command, task-notification and sidechain cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md",
+          "foundationFor": [
+            "delivery-landing-kind",
+            "subagent-human-input-scanner"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W1 (.pan/drafts/PAN-4247.md) in src/lib/transcript-landing.ts. (1) In probeTranscriptSince add queuedPromptText(): a queue-operation record with operation 'enqueue' and string content, or an attachment record with attachment.type 'queued_command' and string prompt, whose normalized text includes the 120-char needle sets matchedUserRecord=true; queued text starting with '<task-notification>' never matches. (2) Track afterTaskNotification while scanning: a user record whose text starts with '<task-notification>' sets it true, any other landed user record sets it false; real assistant records increment realAssistantTurnCount only when afterTaskNotification is false. (3) Export extractSidechainHumanText(content) (strip leading 'The user sent a new message while you were working:\\n', cut at first '\\n\\nThis is how Claude Code surfaces', trim; raw trimmed text if prefix absent), interface SidechainHumanInput {id,text,createdAt}, readSidechainHumanInputs(file, fromByteOffset) returning {inputs, readOffset} over complete lines only, keeping records with type 'user' AND isSidechain true AND origin.kind 'human'; captureSidechainOffsets(sessionFile) mapping each subagents/agent-*.jsonl to its size (empty map if dir missing); probeSidechainsSince(sessionFile, offsets, messageText) returning {agentId, description} for the first human input whose normalized text includes the needle (files absent from offsets start at 0; agentId from filename; description from agent-<id>.meta.json, fallback agentId), else null. Compute the subagents dir as join(sessionFile.replace(/\\.jsonl$/, ''), 'subagents'); do NOT import from src/dashboard. Async fs only. Add the tests listed in W1 step 4 using temp JSONL files."
+        },
+        "items": [
+          {
+            "id": "landing-probe.ac1",
+            "title": "Given a transcript whose only new record is a queue-operation enqueue (or a queued_command attachment) carrying the message, probeTranscriptSince returns matchedUserRecord true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-probe.ac2",
+            "title": "Given an assistant record that follows a <task-notification> user record after the offset, probeTranscriptSince returns realAssistantTurnCount 0; after an ordinary user record it returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-probe.ac3",
+            "title": "extractSidechainHumanText returns only the operator text for the Claude Code wrapper and returns the raw trimmed text when the wrapper is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-probe.ac4",
+            "title": "probeSidechainsSince returns {agentId, description} for a human-origin sidechain record written after the captured offset and returns null for coordinator, peer, task-notification origins and for records before the offset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery-landing-kind",
+        "title": "Return a landing kind from transcript confirmation and skip redelivery on subagent landing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4247",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/delivery.ts",
+            "src/lib/agents/__tests__/delivery.test.ts",
+            "src/lib/agents/messaging.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/delivery.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "delivery.test.ts passes including the subagent-landing and main-landing cases",
+            "typecheck completes without errors",
+            "file-size lint reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md"
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W2. In src/lib/agents/delivery.ts export type TranscriptLanding = {kind:'main'} | {kind:'subagent'; agentId; description} | {kind:'none'}. In deliverMessageWithTranscriptConfirmation capture sidechainOffsets = await captureSidechainOffsets(before.sessionFile) right after the snapshot and before the first delivery; add injectable arg probeSidechains?: typeof probeSidechainsSince. Change waitForTranscriptMessageLanding to return TranscriptLanding with per-poll order: main user/queue match -> {kind:'main'}; probeSidechains non-null -> {kind:'subagent',...}; realAssistantTurnCount > 0 -> {kind:'main'} ONLY once the sidechain probe has stayed negative for ASSISTANT_ONLY_SETTLE_MS = 3000 since the first poll that saw an assistant turn (so a sidechain record written a moment later still wins); after the deadline the same order then {kind:'none'}. deliverMessageWithTranscriptConfirmation returns {delivered: landing.kind==='main', attempts, landing, lastDelivery?} and returns immediately (no attempt 2) when landing.kind is 'subagent'. Adjust the other caller at messaging.ts:~513 only for the type. delivery.ts is at its allowlist ceiling (1061): if it grows past its origin/main count, add '<lines> src/lib/agents/delivery.ts # PAN-4247' to scripts/file-size-allowlist.txt in the same commit. Tests use fake timers and injected deliver/snapshot/probe/probeSidechains stubs."
+        },
+        "items": [
+          {
+            "id": "delivery-landing-kind.ac1",
+            "title": "Given probeSidechains returns a subagent hit, deliverMessageWithTranscriptConfirmation returns delivered false with landing.kind 'subagent' and calls deliver exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-landing-kind.ac2",
+            "title": "Given the main probe matches, deliverMessageWithTranscriptConfirmation returns delivered true, attempts 1, and landing.kind 'main'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-landing-kind.ac4",
+            "title": "Given the main probe reports only assistant turns and probeSidechains reports a hit 1 s later, deliverMessageWithTranscriptConfirmation returns landing.kind 'subagent' (the 3 s settle window defers the assistant-only fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-landing-kind.ac3",
+            "title": "scripts/lint-file-size.sh exits 0 on the item's commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tell-subagent-outcome",
+        "title": "pan tell reports subagent landing and exits 1 instead of 'turn confirmed'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4247",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/cli/commands/tell.ts",
+            "tests/unit/lib/agents/message-agent.test.ts",
+            "src/cli/commands/__tests__/tell.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/message-agent.test.ts src/cli/commands/__tests__/tell.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "message-agent.test.ts and tell.test.ts pass including the subagent-landing cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md"
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W3. Add landedInSubagent?: {agentId; description} to MessageDeliveryOutcome in src/lib/agents/messaging.ts. In the Claude transcript-confirmation path (~lines 687-708), after deliverMessageWithTranscriptConfirmation returns: if landing.kind === 'subagent' call queueAgentMail(normalizedId, message, 'queued'), log 'messageAgent landed in subagent <agentId>', and return {delivered:false, queuedToMail:true, confirmed:false, landedInSubagent, reason: `Claude Code routed the message into running subagent \"${description}\" (${agentId}), not the main conversation. Stop or finish that subagent, then resend.`}; otherwise keep today's behavior with queueAgentMail(..., 'delivered') moved below the result check. In src/cli/commands/tell.ts, before the generic not-delivered branch, when outcome.landedInSubagent is set print in red `Message NOT delivered to <agentId>'s main conversation — it went to running subagent \"<description>\" (<subagentId>)`, then the dim quoted message and reason, and return exitCli(1)."
+        },
+        "items": [
+          {
+            "id": "tell-subagent-outcome.ac1",
+            "title": "Given deliverMessageWithTranscriptConfirmation returns a subagent landing, messageAgent returns delivered false, confirmed false, and landedInSubagent with the subagent's agentId and description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tell-subagent-outcome.ac2",
+            "title": "Given an outcome with landedInSubagent, tellCommand prints the subagent name and exits with code 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tell-subagent-outcome.ac3",
+            "title": "Given an outcome with landedInSubagent, tellCommand output never contains 'turn confirmed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "subagent-summary-contract",
+        "title": "Contract: add background, humanInputs, and subagent delivery fields to shared types",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4247",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/rpc.ts",
+            "src/dashboard/frontend/src/components/chat/chat-types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-9"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md",
+          "foundationFor": [
+            "subagent-human-input-scanner",
+            "reconcile-sidechain",
+            "not-found-outbox",
+            "routing-notice"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W4. In packages/contracts/src/rpc.ts add export const SubagentHumanInput = Schema.Struct({id: Schema.String, text: Schema.String, createdAt: Schema.String}) and add to SubagentSummary: background: Schema.optional(Schema.Boolean), humanInputs: Schema.optional(Schema.Array(SubagentHumanInput)). Mirror in src/dashboard/frontend/src/components/chat/chat-types.ts SubagentSummary (background?: boolean; humanInputs?: {id; text; createdAt}[]). In the same chat-types.ts extend ChatMessage.deliveryState to 'pending' | 'accepted' | 'unknown' | 'subagent', add ChatMessage.deliveredToSubagent?: {agentId: string; description: string}, and add FailedMessage.notFoundInTranscript?: boolean. Type-only change; no behavior."
+        },
+        "items": [
+          {
+            "id": "subagent-summary-contract.ac1",
+            "title": "Given the updated contract, npm run typecheck exits 0 with SubagentSummary.background and SubagentSummary.humanInputs declared in both packages/contracts/src/rpc.ts and chat-types.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subagent-summary-contract.ac2",
+            "title": "chat-types.ts accepts deliveryState 'subagent' with deliveredToSubagent and FailedMessage.notFoundInTranscript without type errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "subagent-human-input-scanner",
+        "title": "Scan human sidechain inputs incrementally into the conversation subagent list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4247",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/subagents.ts",
+            "tests/unit/dashboard/server/services/conversation/subagents.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/conversation/subagents.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "subagents.test.ts passes including background, humanInputs and incremental-read cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md"
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W5 in src/dashboard/server/services/conversation/subagents.ts. Add createSubagentHumanInputScanner() returning (sessionFile, agentId) => Promise<SubagentHumanInput[]>, mirroring createTaskNotificationScanner: a module-level Map<filePath,{offset; inputs}>; call readSidechainHumanInputs(file, offset) from src/lib/transcript-landing.ts; text = extractSidechainHumanText(...) truncated to 2000 chars; append and keep the last 20; if the file is smaller than the cached offset reset that entry to offset 0. Use one shared scanner instance so startSubagentListPolling and the one-shot read path reuse offsets. In listSubagentSummaries surface background (from DiscoveredSubagent) and humanInputs (omit key when empty) on every summary."
+        },
+        "items": [
+          {
+            "id": "subagent-human-input-scanner.ac1",
+            "title": "Given a background subagent file with one human-origin sidechain record, listSubagentSummaries returns that subagent with background true and one humanInputs entry whose text is the unwrapped operator text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subagent-human-input-scanner.ac2",
+            "title": "Given a coordinator-origin sidechain record only, listSubagentSummaries returns no humanInputs for that subagent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subagent-human-input-scanner.ac3",
+            "title": "Given a second human record appended after a first listing, the next listing returns two humanInputs and reads only the appended bytes from the cached offset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-sidechain",
+        "title": "Clear pending bubbles delivered into a subagent and label them 'Delivered to subagent'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4247",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerEchoes.ts",
+            "src/dashboard/frontend/src/components/chat/useComposerEchoes.ts",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/composerEchoes.test.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/composerEchoes.test.ts src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "composerEchoes.test.ts and MessagesTimeline.test.tsx pass including the subagent cases",
+            "typecheck completes without errors",
+            "file-size lint reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md"
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W6. reconcileComposerEchoes(state, messages, subagents = []): after the main-transcript pass, for each unmatched optimistic entry with deliveryState !== 'subagent', find a humanInputs entry (across subagents) whose id is not in consumedEchoIds, whose createdAt >= local.createdAt, and where normalizeWs(input.text).includes(normalizeWs(local.text)) with normalizeWs = s => s.replace(/\\s+/g,' ').trim(). On match add input.id to consumedEchoIds and replace the entry in optimistic with {...local, acknowledged:true, deliveryState:'subagent', deliveredToSubagent:{agentId, description}}; a later main echo still removes it. useComposerEchoes(conversationName, messages, subagents) forwards subagents; ConversationPanel.tsx (~line 1268) passes data?.subagents ?? []. In messageRows.tsx, before the isPending branch, render deliveryState 'subagent' with no spinner, full opacity, label `Delivered to subagent · ${description}` and title 'Claude Code routed this message to running subagent <agentId>, not the main conversation.'. ConversationPanel.tsx is 1505 lines on origin/main: any growth needs '<lines> src/dashboard/frontend/src/components/chat/ConversationPanel.tsx # PAN-4247' in scripts/file-size-allowlist.txt in the same commit. Create composerEchoes.test.ts and extend the MessagesTimeline delivery-state it.each table."
+        },
+        "items": [
+          {
+            "id": "reconcile-sidechain.ac1",
+            "title": "Given an accepted bubble and a subagent humanInputs entry (created later) containing the same text behind an @/path prefix line, reconcileComposerEchoes returns the entry with deliveryState 'subagent', the subagent's description, and the input id in consumedEchoIds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-sidechain.ac2",
+            "title": "Given a humanInputs entry created before the bubble, reconcileComposerEchoes leaves the bubble unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-sidechain.ac3",
+            "title": "Given a message with deliveryState 'subagent', MessagesTimeline renders 'Delivered to subagent · <description>' and does not render 'Sent · waiting for transcript'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-joined",
+        "title": "Clear every bubble whose texts were joined into one transcript message",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4247",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerEchoes.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerEchoes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/composerEchoes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "composerEchoes.test.ts passes including the joined-message cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md"
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W7 in reconcileComposerEchoes, after the single-echo pass and before the sidechain pass. Take remaining pending entries (optimistic plus failed prompts) sorted by createdAt. For each unused main role 'user' message not in any entry's echoBaselineIds, try each contiguous run of >= 2 remaining entries with message.createdAt >= run[0].createdAt; the run matches when normalizeText(message.text) equals normalizeText(run.map(t => normalizeText(t.text)).join(sep)) for sep in ['', '\\n', ' ']. On match mark every entry in the run matched and consume the message id."
+        },
+        "items": [
+          {
+            "id": "reconcile-joined.ac1",
+            "title": "Given pending bubbles 'Ah ok that was it' and 'I was sending to a subagent wasnt I?' and one user message 'Ah ok that was itI was sending to a subagent wasnt I?', reconcileComposerEchoes removes both bubbles and records the message id in consumedEchoIds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-joined.ac2",
+            "title": "Given a user message that equals no contiguous concatenation of pending bubbles, reconcileComposerEchoes returns the state unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "not-found-outbox",
+        "title": "Move unmatched accepted bubbles to a 'Not found in transcript' outbox entry with Resend and Copy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4247",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/useComposerEchoes.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/composerDelivery.test.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/useComposerEchoes.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/composerDelivery.test.ts src/dashboard/frontend/src/components/chat/__tests__/useComposerEchoes.test.tsx src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the three test files pass including not-found, streaming-gate and fresh-identity resend cases",
+            "typecheck completes without errors",
+            "file-size lint reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-2"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md"
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W8. Add store action markNotFoundInTranscript(conversationName, id) in composerStore.ts that moves the optimistic entry to failed as {...entry, id:`failed-${crypto.randomUUID()}`, kind:'prompt', notFoundInTranscript:true, deliveryUnknown:true, retryable:true, error:'No transcript record after 4 minutes. It may still arrive; resending can duplicate it.'}. useComposerEchoes gains a streaming parameter: for the oldest optimistic entry with acknowledged true and deliveryState 'accepted', schedule markNotFoundInTranscript at createdAt + TURN_STALL_MS, but never while streaming is true (re-evaluate when streaming changes). ConversationPanel.tsx passes data?.streaming ?? false (allowlist row if the file grows past its origin/main count). In retryFailed, a notFoundInTranscript entry uses a fresh crypto.randomUUID() clientMessageId and omits retry:true. MessagesTimeline.tsx outbox: label 'Not found in transcript' for notFoundInTranscript, Retry button text 'Resend' for those entries, and a 'Copy' button on every prompt entry calling navigator.clipboard.writeText(fm.text). Tests use vi.useFakeTimers (repo rule fake-timers-for-retry-tests)."
+        },
+        "items": [
+          {
+            "id": "not-found-outbox.ac1",
+            "title": "Given an accepted bubble and streaming false, after vi.advanceTimersByTime(TURN_STALL_MS) the entry moves to failed with notFoundInTranscript true; with streaming true it stays in optimistic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "not-found-outbox.ac2",
+            "title": "Given a not-found failed entry, a later reconcileEchoes with a matching echo removes it from failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "not-found-outbox.ac3",
+            "title": "Given a not-found failed entry, retryFailed calls fetch with a clientMessageId different from the original and a body without a retry key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "not-found-outbox.ac4",
+            "title": "Given a not-found failed entry, MessagesTimeline renders 'Not found in transcript', a 'Resend' button, and a 'Copy' button that writes the text to the clipboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routing-notice",
+        "title": "Composer notice when input is routed into (or may reach) a background subagent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4247",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/subagentRouting.ts",
+            "src/dashboard/frontend/src/lib/__tests__/subagentRouting.test.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/subagentRouting.test.ts src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "subagentRouting.test.ts and ComposerFooter.test.tsx pass including routed and running notice cases",
+            "typecheck completes without errors",
+            "file-size lint reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md"
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W9. Create src/dashboard/frontend/src/lib/subagentRouting.ts exporting type SubagentRoutingNotice ({kind:'routed'|'running'; key; agentId; description} | null) and subagentRoutingNotice(subagents, messages): 'routed' when the newest humanInputs entry across subagents is newer than the newest role 'user' message whose id does not start with 'optimistic-' AND whose text does not start with '<task-notification>' (subagent relays land such records in main and must not clear the notice; key = input.id); else 'running' for the first subagent with background true and status 'running' (key = agentId); else null. ConversationPanel.tsx computes it from data?.subagents and serverMessages and passes subagentNotice to <ComposerFooter> (allowlist row if the file grows past its origin/main count). ComposerFooter renders the notice above the input. routed text: `Your last message went to subagent \"<description>\", not this conversation. New messages may go there too.`; while an unconfirmed routed key is shown, handleSubmit does not send but sets confirmPending and shows buttons 'Send anyway' (records the key as confirmed, then submits) and 'Wait' (clears confirmPending, keeps the draft). running text: `Background subagent \"<description>\" is running. Claude Code may route typed messages to it.` — informational only, never blocks sending."
+        },
+        "items": [
+          {
+            "id": "routing-notice.ac1",
+            "title": "subagentRoutingNotice returns 'routed' when a humanInputs entry is newer than the newest non-optimistic user message, and returns 'running' or null otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routing-notice.ac2",
+            "title": "Given a newer main-transcript user message than every humanInputs entry, subagentRoutingNotice does not return 'routed'; given only a newer '<task-notification>' user message, it still returns 'routed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routing-notice.ac3",
+            "title": "Given a routed notice, the first ComposerFooter submit does not call fetch and renders 'Send anyway' and 'Wait'; clicking 'Send anyway' calls fetch once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routing-notice.ac4",
+            "title": "Given a running notice, the first ComposerFooter submit calls fetch once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-delivery-states",
+        "title": "Document subagent routing and composer delivery states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T09:38:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4247",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONVERSATION-SUBAGENTS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Input routed into a subagent' docs/CONVERSATION-SUBAGENTS.md",
+            "grep -n 'Delivered to subagent' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'Not found in transcript' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-11"
+          ],
+          "prd": ".pan/drafts/PAN-4247.md"
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W10. docs/CONVERSATION-SUBAGENTS.md '## Transport': document SubagentSummary.background and humanInputs (human-origin sidechain records, last 20 per subagent, 2000 chars each, incremental byte-offset scan). Add a section '## Input routed into a subagent' describing the record shape (isSidechain true, origin.kind 'human', the Claude Code wrapper text), the composer label 'Delivered to subagent · <description>', the routed notice (Send anyway / Wait) and the informational running notice, and pan tell's exit-1 report naming the subagent instead of 'turn confirmed'. docs/DASHBOARD-ARCHITECTURE.md, the bullet at ~lines 289-292 ('HTTP acceptance and transcript confirmation are distinct'): list the bubble states Sending… (pending), Delivery not confirmed (unknown), Sent · waiting for transcript (accepted), Delivered to subagent · <description> (subagent), and the 'Not found in transcript' outbox entry after 4 minutes while not streaming with Resend (fresh identity) and Copy; state that one joined queued message clears every contributing bubble. The OKF concept ../overdeck-knowledge/frontend/conversation-ui.md is follow-through outside this PR."
+        },
+        "items": [
+          {
+            "id": "docs-delivery-states.ac1",
+            "title": "Given the docs change, grep -n '## Input routed into a subagent' docs/CONVERSATION-SUBAGENTS.md exits 0 and that section contains origin.kind 'human' and pan tell's exit code 1 for a subagent landing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-delivery-states.ac2",
+            "title": "Given the docs change, docs/DASHBOARD-ARCHITECTURE.md contains 'Delivered to subagent' and 'Not found in transcript' and states the 4-minute rule applies when the conversation is not streaming",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "landing-probe",
+        "to": "delivery-landing-kind",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-landing-kind",
+        "to": "tell-subagent-outcome",
+        "type": "blocks"
+      },
+      {
+        "from": "landing-probe",
+        "to": "subagent-human-input-scanner",
+        "type": "blocks"
+      },
+      {
+        "from": "subagent-summary-contract",
+        "to": "subagent-human-input-scanner",
+        "type": "blocks"
+      },
+      {
+        "from": "subagent-summary-contract",
+        "to": "reconcile-sidechain",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-sidechain",
+        "to": "reconcile-joined",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-sidechain",
+        "to": "not-found-outbox",
+        "type": "blocks"
+      },
+      {
+        "from": "subagent-summary-contract",
+        "to": "not-found-outbox",
+        "type": "blocks"
+      },
+      {
+        "from": "subagent-summary-contract",
+        "to": "routing-notice",
+        "type": "blocks"
+      },
+      {
+        "from": "not-found-outbox",
+        "to": "routing-notice",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

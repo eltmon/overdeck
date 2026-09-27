@@ -26,10 +26,8 @@ import {
   type WorkhorseSlot,
   type TtsDaemonConfig,
   type ConversationSearchConfig,
-  type RoleEffort,
   type ProviderConfig,
   type DesignLanguage,
-  ROLE_EFFORTS,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
@@ -38,7 +36,9 @@ import { validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
-import { hasModelCapability, MODEL_DEPRECATIONS, resolveModelId, getModelEffortLevels } from './model-capabilities.js';
+import { hasModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
+import { isEffortLevel } from '@overdeck/contracts';
+import { effortConfigErrors } from './agents/effort-support.js';
 import { resolveTelemetryEnabled, telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { getOrCreateInstallId } from './telemetry/install-id.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
@@ -509,10 +509,7 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
     errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, null, or empty string`);
   }
 
-  const effort = roleConfig.effort;
-  if (effort !== undefined && !ROLE_EFFORTS.includes(effort as RoleEffort)) {
-    errors.push(`${fieldPath}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
-  }
+  errors.push(...effortConfigErrors(fieldPath, roleConfig.effort, []));
 
   const maxAgents = roleConfig.maxAgents;
   if (maxAgents !== undefined && (typeof maxAgents !== 'number' || !Number.isInteger(maxAgents) || maxAgents < 1)) {
@@ -579,33 +576,17 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
         validateRoleFields(`roles.${role}`, rawRoleConfig, errors);
 
         // Model-aware effort: reject levels the role's resolved model doesn't accept.
-        // For a distribution, every entry must support the effort.
+        // For a distribution, every entry must support the effort. Also used as the
+        // sub-role effort fallback below, when a sub-role has no model of its own.
+        const roleModelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
+        const resolvedRoleModels = (Array.isArray(roleModelRef)
+          ? (roleModelRef as WeightedModelRef[]).map((entry) => resolveModelRefToId(entry.model, effectiveWorkhorses))
+          : [resolveModelRefToId(roleModelRef, effectiveWorkhorses)]
+        ).filter((model): model is ModelId => model !== undefined);
+
         const effort = rawRoleConfig.effort;
-        if (typeof effort === 'string' && ROLE_EFFORTS.includes(effort as RoleEffort)) {
-          const modelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
-          if (Array.isArray(modelRef)) {
-            for (const entry of modelRef as WeightedModelRef[]) {
-              const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
-              if (resolvedModel) {
-                const supported = getModelEffortLevels(resolvedModel);
-                if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
-                  errors.push(
-                    `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
-                  );
-                }
-              }
-            }
-          } else {
-            const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
-            if (resolvedModel) {
-              const supported = getModelEffortLevels(resolvedModel);
-              if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
-                errors.push(
-                  `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
-                );
-              }
-            }
-          }
+        if (typeof effort === 'string' && isEffortLevel(effort)) {
+          errors.push(...effortConfigErrors(`roles.${role}`, effort, resolvedRoleModels));
         }
 
         if (rawRoleConfig.sub !== undefined) {
@@ -631,6 +612,12 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
                 true,
                 true,
               );
+
+              // Sub-role model falls back to the role's model when unset/PARENT_MODEL_REF
+              // (resolveModelRefToId already returns undefined for both).
+              const resolvedSubModel = resolveModelRefToId(rawSubConfig.model, effectiveWorkhorses);
+              const subModels = resolvedSubModel !== undefined ? [resolvedSubModel] : resolvedRoleModels;
+              errors.push(...effortConfigErrors(`roles.${role}.sub.${subRole}`, rawSubConfig.effort, subModels));
             }
           }
         }
@@ -1046,7 +1033,10 @@ async function saveSettingsApiPromiseUnlocked(
       ? { permissionMode: settings.codex.permissionMode }
       : undefined,
     remote: settings.remote,
-    tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, currentConfig.providerAuth),
+    tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, {
+      providerAuth: currentConfig.providerAuth,
+      workhorses: { ...currentConfig.workhorses, ...(settings.workhorses ?? {}) },
+    }),
   };
 
   await writeYamlConfigPreservingComments(yamlConfig);
@@ -1324,7 +1314,12 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   }
 
   if (settings.tiered_execution !== undefined) {
-    const tieredExecutionError = validateTieredExecutionSettings(settings.tiered_execution, loadConfigSync().config.providerAuth);
+    const { config: currentConfig } = loadConfigSync();
+    const tieredExecutionError = validateTieredExecutionSettings(settings.tiered_execution, {
+      providerAuth: currentConfig.providerAuth,
+      // PAN-4191: tier refs deref through the slots this same save writes.
+      workhorses: { ...currentConfig.workhorses, ...(isRecord(settings.workhorses) ? settings.workhorses : {}) },
+    });
     if (tieredExecutionError) errors.push(tieredExecutionError);
   }
 

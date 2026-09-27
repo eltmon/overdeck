@@ -15,6 +15,7 @@ import {
 import { findProjectByPath, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
 import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../../lib/overdeck/plan-artifact-commit.js';
+import { surfacePlanArtifactPush } from '../../lib/overdeck/plan-artifact-push-report.js';
 
 interface OrdersCommandDeps {
   cwd?: string;
@@ -74,8 +75,8 @@ async function commitOrders(panDir: string, subject: string): Promise<void> {
     return;
   }
   const push = await pushPlanArtifacts(planHome);
-  const warning = push.pushed ? push.warning : push.skipped ? undefined : push.reason;
-  if (warning) console.error(chalk.yellow(`⚠ Order book push: ${warning}`));
+  const description = await surfacePlanArtifactPush(push, { planHome, command: 'pan orders' });
+  if (description) console.error(chalk.yellow(`⚠ Order book push: ${description.message}`));
 }
 
 async function requireBook(panDir: string, bookId: string): Promise<OrderBook> {
