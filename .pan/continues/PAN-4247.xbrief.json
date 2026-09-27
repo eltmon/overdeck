@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:46:43.067Z",
+  "updated": "2026-09-27T11:46:58.580Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "landing-probe.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T11:46:43.067Z"
+    },
+    "landing-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:46:58.580Z"
     }
   }
 }
