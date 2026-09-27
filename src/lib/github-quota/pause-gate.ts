@@ -92,8 +92,8 @@ export class GitHubRateLimitedError extends Error {
   /** ISO time the resulting pause ends. */
   readonly until: string;
 
-  constructor(pause: PauseRecord) {
-    super(pauseMessage(pause.bucket, Date.parse(pause.until), pause.kind));
+  constructor(pause: PauseRecord, options?: { cause?: unknown }) {
+    super(pauseMessage(pause.bucket, Date.parse(pause.until), pause.kind), options);
     this.name = 'GitHubRateLimitedError';
     this.pool = pause.pool;
     this.bucket = pause.bucket;
