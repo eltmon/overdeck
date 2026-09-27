@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4265",
   "created": "2026-09-27T15:21:17.185Z",
-  "updated": "2026-09-27T15:29:00.445Z",
+  "updated": "2026-09-27T15:31:04.020Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-27T15:28:56.362Z"
     },
     "wire-service-routes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4265",
-      "claimedAt": "2026-09-27T15:29:00.445Z"
+      "claimedAt": "2026-09-27T15:29:00.445Z",
+      "doneAt": "2026-09-27T15:31:04.020Z"
     }
   }
 }
