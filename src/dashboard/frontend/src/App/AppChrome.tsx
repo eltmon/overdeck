@@ -12,6 +12,7 @@ import { InotifyPressureBanner } from '../components/InotifyPressureBanner';
 import { LinearMcpAuthBanner } from '../components/LinearMcpAuthBanner';
 import { RestartApprovalBanner } from '../components/RestartApprovalBanner';
 import { GitHubRateLimitBanner } from '../components/GitHubRateLimitBanner';
+import { GitHubQuotaPill } from '../components/GitHubQuotaPill';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
@@ -239,6 +240,7 @@ export function AppChrome({
           <StoppedAgentsBanner variant="pill" />
           <LowCostModePill onOpenSettings={onOpenSettings} />
           <StaleBuildChip />
+          <GitHubQuotaPill />
           <SystemHealthPill />
           <DecisionsIndicator />
           <NeedsYouIndicator onActivate={onNavigateNeedsYou} />
