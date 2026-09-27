@@ -166,7 +166,8 @@ export function getIssuePrd(id: string) {
   return Effect.gen(function* () {
     const resolvedProject = resolveProjectFromIssueSync(id);
     const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPath(id);
-    const location = projectPath ? findPrdAnywhere(projectPath, id) : null;
+    const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`) : '';
+    const location = projectPath ? findPrdAnywhere(projectPath, id, workspacePath) : null;
     if (!location) {
       return jsonResponse({ hasPrd: false, error: `No PRD draft for ${id}.` }, { status: 404 });
     }

@@ -727,7 +727,8 @@ async function computeResourceAllocatedIssues(
   await Promise.all([...issueMap.values()].map(async (issue) => {
     const project = resolveProjectRef(issue.issueId);
     if (!project) return;
-    const draft = await findDraftPrd(project.config.path, issue.issueId).catch(() => null);
+    const workspacePath = join(project.config.path, 'workspaces', `feature-${issue.issueId.toLowerCase()}`);
+    const draft = await findDraftPrd(project.config.path, issue.issueId, workspacePath).catch(() => null);
     if (!draft) return;
     issue.resourceSources.add('prd');
     issue.resourceDetails.prdPath = draft.path;

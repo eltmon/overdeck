@@ -1,0 +1,506 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-26T01:41:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4224: Primary main keeps diverging: plan-artifact push lands on origin but local main can't follow (untracked .pan files block reset --keep)",
+    "updated": "2026-09-26T04:24:10.036Z"
+  },
+  "plan": {
+    "id": "pan-4224",
+    "title": "Primary main keeps diverging: plan-artifact push lands on origin but local main can't follow (untracked .pan files block reset --keep)",
+    "status": "running",
+    "uid": "7202803d-3d7d-45f8-94e4-8dd58c85a89d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 3,
+    "created": "2026-09-26T01:41:43Z",
+    "updated": "2026-09-26T04:24:10.036Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4224",
+        "label": "PAN-4224",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4225",
+        "label": "PAN-4225 (sibling: continue/spec writers)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4224.md",
+        "label": "PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "git",
+      "plan-home",
+      "backlog",
+      "orders",
+      "planning",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "pushPlanArtifacts (src/lib/overdeck/plan-artifact-commit.ts) pushes backlog-sequence and order-book commits from the primary checkout. When origin gained a .pan/ file through a PR merge that the primary holds untracked, the push landed but the follow step (git reset --keep) was refused. Every later write then replayed already-landed commits, which produced empty duplicates (a4ae61d3bf7) or conflicts, so local main drifted further and the warning went only to CLI stderr. The untracked files exist because complete-planning promotes the workspace PRD draft into the primary checkout instead of onto the feature branch (planning-promotion.ts:673).",
+      "Proposal": "Make pushPlanArtifacts replay only commits not already upstream (rev-list --cherry-pick --right-only), skip empty replays, and self-heal to origin when every local commit already landed. Before the follow, set aside colliding untracked .pan/ files: delete the identical ones after a successful reset, keep non-identical ones under <planHome>/.overdeck/plan-artifact-backups/<stamp>/ (a self-ignoring root), and restore everything if the reset still fails. Surface every push problem as a warn activity entry through a shared helper that both CLI callers use. Promote the PRD draft into the workspace plan home, so the planning commit carries it on the feature branch, and point the planning prompt and the PRD-gate message at the workspace path. Update docs/XBRIEF.md, reference/troubleshooting.mdx and the codebase concerns map.",
+      "NonGoals": "- Moving continue/spec/feedback/slot-ledger writers and readers off the primary checkout (filed as PAN-4225)\n- Clearing tracked .pan/ files with local modifications that block the follow; they produce a surfaced warning instead\n- A one-time cleanup of untracked files already in the primary checkout\n- Any change to how commitPlanArtifacts stages or commits\n- A persistent 'diverged' badge in the workspace UI\n- Using git stash, git clean, force-push, or --no-verify anywhere in the push path"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the continue/spec writers into sibling issue PAN-4225",
+        "rationale": "A census found about 10 writers across cloister, lifecycle, CLI start/scope and swarm that pass the primary root, and readers (handoff-context.ts:124, test-skip-waiver.ts:47) that read the primary copy. Moving the writes alone would break feedback delivery, and the redesign exceeds the finalize size lint. The robust push makes their collisions survivable meanwhile."
+      },
+      {
+        "summary": "Clear only untracked colliding .pan/ files; tracked-modified collisions stay a surfaced refusal",
+        "rationale": "The issue names untracked files only. Discarding an operator's working-tree edit, even with a backup, is not authorized by the issue, and the dashboard warning now names the blocking path."
+      },
+      {
+        "summary": "Back up non-identical files under <planHome>/.overdeck/plan-artifact-backups/<stamp>/ with a .gitignore containing '*' at the root",
+        "rationale": "The issue asks for a backup under .overdeck/. .overdeck/ is not wholly ignored in every plan home (Overdeck tracks .overdeck/context/codebase/), so a self-ignoring root keeps backups out of git status in any repo."
+      },
+      {
+        "summary": "Surface problems with emitActivityEntryOncePortable, source 'plan-artifacts', level warn, id derived from sha1(planHome + message)",
+        "rationale": "This is the existing CLI-to-dashboard activity path (used by /pan reload). A deterministic id keeps a repeated failure from spamming the feed. The console print stays as the fallback when the dashboard is down."
+      },
+      {
+        "summary": "Refuse to push when local main holds merge commits over upstream",
+        "rationale": "The replay rebuilds single-parent commits only. A merge commit cannot be replayed safely, and plan-home verbs never create one."
+      },
+      {
+        "summary": "Promotion copies a primary-only draft into the workspace plan home and never deletes the primary copy",
+        "rationale": "This brings older primary-only drafts onto the feature branch without destroying the operator's file. When the PR merges, the robust follow clears the now-identical untracked copy."
+      }
+    ],
+    "items": [
+      {
+        "id": "push-skip-landed",
+        "title": "pushPlanArtifacts replays only commits not already on the upstream and self-heals when all landed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T01:41:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/plan-artifact-commit.ts",
+            "tests/unit/lib/overdeck/plan-artifact-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/plan-artifact-commit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-artifact-commit.test.ts passes including the three new WI-1 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 in src/lib/overdeck/plan-artifact-commit.ts. Keep `local = rev-list --reverse onto..head` for the not-ahead skip. Refuse when `rev-list --merges onto..head` is non-empty (reason contains 'merge commits'). Compute `pending = rev-list --reverse --cherry-pick --right-only --no-merges <onto>...<head>` (three dots) and run the .pan/-only check over pending only. If pending is empty, skip the push and move the branch onto `onto` with reset --keep, returning { pushed:false, skipped:true, reason:'<branch> was already on <upstream>; moved <branch> onto it' }. If that move fails, return skipped:false with 'could not move … run git pull --rebase in <cwd>'. In the replay loop over pending, skip commit-tree when the merge-tree result equals `<tip>^{tree}`. If nothing was replayed, follow without pushing. Keep the fast-forward path. Add the three WI-1 tests named in the PRD to the existing describe('pushPlanArtifacts') harness. Async execFile only, no stash, no force."
+        },
+        "items": [
+          {
+            "id": "push-skip-landed.ac1",
+            "title": "Given origin already holds a patch-equivalent copy of local commit X and local has a new commit Y, when pushPlanArtifacts runs, then origin gains exactly one commit, that commit touches at least one file, and home HEAD equals origin main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-skip-landed.ac2",
+            "title": "Given every local commit already landed on origin, when pushPlanArtifacts runs, then it returns pushed:false, skipped:true with a reason containing 'already on', origin main is unchanged, and home HEAD equals origin main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-skip-landed.ac3",
+            "title": "Given local main holds a merge commit over origin, when pushPlanArtifacts runs, then it returns pushed:false, skipped:false with a reason containing 'merge commits', and origin main is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-skip-landed.ac4",
+            "title": "Given origin has not moved since the last fetch, when pushPlanArtifacts runs with one local .pan/ commit, then it pushes that commit unchanged and returns rebased:false with sha equal to local HEAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-clear-untracked",
+        "title": "pushPlanArtifacts sets aside colliding untracked .pan/ files before reset --keep",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T01:41:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/plan-artifact-commit.ts",
+            "tests/unit/lib/overdeck/plan-artifact-commit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/plan-artifact-commit.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "plan-artifact-commit.test.ts passes including the issue acceptance test, the non-identical backup test, and the restore test",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 in src/lib/overdeck/plan-artifact-commit.ts. Add `backedUp?: readonly { path; backup }[]` to the pushed:true variant and to the skipped:true variant of PushPlanArtifactsResult. Add a non-exported `followTip(cwd, branch, head, tip)` used by both follow paths (replayed push and the all-landed self-heal from push-skip-landed). It runs: HEAD-moved check; `git diff --name-only --no-renames --diff-filter=A -z HEAD <tip> -- .pan/` ∩ `git ls-files --others --exclude-standard -z -- .pan/`; for each collision, compute identical = (git hash-object <file>) === (git rev-parse <tip>:<path>) BEFORE moving; fs.rename it to <cwd>/.overdeck/plan-artifact-backups/<stamp>/<path> (stamp = new Date().toISOString().replace(/[:.]/g,'-')), creating <backupRoot>/.gitignore with '*\\n' if missing; `git reset --quiet --keep <tip>`; on success delete identical backups and the empty stamp dir, return the non-identical ones; on failure rename every backup back and return the error's first line. Keep the existing 'pushed, but could not move … run git pull --rebase in <cwd>' warning text. Update the module header and the pushPlanArtifacts JSDoc. Never git stash or git clean. Add the three WI-2 tests from the PRD, including the issue acceptance test."
+        },
+        "items": [
+          {
+            "id": "push-clear-untracked.ac1",
+            "title": "Given origin gained .pan/continues/X.json through a merge and the plan home holds an identical untracked copy, when a sequence commit is pushed, then home HEAD equals origin main, X.json is tracked and clean with origin's content, and no backup file remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-clear-untracked.ac2",
+            "title": "Given the untracked copy differs from origin's, when the push follows, then home HEAD equals origin main, the result's backedUp lists path '.pan/continues/X.json' with a backup file containing the local bytes, and git status --porcelain shows no plan-artifact-backups entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-clear-untracked.ac3",
+            "title": "Given an identical untracked collision plus a tracked .pan/ file whose local modification makes reset --keep refuse, when the push runs, then the result carries a warning containing 'could not move', the untracked file is restored at its original path with its original content, and home HEAD is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-clear-untracked.ac4",
+            "title": "Given a non-colliding untracked .pan/backlog/draft.md, when the push replays onto a moved origin, then the file remains untracked at its path with unchanged content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-report-dashboard",
+        "title": "Surface plan-artifact push problems as a dashboard activity warning",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:41:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/plan-artifact-push-report.ts",
+            "tests/unit/lib/overdeck/plan-artifact-push-report.test.ts",
+            "src/lib/activity-logger.ts",
+            "src/cli/index.ts",
+            "src/cli/commands/orders.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/plan-artifact-push-report.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "plan-artifact-push-report.test.ts passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3. Add 'plan-artifacts' to the ActivitySource union in src/lib/activity-logger.ts. Create src/lib/overdeck/plan-artifact-push-report.ts exporting describePlanArtifactPush(push) → {message, details?} | null and surfacePlanArtifactPush(push, {planHome, command}). describe rules: pushed with warning → warning; pushed:false skipped:false → reason; backedUp non-empty on either success variant → append 'moved N untracked .pan/ file(s) that differed from origin to <backup dir>' with details listing 'path -> backup' lines; otherwise null. surface calls emitActivityEntryOncePortable({ id: 'plan-artifact-push:' + first 12 hex of sha1(planHome + '\\n' + message), source: 'plan-artifacts', level: 'warn', command, message: `Plan home ${planHome}: ${message}`, details }), ignores the outcome, and returns the description. Replace the inline warning logic at src/cli/index.ts:302-306 (label 'Sequence push', command 'pan backlog write-sequence') and src/cli/commands/orders.ts:76-78 (label 'Order book push', command 'pan orders') with the helper, keeping the chalk.yellow stderr line. Write the unit tests in the PRD with vi.mock of activity-logger."
+        },
+        "items": [
+          {
+            "id": "push-report-dashboard.ac1",
+            "title": "describePlanArtifactPush returns null for a clean push and for a plain skip, returns the warning text for a pushed-with-warning result, and lists each backup as 'path -> backup' in details when backedUp is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-report-dashboard.ac2",
+            "title": "surfacePlanArtifactPush emits exactly one activity entry with source 'plan-artifacts', level 'warn', and an id matching /^plan-artifact-push:[0-9a-f]{12}$/ for a problem result, and emits nothing for a clean push",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-report-dashboard.ac3",
+            "title": "Both CLI callers route through surfacePlanArtifactPush: `grep -n \"push.pushed ? push.warning\" src/cli/index.ts src/cli/commands/orders.ts` returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "draft-promote-workspace",
+        "title": "Complete-planning promotes the PRD draft into the workspace plan home",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-26T01:41:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/drafts.ts",
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/lib/pan-dir/__tests__/drafts-promote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/drafts-promote.test.ts src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "drafts-promote.test.ts passes including the two new tests; both planning-promotion tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. Add optional `primaryRoot` to promoteWorkspacePrdDraft's args in src/lib/pan-dir/drafts.ts. When no canonical draft exists in the target and there is no workspace source, copy the content of getIssueDraftPath(primaryRoot, issueId) (if it exists) into the target via writeIssueDraft and return { promoted:true, reason:'promoted', path, source:<primary path>, sourceRemoved:false }. Never delete the primary copy. Change the call in src/lib/overdeck/planning-promotion.ts (~line 673) to `promoteWorkspacePrdDraft({ projectRoot: workspacePath, workspacePath, issueId: id, primaryRoot: projectPath })`. Update the JSDoc. Add the two new tests from the PRD. ALSO (hazard H1): this issue's own PRD was promoted into the primary checkout by the unfixed finalize. Copy <primary>/.pan/drafts/pan-4224.md into this workspace's .pan/drafts/pan-4224.md and commit it with this item, so the PR carries its PRD. Do not delete the primary copy."
+        },
+        "items": [
+          {
+            "id": "draft-promote-workspace.ac1",
+            "title": "Given the target root is the workspace and the workspace holds .pan/drafts/PAN-4224.md, when promoteWorkspacePrdDraft runs, then it returns reason 'canonical-exists' and the file is still present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-promote-workspace.ac2",
+            "title": "Given a draft exists only under primaryRoot, when promoteWorkspacePrdDraft runs with the workspace as target, then it returns promoted:true, the workspace plan home's .pan/drafts/<issue>.md contains the primary content, and the primary file still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-promote-workspace.ac3",
+            "title": "Given a distinct projectRoot and workspaceRoot, when promoteWorkspacePrdDraft runs, then it writes the canonical draft under projectRoot and removes the workspace copy; and planning-promotion.ts passes `projectRoot: workspacePath, primaryRoot: projectPath`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-promote-workspace.ac4",
+            "title": "Given the PAN-4224 PR branch, when `git show HEAD:.pan/drafts/pan-4224.md` runs, then it returns the PRD with at least 20 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "draft-path-hints",
+        "title": "Planning prompt and PRD-gate message name the workspace draft path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:41:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/drafts.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/cli/commands/plan-finalize.ts",
+            "src/lib/pan-dir/__tests__/drafts-planning-path.test.ts",
+            "tests/unit/cli/plan-finalize-prd-gate-message.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/drafts-planning-path.test.ts tests/unit/cli/plan-finalize-prd-gate-message.test.ts src/lib/planning/__tests__/spawn-planning-session.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the two new test files pass and spawn-planning-session.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. Export resolvePlanningDraftPath(workspacePath, primaryRoot | null, issueId) from src/lib/pan-dir/drafts.ts: the first existing path of getIssueDraftPath(workspacePath, issueId) and getIssueDraftPath(primaryRoot, issueId), else null. In src/lib/planning/spawn-planning-session.ts (~line 269) set `const prdPath = resolvePlanningDraftPath(workspacePath, projectConfig?.path ?? null, issue.identifier)` and `prdExists = prdPath !== null`. In src/cli/commands/plan-finalize.ts, rename formatPrdGateFailureMessage's third parameter to draftRootHint and pass workspacePath at the call (~line 222). The checkPrdGate call is unchanged. Add the two test files from the PRD."
+        },
+        "items": [
+          {
+            "id": "draft-path-hints.ac1",
+            "title": "resolvePlanningDraftPath returns the workspace path when both drafts exist, returns the primary path when only it exists, and returns null when neither exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-path-hints.ac2",
+            "title": "formatPrdGateFailureMessage('PAN-9', { ok:false, reason:'missing', searched:[] }, '/tmp/ws') returns text containing '/tmp/ws/.pan/drafts/pan-9.md'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "draft-path-hints.ac3",
+            "title": "spawn-planning-session.ts no longer calls getIssueDraftPath(projectConfig.path, …) directly for the prompt's PRD reference: `grep -n \"getIssueDraftPath(projectConfig.path\" src/lib/planning/spawn-planning-session.ts` returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-plan-home-push",
+        "title": "Document the robust plan-artifact push, backups, and draft promotion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-26T01:41:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4224",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/XBRIEF.md",
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'plan-artifact-backups' docs/XBRIEF.md reference/troubleshooting.mdx",
+            "grep -n 'PAN-4225' .overdeck/context/codebase/concerns.md"
+          ],
+          "expected_outputs": [
+            "both doc files contain plan-artifact-backups",
+            "concerns.md contains a PAN-4225 bullet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. In docs/XBRIEF.md, extend the paragraph at line 49 (starts '`.pan/` lives in the project repo'). Say that the push skips commits already on origin and never creates empty duplicates, moves local main onto origin when all its commits already landed, clears colliding untracked .pan/ files that match origin, backs up non-matching ones under .overdeck/plan-artifact-backups/<stamp>/, and reports problems as a dashboard activity warning. Also say that complete-planning commits the PRD draft on the feature branch in the workspace plan home. In reference/troubleshooting.mdx, add an entry 'Local main diverged after a backlog or order-book write' with the symptom (the 'Sequence push:' / 'Order book push:' warning in the activity feed), the cause, the backup location, and the manual fix (resolve the named path, then git pull --rebase in the plan home). In .overdeck/context/codebase/concerns.md, add a bullet that per-issue continue/spec writers still target the primary checkout uncommitted (PAN-4225) and that pushPlanArtifacts tolerates the collisions, and bump the last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs-plan-home-push.ac1",
+            "title": "docs/XBRIEF.md states that the push skips commits already on origin, clears identical untracked .pan/ collisions, backs up differing ones under .overdeck/plan-artifact-backups/, and reports problems in the dashboard activity feed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-plan-home-push.ac2",
+            "title": "reference/troubleshooting.mdx contains an entry titled 'Local main diverged after a backlog or order-book write' that names the backup location and the git pull --rebase recovery step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-plan-home-push.ac3",
+            "title": ".overdeck/context/codebase/concerns.md contains a bullet referencing PAN-4225 and its last-verified marker shows the implementation date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "push-skip-landed",
+        "to": "push-clear-untracked",
+        "type": "blocks"
+      },
+      {
+        "from": "push-clear-untracked",
+        "to": "push-report-dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "draft-promote-workspace",
+        "to": "draft-path-hints",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-26-PAN-4224-primary-main-keeps-diverging-plan-artifact-push-lands-on-origin-but-local-main-can-t-follow-untracked-pan-files-block-reset-keep.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
