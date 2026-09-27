@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4263",
   "created": "2026-09-27T14:44:33.622Z",
-  "updated": "2026-09-27T15:23:06.415Z",
+  "updated": "2026-09-27T15:23:16.925Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "deferred-verdict-replay.ac5": {
       "status": "completed",
       "doneAt": "2026-09-27T15:23:06.415Z"
+    },
+    "docs-pipeline-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T15:23:16.925Z"
     }
   }
 }
