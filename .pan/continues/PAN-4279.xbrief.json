@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-27T23:56:02.360Z",
+  "updated": "2026-09-27T23:56:13.579Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-27T23:50:02.319Z"
     },
     "eventrouter-bootstrap": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4279",
-      "claimedAt": "2026-09-27T23:56:02.360Z"
+      "claimedAt": "2026-09-27T23:56:02.360Z",
+      "doneAt": "2026-09-27T23:56:13.579Z"
     }
   }
 }
