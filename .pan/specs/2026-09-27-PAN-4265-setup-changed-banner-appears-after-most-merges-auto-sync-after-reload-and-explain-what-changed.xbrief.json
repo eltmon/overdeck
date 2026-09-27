@@ -1,0 +1,557 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T15:15:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4265: 'Setup changed' banner appears after most merges: auto-sync after reload and explain what changed",
+    "updated": "2026-09-27T15:18:12.622Z"
+  },
+  "plan": {
+    "id": "pan-4265",
+    "title": "'Setup changed' banner appears after most merges: auto-sync after reload and explain what changed",
+    "status": "proposed",
+    "uid": "4a4173a9-b790-47d1-bf35-69d540633451",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-27T15:15:03Z",
+    "updated": "2026-09-27T15:18:12.622Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4265",
+        "label": "PAN-4265",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "sync",
+      "dashboard",
+      "banner",
+      "context-layers"
+    ],
+    "narratives": {
+      "Problem": "The dashboard 'Setup changed' banner shows after most merges. The sync-input hash moves whenever main's sync-sources/ changes, nothing re-syncs after pan reload, the hash includes the process cwd so a pan sync run from any other directory never satisfies the dashboard, and the banner cannot say what changed because the manifest stores one opaque hash.",
+      "Proposal": "Store a per-input digest map in a v2 sync manifest with a cwd-independent globalHash; add a pure summarizer that names what changed; add a dashboard auto-sync service that evaluates status every 60 s (and at boot, so after every reload), runs the light pan sync --if-changed once per input set, and serves cached status; show the banner only when auto-sync failed, could not converge, or is off (context.auto_sync: false), with the reason text.",
+      "NonGoals": "- No settings-UI toggle for context.auto_sync (config file only)\n- No change to pan reload or pan up; pan up's deferred full sync stays\n- No rerouting of the post-approve pan sync in routes/workspaces/merge-ops.ts\n- No fs.watch/inotify change detection\n- No cross-process lock for concurrent pan sync runs\n- No asynchronous rewrite of input hashing\n- Auto-sync must never run on a peer dashboard\n- Auto-sync must never retry the same input set after a failure"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Auto-sync runs in a dashboard-server service instead of as a step in pan reload",
+        "rationale": "pan reload replaces the server, so a boot-time evaluation covers 'after reload'; the same 60 s evaluation covers main's sync-sources moving between reloads, giving one mechanism for both triggers the issue names."
+      },
+      {
+        "summary": "The dashboard compares a cwd-independent globalHash; pan sync --if-changed keeps comparing everything",
+        "rationale": "The live dashboard runs with cwd = primary checkout, so any pan sync from a workspace wrote a hash the dashboard never matched; this is a verified second noise source."
+      },
+      {
+        "summary": "One auto-sync attempt per distinct input set; banner shows only for failed, unresolved, or disabled states",
+        "rationale": "Prevents a retry loop on persistent failure while keeping the operator's Sync now button; 'unresolved' is the concrete meaning of 'a change a sync can't apply by itself'."
+      },
+      {
+        "summary": "Setting is context.auto_sync (default true), config-file only",
+        "rationale": "The issue marks the setting optional; the context config section already owns sync-render behavior (context.rules)."
+      },
+      {
+        "summary": "Auto runs use 'pan sync --if-changed' with OVERDECK_HERDR_SYNC_LIGHT=1 after a 60 s boot delay",
+        "rationale": "Light mode matches the existing dashboard Sync now path (PAN-3956); --if-changed and the delay reduce overlap with pan up's detached deferred sync."
+      }
+    ],
+    "items": [
+      {
+        "id": "change-summary",
+        "title": "Add the pure sync change summarizer module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:15:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sync-change-summary.ts",
+            "src/lib/__tests__/sync-change-summary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/sync-change-summary.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync-change-summary.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/sync-change-summary.ts exporting summarizeSyncInputChanges(previous, current, opts) exactly as specified in .pan/drafts/PAN-4265.md Work item 1: diff two input-key digest maps, drop cwd keys by default, group changed keys into units (skill dirs, rules, hooks, agent definitions, templates, project skills, project contexts, singletons), and phrase one sentence like '3 skills and 1 rule changed'. Add the unit tests listed in Work item 1."
+        },
+        "items": [
+          {
+            "id": "change-summary.ac1",
+            "title": "Given three changed files in two skill dirs and one changed rule, summarizeSyncInputChanges returns summary '2 skills and 1 rule changed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-summary.ac2",
+            "title": "Given a changed hook, plugins.json, and global-context key, it returns '1 hook, the plugin list, and the global context changed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-summary.ac3",
+            "title": "Given only a changed 'cwd' key and default opts, it returns an empty changedKeys array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "change-summary.ac4",
+            "title": "Given previous null it returns 'No sync has been recorded on this machine', and given 'no-record' it returns a summary starting 'Setup inputs changed since the last sync'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "manifest-v2",
+        "title": "Record per-input digests in a v2 sync manifest and add readSyncInputStatus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:15:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4265",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sync-startup-gate.ts",
+            "src/lib/sync.ts",
+            "tests/unit/lib/sync-startup-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sync-startup-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync-startup-gate.test.ts passes including the existing cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "auto-sync-service"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the streaming hash in src/lib/sync-startup-gate.ts with collectSyncInputs() using the key grammar in .pan/drafts/PAN-4265.md FR-1, write manifest v2 {version, hash, globalHash, generatedAt, inputs} from writeSyncManifest(), keep isStartupSyncNeeded() comparing the all-keys hash, and add readSyncInputStatus() comparing globalHash (excluding cwd keys) and filling summary/changedKeys via summarizeSyncInputChanges. Re-export it from src/lib/sync.ts. Extend the tests per Work item 2 and give the listProjectsSync mock entries a key."
+        },
+        "items": [
+          {
+            "id": "manifest-v2.ac1",
+            "title": "After writeSyncManifest(), the manifest file contains version 2, a globalHash, and an inputs key 'sync-sources/skills/.gitkeep', and readSyncInputStatus() returns needed false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest-v2.ac2",
+            "title": "Given a manifest written from one cwd, readSyncInputStatus() from a different cwd returns needed false while isStartupSyncNeeded() returns needed true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest-v2.ac3",
+            "title": "When a skill dir file and a rule file change after the manifest is written, readSyncInputStatus() returns needed true with summary '1 skill and 1 rule changed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest-v2.ac4",
+            "title": "Given a v1 manifest without inputs, readSyncInputStatus() returns needed true and a summary starting 'Setup inputs changed since the last sync'; given a missing rules dir it returns an attemptKey starting 'error:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-auto-sync",
+        "title": "Add the context.auto_sync setting with default true",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:15:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/__tests__/merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/merge.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "merge.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard reports no new violation"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add auto_sync?: boolean to ContextConfig and autoSync: boolean to NormalizedContextConfig, default autoSync true in DEFAULT_CONFIG, and fix mergeConfigs so the context merge spreads result.context instead of rebuilding it with only rules (merge.ts lines ~157 and ~289), exactly as the before/after in .pan/drafts/PAN-4265.md Work item 3. Keep schema.ts under its 1096-line allowlist cap or add a PAN-4265 allowlist row."
+        },
+        "items": [
+          {
+            "id": "config-auto-sync.ac1",
+            "title": "Given no config files, mergeConfigs() returns context.autoSync true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-auto-sync.ac2",
+            "title": "Given a config with context.auto_sync false and a rules map, mergeConfigs() returns autoSync false and preserves the rules map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-auto-sync.ac3",
+            "title": "Given an earlier config with auto_sync false and a later config with only rules, mergeConfigs() preserves autoSync false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-sync-service",
+        "title": "Add the dashboard auto-sync service with single-flight runner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:15:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4265",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/sync-auto-service.ts",
+            "src/dashboard/server/services/__tests__/sync-auto-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/sync-auto-service.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "sync-auto-service.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "wire-service-routes",
+            "banner-reason"
+          ],
+          "parallelSafeReason": "New file plus its own test file; shares no file with any other item."
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/sync-auto-service.ts with the API and behavior in .pan/drafts/PAN-4265.md Work item 4: states idle/pending/running/failed/unresolved/disabled, a 60 s evaluation interval, a 60 s boot delay before auto runs, one attempt per attempt key, auto runs as 'pan sync --if-changed' with OVERDECK_HERDR_SYNC_LIGHT=1 via promisified execFile of panCliInvocation (never execSync), a shared single-flight runSyncNow, and a cached SyncStatusPayload. Deps are injectable; the gate module is loaded by dynamic import. Tests use vi.useFakeTimers() and stubbed deps only. Before the first evaluation, getSyncStatus() returns needed false, reason 'not evaluated yet', banner false, state idle; tests flush the boot setImmediate with await vi.advanceTimersByTimeAsync(0)."
+        },
+        "items": [
+          {
+            "id": "auto-sync-service.ac1",
+            "title": "Given a needed key K at boot, the service returns state pending with banner false and spawns no sync until 60 s elapse, then calls runPanSync once with ['sync','--if-changed']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-sync-service.ac2",
+            "title": "When the auto run fails, getSyncStatus() returns state failed, banner true, and lastError, and later ticks with the same key K make no new call while a new key K2 makes one call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-sync-service.ac3",
+            "title": "When the run succeeds but status is still needed with key K, getSyncStatus() returns state unresolved with banner true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-sync-service.ac4",
+            "title": "Given autoSyncEnabled false or autoRun false, getSyncStatus() returns state disabled with banner true and runPanSync receives zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-sync-service.ac5",
+            "title": "When runSyncNow('manual') is called while an auto run is in flight, runPanSync is called once and both callers resolve the same result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-service-routes",
+        "title": "Serve sync status from the service and route Sync now through it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:15:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/routes/misc/meta.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/services/__tests__/sync-auto-service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "sync-auto-service.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/misc/meta.ts make GET /api/sync-status return getSyncStatus() and make POST /api/system/sync await runSyncNow('manual'), returning {ok:true, output} or a 500 with {ok:false, error} as in .pan/drafts/PAN-4265.md Work item 5. In src/dashboard/server/main.ts call startSyncAutoService({ autoRun: !isPeerDashboard }) after startCostReconcileService() and stopSyncAutoService() next to stopCostReconcileService(). Remove imports only if grep shows them unused."
+        },
+        "items": [
+          {
+            "id": "wire-service-routes.ac1",
+            "title": "GET /api/sync-status returns the payload from getSyncStatus() including banner, summary, details, and autoSync fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-service-routes.ac2",
+            "title": "POST /api/system/sync routes through runSyncNow('manual') and returns status 500 with an error field when the sync fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-service-routes.ac3",
+            "title": "When the server boots as a peer dashboard, main.ts starts the service with autoRun false and logs '[overdeck] Sync auto service started (peer: observe only)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner-reason",
+        "title": "Show the banner only on failure or unresolved change, with the reason text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:15:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SyncRequiredBanner.tsx",
+            "src/dashboard/frontend/src/components/SyncRequiredBanner.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/SyncRequiredBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SyncRequiredBanner.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend SyncRequiredBanner's SyncStatus type to the FR-7 payload, render nothing unless banner is true, and show per-state text ('Auto-sync failed — <summary>. <first line of lastError>', unresolved, disabled), a details tooltip, and a 'Retry sync' label in the failed state, exactly as .pan/drafts/PAN-4265.md Work item 6. Rewrite the tests to assert on data-testid 'sync-required-banner' because the current text assertions pass vacuously."
+        },
+        "items": [
+          {
+            "id": "banner-reason.ac1",
+            "title": "Given a status with needed true, state pending, and banner false, the component renders no element with testid sync-required-banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-reason.ac2",
+            "title": "Given state failed, summary '3 skills and 1 rule changed', and lastError 'pan sync failed: boom', the banner shows 'Auto-sync failed', the summary, and 'boom' with a 'Retry sync' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-reason.ac3",
+            "title": "Given state disabled, clicking 'Sync now' sends POST /api/system/sync and a following banner false response removes the testid element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-auto-sync",
+        "title": "Describe dashboard auto-sync and context.auto_sync in the context-layers docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:15:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4265",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONTEXT-LAYERS.md",
+            "configuration/context-layers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'auto_sync' docs/CONTEXT-LAYERS.md configuration/context-layers.mdx"
+          ],
+          "expected_outputs": [
+            "both files contain a context.auto_sync reference"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite the sync-manifest bullet in docs/CONTEXT-LAYERS.md ('`pan sync` and launch-time delivery' section) and the Sync now paragraph in configuration/context-layers.mdx per .pan/drafts/PAN-4265.md Work item 7: per-input manifest that ignores the directory pan sync ran from, dashboard light sync on boot and within 60 s of sync-sources changes, banner only on failure/unresolved/disabled naming what changed, and a context.auto_sync: false YAML snippet."
+        },
+        "items": [
+          {
+            "id": "docs-auto-sync.ac1",
+            "title": "docs/CONTEXT-LAYERS.md contains a sentence stating the dashboard runs the light pan sync on boot and when sync-sources changes, plus a context.auto_sync YAML snippet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-auto-sync.ac2",
+            "title": "configuration/context-layers.mdx shows that the Sync now banner appears only when auto-sync failed, could not apply the change, or is turned off, with an example reason like '3 skills and 1 rule changed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "change-summary",
+        "to": "manifest-v2",
+        "type": "blocks"
+      },
+      {
+        "from": "manifest-v2",
+        "to": "auto-sync-service",
+        "type": "blocks"
+      },
+      {
+        "from": "config-auto-sync",
+        "to": "auto-sync-service",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-sync-service",
+        "to": "wire-service-routes",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-27-PAN-4265-setup-changed-banner-appears-after-most-merges-auto-sync-after-reload-and-explain-what-changed.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
