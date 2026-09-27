@@ -83,4 +83,14 @@ describe('GitHubRateLimitBanner (PAN-4264)', () => {
     render(<GitHubRateLimitBanner />);
     expect(bannerText()).toBe(`GitHub rate limit for your account: calls paused until ${HHMM}.`);
   });
+
+  it('names the PAT or App identity for a pause outside the user pool, never the gh login', () => {
+    const patPause = { ...pause('primary'), pool: 'pat' as const };
+    useDashboardStore.setState({ githubQuota: quota({ ownUsageLow: true, pauses: [patPause] }) });
+    render(<GitHubRateLimitBanner />);
+    const text = bannerText();
+    expect(text.startsWith(`GitHub rate limit for the GITHUB_TOKEN personal access token: calls paused until ${HHMM}.`)).toBe(true);
+    expect(text).not.toContain('octo-login');
+    expect(text).not.toContain('not caused by this machine');
+  });
 });

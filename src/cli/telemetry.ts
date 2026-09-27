@@ -13,6 +13,7 @@ import {
 import { maybeSendInstanceHeartbeat } from '../lib/telemetry/instance-heartbeat.js';
 import { registerCliExitFinalizer } from './exit.js';
 import { registerGitHubRateLimitedTelemetry } from '../lib/telemetry/github-quota-telemetry.js';
+import { flushLedgerWrites } from '../lib/github-quota/ledger.js';
 
 export { exitCli } from './exit.js';
 
@@ -79,6 +80,9 @@ export class CliTelemetryLifecycle {
     });
     // Tracked, not awaited: shutdownAnalyticsServices waits for it within its deadline.
     if (this.heartbeat) void trackAnalyticsTask(this.heartbeat());
+    // PAN-4264: GitHub quota ledger lines are queued, not awaited; land them
+    // before the process exits (every CLI exit path finishes here).
+    await flushLedgerWrites();
     await this.shutdown();
   }
 }

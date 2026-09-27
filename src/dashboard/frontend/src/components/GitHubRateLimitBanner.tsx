@@ -23,7 +23,13 @@ function latestPause(pauses: readonly GitHubQuotaPause[]): GitHubQuotaPause | nu
  * top caller count points in the paused bucket over the last hour.
  */
 export function gitHubRateLimitBannerText(quota: GitHubQuotaSnapshot, pause: GitHubQuotaPause): string {
-  const who = quota.login ?? 'your account';
+  // The login and ownUsageLow describe the gh (user) pool only; a PAT or App
+  // pause names its own identity and skips the "not caused by this machine" row.
+  const who = pause.pool === 'pat'
+    ? 'the GITHUB_TOKEN personal access token'
+    : pause.pool === 'app'
+      ? 'the GitHub App'
+      : quota.login ?? 'your account';
   const until = localTime(pause.until);
   if (pause.kind === 'secondary') {
     return `GitHub secondary rate limit for ${who}: calls paused until ${until}. Overdeck sent requests too fast; pollers resume automatically.`;
@@ -31,7 +37,7 @@ export function gitHubRateLimitBannerText(quota: GitHubQuotaSnapshot, pause: Git
 
   const bucketPoints = (usage: GitHubQuotaSnapshot['callers'][number]) => usage[pause.bucket].points;
   const machinePoints = quota.callers.reduce((sum, usage) => sum + bucketPoints(usage), 0);
-  if (quota.ownUsageLow) {
+  if (quota.ownUsageLow && pause.pool === 'user') {
     return `GitHub rate limit for ${who}: calls paused until ${until}; not caused by this machine (this machine used ${machinePoints} points in the last hour). Another tool or Overdeck install using this account is spending the shared limit.`;
   }
 

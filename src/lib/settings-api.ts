@@ -1016,7 +1016,7 @@ async function saveSettingsApiPromiseUnlocked(
       ? {
           enabled: settings.telemetry.enabled,
           // PAN-4264: written only when it is or was on, so saves do not add the key everywhere.
-          ...(settings.telemetry.operatorGrouping === true || currentConfig.telemetry.operator_grouping
+          ...(settings.telemetry.operatorGrouping === true || currentConfig.telemetry?.operator_grouping
             ? { operator_grouping: settings.telemetry.operatorGrouping === true }
             : {}),
         }
