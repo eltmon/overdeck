@@ -1,10 +1,10 @@
-import { useState, type ReactNode, type KeyboardEvent } from 'react'
-import { Terminal, Globe } from 'lucide-react'
+import { useState, type ReactNode, type KeyboardEvent, type Ref } from 'react'
+import { Terminal, Globe, MessagesSquare } from 'lucide-react'
 import { AgentIcon } from './AgentIcon'
 import { orderIntents } from './launcherOrdering'
 import styles from '../stage.module.css'
 
-export type LauncherIntentKind = 'agent' | 'terminal' | 'web'
+export type LauncherIntentKind = 'agent' | 'terminal' | 'web' | 'talk'
 
 export interface LauncherIntent {
   /** Stable id — 'claude-code' | 'terminal' | 'web' | 'codex' | an agent id. */
@@ -33,6 +33,8 @@ export function intentLabel(intent: LauncherIntent): string {
       return 'Run in terminal:'
     case 'web':
       return 'Search the web:'
+    case 'talk':
+      return 'Talk it through first:'
     case 'agent':
       return `Ask ${intent.agentName ?? 'agent'}:`
   }
@@ -40,6 +42,7 @@ export function intentLabel(intent: LauncherIntent): string {
 
 function IntentIcon({ kind, id, label }: { kind: LauncherIntentKind; id: string; label?: string }) {
   if (kind === 'agent') return <AgentIcon id={id} label={label} size={14} />
+  if (kind === 'talk') return <MessagesSquare size={14} />
   const Icon = kind === 'terminal' ? Terminal : Globe
   return <Icon size={14} />
 }
@@ -59,6 +62,12 @@ export interface LauncherProps {
   errorText?: string
   /** Id of the last-run agent in this workspace; floats it to position 1. */
   lastUsedAgentId?: string | null
+  /** Forwarded to the underlying input's ref, for callers that need focus control. */
+  inputRef?: Ref<HTMLInputElement>
+  /** Forwarded to the underlying input's autoFocus. */
+  autoFocus?: boolean
+  /** Forwarded to the underlying input's data-testid. */
+  inputTestId?: string
 }
 
 /**
@@ -76,6 +85,9 @@ export function Launcher({
   busy = false,
   errorText,
   lastUsedAgentId,
+  inputRef,
+  autoFocus,
+  inputTestId,
 }: LauncherProps) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
@@ -133,6 +145,9 @@ export function Launcher({
     <div className={styles.launcher}>
       <div className={styles.launchBar}>
         <input
+          ref={inputRef}
+          autoFocus={autoFocus}
+          data-testid={inputTestId}
           className={styles.launchInput}
           value={query}
           placeholder={placeholder}

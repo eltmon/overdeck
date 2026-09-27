@@ -9,6 +9,7 @@ function handlers(): LauncherHandlers & { calls: Record<string, unknown[]> } {
     openAgent: (i, q) => (calls.openAgent = [i, q]),
     openTerminal: (q) => (calls.openTerminal = [q]),
     openWeb: (q, url) => (calls.openWeb = [q, url]),
+    openTalk: (q) => (calls.openTalk = [q]),
     onAgentRun: (id) => (calls.onAgentRun = [id]),
   }
 }
@@ -32,6 +33,12 @@ describe('dispatchLauncherIntent', () => {
     dispatchLauncherIntent(intent, 'fix it', h)
     expect(h.calls.onAgentRun).toEqual(['codex'])
     expect(h.calls.openAgent).toEqual([intent, 'fix it'])
+  })
+
+  it('talk intent calls openTalk with the query', () => {
+    const h = handlers()
+    dispatchLauncherIntent({ id: 'talk', kind: 'talk' }, 'how do I ship this', h)
+    expect(h.calls.openTalk).toEqual(['how do I ship this'])
   })
 
   it('does not call openAgent for non-agent intents', () => {
