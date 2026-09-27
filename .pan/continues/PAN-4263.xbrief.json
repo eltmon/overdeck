@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4263",
   "created": "2026-09-27T14:44:33.622Z",
-  "updated": "2026-09-27T14:50:18.886Z",
+  "updated": "2026-09-27T14:50:23.937Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4263",
       "claimedAt": "2026-09-27T14:49:23.853Z",
       "doneAt": "2026-09-27T14:50:18.885Z"
+    },
+    "merge-lands-fresh-pr": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4263",
+      "claimedAt": "2026-09-27T14:50:23.937Z"
     }
   }
 }
