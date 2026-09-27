@@ -19,6 +19,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'claude-opus-4-7': 'frontier',
   'claude-opus-4-6': 'frontier',
   'gpt-6-astra': 'frontier',
+  'gpt-6-sol': 'frontier',
   'gpt-5.6-sol': 'frontier',
   'gpt-5.6-sol[372k]': 'frontier',
   'gemini-3.1-pro-preview': 'frontier',
@@ -68,6 +69,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   // small
   'claude-haiku-4-5': 'small',
   'gpt-5.6-luna': 'small',
+  'gpt-6-luna': 'small',
   'gpt-5.6-luna[372k]': 'small',
   'gemini-3.1-flash-lite-preview': 'small',
   'gemini-3.5-flash-lite': 'small',
