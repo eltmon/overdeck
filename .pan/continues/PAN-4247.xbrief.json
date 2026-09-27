@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:51:12.900Z",
+  "updated": "2026-09-27T11:51:22.198Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "reconcile-joined.ac1": {
       "status": "completed",
       "doneAt": "2026-09-27T11:51:12.899Z"
+    },
+    "reconcile-joined.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:51:22.198Z"
     }
   }
 }
