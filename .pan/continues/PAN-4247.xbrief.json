@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4247",
   "created": "2026-09-27T09:48:45.802Z",
-  "updated": "2026-09-27T11:50:00.449Z",
+  "updated": "2026-09-27T11:50:10.210Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "subagent-summary-contract.ac2": {
       "status": "completed",
       "doneAt": "2026-09-27T11:50:00.448Z"
+    },
+    "subagent-human-input-scanner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T11:50:10.210Z"
     }
   }
 }
