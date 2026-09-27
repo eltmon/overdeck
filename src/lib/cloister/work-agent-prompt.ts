@@ -5,7 +5,7 @@ import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByPath, findProjectByTeam } from '../projects.js';
 import { resolveVerificationTestsMode } from './verification-tests-mode.js';
 import { isTldrEnabled } from '../config-yaml.js';
-import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext, readIssueDraft } from '../pan-dir/index.js';
+import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext, resolvePlanningDraftPath } from '../pan-dir/index.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
 import { loadConfigSync } from '../config.js';
@@ -315,14 +315,21 @@ export async function getTrackerContext(
 
 /**
  * Read the issue's PRD draft (`.pan/drafts/<issue>.md`), the source for
- * Stitch design sections referenced in the kickoff prompt.
+ * Stitch design sections referenced in the kickoff prompt. Checks the
+ * workspace's own copy first, falling back to the primary checkout's (PAN-4224:
+ * complete-planning promotes onto the workspace, not the primary, but an
+ * earlier unfixed run — or a monorepo where the two coincide — may have left
+ * the draft in the primary instead).
  */
 export async function readPlanningContext(workspacePath: string, projectRoot?: string): Promise<string | null> {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
-  if (!issueId || !projectRoot) return null;
+  if (!issueId) return null;
+
+  const draftPath = resolvePlanningDraftPath(workspacePath, projectRoot ?? null, issueId);
+  if (!draftPath) return null;
 
   try {
-    return await Effect.runPromise(readIssueDraft(projectRoot, issueId));
+    return readFileSync(draftPath, 'utf-8');
   } catch { /* ignore */ }
 
   return null;
