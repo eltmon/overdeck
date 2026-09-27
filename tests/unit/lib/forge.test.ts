@@ -27,18 +27,15 @@ vi.mock('child_process', () => {
   }
 
   (exec as any)[kCustom] = execMock;
-  // The real github-app module (for selectPullRequestForHead) promisifies execFile at load.
-  return { exec, execFile: vi.fn() };
+  return { exec };
 });
 
-vi.mock('../../../src/lib/github-app.js', async (importOriginal) => ({
+vi.mock('../../../src/lib/github-app.js', () => ({
   getPullRequestState: getPullRequestStateMock,
   isGitHubAppConfigured: isGitHubAppConfiguredMock,
   listPullRequestsForHead: listPullRequestsForHeadMock,
   mergePullRequestWithApp: mergePullRequestWithAppMock,
   parsePullRequestRef: parsePullRequestRefMock,
-  selectPullRequestForHead: (await importOriginal<typeof import('../../../src/lib/github-app.js')>())
-    .selectPullRequestForHead,
 }));
 
 import { getForgeAdapter, GITHUB_MERGE_TIMEOUT_MS, parseArtifactRef } from '../../../src/lib/forge.js';

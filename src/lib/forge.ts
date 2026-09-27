@@ -10,9 +10,9 @@ import {
   listPullRequestsForHead,
   mergePullRequestWithApp,
   parsePullRequestRef,
-  selectPullRequestForHead,
   type GitHubPullRequestState,
 } from './github-app.js';
+import { selectPullRequestForHead } from './github-pr-selection.js';
 
 /** A forge (GitHub or GitLab) review-artifact operation failed. */
 class ForgeError extends Data.TaggedError('ForgeError')<{
