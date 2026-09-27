@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4244",
   "created": "2026-09-27T08:41:42.862Z",
-  "updated": "2026-09-27T08:41:42.862Z",
+  "updated": "2026-09-27T08:56:44.759Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "deterministic-zombie-fixture": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4244",
-      "claimedAt": "2026-09-27T08:41:42.861Z"
+      "claimedAt": "2026-09-27T08:41:42.861Z",
+      "doneAt": "2026-09-27T08:56:44.758Z"
     }
   }
 }
