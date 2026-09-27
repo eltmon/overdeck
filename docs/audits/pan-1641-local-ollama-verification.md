@@ -49,7 +49,11 @@ export CLAUDE_CODE_AUTO_COMPACT_WINDOW="32768"
 The launch flag is `--model 'gemma4:12b'`, so the `ollama:` prefix was stripped at the
 single launch-arg door. Exactly one pin pair is exported, confirming
 `getClaudeCodeContextPolicyForModel` correctly returns `{}` for this provider.
-**AC-10.ac2 is met.**
+**AC-10.ac2 is met.** The captured launcher, alongside the same exports regenerated
+from the shipping build, is committed at
+[`pan-1641-pan-3684-launcher-env.txt`](pan-1641-pan-3684-launcher-env.txt). The two
+differ only in the pin value, for the reason in "A pin bug this run found and fixed"
+below; the shipping build pins 32768, this host's real serving window.
 
 **3. Ollama really served the agent.** The agent's first turn consumed
 **16387 input tokens** and produced output, so the Messages API round-trip works

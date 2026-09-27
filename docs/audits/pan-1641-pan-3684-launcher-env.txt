@@ -1,0 +1,68 @@
+# PAN-1641 AC-10.ac2 evidence — the Ollama launch env, 2026-09-27
+#
+# Block A is the launcher Overdeck generated for the live PAN-3684 spawn:
+#   node dist/cli/index.js start PAN-3684 --model ollama:gemma4:12b --harness claude-code
+# read from ~/.overdeck/agents/agent-pan-3684/launcher.sh while the agent ran.
+#
+# Block B is getProviderExportsForModel('ollama:gemma4:12b','claude-code') from the
+# SHIPPING build. The two differ in one value on purpose: the live spawn ran a build
+# that asked Ollama for a 65536 window via options.num_ctx, which the run proved
+# over-promises (the harness's own requests get the server default, and turns of
+# 58595 and 61349 input tokens returned zero output). That was reverted, so the
+# shipping build pins 32768 — this host's real serving window. Everything else,
+# including the absence of ANTHROPIC_API_KEY, is identical.
+
+## Block A — live PAN-3684 launcher (pre-revert build)
+
+unset ANTHROPIC_API_KEY
+unset ANTHROPIC_BASE_URL
+unset ANTHROPIC_AUTH_TOKEN
+unset ANTHROPIC_DEFAULT_HAIKU_MODEL
+unset ANTHROPIC_DEFAULT_OPUS_MODEL
+unset ANTHROPIC_DEFAULT_SONNET_MODEL
+unset ANTHROPIC_SMALL_FAST_MODEL
+unset CLAUDE_CODE_SUBAGENT_MODEL
+unset CLAUDE_CODE_AUTO_COMPACT_WINDOW
+unset CLAUDE_CODE_MAX_CONTEXT_TOKENS
+unset API_TIMEOUT_MS
+unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
+export ANTHROPIC_BASE_URL="http://localhost:11434"
+export ANTHROPIC_AUTH_TOKEN="ollama"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="gemma4:12b"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="gemma4:12b"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="gemma4:12b"
+export ANTHROPIC_SMALL_FAST_MODEL="gemma4:12b"
+export CLAUDE_CODE_SUBAGENT_MODEL="gemma4:12b"
+export API_TIMEOUT_MS="600000"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS="65536"
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW="65536"
+
+# Launch flag (ollama: prefix stripped at the single launch-arg door):
+--model 'gemma4:12b'
+
+## Block B — shipping build exports
+
+unset ANTHROPIC_API_KEY
+unset ANTHROPIC_BASE_URL
+unset ANTHROPIC_AUTH_TOKEN
+unset ANTHROPIC_DEFAULT_HAIKU_MODEL
+unset ANTHROPIC_DEFAULT_OPUS_MODEL
+unset ANTHROPIC_DEFAULT_SONNET_MODEL
+unset ANTHROPIC_SMALL_FAST_MODEL
+unset CLAUDE_CODE_SUBAGENT_MODEL
+unset CLAUDE_CODE_AUTO_COMPACT_WINDOW
+unset CLAUDE_CODE_MAX_CONTEXT_TOKENS
+unset API_TIMEOUT_MS
+unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
+export ANTHROPIC_BASE_URL="http://localhost:11434"
+export ANTHROPIC_AUTH_TOKEN="ollama"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="gemma4:12b"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="gemma4:12b"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="gemma4:12b"
+export ANTHROPIC_SMALL_FAST_MODEL="gemma4:12b"
+export CLAUDE_CODE_SUBAGENT_MODEL="gemma4:12b"
+export API_TIMEOUT_MS="600000"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS="32768"
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW="32768"
