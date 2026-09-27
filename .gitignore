@@ -233,6 +233,10 @@ __pycache__/
 # workspace working copies are ignored — see the `.pan/` entries above.
 # Records are gone with the state layer; if one is ever written, do not track it.
 .pan/records/
+# Context layers moved to `.overdeck/context/` (the codebase map is tracked at
+# `.overdeck/context/codebase/`); `.pan/context/` is a read-only legacy fallback
+# that nothing writes. A leftover copy there is a stale duplicate — never track it.
+.pan/context/
 .beads/
 .overdeck/continue.json
 .overdeck/pending-promotion.json

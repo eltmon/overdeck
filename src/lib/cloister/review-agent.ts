@@ -73,7 +73,7 @@ const execAsync = promisify(exec);
 // PAN-2584: liveness budget for the review PARENT (discovery + convoy + synthesis).
 // Sub-reviewers get their own 20-minute deadlines in review-convoy.ts; the parent
 // needs headroom for all three phases. Enforced by checkStalledReviewParents.
-const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
+export const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 // Review now runs against the committed diff only. The dirty-worktree gate
 // at pan done time (and the same gate added to /api/review/:id/request)
 // guarantees the worktree is clean before specialists see the diff.
@@ -81,7 +81,7 @@ const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 const reviewSynthesisPath = (reviewDir: string): string => join(reviewDir, 'synthesis.md');
 const selfReviewReportPath = (reviewDir: string): string => join(reviewDir, 'review.md');
 
-async function deriveReviewRunHead8(issueId: string, workspace: string): Promise<string> {
+export async function deriveReviewRunHead8(issueId: string, workspace: string): Promise<string> {
   try {
     const { resolvePrimaryWorkspaceRepoDir, resolveWorkspaceRepoRoots } = await import('../project-repos.js');
     const roots = resolveWorkspaceRepoRoots(issueId, workspace);

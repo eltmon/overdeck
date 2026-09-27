@@ -39,6 +39,7 @@ import {
   GITHUB_API_TIMEOUT_MS,
   GitHubRequestTimeoutError,
   generateInstallationToken,
+  getBotIdentity,
   getCiCheckRunsState,
   getIssueState,
   getMergeBackendStatus,
@@ -48,8 +49,77 @@ import {
   listPullRequestsForHead,
   mergePullRequestWithApp,
   postOverdeckTestsStatus,
+  resetAppBotLoginCache,
+  resolveAppBotLogin,
   verifyAppCanMerge,
 } from '../../../src/lib/github-app.js';
+
+// #4066 review (R3-2): the bot whose reviews approve a merge is the installed
+// App's (here `overdeck-agent`, App 4205044), never a hard-coded login.
+describe('the App bot identity', () => {
+  const fetchMock = vi.fn();
+  const defaultReadFile = readFileSyncMock.getMockImplementation()!;
+  const withSlugFile = (slug: string | null) => readFileSyncMock.mockImplementation((path: string) => {
+    if (path.endsWith('app-slug')) {
+      if (slug === null) throw new Error('ENOENT: app-slug');
+      return `${slug}\n`;
+    }
+    return defaultReadFile(path);
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetAppBotLoginCache();
+    existsSyncMock.mockReturnValue(true);
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    readFileSyncMock.mockImplementation(defaultReadFile);
+    existsSyncMock.mockReturnValue(true);
+    vi.unstubAllGlobals();
+    resetAppBotLoginCache();
+  });
+
+  it('names the bot from the app-slug file the App setup writes', async () => {
+    withSlugFile('overdeck-agent');
+    await expect(resolveAppBotLogin()).resolves.toBe('overdeck-agent[bot]');
+    expect(getBotIdentity().name).toBe('overdeck-agent[bot]');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('asks GitHub for the App slug under its JWT when the file is missing, once', async () => {
+    withSlugFile(null);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ id: 4205044, slug: 'overdeck-agent' }), { status: 200 }));
+    await expect(resolveAppBotLogin()).resolves.toBe('overdeck-agent[bot]');
+    await expect(resolveAppBotLogin()).resolves.toBe('overdeck-agent[bot]');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]![0]).toBe('https://api.github.com/app');
+    expect((fetchMock.mock.calls[0]![1] as RequestInit).headers).toEqual(expect.objectContaining({
+      Authorization: expect.stringMatching(/^Bearer /),
+    }));
+  });
+
+  it('fails closed, and retries later, when the configured App slug cannot be read', async () => {
+    withSlugFile(null);
+    fetchMock.mockResolvedValueOnce(new Response('Bad credentials', { status: 401 }));
+    await expect(resolveAppBotLogin()).rejects.toThrow('GET /app failed: 401');
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ slug: 'overdeck-agent' }), { status: 200 }));
+    await expect(resolveAppBotLogin()).resolves.toBe('overdeck-agent[bot]');
+  });
+
+  it('refuses a slug that is not one', async () => {
+    withSlugFile('not a slug; rm -rf');
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ slug: '' }), { status: 200 }));
+    await expect(resolveAppBotLogin()).rejects.toThrow('no slug');
+  });
+
+  it('is null without an App', async () => {
+    existsSyncMock.mockReturnValue(false);
+    await expect(resolveAppBotLogin()).resolves.toBeNull();
+  });
+});
 
 describe('getMergeBackendStatus', () => {
   beforeEach(() => {

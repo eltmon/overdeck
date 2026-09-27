@@ -30,7 +30,7 @@ import { getAgentState } from '../../../lib/agents/agent-state-read.js';
 import { formatUatMarker } from '../../../lib/cloister/uat-verdict-marker.js';
 import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/services/pr-tab-cache.js';
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
-import { reviewedHeadFromRunId, reviewVerdictRefusal, verdictCallerFromEnv } from '../../../lib/cloister/verdict-caller.js';
+import { readAncestorAgentIds, reviewedHeadFromRunId, reviewVerdictRefusal, verdictCallerFromEnv } from '../../../lib/cloister/verdict-caller.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
 import { appendPipelineEntry } from '../../../lib/cloister/pipeline-journal.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
@@ -213,7 +213,9 @@ export async function doneCommand(
     // verdict only as the issue's review session, and never reverses an
     // approval proven to stand on the exact head, unless the operator asked
     // for this run. Unproven means the verdict goes through.
-    const caller = verdictCallerFromEnv();
+    // #4066 review: an agent's harness ancestors name it even when its own
+    // environment dropped or faked OVERDECK_AGENT_ID.
+    const caller = verdictCallerFromEnv(process.env, readAncestorAgentIds);
     const facts = caller.kind === 'agent' ? await getPrFacts(normalizedIssueId) : undefined;
     let guardFacts: Pick<PrFacts, 'approved' | 'approvedAtHead' | 'headSha'> | null = facts ?? null;
     let operatorRequested = false;

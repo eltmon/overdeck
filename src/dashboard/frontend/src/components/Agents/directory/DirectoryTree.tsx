@@ -37,7 +37,7 @@ export const DirectoryTree = forwardRef<HTMLDivElement, DirectoryTreeProps>(func
   ref,
 ) {
   return (
-    <div className="flex min-h-0 flex-col border-r border-border" data-component="directory-tree-pane">
+    <div className="flex min-h-0 flex-1 flex-col" data-component="directory-tree-pane">
       <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
         <span className="text-[12px] font-medium text-foreground">Locations</span>
         <ViewToggle
@@ -47,6 +47,9 @@ export const DirectoryTree = forwardRef<HTMLDivElement, DirectoryTreeProps>(func
           onChange={(value) => onWindowChange(value === '168' ? 168 : 24)}
         />
       </div>
+      <p data-component="directory-window-note" className="shrink-0 border-b border-border px-3 py-1.5 text-[11px] text-muted-foreground">
+        Live agents always show. Finished ones show if active in the last {windowHours === 168 ? '7 days' : '24 hours'}.
+      </p>
       <div
         ref={ref}
         role="tree"
@@ -100,7 +103,11 @@ export const DirectoryTree = forwardRef<HTMLDivElement, DirectoryTreeProps>(func
                 <span className={cn(node.kind === 'issue' && 'font-mono-ui text-[11px]')}>{node.label}</span>
                 {node.title && <span className="text-muted-foreground"> · {node.title}</span>}
               </span>
-              <span className="shrink-0 font-mono-ui text-[11px] tabular-nums text-muted-foreground">
+              <span
+                title={`${node.liveCount} live of ${node.totalCount} shown`}
+                aria-label={`${node.liveCount} live of ${node.totalCount} shown`}
+                className="shrink-0 font-mono-ui text-[11px] tabular-nums text-muted-foreground"
+              >
                 {node.liveCount}/{node.totalCount}
               </span>
             </div>

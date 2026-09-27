@@ -11,7 +11,7 @@ import { hostTerminalBackendName } from '../terminal-backends/select.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
-import { getOverdeckHome } from '../paths.js';
+import { getOverdeckHome, packageRoot } from '../paths.js';
 import { getProviderForModel } from '../providers.js';
 import { writePtyToken } from '../pty-token.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
@@ -348,10 +348,9 @@ export async function writeChannelsBridgeMcpConfig(
   // lives in src/lib/channels/ and is executed directly via `bun run`
   // (Bun runs TypeScript without pre-compilation). We must point at the
   // source, not a dist copy, because the build does not copy the bridge
-  // script into the bundle output.
-  const here = dirname(import.meta.url.replace('file://', ''));
-  const projectRoot = join(here, '..', '..');
-  const repoBridgePath = join(projectRoot, 'src', 'lib', 'channels', 'overdeck-bridge.ts');
+  // script into the bundle output. `packageRoot`, not a walk up from this
+  // module: the bundler places this code in chunks at different depths.
+  const repoBridgePath = join(packageRoot, 'src', 'lib', 'channels', 'overdeck-bridge.ts');
   const mcpConfig = {
     mcpServers: {
       'overdeck-bridge': {

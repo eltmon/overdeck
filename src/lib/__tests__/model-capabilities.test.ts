@@ -49,7 +49,7 @@ describe('model capabilities', () => {
   // PAN-3057: the harness pin and the capability table are one number. If these
   // drift again, the dashboard meter and the Deacon's proactive compaction score
   // GPT-5.6 agents against a window the harness was never given.
-  it.each(['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
+  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
     'feeds the same window to the harness env exports and the capability table for %s',
     async (model) => {
       const { getClaudeCodeContextPolicyForModel } = await import('../agents/provider-env.js');
@@ -94,12 +94,38 @@ describe('model capabilities', () => {
     expect(pricing.cacheReadPer1k).toBe(0.001);
   });
 
-  // No [372k] opt-in variant ships for astra: the 372K pin was measured on
-  // gpt-5.6-sol only. Guard against someone adding the id without measuring.
-  it('does not surface a gpt-6-astra[372k] variant', async () => {
+  // gpt-6-sol / gpt-6-luna (2026-09-22): Codex 0.157.1 `codex debug models`
+  // reports context_window 272000, max_context_window 872000, supported_in_api
+  // true. Pricing per developers.openai.com/api/docs/models/gpt-6-sol and
+  // /gpt-6-luna: Sol $2 in / $0.20 cached / $10 out, Luna $0.10 / $0.01 / $0.50,
+  // with the same >272K-input 2x/1.5x tier as the GPT-5.6 family.
+  it.each([
+    ['gpt-6-sol', 'GPT-6 Sol', 0.002, 0.0002, 0.01],
+    ['gpt-6-luna', 'GPT-6 Luna', 0.0001, 0.00001, 0.0005],
+  ] as const)('registers %s against the openai provider with the 272K billing-tier pin', async (model, displayName, input, cached, output) => {
+    const { getProviderForModel } = await import('../providers.js');
+    const { getPricing } = await import('../cost.js');
+
+    expect(getProviderForModel(model).name).toBe('openai');
+
+    const capability = MODEL_CAPABILITIES[model];
+    expect(capability.displayName).toBe(displayName);
+    expect(capability.contextWindow).toBe(CLIPROXY_GPT56_CONTEXT_WINDOW);
+    expect(capability.maxOutputTokens).toBe(128_000);
+    expect(capability.effortLevels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+
+    const pricing = getPricing('openai', model)!;
+    expect(pricing.inputPer1k).toBe(input);
+    expect(pricing.cacheReadPer1k).toBe(cached);
+    expect(pricing.outputPer1k).toBe(output);
+  });
+
+  // No [372k] opt-in variant ships for the GPT-6 family: the 372K pin was
+  // measured on gpt-5.6-sol only. Guard against adding the id without measuring.
+  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna'])('does not surface a %s[372k] variant', async (model) => {
     const { GPT56_LONG_CONTEXT_VARIANTS } = await import('../model-context-windows.js');
-    expect(Object.keys(GPT56_LONG_CONTEXT_VARIANTS)).not.toContain('gpt-6-astra[372k]');
-    expect((MODEL_CAPABILITIES as Record<string, unknown>)['gpt-6-astra[372k]']).toBeUndefined();
+    expect(Object.keys(GPT56_LONG_CONTEXT_VARIANTS)).not.toContain(`${model}[372k]`);
+    expect((MODEL_CAPABILITIES as Record<string, unknown>)[`${model}[372k]`]).toBeUndefined();
   });
 
   it('exposes QuantumLlama capabilities with spec display names and windows (PAN-3252)', () => {

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   messageAgent: vi.fn(),
   postMergeLifecycle: vi.fn(),
   rebaseFeatureBranch: vi.fn(),
+  reportCommitStatus: vi.fn(async () => undefined),
   sessionExists: vi.fn(),
   setMergeRun: vi.fn(),
 }));
@@ -80,7 +81,7 @@ vi.mock('../../../../../lib/github-app.js', () => ({
   isGitHubAppConfigured: vi.fn(() => true),
   isIntegrationPermissionError: vi.fn(() => false),
   parsePullRequestRef: vi.fn(() => ({ owner: 'eltmon', repo: 'overdeck', number: 3102 })),
-  reportCommitStatus: vi.fn(async () => undefined),
+  reportCommitStatus: (...args: unknown[]) => mocks.reportCommitStatus(...args),
   verifyAppCanMerge: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../../../../../lib/merge-set.js', () => ({
@@ -156,7 +157,7 @@ describe('triggerMerge server rebase escalation', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     mocks.existsSync.mockReturnValue(true);
-    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110' } });
+    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110', url: PR_URL } });
     mocks.getPullRequestState.mockResolvedValue(pullRequestState());
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, newHead: HEAD_SHA }));
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
@@ -220,12 +221,45 @@ describe('triggerMerge server rebase escalation', () => {
     try {
       const result = await triggerMerge('PAN-3110');
       expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
-      expect(mocks.rebaseFeatureBranch).toHaveBeenCalledWith('/workspace/feature-pan-3110', 'feature/pan-3110', 'main', 'PAN-3110');
+      expect(mocks.rebaseFeatureBranch).toHaveBeenCalledWith('/workspace/feature-pan-3110', 'feature/pan-3110', 'main', 'PAN-3110', {});
       expect(mocks.messageAgent).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Could not determine whether feature/pan-3110 contains origin/main'));
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  // #4066 review: a manual merge of an up-to-date branch lands the branch as
+  // it is, so it must still be the head the merge gate passed.
+  it('refuses a manual merge when the up-to-date branch moved after the merge gate passed', async () => {
+    const PUSHED = 'd'.repeat(40);
+    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110', headSha: HEAD_SHA, url: PR_URL } });
+    mocks.execFile.mockImplementation(async (file, args) => {
+      if (file === 'gh' && args[0] === 'pr' && args[1] === 'list') return { stdout: JSON.stringify([{ url: PR_URL, state: 'OPEN' }]), stderr: '' };
+      if (file === 'git' && args[0] === 'rev-parse') return { stdout: `${PUSHED}\n`, stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409 }));
+    expect(result.error).toContain(`the PR head moved to ${PUSHED.slice(0, 12)}`);
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+  });
+
+  it('pins a manual up-to-date merge to the head the merge gate passed', async () => {
+    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110', headSha: HEAD_SHA, url: PR_URL } });
+    mocks.execFile.mockImplementation(async (file, args) => {
+      if (file === 'gh' && args[0] === 'pr' && args[1] === 'list') return { stdout: JSON.stringify([{ url: PR_URL, state: 'OPEN' }]), stderr: '' };
+      if (file === 'git' && args[0] === 'rev-parse') return { stdout: `${HEAD_SHA}\n`, stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+    expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: HEAD_SHA }));
   });
 
   it('engages the work agent after a server-side conflict', async () => {
@@ -242,6 +276,115 @@ describe('triggerMerge server rebase escalation', () => {
     expect(result).toEqual(expect.objectContaining({ success: false }));
     expect(result).not.toHaveProperty('retryable');
     expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ phase: 'failed' }));
+  });
+
+  // #4066 review: an automatic merge rebases exactly the approved head, on
+  // the server, and merges the commit that rebase produced.
+  describe('an automatic merge', () => {
+    const REBASED = 'c'.repeat(40);
+    const gitHeads = (worktree: string, remote: string) => {
+      mocks.evaluateIssueMergeGate.mockResolvedValue({
+        ready: true, facts: { headBranch: 'feature/pan-3110', headSha: HEAD_SHA, url: PR_URL },
+      });
+      mocks.execFile.mockImplementation(async (file, args) => {
+        if (file === 'gh' && args[0] === 'pr' && args[1] === 'list') return { stdout: JSON.stringify([{ url: PR_URL, state: 'OPEN' }]), stderr: '' };
+        if (file === 'git' && args[0] === 'merge-base') throw new Error('branch is behind');
+        if (file === 'git' && args[0] === 'rev-parse') return { stdout: `${args[1] === 'HEAD' ? worktree : remote}\n`, stderr: '' };
+        return { stdout: '', stderr: '' };
+      });
+    };
+
+    it('rebases the approved head on the server and pins the merge to the rebase', async () => {
+      gitHeads(HEAD_SHA, HEAD_SHA);
+      mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, newHead: REBASED }));
+
+      const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+      expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+      expect(mocks.rebaseFeatureBranch).toHaveBeenCalledWith(
+        expect.any(String), 'feature/pan-3110', 'main', 'PAN-3110', { expectedHead: HEAD_SHA },
+      );
+      expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: REBASED }));
+    });
+
+    it('never verifies or pins a push that lands after the start check on an up-to-date branch (#4066 review, R3-1)', async () => {
+      // The approved head already contains main, so `merge-base` succeeds. The
+      // start check reads the PR branch at the approved head; the agent then
+      // pushes X, a child of it, and every later read of the branch sees X.
+      const PUSHED = 'd'.repeat(40);
+      gitHeads(HEAD_SHA, HEAD_SHA);
+      let remoteReads = 0;
+      mocks.execFile.mockImplementation(async (file, args) => {
+        if (file === 'gh' && args[0] === 'pr' && args[1] === 'list') return { stdout: JSON.stringify([{ url: PR_URL, state: 'OPEN' }]), stderr: '' };
+        if (file === 'git' && args[0] === 'merge-base') return { stdout: '', stderr: '' };
+        if (file === 'git' && args[0] === 'rev-parse' && args[1] === 'HEAD') return { stdout: `${HEAD_SHA}\n`, stderr: '' };
+        if (file === 'git' && args[0] === 'rev-parse') {
+          remoteReads += 1;
+          return { stdout: `${remoteReads === 1 ? HEAD_SHA : PUSHED}\n`, stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+      mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, skipped: true, newHead: HEAD_SHA }));
+
+      const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+      expect(mocks.mergeReviewArtifact).not.toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: PUSHED }));
+      expect(mocks.reportCommitStatus).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), PUSHED, expect.anything(), expect.anything(), expect.anything());
+      expect(mocks.rebaseFeatureBranch).toHaveBeenCalledWith(
+        expect.any(String), 'feature/pan-3110', 'main', 'PAN-3110', { expectedHead: HEAD_SHA },
+      );
+      expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
+      expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: HEAD_SHA }));
+    });
+
+    it('refuses to start when a push landed on the PR branch after the approval', async () => {
+      gitHeads(HEAD_SHA, 'e'.repeat(40));
+
+      const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+      expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409 }));
+      expect(result.error).toContain('the PR branch is at');
+      expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
+      expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+    });
+
+    it('retries, never fails for good, when the start check cannot read git (#4066 review, F1)', async () => {
+      gitHeads(HEAD_SHA, HEAD_SHA);
+      const heads = mocks.execFile.getMockImplementation()!;
+      mocks.execFile.mockImplementation(async (file, args, options) => {
+        if (file === 'git' && args[0] === 'fetch') throw new Error('Could not resolve host: github.com');
+        return heads(file, args, options);
+      });
+
+      const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+      expect(result).toEqual(expect.objectContaining({ success: false, retryable: true }));
+      expect(result.error).toContain('Could not resolve host');
+      expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
+      expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+    });
+
+    it('refuses to start when the worktree holds a commit past the approved head', async () => {
+      gitHeads('f'.repeat(40), HEAD_SHA);
+
+      const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+      expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409 }));
+      expect(result.error).toContain('worktree HEAD');
+      expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
+    });
+
+    it('never hands a failed rebase to the work agent, whose push would merge unreviewed', async () => {
+      gitHeads(HEAD_SHA, HEAD_SHA);
+      mocks.rebaseFeatureBranch.mockReturnValue(Effect.fail({ message: 'conflict', conflictedFiles: ['src/conflict.ts'] }));
+
+      const result = await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+      expect(mocks.messageAgent).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ success: false }));
+      expect(result).not.toHaveProperty('retryable');
+      expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+    });
   });
 
   it('queues a retry when the agent stops after a non-conflict failure', async () => {

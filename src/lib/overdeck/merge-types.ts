@@ -26,6 +26,8 @@ export interface PendingAutoMerge {
   failureReason?: string;
   cancelledAt?: string;
   cancelledBy?: string;
+  /** #3983: the PR head the merge gate judged ready when this row was scheduled. */
+  headSha?: string;
 }
 
 export type UatGenerationStatus =

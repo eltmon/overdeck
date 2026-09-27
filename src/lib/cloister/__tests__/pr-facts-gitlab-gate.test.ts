@@ -4,11 +4,25 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { evaluateMergeReadiness, getPrFacts, resetPrFactsCache, type GitLabMrView, type PrFactsDeps } from '../pr-facts.js';
+import {
+  evaluateMergeReadiness,
+  getPrFacts,
+  resetPrFactsCache,
+  type GitLabMrApprovals,
+  type GitLabMrView,
+  type PrFactsDeps,
+} from '../pr-facts.js';
 
 const WEB_URL = 'https://gitlab.com/mind-your-now/frontend/-/merge_requests/77';
 
-function deps(view: () => Promise<GitLabMrView>): PrFactsDeps {
+const APPROVED: GitLabMrApprovals = {
+  approved: true, approvals_required: 0, approvals_left: 0, approved_by: [{ user: { username: 'eltmon' } }],
+};
+
+function deps(
+  view: () => Promise<GitLabMrView>,
+  approvals: () => Promise<GitLabMrApprovals> = async () => APPROVED,
+): PrFactsDeps {
   return {
     fetchGitHubPr: async (issueId) => ({ issueId, pr: null }),
     resolveRepos: () => [{
@@ -19,6 +33,7 @@ function deps(view: () => Promise<GitLabMrView>): PrFactsDeps {
     }] as never,
     listGitLabMrs: async () => [{ iid: 77, source_branch: 'feature/min-77', web_url: WEB_URL, state: 'opened' }] as never,
     viewGitLabMr: view,
+    readGitLabApprovals: approvals,
   };
 }
 
@@ -29,7 +44,7 @@ const MERGEABLE_VIEW: GitLabMrView = {
   sha: 'f00d',
   source_branch: 'feature/min-77',
   detailed_merge_status: 'mergeable',
-  approved: true,
+  head_pipeline: { status: 'success' },
 };
 
 describe('GitLab MR through the merge gate', () => {
@@ -45,6 +60,32 @@ describe('GitLab MR through the merge gate', () => {
     resetPrFactsCache();
     const facts = await getPrFacts('MIN-77', deps(async () => ({ ...MERGEABLE_VIEW, head_pipeline: { status: 'failed' } })));
     expect(evaluateMergeReadiness(facts).ready).toBe(false);
+  });
+
+  // #4066 review: the MYN backend requires 0 approvals, so GitLab's own
+  // `approved` is true and the merge status `mergeable` for every green MR.
+  it('refuses a green, mergeable MR nobody approved (approvals_required: 0, approved_by: [])', async () => {
+    resetPrFactsCache();
+    const facts = await getPrFacts('MIN-77', deps(
+      async () => MERGEABLE_VIEW,
+      async () => ({ approved: true, approvals_required: 0, approvals_left: 0, approved_by: [] }),
+    ));
+    expect(facts.approved).toBe(false);
+    expect(evaluateMergeReadiness(facts, { requireApprovalAtHead: true })).toEqual({ ready: false, reason: 'PR is not approved' });
+  });
+
+  it('merges a green MR someone approved with `glab mr approve`', async () => {
+    resetPrFactsCache();
+    const facts = await getPrFacts('MIN-77', deps(async () => MERGEABLE_VIEW));
+    expect(facts.approved).toBe(true);
+    expect(evaluateMergeReadiness(facts, { requireApprovalAtHead: true })).toEqual({ ready: true });
+  });
+
+  it('names a failed approvals read as the refusal', async () => {
+    resetPrFactsCache();
+    const facts = await getPrFacts('MIN-77', deps(async () => MERGEABLE_VIEW, async () => { throw new Error('glab: 403'); }));
+    expect(facts.approved).toBe(false);
+    expect(evaluateMergeReadiness(facts).reason).toBe('GitLab MR approvals read failed for !77: glab: 403');
   });
 
   it('names a failed MR view as the refusal instead of a missing approval', async () => {

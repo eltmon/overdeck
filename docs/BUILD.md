@@ -83,6 +83,7 @@ All TypeScript bundling uses [tsdown](https://tsdown.dev/) (powered by Rolldown,
 - **`shims: true`**: Auto-injects `createRequire`, `__filename`, `__dirname` for ESM→CJS interop
 - **`deps.alwaysBundle`**: Workspace packages (`@overdeck/*`) are bundled into the output
 - **`clean: true`**: Wipes `dist/` before building (dashboard build runs after)
+- **Lazy command loading (PAN-4195)**: `dist/cli/index.js` statically imports only Commander, chalk and the telemetry lifecycle. Command implementations load when their command runs: commands defined in `src/cli/index.ts` use `lazyAction(() => import('./commands/x.js'), 'xCommand')` (`src/cli/lazy-action.ts`), and group modules (`registerXCommands`/`createXCommand`) are listed in `src/cli/command-groups.ts` and registered only when argv invokes one of their names (`src/cli/command-group-loader.ts`; `pan admin` nests its own table). Root `--help`, `help` and unknown names register every group, so help output is unchanged. Don't add a static import of a command module to the entry: `tests/unit/cli/startup-lazy-load.test.ts` traces `pan --version` with `tests/helpers/module-trace.mjs` and fails on command-only packages or a module count over budget. Lazily loaded modules land in `dist/` chunks, not `dist/cli/`, so resolve package files with `packageRoot` from `src/lib/paths.ts`, never a relative walk from `import.meta.url`.
 
 **Dashboard Server** — `src/dashboard/server/tsdown.config.ts`
 - **Entry point**: `main.ts` → `dist/dashboard/server.js`
@@ -235,6 +236,20 @@ Each `dist:*` command also stamps the generated `latest*.yml`/`beta*.yml` manife
 - **Output**: `dist-electron/main.js`, `dist-electron/preload.js`
 - **`deps.neverBundle: ["electron"]`** — Electron is provided by the runtime, never bundled
 - **`deps.alwaysBundle`**: `@overdeck/*` workspace packages (contracts etc.)
+
+### macOS Signing and Notarization
+
+Packaging uses electron-builder 26, with Electron exact-pinned to `40.10.6` in `apps/desktop/package.json` (an exact version, not a range, because `bun update` does not move exact pins — bumping Electron requires editing the pin by hand).
+
+`build.mac` sets `notarize: false`, which disables electron-builder's built-in notarization. Notarization instead runs in the `afterSign` hook (`apps/desktop/scripts/notarize.cjs`), and only when all three App Store Connect API-key environment variables are present:
+
+- `APPLE_API_KEY` — path to the API key `.p8` file
+- `APPLE_API_KEY_ID` — the key's Key ID
+- `APPLE_API_ISSUER` — the API key Issuer ID
+
+These are set by the macOS runner in `.github/workflows/release.yml`. Without them the hook logs a skip and the app still ships, signed but not notarized (downloaders see a Gatekeeper warning).
+
+`@electron/notarize` is pinned to the 3.x line, which is ESM-only; the `.cjs` hook loads it with a plain `require("@electron/notarize")`, which works via Node's `require(esm)` support on Node >= 22.12 (verified under 22.22 — no `await import()` fallback is needed). `notarize()` staples the ticket itself; the hook's extra `xcrun stapler staple` call afterward is redundant but harmless.
 
 ### Native Addon Rebuild
 

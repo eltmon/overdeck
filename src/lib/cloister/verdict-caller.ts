@@ -17,16 +17,81 @@
  * gives no such proof, so there the guard never refuses a rejection.
  */
 
+import { readFileSync } from 'node:fs';
+
 import type { PrFacts } from './pr-facts.js';
 
 export type VerdictCaller =
   | { readonly kind: 'operator'; readonly id: string | null }
   | { readonly kind: 'agent'; readonly id: string };
 
-/** Classify the process recording a verdict from its environment. */
-export function verdictCallerFromEnv(env: NodeJS.ProcessEnv = process.env): VerdictCaller {
+/** The caller id for a managed pane that dropped `OVERDECK_AGENT_ID` (#4066 review). */
+export const UNIDENTIFIED_PANE_AGENT_ID = 'unidentified-managed-pane';
+
+const MAX_ANCESTORS = 32;
+
+/**
+ * The `OVERDECK_AGENT_ID` each ancestor process was started with, nearest
+ * first, from `/proc/<pid>/environ` (Linux). A process cannot rewrite the
+ * environment its ancestors were started with, so an agent that unsets or
+ * fakes its own `OVERDECK_AGENT_ID` still runs under its harness process,
+ * which carries the real one. Empty where `/proc` is unreadable.
+ */
+export function readAncestorAgentIds(startPid: number = process.ppid): string[] {
+  const ids: string[] = [];
+  let pid = startPid;
+  for (let depth = 0; depth < MAX_ANCESTORS && pid > 1; depth += 1) {
+    let stat: string;
+    try {
+      const environ = readFileSync(`/proc/${pid}/environ`, 'utf-8');
+      const entry = environ.split('\0').find((pair) => pair.startsWith('OVERDECK_AGENT_ID='));
+      const id = entry?.slice('OVERDECK_AGENT_ID='.length).trim();
+      if (id) ids.push(id);
+      stat = readFileSync(`/proc/${pid}/stat`, 'utf-8');
+    } catch {
+      break;
+    }
+    // `pid (comm) state ppid …`; comm may contain spaces or parentheses.
+    const ppid = Number.parseInt(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1] ?? '', 10);
+    if (!Number.isFinite(ppid) || ppid === pid) break;
+    pid = ppid;
+  }
+  return ids;
+}
+
+/**
+ * Classify the process recording a verdict.
+ *
+ * #4066 review: an agent that holds the operator's shell can drop or fake its
+ * own `OVERDECK_AGENT_ID`, so two more signals are read first:
+ *
+ *   - an ancestor process started with a non-`conv-` `OVERDECK_AGENT_ID` makes
+ *     the caller that agent, whatever its own environment says;
+ *   - `OVERDECK_ISSUE_ID` or `OVERDECK_SESSION_TYPE` without an agent id is a
+ *     managed pane that unset its identity, never an operator shell.
+ *
+ * Neither is proof against an agent that daemonizes out of its harness's
+ * process tree and scrubs all three variables; see docs/PIPELINE-GATES.md.
+ */
+export function verdictCallerFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  ancestorAgentIds: () => readonly string[] = readAncestorAgentIds,
+): VerdictCaller {
+  let ancestors: readonly string[] = [];
+  try {
+    ancestors = ancestorAgentIds();
+  } catch {
+    ancestors = [];
+  }
+  const ancestorAgent = ancestors.find((ancestorId) => !ancestorId.startsWith('conv-'));
+  if (ancestorAgent) return { kind: 'agent', id: ancestorAgent };
   const id = env.OVERDECK_AGENT_ID?.trim();
-  if (!id) return { kind: 'operator', id: null };
+  if (!id) {
+    if (env.OVERDECK_ISSUE_ID?.trim() || env.OVERDECK_SESSION_TYPE?.trim()) {
+      return { kind: 'agent', id: UNIDENTIFIED_PANE_AGENT_ID };
+    }
+    return { kind: 'operator', id: null };
+  }
   if (id.startsWith('conv-')) return { kind: 'operator', id };
   return { kind: 'agent', id };
 }

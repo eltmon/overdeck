@@ -5,9 +5,7 @@
  */
 
 import { Command } from 'commander';
-import { statusCommand } from './status.js';
-import { startCommand } from './start.js';
-import { stopCommand } from './stop.js';
+import { lazyAction } from '../../lazy-action.js';
 
 export function registerCloisterCommands(program: Command): void {
   const cloister = program
@@ -19,23 +17,23 @@ export function registerCloisterCommands(program: Command): void {
     .command('status')
     .description('Show Cloister service status and agent health')
     .option('--json', 'Output in JSON format')
-    .action(statusCommand);
+    .action(lazyAction(() => import('./status.js'), 'statusCommand'));
 
   // pan cloister start
   cloister
     .command('start')
     .description('Start Cloister monitoring service')
-    .action(startCommand);
+    .action(lazyAction(() => import('./start.js'), 'startCommand'));
 
   // pan cloister stop
   cloister
     .command('stop')
     .description('Stop Cloister monitoring (agents continue running)')
-    .action(stopCommand);
+    .action(lazyAction(() => import('./stop.js'), 'stopCommand'));
 
   // pan cloister emergency-stop
   cloister
     .command('emergency-stop')
     .description('Emergency stop - kill ALL agents immediately')
-    .action(() => stopCommand({ emergency: true }));
+    .action(async () => (await import('./stop.js')).stopCommand({ emergency: true }));
 }

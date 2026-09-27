@@ -9,8 +9,7 @@
  */
 
 import type { Command } from 'commander';
-import { reloadCommand } from './reload.js';
-import { restartApproveCommand, restartCommand } from './restart.js';
+import { lazyAction } from '../lazy-action.js';
 
 /** Defines `pan up` without its action; the caller attaches the action. */
 export function defineUpCommand(program: Command): Command {
@@ -41,7 +40,7 @@ export function registerReloadAndRestartCommands(program: Command): void {
     .option('--no-deacon', 'Refused: a Deacon-off dashboard is a peer and cannot hold the host dashboard port')
     .option('--resume', 'Enable agent auto-resume on the reloaded dashboard (default: keep the running dashboard\'s resume gate)')
     .option('--no-resume', 'Disable agent auto-resume on the reloaded dashboard (default: keep the running dashboard\'s resume gate)')
-    .action(reloadCommand);
+    .action(lazyAction(() => import('./reload.js'), 'reloadCommand'));
 
   // Scoped restart: `pan restart` defaults to the dashboard only and never
   // touches CLIProxy / Traefik / TLDR. Use `--full` for the nuclear option.
@@ -64,7 +63,7 @@ export function registerReloadAndRestartCommands(program: Command): void {
     .option('--resume', 'Enable agent auto-resume on boot — auto-resume is ON by default (flag kept for explicitness)')
     .option('--no-resume', 'Disable agent auto-resume on restart (opt out of the default-on auto-resume)')
     .option('--now', 'Skip the operator-approval wait: approve everything already waiting, then restart the dashboard immediately')
-    .action(restartCommand);
+    .action(lazyAction(() => import('./restart.js'), 'restartCommand'));
 
   // Dashboard, reload and post-merge deploy restarts wait for operator approval so
   // they cannot interrupt live work. This releases whatever is waiting — the same
@@ -73,6 +72,6 @@ export function registerReloadAndRestartCommands(program: Command): void {
     .command('approve')
     .description('Approve every dashboard restart request that is waiting for the operator')
     .action(async () => {
-      await restartApproveCommand();
+      await (await import('./restart.js')).restartApproveCommand();
     });
 }

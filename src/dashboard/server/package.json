@@ -13,7 +13,7 @@
     "effect": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node": "catalog:",
-    "@lydell/node-pty": "1.2.0-beta.14",
+    "@lydell/node-pty": "1.2.0-beta.15",
     "@linear/sdk": "^29.0.0"
   },
   "optionalDependencies": {
@@ -21,9 +21,9 @@
   },
   "devDependencies": {
     "@types/bun": "catalog:",
-    "@types/node": "^20.10.0",
-    "tsdown": "^0.21.7",
-    "tsx": "^4.7.0",
+    "@types/node": "^20.19.43",
+    "tsdown": "^0.21.10",
+    "tsx": "^4.23.15",
     "typescript": "catalog:"
   }
 }

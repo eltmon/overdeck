@@ -98,6 +98,41 @@ describe('work-agent-lifecycle', () => {
     sessionExistsSpy.mockRestore();
   });
 
+  it('allows a troubled agent to start fresh only with allowTroubledForce (PAN-4211)', async () => {
+    const agentId = getUniqueAgentId('troubled-force');
+    const workspace = join('/tmp', agentId);
+    mkdirSync(workspace, { recursive: true });
+
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-4211',
+      workspace,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+      troubled: true,
+      consecutiveFailures: 3,
+    });
+    saveAgentRuntimeState(agentId, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+    saveSessionId(agentId, 'session-123');
+
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
+    const transcriptExistsSpy = vi.spyOn(claudeStorage, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const lifecycle = await getWorkAgentLifecycleState(agentId);
+
+    expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(true);
+    await expect(assertCanStartFresh(agentId)).rejects.toThrow();
+    await expect(assertCanStartFresh(agentId, { allowTroubledForce: true })).resolves.toBeDefined();
+
+    transcriptExistsSpy.mockRestore();
+    sessionExistsSpy.mockRestore();
+  });
+
   it('requires explicit --fresh to replace a handed-off agent saved session (PAN-3583)', async () => {
     const agentId = getUniqueAgentId('handoff-fresh');
     const workspace = join('/tmp', agentId);

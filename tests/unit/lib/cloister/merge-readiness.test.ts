@@ -24,6 +24,7 @@ function facts(overrides: Partial<PrFacts> = {}): PrFacts {
     headBranch: 'feature/pan-1',
     reviewDecision: 'APPROVED',
     approved: true,
+    approvedAtHead: true,
     changesRequested: false,
     mergeable: true,
     mergeableState: 'clean',

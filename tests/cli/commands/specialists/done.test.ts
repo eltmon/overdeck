@@ -61,6 +61,14 @@ vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
   forgeApprovalAtHead: mockForgeApprovalAtHead,
 }));
 
+// #4066 review: the caller is also read from ancestor processes. The suite
+// must not inherit the runner's own harness identity.
+const ancestors = vi.hoisted(() => ({ ids: [] as string[] }));
+vi.mock('../../../../src/lib/cloister/verdict-caller.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../src/lib/cloister/verdict-caller.js')>(),
+  readAncestorAgentIds: () => ancestors.ids,
+}));
+
 vi.mock('../../../../src/lib/agents/agent-state-read.js', () => ({
   getAgentState: mockGetAgentState,
 }));
@@ -101,6 +109,9 @@ describe('specialists done command', () => {
     // #3853: the caller's identity decides the override door; default to an
     // operator shell so the suite does not inherit the runner's agent id.
     vi.stubEnv('OVERDECK_AGENT_ID', '');
+    vi.stubEnv('OVERDECK_ISSUE_ID', '');
+    vi.stubEnv('OVERDECK_SESSION_TYPE', '');
+    ancestors.ids = [];
     mockGetAgentState.mockReturnValue(null);
     mockForgeApprovalAtHead.mockResolvedValue(undefined);
 
@@ -405,6 +416,44 @@ describe('specialists done command', () => {
 
     it('refuses a non-review agent session recording any review verdict', async () => {
       vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059');
+      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'self-approval' });
+
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+    });
+
+    // #4066 review: an agent that unsets or fakes OVERDECK_AGENT_ID is still
+    // an agent. Its harness process, an ancestor, carries the real id.
+    it('refuses an APPROVED verdict from a work agent that unset OVERDECK_AGENT_ID', async () => {
+      ancestors.ids = ['agent-pan-1059'];
+      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'self-approval', runId: 'agent-pan-1059-review-abcdef12' });
+
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+    });
+
+    it('refuses a work agent that fakes the review session id or a conv-* id', async () => {
+      ancestors.ids = ['agent-pan-1059', 'conv-20260916-2706'];
+      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+      for (const faked of ['agent-pan-1059-review', 'conv-20260916-2706']) {
+        vi.stubEnv('OVERDECK_AGENT_ID', faked);
+        await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'self-approval' });
+      }
+
+      expect(exit).toHaveBeenCalledTimes(2);
+      expect(mockPostReviewVerdict).not.toHaveBeenCalled();
+    });
+
+    it('refuses a managed pane that unset its agent id but kept its issue id', async () => {
+      vi.stubEnv('OVERDECK_ISSUE_ID', 'PAN-1059');
       const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
       const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 

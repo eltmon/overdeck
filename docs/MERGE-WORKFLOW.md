@@ -54,8 +54,13 @@ verdict, every time it's asked.
 3. **Review and test.** The four reviewer roles (correctness, security,
    performance, requirements) post PR reviews — approve or request changes.
    Verification (typecheck, lint, tests) runs as check runs on the PR.
-   "Ready" is derived, not stored: approvals in, checks green, forge reports
-   `mergeable: true`. Two more conditions come from the forge too
+   "Ready" is derived, not stored: approved on the head, checks green, forge
+   reports `mergeable: true`. Approval for a merge is bound to the exact head
+   commit (#3983): a trusted reviewer's standing GitHub review approving that
+   commit, or a trusted verdict marker whose `sha=` names it; a marker without
+   `sha=`, one for an older head, or a review from an account the marker rule
+   does not trust, never approves a merge. A GitLab MR needs a named approver
+   in `approved_by`. Two more conditions come from the forge too
    (`cloister/merge-gate.ts`, see
    [PIPELINE-GATES.md](PIPELINE-GATES.md#the-merge-gate-4016-4021-4036)): in a
    `verification.tests: ci` project the CI `test` job must have concluded
@@ -67,11 +72,28 @@ verdict, every time it's asked.
    markers in PR comments (review approval, UAT pass or fail) count only
    from the repository's owners, members and collaborators, or from
    Overdeck's own posting identity; anyone else's are ignored.
-4. **Human clicks the dashboard Merge button** (or `gh pr merge`). The
-   dashboard re-reads readiness from the forge and refuses with the first
-   failing condition (`Cannot merge: …`); the board enables the button on
-   approvals, checks and mergeability alone, so the CI test job and UAT
-   conditions show up as that refusal. Otherwise it:
+4. **Human clicks the dashboard Merge button** (or `gh pr merge`), or the
+   auto-merge executor merges a scheduled entry. Both go through
+   `triggerMerge`, which re-reads readiness from the merge gate alone and
+   refuses with the first failing condition (`Cannot merge: …`); the derived
+   issue state refuses only an issue already merged. The board shows the
+   button on the derived state, whose `ready` applies the gate's own approval
+   rule from the gate's cached answer for the PR head (#4066 review), so the
+   CI test job and UAT conditions show up as that refusal. The gate is bound
+   to the `feature/<issue>` PR the merge lands, and a merge of any other PR is
+   refused. An automatic merge merges only its approved head: directly when
+   the PR is clean and still at it, otherwise through a server rebase of
+   exactly that commit in a server-owned detached worktree, pinned to the
+   result, never through the work agent
+   (see [auto-merge](../configuration/auto-merge.mdx)). A git read that fails
+   while checking where it may start is retried, never counted against that
+   head for good. Automatic merges are refused for polyrepo projects (their
+   merge sets are left to the operator) and for branches that track
+   `.planning/` files (stripping them pushes a head nobody approved); merge
+   those by hand. A manual merge is pinned as well: to the head the gate
+   passed, refused if the PR moved off it before a merge that lands the PR as
+   it is, or to the commit its own rebase or `.planning/` strip produced
+   (see [PIPELINE-GATES](PIPELINE-GATES.md)). Otherwise it:
    - Merges a GitHub-clean PR directly when its head already contains the
      required base and checks are complete.
    - Otherwise runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)`

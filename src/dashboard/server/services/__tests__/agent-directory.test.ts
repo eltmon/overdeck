@@ -2,7 +2,7 @@
  * PAN-3920 W3 — the Agents Directory read model. Every source is injected;
  * nothing touches ~/.overdeck, tmux, Herdr or overdeck.db.
  */
-import type { BackendPane } from '@overdeck/contracts';
+import type { BackendPane, DerivedIssueState, IssueState } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AgentState } from '../../../../lib/agents/agent-state-read.js';
@@ -11,6 +11,7 @@ import { listExternalCandidates, type ExternalDirectorySources } from '../agent-
 import {
   _resetAgentDirectoryForTests,
   buildAgentDirectory,
+  buildLiveAgentDirectory,
   getAgentDirectory,
   type AgentDirectoryDeps,
   type DirectoryConversationRow,
@@ -134,6 +135,15 @@ describe('buildAgentDirectory', () => {
       issueId: 'PAN-1',
       transcript: { route: 'agent', agentId: 'agent-pan-1-slot-2' },
     });
+  });
+
+  it("lists a native agent that is a conversation's own pane once, as the conversation", async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'sequencer-runner', role: 'sequencer', issueId: 'sequencer-runner' })],
+      getBackendPanes: async () => [pane({ id: 'w9:p1', agentId: 'sequencer-runner' })],
+      listConversations: async () => [conversation({ name: 'sequencer-runner', tmuxSession: 'sequencer-runner', isWorking: true })],
+    }));
+    expect(result.entries.map((entry) => entry.id)).toEqual(['conv:sequencer-runner']);
   });
 
   it('never lists conv-* agent dirs as native agents', async () => {
@@ -398,6 +408,125 @@ describe('buildAgentDirectory', () => {
       latestWorkerReportAt: async () => NOW,
     }));
     expect(result.entries[0]!.state).toBe('idle');
+  });
+});
+
+describe('buildAgentDirectory — pause facts (PAN-4197 FR-3)', () => {
+  const entryFor = async (state: AgentState) => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [state],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: state.id, state: 'idle' })],
+    }));
+    return result.entries.find((entry) => entry.id === state.id)!;
+  };
+
+  it('reports an operator pause with its reason and time', async () => {
+    const entry = await entryFor(agent({
+      id: 'agent-pan-1', paused: true, pausedBy: 'operator', pausedReason: 'x', pausedAt: iso(HOUR),
+    }));
+    expect(entry.pause).toEqual({ by: 'operator', reason: 'x', since: iso(HOUR) });
+  });
+
+  it('reports a scheduler yield as a scheduler pause, since the yield time', async () => {
+    const entry = await entryFor(agent({
+      id: 'agent-pan-1', paused: true, yieldedByScheduler: true, yieldedAt: iso(2 * HOUR),
+    }));
+    expect(entry.pause).toEqual({ by: 'scheduler', reason: null, since: iso(2 * HOUR) });
+  });
+
+  it('reports a pause with no operator or scheduler mark as a machine pause', async () => {
+    const entry = await entryFor(agent({ id: 'agent-pan-1', paused: true }));
+    expect(entry.pause).toEqual({ by: 'machine', reason: null, since: null });
+  });
+
+  it('puts no pause key on an unpaused agent, a conversation or a subagent', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1', paused: false })],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: 'agent-pan-1', issue: 'PAN-1' })],
+      listConversations: async () => [conversation({ name: 'alpha' })],
+      listAgentSubagents: async () => [
+        { agentId: 'a1', agentType: 'Explore', description: 'find the route', mtimeMs: NOW - 10_000 },
+      ],
+    }));
+    expect(result.entries.map((entry) => entry.kind).sort()).toEqual(['agent', 'conversation', 'subagent']);
+    for (const entry of result.entries) expect(entry).not.toHaveProperty('pause');
+  });
+});
+
+describe('buildLiveAgentDirectory (PAN-4197 FR-2)', () => {
+  const derived = (states: Record<string, IssueState>) => () =>
+    new Map(Object.entries(states).map(([issueId, state]): [string, DerivedIssueState] => [issueId, { issueId, state }]));
+  const ids = (result: { entries: readonly { id: string }[] }) => result.entries.map((entry) => entry.id).sort();
+
+  it('answers scope live with windowHours 0 and drops a stopped strike of a merged issue', async () => {
+    const result = await buildLiveAgentDirectory(deps({
+      listAgentStates: () => [agent({ id: 'strike-pan-1', role: 'strike', lastActivity: iso(60_000) })],
+      derivedIssueStates: derived({ 'PAN-1': 'merged' }),
+    }));
+    expect(result).toMatchObject({ windowHours: 0, scope: 'live', entries: [] });
+  });
+
+  it('keeps only the newest stopped work agent of an in-review issue, whatever its age', async () => {
+    const result = await buildLiveAgentDirectory(deps({
+      listAgentStates: () => [
+        agent({ id: 'agent-pan-1-old', startedAt: iso(50 * HOUR), lastActivity: iso(49 * HOUR) }),
+        agent({ id: 'agent-pan-1-new', startedAt: iso(40 * HOUR), lastActivity: iso(39 * HOUR) }),
+      ],
+      derivedIssueStates: derived({ 'PAN-1': 'in-review' }),
+    }));
+    expect(ids(result)).toEqual(['agent-pan-1-new']);
+    expect(result.entries[0]!.state).toBe('stopped');
+  });
+
+  it('keeps a paused agent of a working issue and drops one of a closed issue', async () => {
+    const result = await buildLiveAgentDirectory(deps({
+      listAgentStates: () => [
+        agent({ id: 'agent-pan-1', paused: true, pausedBy: 'operator' }),
+        agent({ id: 'agent-pan-2', issueId: 'PAN-2', paused: true, pausedBy: 'operator' }),
+      ],
+      derivedIssueStates: derived({ 'PAN-1': 'working', 'PAN-2': 'closed' }),
+    }));
+    expect(ids(result)).toEqual(['agent-pan-1']);
+  });
+
+  it('keeps a paused agent with no issue', async () => {
+    const result = await buildLiveAgentDirectory(deps({
+      listAgentStates: () => [agent({ id: 'agent-free', issueId: undefined, paused: true })],
+      derivedIssueStates: derived({}),
+    }));
+    expect(ids(result)).toEqual(['agent-free']);
+  });
+
+  it('keeps a working subagent with its live parent and drops a done one', async () => {
+    const result = await buildLiveAgentDirectory(deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1' })],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: 'agent-pan-1', issue: 'PAN-1' })],
+      listAgentSubagents: async () => [
+        { agentId: 'a1', agentType: 'Explore', description: 'find the route', mtimeMs: NOW - 10_000 },
+        { agentId: 'a2', agentType: 'general-purpose', description: 'old', mtimeMs: NOW - 10 * 60_000 },
+      ],
+      derivedIssueStates: derived({ 'PAN-1': 'working' }),
+    }));
+    expect(ids(result)).toEqual(['agent-pan-1', 'sub:agent-pan-1:a1']);
+  });
+
+  it('keeps a live conversation and drops an ended one', async () => {
+    const result = await buildLiveAgentDirectory(deps({
+      listConversations: async () => [
+        conversation({ name: 'alpha' }),
+        conversation({ name: 'beta', sessionAlive: false, endedAt: iso(HOUR), lastActivityAt: iso(HOUR) }),
+      ],
+      derivedIssueStates: derived({}),
+    }));
+    expect(ids(result)).toEqual(['conv:alpha']);
+  });
+
+  it('keeps the window answer unchanged apart from scope window', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1', lastActivity: iso(2 * HOUR) })],
+    }));
+    expect(result).toMatchObject({ windowHours: 24, scope: 'window' });
+    expect(ids(result)).toEqual(['agent-pan-1']);
   });
 });
 

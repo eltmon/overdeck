@@ -90,9 +90,12 @@ export interface IssuePullRequestData {
   body: string;
   /** Optional: absent from the many fixtures that predate the verdict marker. */
   comments?: Array<{
+    /** The comment's GraphQL node id (`IC_…`), by which its author's account type is read. */
+    id?: string;
     body?: string;
     createdAt?: string;
-    author?: { login?: string } | null;
+    /** `__typename` is never from `gh pr view`; `pr-facts` adds it where the trust rule needs it. */
+    author?: { login?: string; __typename?: string | null } | null;
     /** GitHub's `OWNER` / `MEMBER` / `COLLABORATOR` / `CONTRIBUTOR` / `NONE` / …. */
     authorAssociation?: string;
   }>;

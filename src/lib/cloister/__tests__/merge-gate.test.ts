@@ -6,7 +6,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { defaultUatRequired, evaluateIssueMergeGate } from '../merge-gate.js';
 import { getMergeReadyIssues } from '../merge-ready-set.js';
-import { emptyPrFacts, type PrFacts } from '../pr-facts.js';
+import {
+  cachedApprovalAtHead,
+  emptyPrFacts,
+  getPrFacts,
+  resetApprovalAtHeadCache,
+  resetPrFactsCache,
+  type GitHubReviewsAtHead,
+  type PrFacts,
+} from '../pr-facts.js';
+import type { IssuePullRequestData } from '../../overdeck/pull-requests.js';
 
 const HEAD = 'dddd444400000000000000000000000000000000';
 
@@ -20,6 +29,7 @@ function readyFacts(issueId: string, overrides: Partial<PrFacts> = {}): PrFacts 
     headBranch: `feature/${issueId.toLowerCase()}`,
     reviewDecision: 'APPROVED',
     approved: true,
+    approvedAtHead: true,
     mergeable: true,
     checks: 'green',
     testChecks: 'green',
@@ -146,5 +156,155 @@ describe('getMergeReadyIssues through the merge gate', () => {
       uatRequired: async () => true,
     });
     expect(ready).toEqual(['PAN-10']);
+  });
+});
+
+// #3983: approval for a merge is proven on the exact head, through the real
+// `getPrFacts` reading marker comments and GitHub's reviews. `reviewDecision`
+// is empty throughout: the repo has no branch protection requiring reviews.
+describe('evaluateIssueMergeGate — approval bound to the PR head (#3983)', () => {
+  const OLD = 'eeee555500000000000000000000000000000000';
+  const HEAD_AT = '2026-09-24T10:00:00Z';
+
+  function pr(overrides: Partial<IssuePullRequestData> = {}): IssuePullRequestData {
+    return {
+      number: 4066,
+      title: 'PAN-3983',
+      url: 'https://github.com/eltmon/overdeck/pull/4066',
+      state: 'OPEN',
+      isDraft: false,
+      baseRefName: 'main',
+      headRefName: 'feature/pan-3983',
+      headRefOid: HEAD,
+      author: { login: 'eltmon' },
+      createdAt: '2026-09-24T09:00:00Z',
+      updatedAt: HEAD_AT,
+      reviewDecision: '',
+      reviewRequests: [],
+      statusCheckRollup: [{ name: 'build', status: 'COMPLETED', conclusion: 'SUCCESS' }],
+      additions: 1,
+      deletions: 0,
+      changedFiles: 1,
+      files: [],
+      labels: [],
+      mergeable: 'MERGEABLE',
+      body: '',
+      commits: [{ oid: HEAD, committedDate: HEAD_AT }],
+      ...overrides,
+    };
+  }
+
+  const marker = (sha?: string) => ({
+    authorAssociation: 'OWNER',
+    body: `<!-- overdeck-verdict: APPROVED${sha ? ` sha=${sha}` : ''} -->\n\nlgtm`,
+    createdAt: '2026-09-24T10:05:00Z',
+  });
+
+  function gate(data: IssuePullRequestData, reviews: GitHubReviewsAtHead = { headRefOid: HEAD, reviews: [] }) {
+    const readReviews = vi.fn(async () => reviews);
+    const result = evaluateIssueMergeGate('PAN-3983', {
+      getFacts: (issueId, options) => {
+        resetPrFactsCache();
+        return getPrFacts(issueId, { fetchGitHubPr: async () => ({ issueId, pr: data }) }, options);
+      },
+      ciTestsRequired: () => false,
+      readReviews,
+    });
+    return { result, readReviews };
+  }
+
+  it('merges on an approval marker whose sha= is the head, with no reviews read', async () => {
+    const { result, readReviews } = gate(pr({ comments: [marker(HEAD)] }));
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: true }));
+    expect(readReviews).not.toHaveBeenCalled();
+  });
+
+  // #4066 review: the board's derived `ready` reads the gate's answer per head.
+  it("records its approval answer for the head it judged, for the board's Merge button", async () => {
+    resetApprovalAtHeadCache();
+    await gate(pr({ comments: [marker(HEAD)] })).result;
+    expect(cachedApprovalAtHead('PAN-3983', HEAD)).toBe(true);
+    await gate(pr({ comments: [marker(OLD)] })).result;
+    expect(cachedApprovalAtHead('PAN-3983', HEAD)).toBe(false);
+    expect(cachedApprovalAtHead('PAN-3983', OLD)).toBeUndefined();
+  });
+
+  it('refuses a marker naming an older head, however recent the comment', async () => {
+    const { result } = gate(pr({ comments: [marker(OLD)] }));
+    const verdict = await result;
+    expect(verdict.ready).toBe(false);
+    expect(verdict.reason).toContain(`PR is not approved at PR HEAD ${HEAD}`);
+  });
+
+  it('refuses a marker without sha=, even one newer than the head commit', async () => {
+    const { result } = gate(pr({ comments: [marker()] }));
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
+  });
+
+  it('merges on a GitHub review approving the exact head', async () => {
+    const { result, readReviews } = gate(pr(), {
+      headRefOid: HEAD,
+      reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: HEAD } }],
+    });
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: true }));
+    expect(readReviews).toHaveBeenCalledWith('eltmon/overdeck', 4066);
+  });
+
+  // #4066 review: the repo is public and has no branch protection, so anyone
+  // can submit an APPROVED review. Only a trusted reviewer's review counts.
+  it("refuses an untrusted account's APPROVED review of the exact head", async () => {
+    const readReviews = vi.fn(async () => ({
+      headRefOid: HEAD,
+      reviews: [{ state: 'APPROVED', author: { login: 'drive-by' }, authorAssociation: 'NONE', commit: { oid: HEAD } }],
+    }));
+    const result = await evaluateIssueMergeGate('PAN-3983', {
+      getFacts: (issueId, options) => {
+        resetPrFactsCache();
+        return getPrFacts(issueId, { fetchGitHubPr: async () => ({ issueId, pr: pr() }) }, options);
+      },
+      ciTestsRequired: () => false,
+      readReviews,
+      overdeckLogins: async () => ['eltmon'],
+    });
+    expect(result.ready).toBe(false);
+    expect(readReviews).toHaveBeenCalled();
+  });
+
+  it("refuses when the approving reviewer's latest review of the head requests changes", async () => {
+    const { result } = gate(pr(), {
+      headRefOid: HEAD,
+      reviews: [
+        { state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:00:00Z' },
+        { state: 'CHANGES_REQUESTED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: HEAD }, submittedAt: '2026-09-24T10:05:00Z' },
+      ],
+    });
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
+  });
+
+  it('refuses a GitHub review that approved an older commit, even with reviewDecision APPROVED', async () => {
+    const { result } = gate(pr({ reviewDecision: 'APPROVED' }), {
+      headRefOid: HEAD,
+      reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: OLD } }],
+    });
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
+  });
+
+  it('refuses a GitHub head approval when the head moved between the two reads', async () => {
+    const { result } = gate(pr(), { headRefOid: OLD, reviews: [{ state: 'APPROVED', author: { login: 'eltmon' }, authorAssociation: 'OWNER', commit: { oid: OLD } }] });
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
+  });
+
+  it('reads no reviews for a PR the gate refuses anyway (red checks)', async () => {
+    const { result, readReviews } = gate(pr({
+      statusCheckRollup: [{ name: 'build', status: 'COMPLETED', conclusion: 'FAILURE' }],
+    }));
+    await expect(result).resolves.toEqual(expect.objectContaining({ ready: false }));
+    expect(readReviews).not.toHaveBeenCalled();
+  });
+
+  it('takes a GitLab approval (a named approver, read into `approved`) as proof', async () => {
+    const facts = readyFacts('MIN-1', { forge: 'gitlab', approvedAtHead: undefined });
+    const result = await evaluateIssueMergeGate('MIN-1', { getFacts: async () => facts, ciTestsRequired: () => false });
+    expect(result.ready).toBe(true);
   });
 });

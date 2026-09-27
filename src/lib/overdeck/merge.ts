@@ -307,6 +307,18 @@ export function dequeueMerge(projectKey: string, completedIssueId?: string): str
   return next?.issue_id ?? null;
 }
 
+/**
+ * Drop an issue's waiting queue entry, leaving a merge already processing
+ * alone. #4066 review: an operator's auto-merge cancel removes any queued
+ * merge of the issue, so the queue cannot start what the operator stopped.
+ * Returns the number of entries removed.
+ */
+export function removeQueuedMerge(issueId: string): number {
+  return overdeckDb().prepare(
+    `DELETE FROM merge_queue WHERE issue_id = ? AND status = 'queued'`,
+  ).run(issueId.toUpperCase()).changes;
+}
+
 /** Get all active queues across all projects. */
 export function getAllActiveQueues(): Array<{
   projectKey: string;

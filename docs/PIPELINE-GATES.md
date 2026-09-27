@@ -236,14 +236,30 @@ the forge (`cloister/pr-facts.ts`) and judges them with
 `evaluateMergeReadiness`. Every merge door asks it: the merge-ready set
 (`getMergeReadyIssues`, which feeds the Flywheel merge order and the merge
 train), the dashboard Merge button, the auto-merge executor and the merge
-train's merge-next (all through `triggerMerge`), and the per-project merge
-queue.
+train's merge-next (all through `triggerMerge`), the per-project merge
+queue, and the auto-merge scheduler (#3983,
+`dashboard/server/services/auto-merge-scheduler.ts`), which asks it before it
+schedules a ready, opted-in PR on the merge-train reconciler tick.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 
-1. it exists, is open, is not a draft, and is approved (a forge review
-   decision, else a trusted verdict marker comment, below) with no changes
-   requested;
+1. it exists, is open, is not a draft, has no changes requested, and is
+   **approved on its exact head commit** (#3983, `approvalProvenAtHead` in
+   `cloister/approval-at-head.ts`): a trusted `overdeck-verdict: APPROVED`
+   marker whose `sha=` is the PR head (`approvedAtHead`), or a trusted
+   reviewer's standing GitHub review whose `commit.oid` is the PR head
+   (`forgeApprovalAtHead`, read only when no marker already proves it). A
+   review counts only from an author the marker rule trusts (below), and each
+   author's latest review stands: a later `CHANGES_REQUESTED` or a dismissal
+   withdraws that author's approval, and any trusted author's standing
+   `CHANGES_REQUESTED` leaves the head unapproved. `reviewDecision` alone
+   never counts, and neither does a marker without `sha=` or one naming
+   another commit. This holds for every door, the Merge button included. A
+   GitLab MR is approved only when `/merge_requests/:iid/approvals` names an
+   approver in `approved_by` (what `glab mr approve` records); a `mergeable`
+   merge status, or GitLab's own `approved` with zero approvals required, is
+   not an approval. GitLab ties no approval to a commit, so a push after the
+   approval is caught only by GitLab's own approval-reset setting;
 2. its checks on the head are all green (`none` and `pending` are not green;
    a GitLab pipeline that `skipped` is green, as the board reads it);
 3. **the CI test job passed on the head** when the project runs
@@ -254,11 +270,47 @@ read when the question is asked. The PR is merge-ready when, in order:
 5. the forge reports it `mergeable`.
 
 A refusal names the first failing condition, e.g. `Cannot merge: browser UAT
-failed on PR HEAD <sha>`. The board's derived `ready` state (and so whether
-the Merge button is enabled) is computed from the batched PR listing and
-covers conditions 1, 2 and 5 only; conditions 3 and 4 surface as that
-refusal when the button is clicked. A forge read that fails is itself the
-refusal, e.g. `Cannot merge: GitLab MR view failed for !77: …`.
+failed on PR HEAD <sha>`. `triggerMerge` takes readiness from this gate alone;
+the derived issue state refuses only an issue already merged or a merge
+already running (#3983). A forge read that fails is itself the refusal, e.g.
+`Cannot merge: GitLab MR view failed for !77: …`.
+
+**Bound to the PR it judged (#4066 review).** `triggerMerge` asks the gate for
+the branch it lands (`feature/<issue>` for a normal merge, `strike/<issue>` for
+a strike), which also reads the head fresh instead of from the 60 s facts
+cache, and refuses when the PR it would merge (the merge set's remembered URL
+or the one `ensurePRExists` finds) is not the PR the gate passed. An automatic
+merge (the executor's, carrying the scheduled head) merges only that head: see
+[auto-merge](../configuration/auto-merge.mdx) for the direct and rebase paths.
+It never joins the project merge queue; when another merge holds the slot it is
+deferred and the executor re-runs every check on its next try.
+
+**A manual merge is pinned too (#4066 review).** The Merge button, merge-next
+and the project queue merge the head the gate passed (`mergeHeadPin`, sent as
+`gh pr merge --match-head-commit`, the App merge's `sha` or `glab mr merge
+--sha`). When the merge lands the PR as it is (a clean PR, or a branch already
+up to date with its base), a live head that differs from the gated head is
+refused first (`Cannot merge: the PR head moved to …`); click Merge again to
+gate the new head. When the merge makes its own head (its rebase, or the
+`.planning/` strip), it is pinned to that commit. Either way a push that lands
+after that point fails the merge. A strike landing is not pinned.
+
+**The Merge button (#4066 review).** The board's derived `ready` applies the
+gate's approval rule, not the forge's `reviewDecision`. Every gate evaluation
+records its approval answer per issue and head (`recordApprovalAtHead`); the
+auto-merge scheduler evaluates every opted-in candidate each tick, and a
+PR-facts read whose trusted marker names the head also counts. The batch loader
+reads that answer for the head in the PR listing (`headRefOid`); a miss or an
+answer for another head derives `in-review`, never `ready`. A changed answer
+re-derives the issue and reaches the board as `issue_state.changed`. No forge
+read is added and the frontend does not poll. A PR held for UAT is not gated by
+the scheduler, so its button appears once some gate evaluation or marker read
+has proven it; the Merge endpoint itself always asks the gate. Conditions 3 and
+4 still surface as the refusal when the button is clicked. The UAT train's
+candidate set (`listReadyIssuesForProject`) keeps the forge's own decision: it
+is mostly held issues the scheduler never gates. Promoting a UAT batch lands
+each member only when its derived state is `ready`, so the promote click runs
+the gate for every member first, recording a fresh answer for its head.
 
 **Trusted verdict comments.** The repository is public and anyone can comment
 on a PR, so a verdict marker counts only when its comment's author is `OWNER`,
@@ -266,10 +318,40 @@ on a PR, so a verdict marker counts only when its comment's author is `OWNER`,
 Overdeck posts verdicts as: the authenticated `gh` user or the GitHub App bot,
 resolved once per process and only when some marker needs it. Every other
 author's marker is ignored, whether it approves, requests changes, passes UAT
-or fails it. This applies to the `overdeck-verdict` review marker as well as the
+or fails it.
+
+**Overdeck's identities are matched as accounts, not logins (#4066 review,
+R3-2).** The App's bot is `<slug>[bot]`, with the slug read from the App
+itself: the `app-slug` file its setup writes to `~/.overdeck/github-app/`,
+else `GET /app` under the App's JWT (`resolveAppBotLogin`). Nothing hard-codes
+it. On this deployment it is `overdeck-agent[bot]`, and the review agent's
+verdicts are that bot's reviews, which GitHub reports as `CONTRIBUTOR`, so
+they count only through this identity rule. `gh pr view` reports only a
+login, and strips a bot's `[bot]` suffix, so the author's account type is read
+from GitHub's GraphQL API by the comment's or review's node id, for the
+authors that are not trusted by association. A bot entry matches only an
+author typed `Bot` with the App's slug, and the `gh` user only an author typed
+`User`, so a User account named after the slug is nobody. An author whose type
+cannot be read matches nothing. With the App configured and its slug
+unreadable, no bot is trusted and no marker approves; the next read tries
+again. This applies to the `overdeck-verdict` review marker as well as the
 UAT marker. A marker must stand on its own line (the review marker as the
 comment's first line); a quote-reply (`> <!-- … -->`) or a marker inside prose
 declares nothing.
+
+**Who may approve by marker** (#4066 review). Agents run with the operator's
+`gh` credentials, which GitHub reports as `OWNER`, so any agent can post an
+`overdeck-verdict: APPROVED sha=<head>` comment. When the GitHub App is
+configured, an `APPROVED` review marker therefore counts only when the App's
+bot posted it (a `Bot`-typed author with the App's slug, above); a marker
+from any other author, the owner included, is skipped as if it were not
+there. The review agent's verdict is normally a real review under the App's
+token, so this costs the normal path nothing; the one approval it loses is a
+verdict that fell back to a marker because the App token failed, which then
+needs a fresh review. A `CHANGES_REQUESTED` marker still counts from every
+trusted author: it can only hold a merge back. Without the App, any trusted
+author's `APPROVED` marker counts, which is trust in the operator's
+credentials; the server logs that once per process.
 
 **Failed UAT.** The newest trusted UAT marker that applies to the current
 head decides. A marker applies when its commit is the head (an abbreviated SHA
@@ -339,7 +421,28 @@ tmux alike (`cloister/verdict-caller.ts`): no id is an operator shell, a
 `conv-*` id is an operator conversation, and anything else is an agent
 session. An operator may record any review verdict. An agent session may
 record one only as the issue's own review session (`agent-<issue>-review` or
-its convoy).
+its convoy), an approval included.
+
+An agent holds the operator's shell and can unset or fake its own
+`OVERDECK_AGENT_ID` (#4066 review), so two more signals come first: the
+nearest ancestor process started with a non-`conv-` `OVERDECK_AGENT_ID` (read
+from `/proc/<pid>/environ`, which the agent cannot rewrite) names the caller,
+whatever its own environment says; and a process with `OVERDECK_ISSUE_ID` or
+`OVERDECK_SESSION_TYPE` but no agent id is a managed pane, never the operator.
+
+**Residual risk.** The approval marker is a cooperative control while agents
+run with the operator's `gh` credentials, which GitHub reports as `OWNER`. An
+agent that daemonizes out of its harness's process tree and scrubs all three
+variables is read as the operator, and any agent can post an
+`overdeck-verdict: APPROVED sha=<head>` comment with `gh pr comment` without
+going through this command at all. With the GitHub App configured, that
+comment approves nothing (only the App bot's approval markers count, above),
+and what remains is an agent minting an installation token from the App's
+private key on disk; without the App, the marker trust rule cannot tell that
+comment from the review agent's. The ancestry read fails the other way too: a
+long-lived process started from an agent pane (a tmux or Herdr server, a
+dashboard) passes that agent's id to everything beneath it, so an operator
+conversation under it is read as that agent and its override is refused.
 
 That review session's `blocked`/`failed` verdict is refused only when it is
 proven that the exact head commit carries an approval: with no new commit
@@ -353,8 +456,8 @@ commit. A head that moved during the review gets a marker without `sha=`, so a
 later cycle can block the new head. A forge review posted with `gh pr review`
 still attaches to the head at submit time (follow-up: post it through the
 reviews API with `commit_id`). The
-reviews are read only on this path (`forgeApprovalAtHead` in `pr-facts`), for
-an agent's rejection of an approved PR, so the shared PR read stays small.
+reviews are read by `forgeApprovalAtHead` in `pr-facts`, only on this path
+and in the merge gate (#3983), so the shared PR read stays small.
 Anything short of proof lets the verdict through: a GitLab MR (GitLab ties no
 approval to a sha, and `mergeable` is not an approval), an approval of an
 older commit, an empty review list, a marker without `sha=`, or a failed
@@ -430,6 +533,13 @@ Auto-resume is intentionally suppressible:
     owed. Stalled-review recovery re-requests it (see below), which covers an
     unpause whose re-request failed, an unpause while the dashboard was down,
     `pan start --force`, and dashboard Start with `clearGates`.
+- **Troubled gate (PAN-4211):** `applyAgentFailure` sets `troubled` (plus
+  `troubledAt` and the failure-tracking fields) after three consecutive
+  resume/start failures within ten minutes. It blocks `pan start`, `pan
+  resume`, dashboard Start and MERGE until cleared. `pan untroubled <id>`
+  clears the flag and the failure counters without spawning. `pan start
+  <id> --force` (and dashboard Start with `clearGates`) clears it and starts
+  in one step. Both doors record an `untroubled` operator intervention.
 - **Operator-stop gate:** `stoppedByUser` blocks autonomous re-drive when no
   completed handoff exists and emits one durable needs-you trip. Only an
   operator-initiated stop sets the flag (PAN-3324) — `pan kill`, `pan
@@ -507,7 +617,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | --- | --- |
 | `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
 | `verification.failed` (`failedCheck: 'test'`, `cycleCount`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
-| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through |
+| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through; also reached over that same door by deacon-lite's `recoverUndispatchedReviews` (source `deacon-lite`), re-requesting a review a dashboard restart left undispatched |
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewers`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
@@ -520,9 +630,9 @@ One piece of stored pipeline state came back, and it is not a status.
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
 
-## Deacon-lite: six routines
+## Deacon-lite: seven routines
 
-`runDeaconLite()` runs on a 60s tick and holds six routines, all of which only
+`runDeaconLite()` runs on a 60s tick and holds seven routines, all of which only
 observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
@@ -538,6 +648,8 @@ observe and nudge — none reconciles a stored copy of anything:
    are all gone.
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
+7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,
+   PAN-4221) — re-requests a review a dashboard restart left undispatched.
 
 `recoverStalledReviews` reads the journal and the issue pause gate
 (`getIssuePause`, see "Manual pause" above), with no GitHub call and no tracker
@@ -565,19 +677,100 @@ so re-verifies nothing; only a parent with no run state at all falls back to the
 full review door. At most one re-dispatch per issue per hour: the cooldown is
 held in memory and, because the deacon child's memory dies on restart, also read
 back from the routine's own `review.redispatched` entry. A recovery that launches
-nothing (every lane already wrote its report) journals and reports nothing, so
-the routine never claims a re-dispatch that did not happen (PAN-3914). When the
-synthesis parent `agent-<issue>-review` is also confirmed dead, that stall is not
-recoverable here (#4134), so the routine logs a `[deacon-lite]` warning once per
-cooldown; a live or indeterminate parent stays quiet.
+nothing journals and reports nothing, so the routine never claims a re-dispatch
+that did not happen (PAN-3914). While some lane is still live without a report
+and the synthesis parent `agent-<issue>-review` is confirmed dead, the routine
+logs a `[deacon-lite]` warning once per cooldown; a live or indeterminate parent
+stays quiet.
+
+When every lane of the run already wrote its report, there is no lane to
+relaunch; what is missing is the synthesis (#4134). The routine then re-runs the
+synthesis step (`redispatchReviewSynthesis` in `review-synthesis-recovery.ts`,
+with a prompt that says the reports are already on disk) only when all of these
+hold: no `review.verdict` is journaled for the run, the run has had fewer than
+three synthesis re-dispatches, the liveness oracle (`isAlive` +
+`isConfirmedDead`) confirms the parent `agent-<issue>-review` dead, and the
+cooldown above has passed. The cooldown starts before the relaunch, and an
+in-flight guard makes an overlapping patrol tick do nothing. The issue pause
+hold comes first: a paused issue, or one whose pause cannot be read, never
+reaches lane or synthesis recovery (PAN-3911).
+
+Under the per-issue review lifecycle lock, the relaunch re-checks everything
+that can change under it and does nothing unless all of it still holds:
+
+- the parent's resume gates allow an **autonomous** relaunch
+  (`decideResumeGate(…, 'autonomous')`): `stoppedByUser`, `paused`, `troubled`
+  and failure backoff all hold it. The hold is logged once.
+- the operator did not abort the review: `pan review abort` journals
+  `review.aborted`, and an abort after the last `review.dispatched` holds it
+  (as the journal's last entry, it also stops the patrol outright).
+- the parent is still confirmed dead, and its saved `reviewRunId` is still the
+  run being recovered.
+- the run id still names the workspace HEAD (`agent-<issue>-review-<head8>`, the
+  idempotency guard's comparison). A run for a head that moved, or an unreadable
+  head, is stale and is never synthesized: recovery logs it and leaves the next
+  review to the dispatch that owns the current head (`pan done`, the webhook,
+  `pan review request`).
+
+It resumes the saved parent session when there is one. A refused resume is
+final: "appears healthy" means another caller already relaunched the parent,
+and a gate refusal is an operator hold. Only a parent with no session to resume
+(or a harness/model drift) gets a fresh spawn: its dead pane is closed and only
+the parent's own state dir is reset (the lanes' state dirs and `sessions.json`
+indexes stay). A fresh spawn for the same run carries the parent's
+`reviewOperatorRequested` flag (#4139).
+
+An indeterminate probe is never death: it takes no action, logs once per
+unknown streak, and re-probes after five minutes rather than every tick. The
+re-dispatch is journaled as `review.redispatched` with
+`via: synthesis-recovery` and the `runId`, which is also the restart-proof
+cooldown and the retry count. After three for one run the routine journals
+`review.synthesis-gave-up`, warns in the activity feed, and stops: that entry is
+the journal's last, so the patrol leaves the issue to the operator.
 
 **Accepted v1 gaps** (stated in the module, deliberately not built): a convoy
 where some reviewers posted a verdict and one died is not recovered, because the
 last entry is then `review.verdict` — `review.dispatched.data.reviewers` carries
 enough to count verdicts later. A quick-mode review writes no `review.dispatched`
-entry, so a dead quick reviewer is not recovered either. And a server death
-between `verification.started` and its outcome leaves `verification.*` last,
-which the rule above deliberately skips.
+entry, so a dead quick reviewer is not recovered either. A server death between
+`verification.started` and its outcome still leaves `verification.started` or
+`verification.failed` last, and both are still skipped by `recoverStalledReviews`
+above (an agent that owes rework must not have verification re-run every hour).
+A `verification.passed` tail whose source is `request-review`, though, is now
+recovered — by `recoverUndispatchedReviews`, below.
+
+`recoverUndispatchedReviews` (PAN-4221) closes the one `verification.*` tail
+`recoverStalledReviews` deliberately leaves alone: a dashboard restart while a
+detached verification worker runs kills the push-and-dispatch continuation that
+lived in the dead process, so the worker's own `verification.passed` write
+becomes a permanent tail with nobody left to dispatch the review (PAN-4198..4201
+sat about 15 hours on 2026-09-25). It acts only when every one of these holds:
+the workspace's **last** journal entry is `verification.passed` with
+`source: 'request-review'` — a `review` (dashboard `/trigger`) or `merge-verify`
+pass belongs to a different door and is left alone, since a `/trigger` run may
+carry a per-run review mode this routine cannot reproduce, and a merge-gate pass
+belongs to the merge door; the entry is at least 5 minutes old
+(`UNDISPATCHED_REVIEW_MIN_AGE_MS`) — past a normal push-and-dispatch, so a runner
+still mid-push is not mistaken for dead; no verification worker is active for the
+issue (`isVerificationWorkerActive`); no pane equal to `agent-<issue>-review` or
+starting with `agent-<issue>-review-` is live — the parent counts, not just the
+sub-reviewer lanes, because quick mode (the default) writes no
+`review.dispatched`, so a healthy quick reviewer's tail stays
+`verification.passed` for its whole life; the issue is unpaused
+(`getIssuePause`); review mode is not `none`; and the primary repo's current
+head, read fresh through `verified-head.ts`'s `readPrimaryHead8`, still matches
+the head the pass stamped. A per-issue hourly cooldown
+(`UNDISPATCHED_REVIEW_COOLDOWN_MS`, set *before* the request so a refused or
+unreachable route is not retried every tick) and a cap of 3 deacon-lite
+`review.requested` entries since the last `review.requested` from any other
+source (`UNDISPATCHED_REVIEW_ATTEMPT_CAP`) stop an hourly re-verify loop once
+each dispatch keeps coming back gated — the cap is logged once, not every tick.
+Recovery goes through the same guarded route `rerequestHaltedReview` uses
+(`requestReviewThroughRoute`, source `deacon-lite`), never a skip-verification
+door: the route re-verifies against current main and journals
+`review.requested` itself, which moves the tail and makes the recovery
+exactly-once. The first deacon-lite patrol runs at deacon start, so a stall that
+began before a restart is covered as soon as the process comes back up.
 
 `retryDeferredHandoffs` acts only when an issue's last `handoff.*` entry is
 `handoff.deferred` or `handoff.retried`. Each of those entries carries the

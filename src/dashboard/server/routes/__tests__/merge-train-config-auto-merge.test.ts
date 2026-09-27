@@ -2,11 +2,13 @@
  * PAN-3917 W6: `/api/flywheel/config` and `/api/flywheel/auto-merge/*` moved
  * to `/api/merge-train/*` (D3). The gate moved with them: scheduling an
  * auto-merge no longer asks a flywheel run or a review-status record, it asks
- * the derived issue state — approvals plus green checks plus mergeability.
+ * the merge gate (#4040, #3983) — approvals (a forge review or a trusted
+ * verdict marker) plus green checks plus mergeability.
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import type { DerivedIssueState } from '@overdeck/contracts';
+import type { MergeGateResult } from '../../../../lib/cloister/merge-gate.js';
+import type { PrFacts } from '../../../../lib/cloister/pr-facts.js';
 
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
 // W5 owns these; they still reach the record plane in this tree, so the route
@@ -47,19 +49,33 @@ const {
 } = await import('../merge-train.js');
 const controlSettings = await import('../../../../lib/overdeck/control-settings.js');
 
-function derived(overrides: Partial<DerivedIssueState> = {}): DerivedIssueState {
-  return {
-    issueId: 'PAN-3917',
-    state: 'ready',
-    pr: {
-      url: 'https://github.com/eltmon/overdeck/pull/42',
-      number: 42,
-      reviewState: 'approved',
-      checks: 'green',
-      mergeable: true,
-    },
-    ...overrides,
-  };
+const READY_FACTS: PrFacts = {
+  issueId: 'PAN-3917',
+  forge: 'github',
+  url: 'https://github.com/eltmon/overdeck/pull/42',
+  number: 42,
+  exists: true,
+  open: true,
+  merged: false,
+  closed: false,
+  draft: false,
+  headSha: 'abc123',
+  headBranch: 'feature/pan-3917',
+  reviewDecision: 'APPROVED',
+  approved: true,
+  approvedAtHead: true,
+  changesRequested: false,
+  mergeable: true,
+  mergeableState: 'mergeable',
+  checks: 'green',
+  testChecks: 'green',
+  testJobSucceeded: true,
+  uatVerdict: null,
+};
+
+/** What the merge gate answers: ready on READY_FACTS unless told otherwise. */
+function gate(facts: Partial<PrFacts> = {}, readiness: { ready: boolean; reason?: string } = { ready: true }): MergeGateResult {
+  return { ...readiness, facts: { ...READY_FACTS, ...facts } };
 }
 
 const baseDeps = {
@@ -69,16 +85,17 @@ const baseDeps = {
   isEligible: async () => ({ eligible: true }) as const,
   getProjectAutoMergeDefault: () => null,
   getIssueLabels: () => [],
+  isIssueClosed: () => false,
   resolveProject: () => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/repos/overdeck' }),
   announce: vi.fn(),
 };
 
 describe('POST /api/merge-train/auto-merge/schedule', () => {
-  it('schedules a ready issue from the derived PR facts', async () => {
+  it("schedules a ready issue from the merge gate's PR facts", async () => {
     const schedule = vi.fn(() => ({ created: true, entry: { id: 1, issueId: 'PAN-3917', status: 'pending' } }));
     const result = await postAutoMergeSchedulePayload({ issueId: 'pan-3917' }, {
       ...baseDeps,
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: schedule as never,
     });
     expect(result.status).toBe(200);
@@ -86,26 +103,27 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
       issueId: 'PAN-3917',
       prNumber: 42,
       prUrl: 'https://github.com/eltmon/overdeck/pull/42',
+      headSha: 'abc123',
       forge: 'github',
       projectKey: 'overdeck',
     }));
   });
 
-  it('refuses an issue that does not derive to ready', async () => {
+  it('refuses an issue the merge gate says is not ready', async () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
-      derivedState: async () => derived({ state: 'changes-requested' }),
+      mergeGate: async () => gate({ changesRequested: true, approved: false }, { ready: false, reason: 'latest review requested changes' }),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(422);
-    expect(result.body).toEqual({ error: 'PAN-3917 is changes-requested, not ready to merge' });
+    expect(result.body).toEqual({ error: 'PAN-3917 is not ready to merge: latest review requested changes' });
   });
 
   it('refuses while UAT is still required', async () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
       isRequireUatBeforeMerge: () => true,
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(412);
@@ -118,7 +136,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
       isRequireUatBeforeMerge: () => true,
       getProjectAutoMergeDefault: () => 'hold',
       getIssueLabels: () => ['auto-merge'],
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: schedule as never,
     });
     expect(result.status).toBe(200);
@@ -131,18 +149,30 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
       isRequireUatBeforeMerge: () => false,
       getProjectAutoMergeDefault: () => 'auto',
       getIssueLabels: () => ['hold-for-uat'],
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(412);
     expect(result.body).toEqual({ error: 'UAT is still required before merge' });
   });
 
+  it('refuses an issue the tracker has closed (#3983)', async () => {
+    const schedule = vi.fn();
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
+      ...baseDeps,
+      isIssueClosed: () => true,
+      mergeGate: async () => gate(),
+      schedule: schedule as never,
+    });
+    expect(result).toEqual({ status: 422, body: { error: 'PAN-3917 is closed in the tracker' } });
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
   it('refuses while the merge train is disabled', async () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
       isMergeTrainEnabled: () => false,
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(412);
@@ -153,7 +183,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
       isEligible: async () => ({ eligible: false, reason: 'do-not-merge label' }) as const,
-      derivedState: async () => derived(),
+      mergeGate: async () => gate(),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(422);
@@ -163,9 +193,7 @@ describe('POST /api/merge-train/auto-merge/schedule', () => {
   it('rejects a PR URL that is not a recognized forge artifact', async () => {
     const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-3917' }, {
       ...baseDeps,
-      derivedState: async () => derived({
-        pr: { url: 'https://example.com/nope', number: 42, reviewState: 'approved', checks: 'green', mergeable: true },
-      }),
+      mergeGate: async () => gate({ url: 'https://example.com/nope' }),
       schedule: vi.fn() as never,
     });
     expect(result.status).toBe(422);
@@ -181,24 +209,31 @@ describe('DELETE /api/merge-train/auto-merge/:id', () => {
   const entry = { id: 7, issueId: 'PAN-3917', status: 'pending' as const };
 
   it('cancels a pending auto-merge and reports the remaining count', () => {
+    const removeQueued = vi.fn(() => 1);
     const result = deleteAutoMergePayload('pan-3917', {
       now: () => new Date('2026-09-18T12:00:00Z'),
       getPending: () => entry as never,
       cancel: () => true,
       countRemaining: () => 0,
       announce: vi.fn(),
+      removeQueued,
     });
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ status: 'cancelled', cancelledBy: 'operator', remainingActionable: 0 });
+    // #4066 review: the cancel also drops the issue's waiting queue entry.
+    expect(removeQueued).toHaveBeenCalledWith('PAN-3917');
   });
 
   it('returns 409 once the entry is merging', () => {
+    const removeQueued = vi.fn(() => 0);
     const result = deleteAutoMergePayload('PAN-3917', {
       getPending: () => ({ ...entry, status: 'merging' }) as never,
       cancel: () => false,
       announce: vi.fn(),
+      removeQueued,
     });
     expect(result.status).toBe(409);
+    expect(removeQueued).not.toHaveBeenCalled();
   });
 
   it('returns 404 when nothing is pending', () => {

@@ -2,19 +2,21 @@ import { exitCli } from '../exit.js';
 import { execSync, spawn, ChildProcess } from 'child_process';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { parse } from '@iarna/toml';
 import chalk from 'chalk';
 import { isNoResumeCliOptionEnabled } from '../../lib/boot-no-resume.js';
 import { writeDevSupervisorMarker, clearDevSupervisorMarker } from '../../lib/dev-supervisor.js';
 import { getInternalToken } from '../../lib/internal-token.js';
+import { packageRoot } from '../../lib/paths.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+// Resolved by lib/paths, not from import.meta.url: the CLI loads this module
+// lazily as a dist/ chunk (PAN-4195), so a relative walk is location-dependent.
+const distDir = join(packageRoot, 'dist');
 
 function ensureDashboardBundle(): boolean {
-  const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
-  const srcDashboard = join(__dirname, '..', '..', 'src', 'dashboard');
+  const bundledServer = join(distDir, 'dashboard', 'server.js');
+  const srcDashboard = join(packageRoot, 'src', 'dashboard');
 
   if (existsSync(bundledServer)) {
     return true;
@@ -27,7 +29,7 @@ function ensureDashboardBundle(): boolean {
   console.log(chalk.yellow('⚠ Dashboard server bundle missing; rebuilding...'));
   try {
     execSync('npm run build:dashboard:server', {
-      cwd: join(__dirname, '..', '..'),
+      cwd: packageRoot,
       stdio: ['pipe', 'inherit', 'pipe'],
     });
   } catch {
@@ -223,8 +225,8 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
 
   const config = readConfig();
   const node22 = resolveNode22();
-  const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
-  const frontendDir = join(__dirname, '..', '..', 'src', 'dashboard', 'frontend');
+  const bundledServer = join(distDir, 'dashboard', 'server.js');
+  const frontendDir = join(packageRoot, 'src', 'dashboard', 'frontend');
   // PAN-1670: sentinel file the Vite plugin watches; touched after a hot-reload's
   // API child is healthy again so Vite pushes a full browser reload (recovers the
   // tab instead of leaving it stuck on "Reconnecting…").
@@ -476,7 +478,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       // the @overdeck/contracts module and wedges open tabs on "Reconnecting…".
       // build:dashboard:server:hot + PAN_HOT_RELOAD=1 overwrites dist in place instead.
       const build = spawn('npm', ['run', 'build:dashboard:server:hot'], {
-        cwd: join(__dirname, '..', '..'),
+        cwd: packageRoot,
         stdio: 'pipe',
         env: { ...process.env, SKIP_DOCS_INDEX: '1', PAN_HOT_RELOAD: '1' },
       });

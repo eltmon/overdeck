@@ -3,8 +3,9 @@
  *
  * Replaces the 3,400-line `deacon.ts` (~60 awaited patrol routines writing to
  * the record plane) with a handful of routines that only observe and
- * nudge/notify — never reconcile a stored copy. Two of them recover from the
- * pipeline journal: `recoverStalledReviews` and `retryDeferredHandoffs`
+ * nudge/notify — never reconcile a stored copy. Three of them recover from
+ * the pipeline journal: `recoverStalledReviews`, `recoverUndispatchedReviews`
+ * (PAN-4221, in undispatched-review-recovery.ts) and `retryDeferredHandoffs`
  * (PAN-4155, in deferred-handoff.ts). See docs/PIPELINE-GATES.md and the PAN-3917
  * PRD ("The patrol loop", FR-11, D1/D4/D5/D6/D7).
  *
@@ -16,6 +17,7 @@
  */
 import { existsSync } from 'node:fs';
 
+import { emitActivityEntry } from '../activity-logger.js';
 import { getIssuePause, type AgentState } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents.js';
 import { isAlive, isConfirmedDead, isIdle } from '../agents/liveness.js';
@@ -26,10 +28,11 @@ import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
-import { appendPipelineEntry, lastPipelineEntry } from './pipeline-journal.js';
+import { appendPipelineEntry, lastPipelineEntry, readPipelineJournal } from './pipeline-journal.js';
 import { retryDeferredHandoffs } from './deferred-handoff.js';
+import { recoverUndispatchedReviews } from './undispatched-review-recovery.js';
 
-export { checkApiErrorAgents, retryDeferredHandoffs };
+export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews };
 
 // ============================================================================
 // checkStuckWorkAgents (FR-11): a work agent idle for N minutes whose feature
@@ -171,6 +174,11 @@ export const reapClosedIssueAgents = reconcileClosedIssueAgents;
 // forever (PAN-3939). The journal says what Overdeck last DID for an issue; if
 // that was "reviewers exist" and no reviewer pane does, the convoy is gone.
 //
+// When every lane of the run already wrote its report, there is no lane to
+// relaunch; what is missing is the synthesis (#4134). The synthesis parent is
+// re-dispatched only when no verdict is journaled for that run AND the liveness
+// oracle confirms the parent dead — "unknown" is never death.
+//
 // ACCEPTED v1 GAPS — stated, not built:
 //   - A convoy where some reviewers posted a verdict and one died is not
 //     recovered: the last entry is then `review.verdict`.
@@ -178,13 +186,16 @@ export const reapClosedIssueAgents = reconcileClosedIssueAgents;
 //     later, when that case is worth the code.
 //   - A quick-mode review writes no `review.dispatched` entry (there is no
 //     convoy), so a dead quick reviewer is not recovered here either.
-//   - Any issue whose LAST entry is `verification.*` is skipped, and that is
-//     wider than it sounds: a `verification.passed` with nothing after it means
-//     the review was never dispatched (the runner died while pushing, or the
-//     review spawn came back gated) — the PAN-3705 shape itself. It stays
-//     unrecovered on purpose: the same skip is what stops this routine from
-//     re-running verification every hour for an agent that owes rework, and
-//     the runner may still legitimately be mid-push when the tick fires.
+//   - Any issue whose LAST entry is `verification.*` is skipped here, and that
+//     is wider than it sounds: a `verification.passed` with nothing after it
+//     means the review was never dispatched (the runner died while pushing, or
+//     the review spawn came back gated) — the PAN-3705 shape itself. It stays
+//     unrecovered by THIS routine on purpose: the same skip is what stops it
+//     from re-running verification every hour for an agent that owes rework,
+//     and the runner may still legitimately be mid-push when the tick fires.
+//     A `request-review` `verification.passed` tail — a dashboard restart
+//     killed the push-and-dispatch continuation, not an agent owing rework —
+//     is recovered by `recoverUndispatchedReviews` below (PAN-4221).
 // ============================================================================
 
 const STALLED_REVIEW_MIN_AGE_MS = 15 * 60_000;
@@ -197,6 +208,8 @@ const loggedPausedSkip = new Map<string, string>();
 /** Test seam: clear the per-issue re-dispatch cooldown between test cases. */
 export function __resetStalledReviewCooldownForTests(): void {
   lastReviewRedispatchAt.clear();
+  loggedUnknownSynthesisLiveness.clear();
+  synthesisRecoveryInFlight.clear();
   loggedPausedSkip.clear();
 }
 
@@ -214,6 +227,104 @@ function stalledReviewReason(type: string): string | null {
     return 'the review was requested but the pipeline never dispatched reviewers';
   }
   return null;
+}
+
+/**
+ * Whether a review verdict is already journaled for `runId`. The run id embeds
+ * the reviewed head, so a verdict carrying it covers this head. A verdict with
+ * no run id (an older writer) counts when it landed after the run's last
+ * dispatch — a verdict must never be re-synthesized over.
+ */
+function verdictJournaledForRun(workspacePath: string, runId: string): boolean {
+  let dispatchedAt = Number.NEGATIVE_INFINITY;
+  const entries = readPipelineJournal(workspacePath);
+  for (const entry of entries) {
+    if (entry.type === 'review.dispatched' && entry.data?.['runId'] === runId) {
+      dispatchedAt = Math.max(dispatchedAt, Date.parse(entry.at));
+    }
+  }
+  return entries.some((entry) => {
+    if (entry.type !== 'review.verdict') return false;
+    const verdictRunId = entry.data?.['runId'];
+    if (verdictRunId !== undefined) return verdictRunId === runId;
+    return Date.parse(entry.at) >= dispatchedAt;
+  });
+}
+
+type SynthesisGate =
+  | { action: 'redispatched'; outcome: string }
+  | { action: 'cool-down' }
+  | { action: 'retry' }
+  | { action: 'skip' };
+
+/** Synthesis re-dispatches allowed per run before recovery gives up on it. */
+const SYNTHESIS_REDISPATCH_CAP = 3;
+/** How long an indeterminate liveness probe waits before the next one. */
+const SYNTHESIS_UNKNOWN_BACKOFF_MS = 5 * 60_000;
+/** Issues whose current indeterminate-liveness streak was already logged. */
+const loggedUnknownSynthesisLiveness = new Set<string>();
+/** Issues with a synthesis recovery in flight: an overlapping patrol tick does nothing. */
+const synthesisRecoveryInFlight = new Set<string>();
+
+/**
+ * The synthesis step of a convoy whose lanes all reported (#4134). Re-runs it
+ * only when no verdict is journaled for the run, the run has not used up its
+ * re-dispatches, and the parent is CONFIRMED dead. An indeterminate probe
+ * backs off a few minutes, not the full cooldown. `redispatchReviewSynthesis`
+ * re-checks liveness, the run, the head and the operator gates under the
+ * per-issue lock.
+ */
+async function recoverDeadSynthesis(issueId: string, workspacePath: string, runId: string, now: number): Promise<SynthesisGate> {
+  if (verdictJournaledForRun(workspacePath, runId)) return { action: 'cool-down' };
+  const attempts = readPipelineJournal(workspacePath).filter((entry) => entry.type === 'review.redispatched'
+    && entry.data?.['via'] === 'synthesis-recovery' && entry.data?.['runId'] === runId).length;
+  if (attempts >= SYNTHESIS_REDISPATCH_CAP) {
+    // Journaled once: `review.synthesis-gave-up` is the tail from now on, and
+    // stalledReviewReason ignores it, so this issue is not patrolled again.
+    const message = `${issueId}: review synthesis for run ${runId} died ${attempts} times after recovery — giving up; the review needs the operator`;
+    console.warn(`[deacon-lite] ${message}`);
+    emitActivityEntry({ source: 'review', level: 'warn', message, issueId });
+    appendPipelineEntry(workspacePath, {
+      type: 'review.synthesis-gave-up', issueId, source: 'deacon-lite', data: { runId, attempts },
+    });
+    return { action: 'cool-down' };
+  }
+
+  const parentId = `agent-${issueId.toLowerCase()}-review`;
+  const verdict = await isAlive(parentId);
+  if (!isConfirmedDead(verdict) && !verdict.alive) {
+    if (!loggedUnknownSynthesisLiveness.has(issueId)) {
+      loggedUnknownSynthesisLiveness.add(issueId);
+      console.warn(`[deacon-lite] ${issueId}: liveness of ${parentId} is unknown — synthesis recovery waits for a definite answer`);
+    }
+    return { action: 'retry' };
+  }
+  loggedUnknownSynthesisLiveness.delete(issueId);
+  if (verdict.alive) return { action: 'cool-down' };
+
+  // An overlapping tick that got this far finds the first one in flight, or
+  // its cooldown, and does nothing.
+  const lastRedispatch = lastReviewRedispatchAt.get(issueId);
+  if (synthesisRecoveryInFlight.has(issueId)
+    || (lastRedispatch !== undefined && now - lastRedispatch < STALLED_REVIEW_COOLDOWN_MS)) {
+    return { action: 'skip' };
+  }
+  synthesisRecoveryInFlight.add(issueId);
+  // The cooldown starts BEFORE the relaunch, so no tick can act while it runs.
+  lastReviewRedispatchAt.set(issueId, now);
+  try {
+    const { redispatchReviewSynthesis } = await import('./review-synthesis-recovery.js');
+    const result = await redispatchReviewSynthesis(issueId, { workspace: workspacePath, runId, source: 'deacon-lite' });
+    if (!result.success) {
+      // One attempt per cooldown window: a spawn that failed is not retried
+      // every tick. A hold logs once where it is decided.
+      if (!result.held) console.warn(`[deacon-lite] Synthesis recovery declined for ${issueId}: ${result.message}`);
+      return { action: 'cool-down' };
+    }
+    return { action: 'redispatched', outcome: result.message };
+  } finally {
+    synthesisRecoveryInFlight.delete(issueId);
+  }
 }
 
 /**
@@ -306,6 +417,7 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
     // re-verifies. Only a parent with no run state at all needs the full door.
     let via = 'convoy-recovery';
     let outcome: string;
+    let journalData: Record<string, unknown> = { reason };
     try {
       const { recoverMissingConvoyReviewers } = await import('./review-convoy.js');
       const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
@@ -326,18 +438,40 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
         console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);
         continue;
       } else if (!recovery.launched) {
-        // Every lane already reported: nothing to relaunch, so no re-dispatch
-        // to journal or report (PAN-3914). Cool down so the next tick does not
-        // re-probe the same convoy.
-        lastReviewRedispatchAt.set(issueId, now);
-        // A confirmed-dead synthesis parent is a real stall nothing here can
-        // recover (#4134): say so, once per cooldown. A live or indeterminate
-        // parent may still be synthesizing, so it stays quiet.
-        const parentId = `agent-${issueId.toLowerCase()}-review`;
-        if (isConfirmedDead(await isAlive(parentId))) {
-          console.warn(`[deacon-lite] ${issueId}: every review lane reported but no verdict was posted and the synthesis parent ${parentId} is dead — not recoverable here (#4134)`);
+        // Nothing to relaunch, so no lane re-dispatch to journal or report
+        // (PAN-3914). When every lane of the run has its report on disk, the
+        // synthesis may be what died (#4134).
+        if (!recovery.allReported || !recovery.runId) {
+          // Some lane is still live without a report. Cool down so the next
+          // tick does not re-probe the same convoy. A confirmed-dead parent is
+          // a stall that synthesis recovery takes over only once every report
+          // lands: say so, once per cooldown. A live or indeterminate parent
+          // may still be waiting on its lanes, so it stays quiet.
+          lastReviewRedispatchAt.set(issueId, now);
+          const parentId = `agent-${issueId.toLowerCase()}-review`;
+          if (isConfirmedDead(await isAlive(parentId))) {
+            console.warn(`[deacon-lite] ${issueId}: no review lane to relaunch, no verdict posted, and the synthesis parent ${parentId} is dead — synthesis is re-dispatched once every lane has its report (#4134)`);
+          }
+          continue;
         }
-        continue;
+        const synthesis = await recoverDeadSynthesis(issueId, workspace.path, recovery.runId, now);
+        if (synthesis.action !== 'redispatched') {
+          // Cool down so the next tick does not re-probe the same convoy. An
+          // indeterminate probe must not buy the wedge an extra hour, but must
+          // not re-probe (and rewrite the parent's state.json) every minute
+          // either: it backs off a few minutes.
+          if (synthesis.action === 'cool-down') lastReviewRedispatchAt.set(issueId, now);
+          if (synthesis.action === 'retry') {
+            lastReviewRedispatchAt.set(issueId, now - STALLED_REVIEW_COOLDOWN_MS + SYNTHESIS_UNKNOWN_BACKOFF_MS);
+          }
+          continue;
+        }
+        via = 'synthesis-recovery';
+        outcome = synthesis.outcome;
+        journalData = {
+          reason: 'every lane reported but the synthesis parent died before posting a verdict',
+          runId: recovery.runId,
+        };
       }
     } catch (err) {
       console.error(`[deacon-lite] Stalled-review recovery failed for ${issueId}:`, err);
@@ -349,7 +483,7 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
       type: 'review.redispatched',
       issueId,
       source: 'deacon-lite',
-      data: { reason, via },
+      data: { ...journalData, via },
     });
     actions.push(`recoverStalledReviews: re-dispatched ${issueId} via ${via} — ${outcome}`);
   }
@@ -371,6 +505,7 @@ export async function runDeaconLite(): Promise<void> {
   await reconcileAgentLiveness();
   await reapClosedIssueAgents();
   await recoverStalledReviews();
+  await recoverUndispatchedReviews();
   // PAN-4155: re-send a planning hand-off a spawn guardrail refused.
   await retryDeferredHandoffs();
 }

@@ -43,8 +43,10 @@ decision. `postReviewVerdict` therefore tries two identities, in order:
 
 1. **The GitHub App.** When `~/.overdeck/github-app/` holds credentials, the
    `gh pr review` call runs with an installation token in `GH_TOKEN`, so the
-   review is authored by `panopticon-agent[bot]`, which is never the PR author
-   and whose review GitHub accepts.
+   review is authored by the App's bot (`<app-slug>[bot]`, e.g.
+   `overdeck-agent[bot]`), which is never the PR author and whose review
+   GitHub accepts. The merge gate trusts that review only from an author
+   GitHub types `Bot` with the installed App's slug (#4066 review).
 2. **A marker comment.** If the forge still refuses a self-review (no app
    installed, or the bot opened the PR), the verdict is posted as a PR comment
    whose first line is a machine marker:
@@ -60,13 +62,23 @@ decision. `postReviewVerdict` therefore tries two identities, in order:
    `via: 'comment'` so the CLI can say which path was used.
 
 `pr-facts` reads both. A real forge `reviewDecision` always wins; only when the
-forge reached no decision does it take the newest marker comment. An `APPROVED`
-marker older than the PR's head commit does **not** count — a stale approval
-must never merge commits it never saw — while a stale `CHANGES_REQUESTED` still
-counts, because rework stays owed until a newer verdict says otherwise.
+forge reached no decision does it take the newest marker comment. A stale
+`CHANGES_REQUESTED` still counts, because rework stays owed until a newer
+verdict says otherwise.
 
-GitLab is unchanged: approval is `glab mr approve`, a rejection is an MR note,
-and there is no marker.
+**Approval for a merge is bound to the head commit (#3983).** Every GitHub
+merge door (the Merge button, the merge queue, the auto-merge scheduler,
+schedule door and executor) accepts exactly two proofs: a trusted reviewer's
+standing GitHub `APPROVED` review whose `commit.oid` is the PR head
+(`forgeApprovalAtHead`; trusted is the marker rule, and each reviewer's latest
+review stands, so a later "Request changes" withdraws the approval), or a
+trusted `APPROVED` marker whose `sha=` is the PR head (`approvedAtHead`). A
+marker without `sha=`, or one naming another commit, never approves a merge,
+however recent the comment. See [PIPELINE-GATES.md](PIPELINE-GATES.md).
+
+GitLab: approval is `glab mr approve`, which the gate reads as a named approver
+in `approved_by` (#4066 review; a green, conflict-free MR nobody approved is
+not approved). A rejection is an MR note, and there is no marker.
 
 ---
 

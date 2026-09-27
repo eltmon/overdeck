@@ -40,8 +40,11 @@ if [[ -n "${OVERDECK_AGENT_ID:-}" ]]; then
   is_agent=1
 fi
 
+# Agent workspaces commit as the GitHub App's bot, `<app-slug>[bot]` (the slug
+# comes from the installed App, e.g. overdeck-agent; #4066 review). Any `[bot]`
+# identity is an agent's, never the operator's.
 git_user_name=$(git config user.name 2>/dev/null || true)
-if [[ "$git_user_name" == "panopticon-agent[bot]" ]]; then
+if [[ "$git_user_name" == *"[bot]" ]]; then
   is_agent=1
 fi
 

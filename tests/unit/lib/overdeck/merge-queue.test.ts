@@ -9,6 +9,7 @@ import {
   enqueueMerge,
   getCurrentMerge,
   markMergeProcessing,
+  removeQueuedMerge,
 } from '../../../../src/lib/overdeck/merge.js';
 
 let odb: OverdeckTestDb;
@@ -62,5 +63,15 @@ describe('persistent merge queue', () => {
     expect(liveQueueRows('pan')).toEqual([
       expect.objectContaining({ issue_id: 'PAN-3136', status: 'processing', started_at: startedAt }),
     ]);
+  });
+
+  // #4066 review: an operator's auto-merge cancel removes the issue's queue entry.
+  it('removes only a waiting entry, never the merge already processing', () => {
+    enqueueMerge('pan', 'PAN-1');
+    markMergeProcessing('pan', 'PAN-1');
+    enqueueMerge('pan', 'PAN-2');
+    expect(removeQueuedMerge('pan-2')).toBe(1);
+    expect(removeQueuedMerge('PAN-1')).toBe(0);
+    expect(liveQueueRows('pan').map((row) => row.issue_id)).toEqual(['PAN-1']);
   });
 });

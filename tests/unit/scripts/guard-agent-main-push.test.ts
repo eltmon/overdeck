@@ -81,6 +81,21 @@ describe('guard-agent-main-push.sh', () => {
     expect(result.output).toContain('src/code.ts');
   });
 
+  // #4066 review: agents commit as the installed App's bot, whatever its slug.
+  it('treats any App bot commit identity as an agent, with no agent id set', () => {
+    for (const bot of ['panopticon-agent[bot]', 'overdeck-agent[bot]']) {
+      const { root, base } = setupRepo(bot);
+      mkdirSync(join(root, 'src'), { recursive: true });
+      writeFileSync(join(root, 'src', 'code.ts'), 'export const code = true;\n');
+      const head = commitAll(root, 'code change');
+
+      const result = runGuard(root, ['--range', `${base}..${head}`], { OVERDECK_AGENT_ID: undefined });
+
+      expect(result.ok).toBe(false);
+      expect(result.output).toContain('src/code.ts');
+    }
+  });
+
   it('allows agent-context ranges touching only state-plane paths', () => {
     const { root, base } = setupRepo();
     mkdirSync(join(root, '.pan', 'records'), { recursive: true });

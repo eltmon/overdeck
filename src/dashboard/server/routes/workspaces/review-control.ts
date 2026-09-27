@@ -129,8 +129,9 @@ const postWorkspaceReviewPurgeRoute = HttpRouter.add(
 // Close every reviewer for an issue through the terminal backend (tmux or
 // Herdr) and mark its row stopped; closes that failed come back in `failed`. Does NOT message the
 // work agent — leaves the worker idle. Use this to stop a runaway or stuck
-// review without triggering a resubmit. PAN-3917: killing the sessions is the
-// whole effect; the PR keeps whatever review state the forge holds.
+// review without triggering a resubmit. PAN-3917: killing the sessions (plus a
+// `review.aborted` journal entry, #4134) is the whole effect; the PR keeps
+// whatever review state the forge holds.
 
 const postWorkspaceAbortReviewRoute = HttpRouter.add(
   'POST',
@@ -163,6 +164,19 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       `[abort-review] Aborted ${killed.length} reviewer session(s) for ${issueId}` +
       (failed.length ? ` (could not stop: ${failed.join(', ')})` : '')
     );
+    // The abort is an operator hold: journal it, so stalled-review recovery
+    // does not re-synthesize the review the operator just stopped (#4134).
+    if (workspaceInfo.localPath) {
+      const { appendPipelineEntry } = yield* Effect.promise(() =>
+        import('../../../../lib/cloister/pipeline-journal.js'),
+      );
+      appendPipelineEntry(workspaceInfo.localPath, {
+        type: 'review.aborted',
+        issueId,
+        source: 'review-abort',
+        data: { killed, failed },
+      });
+    }
 
     return jsonResponse({
       success: true,

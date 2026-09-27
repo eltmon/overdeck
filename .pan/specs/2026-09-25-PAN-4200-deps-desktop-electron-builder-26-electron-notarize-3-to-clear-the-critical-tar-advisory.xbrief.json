@@ -1,0 +1,498 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-25T06:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4200: deps(desktop): electron-builder 26 + @electron/notarize 3 to clear the critical tar advisory",
+    "updated": "2026-09-25T06:41:29.141Z"
+  },
+  "plan": {
+    "id": "pan-4200",
+    "title": "deps(desktop): electron-builder 26 + @electron/notarize 3 to clear the critical tar advisory",
+    "status": "running",
+    "uid": "0b202478-9920-47de-bcc6-0a9307173a58",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 3,
+    "created": "2026-09-25T06:30:00Z",
+    "updated": "2026-09-25T06:41:29.141Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4200",
+        "label": "PAN-4200",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4200.md",
+        "label": "PRD draft (.pan/drafts/pan-4200.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "deps",
+      "security",
+      "desktop",
+      "electron",
+      "packaging"
+    ],
+    "narratives": {
+      "Problem": "bun audit reports one critical advisory (GHSA-23hp-3jrh-7fpw, tar <7.5.7). Both vulnerable copies are tar@6.2.1, pulled in only by electron-builder 25 (app-builder-lib 25 directly, and via @electron/rebuild 3.6.1 -> node-gyp 9 -> cacache 16). No patched tar 6.x exists. electron-builder 25 also carries the high AppImage search-path advisory GHSA-7g7r-gx96-252g, and the exact electron pin 40.6.0 carries ~35 Electron advisories fixed by 40.8.0+.",
+      "Proposal": "Bump electron-builder to ^26.15.3 (app-builder-lib 26 uses tar ^7.5.7 and @electron/rebuild 4) and @electron/notarize to ^3.1.1; move electron's exact pin to 40.10.6. Keep the .cjs afterSign hook (Node 22.12+ require(esm) loads ESM-only notarize 3; verified on 22.22) and drop its notarize-2-only `tool` option; keep mac.notarize: false (still a boolean in electron-builder 26's schema and still skips built-in notarization). Guard the pins and hook with package-structure tests, document notarization in docs/BUILD.md, and prove the Linux AppImage builds and starts in a virgin environment.",
+      "NonGoals": "- Upgrading electron-updater or any other runtime dependency (the remaining builder-util-runtime <9.7.0 high advisory via electron-updater is a follow-up)\n- Switching to electron-builder 26's built-in notarization or deleting the afterSign hook\n- Renaming notarize.cjs to .mjs (only the documented await import() fallback inside the .cjs may change its load form)\n- Changing afterPack.cjs\n- Fixing other non-critical bun audit advisories (mermaid, react-router, vite, fastify, ...)\n- Moving Electron to a new major or changing mac arch targets\n- Adding mac or Windows packaging runs to local verification or CI\n- Adding package overrides/resolutions to force transitive versions"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the afterSign hook as .cjs with a synchronous require of @electron/notarize 3",
+        "rationale": "Issue step 2 makes the .mjs rename conditional on Node 22 failing to load it; a scratch probe loaded notarize 3.1.1 via require() under Node v22.22.0 (require(esm), no top-level await), and CI setup-node 22 resolves to >=22.12. Fallback await import() documented as a checkpoint."
+      },
+      {
+        "summary": "Remove the `tool: \"notarytool\"` option from the notarize() call",
+        "rationale": "notarize 3's NotarizeOptions has no tool field; the hook only runs on the macOS release runner and cannot be exercised locally, so it must not rely on the library ignoring unknown keys."
+      },
+      {
+        "summary": "Keep the hook's manual `xcrun stapler staple`",
+        "rationale": "notarize 2.5.0 already stapled internally, so the redundancy predates this change; re-stapling is harmless and changing an untestable release path buys nothing."
+      },
+      {
+        "summary": "Keep mac.notarize: false plus the custom hook instead of electron-builder 26's built-in notarization",
+        "rationale": "Matches issue steps 2-3; the schema still types notarize as boolean and notarizeIfProvided returns early on false. Switching would make the @electron/notarize 3 devDependency dead weight."
+      },
+      {
+        "summary": "Use ^26.15.3 for electron-builder",
+        "rationale": "26.15.3 is the npm latest dist-tag and >=26.15.0 (the AppImage fix); the caret resolves the newest 26.x (26.16.1 at planning time)."
+      },
+      {
+        "summary": "Leave electron-updater at ^6.8.3",
+        "rationale": "It is a runtime dependency shipped in the app and outside the issue's stated scope (0 critical); its builder-util-runtime high advisory is named in the PR body as a follow-up."
+      },
+      {
+        "summary": "Record WI-6 verification evidence in an empty commit",
+        "rationale": "The verification changes no files but pan task done checks for an Item-trailer commit; an --allow-empty commit whose body lists the commands and results is durable evidence."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-25-PAN-4200-deps-desktop-electron-builder-26-electron-notarize-3-to-clear-the-critical-tar-advisory.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "wi1-electron-builder-26",
+        "title": "Bump electron-builder to ^26.15.3 and @electron/notarize to ^3.1.1",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4200",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install --frozen-lockfile",
+            "grep -c 'tar@6' bun.lock",
+            "bun audit 2>&1 | tail -6"
+          ],
+          "expected_outputs": [
+            "bun install --frozen-lockfile exits 0",
+            "grep prints 0",
+            "bun audit summary shows 0 critical and no 'tar ' or 'app-builder-lib ' block"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/pan-4200.md). In apps/desktop/package.json devDependencies change \"@electron/notarize\": \"^2.5.0\" -> \"^3.1.1\" and \"electron-builder\": \"^25.1.8\" -> \"^26.15.3\". Do not touch dependencies (conf, electron-updater). Run bun install from the repo root and commit bun.lock. Expect two @electron/notarize entries in bun.lock afterwards (top-level 3.x plus app-builder-lib/@electron/notarize 2.5.0) - that is correct, add no overrides."
+        },
+        "items": [
+          {
+            "id": "wi1-electron-builder-26.ac1",
+            "title": "Given the bumped package.json, when `bun install --frozen-lockfile` runs on the committed bun.lock, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-electron-builder-26.ac2",
+            "title": "Given the committed bun.lock, when grepping for `tar@6`, then it returns zero matches and `app-builder-lib` resolves to a 26.x version >= 26.15.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-electron-builder-26.ac3",
+            "title": "Given the repo root, when `bun audit` runs, then its summary line reports `0 critical` and it prints no `tar ` or `app-builder-lib ` advisory block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-electron-builder-26.ac4",
+            "title": "Given apps/desktop/package.json, when diffed against main, then the `dependencies` object is byte-identical (conf and electron-updater unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-electron-pin",
+        "title": "Move the exact electron pin from 40.6.0 to 40.10.6",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4200",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install --frozen-lockfile",
+            "grep '\"electron\": \\[\"electron@' bun.lock",
+            "bun audit 2>&1 | grep -c '^electron '"
+          ],
+          "expected_outputs": [
+            "bun install exits 0",
+            "lock entry shows electron@40.10.6",
+            "grep count prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Edit apps/desktop/package.json devDependencies by hand: \"electron\": \"40.6.0\" -> \"40.10.6\" (exact, no caret; bun update does not move exact pins). Run bun install from the repo root and commit bun.lock. Electron 40.x keeps ABI 143, so prepare-server-resources.mjs needs no change."
+        },
+        "items": [
+          {
+            "id": "wi2-electron-pin.ac1",
+            "title": "Given apps/desktop/package.json, when read, then devDependencies.electron equals the exact string `40.10.6`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-electron-pin.ac2",
+            "title": "Given the committed bun.lock, when `bun install --frozen-lockfile` runs, then it exits 0 and the lock resolves `electron@40.10.6`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-electron-pin.ac3",
+            "title": "Given the repo root, when `bun audit` runs, then it prints no `electron ` advisory block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-notarize-hook",
+        "title": "Drop the notarize-2 `tool` option from the afterSign hook and document its ESM loading",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4200",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/scripts/notarize.cjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && node -e 'const m=require(\"@electron/notarize\");if(typeof m.notarize!==\"function\")process.exit(1)'",
+            "cd apps/desktop && node -e 'require(\"./scripts/notarize.cjs\").default({electronPlatformName:\"linux\"}).then(()=>process.exit(0))'",
+            "grep -c 'tool:' apps/desktop/scripts/notarize.cjs"
+          ],
+          "expected_outputs": [
+            "first node command exits 0",
+            "second node command exits 0",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In apps/desktop/scripts/notarize.cjs: remove the `tool: \"notarytool\",` line from the notarize() options (notarize 3's NotarizeOptions has no tool field); extend the comment above `const { notarize } = require(\"@electron/notarize\");` to say notarize 3 is ESM-only and Node >= 22.12 loads it via require(esm). Keep the .cjs filename, keep execSync and the `xcrun stapler staple` call, keep the env-var gating. Do not edit package.json build.mac.notarize (stays false) or build.afterSign. CHECKPOINT: if the require check fails with ERR_REQUIRE_ESM, replace the require line with `const { notarize } = await import(\"@electron/notarize\");` in the same .cjs file and re-run."
+        },
+        "items": [
+          {
+            "id": "wi3-notarize-hook.ac1",
+            "title": "Given @electron/notarize 3 installed, when `require(\"@electron/notarize\")` runs under Node 22 in apps/desktop, then it returns an object whose `notarize` export is a function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-notarize-hook.ac2",
+            "title": "Given a non-darwin context, when the hook's default export is called with `{electronPlatformName: \"linux\"}`, then it resolves without throwing and the process exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-notarize-hook.ac3",
+            "title": "Given apps/desktop/scripts/notarize.cjs, when grepped, then it contains no `tool:` key and still passes appPath, appleApiKey, appleApiKeyId, appleApiIssuer to notarize()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-guard-test",
+        "title": "Add PAN-4200 regression assertions to the desktop package-structure test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4200",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/tests/package-structure.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx vitest run --configLoader runner tests/package-structure.test.ts"
+          ],
+          "expected_outputs": [
+            "package-structure.test.ts passes including the 'desktop packaging dependencies (PAN-4200)' describe block (5 tests)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Append the describe(\"desktop packaging dependencies (PAN-4200)\") block from the PRD to apps/desktop/tests/package-structure.test.ts, reusing the file's readPkg() and desktopDir. Five tests: electron-builder matches /^\\^26\\./, @electron/notarize matches /^\\^3\\./, electron === \"40.10.6\", build.mac.notarize === false and build.afterSign === \"scripts/notarize.cjs\", notarize.cjs has no `tool: \"notarytool\"` and contains `appleApiKey: APPLE_API_KEY`. Run only this test file, never the full npm test."
+        },
+        "items": [
+          {
+            "id": "wi4-guard-test.ac1",
+            "title": "Given the bumped package.json and hook, when `npx vitest run --configLoader runner tests/package-structure.test.ts` runs in apps/desktop, then all tests pass including five in the `desktop packaging dependencies (PAN-4200)` block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-guard-test.ac2",
+            "title": "Given electron is temporarily set back to `40.6.0`, when the test file runs, then the `exact-pins electron 40.10.6` test fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-guard-test.ac3",
+            "title": "Given `tool: \"notarytool\"` is temporarily re-added to notarize.cjs, when the test file runs, then the hook-options test fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-docs-build",
+        "title": "Document macOS notarization and pinned packaging versions in docs/BUILD.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4200",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/BUILD.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### macOS Signing and Notarization' docs/BUILD.md",
+            "grep -c 'APPLE_API_KEY_ID\\|APPLE_API_ISSUER\\|notarize: false\\|40.10.6\\|22.12' docs/BUILD.md"
+          ],
+          "expected_outputs": [
+            "heading found inside the Electron Desktop App section, before ### Native Addon Rebuild",
+            "count is at least 5"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In docs/BUILD.md, section `## Electron Desktop App (apps/desktop)`, insert `### macOS Signing and Notarization` immediately before `### Native Addon Rebuild`. State in prose: electron-builder 26, Electron exact-pinned 40.10.6 (bun update does not move exact pins); build.mac.notarize is false so built-in notarization is off; notarization runs in the afterSign hook apps/desktop/scripts/notarize.cjs only when APPLE_API_KEY (.p8 path), APPLE_API_KEY_ID and APPLE_API_ISSUER are all set (release workflow macOS runner), otherwise it logs a skip and the app ships signed but not notarized; @electron/notarize 3 is ESM-only and needs Node >= 22.12, loaded by the .cjs hook via require(esm); notarize() staples itself and the hook's extra xcrun stapler staple is harmless."
+        },
+        "items": [
+          {
+            "id": "wi5-docs-build.ac1",
+            "title": "Given docs/BUILD.md, when read, then a `### macOS Signing and Notarization` subsection appears inside the Electron Desktop App section directly before `### Native Addon Rebuild`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-docs-build.ac2",
+            "title": "Given that subsection, when read, then it names `notarize: false`, `scripts/notarize.cjs`, and all three variables APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-docs-build.ac3",
+            "title": "Given that subsection, when read, then it states the Node >= 22.12 requirement for the ESM-only @electron/notarize 3 and the exact Electron pin 40.10.6",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-linux-verify",
+        "title": "Verify the Linux AppImage builds and starts in a virgin environment",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-25T06:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4200",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/dist/*.AppImage",
+            "apps/desktop/dist/latest-linux.yml"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "bun run build:desktop:linux",
+            "see PRD WI-6 step 3 xvfb-run virgin-launch script"
+          ],
+          "expected_outputs": [
+            "build:desktop:linux exits 0 and smoke-appimage-cli passes",
+            "script prints 'health 200 on port <p>', 'Overdeck windows: 1', 'exited-code lines: 0'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. From the repo root run `bun run build:desktop:linux` (run `npm run build` first if server/frontend output is missing). Then run the PRD's virgin-launch script (env -i HOME=<scratch> PATH=/usr/bin:/bin inside one xvfb-run; poll /api/health on ports 7825-7834; count windows named Overdeck; count 'exited code' log lines; stop with pkill -f \"mount_Overd[e]\"). No files change: record the commands and results in an empty commit (git commit --allow-empty) carrying the Item trailer. If electron-builder 26 broke the AppImage (e.g. resources layout), fix it within this issue - a broken AppImage is not a follow-up."
+        },
+        "items": [
+          {
+            "id": "wi6-linux-verify.ac1",
+            "title": "Given WI-1..WI-3 landed, when `bun run build:desktop:linux` runs, then it exits 0 including prepare-server-resources' Electron ABI load check and smoke-appimage-cli",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-linux-verify.ac2",
+            "title": "Given the build, when apps/desktop/dist is listed, then it contains `Overdeck-<version>.AppImage` and `latest-linux.yml`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-linux-verify.ac3",
+            "title": "Given a virgin environment under xvfb-run, when the AppImage launches, then /api/health returns 200 on a port in 7825-7834, exactly one window named `Overdeck` exists, and the log contains zero `exited code` lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-electron-builder-26",
+        "to": "wi2-electron-pin",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-electron-builder-26",
+        "to": "wi3-notarize-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-electron-builder-26",
+        "to": "wi4-guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-electron-pin",
+        "to": "wi4-guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-notarize-hook",
+        "to": "wi4-guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-electron-builder-26",
+        "to": "wi6-linux-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-electron-pin",
+        "to": "wi6-linux-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-notarize-hook",
+        "to": "wi6-linux-verify",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
