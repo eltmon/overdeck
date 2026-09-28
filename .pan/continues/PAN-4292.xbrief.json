@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T12:52:40.778Z",
+  "updated": "2026-09-28T12:52:46.122Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4292",
       "claimedAt": "2026-09-28T12:50:00.908Z",
       "doneAt": "2026-09-28T12:52:40.778Z"
+    },
+    "tmux-steer-submit": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T12:52:46.121Z"
     }
   }
 }
