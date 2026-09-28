@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3942",
   "created": "2026-09-28T17:21:05.119Z",
-  "updated": "2026-09-28T18:26:56.185Z",
+  "updated": "2026-09-28T18:27:06.028Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "resolver.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T18:26:56.185Z"
+    },
+    "resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:27:06.028Z"
     }
   }
 }
