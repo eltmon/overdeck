@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:03:36.821Z",
+  "updated": "2026-09-28T16:03:48.417Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -276,6 +276,10 @@
     "gate-admission-psi.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T16:03:36.821Z"
+    },
+    "gate-admission-psi.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:03:48.417Z"
     }
   }
 }
