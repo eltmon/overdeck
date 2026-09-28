@@ -89,14 +89,24 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   another HTTP error is a settled answer and shows the alert with its Retry
   button. The membership query also joins the reconnect refetch above.
 
-**Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
-starts a discuss-first conversation through `POST /api/conversations` and opens
-`/conv/:name`. The description uses a full row, with the project selector, model
-picker, and action wrapping below it. The model picker follows the configured
-provider harness unless explicit harness permutations are enabled. Click and
-Enter share a pending-launch guard. Launch errors appear below the controls;
-the draft stays available for retry. Browser coverage lives in
-`src/dashboard/frontend/tests/talk-it-through.spec.ts`.
+**Home composer** (PAN-4280): `components/home/HomeComposer.tsx`, mounted on
+both Simple and Advanced Home. It wraps the existing Launcher with the Home
+intent order from `buildHomeIntents` (agent, terminal, optional codex,
+Simple-only "Talk it through first:"), a project chip, and type-to-focus.
+Enter posts the raw typed text to `POST /api/conversations` (no `projectKey`
+when no project is chosen) and opens `/conv/:name`; the Simple discuss-first
+flow sends `seedDiscussPrompt(text)` instead. Ctrl+Enter (or the terminal row)
+writes a terminal hand-off through `components/home/pendingTerminal.ts` — a
+sessionStorage record plus a same-tab `CustomEvent` — then navigates to the
+deck; `Stage` and `TerminalDrawer` each consume that hand-off (opening the
+drawer and running the command in a fresh shell) so it runs exactly once.
+Launch errors appear below the input; the draft stays available for retry.
+Browser coverage lives in `src/dashboard/frontend/tests/home-type-and-go.spec.ts`
+and `tests/talk-it-through.spec.ts`.
+
+`POST /api/terminals` also accepts an optional `command` (a single line, at
+most 2000 characters): once the tmux session exists, it is typed in with
+`send-keys -l` then Enter, and the response reports `commandSent`.
 
 **Pipeline retrospective button:** the Command Deck header's
 `RetrospectiveButton` (`components/CommandDeck/RetrospectiveButton.tsx`) POSTs
