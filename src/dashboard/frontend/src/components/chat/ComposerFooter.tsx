@@ -14,6 +14,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
+import { getHarnessBehavior } from '@overdeck/contracts';
 import { isServerWriteBlocked } from '../../lib/connectionState';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
@@ -73,6 +74,9 @@ interface ComposerFooterProps {
 }
 
 type DeliverAs = 'auto' | 'steer' | 'follow_up';
+
+/** PAN-4292 D1: what Steer means for Claude Code, shown on the selector while Steer is chosen. */
+const CLAUDE_STEER_TOOLTIP = 'Steer: interrupt the current turn and send now (Claude Code Ctrl+Enter). Auto queues the message for the running turn.';
 
 function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
@@ -181,6 +185,12 @@ export function ComposerFooter({
   }, [conversation.name, conversation.effort, resolvedConversationEffort]);
 
   const piConversation = isPiConversation(conversation);
+  // PAN-4292: the delivery selector follows the harness steer capability. Pi
+  // steers over its control channel, which only the conversation route
+  // carries; Claude Code steers with send-now keys on both routes.
+  const steerKind = getHarnessBehavior(harness).steerKind;
+  const showDeliverySelector = steerKind === 'send-now-keys' || (steerKind === 'control-channel' && !agentId);
+  const steerOptionLabel = navigator.platform.toLowerCase().includes('mac') ? 'Steer (⌘+Enter)' : 'Steer (Ctrl+Enter)';
   const isDisabled = !conversation.sessionAlive || sending;
   const canEditModelBeforeStart = !agentId && !conversation.sessionAlive && !conversation.claudeSessionId;
   const isEmpty = text.trim() === '';
@@ -420,7 +430,7 @@ export function ComposerFooter({
     }
   }, []);
 
-  const handleSubmit = useCallback(async (directMessageText?: string) => {
+  const handleSubmit = useCallback(async (directMessageText?: string, deliverAsOverride?: 'steer') => {
     const editor = editorRef.current;
     if (!editor) {
       console.warn('[ComposerFooter] handleSubmit: editor ref not ready');
@@ -493,6 +503,7 @@ export function ComposerFooter({
     // control-plane lane and leave any uploaded attachments pending.
     const submissionMessage = isPortableCommand ? messageText : composedMessage;
     const clientMessageId = crypto.randomUUID();
+    const sendDeliverAs = deliverAsOverride ?? (showDeliverySelector && deliverAs !== 'auto' ? deliverAs : undefined);
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
       // This auto-switch silently killed a running agent's live session (the Opus
@@ -520,7 +531,7 @@ export function ComposerFooter({
         }
         holdSend(submitConversationName, composedMessage, {
           clientMessageId,
-          deliverAs: piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
+          deliverAs: sendDeliverAs,
         });
         consumeAttachmentsForConversation(submitConversationName);
         editor.update(() => {
@@ -539,7 +550,7 @@ export function ComposerFooter({
         submitConversationName,
         submissionMessage,
         agentId,
-        piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
+        sendDeliverAs,
         undefined,
         { clientMessageId },
       );
@@ -589,7 +600,7 @@ export function ComposerFooter({
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
       onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt', {
         ...sendFailureDetails(err), clientMessageId,
-        deliverAs: piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
+        deliverAs: sendDeliverAs,
       });
     } finally {
       // Clear the originating conversation's sending state regardless of which
@@ -598,7 +609,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, sending, setSendingFor, showDeliverySelector]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -660,10 +671,13 @@ export function ComposerFooter({
   }, [isDisabled]);
 
   const handleCommandKey = useCallback(
-    (key: 'Enter') => {
-      if (key === 'Enter') void handleSubmit();
+    (key: 'Enter' | 'SteerEnter') => {
+      // PAN-4292 D5: Ctrl/Cmd+Enter steers on a steer-capable harness, busy or
+      // idle (an idle steer is a plain submit); elsewhere it is Enter.
+      if (key === 'SteerEnter') void handleSubmit(undefined, showDeliverySelector ? 'steer' : undefined);
+      else void handleSubmit();
     },
-    [handleSubmit],
+    [handleSubmit, showDeliverySelector],
   );
 
   return (
@@ -783,20 +797,24 @@ export function ComposerFooter({
           <div className={styles.composerToolbarDivider} />
           <EffortPicker unverified={!effortVerified && Boolean(conversation.sessionAlive || conversation.claudeSessionId)} title={(!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode') ? 'Change effort in the native terminal for this session.' : 'Changes apply to subsequent turns after runtime acceptance.'} value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive || Boolean(agentId) || (!piConversation && harness !== 'codex' && harness !== 'acp' && harness !== 'opencode')} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
+          {showDeliverySelector && (
+            <select
+              className={styles.deliveryMethodSelect}
+              value={deliverAs}
+              onChange={(event) => setDeliverAs(event.target.value as DeliverAs)}
+              title={steerKind === 'control-channel'
+                ? (agentBusy ? 'Pi delivery mode while busy' : 'Pi delivery mode')
+                : (deliverAs === 'steer' ? CLAUDE_STEER_TOOLTIP : 'Delivery mode')}
+              aria-label={steerKind === 'control-channel' ? 'Pi delivery mode' : 'Delivery mode'}
+              disabled={!conversation.sessionAlive}
+            >
+              <option value="auto">Auto</option>
+              <option value="steer">{steerOptionLabel}</option>
+              {steerKind === 'control-channel' && <option value="follow_up">Follow-up</option>}
+            </select>
+          )}
           {piConversation && !agentId && (
             <>
-              <select
-                className={styles.deliveryMethodSelect}
-                value={deliverAs}
-                onChange={(event) => setDeliverAs(event.target.value as DeliverAs)}
-                title={agentBusy ? 'Pi delivery mode while busy' : 'Pi delivery mode'}
-                aria-label="Pi delivery mode"
-                disabled={!conversation.sessionAlive}
-              >
-                <option value="auto">Auto</option>
-                <option value="steer">Steer</option>
-                <option value="follow_up">Follow-up</option>
-              </select>
               <button
                 className={styles.voiceToolbarButton}
                 onClick={handleCompact}

@@ -117,7 +117,7 @@ export async function sendConversationMessage(
   const payload = {
     message,
     ...options,
-    ...(deliverAs && !agentId ? { deliverAs } : {}),
+    ...(deliverAs ? { deliverAs } : {}),
     ...(confirmation ? {
       confirmationNonce: confirmation.nonce,
       ...(confirmation.typedText !== undefined
