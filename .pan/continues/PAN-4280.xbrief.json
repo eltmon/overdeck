@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:19:16.090Z",
+  "updated": "2026-09-28T01:19:26.475Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -302,6 +302,10 @@
     "sidebar-no-project-row.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T01:19:16.089Z"
+    },
+    "home-e2e-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:19:26.475Z"
     }
   }
 }
