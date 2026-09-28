@@ -89,6 +89,11 @@ export interface WorkspaceIntentDryRun {
 export interface ResolvedWorkspaceIntent extends WorkspaceIntentDryRun {
   /** True when `path` sits under no registered target for the project — informational, never an error. */
   unregisteredTargetPath: boolean;
+  /**
+   * Branches matching `branchQuery`, prefix matches first (≤ 20). A dashboard
+   * suggestion list only: not part of the dry-run payload.
+   */
+  branchCandidates: string[];
   /** Empty when the intent is ready to perform. */
   findings: WorkspaceIntentFinding[];
 }
@@ -107,6 +112,8 @@ export interface WorkspaceCreateInput {
   isolated?: boolean;
   targetPath?: string;
   parentBranch?: string;
+  /** Text to match branch names against for `branchCandidates`; ignored below 2 characters. */
+  branchQuery?: string;
 }
 
 interface ResolvedProjectRef {
@@ -144,6 +151,39 @@ function isPathUnder(path: string, candidate: string): boolean {
 }
 
 type ProjectRefResult = { ref: ResolvedProjectRef } | { finding: WorkspaceIntentFinding };
+
+const BRANCH_CANDIDATE_LIMIT = 20;
+
+/**
+ * Local and remote-tracking branches of `cwd` matching `query`, case-insensitive:
+ * prefix matches first, then substring matches, deduplicated and capped. Any git
+ * failure (not a repository, timeout) is simply no suggestions.
+ */
+async function listBranchCandidates(cwd: string, query: string): Promise<string[]> {
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync('git', ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes'], {
+      cwd,
+      timeout: 5_000,
+    }));
+  } catch {
+    return [];
+  }
+  const names: string[] = [];
+  for (const ref of String(stdout).split('\n').map((line) => line.trim())) {
+    if (ref.startsWith('refs/heads/')) names.push(ref.slice('refs/heads/'.length));
+    // A remote's HEAD is an alias for one of its branches, not a branch to start from.
+    else if (ref.startsWith('refs/remotes/') && !ref.endsWith('/HEAD')) names.push(ref.slice('refs/remotes/'.length));
+  }
+  const needle = query.trim().toLowerCase();
+  const prefix = names.filter((name) => name.toLowerCase().startsWith(needle));
+  const substring = names.filter((name) => !name.toLowerCase().startsWith(needle) && name.toLowerCase().includes(needle));
+  return [...new Set([...prefix, ...substring])].slice(0, BRANCH_CANDIDATE_LIMIT);
+}
+
+function wantsBranchCandidates(input: WorkspaceCreateInput): input is WorkspaceCreateInput & { branchQuery: string } {
+  return (input.branchQuery?.trim().length ?? 0) >= 2;
+}
 
 /** Resolve an explicit key, else the sole registered project, else the caller's cwd. */
 async function resolveProjectRef(projectKey?: string, cwd?: string): Promise<ProjectRefResult> {
@@ -258,6 +298,7 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
     isGitRepository: false,
     wouldCreateWorktree: false,
     unregisteredTargetPath: false,
+    branchCandidates: [],
     findings,
   };
 
@@ -287,7 +328,16 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
   // mode undetermined, everything downstream — the project lookup, the git
   // rev-parse, the filesystem stats — would be derived from input we have
   // already refused, so we touch neither git nor the filesystem.
-  if (findings.length > 0) return intent;
+  if (findings.length > 0) {
+    // The Smart field asks for branches before a name is chosen, and an empty
+    // name is invalid, so suggestions still answer here. Only a dashboard
+    // request sends branchQuery; the CLI path is unchanged.
+    if (wantsBranchCandidates(input)) {
+      const project = await resolveProjectRef(input.projectKey, input.cwd);
+      if ('ref' in project) intent.branchCandidates = await listBranchCandidates(project.ref.config.path, input.branchQuery);
+    }
+    return intent;
+  }
 
   const project = await resolveProjectRef(input.projectKey, input.cwd);
   if ('finding' in project) {
@@ -296,6 +346,9 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
   }
   const { key, config } = project.ref;
   intent.projectId = key;
+  if (wantsBranchCandidates(input)) {
+    intent.branchCandidates = await listBranchCandidates(config.path, input.branchQuery);
+  }
 
   if (kind === 'scratch') {
     const parentBranch = input.parentBranch ?? (await inferParentBranch(config.path, input.refreshParentBranch));

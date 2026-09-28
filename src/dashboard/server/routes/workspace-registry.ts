@@ -198,6 +198,7 @@ function toCreateInput(body: Record<string, unknown>): WorkspaceCreateInput {
     targetPath: str(body.targetPath),
     isolated: body.isolated === true,
     parentBranch: str(body.parentBranch),
+    branchQuery: str(body.branchQuery),
   };
 }
 
