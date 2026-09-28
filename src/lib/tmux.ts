@@ -1034,11 +1034,9 @@ export const sendKeys = (
   Effect.tryPromise({
     try: async () => {
       validateSessionName(sessionName);
-      // PAN-4292: a steer submits with Claude Code's send-now chord (C-x C-s)
-      // instead of Enter, on the first submit and on the resend chaser.
-      const steer = options?.submit === 'steer';
+      // PAN-4292: a steer submits (and resubmits) with the send-now chord, never Enter.
       const submitKeys = tmuxSubmitKeys(options?.submit);
-      const submitLabel = steer ? 'Steer' : 'Enter';
+      const submitLabel = options?.submit === 'steer' ? 'Steer' : 'Enter';
       logSendKeys(sessionName, keys, caller);
 
       const sendId = randomUUID();
