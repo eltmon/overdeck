@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4300",
+  "created": "2026-09-28T12:54:38.633Z",
+  "updated": "2026-09-28T12:54:38.633Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "dead-agent-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4300",
+      "claimedAt": "2026-09-28T12:54:38.633Z"
+    }
+  }
+}
