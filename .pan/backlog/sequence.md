@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:54:44.350190Z · model: claude-opus-5-5 · open: 785_
+_Last sequenced: 2026-09-28T12:55:47.278022Z · model: claude-opus-5-5 · open: 787_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -477,6 +477,7 @@ _Last sequenced: 2026-09-28T12:54:44.350190Z · model: claude-opus-5-5 · open: 
 | 538 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
 | 539 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
 | 540 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 541 | PAN-4307 | L | medium | ok |  | PAN-2609 | Session Vault dashboard consumer: auto-settle, read-only browse copies, Continue here, eviction review panel. Blocked by PAN-2609. |
 | 542 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
 | 543 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
 | 544 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
@@ -541,6 +542,7 @@ _Last sequenced: 2026-09-28T12:54:44.350190Z · model: claude-opus-5-5 · open: 
 | 606 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
 | 607 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
 | 608 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 609 | PAN-4308 | S | medium | ok |  | PAN-2609, PAN-4295 | Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap). |
 | 610 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
 | 611 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
 | 612 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
@@ -1100,10 +1102,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:54:44.350190Z",
+  "generatedAt": "2026-09-28T12:55:47.278022Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 785,
+  "openCount": 787,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -10858,6 +10860,37 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "rationale": "New issue split out of in-pipeline PAN-4301 with verified emit sites and ACs; ranked in the medium band because it waits on PAN-4300 (in pipeline) and is feed hygiene, not substrate.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4307",
+      "rank": 541,
+      "size": "L",
+      "importance": "medium",
+      "score": 42,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2609"
+      ],
+      "why": "Session Vault dashboard consumer: auto-settle, read-only browse copies, Continue here, eviction review panel. Blocked by PAN-2609.",
+      "rationale": "New node split from PAN-2609 during its 2026-09-28 planning; placed just after the vault engine it consumes, in a free slot so no other rank moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4308",
+      "rank": 609,
+      "size": "S",
+      "importance": "medium",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-2609",
+        "PAN-4295"
+      ],
+      "why": "Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap).",
+      "rationale": "New node split from PAN-2609; placed after both blockers (PAN-2609 at 506, PAN-4295 at 566) in a free slot so no other rank moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12078,6 +12111,41 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "type": "informs",
       "source": "github-ref",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4307",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4308",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2609",
+      "to": "PAN-4307",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2609",
+      "to": "PAN-4308",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4295",
+      "to": "PAN-4308",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
