@@ -82,7 +82,7 @@ export function ReviewVerificationCard({ issueId }: { issueId: string }) {
   )
 
   const restartReview = actions.all.find((v) => v.action.key === 'restartReview')
-  const actionButtons = [restartReview].filter((v): v is IssueActionView => !!v && v.enabled)
+  const actionButtons = [restartReview].filter((v): v is IssueActionView => !!v && (v.enabled || v.blockedOffline))
 
   return (
     <CockpitCard
@@ -123,7 +123,8 @@ export function ReviewVerificationCard({ issueId }: { issueId: string }) {
             <button
               key={v.action.key}
               type="button"
-              disabled={v.isPending}
+              disabled={v.isPending || v.blockedOffline}
+              title={v.blockedOffline ? v.disabledReason : undefined}
               onClick={v.invoke}
               className="inline-flex items-center rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-accent disabled:opacity-50"
             >

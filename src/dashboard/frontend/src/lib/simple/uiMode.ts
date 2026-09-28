@@ -3,7 +3,10 @@
  *
  * One global mode, persisted per browser. Simple is the default for fresh
  * profiles; existing users (who already have dashboard localStorage footprint)
- * keep Advanced until they toggle — no jarring surprise mid-rollout.
+ * keep Advanced until they toggle — no jarring surprise mid-rollout. The
+ * resolved mode is saved back to storage on first load: App writes last-tab
+ * on every load, so an unsaved "simple" would read as "advanced" on the next
+ * load (PAN-4280).
  *
  * Simple mode reuses the SAME issue URL (/issues/:id): when mode is simple,
  * App's issue-route handler opens the simple issue page instead of the drawer.
@@ -15,16 +18,21 @@ export type UiMode = 'simple' | 'advanced';
 const MODE_KEY = 'overdeck:ui-mode';
 const LEGACY_FOOTPRINT_KEY = 'overdeck:last-tab';
 
-function initialMode(): UiMode {
-  if (typeof window === 'undefined') return 'advanced';
+export function initialMode(
+  storage: Storage | undefined = typeof window === 'undefined' ? undefined : window.localStorage,
+): UiMode {
+  if (!storage) return 'simple';
   try {
-    const stored = window.localStorage.getItem(MODE_KEY);
+    const stored = storage.getItem(MODE_KEY);
     if (stored === 'simple' || stored === 'advanced') return stored;
-    // Fresh profiles default to simple; anyone with an existing dashboard
-    // footprint stays advanced until they opt in.
-    return window.localStorage.getItem(LEGACY_FOOTPRINT_KEY) ? 'advanced' : 'simple';
+    // Fresh profiles default to simple; an existing dashboard footprint stays
+    // advanced. Save the answer now: App writes last-tab on every load, so an
+    // unsaved "simple" would read as "advanced" on the next load (PAN-4280).
+    const resolved: UiMode = storage.getItem(LEGACY_FOOTPRINT_KEY) ? 'advanced' : 'simple';
+    storage.setItem(MODE_KEY, resolved);
+    return resolved;
   } catch {
-    return 'advanced';
+    return 'simple';
   }
 }
 

@@ -83,9 +83,12 @@ const getVersionRoute = HttpRouter.add(
 const getPrerequisitesRoute = HttpRouter.add(
   'GET',
   '/api/prerequisites',
-  Effect.promise(async () => {
-    const { checkSystemPrerequisites } = await import('../../../../lib/system-prerequisites.js');
-    return jsonResponse(await checkSystemPrerequisites());
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = new URL(request.url, 'http://localhost');
+    const refresh = url.searchParams.get('refresh') === '1';
+    const { buildPrerequisitesReport } = yield* Effect.promise(() => import('./prerequisites-report.js'));
+    return jsonResponse(yield* Effect.promise(() => buildPrerequisitesReport({ refresh })));
   }),
 );
 

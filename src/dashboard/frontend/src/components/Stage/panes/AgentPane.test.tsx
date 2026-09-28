@@ -45,6 +45,11 @@ vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({
     <div data-testid="session-panel" data-session={session.id} data-issue={issueId} />
   ),
 }))
+// UnscopedConversationChip fetches the registered-projects query; stub it so
+// these pane-mechanics tests don't need a QueryClientProvider (PAN-4280).
+vi.mock('../../CommandDeck/UnscopedConversationChip', () => ({
+  UnscopedConversationChip: () => <div data-testid="unscoped-conversation-chip" />,
+}))
 
 const WS = 'PAN-1549'
 

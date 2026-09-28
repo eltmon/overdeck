@@ -1,4 +1,5 @@
 import { resolveMuseSessionPath } from '../../lib/runtimes/storage/muse.js';
+import { readPrimeAgentSessionFile } from '../../lib/runtimes/storage/prime-agent.js';
 /**
  * WebSocket RPC handlers — implements PanRpcGroup using Effect (PAN-428 B5)
  *
@@ -153,6 +154,10 @@ export function streamHarnessFullParseSnapshots(
     case 'kimi-wire-jsonl': return streamResolved(
       () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),
       sharedTranscriptParser('kimi'),
+    );
+    case 'prime-agent-jsonl': return streamResolved(
+      () => readPrimeAgentSessionFile(sessionName),
+      sharedTranscriptParser('prime-agent'),
     );
     // Claude uses the worker-backed initial parse plus incremental watcher below.
     case 'claude-jsonl': return null;

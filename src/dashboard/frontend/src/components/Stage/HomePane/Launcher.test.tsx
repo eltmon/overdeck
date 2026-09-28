@@ -9,6 +9,10 @@ describe('intentLabel', () => {
     expect(intentLabel({ id: 'w', kind: 'web' })).toBe('Search the web:')
     expect(intentLabel({ id: 'c', kind: 'agent', agentName: 'Claude Code' })).toBe('Ask Claude Code:')
   })
+
+  it('renders the talk row label', () => {
+    expect(intentLabel({ id: 'talk', kind: 'talk' })).toBe('Talk it through first:')
+  })
 })
 
 describe('Launcher', () => {
@@ -107,6 +111,14 @@ describe('Launcher', () => {
   it('renders no alert when error text is absent', () => {
     render(<Launcher />)
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('forwards inputTestId and inputRef to the input', () => {
+    const ref = { current: null as HTMLInputElement | null }
+    render(<Launcher inputRef={ref} inputTestId="home-composer-input" />)
+    const input = screen.getByTestId('home-composer-input')
+    expect(input).toBe(screen.getByRole('textbox'))
+    expect(ref.current).toBe(input)
   })
 
   it('hides extras in compact mode but shows them otherwise', () => {

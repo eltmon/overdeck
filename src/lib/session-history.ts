@@ -52,7 +52,7 @@ export interface SessionIndexEntry {
   path?: string;
 }
 
-export type TranscriptCandidateKind = 'claude' | 'codex' | 'pi' | 'ohmypi' | 'acp' | 'kimi' | 'muse';
+export type TranscriptCandidateKind = 'claude' | 'codex' | 'pi' | 'ohmypi' | 'acp' | 'kimi' | 'muse' | 'prime-agent';
 export interface TranscriptCandidate { kind: TranscriptCandidateKind; path: string; model?: string }
 
 export interface TranscriptCandidateSources {
@@ -74,6 +74,7 @@ export function transcriptCandidateKind(harness: string | null | undefined): Tra
   if (transcriptKind === 'acp-jsonl') return 'acp';
   if (transcriptKind === 'kimi-wire-jsonl') return 'kimi';
   if (transcriptKind === 'muse-jsonl') return 'muse';
+  if (transcriptKind === 'prime-agent-jsonl') return 'prime-agent';
   return 'claude';
 }
 

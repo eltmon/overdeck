@@ -11,14 +11,24 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/cloister/spawn-status
  *   GET  /api/cloister/config
  *   PUT  /api/cloister/config
+ *   GET  /api/cloister/close-out
+ *   PUT  /api/cloister/close-out
+ *   GET  /api/cloister/close-out/disk
+ *   POST /api/cloister/close-out/cleanup
  *   GET  /api/cloister/agents/health
  */
 
-import { Effect, Layer } from 'effect';
+import { Data, Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfigSync, saveCloisterConfigSync } from '../../../lib/cloister/config.js';
+import {
+  CloseOutSettingsError,
+  readCloseOutSettings,
+  writeCloseOutSetting,
+} from '../../../lib/cloister/close-out-settings.js';
+import { cleanupClosedIssueWorkspaces, collectClosedIssueWorkspaces } from '../../../lib/workspaces/closed-issue-workspaces.js';
 import { emergencyBrake } from '../../../lib/cloister/concurrency.js';
 import { saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { getAgentState } from '../../../lib/agents.js';
@@ -42,6 +52,16 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
+
+/** Tagged catch for the close-out routes (PAN-4283) — httpHandler's catchCause fallback still reads .message. */
+class CloseOutRouteError extends Data.TaggedError('CloseOutRouteError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+function toCloseOutRouteError(err: unknown): CloseOutRouteError {
+  return new CloseOutRouteError({ message: err instanceof Error ? err.message : String(err), cause: err });
+}
 
 // ─── Route: GET /api/cloister/status ─────────────────────────────────────────
 
@@ -205,6 +225,65 @@ const putCloisterConfigRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/cloister/close-out ──────────────────────────────────────
+
+const getCloisterCloseOutRoute = HttpRouter.add(
+  'GET',
+  '/api/cloister/close-out',
+  httpHandler(Effect.tryPromise({
+    try: async () => jsonResponse(await readCloseOutSettings()),
+    catch: toCloseOutRouteError,
+  })),
+);
+
+// ─── Route: PUT /api/cloister/close-out ──────────────────────────────────────
+
+const putCloisterCloseOutRoute = HttpRouter.add(
+  'PUT',
+  '/api/cloister/close-out',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { key, value } = (body ?? {}) as { key?: unknown; value?: unknown };
+    return yield* Effect.tryPromise({
+      try: async () => {
+        try {
+          const settings = await writeCloseOutSetting(key, value);
+          const reload = reloadDurableCloisterConfig();
+          return jsonResponse({ settings, reloaded: reload.accepted });
+        } catch (err) {
+          if (err instanceof CloseOutSettingsError) {
+            return jsonResponse({ error: err.message }, { status: err.status });
+          }
+          throw err;
+        }
+      },
+      catch: toCloseOutRouteError,
+    });
+  })),
+);
+
+// ─── Route: GET /api/cloister/close-out/disk ─────────────────────────────────
+
+const getCloisterCloseOutDiskRoute = HttpRouter.add(
+  'GET',
+  '/api/cloister/close-out/disk',
+  httpHandler(Effect.tryPromise({
+    try: async () => jsonResponse(await collectClosedIssueWorkspaces()),
+    catch: toCloseOutRouteError,
+  })),
+);
+
+// ─── Route: POST /api/cloister/close-out/cleanup ─────────────────────────────
+
+const postCloisterCloseOutCleanupRoute = HttpRouter.add(
+  'POST',
+  '/api/cloister/close-out/cleanup',
+  httpHandler(Effect.tryPromise({
+    try: async () => jsonResponse(await cleanupClosedIssueWorkspaces()),
+    catch: toCloseOutRouteError,
+  })),
+);
+
 // ─── Route: GET /api/cloister/agents/health ──────────────────────────────────
 
 const getCloisterAgentsHealthRoute = HttpRouter.add(
@@ -231,6 +310,10 @@ export const cloisterRouteLayer = Layer.mergeAll(
   getCloisterSpawnStatusRoute,
   getCloisterConfigRoute,
   putCloisterConfigRoute,
+  getCloisterCloseOutRoute,
+  putCloisterCloseOutRoute,
+  getCloisterCloseOutDiskRoute,
+  postCloisterCloseOutCleanupRoute,
   getCloisterAgentsHealthRoute,
 );
 

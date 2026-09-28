@@ -36,6 +36,10 @@ import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkProjectTrackerConfig } from './doctor-project-config.js';
 import { checkHerdr } from './doctor-herdr.js';
+import { checkPrimeAgent } from './doctor-prime-agent.js';
+import { checkCoreCommands, checkFirstRunLogins } from './doctor-first-run.js';
+import { checkClaudeLogin, checkGhLogin } from '../../lib/first-run-checks.js';
+import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
 import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
 import { checkPlanHomePanIgnore } from './doctor-plan-home-ignore.js';
@@ -729,21 +733,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   const checks: CheckResult[] = [];
 
-  // Check required commands
-  const requiredCommands = [
-    { cmd: 'git', name: 'Git', fix: 'Install git' },
-    { cmd: 'tmux', name: 'tmux', fix: 'Install tmux: apt install tmux / brew install tmux' },
-    { cmd: 'node', name: 'Node.js', fix: 'Install Node.js 18+' },
-    { cmd: 'claude', name: 'Claude CLI', fix: 'Install: npm install -g @anthropic-ai/claude-code' },
-  ];
-
-  for (const { cmd, name, fix } of requiredCommands) {
-    if (checkCommand(cmd)) {
-      checks.push({ name, status: 'ok', message: 'Installed' });
-    } else {
-      checks.push({ name, status: 'error', message: 'Not found', fix });
-    }
-  }
+  // Check required commands (git, tmux, Node.js, Claude CLI). tmux warns
+  // instead of erroring when the host backend is Herdr (PAN-4282 D9).
+  const backend = await hostTerminalBackendName();
+  checks.push(...checkCoreCommands({ backend, has: checkCommand }));
 
   // Check optional commands
   const optionalCommands = [
@@ -759,6 +752,13 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     }
   }
 
+  // Claude and GitHub CLI login state (warn-level; PAN-4282 D9, FR-24).
+  checks.push(...await checkFirstRunLogins({
+    claudeLogin: () => checkClaudeLogin(),
+    ghLogin: () => checkGhLogin(),
+    has: checkCommand,
+  }));
+
   // oh-my-pi / omp (ohmypi harness — PAN-1989, replaces pi PAN-636).
   // omp is optional: missing → warn (or error under --strict). When installed, version
   // is compared against SUPPORTED_OMP_VERSION_MIN and the bundled extension is checked.
@@ -769,6 +769,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+  for (const c of await checkPrimeAgent()) checks.push(c); // PAN-3668: version pin + orphaned daemons
   try {
     for (const c of await checkHerdr()) checks.push(c); // PAN-3956: terminal backend + Herdr
   } catch (error) {

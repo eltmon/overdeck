@@ -85,7 +85,7 @@ test('simple home renders the three questions in plain words, zero jargon', asyn
   await expect(home.getByText(/ready to merge/).first()).toBeVisible();
 
   // The composer is the front door, in plain words.
-  await expect(home.getByTestId('talk-it-through-input')).toHaveAttribute('placeholder', /plain words/);
+  await expect(home.getByTestId('home-composer-input')).toHaveAttribute('placeholder', /plain words/);
 
   expect(await bannedWordsIn(home)).toEqual([]);
 });
@@ -104,8 +104,9 @@ test('handing off a task starts a seeded discussion, not a tracker form', async 
   await page.waitForTimeout(2000);
 
   const description = 'make the weekly digest video resumable after a crash';
-  await home.getByTestId('talk-it-through-input').fill(description);
-  await home.getByRole('button', { name: 'Talk it through' }).click();
+  const input = home.getByTestId('home-composer-input');
+  await input.fill(description);
+  await home.getByRole('option', { name: /Talk it through first:/ }).click();
 
   // We leave simple mode for the new conversation — the AI discusses first.
   await page.waitForURL('**/conv/usability-e2e-run**', { timeout: 15_000 });

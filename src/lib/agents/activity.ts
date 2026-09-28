@@ -205,6 +205,16 @@ export function resolveLatestSessionId(
     } catch { /* non-fatal */ }
   }
 
+  // Prime Agent (PAN-3668 D7): the host records the session id beside the
+  // session-file pointer once the session is ready.
+  if (sessionIdSource === 'prime-agent-session-id') {
+    checked.push('Prime Agent session id');
+    try {
+      const primeSessionId = readFileSync(join(getAgentDir(agentId), 'prime-agent-session-id'), 'utf-8').trim();
+      if (primeSessionId) return { sessionId: primeSessionId, checked };
+    } catch { /* non-fatal */ }
+  }
+
   // OhMyPi's resumable id lives inside its freshest session JSONL.
   //    the freshest session JSONL. Mirror the ohmypi runtime adapter's own resume
   //    resolution so the deacon recovery path can resume a crashed ohmypi agent

@@ -1,4 +1,5 @@
 import { resolveMuseSessionPath } from '../runtimes/storage/muse.js';
+import { readPrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
 import { parseMuseRecords } from '../cost-parsers/muse-parser.js';
 /**
  * Conversation transcript adapter.
@@ -559,6 +560,24 @@ const codexAdapter: ConversationTranscriptAdapter = {
   },
 };
 
+// ─── Prime Agent ──────────────────────────────────────────────────────────
+
+/**
+ * Prime Agent (PAN-3668) writes the pi v3 session format, so it serializes and
+ * summarizes like pi. Its transcript is the session file the host recorded in the
+ * `prime-agent-session-file` pointer. A plain fork copies raw Claude JSONL, which a
+ * Prime session is not.
+ */
+const primeAgentAdapter: ConversationTranscriptAdapter = {
+  ...piAdapter,
+  name: 'prime-agent',
+  supportsPlainForkAsSource: false,
+  supportsSourceAuthoredHandoff: false,
+  async resolveSessionFile(conv) {
+    return readPrimeAgentSessionFile(conv.tmuxSession);
+  },
+};
+
 // ─── Registry ─────────────────────────────────────────────────────────────
 
 const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
@@ -569,6 +588,7 @@ const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'opencode': acpAdapter,
   'kimi-code': kimiCodeAdapter,
   muse: museAdapter,
+  'prime-agent': primeAgentAdapter,
 };
 
 /**

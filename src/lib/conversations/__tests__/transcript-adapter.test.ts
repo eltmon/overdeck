@@ -422,3 +422,30 @@ describe('Muse transcript adapter', () => {
     expect(mockedSummarize).toHaveBeenCalledWith('[assistant]\nCommitted answer', expect.objectContaining({ timeoutMs: 1234 }));
   });
 });
+
+describe('Prime Agent transcript adapter (PAN-3668 WI-18)', () => {
+  it('resolves the recorded session file and serializes it like pi', async () => {
+    const adapter = getTranscriptAdapter('prime-agent');
+    expect(adapter.name).toBe('prime-agent');
+    expect(adapter.supportsPlainForkAsSource).toBe(false);
+
+    const agentDir = join(workDir, 'agents', 'conv-prime');
+    await mkdir(join(agentDir, 'prime-sessions'), { recursive: true });
+    const sessionFile = join(agentDir, 'prime-sessions', '01a0.jsonl');
+    await writeFile(sessionFile, [
+      JSON.stringify({ type: 'session', version: 3, id: 'sid', timestamp: '2026-09-25T10:00:00.000Z', cwd: '/w' }),
+      JSON.stringify({ type: 'message', id: 'u1', parentId: null, timestamp: '2026-09-25T10:00:01.000Z', message: { role: 'user', content: [{ type: 'text', text: 'hello prime' }] } }),
+      JSON.stringify({ type: 'message', id: 'a1', parentId: 'u1', timestamp: '2026-09-25T10:00:02.000Z', message: { role: 'assistant', content: [{ type: 'text', text: 'hi there' }], stopReason: 'stop' } }),
+    ].join('\n'));
+    await writeFile(join(agentDir, 'prime-agent-session-file'), `${sessionFile}\n`);
+
+    await expect(adapter.resolveSessionFile({ tmuxSession: 'conv-prime' } as never)).resolves.toBe(sessionFile);
+    const serialized = await adapter.serializeTranscript(sessionFile);
+    expect(serialized).toContain('hello prime');
+    expect(serialized).toContain('hi there');
+  });
+
+  it('resolves null when no session file was recorded', async () => {
+    await expect(getTranscriptAdapter('prime-agent').resolveSessionFile({ tmuxSession: 'conv-none' } as never)).resolves.toBeNull();
+  });
+});
