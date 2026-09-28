@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:20:17.066Z",
+  "updated": "2026-09-28T15:20:20.706Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,11 @@
       "claimedBy": "agent-pan-4311",
       "claimedAt": "2026-09-28T15:17:43.368Z",
       "doneAt": "2026-09-28T15:20:17.066Z"
+    },
+    "guardrail-cpu-warning": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:20:20.706Z"
     }
   }
 }
