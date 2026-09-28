@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4320",
   "created": "2026-09-28T15:34:16.087Z",
-  "updated": "2026-09-28T16:26:23.505Z",
+  "updated": "2026-09-28T16:26:35.218Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "state-seed-agent-key.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T16:26:23.505Z"
+    },
+    "projection-agent-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:26:35.218Z"
     }
   }
 }
