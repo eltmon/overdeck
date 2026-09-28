@@ -6,6 +6,7 @@ import { DEFAULT_TIERED_EXECUTION_CONFIG } from '../agents/tier-table.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES } from './roles.js';
 import { computeGovernorReserveDefaultsGb, computeSpawnMemoryThresholdDefaultsGb } from './governor-reserves.js';
 import type { NormalizedConfig } from './schema.js';
+import { DEFAULT_NORMALIZED_OLLAMA } from './ollama.js';
 
 /**
  * PAN-2500: default deacon memory-governor reserves as fractions of total RAM,
@@ -42,6 +43,10 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   // 'overdeck' session socket are present, else tmux with a diagnostic
   // (src/lib/terminal-backends/select.ts).
   terminal: {},
+  // PAN-1641: a local Ollama server on the default port, and the context window
+  // Overdeck asks for when it starts `ollama serve` itself. 64K is the smallest
+  // window a work agent's first prompt comfortably fits in.
+  ollama: { ...DEFAULT_NORMALIZED_OLLAMA },
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   // Seeded conversation-model default for brand-new installs (operator
   // decision, 2026-07-12): the new-conversation picker must never be empty.

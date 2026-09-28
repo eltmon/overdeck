@@ -12,7 +12,7 @@ import type { RuntimeName } from './runtimes/types.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go' | 'ollama';
 
 /**
  * Provider configuration
@@ -300,6 +300,19 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     tested: false,
     description: 'Route directly to the QuantumLlama Anthropic-compatible endpoint using QUANTUMLLAMA_API_KEY. Synthetic benchmark provider (PAN-3252); no live endpoint exists.',
   },
+  ollama: {
+    name: 'ollama',
+    displayName: 'Ollama (local)',
+    compatibility: 'direct',
+    defaultHarness: 'claude-code',
+    // No /v1: Claude Code appends /v1/messages to ANTHROPIC_BASE_URL itself.
+    baseUrl: 'http://localhost:11434',
+    authType: 'static',
+    // Dynamic: any tag the local server has pulled, addressed as ollama:<tag>.
+    models: [],
+    tested: true,
+    description: 'Local models served by Ollama (>= 0.14, Anthropic Messages API) on the claude-code harness. Model ids are ollama:<tag>.',
+  },
 };
 
 /**
@@ -415,6 +428,9 @@ function nearestKnownModelId(modelId: string): string | undefined {
  * Get provider for a given model ID
  */
 export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
+  // First, before every other branch: an Ollama tag can contain '/' (hf.co/... pulls)
+  // and would otherwise be read as an OpenRouter id by the slash catch-all below.
+  if (modelId.startsWith('ollama:')) return PROVIDERS.ollama;
   if (PROVIDERS.meta.models.includes(modelId)) return PROVIDERS.meta;
   // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free'),
   // except for explicitly supported slash-delimited providers such as Nous Portal.

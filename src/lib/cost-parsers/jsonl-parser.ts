@@ -211,6 +211,16 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     return { provider: 'custom', model };
   }
 
+  // Local Ollama models (PAN-1641). Two spellings reach here: `ollama:<tag>` as
+  // Overdeck stamps it on the agent, and the bare `<tag>` the harness writes into
+  // its JSONL. A bare tag is `name:version` with no slash, which nothing else this
+  // function can still reach looks like — every OpenRouter id carries a '/'. Local
+  // inference has no per-token price and `custom` has no row for these tags, so
+  // getPricing returns null and the run records $0.
+  if (model.startsWith('ollama:') || /^[^/\s]+:[^/\s]+$/.test(model)) {
+    return { provider: 'custom', model };
+  }
+
   // Default to anthropic/claude
   return { provider: 'anthropic', model: 'claude-sonnet-4' };
 }

@@ -31,6 +31,7 @@ import { readHerdrVersion } from '../../lib/herdr-setup/binary.js';
 import { hostTerminalBackendName, probeHerdrAvailability } from '../../lib/terminal-backends/select.js';
 import type { TerminalBackendName } from '../../lib/terminal-backends/types.js';
 import { renderHerdrReport } from '../herdr-report.js';
+import { setupOllamaForInstall } from './install-ollama.js';
 import { evaluatePrereqGate, forgivenPrereqNames, type PrereqResult } from './install-prereqs.js';
 
 export function registerInstallCommand(program: Command): void {
@@ -44,6 +45,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-moonshine', 'Skip Moonshine voice sidecar build (AutoPreso + Voice STT will not work without it)')
     .option('--skip-tts-daemon', 'Skip Qwen TTS daemon venv install (CUDA torch download is large)')
     .option('--skip-herdr', 'Skip Herdr terminal backend install/verify (tmux-only hosts)')
+    .option('--skip-ollama', 'Skip Ollama local-model detection and optional gemma4:12b pull')
     .action(installCommand);
 }
 
@@ -55,6 +57,7 @@ interface InstallOptions {
   skipMoonshine?: boolean;
   skipTtsDaemon?: boolean;
   skipHerdr?: boolean;
+  skipOllama?: boolean;
 }
 
 // Effect.runSync(detectPlatform()) is now in src/lib/platform.ts
@@ -442,6 +445,15 @@ async function installCommand(options: InstallOptions): Promise<void> {
   } catch (error) {
     spinner.fail(`Herdr setup failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  // Step 5f: Ollama — detection and guidance for local-GPU agents (PAN-1641).
+  // Never fails the install; never runs an installer on the operator's behalf.
+  await setupOllamaForInstall({
+    skip: options.skipOllama,
+    platform: await Effect.runPromise(detectPlatform()),
+    spinner,
+    isTty: Boolean(process.stdin.isTTY),
+  });
 
   // Step 5d: Build Moonshine voice sidecar (AutoPreso + Voice STT)
   // Linux x64 only — the build script enforces this. Skip silently on other platforms.
