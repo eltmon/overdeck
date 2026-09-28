@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { HomeComposerProjectChip } from '../HomeComposerProjectChip';
+import { useAddProjectDialog } from '../../project/new/addProjectDialogStore';
 
 const PROJECTS = [
   { key: 'overdeck', name: 'Overdeck', path: '/home/user/Projects/overdeck' },
@@ -32,16 +33,16 @@ describe('HomeComposerProjectChip', () => {
     expect(screen.getByRole('menuitem', { name: 'Add a project…' })).toBeTruthy();
   });
 
-  it('Add a project navigates to /projects/new', () => {
+  it('Add a project opens the Add-project dialog without leaving Home (PAN-4281)', () => {
+    useAddProjectDialog.getState().hide();
     const pushStateSpy = vi.spyOn(window.history, 'pushState');
-    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
     render(<HomeComposerProjectChip mode="advanced" projects={PROJECTS} value={undefined} onChange={() => {}} />);
     fireEvent.click(screen.getByTestId('home-composer-project'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Add a project…' }));
 
-    expect(pushStateSpy).toHaveBeenCalledWith({ tab: 'project-new' }, '', '/projects/new');
-    expect(dispatchSpy).toHaveBeenCalledWith(expect.any(PopStateEvent));
+    expect(useAddProjectDialog.getState().open).toBe(true);
+    expect(pushStateSpy).not.toHaveBeenCalled();
     pushStateSpy.mockRestore();
-    dispatchSpy.mockRestore();
+    useAddProjectDialog.getState().hide();
   });
 });
