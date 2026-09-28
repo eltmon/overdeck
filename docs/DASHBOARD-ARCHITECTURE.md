@@ -57,14 +57,19 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
 - The snapshot's agent `status` is derived when it is served, not copied from the stored
   record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
-  backend inventory (matched by terminal id, pane id or the `agentId` token, the way
-  `GET /api/agents` matches) is served `stopped`. Before the inventory has answered even
-  once (Herdr not up at dashboard boot), such rows are served `unknown`, never dead; after
-  that, a failed read keeps the last-good panes. Stored `stopped`/`error` and the `paused`
-  / `stoppedByUser` intent fields pass through unchanged. Only `agent-`, `planning-` and
-  `strike-` ids are derived, the set the inventory answers for
-  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`). A row served
-  `stopped` this way also has `hasLivePane` (and its deprecated alias
+  backend inventory is served `stopped`. Every agent-to-pane join in the server, including
+  this one, goes through `indexPanesByAgentKey` in `packages/contracts/src/backend-pane.ts`
+  (PAN-4320): the key is `agentId ?? terminalId ?? id`, and when two panes share a key —
+  a restarted Herdr agent beside its exited pane — the non-exited pane wins. On Herdr, the
+  enrichment poller's `agent.created` is the only way an agent started after dashboard boot
+  enters `agentsById` (Herdr work agents run without the PTY supervisor), and under Herdr
+  the poller skips a cycle only while the backend inventory is degraded, never for lack of a
+  tmux census. Before the inventory has answered even once (Herdr not up at dashboard boot),
+  such rows are served `unknown`, never dead; after that, a failed read keeps the last-good
+  panes. Stored `stopped`/`error` and the `paused` / `stoppedByUser` intent fields pass
+  through unchanged. Only `agent-`, `planning-` and `strike-` ids are derived, the set the
+  inventory answers for (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`).
+  A row served `stopped` this way also has `hasLivePane` (and its deprecated alias
   `hasLiveTmuxSession`) served `false`; a row served `unknown` keeps its stored flags.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Outage handling never blocks the UI: see [Degraded mode (PAN-4279)](#degraded-mode-pan-4279).

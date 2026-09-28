@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createResourceRefreshTriggers,
+  issueForAgentFromPanes,
   type ResourceRefreshEvent,
   type ResourceRefreshTriggerDeps,
 } from '../../../src/dashboard/server/services/resource-refresh-triggers.js';
 import type { ProjectConfig } from '../../../src/lib/projects.js';
+import type { BackendPane } from '@overdeck/contracts';
 
 const panProject = { name: 'overdeck', path: '/overdeck' } as ProjectConfig;
 const minProject = { name: 'myn', path: '/myn' } as ProjectConfig;
@@ -95,5 +97,28 @@ describe('createResourceRefreshTriggers', () => {
 
     dispose();
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+});
+
+describe('issueForAgentFromPanes', () => {
+  function herdrPane(agentId: string, issue: string): BackendPane {
+    return {
+      id: 'wKZ:p3',
+      terminalId: 'term_65c8b78d3f05a5df',
+      agentId,
+      issue,
+      role: 'work',
+      state: 'working',
+      harness: 'claude-code',
+      model: 'unknown',
+    };
+  }
+
+  it('finds a Herdr-shaped pane by agentId and returns its issue', () => {
+    expect(issueForAgentFromPanes([herdrPane('agent-pan-4311', 'PAN-4311')], 'agent-pan-4311')).toBe('PAN-4311');
+  });
+
+  it('returns null for an unknown agent', () => {
+    expect(issueForAgentFromPanes([herdrPane('agent-pan-4311', 'PAN-4311')], 'agent-pan-9999')).toBeNull();
   });
 });

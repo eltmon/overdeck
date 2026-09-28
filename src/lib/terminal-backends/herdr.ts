@@ -174,7 +174,7 @@ export function toBackendEvents(kind: string, data: Record<string, unknown>): Ba
     case 'pane_created': {
       const pane = data.pane as HerdrPaneInfo | undefined;
       if (!pane) return [];
-      return [{ kind: 'pane-created', paneId: pane.pane_id, workspaceId: pane.workspace_id }];
+      return [{ kind: 'pane-created', paneId: pane.pane_id, workspaceId: pane.workspace_id, terminalId: pane.terminal_id, ...(agentIdOf(pane) ? { agentId: agentIdOf(pane) } : {}) }];
     }
     case 'pane_exited':
       return [{ kind: 'pane-exited', paneId: String(data.pane_id ?? ''), code: null }];
@@ -186,7 +186,7 @@ export function toBackendEvents(kind: string, data: Record<string, unknown>): Ba
         events.push({ kind: 'agent-state', paneId: pane.pane_id, state: toAgentState(pane.agent_status) });
       }
       if (pane.tokens) {
-        events.push({ kind: 'metadata', paneId: pane.pane_id, tokens: pane.tokens as Partial<PaneTokens> });
+        events.push({ kind: 'metadata', paneId: pane.pane_id, tokens: pane.tokens as Partial<PaneTokens>, ...(agentIdOf(pane) ? { agentId: agentIdOf(pane) } : {}) });
       }
       return events;
     }

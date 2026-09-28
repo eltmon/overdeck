@@ -299,7 +299,8 @@ export class BackendPaneCache {
           model: 'unknown',
           state: 'unknown',
           stateSince: now,
-          terminalId: event.paneId,
+          terminalId: event.terminalId ?? event.paneId,
+          ...(event.agentId ? { agentId: event.agentId } : {}),
         });
         return;
       }
@@ -317,6 +318,7 @@ export class BackendPaneCache {
         if (event.tokens.role) next.role = event.tokens.role;
         if (event.tokens.harness) next.harness = event.tokens.harness;
         if (event.tokens.model) next.model = event.tokens.model;
+        if (event.agentId) next.agentId = event.agentId;
         this.panes.set(event.paneId, next);
         return;
       }

@@ -275,6 +275,18 @@ describe('BackendPaneCache — events folded onto the snapshot', () => {
     expect(cache.get('w2:p1')).toMatchObject({ issue: 'PAN-4000', role: 'review', harness: 'codex', model: 'gpt-5.5' });
   });
 
+  it('carries agentId from metadata onto a pane created without one (PAN-4320)', () => {
+    const cache = new BackendPaneCache();
+    cache.apply({ kind: 'pane-created', paneId: 'wKZ:p3', workspaceId: 'wKZ', terminalId: 'term_65c8b78d3f05a5df' }, NOW);
+    cache.apply({
+      kind: 'metadata',
+      paneId: 'wKZ:p3',
+      tokens: { issue: 'PAN-4311', role: 'work', harness: 'claude-code', model: 'm' },
+      agentId: 'agent-pan-4311',
+    }, NOW);
+    expect(cache.get('wKZ:p3')).toMatchObject({ agentId: 'agent-pan-4311', terminalId: 'term_65c8b78d3f05a5df' });
+  });
+
   it('answers by issue', () => {
     const cache = new BackendPaneCache([
       { id: 'a', issue: 'PAN-1', role: 'work', harness: 'h', model: 'm', state: 'working' },

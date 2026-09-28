@@ -43,12 +43,17 @@ describe('isInteractiveRoleAgent', () => {
 })
 
 describe('shouldSkipEnrichmentCycle', () => {
+  it('ignores the tmux census on Herdr and follows the inventory degraded flag', () => {
+    expect(shouldSkipEnrichmentCycle({ tmuxAvailable: false }, { backend: 'herdr', degraded: false })).toBe(false)
+    expect(shouldSkipEnrichmentCycle({ tmuxAvailable: true }, { backend: 'herdr', degraded: true })).toBe(true)
+  })
+
   it('returns true when tmux census evidence is unavailable', () => {
-    expect(shouldSkipEnrichmentCycle({ tmuxAvailable: false })).toBe(true)
+    expect(shouldSkipEnrichmentCycle({ tmuxAvailable: false }, { backend: 'tmux', degraded: false })).toBe(true)
   })
 
   it('returns false when tmux census evidence is available', () => {
-    expect(shouldSkipEnrichmentCycle({ tmuxAvailable: true })).toBe(false)
+    expect(shouldSkipEnrichmentCycle({ tmuxAvailable: true }, { backend: 'tmux', degraded: false })).toBe(false)
   })
 })
 

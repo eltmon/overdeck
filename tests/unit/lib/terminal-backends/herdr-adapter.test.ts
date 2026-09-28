@@ -54,12 +54,35 @@ describe('toBackendEvents', () => {
 
   it('maps creation, exit and workspace close', () => {
     expect(toBackendEvents('pane_created', { pane: { pane_id: 'w1:p1', terminal_id: 't', workspace_id: 'w1' } }))
-      .toEqual([{ kind: 'pane-created', paneId: 'w1:p1', workspaceId: 'w1' }]);
+      .toEqual([{ kind: 'pane-created', paneId: 'w1:p1', workspaceId: 'w1', terminalId: 't' }]);
     expect(toBackendEvents('pane_exited', { pane_id: 'w1:p1' }))
       .toEqual([{ kind: 'pane-exited', paneId: 'w1:p1', code: null }]);
     expect(toBackendEvents('workspace_closed', { workspace_id: 'w1' }))
       .toEqual([{ kind: 'workspace-closed', workspaceId: 'w1' }]);
     expect(toBackendEvents('layout_updated', {})).toEqual([]);
+  });
+
+  // PAN-4320: the pane-created and metadata events must carry agentId (and
+  // pane-created its real terminalId), or a Herdr pane cannot be joined to
+  // its agent until the next 5s list refresh.
+  it('carries agentId and terminalId into pane-created and metadata events', () => {
+    const pane = {
+      pane_id: 'wKZ:p3',
+      terminal_id: 'term_1',
+      workspace_id: 'wKZ',
+      tokens: { agentId: 'agent-pan-4311', role: 'work', issue: 'PAN-4311', harness: 'claude-code', model: 'm' },
+    };
+
+    expect(toBackendEvents('pane_created', { pane }))
+      .toEqual([{ kind: 'pane-created', paneId: 'wKZ:p3', workspaceId: 'wKZ', terminalId: 'term_1', agentId: 'agent-pan-4311' }]);
+
+    const updated = toBackendEvents('pane_updated', { pane: { ...pane, agent_status: undefined } });
+    expect(updated).toEqual([{
+      kind: 'metadata',
+      paneId: 'wKZ:p3',
+      tokens: pane.tokens,
+      agentId: 'agent-pan-4311',
+    }]);
   });
 
   it('keeps Herdr states and reserves unknown for anything else', () => {

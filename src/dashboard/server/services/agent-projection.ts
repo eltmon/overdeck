@@ -32,7 +32,7 @@ import { getBackendPanes } from './backend-inventory.js';
 import { cleanupUnreferencedConversationAttachments } from './conversation-attachments.js';
 import { respawnStartedAt } from './pending-respawn.js';
 import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
-import type { DomainEvent } from '@overdeck/contracts';
+import { indexPanesByAgentKey, type DomainEvent } from '@overdeck/contracts';
 
 export interface AgentProjectionResult {
   /** Assigned event sequence number. */
@@ -217,7 +217,7 @@ function isoToMs(value: string | null | undefined): number {
 
 async function paneAlreadyExited(agentId: string): Promise<boolean> {
   const panes = await getBackendPanes();
-  const pane = panes.find((candidate) => candidate.id === agentId || candidate.terminalId === agentId);
+  const pane = indexPanesByAgentKey(panes).get(agentId);
   return pane?.state === 'exited';
 }
 
