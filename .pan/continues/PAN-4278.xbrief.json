@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4278",
   "created": "2026-09-27T23:29:11.482Z",
-  "updated": "2026-09-28T00:12:26.951Z",
+  "updated": "2026-09-28T00:12:32.211Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-4278",
       "claimedAt": "2026-09-28T00:08:07.069Z",
       "doneAt": "2026-09-28T00:12:26.951Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-28T00:12:32.211Z"
     }
   }
 }
