@@ -10,6 +10,7 @@ import { hostDisplayName, hostSocketPath, hostTokenFile, hostTransportFor, type 
 import { markKimiContextDelivered, prepareKimiMessage, type PreparedKimiMessage } from '../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agents.js';
 import type { PromptResult, PromptSender } from '../terminal-backends/types.js';
+import type { SubmitMode } from '../terminal-backends/steer-keys.js';
 import {
   normalizeAgentId,
   getAgentState,
@@ -109,7 +110,16 @@ export type DeliveryResult = {
   /** True when the delivery was suppressed by the keyed dedup record — the
    * side effect already happened on an earlier call with the same key. */
   deduplicated?: boolean;
+  /**
+   * Set when the caller asked for `submit: 'steer'` (PAN-4292): true when the
+   * send-now chord was pressed, false when the tier pressed Enter instead (a
+   * PTY supervisor that predates steer). `failure` then says so.
+   */
+  steered?: boolean;
 };
+
+/** `failure` text when an old PTY supervisor pressed Enter for a steer (PAN-4292 D9). */
+export const SUPERVISOR_PREDATES_STEER = 'supervisor predates steer; delivered as a normal submit';
 
 export interface DeliverAgentMessageOptions {
   /** Conversation sessions have no AgentState; identify their Kimi context explicitly. */
@@ -146,6 +156,15 @@ export interface DeliverAgentMessageOptions {
    * operator shell with none is treated as an operator conversation).
    */
   sender?: PromptSender;
+  /**
+   * How to finish the message (PAN-4292). `enter` (default) is today's
+   * submit, which queues behind a running turn. `steer` presses Claude Code's
+   * send-now chord, which interrupts the turn. Only the Herdr, PTY supervisor
+   * and tmux tiers can carry a steer; the app-server, ACP/Prime host and
+   * Channels tiers answer `ok: false, failure: 'steer-unsupported: <tier>'`
+   * rather than delivering a plain submit. A keyed steer is rejected.
+   */
+  submit?: SubmitMode;
 }
 
 /**
@@ -375,6 +394,17 @@ export async function deliverAgentMessage(
 ): Promise<DeliveryResult> {
   const normalizedId = normalizeAgentId(agentId);
   const dedupKey = opts.dedupKey;
+  const steer = opts.submit === 'steer';
+  if (steer && dedupKey !== undefined) {
+    throw new Error(`MessageDeliveryFailed: keyed delivery cannot steer (${normalizedId}, ${caller})`);
+  }
+  const steerUnsupported = (path: DeliveryResult['path']): DeliveryResult =>
+    ({ ok: false, path, failure: `steer-unsupported: ${path}` });
+  // Default deliveries keep the exact pre-steer call shape (NFR-3).
+  const pasteAndSubmit = () => (steer
+    ? sendKeys(normalizedId, message, undefined, { submit: 'steer' })
+    : sendKeys(normalizedId, message));
+  const steeredResult = steer ? { steered: true } : {};
 
 
   let channelsEnabled = false;
@@ -426,7 +456,7 @@ export async function deliverAgentMessage(
     let result: PromptResult;
     try {
       result = await Effect.runPromise(
-        herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
+        herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender, ...(steer ? { submit: 'steer' as const } : {}) }),
       );
     } catch (err: unknown) {
       return { ok: false, path: 'herdr', failure: err instanceof Error ? err.message : String(err) };
@@ -435,7 +465,7 @@ export async function deliverAgentMessage(
     if (isPromptDropped(result)) {
       return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
     }
-    if (!isUnsupported(result)) return { ok: true, path: 'herdr' };
+    if (!isUnsupported(result)) return { ok: true, path: 'herdr', ...steeredResult };
   }
   // Not a Herdr agent, one Herdr cannot prompt, or a tmux host: same cascade, same guard.
   const guard = checkPrompt({ targetId: normalizedId, targetTokens, sender, messageId });
@@ -482,14 +512,16 @@ export async function deliverAgentMessage(
 
   if (resolvedMethod === 'tmux') {
     await assertTmuxTargetCanReceive(normalizedId, caller);
-    await Effect.runPromise(sendKeys(normalizedId, message));
-    return completeDelivery({ ok: true, path: 'tmux' });
+    await Effect.runPromise(pasteAndSubmit());
+    return completeDelivery({ ok: true, path: 'tmux', ...steeredResult });
   }
 
   let appServerFailure: string | undefined;
   if (resolvedMethod === 'auto' && !isHostTarget) {
     const appServerSocketPath = join(overdeckHomeForSockets(), 'sockets', `appserver-${normalizedId}.sock`);
     if (existsSync(appServerSocketPath)) {
+      // Codex app-server steer is PAN-4303; never deliver a steer as a plain turn.
+      if (steer) return steerUnsupported('app-server');
       const appServerToken = readAppServerTokenSync(normalizedId);
       if (!appServerToken) {
         appServerFailure = 'appserver-token-missing';
@@ -523,6 +555,7 @@ export async function deliverAgentMessage(
         : existsSync(hostSocketPath(normalizedId, 'prime-agent', socketHome)) ? 'prime-agent'
           : null);
     if (transport) {
+      if (steer) return steerUnsupported(transport);
       const socketPath = hostSocketPath(normalizedId, transport, socketHome);
       const hostToken = readHostTokenSync(normalizedId, transport);
       if (!existsSync(socketPath)) {
@@ -578,13 +611,18 @@ export async function deliverAgentMessage(
         // re-create the duplicate-writer race PAN-1769 fixed.
         const supervisorResponse = await postUnixSocketJson(
           supervisorSocketPath,
-          { content: message, meta: { caller } },
+          { content: message, meta: { caller }, ...(steer ? { submit: 'steer' } : {}) },
           supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS,
           ptyToken,
           PTY_TOKEN_HEADER,
         );
         await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
-        return completeDelivery({ ok: true, path: 'supervisor' });
+        if (!steer) return completeDelivery({ ok: true, path: 'supervisor' });
+        // PAN-4292 D9: a supervisor that predates steer ignores `submit` and
+        // presses Enter. Only the new one answers {ok:true, submit:'steer'}.
+        return completeDelivery(supervisorAcknowledgedSteer(supervisorResponse.body)
+          ? { ok: true, path: 'supervisor', steered: true }
+          : { ok: true, path: 'supervisor', steered: false, failure: SUPERVISOR_PREDATES_STEER });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         supervisorFailure = `socket-post-failed: ${reason}`;
@@ -603,6 +641,8 @@ export async function deliverAgentMessage(
       channelFailure = 'channels-disabled';
     } else if (!existsSync(socketPath)) {
       channelFailure = 'socket-missing';
+    } else if (steer) {
+      return steerUnsupported('channels');
     } else {
       const bridgeToken = readBridgeToken(normalizedId);
       if (!bridgeToken) {
@@ -642,13 +682,23 @@ export async function deliverAgentMessage(
       ...(channelFailure ? { channels: channelFailure } : {}),
     });
     await assertTmuxTargetCanReceive(normalizedId, caller);
-    await Effect.runPromise(sendKeys(normalizedId, message));
-    return completeDelivery({ ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure });
+    await Effect.runPromise(pasteAndSubmit());
+    return completeDelivery({ ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure, ...steeredResult });
   }
 
   await assertTmuxTargetCanReceive(normalizedId, caller);
-  await Effect.runPromise(sendKeys(normalizedId, message));
-  return completeDelivery({ ok: true, path: 'tmux' });
+  await Effect.runPromise(pasteAndSubmit());
+  return completeDelivery({ ok: true, path: 'tmux', ...steeredResult });
+}
+
+/** True when a PTY supervisor answered a steer with `{ok:true, submit:'steer'}` (PAN-4292 D9). */
+function supervisorAcknowledgedSteer(body: string): boolean {
+  try {
+    const parsed = JSON.parse(body) as { ok?: unknown; submit?: unknown } | null;
+    return parsed !== null && typeof parsed === 'object' && parsed.ok === true && parsed.submit === 'steer';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -856,6 +906,8 @@ export async function deliverMessageWithTranscriptConfirmation(args: {
   message: string;
   caller: string;
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux';
+  /** PAN-4292: `steer` presses the send-now chord on every delivery attempt. */
+  submit?: SubmitMode;
   timeoutMs?: number;
   intervalMs?: number;
   deliver?: typeof deliverAgentMessage;
@@ -875,7 +927,9 @@ export async function deliverMessageWithTranscriptConfirmation(args: {
   let landing: TranscriptLanding = { kind: 'none' };
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    lastDelivery = await deliver(args.agentId, args.message, args.caller, args.deliveryMethod);
+    lastDelivery = args.submit
+      ? await deliver(args.agentId, args.message, args.caller, args.deliveryMethod, { submit: args.submit })
+      : await deliver(args.agentId, args.message, args.caller, args.deliveryMethod);
     if (lastDelivery.ok) {
       landing = await waitForTranscriptMessageLanding(
         args.workspace,
