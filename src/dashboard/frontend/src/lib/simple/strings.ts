@@ -3,8 +3,8 @@
  *
  * Simple-mode UI copy must live in this catalog (or in userFacingState.ts) and
  * must not contain internal jargon. The lint test
- * (src/lib/__tests__/simple-copy-lint.test.ts) scans both this catalog and the
- * simple components' source. Internal terms belong to Advanced mode only.
+ * (src/lib/__tests__/simple-foundations.test.ts) scans both this catalog and
+ * the simple components' source. Internal terms belong to Advanced mode only.
  */
 
 /** Internal jargon that must never appear in simple-mode user-facing strings. */
@@ -46,8 +46,11 @@ export const SIMPLE_STRINGS = {
     workingSub: "Nothing for you to do on these — you'll be told when they're ready.",
     readyTitle: 'Ready to merge',
     doneTitle: 'Finished',
-    composerPlaceholder: 'Describe what you want built or fixed, in plain words…',
+    composerPlaceholder: 'Ask for anything, or describe what you want built, in plain words…',
     composerButton: 'Talk it through',
+    chipIn: 'In: ',
+    chipNoProject: 'Not in a project',
+    chipAddProject: 'Add a project…',
     nothingNeedsYou: 'Nothing needs you right now. Nice.',
     quietEmpty: 'Nothing here yet.',
   },
