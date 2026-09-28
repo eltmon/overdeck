@@ -15,13 +15,15 @@ let aliveVerdict: { alive: boolean; paneAlive?: boolean; reason?: string } = { a
 let idle = false;
 let sessions: Array<{ name: string; created: Date; attached: boolean; windows: number }> = [];
 let agentState: Record<string, unknown> | null = null;
+const sent: Array<{ session: string; text: string; options?: { submit?: string } }> = [];
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
   createSession: (name: string, cwd: string, command?: string, options?: { env?: Record<string, string> }) =>
     Effect.sync(() => { created.push({ name, cwd, command, env: options?.env }); }),
   killSession: (name: string) => Effect.sync(() => { killed.push(name); }),
   listSessions: () => Effect.succeed(sessions),
-  sendKeys: () => Effect.succeed(undefined),
+  sendKeys: (session: string, text: string, _caller?: string, options?: { submit?: string }) =>
+    Effect.sync(() => { sent.push({ session, text, options }); }),
   sessionExists: () => Effect.succeed(true),
 }));
 
@@ -42,6 +44,7 @@ const { TmuxBackend, toPaneRole, tmuxTargetTokens } = await import('../../../../
 beforeEach(() => {
   created.length = 0;
   killed.length = 0;
+  sent.length = 0;
   aliveVerdict = { alive: true, paneAlive: true };
   idle = false;
   sessions = [];
@@ -177,5 +180,30 @@ describe('tmux adapter — close', () => {
       agentName: 'agent-pan-3917',
     }));
     expect(killed).toEqual(['agent-pan-3917']);
+  });
+});
+
+describe('tmux adapter — prompt submit mode (PAN-4292)', () => {
+  const sender = { id: 'conv-4292' };
+
+  it('passes submit steer through to sendKeys', async () => {
+    const result = await Effect.runPromise(new TmuxBackend().prompt(
+      { agentName: 'agent-pan-4292' },
+      'change course',
+      { messageId: 'steer-1', sender, submit: 'steer' },
+    ));
+
+    expect(result).toEqual({ delivered: true, messageId: 'steer-1' });
+    expect(sent).toEqual([{ session: 'agent-pan-4292', text: 'change course', options: { submit: 'steer' } }]);
+  });
+
+  it('passes no submit mode for a default prompt', async () => {
+    await Effect.runPromise(new TmuxBackend().prompt(
+      { agentName: 'agent-pan-4292' },
+      'queue this',
+      { messageId: 'enter-1', sender },
+    ));
+
+    expect(sent[0]?.options?.submit).toBeUndefined();
   });
 });

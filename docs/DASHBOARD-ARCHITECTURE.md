@@ -18,6 +18,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Deacon child process** (PAN-3922):
 - The dashboard forks `dist/dashboard/deacon.js` (`src/dashboard/server/deacon-main.ts`) through `services/deacon-supervisor.ts`. Cloister and deacon-lite run only in that child, never in the dashboard process.
 - IPC, parent to child: `{type:'patrol'}` (run one patrol now) and `{type:'reload-config'}`. Child to parent: `{type:'patrol-done', at, error}` after every completed deacon-lite tick, scheduled or manual.
+- Dead-agent events (PAN-4300): each deacon-lite tick checks agents whose `state.json` says `running`. When one is absent from the backend inventory and the liveness oracle confirms it dead, the child emits `agent.heartbeat_dead` and then `agent.status_changed` with `status: stopped`, `previousStatus` set to the recorded status, and `hasLivePane: false`. It emits this pair once per death: it remembers the agent id and launch generation (`startedAt` + `lastResumeAt`) in memory and emits again only after the agent is seen alive, is resumed, or leaves the `running` list. `state.json` is not changed. A deacon child restart emits the pair once more for each agent that is still dead.
 - The supervisor keeps the latest `patrol-done` report in memory, across child restarts. Nothing is written to disk.
 - `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
 - The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
@@ -298,6 +299,15 @@ door that does not exist; a real record read door would be a separate change.
   lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
   names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
   subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
+- Delivery modes (PAN-4292). `HarnessBehavior.steerKind` (`packages/contracts/src/harness-behavior.ts`)
+  says how a harness can be steered: `send-now-keys` (Claude Code), `control-channel` (Pi), or
+  `null`. The composer shows its delivery selector only for a steer-capable harness (Pi only on
+  conversations), and Ctrl/Cmd+Enter sends with `deliverAs: 'steer'`; elsewhere Ctrl+Enter is
+  Enter. Both `POST /api/conversations/:name/message` and `POST /api/agents/:id/message` accept
+  the `deliverAs` body field. A Claude Code steer reaches the delivery door as
+  `submit: 'steer'`. A harness without steer, or `follow_up` on Claude Code, answers **422**
+  `steer-unsupported` and delivers nothing. When an old PTY supervisor pressed Enter instead, the
+  response carries `steerDegraded` with the reason.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to

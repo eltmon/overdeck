@@ -711,6 +711,13 @@ export interface MessageAgentRedriveOptions {
    * recovery can never inject the same keyed message twice.
    */
   dedupKey?: string;
+  /**
+   * PAN-4292: interrupt the running turn and send now (Claude Code send-now
+   * chord). Refused, with nothing delivered or mailed, for a harness without
+   * send-now steer, a remote agent, a keyed send, and a paused, suspended or
+   * stopped agent (there is no running turn to interrupt).
+   */
+  steer?: boolean;
 }
 
 export interface ResumeGateContext {

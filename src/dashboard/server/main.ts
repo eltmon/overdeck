@@ -44,8 +44,9 @@ import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier } from '../../lib/cloister/deacon-lite.js';
-import { getAgentState, type AgentState } from '../../lib/agents.js';
+import { getAgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
+import { buildAgentStatusChangedPayload, buildConfirmedDeadAgentEvents } from '../../lib/cloister/agent-status-events.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
@@ -423,72 +424,26 @@ setPipelineHandler((event) => {
 });
 console.log('[overdeck] Pipeline notifier → domain events wired');
 
-function toAgentStatusPayload(status: AgentState['status'] | undefined) {
-  return status === 'starting' || status === 'running' || status === 'stopped' || status === 'error'
-    ? status
-    : 'unknown';
-}
-
-function buildAgentStatusChangedPayload(
-  state: AgentState,
-  previousStatus?: AgentState['status'],
-  hasLiveTmuxSession?: boolean,
-) {
-  const payload = {
-    agentId: state.id,
-    issueId: state.issueId,
-    status: toAgentStatusPayload(state.status),
-    previousStatus: previousStatus ? toAgentStatusPayload(previousStatus) : undefined,
-    stoppedByUser: state.stoppedByUser === true,
-    paused: state.paused === true,
-    pausedReason: state.pausedReason ?? null,
-    pausedAt: state.pausedAt ?? null,
-    troubled: state.troubled === true,
-    troubledAt: state.troubledAt ?? null,
-    consecutiveFailures: state.consecutiveFailures ?? 0,
-    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
-    lastFailureAt: state.lastFailureAt ?? null,
-    lastFailureReason: state.lastFailureReason ?? null,
-    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
-  };
-  // `hasLiveTmuxSession` is the deprecated alias of `hasLivePane` (#4105).
-  return hasLiveTmuxSession === undefined ? payload : { ...payload, hasLivePane: hasLiveTmuxSession, hasLiveTmuxSession };
-}
-
 // Wire up deacon → domain events for orphaned agent recovery.
 // When deacon resets agent state directly, publish the saved state to live clients.
+// Unreachable today — deacon-lite runs only in the deacon child (PAN-3922) —
+// kept so the two registrations stay identical.
 setAgentStoppedNotifier((agentId) => {
-  void (async () => {
-    try {
-      const es = getEventStore();
-      const state = getAgentState(agentId);
-      if (state) {
-        // heartbeat_dead only updates runtime snapshot; emit it directly.
-        es.append({
-          type: 'agent.heartbeat_dead',
-          timestamp: new Date().toISOString(),
-          payload: { agentId, issueId: state.issueId, sessionId: state.sessionId },
-        } as any);
+  try {
+    const es = getEventStore();
+    const state = getAgentState(agentId);
+    for (const event of buildConfirmedDeadAgentEvents(agentId, state)) {
+      if (event.type === 'agent.status_changed' && state) {
         // PAN-1908: write-through projection — agents-row upsert + lifecycle
         // event append in one SQLite transaction.
-        // PAN-2633: heartbeat_dead means the deacon has determined the tmux
-        // session is gone, so assert hasLiveTmuxSession: false explicitly.
-        saveAgentStateAndEmitEvent(state, {
-          type: 'agent.status_changed',
-          timestamp: new Date().toISOString(),
-          payload: buildAgentStatusChangedPayload(state, undefined, false),
-        });
-        return;
+        saveAgentStateAndEmitEvent(state, event as any);
+      } else {
+        es.append(event as any);
       }
-      es.append({
-        type: 'agent.heartbeat_dead',
-        timestamp: new Date().toISOString(),
-        payload: { agentId },
-      } as any);
-    } catch (err) {
-      console.error('[pipeline] Failed to append agent stopped/status event:', err);
     }
-  })();
+  } catch (err) {
+    console.error('[pipeline] Failed to append agent stopped/status event:', err);
+  }
 });
 setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
   try {

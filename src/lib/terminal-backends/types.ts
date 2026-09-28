@@ -22,6 +22,7 @@ import type {
   PaneTokens,
   TerminalBackendName,
 } from '@overdeck/contracts';
+import type { SubmitMode } from './steer-keys.js';
 
 export type { AgentRole, AgentState, BackendAgentSnapshot, PaneTokens, TerminalBackendName };
 
@@ -134,6 +135,12 @@ export interface PromptOptions {
   readonly wait?: { readonly until?: readonly AgentState[]; readonly timeoutMs?: number };
   /** Who is sending. The guard accepts the target issue's `work` pane or an operator conversation. */
   readonly sender: PromptSender;
+  /**
+   * How to finish the prompt (PAN-4292). `enter` (default) submits, which
+   * queues behind a running turn. `steer` presses Claude Code's send-now
+   * chord, Ctrl+X Ctrl+S (see `steer-keys.ts`), which interrupts the turn.
+   */
+  readonly submit?: SubmitMode;
 }
 
 /**

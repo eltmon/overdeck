@@ -34,3 +34,20 @@ describe("PRIME_AGENT_BEHAVIOR", () => {
     expect(seen.has("Prime Agent")).toBe(true)
   })
 })
+
+describe("steerKind (PAN-4292)", () => {
+  it("Claude Code steers with its send-now keys", () => {
+    expect(getHarnessBehavior("claude-code").steerKind).toBe("send-now-keys")
+  })
+
+  it("Pi (ohmypi and pi) steers over the control channel", () => {
+    expect(getHarnessBehavior("ohmypi").steerKind).toBe("control-channel")
+    expect(getHarnessBehavior("pi").steerKind).toBe("control-channel")
+  })
+
+  it("every other harness has no steer delivery", () => {
+    for (const harness of ["codex", "acp", "opencode", "kimi-code", "muse", "prime-agent"] as const) {
+      expect(getHarnessBehavior(harness).steerKind).toBeNull()
+    }
+  })
+})

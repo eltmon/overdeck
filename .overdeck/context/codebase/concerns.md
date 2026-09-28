@@ -86,6 +86,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   only appends an event, so complete-planning's "Marked planning-… as stopped"
   never reaches `state.json`. Never gate behavior on that label; use the live
   inventory (`liveness.ts` / `liveAgentInventory`) and `startedAt`/`stoppedAt`.
+  Consequence: a dead agent stays in `listAgentStates({ status: 'running' })`
+  forever, so any patrol that iterates it and emits per agent must dedupe per
+  death — deacon-lite's `reconcileAgentLiveness` did not, and emitted ~50k
+  events/day (PAN-4300).
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
   dies under Bun; circular ESM imports die under tsx/Node source mode).
 - **`execSync` freezes the server** — anything reachable from the dashboard event
