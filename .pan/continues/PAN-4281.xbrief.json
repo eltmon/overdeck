@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T08:24:53.520Z",
+  "updated": "2026-09-28T08:25:05.595Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "nested-repo-scan.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T08:24:53.519Z"
+    },
+    "polyrepo-create.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:25:05.594Z"
     }
   }
 }
