@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:20:59.764Z",
+  "updated": "2026-09-28T14:21:11.374Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "gh-local-failure-cost.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T14:20:59.764Z"
+    },
+    "close-out-negative-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:21:11.374Z"
     }
   }
 }
