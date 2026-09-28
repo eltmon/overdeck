@@ -21,6 +21,13 @@ export interface ConversationFeedRow {
   harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | null;
   archivedAt?: string | null;
   messageCount?: number;
+  status?: 'active' | 'ended' | null;
+  endedAt?: string | null;
+  sessionAlive?: boolean;
+  isWorking?: boolean;
+  pendingInputCount?: number;
+  /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
+  projectKey?: string | null;
 }
 
 export interface UseConversationFeedResult {
@@ -36,20 +43,29 @@ async function fetchConversations(): Promise<ConversationFeedRow[]> {
 }
 
 export function mapConversationToFeedEntry(conversation: ConversationFeedRow): ConversationSessionFeedEntry {
-  // PAN-1556: prefer the transcript's last-activity (JSONL mtime) so a fresh
-  // reply re-surfaces the conversation at the top of the feed. lastAttachedAt
-  // only moves on terminal re-attach, so it left active conversations stale.
-  const lastMessageDate = conversation.lastActivityAt ?? conversation.lastAttachedAt ?? conversation.createdAt;
+  // PAN-4301 FR-1: `timestamp` records a lifecycle fact (started / ended), never
+  // the transcript mtime, so a working conversation does not jump back to
+  // "Just Now" on every poll. The recency timestamp (PAN-1556 precedence) is kept
+  // separately; the Chats tab re-dates by it.
+  const recencyAt = conversation.lastActivityAt ?? conversation.lastAttachedAt ?? conversation.createdAt;
+  const endedAt = conversation.status === 'ended' ? conversation.endedAt ?? null : null;
+  const sessionAlive = conversation.sessionAlive === true;
   return {
     kind: 'conversation',
     id: `conversation:${conversation.name}`,
-    timestamp: lastMessageDate,
+    timestamp: endedAt ?? conversation.createdAt,
+    timestampLabel: endedAt ? 'ended' : 'started',
+    recencyAt,
+    sessionAlive,
+    agentState: sessionAlive && (conversation.pendingInputCount ?? 0) > 0 ? 'waiting'
+      : sessionAlive && conversation.isWorking ? 'active' : 'idle',
+    projectKey: conversation.projectKey ?? null,
     workspaceId: conversation.cwd ?? null,
     issueId: conversation.issueId as IssueId | null,
     conversationId: conversation.id,
     conversationName: conversation.name,
     agent: mapHarnessToAgent(conversation.harness),
-    lastMessageDate,
+    lastMessageDate: recencyAt,
     lastMessageSnippet: conversation.title ?? 'No messages yet',
     ...(conversation.messageCount === undefined ? {} : { messageCount: conversation.messageCount }),
   };

@@ -423,7 +423,7 @@ function isSessionFeedTab(value: string | null): value is SessionFeedTab {
     || value === 'activity';
 }
 
-function navigateToFeedEntry(entry: SessionFeedEntry) {
+export function navigateToFeedEntry(entry: SessionFeedEntry) {
   if (typeof window === 'undefined') return;
 
   switch (entry.kind) {
@@ -437,6 +437,11 @@ function navigateToFeedEntry(entry: SessionFeedEntry) {
       }
       if (entry.issueId) pushRoute(`/command-deck?issue=${encodeURIComponent(entry.issueId)}&tab=activity`);
       return;
+    case 'gauntlet_run': {
+      const target = entry.orchestratorName ?? entry.lanes[0]?.name;
+      if (target) pushRoute(`/conv/${encodeURIComponent(target)}`);
+      return;
+    }
     case 'git':
       if (!loggedGitNavigationNoop) {
         console.debug('Session feed git entries do not have a destination yet.');

@@ -1,8 +1,8 @@
-import type { IssueId } from '@overdeck/contracts';
+import type { IssueId, LaneActivity } from '@overdeck/contracts';
 
 export type SessionFeedTab = 'all' | 'chats' | 'files' | 'git' | 'comments' | 'activity';
 
-export type SessionFeedEntryKind = 'conversation' | 'activity' | 'git' | 'file_change' | 'comment' | 'placeholder';
+export type SessionFeedEntryKind = 'conversation' | 'activity' | 'gauntlet_run' | 'git' | 'file_change' | 'comment' | 'placeholder';
 
 export interface SessionFeedEntryBase {
   id: string;
@@ -21,6 +21,14 @@ export interface ConversationSessionFeedEntry extends SessionFeedEntryBase {
   messageCount?: number;
   threadLabel?: string;
   threadIsPrimary?: boolean;
+  /** Recency timestamp (lastActivityAt ?? lastAttachedAt ?? createdAt); the Chats tab dates by it. */
+  recencyAt: string;
+  /** Which fact `timestamp` records. */
+  timestampLabel: 'started' | 'ended' | 'active';
+  sessionAlive: boolean;
+  /** FR-5 derived status dot. */
+  agentState: 'active' | 'waiting' | 'idle';
+  projectKey: string | null;
 }
 
 export interface ActivitySessionFeedEntry extends SessionFeedEntryBase {
@@ -51,6 +59,40 @@ export interface ActivitySessionFeedEntry extends SessionFeedEntryBase {
    * shown in every feed scope, never filtered out by project issue scoping.
    */
   systemWide?: boolean;
+  /** FR-14: number of entries for this issue collapsed into this card (1 when not collapsed). */
+  stepCount?: number;
+}
+
+export interface GauntletRunLane {
+  id: number;
+  name: string;
+  key: string;
+  role: 'builder' | 'critic' | 'verifier' | 'play' | 'orchestrator';
+  iteration: number | null;
+  activity: LaneActivity;
+  report: { status: string; at: string; verdict: string | null } | null;
+  criticOfConversationId: number | null;
+  createdAt: string;
+}
+
+/**
+ * PAN-4301: one card per gauntlet run — the lanes sharing (projectKey, gauntletRun).
+ * `id` is `gauntlet-run:<projectKey ?? '-'>:<run>`; `timestamp` = `latest.at`;
+ * `issueId` and `workspaceId` are null.
+ */
+export interface GauntletRunSessionFeedEntry extends SessionFeedEntryBase {
+  kind: 'gauntlet_run';
+  run: string;
+  projectKey: string | null;
+  orchestratorName: string | null;
+  orchestratorTitle: string | null;
+  countsLine: string;
+  state: 'needs-you' | 'failed' | 'working' | 'idle' | 'stopped';
+  latest: { text: string; at: string };
+  /** Ordered per FR-12. */
+  lanes: GauntletRunLane[];
+  laneConversationIds: number[];
+  anyAlive: boolean;
 }
 
 export interface GitSessionFeedEntry extends SessionFeedEntryBase {
@@ -87,6 +129,7 @@ export interface PlaceholderSessionFeedEntry extends SessionFeedEntryBase {
 export type SessionFeedEntry =
   | ConversationSessionFeedEntry
   | ActivitySessionFeedEntry
+  | GauntletRunSessionFeedEntry
   | GitSessionFeedEntry
   | FileChangeSessionFeedEntry
   | CommentSessionFeedEntry

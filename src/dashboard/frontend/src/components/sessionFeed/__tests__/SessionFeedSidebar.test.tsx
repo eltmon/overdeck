@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../lib/store';
 import { useAskUserQuestionUiStore } from '../../../lib/askUserQuestionUiStore';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
-import { SESSION_FEED_TAB_STORAGE_KEY, SessionFeedSidebar } from '../SessionFeedSidebar';
-import type { ConversationSessionFeedEntry, GitSessionFeedEntry } from '../types';
+import { SESSION_FEED_TAB_STORAGE_KEY, SessionFeedSidebar, navigateToFeedEntry } from '../SessionFeedSidebar';
+import type { ConversationSessionFeedEntry, GauntletRunSessionFeedEntry, GitSessionFeedEntry } from '../types';
 
 // The sidebar's pending-input count now spans two domains: agents from the read
 // model and conversations from the REST door, which it reads via react-query.
@@ -89,6 +89,11 @@ function conversationEntry(overrides: Partial<ConversationSessionFeedEntry> = {}
     agent: 'claude_code',
     lastMessageDate: '2026-05-23T01:04:00.000Z',
     lastMessageSnippet: 'Conversation destination',
+    recencyAt: '2026-05-23T01:04:00.000Z',
+    timestampLabel: 'started',
+    sessionAlive: false,
+    agentState: 'idle',
+    projectKey: null,
     ...overrides,
   };
 }
@@ -527,5 +532,58 @@ describe('SessionFeedSidebar', () => {
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
     expect(screen.getByText('agent-unbound')).toBeTruthy();
+  });
+});
+
+describe('navigateToFeedEntry', () => {
+  function gauntletRunEntry(overrides: Partial<GauntletRunSessionFeedEntry> = {}): GauntletRunSessionFeedEntry {
+    return {
+      kind: 'gauntlet_run',
+      id: 'gauntlet-run:lexerra:india',
+      timestamp: '2026-09-28T10:00:00.000Z',
+      workspaceId: null,
+      issueId: null,
+      run: 'india',
+      projectKey: 'lexerra',
+      orchestratorName: 'conv-2884',
+      orchestratorTitle: 'Lexerra gauntlet',
+      countsLine: '1 builder · 1 working',
+      state: 'working',
+      latest: { text: 'alpha builder launched', at: '2026-09-28T10:00:00.000Z' },
+      lanes: [{
+        id: 7,
+        name: 'conv-lane-alpha',
+        key: 'alpha',
+        role: 'builder',
+        iteration: 1,
+        activity: 'working',
+        report: null,
+        criticOfConversationId: null,
+        createdAt: '2026-09-28T10:00:00.000Z',
+      }],
+      laneConversationIds: [7],
+      anyAlive: true,
+      ...overrides,
+    };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('routes a gauntlet run card to its orchestrator conversation', () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+
+    navigateToFeedEntry(gauntletRunEntry());
+
+    expect(pushState).toHaveBeenCalledWith(null, '', '/conv/conv-2884');
+  });
+
+  it('routes a gauntlet run card without an orchestrator to its first lane', () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+
+    navigateToFeedEntry(gauntletRunEntry({ orchestratorName: null }));
+
+    expect(pushState).toHaveBeenCalledWith(null, '', '/conv/conv-lane-alpha');
   });
 });

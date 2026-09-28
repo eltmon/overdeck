@@ -31,6 +31,8 @@ function renderEntry(entry: SessionFeedEntry, onSelect: (entry: SessionFeedEntry
       return <ActivityFeedCard key={entry.id} entry={entry} onSelect={handleSelect} now={now} />;
     case 'git':
       return <GitFeedCard key={entry.id} entry={entry} onSelect={handleSelect} now={now} />;
+    case 'gauntlet_run':
+      return null;
     case 'file_change':
     case 'comment':
     case 'placeholder':
