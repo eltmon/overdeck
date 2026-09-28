@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3942",
   "created": "2026-09-28T17:21:05.119Z",
-  "updated": "2026-09-28T18:29:34.365Z",
+  "updated": "2026-09-28T18:29:44.027Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "launcher-wiring.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T18:29:34.365Z"
+    },
+    "launcher-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:29:44.026Z"
     }
   }
 }
