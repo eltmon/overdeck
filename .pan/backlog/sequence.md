@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T14:04:09.836894Z · model: claude-opus-5-5 · open: 790_
+_Last sequenced: 2026-09-28T14:06:07.359461Z · model: claude-opus-5-5 · open: 790_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -264,7 +264,7 @@ _Last sequenced: 2026-09-28T14:04:09.836894Z · model: claude-opus-5-5 · open: 
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 316 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 316 | PAN-1166 | M | high | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
 | 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28: PAN-3762 per-machine server is default; adds Vault/Fly/paid tracks. Children carry the order. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
@@ -1105,7 +1105,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T14:04:09.836894Z",
+  "generatedAt": "2026-09-28T14:06:07.359461Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 790,
@@ -8710,7 +8710,7 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "issue": "PAN-1166",
       "rank": 316,
       "size": "M",
-      "importance": "low",
+      "importance": "high",
       "score": 21,
       "condition": "ok",
       "dependsOn": [],
