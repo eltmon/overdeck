@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { saveCommand, describeVerdict, resolveTargets } from '../../../../src/cli/commands/vault/save.js';
 import { setupCommand } from '../../../../src/cli/commands/vault/setup.js';
 import { syncCommand } from '../../../../src/cli/commands/vault/sync.js';
-import type { DiscoveredFile } from '../../../../src/lib/conversations/harness-discovery.js';
+import type { DiscoveredTranscript } from '../../../../src/lib/vault/discover.js';
 import { VAULT_OFF_MESSAGE } from '../../../../src/lib/vault/config.js';
 import { listOwned } from '../../../../src/lib/vault/local-index.js';
 import { Fixture, captureIo, runCli } from './helpers.js';
@@ -19,7 +19,7 @@ describe('pan vault save / sync', () => {
   let fx: Fixture;
   let cwd: string;
   let sessions: Record<string, string>;
-  let discovered: DiscoveredFile[];
+  let discovered: DiscoveredTranscript[];
 
   beforeEach(async () => {
     fx = new Fixture();
@@ -39,7 +39,7 @@ describe('pan vault save / sync', () => {
       const when = new Date(Date.now() - ageDays * 24 * 60 * 60 * 1000);
       utimesSync(path, when, when);
       sessions[name] = path;
-      discovered.push({ jsonlPath: path, projectDir, harness: 'claude-code' });
+      discovered.push({ nativePath: path, harness: 'claude-code', sessionId: id });
     }
   });
 

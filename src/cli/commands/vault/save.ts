@@ -7,8 +7,8 @@
  * 0, so it can never block Claude Code.
  */
 import { stat } from 'node:fs/promises';
-import { basename, extname, resolve } from 'node:path';
-import { discoverJsonlFiles, type DiscoveredFile } from '../../../lib/conversations/harness-discovery.js';
+import { basename, resolve } from 'node:path';
+import { discoverTranscripts, isFile, type DiscoveredTranscript } from '../../../lib/vault/discover.js';
 import { settle, type SettleResult } from '../../../lib/vault/settle.js';
 import { defaultIo, openVault, type CliIo, type OpenVault } from './shared.js';
 
@@ -50,21 +50,14 @@ export function harnessForPath(path: string): string {
 export async function resolveTargets(
   target: string | undefined,
   options: SaveOptions,
-  discover: () => Promise<DiscoveredFile[]> = () => discoverJsonlFiles([]),
+  discover: () => Promise<DiscoveredTranscript[]> = discoverTranscripts,
 ): Promise<SaveTarget[]> {
   if (target) {
     const asPath = resolve(target);
-    try {
-      if ((await stat(asPath)).isFile()) return [{ nativePath: asPath, harness: harnessForPath(asPath) }];
-    } catch {
-      // not a path; fall through to session-id lookup
-    }
+    if (await isFile(asPath)) return [{ nativePath: asPath, harness: harnessForPath(asPath) }];
     const files = await discover();
-    const matches = files.filter((file) => {
-      const id = basename(file.jsonlPath, extname(file.jsonlPath));
-      return id === target || id.startsWith(target);
-    });
-    return matches.map((file) => ({ nativePath: file.jsonlPath, harness: file.harness }));
+    const matches = files.filter((file) => file.sessionId === target || file.sessionId.startsWith(target));
+    return matches.map((file) => ({ nativePath: file.nativePath, harness: file.harness }));
   }
   if (!options.all) throw new Error('Give a session id, a transcript path, or --all.');
   const since = options.since ? new Date(options.since) : null;
@@ -75,12 +68,12 @@ export async function resolveTargets(
     if (options.harness && file.harness !== options.harness) continue;
     if (since) {
       try {
-        if ((await stat(file.jsonlPath)).mtimeMs < since.getTime()) continue;
+        if ((await stat(file.nativePath)).mtimeMs < since.getTime()) continue;
       } catch {
         continue;
       }
     }
-    out.push({ nativePath: file.jsonlPath, harness: file.harness });
+    out.push({ nativePath: file.nativePath, harness: file.harness });
   }
   return out;
 }
@@ -119,7 +112,7 @@ export async function saveCommand(
   target: string | undefined,
   options: SaveOptions = {},
   io: CliIo = defaultIo,
-  deps: { discover?: () => Promise<DiscoveredFile[]>; stdin?: () => Promise<string> } = {},
+  deps: { discover?: () => Promise<DiscoveredTranscript[]>; stdin?: () => Promise<string> } = {},
 ): Promise<void> {
   if (options.hook) {
     try {
