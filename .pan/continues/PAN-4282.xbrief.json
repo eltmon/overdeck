@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:37:16.910Z",
+  "updated": "2026-09-28T00:37:29.458Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "get-set-up-card.ac5": {
       "status": "completed",
       "doneAt": "2026-09-28T00:37:16.910Z"
+    },
+    "banner-hide-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:29.458Z"
     }
   }
 }
