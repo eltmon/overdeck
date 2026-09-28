@@ -885,7 +885,7 @@ function providerConfigForSave(
  */
 let settingsWriteQueue: Promise<unknown> = Promise.resolve();
 
-function runSettingsWriteSerialized<T>(fn: () => Promise<T>): Promise<T> {
+export function runSettingsWriteSerialized<T>(fn: () => Promise<T>): Promise<T> {
   const turn = settingsWriteQueue.then(fn, fn);
   // Swallow rejections in the queue's own chain — a failed write must not
   // permanently wedge every subsequent write behind a forever-rejected turn.
