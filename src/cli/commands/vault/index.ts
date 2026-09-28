@@ -56,4 +56,20 @@ export function registerVaultCommands(program: Command): void {
     .description('Print a saved conversation read-only with its versions')
     .option('--json', 'Output in JSON format')
     .action(lazyAction(() => import('./show.js'), 'showCommand'));
+
+  vault
+    .command('evict')
+    .description('Review the pending-deletion batch (default) or act on it; nothing is deleted without --confirm')
+    .option('--review', 'Scan and print the batch with its fingerprint (default)')
+    .option('--confirm <fingerprint>', 'Delete the reviewed files if the batch still matches this fingerprint')
+    .option('--decline <vaultId>', 'Remove an entry from the batch and do not offer it again')
+    .option('--reoffer <vaultId>', 'Allow a declined entry to be offered again')
+    .option('--clear', 'Empty the batch without deleting or declining anything')
+    .action(lazyAction(() => import('./evict.js'), 'evictCommand'));
+
+  vault
+    .command('restore <id>')
+    .description('Rebuild an evicted transcript byte for byte at its original path')
+    .option('--to <path>', 'Write the rebuilt file here instead of the recorded path')
+    .action(lazyAction(() => import('./restore.js'), 'restoreCommand'));
 }

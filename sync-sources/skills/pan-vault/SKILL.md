@@ -48,3 +48,17 @@ pan vault show <id>                 # human turns, assistant text and versions, 
 ```
 
 `resume` compares the target directory's git state with the saved state. On a difference it asks on a TTY; `--on-drift continue|note|cancel` answers non-interactively and a non-TTY run without the flag cancels. Claude Code and Codex resume natively; other harnesses get a seed digest file in the target directory.
+
+## Eviction (opt-in, confirmation required)
+
+```bash
+pan vault evict                       # review: paths, sizes, status, total, fingerprint; deletes nothing
+pan vault evict --confirm <fingerprint>
+pan vault evict --decline <vaultId>
+pan vault evict --reoffer <vaultId>
+pan vault evict --clear
+pan vault restore <id>                # rebuild an evicted transcript byte for byte
+pan vault restore <id> --to <path>
+```
+
+Eviction only runs when `vault.evict` is `true` in `~/.overdeck/vault/config.json`. Even then, transcripts wait in a pending-deletion batch until `--confirm` with the fingerprint printed by the review; anything that changed since the review is skipped.
