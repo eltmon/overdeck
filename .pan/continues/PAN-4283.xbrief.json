@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T00:55:44.159Z",
+  "updated": "2026-09-28T00:55:54.843Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "close-out-settings-routes.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:55:44.159Z"
+    },
+    "close-out-settings-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:55:54.843Z"
     }
   }
 }
