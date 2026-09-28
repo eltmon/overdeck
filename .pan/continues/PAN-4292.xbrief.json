@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:09:57.673Z",
+  "updated": "2026-09-28T13:09:59.396Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,7 +38,7 @@
     "conversation-route-steer": {
       "status": "in_progress",
       "claimedBy": "agent-pan-4292",
-      "claimedAt": "2026-09-28T13:06:59.375Z"
+      "claimedAt": "2026-09-28T13:09:59.396Z"
     }
   }
 }
