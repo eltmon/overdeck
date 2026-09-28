@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T13:55:09.042Z",
+  "updated": "2026-09-28T13:55:22.792Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "gauntlet-run-selector.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T13:55:09.042Z"
+    },
+    "gauntlet-run-selector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:22.792Z"
     }
   }
 }
