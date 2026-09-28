@@ -87,6 +87,7 @@ const {
   DEACON_LITE_INTERVAL_MS,
   setAgentStoppedNotifier,
   __resetStuckWorkAgentCooldownForTests,
+  __resetReportedDeadAgentsForTests,
 } = await import('../../../../src/lib/cloister/deacon-lite.js');
 const { checkApiErrorAgents, __resetApiErrorRecoveryStateForTests } = await import('../../../../src/lib/cloister/deacon-api-recovery.js');
 
@@ -113,6 +114,7 @@ describe('deacon-lite', () => {
     mocks.capturePaneText.mockReturnValue('');
     mocks.reconcileClosedIssueAgents.mockResolvedValue([]);
     __resetStuckWorkAgentCooldownForTests();
+    __resetReportedDeadAgentsForTests();
     __resetApiErrorRecoveryStateForTests();
     mocks.isDeaconGloballyPaused.mockReturnValue(false);
   });
@@ -325,6 +327,140 @@ describe('deacon-lite', () => {
       await expect(reconcileAgentLiveness()).resolves.toEqual(
         expect.arrayContaining([]),
       );
+    });
+
+    // PAN-4300: reportedDeadAgents guard — a confirmed-dead agent is reported
+    // once per launch generation, not once per 60s tick.
+    describe('reported-dead guard (PAN-4300)', () => {
+      it('reports a confirmed-dead agent once across five patrol ticks', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        mocks.isIdle.mockReturnValue(false);
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        startDeaconLite();
+        await vi.advanceTimersByTimeAsync(0);
+        await vi.advanceTimersByTimeAsync(DEACON_LITE_INTERVAL_MS * 4);
+
+        expect(notifier).toHaveBeenCalledTimes(1);
+        expect(notifier).toHaveBeenCalledWith('agent-pan-1');
+        setAgentStoppedNotifier(null);
+      });
+
+      it('reports again after the agent is seen alive and dies again', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        // Tick 1: dead.
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+
+        // Tick 2: alive (present in the inventory).
+        mocks.liveAgentInventory.mockResolvedValue(inventory(['agent-pan-1']));
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+
+        // Tick 3: dead again.
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(2);
+        setAgentStoppedNotifier(null);
+      });
+
+      it('reports again when the launch generation changes', async () => {
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        // Tick 1: dead, generation A.
+        mocks.listAgentStates.mockReturnValue([workAgent({ startedAt: '2026-09-18T00:00:00.000Z' })]);
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+
+        // Tick 2: dead again, but resumed — new generation.
+        mocks.listAgentStates.mockReturnValue([
+          workAgent({ startedAt: '2026-09-18T00:00:00.000Z', lastResumeAt: '2026-09-18T11:00:00.000Z' }),
+        ]);
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(2);
+
+        // Tick 3: same generation — no additional call.
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(2);
+        setAgentStoppedNotifier(null);
+      });
+
+      it('drops the entry when the agent leaves the running list', async () => {
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        // Tick 1: dead.
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+
+        // Tick 2: no longer in the running list (e.g. reaped or restarted fresh).
+        mocks.listAgentStates.mockReturnValue([]);
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+
+        // Tick 3: dead again — the guard entry was dropped, so it reports again.
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(2);
+        setAgentStoppedNotifier(null);
+      });
+
+      it('retries on the next tick when the notifier throws', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        const notifier = vi.fn().mockImplementationOnce(() => {
+          throw new Error('notify boom');
+        });
+        setAgentStoppedNotifier(notifier);
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(2);
+
+        consoleErrorSpy.mockRestore();
+        setAgentStoppedNotifier(null);
+      });
+
+      it('leaves the entry on an indeterminate verdict', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        // Tick 1: dead.
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+
+        // Tick 2: indeterminate — the entry is untouched.
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+
+        // Tick 3: still dead — the existing generation entry still matches, no call.
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        await reconcileAgentLiveness();
+        expect(notifier).toHaveBeenCalledTimes(1);
+        setAgentStoppedNotifier(null);
+      });
     });
   });
 
