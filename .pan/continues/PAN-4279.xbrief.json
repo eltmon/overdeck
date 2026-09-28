@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:40:34.328Z",
+  "updated": "2026-09-28T00:40:45.681Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "remove-outage-guards.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T00:40:34.328Z"
+    },
+    "remove-outage-guards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:40:45.680Z"
     }
   }
 }
