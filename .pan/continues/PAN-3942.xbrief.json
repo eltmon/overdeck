@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3942",
   "created": "2026-09-28T17:21:05.119Z",
-  "updated": "2026-09-28T18:05:07.539Z",
+  "updated": "2026-09-28T18:05:08.867Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-3942",
       "claimedAt": "2026-09-28T17:44:01.886Z",
       "doneAt": "2026-09-28T18:05:07.539Z"
+    },
+    "ui-mounts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T18:05:08.867Z"
     }
   }
 }
