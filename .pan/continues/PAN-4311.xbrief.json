@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:37:16.753Z",
+  "updated": "2026-09-28T15:37:22.016Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
       "claimedBy": "agent-pan-4311",
       "claimedAt": "2026-09-28T15:29:33.166Z",
       "doneAt": "2026-09-28T15:37:16.753Z"
+    },
+    "runaway-patrol": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T15:37:22.016Z"
     }
   }
 }
