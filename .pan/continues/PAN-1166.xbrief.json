@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T14:02:07.790Z",
+  "updated": "2026-09-28T14:02:20.620Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -230,6 +230,10 @@
     "voice-hook-mint-first.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T14:02:07.790Z"
+    },
+    "auth-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:20.620Z"
     }
   }
 }
