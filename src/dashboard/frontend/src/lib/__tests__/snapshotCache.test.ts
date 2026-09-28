@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { saveSnapshotToCache, loadSnapshotFromCache, clearSnapshotCache } from '../snapshotCache'
+import { saveSnapshotToCache, loadSnapshotFromCache, loadSnapshotCacheEntry, clearSnapshotCache } from '../snapshotCache'
 import type { DashboardSnapshot } from '@overdeck/contracts'
 
 function makeSnapshot(sequence = 1, issueCount = 0): DashboardSnapshot {
@@ -51,6 +51,31 @@ describe('loadSnapshotFromCache', () => {
   it('ignores entries stored under a different (old) version key', () => {
     localStorage.setItem('pan-snapshot-cache-v0', JSON.stringify({ data: makeSnapshot(99), timestamp: new Date().toISOString() }))
     expect(loadSnapshotFromCache()).toBeNull()
+  })
+})
+
+describe('loadSnapshotCacheEntry', () => {
+  it('returns the snapshot with the ISO timestamp it was stored at', () => {
+    const storedAt = '2026-09-27T23:30:00.000Z'
+    localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({ data: makeSnapshot(3), timestamp: storedAt }))
+    const entry = loadSnapshotCacheEntry()
+    expect(entry?.timestamp).toBe(storedAt)
+    expect(entry?.data.sequence).toBe(3)
+  })
+
+  it('stamps entries written by saveSnapshotToCache', () => {
+    saveSnapshotToCache(makeSnapshot(5))
+    const entry = loadSnapshotCacheEntry()
+    expect(Number.isNaN(Date.parse(entry!.timestamp))).toBe(false)
+  })
+
+  it('returns null for corrupt entries', () => {
+    localStorage.setItem('pan-snapshot-cache-v1', 'INVALID JSON {{{')
+    expect(loadSnapshotCacheEntry()).toBeNull()
+    localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({ data: { foo: 'bar' }, timestamp: '2026-09-27T23:30:00.000Z' }))
+    expect(loadSnapshotCacheEntry()).toBeNull()
+    localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({ data: makeSnapshot(1) }))
+    expect(loadSnapshotCacheEntry()).toBeNull()
   })
 })
 

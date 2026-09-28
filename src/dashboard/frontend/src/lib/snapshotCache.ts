@@ -47,21 +47,30 @@ export function saveSnapshotToCache(snapshot: DashboardSnapshot): void {
 }
 
 /**
- * Load a DashboardSnapshot from localStorage.
+ * Load the cached snapshot with the ISO time it was saved (the degraded-mode
+ * banner's "showing data from HH:MM" before any bootstrap, PAN-4279).
  * Returns null if not found, corrupt, or from an incompatible schema version.
  */
-export function loadSnapshotFromCache(): DashboardSnapshot | null {
+export function loadSnapshotCacheEntry(): CacheEntry | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
 
     const entry = JSON.parse(raw) as CacheEntry
-    if (entry?.data?.sequence == null) return null
+    if (entry?.data?.sequence == null || typeof entry.timestamp !== 'string') return null
 
-    return entry.data
+    return entry
   } catch {
     return null
   }
+}
+
+/**
+ * Load a DashboardSnapshot from localStorage.
+ * Returns null if not found, corrupt, or from an incompatible schema version.
+ */
+export function loadSnapshotFromCache(): DashboardSnapshot | null {
+  return loadSnapshotCacheEntry()?.data ?? null
 }
 
 /**

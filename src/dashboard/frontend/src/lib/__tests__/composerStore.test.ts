@@ -50,6 +50,85 @@ describe('composerStore optimistic messages', () => {
   });
 });
 
+describe('composerStore held messages (PAN-4279)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetComposerStore();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function holdOne(text = 'held ping', clientMessageId = 'client-held-1'): string {
+    useComposerStore.getState().holdSend(CONV, text, { clientMessageId });
+    const failed = useComposerStore.getState().byConversation[CONV]?.failed ?? [];
+    return failed[failed.length - 1]!.id;
+  }
+
+  it('holdSend adds an unsent, retryable prompt without POSTing', () => {
+    holdOne();
+    const [held] = useComposerStore.getState().byConversation[CONV]!.failed;
+    expect(held).toMatchObject({
+      text: 'held ping',
+      kind: 'prompt',
+      clientMessageId: 'client-held-1',
+      heldOffline: true,
+      retryable: true,
+    });
+    expect(held!.error).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends a held message once with its clientMessageId and no retry flag', async () => {
+    fetchMock.mockResolvedValue(fetchResult(true));
+    const id = holdOne();
+
+    await useComposerStore.getState().retryFailed(CONV, id, 'held ping', 0);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/conversations/${CONV}/message`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: 'held ping', clientMessageId: 'client-held-1' }),
+      }),
+    );
+    const slice = useComposerStore.getState().byConversation[CONV]!;
+    expect(slice.failed).toEqual([]);
+    expect(slice.optimistic.map((m) => m.clientMessageId)).toEqual(['client-held-1']);
+  });
+
+  it('gives the sent bubble a fresh createdAt rather than the hold time', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-09-27T23:00:00.000Z'));
+      const id = holdOne();
+      vi.setSystemTime(new Date('2026-09-27T23:10:00.000Z'));
+      fetchMock.mockResolvedValue(fetchResult(true));
+
+      await useComposerStore.getState().retryFailed(CONV, id, 'held ping', 0);
+
+      expect(useComposerStore.getState().byConversation[CONV]!.optimistic[0]!.createdAt).toBe('2026-09-27T23:10:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends a held message to the agent endpoint when an agentId is supplied', async () => {
+    fetchMock.mockResolvedValue(fetchResult(true));
+    const id = holdOne();
+
+    await useComposerStore.getState().retryFailed(CONV, id, 'held ping', 0, 'agent-pan-42');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-42/message', expect.objectContaining({ method: 'POST' }));
+  });
+});
+
 describe('composerStore retryFailed — a retry never loses the text', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
