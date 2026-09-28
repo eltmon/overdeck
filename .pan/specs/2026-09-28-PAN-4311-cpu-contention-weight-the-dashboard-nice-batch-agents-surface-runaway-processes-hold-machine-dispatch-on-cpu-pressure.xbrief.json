@@ -1,0 +1,1472 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T13:53:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4311: CPU contention: weight the dashboard, nice batch agents, surface runaway processes, hold machine dispatch on CPU pressure",
+    "updated": "2026-09-28T13:58:38.783Z"
+  },
+  "plan": {
+    "id": "pan-4311",
+    "title": "CPU contention: weight the dashboard, nice batch agents, surface runaway processes, hold machine dispatch on CPU pressure",
+    "status": "proposed",
+    "uid": "36b78e5b-f0ea-4080-8b78-34117bb6bbe2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-28T13:53:07Z",
+    "updated": "2026-09-28T13:58:38.783Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4311",
+        "label": "PAN-4311",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-4311/.pan/drafts/pan-4311.md",
+        "label": "PRD draft (.pan/drafts/pan-4311.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "resources",
+      "cpu",
+      "governor",
+      "terminal-backends",
+      "cloister",
+      "observability"
+    ],
+    "metadata": {
+      "sizeJustification": "One issue with one acceptance set: the three steps (weights+nice, runaway detector, CPU dispatch hold) share the resources.* config keys (cfg-keys), the PSI reader and stateless CPU check (cpu-psi-reader), and the governor's cpu trigger. The DAG has no edges between the three steps except through those shared foundations, so the work agent can fan them out in parallel. Splitting into sibling tracker issues is an operator action and was not taken in auto mode.",
+      "canonicalFilename": "2026-09-28-PAN-4311-cpu-contention-weight-the-dashboard-nice-batch-agents-surface-runaway-processes-hold-machine-dispatch-on-cpu-pressure.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Load reached ~79 on the 24-core host (2026-09-28). A lane ran 42 `yes` processes; conversation 2884's `git log -S | head` outlived its timed-out Bash call and burned ~90% of a core for 95 minutes. The dashboard slowed and conversations loaded slowly. Overdeck has no working CPU protection: the governor's CPU hold gates nothing, no dispatch door reads CPU, app.slice has no cpu controller (dashboard competes per thread with every agent), every agent runs at nice 0, and the existing runaway attribution code (buildHostProcesses, spike sampler, history sampler) has no production input.",
+      "Proposal": "(1) Weights and nice: CPUWeight=1000 on the dashboard transient unit and supervisor (enables the cpu controller in app.slice), CPUWeight=20 on verification scopes, and a nice prefix at launchAgentPane by CPU class (batch 10, lane 15, interactive conversations unchanged). (2) An observe-only runaway sampler started from the dashboard main process (30 s, async /proc reads) with a pure classifier (orphaned / detached-from-tool-shell / outlived-tool-call / long-burn at >=0.5 sustained cores over 10 min), transition-only warn/escalate/resolve feed entries, and real input for /api/resources hostProcesses and the spike sampler. (3) CPU PSI (/proc/pressure/cpu some avg60, load fallback): a cpu trigger in the governor feed, a stateless assessCpuPressure used by the lane door (429 unless --force), an acknowledgeable cpu_saturated guardrail warning, an opt-in Flywheel spawn hold (default off), PSI in quality-gate admission, and PSI in the (now wired) resource history plus a 5-minute calibration log line. Full detail, corrected references and snippets: PRD .pan/drafts/pan-4311.md.",
+      "NonGoals": "- Per-agent systemd scopes / overdeck-{conversations,agents,lanes}.slice and CPUWeight on the Herdr unit (renderHerdrUnit stays unchanged)\n- Killing, pausing, stopping or messaging any process or agent automatically\n- Gating conversations, operator pan start, or dashboard Start on CPU\n- Enabling the Flywheel spawn hold by default (governor_cpu_hold_dispatch stays false)\n- ionice, IOWeight, or CPUQuota anywhere\n- Dashboard cpu.pressure in /api/metrics, nicing the dashboard's own children, CPU admission for other projects' tests, Docker cpu_shares\n- Frontend UI changes\n- New HTTP routes\n- Running pan reload / pan up / pan restart from the workspace (the live cgroup check is a post-merge operator checkpoint)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Start the runaway sampler from dashboard main.ts next to startResourcesSnapshotService, not from the hygiene scheduler",
+        "rationale": "The hygiene scheduler runs in the deacon child process (deacon-main.ts:143 -> cloister/service.ts:348), so its module cache is invisible to /api/resources in main; the runtime mirror behind isIdle is also populated only in main."
+      },
+      {
+        "summary": "Dispatch gates use a stateless assessCpuPressure() instead of the governor's cached verdict",
+        "rationale": "getCachedMemoryVerdict() is null outside the deacon child; the lane door and guardrail run in main and spawnAgent runs in the pan start CLI. A stateless PSI threshold check gives the same answer in every process; the governor's hysteresis stays for the feed only."
+      },
+      {
+        "summary": "Flywheel spawn hold ships behind resources.governor_cpu_hold_dispatch, default false",
+        "rationale": "The issue body names this default; the 2026-08-02 swap-residency correction in memory-governor.ts records that holds on persistently elevated signals wedged the pipeline for weeks."
+      },
+      {
+        "summary": "Exclude quality gates by derivable facts (verification scopes are not enumerated; leader nice 19 and age < 20.5 min) instead of the in-memory gate registry",
+        "rationale": "activeGateProcessGroups lives in the process that ran the gate and cannot be read cross-process; gates are always nice -n 19 and are group-killed by their watchdog after 20.5 min."
+      },
+      {
+        "summary": "Resolve the harness pid from /proc comm/environ data rather than findAgentRuntimePidInSubtree",
+        "rationale": "The probe execs ps/pgrep per tree node, which would spawn hundreds of processes per 30 s tick; the sampler already reads comm, ppid and environ for every pid."
+      },
+      {
+        "summary": "Wire recordResourceHistorySample from refreshResourcesSnapshot and add a 5-minute calibration line to deacon.log",
+        "rationale": "The history sampler has no production caller and keeps only 24 h in memory, so it cannot hold the week of PSI samples the issue wants for calibration; deacon.log is durable."
+      },
+      {
+        "summary": "Derive the lane CPU class from the conversation row's laneRole inside spawnConversationSession",
+        "rationale": "Passing it only through the launch context would lose it on resume; laneRole is a write-once fact on the row."
+      },
+      {
+        "summary": "evaluateSpawnGuardrails takes the CPU verdict as a second parameter (default null); spawn-gate.ts passes null",
+        "rationale": "Keeps the guardrail pure over its inputs; SystemHealthSnapshot carries no PSI."
+      },
+      {
+        "summary": "The live cgroup/nice check (issue AC-0) is a post-merge operator checkpoint, not an xBRIEF acceptance criterion",
+        "rationale": "It needs a deploy via pan reload, which only the Flywheel/operator performs; work and test roles cannot observe it before merge."
+      },
+      {
+        "summary": "Keep one issue and one plan with sizeJustification instead of filing sibling issues",
+        "rationale": "The operator filed one issue with one acceptance set; the steps share config keys, the PSI reader and the cpu trigger; creating tracker issues is an operator action. The DAG keeps the three steps parallel."
+      },
+      {
+        "summary": "Quality-gate admission uses PSI some avg10 >= 25 (constant) with load/core >= 1 as fallback",
+        "rationale": "25 matches the governor's recovery default: heavy test runs start only when the machine is back to the recovered level; avg10 matches the admission's short sampling horizon."
+      },
+      {
+        "summary": "Conversations without runtime-mirror state never trigger the outlived-tool-call leg; the 30-minute long-burn backstop covers them",
+        "rationale": "liveness.isIdle returns false without runtime state; the backstop still catches the conv-2884 shape within 30 minutes."
+      }
+    ],
+    "items": [
+      {
+        "id": "cfg-keys",
+        "title": "WI-1: add the seven PAN-4311 resources.* config keys with defaults and validation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "tests/lib/config-yaml.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/config-yaml.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/lib/config-yaml.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Add yaml keys dashboard_cpu_weight, verification_cpu_weight, agent_nice, lane_nice, governor_cpu_psi_hold_avg60, governor_cpu_psi_recovery_avg60, governor_cpu_hold_dispatch and their resolved camelCase fields (defaults 1000, 20, 10, 15, 50, 25, false). Validate in merge.ts beside the existing governor_cpu_* block (merge.ts:815-852): weights integers 1-10000, nice integers 0-19, PSI thresholds finite in (0,100] (recovery >= 0), boolean flag; recovery >= hold resets both to defaults with a warning. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "cfg-keys.ac1",
+            "title": "Given an empty config, loading resolves resources.dashboardCpuWeight=1000, verificationCpuWeight=20, agentNice=10, laneNice=15, governorCpuPsiHoldAvg60=50, governorCpuPsiRecoveryAvg60=25, governorCpuHoldDispatch=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cfg-keys.ac2",
+            "title": "Given resources.agent_nice: 25, the merge falls back to agentNice=10",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cfg-keys.ac3",
+            "title": "Given governor_cpu_psi_recovery_avg60 >= governor_cpu_psi_hold_avg60, the merge emits a warning naming both keys and falls back to 50/25",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cfg-keys.ac4",
+            "title": "Given valid overrides (dashboard_cpu_weight: 400, governor_cpu_hold_dispatch: true), the resolved config applies them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-supervisor-weight",
+        "title": "WI-2: set CPUWeight on the dashboard transient unit and the supervisor unit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/restart.ts",
+            "src/lib/systemd.ts",
+            "tests/unit/cli/restart-spawn-pid.test.ts",
+            "src/lib/__tests__/systemd.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/restart-spawn-pid.test.ts src/lib/__tests__/systemd.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/cli/restart-spawn-pid.test.ts passes",
+            "src/lib/__tests__/systemd.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add --property=CPUWeight=<resources.dashboardCpuWeight> to the systemd-run args in restart.ts spawnDashboardSystemdUnit (after ManagedOOMPreference=avoid, l.373), threaded from spawnDashboardDetached via a new DashboardSpawnOptions.dashboardCpuWeight override that defaults to loadConfigSync().config.resources.dashboardCpuWeight. Add CPUWeight=<weight> under [Service] in systemd.ts renderSupervisorUnit via a new cpuWeight option with the same default. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "dashboard-supervisor-weight.ac1",
+            "title": "Given no override, spawnDashboardDetached passes '--property=CPUWeight=1000' in the systemd-run argument list (execFileSync mock)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-supervisor-weight.ac2",
+            "title": "Given dashboardCpuWeight: 400, spawnDashboardDetached passes '--property=CPUWeight=400'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-supervisor-weight.ac3",
+            "title": "renderSupervisorUnit({ cpuWeight: 1000, ... }) returns unit text containing the line 'CPUWeight=1000' in the [Service] section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verification-weight",
+        "title": "WI-3: set CPUWeight=20 on verification-worker systemd scopes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-worker-launcher.ts",
+            "tests/unit/lib/cloister/verification-worker-launcher.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-worker-launcher.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/verification-worker-launcher.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a cpuWeight parameter (default 20) to buildVerificationWorkerLaunch and insert --property=CPUWeight=<cpuWeight> after '--quiet' in the systemd-run scope args; launchVerificationWorker passes loadConfigSync().config.resources.verificationCpuWeight. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "verification-weight.ac1",
+            "title": "Given systemd mode, buildVerificationWorkerLaunch returns args containing '--property=CPUWeight=20' by default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-weight.ac2",
+            "title": "Given cpuWeight 35, the args contain '--property=CPUWeight=35'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-weight.ac3",
+            "title": "Given non-systemd mode, buildVerificationWorkerLaunch returns { command: process.execPath, args: [workerPath, request] } unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cpu-class-launch",
+        "title": "WI-4: add withCpuClass and nice batch/lane launches at launchAgentPane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/cpu-class.ts",
+            "src/lib/terminal-backends/launch.ts",
+            "tests/unit/lib/terminal-backends/cpu-class.test.ts",
+            "tests/unit/lib/terminal-backends/launch-cpu-class.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/cpu-class.test.ts tests/unit/lib/terminal-backends/launch-cpu-class.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/terminal-backends/cpu-class.test.ts passes",
+            "tests/unit/lib/terminal-backends/launch-cpu-class.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/terminal-backends/cpu-class.ts with CpuClass, withCpuClass(argv, cpuClass, platform, nice), defaultCpuClass(role) and cpuClassForConversation(laneRole, role). Add optional cpuClass to LaunchPaneRequest and wrap request.argv in launchAgentPane with the class resolved as request.cpuClass ?? defaultCpuClass(tokens.role), nice levels from loadConfigSync().config.resources (lazy import). Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "cpu-class-launch.ac1",
+            "title": "withCpuClass returns argv unchanged for 'interactive' and for 'batch' on win32",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cpu-class-launch.ac2",
+            "title": "withCpuClass returns ['nice','-n','10','--',...argv] for 'batch' and nice level 15 for 'lane' with default levels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cpu-class-launch.ac3",
+            "title": "Given a fake backend, launchAgentPane passes the nice-wrapped argv to startAgent for tokens.role 'work' and the unwrapped argv for tokens.role 'conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cpu-class-launch.ac4",
+            "title": "Given a HerdrBackend with a fake API, launchAgentPane for a work agent sends pane.send_input text that starts with 'nice -n 10 -- bash '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-cpu-class",
+        "title": "WI-5: launch lane conversations with the lane CPU class derived from the conversation row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/terminal-backends/cpu-class.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/cpu-class.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/terminal-backends/cpu-class.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In conversation-runtime.ts spawnConversationSession, pass cpuClass: cpuClassForConversation(getConversationByName(tmuxSession.replace(/^conv-/, ''))?.laneRole, role) to the launchAgentPane call (grep \"argv: ['bash', launcherScript]\"). Deriving from the row keeps a resumed lane in the lane class. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "lane-cpu-class.ac1",
+            "title": "cpuClassForConversation('builder', 'conversation') returns 'lane'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cpu-class.ac2",
+            "title": "cpuClassForConversation(null, 'conversation') returns 'interactive' and cpuClassForConversation(null, 'worker') returns 'batch'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cpu-class.ac3",
+            "title": "Given a conversation row with laneRole 'builder', spawnConversationSession passes cpuClass 'lane' to launchAgentPane, so the lane pane launches with nice 15",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cpu-psi-reader",
+        "title": "WI-6: parse /proc/pressure/cpu and add the stateless assessCpuPressure check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-health/cpu-psi.ts",
+            "src/lib/cloister/cpu-pressure.ts",
+            "src/lib/system-health/__tests__/cpu-psi.test.ts",
+            "tests/unit/lib/cloister/cpu-pressure.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/system-health/__tests__/cpu-psi.test.ts tests/unit/lib/cloister/cpu-pressure.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "src/lib/system-health/__tests__/cpu-psi.test.ts passes",
+            "tests/unit/lib/cloister/cpu-pressure.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "governor-cpu-trigger",
+            "lane-door-hold",
+            "flywheel-spawn-hold",
+            "guardrail-cpu-warning",
+            "gate-admission-psi",
+            "history-psi"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/system-health/cpu-psi.ts with parseCpuPsi/readCpuPsi (some avg10, avg60; nulls when absent or non-Linux); it lives in src/lib because the root tsconfig excludes src/dashboard/** and spawnAgent (CLI) imports the check. Create src/lib/cloister/cpu-pressure.ts with CpuPressureReading, CpuPressureVerdict, classifyCpuPressure (PSI some avg60 vs governorCpuPsiHoldAvg60, load/core vs governorCpuSoftLoadPerCore when PSI is null), readCpuPressure and assessCpuPressure. No stored state, async only, no sync twin. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "cpu-psi-reader.ac1",
+            "title": "parseCpuPsi on 'some avg10=12.50 avg60=55.00 avg300=3.00 total=1' returns { someAvg10: 12.5, someAvg60: 55 } and returns nulls for unparseable text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cpu-psi-reader.ac2",
+            "title": "classifyCpuPressure with PSI avg60 55 and hold 50 returns saturated true with signal 'psi-some-avg60'; with PSI 20 returns saturated false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cpu-psi-reader.ac3",
+            "title": "classifyCpuPressure with PSI null and load/core 1.6 against 1.5 returns saturated true with signal 'load-per-core'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cpu-psi-reader.ac4",
+            "title": "readCpuPsi returns { someAvg10: null, someAvg60: null } when the platform is not linux",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "governor-cpu-trigger",
+        "title": "WI-7: use CPU PSI in the governor and record a cpu trigger kind",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-verdict-cache.ts",
+            "src/lib/cloister/memory-governor.ts",
+            "tests/unit/lib/cloister/memory-governor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-governor.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/memory-governor.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'cpu' to GovernorTriggerKind plus optional cpuSignal/cpuReading/cpuThreshold trigger fields and psiCpuSomeAvg10/60 verdict fields. Export nextGovernorModeWithRunway; compute cpuSaturated from runway.psiCpuSomeAvg60 (hold threshold while admitting, recovery while held) with the load/core rule as fallback; a CPU hold returns trigger memoryTrigger ?? cpuTrigger. assessMemoryPressure reads readCpuPsi() and uses the same CPU-below-recovery rule in the calm re-admit condition. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "governor-cpu-trigger.ac1",
+            "title": "nextGovernorModeWithRunway with memory above recovery and PSI avg60 55 while admitting returns mode 'holding' with trigger kind 'cpu' and cpuReading 55",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-cpu-trigger.ac2",
+            "title": "With previous mode 'holding', PSI 30 returns 'holding' and PSI 20 returns 'admitting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-cpu-trigger.ac3",
+            "title": "With PSI null and load/core 1.6 while admitting, it returns 'holding' with cpuSignal 'load-per-core'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-cpu-trigger.ac4",
+            "title": "Given fake timers, a CPU hold and CPU PSI below recovery, assessMemoryPressure returns band 'soft' before governorPsiCalmWindowMs elapses and returns band 'ok' after it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "governor-cpu-feed",
+        "title": "WI-8: name CPU pressure in the memory-pressure feed and log a 5-minute calibration line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/memory-pressure-patrol.ts",
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-pressure-patrol.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/memory-pressure-patrol.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "formatTrigger handles kind 'cpu' (PSI or load wording); the holding message for a CPU trigger states the CPU recovery threshold; GOVERNOR_SCOPE is rewritten to the PRD text; the holding dedup key includes the trigger kind; at most once per 5 minutes the patrol calls logDeaconEvent with '[deacon] cpu-pressure sample psi_some_avg10=... psi_some_avg60=... load_per_core=...'. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "governor-cpu-feed.ac1",
+            "title": "Given a verdict with a cpu trigger at PSI 55, the emitted message contains 'CPU pressure (PSI some avg60) reached 55.0%' and does not contain 'before trigger details were available'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-cpu-feed.ac2",
+            "title": "Given a memory hold followed by a CPU hold, the patrol emits two separate warn entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-cpu-feed.ac3",
+            "title": "Given an injected clock, the patrol logs the cpu-pressure calibration line at the first tick, logs nothing extra 4 minutes later, and logs it again at 5 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-door-hold",
+        "title": "WI-9: refuse lane launches with 429 cpu-saturated unless force is set",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/types.ts",
+            "src/lib/lanes/launch.ts",
+            "src/dashboard/server/routes/lanes.ts",
+            "src/cli/commands/lane.ts",
+            "src/lib/lanes/__tests__/launch.test.ts",
+            "src/dashboard/server/routes/__tests__/lanes-route.test.ts",
+            "src/cli/commands/__tests__/lane.test.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-start.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/launch.test.ts src/dashboard/server/routes/__tests__/lanes-route.test.ts src/cli/commands/__tests__/lane.test.ts src/lib/overdeck/__tests__/conversation-runtime-start.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "src/lib/lanes/__tests__/launch.test.ts passes",
+            "src/dashboard/server/routes/__tests__/lanes-route.test.ts passes",
+            "src/cli/commands/__tests__/lane.test.ts passes",
+            "src/lib/overdeck/__tests__/conversation-runtime-start.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 429 to LaneLaunchError status and force?: boolean to LaneLaunchRequest; launchLane checks an injectable cpuPressure dep (default assessCpuPressure) right after validateRequest and throws LaneLaunchError(429, 'cpu-saturated: ...') unless request.force. Add 'force' to BOOLEAN_FIELDS in routes/lanes.ts and a --force option to pan lane start that sends force: true. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "lane-door-hold.ac1",
+            "title": "Given a saturated cpuPressure dep, launchLane rejects with LaneLaunchError status 429 whose message starts with 'cpu-saturated'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-door-hold.ac2",
+            "title": "Given a saturated verdict and force: true, launchLane calls the start dep and returns a result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-door-hold.ac3",
+            "title": "parseLaneLaunchBody rejects force: 'yes' with 'force must be a boolean', and laneStartCommand with force posts a body containing force: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-door-hold.ac4",
+            "title": "Given assessCpuPressure mocked saturated, startConversationRuntime still calls its spawn dep (conversations are never gated)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-spawn-hold",
+        "title": "WI-10: opt-in hold of Flywheel spawns under CPU pressure in spawnAgent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/cpu-dispatch-hold.ts",
+            "src/lib/agents/spawn.ts",
+            "tests/unit/lib/agents/cpu-dispatch-hold.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/cpu-dispatch-hold.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/agents/cpu-dispatch-hold.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/cpu-dispatch-hold.ts with CpuPressureHoldError (code 'cpu-pressure-hold'), shouldHoldSpawnForCpu and assertSpawnAdmittedForCpu(startedBy, deps) that reads the CPU verdict only when resources.governorCpuHoldDispatch is true and startedBy is a flywheel: provenance. Call it in spawnAgent (spawn.ts ~l.612) right after startedBy is resolved. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "flywheel-spawn-hold.ac1",
+            "title": "Given governorCpuHoldDispatch true, startedBy 'flywheel:conv-flywheel' and a saturated verdict, assertSpawnAdmittedForCpu rejects with CpuPressureHoldError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-spawn-hold.ac2",
+            "title": "Given governorCpuHoldDispatch true, startedBy 'operator:cli' and a saturated verdict, it resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-spawn-hold.ac3",
+            "title": "Given the default (false), a flywheel spawn under a saturated verdict resolves and the assess dep is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guardrail-cpu-warning",
+        "title": "WI-11: add an acknowledgeable cpu_saturated guardrail warning",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/dashboard/server/routes/resources/spawn-gate.ts",
+            "src/dashboard/server/routes/__tests__/agents-guardrails.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-guardrails.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/routes/__tests__/agents-guardrails.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'cpu_saturated' to SPAWN_GUARDRAIL_WARNING_KINDS and 'cpu_pressure' to the advisory code union, keeping it out of AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT. evaluateSpawnGuardrails takes a second parameter cpu (default null) and pushes a warning-severity cpu_saturated advisory when cpu.saturated. routes/agents/spawn.ts passes await assessCpuPressure(); spawn-gate.ts passes null. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "guardrail-cpu-warning.ac1",
+            "title": "Given a saturated CPU verdict, evaluateSpawnGuardrails returns a warning with kind 'cpu_saturated', requiresAcknowledgement true and status 409",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guardrail-cpu-warning.ac2",
+            "title": "Given that decision, unacknowledgedSpawnGuardrailWarnings with kinds ['cpu_saturated'] returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guardrail-cpu-warning.ac3",
+            "title": "AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT does not include 'cpu_saturated', and a null CPU verdict produces no cpu warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-admission-psi",
+        "title": "WI-12: use CPU PSI in quality-gate admission with load/core fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/quality-gate-admission.ts",
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/quality-gate-admission.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/quality-gate-admission.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Export sampleQualityGatePressure(sleep, readPsi = readCpuPsi); add QUALITY_GATE_PSI_SOME_AVG10_START_THRESHOLD = 25 and psiSomeAvg10 on the sample; pressured = utilization >= 0.75 OR (PSI present ? psi some avg10 >= 25 : load/core >= 1). Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "gate-admission-psi.ac1",
+            "title": "Given seeded PSI some avg10 30 and low utilization, sampleQualityGatePressure returns pressured true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-admission-psi.ac2",
+            "title": "Given PSI some avg10 10 and load/core 3, it returns pressured false (PSI takes precedence over load)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-admission-psi.ac3",
+            "title": "Given PSI null and load/core 1.2, it falls back to load and returns pressured true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "history-psi",
+        "title": "WI-13: wire the resource history sampler and record CPU PSI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/history.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "tests/unit/dashboard/routes/resources-history.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/resources-history.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/routes/resources-history.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Add psiCpuSomeAvg10/psiCpuSomeAvg60 to ResourceHistorySample and a cpuPsi series (5-min bucket average of non-null avg60) to ResourceHistoryResponse. refreshResourcesSnapshot records one sample per refresh from the payload's host CPU/memory percent plus readCpuPsi(), skipping when the CPU percent is null. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "history-psi.ac1",
+            "title": "Given a recorded sample with PSI avg10 12 and avg60 40, buildResourceHistoryResponse returns a cpuPsi point with value 40",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-psi.ac2",
+            "title": "Given only samples with null PSI, the response's cpuPsi series is empty and the cpu/mem series are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-psi.ac3",
+            "title": "Given a resources snapshot refresh, recordResourceHistorySample receives one sample carrying the host CPU percent and the PSI values (spy assertion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runaway-classify",
+        "title": "WI-14: pure runaway classifier over /proc facts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/runaway-classify.ts",
+            "tests/unit/lib/cloister/runaway-classify.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/runaway-classify.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/runaway-classify.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ],
+          "foundationFor": [
+            "runaway-patrol",
+            "runaway-wiring"
+          ],
+          "parallelSafeReason": "Touches only new files (src/lib/cloister/runaway-classify.ts) ; any other item touching the same file is ordered after it by a DAG edge, so it runs in its own slot once its blockers finish."
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/runaway-classify.ts exporting RunawayProcessFact, RunawayContext, RunawayReason, RunawayGroup, resolveHarnessPids and classifyRunaways exactly as specified in PRD WI-14: harness pid resolution (D6), exclusions (FR-10), owner attribution (environ, ancestor environ, cgroup, cwd, host), chain classification (attached / orphaned / harness gone), grouping by (owner, pgid) with the oldest member as representative (D7), and the four legs (FR-9) at >= 0.5 sustained cores. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "runaway-classify.ac1",
+            "title": "Given the conv-2884 shape (git under a live bash -c under a live claude with OVERDECK_CONVERSATION, age 16 min, 0.9 cores, agent idle), classifyRunaways returns one group with reason 'outlived-tool-call'; a direct child of claude at 11 min returns 'detached-from-tool-shell'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-classify.ac2",
+            "title": "Given git under a live tool shell with the agent busy, it returns no group at 16 min and reason 'long-burn' at 30 min; an orphan whose ppid is the user manager at 11 min returns 'orphaned'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-classify.ac3",
+            "title": "classifyRunaways returns no group for the harness pid, its pane bash, the herdr server, a docker-cgroup pid or the admission owner's tree, even at 1.0 core for 40 min",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-classify.ac4",
+            "title": "classifyRunaways returns one group with count 42 for 42 yes processes sharing one pgid, returns no group for a nice-19 gate-shaped group at 19 min, and returns it at 21 min",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runaway-patrol",
+        "title": "WI-15: observe-only runaway sampler with one warn, one escalation and one resolve per group",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/runaway-process-patrol.ts",
+            "tests/unit/lib/cloister/runaway-process-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/runaway-process-patrol.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/runaway-process-patrol.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Touches only new files (src/lib/cloister/runaway-process-patrol.ts) ; any other item touching the same file is ordered after it by a DAG edge, so it runs in its own slot once its blockers finish."
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/runaway-process-patrol.ts per PRD WI-15: injectable seams for cgroup.procs, /proc stat/environ/cmdline/cwd/uptime, admission owner, isAgentIdle, emit and now; a per-(pid, starttime) ring of CPU ticks over a 10-minute window; transition-only feed entries; snapshot() for the resources route; startRunawayPatrol/stopRunawayPatrol/getRunawaySnapshot on a 30 s unref'd interval, Linux only. Async fs only. Header comment states the stall-sweeper never-act directive. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "runaway-patrol.ac1",
+            "title": "Under vi.useFakeTimers with a synthetic yes group burning one core, advancing in 30 s steps emits nothing before the 10-minute window fills and exactly one warn entry containing 'kill -TERM -<pgid>' at the crossing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-patrol.ac2",
+            "title": "Later ticks emit no repeat; exactly one escalation entry is emitted when the group's age crosses 60 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-patrol.ac3",
+            "title": "After the pid disappears the patrol emits one info entry containing 'exited'; a pid reused with a different starttime is treated as a new process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-patrol.ac4",
+            "title": "Given a full runaway lifecycle, the spies on process.kill, stopAgent, setAgentPaused and deliverAgentMessage record zero invocations (the patrol refuses to act)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runaway-wiring",
+        "title": "WI-16: feed /api/resources hostProcesses and the spike sampler from the runaway patrol",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/routes/resources/host-processes.ts",
+            "src/dashboard/server/routes/resources/snapshot.ts",
+            "src/lib/cloister/runaway-process-patrol.ts",
+            "tests/unit/dashboard/routes/resources-host-processes.test.ts",
+            "tests/unit/dashboard/routes/resources-spike-sampler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/resources-host-processes.test.ts tests/unit/dashboard/routes/resources-spike-sampler.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/routes/resources-host-processes.test.ts passes",
+            "tests/unit/dashboard/routes/resources-spike-sampler.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "getHostProcessesSnapshot(snapshot = getRunawaySnapshot()) builds rows from the patrol's records with agentSessions (rootPid = harness pid) and coreServicePids, and returns buildHostProcesses([]) when there is no snapshot. The default patrol feeds one createResourceSpikeSampler per tick. main.ts starts the patrol next to startResourcesSnapshotService() and stops it in the same shutdown path. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "runaway-wiring.ac1",
+            "title": "Given a seeded snapshot, getHostProcessesSnapshot returns a non-empty row whose owner.agentId is 'conv-2884' for a Herdr-hosted git process whose ppid chain reaches that agent's harness pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-wiring.ac2",
+            "title": "Given no snapshot, getHostProcessesSnapshot returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-wiring.ac3",
+            "title": "Given a tick with load1 40 on 24 cores and a 'yes x42' group, the spike sampler emits exactly one entry whose message contains 'yes x42'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runaway-wiring.ac4",
+            "title": "When the dashboard server boots, main.ts starts the runaway patrol next to startResourcesSnapshotService() and its shutdown path stops it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-gates",
+        "title": "WI-17: document CPU pressure gates and runaway detection (PIPELINE-GATES, CLAUDE.md, memory-governor.mdx)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "CLAUDE.md",
+            "configuration/memory-governor.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff --stat origin/main -- docs/PIPELINE-GATES.md CLAUDE.md configuration/memory-governor.mdx"
+          ],
+          "expected_outputs": [
+            "the diff shows changes to each listed doc file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9",
+            "FR-14",
+            "FR-15",
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite the Memory gate bullet in docs/PIPELINE-GATES.md (l.605) so it no longer names resumeYieldedAgents as a gated caller; add CPU pressure and Runaway processes bullets; replace the CLAUDE.md Key Invariants governor sentence (l.37) with the PRD text; add a '## CPU pressure' section to configuration/memory-governor.mdx listing the seven new keys and the pan lane start --force escape. Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "docs-gates.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a 'CPU pressure (PAN-4311)' bullet naming the lane 429 cpu-saturated refusal, the cpu_saturated guardrail warning and the opt-in resources.governor_cpu_hold_dispatch hold, and no longer states that the governor gates resumeYieldedAgents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-gates.ac2",
+            "title": "docs/PIPELINE-GATES.md contains a 'Runaway processes (PAN-4311)' bullet that lists the four legs with their thresholds and states that nothing is killed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-gates.ac3",
+            "title": "CLAUDE.md no longer contains 'The resource governor holds dispatch during memory or CPU saturation' and states that conversations are never gated and runaways are surfaced, never killed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-gates.ac4",
+            "title": "configuration/memory-governor.mdx renders a '## CPU pressure' section listing all seven new resources.* keys with their defaults",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-weights",
+        "title": "WI-18: document CPU classes, CPUWeight and IO limits (TERMINAL-BACKENDS, DASHBOARD-ARCHITECTURE)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:53:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4311",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff --stat origin/main -- docs/TERMINAL-BACKENDS.md docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "the diff shows changes to each listed doc file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add '## CPU classes and priority (PAN-4311)' to docs/TERMINAL-BACKENDS.md (classes, nice defaults, lane derivation, nice execs so Herdr detection holds, CPUWeight on dashboard/supervisor/verification, why not ionice, IOWeight needs the root Delegate drop-in, Herdr unit unchanged) and a short CPUWeight + runaway-sampler section to docs/DASHBOARD-ARCHITECTURE.md (fixes contention starvation, not self-inflicted event-loop p99). Full step-by-step detail, snippets and exact anchors: PRD work item referenced in the title."
+        },
+        "items": [
+          {
+            "id": "docs-weights.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md contains a 'CPU classes and priority (PAN-4311)' section stating the interactive/batch/lane classes with nice 0/10/15 defaults and that nice execs the harness so Herdr detection still works",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-weights.ac2",
+            "title": "docs/TERMINAL-BACKENDS.md contains the statements that ionice has no effect with the NVMe 'none' scheduler and that IOWeight needs a root 'Delegate=cpu memory pids io' drop-in on user@.service",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-weights.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the dashboard unit's CPUWeight default 1000 and the statement that it does not fix event-loop p99 caused by the dashboard's own blocking work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cfg-keys",
+        "to": "dashboard-supervisor-weight",
+        "type": "blocks"
+      },
+      {
+        "from": "cfg-keys",
+        "to": "verification-weight",
+        "type": "blocks"
+      },
+      {
+        "from": "cfg-keys",
+        "to": "cpu-class-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "cfg-keys",
+        "to": "cpu-psi-reader",
+        "type": "blocks"
+      },
+      {
+        "from": "cfg-keys",
+        "to": "governor-cpu-trigger",
+        "type": "blocks"
+      },
+      {
+        "from": "cfg-keys",
+        "to": "flywheel-spawn-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "cfg-keys",
+        "to": "docs-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "cpu-class-launch",
+        "to": "lane-cpu-class",
+        "type": "blocks"
+      },
+      {
+        "from": "cpu-class-launch",
+        "to": "docs-weights",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-supervisor-weight",
+        "to": "docs-weights",
+        "type": "blocks"
+      },
+      {
+        "from": "cpu-psi-reader",
+        "to": "governor-cpu-trigger",
+        "type": "blocks"
+      },
+      {
+        "from": "cpu-psi-reader",
+        "to": "lane-door-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "cpu-psi-reader",
+        "to": "flywheel-spawn-hold",
+        "type": "blocks"
+      },
+      {
+        "from": "cpu-psi-reader",
+        "to": "guardrail-cpu-warning",
+        "type": "blocks"
+      },
+      {
+        "from": "cpu-psi-reader",
+        "to": "gate-admission-psi",
+        "type": "blocks"
+      },
+      {
+        "from": "cpu-psi-reader",
+        "to": "history-psi",
+        "type": "blocks"
+      },
+      {
+        "from": "governor-cpu-trigger",
+        "to": "governor-cpu-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "runaway-classify",
+        "to": "runaway-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "runaway-patrol",
+        "to": "runaway-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "history-psi",
+        "to": "runaway-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-door-hold",
+        "to": "docs-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "runaway-patrol",
+        "to": "docs-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "governor-cpu-feed",
+        "to": "docs-gates",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
