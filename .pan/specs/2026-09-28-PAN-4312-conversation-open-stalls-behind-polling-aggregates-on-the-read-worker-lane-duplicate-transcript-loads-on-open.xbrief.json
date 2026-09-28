@@ -1,0 +1,808 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T14:06:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4312: Conversation open stalls behind polling aggregates on the read worker lane; duplicate transcript loads on open",
+    "updated": "2026-09-28T14:10:40.242Z"
+  },
+  "plan": {
+    "id": "pan-4312",
+    "title": "Conversation open stalls behind polling aggregates on the read worker lane; duplicate transcript loads on open",
+    "status": "proposed",
+    "uid": "22f0c67f-ba34-44f9-89bf-e6b77e8ca776",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-28T14:06:54Z",
+    "updated": "2026-09-28T14:10:40.242Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4312",
+        "label": "PAN-4312",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-4312/.pan/drafts/pan-4312.md",
+        "label": "PRD draft (.pan/drafts/pan-4312.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "performance",
+      "conversations",
+      "worker-lanes",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "Opening a conversation can hold the transcript skeleton for seconds. The WebSocket stream's first payload waits for getConversationByName (0-1 ms of work) on the one-slot read worker lane, which also runs polling aggregates of up to 34 s (search stats p50 13.4 s, cost snapshot ~1.2 s every 15 s); in one boot it waited >1 s 9 times, p50 11.5 s, max 17.6 s. Every open also repeats transcript work: a duplicate HTTP /messages load for live conversations, synchronous computeContextUsage re-parses (30-300 ms per call), an uncached full-file claude-initial parse, and /diffs spawning two git processes per edited turn every 5 s, even for ended conversations.",
+      "Proposal": "Move the four polling aggregates to a new poll lane so read serves point lookups only; make search stats cheap by reading lastIndexedAt from file_cursors; derive /messages context usage from its parse and memoize computeContextUsage; after the lane split, turn the HTTP /messages read for streaming conversations into a 1500 ms fallback (resume/switch-model/fork completion re-read via fetchQuery) and drop the dead cancelQueries calls; reuse the claude-initial snapshot through sharedTranscriptParser with per-subscriber parse-state copies; make /diffs poll only live conversations, run one diff pair per repo, and cache results for 30 s. Document the lanes and the open sequence.",
+      "NonGoals": "- The hard-load burst (~60 parallel REST calls and a 5.35 MB getSnapshot frame before the skeleton)\n- Windowing or tail-first initial payloads\n- The background main-thread load (40-60% of a core, p99 event-loop lag at rest)\n- Sharing one pane read across getConversationRead's permission, pane-choice and input-target checks (investigation fix 7)\n- Removing GET side effects (updateConversationCost in /messages, permission-registry pruning in getConversationRead)\n- Reverting PAN-3752 to resolve the subscribe row synchronously (contingency only if post-deploy verification fails)\n- Changes to SimpleActivityFeed or useSubagentTranscript\n- Changing MAX_CONCURRENT_JOBS_PER_LANE or adding concurrency to any lane\n- An index or schema migration on the embeddings DB"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add a fifth worker lane named poll instead of reusing long.",
+        "rationale": "long runs costReconcileSweep/scanConversations/enrich/embed for minutes; a 15 s cost snapshot behind them would exceed its 5-minute maxAgeMs and start failing routes. One extra worker thread is accepted."
+      },
+      {
+        "summary": "All four polling aggregates share the single poll lane, as the issue specifies.",
+        "rationale": "The only interactive consumer is the conversation list's cold ledger read at boot, which is no worse than today; search-stats-cursor cuts the long job from ~9 s to <300 ms."
+      },
+      {
+        "summary": "Search stats read lastIndexedAt from max(file_cursors.updated_at WHERE byte_offset > 0); count(*) and the per-refresh open stay.",
+        "rationale": "Measured read-only on the live 3.07 GB DB at load 16.6: max(indexed_at) 9005 ms, count(*) 290 ms (covering index), cursor max 0.4 ms, open+sqlite-vec 3 ms. An index would cost a one-time ~9 s scan at open plus per-upsert write cost."
+      },
+      {
+        "summary": "Memoize inside computeContextUsage keyed by (sessionFile, model) and validated by size+mtimeMs, 16 entries.",
+        "rationale": "Covers getConversationRead without editing it; same effect as the issue's getConversationRead memo."
+      },
+      {
+        "summary": "HTTP fallback delay is 1500 ms, implemented in a new hook file.",
+        "rationale": "The issue proposes ~1.5 s; a separate file keeps ConversationPanel.tsx under its 1531-line allowlist row."
+      },
+      {
+        "summary": "Resume, switch-model and fork completion re-read /messages with queryClient.fetchQuery instead of invalidateQueries.",
+        "rationale": "invalidateQueries does not refetch a disabled query, and those events are when the stream may still watch an old session file; fetchQuery preserves today's HTTP refresh."
+      },
+      {
+        "summary": "The claude-initial snapshot shares sharedTranscriptParser's existing cache and budget, with per-subscriber copies of parse-state containers.",
+        "rationale": "Concurrent requests already coalesce via COALESCED_OPERATIONS; the incremental parser mutates priorState maps/sets in place, so copies are required for correctness."
+      },
+      {
+        "summary": "Diffs cache key is (conversation name, sessionFile, size, mtimeMs) with a 30 s TTL; repo HEAD is not in the key.",
+        "rationale": "git diff <base> -- <paths> compares against the working tree, so HEAD does not decide the result; the TTL bounds staleness from outside edits."
+      },
+      {
+        "summary": "Live latency targets (30-minute slow-log window, p90 open at load 20, 150 ms warm /messages) are post-deploy verification in the PRD, not item ACs.",
+        "rationale": "They need the deployed dashboard; item ACs are unit tests plus one Playwright UAT the test role can run on the branch."
+      },
+      {
+        "summary": "OKF knowledge pages are updated inside docs-architecture and committed in the separate overdeck-knowledge repo.",
+        "rationale": "A commit in that repo cannot carry the Item: trailer pan task done checks on the feature branch; the DASHBOARD-ARCHITECTURE.md commit carries it."
+      },
+      {
+        "summary": "Investigation fix 7 (shared pane reads) and the GET side effects stay out of scope.",
+        "rationale": "The issue's Fix list names six fixes and omits them; they are minor and independent."
+      },
+      {
+        "summary": "Accept that opening a streaming conversation no longer calls updateConversationCost.",
+        "rationale": "The list prefers ledger cost (conversation-list.ts line 265); the write was an undesired GET side effect."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-28-PAN-4312-conversation-open-stalls-behind-polling-aggregates-on-the-read-worker-lane-duplicate-transcript-loads-on-open.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "poll-lane",
+        "title": "Route the four polling aggregates to a new poll worker lane",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dashboard-poll-worker.test.ts reports all cases green including 'keeps point lookups on the read lane'",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/server/services/dashboard-db-task.ts: widen `export type WorkerLane` (line 64) with 'poll'; add `poll: null` to the `workers` record (line 130); in `workerLane()` (line 202) change `if (isPollingSnapshot(operation)) return 'read';` to `return 'poll';`. Leave every other branch unchanged. In src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts change the it.each lane assertion to 'poll' and add `it('keeps point lookups on the read lane')` asserting `workerLane('getConversationByName')` is 'read' (assert workerLane() only; do not dispatch getConversationByName, which runs inline against the real DB under Vitest). Why a new lane and not `long`: bulk sweeps on `long` can run for minutes and would push 15 s cost snapshots past their 5-minute maxAgeMs."
+        },
+        "items": [
+          {
+            "id": "poll-lane.ac1",
+            "title": "workerLane() returns 'poll' for getCostsByIssueSnapshot, getConversationSearchStats, getConversationLedgerCosts and getAgentCostStats",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-lane.ac2",
+            "title": "workerLane('getConversationByName') returns 'read' in the new dashboard-poll-worker.test.ts case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-lane.ac3",
+            "title": "Given two identical polling requests, when both dispatch, then they share one promise and one Worker instance (existing coalescing case stays green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "search-stats-cursor",
+        "title": "Read search-stats lastIndexedAt from file_cursors instead of scanning chunks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/database/conversation-embeddings-db.ts",
+            "src/lib/database/__tests__/conversation-embeddings-db.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/database/__tests__/conversation-embeddings-db.test.ts",
+            "! grep -q 'max(indexed_at)' src/lib/database/conversation-embeddings-db.ts"
+          ],
+          "expected_outputs": [
+            "conversation-embeddings-db.test.ts reports every getStats case green",
+            "grep finds no match and the command exits 0"
+          ],
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and Decision 3. In src/lib/database/conversation-embeddings-db.ts `getStats()` (line 450) replace `SELECT count(*) AS chunkCount, max(indexed_at) AS lastIndexedAt FROM chunks` with `SELECT count(*) AS chunkCount FROM chunks`, and extend the file_cursors query to `SELECT count(*) AS indexedFileCount, max(updated_at) AS lastIndexedAt FROM file_cursors WHERE byte_offset > 0`; return lastIndexedAt from the cursor row. Add a one-line comment giving the reason (max(indexed_at) scans every chunk row, 9 s on the 3 GB DB). Keep the per-refresh open (measured 3 ms). Update src/lib/database/__tests__/conversation-embeddings-db.test.ts `describe('getStats')` (line 371): pin the clock with vi.useFakeTimers() + vi.setSystemTime() before setCursor (it stamps new Date().toISOString()), restore real timers in afterEach, and add a case where a cursor reset to 0 does not count toward lastIndexedAt."
+        },
+        "items": [
+          {
+            "id": "search-stats-cursor.ac1",
+            "title": "getStats() returns lastIndexedAt equal to the most recent setCursor timestamp for a cursor with byte_offset > 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-stats-cursor.ac2",
+            "title": "Given a cursor reset to 0 after a newer write, when getStats() runs, then lastIndexedAt still returns the latest non-zero cursor timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "search-stats-cursor.ac3",
+            "title": "conversation-embeddings-db.ts contains no max(indexed_at) query (the negated grep exits 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "messages-read-context-usage",
+        "title": "Derive /messages context usage from the parse result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/__tests__/conversation-messages-read-context-usage.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-messages-read-context-usage.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-messages-read-context-usage.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/overdeck/conversation-reads.ts `getConversationMessagesRead` (lines 580-592) replace the try/await computeContextUsage block with `const contextUsage = conv ? contextUsageFromParseResult(parsed, conv.model) : null;`. Import contextUsageFromParseResult from '../../dashboard/server/services/conversation-service.js' next to computeContextUsage (import block lines 50-55); keep computeContextUsage because getConversationRead still uses it. New test src/lib/overdeck/__tests__/conversation-messages-read-context-usage.test.ts, mocking in the style of conversation-read-input-target.test.ts: getCachedMessages yields a parse result with latestAssistantUsage and contextActiveBytes; spy on computeContextUsage."
+        },
+        "items": [
+          {
+            "id": "messages-read-context-usage.ac1",
+            "title": "getConversationMessagesRead returns contextUsage equal to contextUsageFromParseResult(parsed, conv.model)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-read-context-usage.ac2",
+            "title": "When getConversationMessagesRead serves a registered conversation, then computeContextUsage receives zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-read-context-usage.ac3",
+            "title": "Given no conversation row (unregistered session file), when /messages resolves, then contextUsage returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-usage-memo",
+        "title": "Memoize computeContextUsage by file size and mtime",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/conversation/context-usage.ts",
+            "src/dashboard/server/services/__tests__/conversation-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-service.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-service.test.ts reports every computeContextUsage case green, old and new"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and Decision 4. In src/dashboard/server/services/conversation/context-usage.ts `computeContextUsage` (line 114): stat the file first, look up a module-level Map keyed by `${sessionFile}\\0${model ?? ''}`, and return the cached usage when size and mtimeMs match; otherwise run findLastCompactBoundary + readLatestAssistantUsage + buildContextUsage, store { size, mtimeMs, usage }, and evict the oldest insertion above 16 entries. Keep unknown-model early return before the stat. Add cases to src/dashboard/server/services/__tests__/conversation-service.test.ts describe('computeContextUsage'); export a __resetContextUsageCacheForTests() and call it in beforeEach if module state leaks between cases. getConversationRead benefits without edits."
+        },
+        "items": [
+          {
+            "id": "context-usage-memo.ac1",
+            "title": "Given an unchanged size and mtimeMs, when computeContextUsage runs a second time, then it opens the file zero additional times and returns an equal ContextUsage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-usage-memo.ac2",
+            "title": "Given a changed mtimeMs, when computeContextUsage runs again, then it reads the file and returns the recomputed usage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-usage-memo.ac3",
+            "title": "The existing computeContextUsage cases (1M promotion, unknown model returns null, empty file) stay green in conversation-service.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diffs-poll-live-only",
+        "title": "Poll /diffs only while the conversation session is alive",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "ConversationPanel.test.tsx reports all cases green including the two /diffs polling cases",
+            "lint-file-size.sh exits 0 with no 'god files must shrink' line"
+          ],
+          "traces": [
+            "FR-11",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/dashboard/frontend/src/components/chat/ConversationPanel.tsx diffs useQuery (lines 327-336) change `refetchInterval: 5000` to `refetchInterval: conversation.sessionAlive ? 5000 : false` with a one-line comment (ended conversations cannot gain edits). Add fake-timer cases to src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx (the strict fetch mock already serves /diffs, line 139). Keep ConversationPanel.tsx at or under 1531 lines (file-size ratchet)."
+        },
+        "items": [
+          {
+            "id": "diffs-poll-live-only.ac1",
+            "title": "Given an ended conversation (sessionAlive false), when 15 s of fake time pass, then the panel sends exactly one GET /api/conversations/<name>/diffs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffs-poll-live-only.ac2",
+            "title": "Given a live conversation (sessionAlive true), when 10 s of fake time pass, then the panel sends more than one GET …/diffs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "messages-http-fallback",
+        "title": "Make HTTP /messages a 1500 ms fallback for streaming conversations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "docs-architecture"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useMessagesHttpFallback.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/useMessagesHttpFallback.test.ts",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/useMessagesHttpFallback.test.ts src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx src/dashboard/frontend/src/components/chat/__tests__/useConversationMessagesStream.test.ts src/dashboard/frontend/src/components/chat/useConversationMessagesStream.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all four listed test files report green",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0 with no 'god files must shrink' line"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (read it in full; it has the hook code). (1) New src/dashboard/frontend/src/components/chat/useMessagesHttpFallback.ts exporting MESSAGES_HTTP_FALLBACK_MS = 1500 and useMessagesHttpFallback(streamEnabled, receivedFirstPayload, identity, delayMs) that returns true only after delayMs pass for this identity without a first payload, and false again once one arrives; when streamEnabled turns false the hook resets its due state so a later re-enable waits another delayMs (PRD sketch). (2) ConversationPanel.tsx: delete the cancelQueries effect (lines 230-234); call the hook after line 193 with conversation.name as identity; hoist the messages queryFn (lines 260-274, keep the PAN-1642 merge) into a useCallback `messagesQueryFn`; set `enabled: !streamMessagesEnabled || Boolean(agentId) || httpFallbackDue`; add refreshMessagesOverHttp = fetchQuery({ queryKey: messagesQueryKey, queryFn: messagesQueryFn }) and use it instead of invalidateQueries on the messages key at resume onSuccess (line 430), switch-model onSuccess (line 462) and the fork-completion effect in ConversationView (line 1240) — invalidateQueries does not refetch a disabled query. Leave the retry button (line 1380) alone. Keep ConversationPanel.tsx at or under 1531 lines. (3) useConversationMessagesStream.ts: delete `void queryClient.cancelQueries({ queryKey });` in useConversationMessagesStream (line 184); leave useSubagentTranscript untouched. (4) Tests with vi.useFakeTimers(): new __tests__/useMessagesHttpFallback.test.ts (renderHook) and new ConversationPanel.test.tsx cases; fix existing cases that assumed the eager HTTP read."
+        },
+        "items": [
+          {
+            "id": "messages-http-fallback.ac1",
+            "title": "Given a streaming conversation whose first stream payload arrives at 500 ms, when 5 s of fake time pass, then the panel sends zero GET /api/conversations/<name>/messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-http-fallback.ac2",
+            "title": "Given a streaming conversation with no stream payload, when 1500 ms of fake time pass, then the panel sends exactly one GET …/messages, and useMessagesHttpFallback returns false again once a payload arrives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-http-fallback.ac3",
+            "title": "When resume succeeds on a streaming conversation, then the panel sends one GET …/messages through fetchQuery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-http-fallback.ac4",
+            "title": "ConversationPanel.tsx and useConversationMessagesStream.ts contain no cancelQueries call on the main messages query key (grep of useConversationMessagesStream.ts shows only the useSubagentTranscript call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-http-fallback.ac5",
+            "title": "Playwright UAT in an isolated browser profile: opening a live conversation in-app records zero GET …/messages in the network log when the first WebSocket frame arrives within 1.5 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-initial-snapshot",
+        "title": "Reuse the Claude initial transcript snapshot through sharedTranscriptParser",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/shared-transcript-parser.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/services/__tests__/shared-transcript-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/shared-transcript-parser.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "shared-transcript-parser.test.ts reports all cases green",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0 with no 'god files must shrink' line"
+          ],
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ],
+          "acJustification": "Five criteria: reuse, coalescing, the missing-file path, container isolation, and the ws-rpc call-site/ratchet check are separate failure modes of one change."
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and Decision 7. (1) src/dashboard/server/services/shared-transcript-parser.ts: add 'claude-initial' to `type Parser`; add exported parseStateFromSnapshot(initial: ParseResult): ParseState that copies pendingToolUse, unresolvedResults (new Map), planToolUseIds, countedUsageIds, orphanToolUseIds (new Set) and fileEditsByAssistantId (new Map with copied arrays), and carries the scalar fields; mirror the field list of the priorState literal at ws-rpc.ts lines 190-203 and the optionality in conversation/types.ts. The incremental parser mutates these containers in place (parser.ts lines 258, 268, 323, 371, 424, 434), so sharing without copies corrupts other subscribers. Also in sharedTranscriptParser: when `await stat(sessionFile)` throws with code 'ENOENT', dispatch runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', { sessionFile, parser }) WITHOUT creating a cache entry and return its result (the worker parser already returns an empty result for a missing file and watchConversation then polls; a freshly spawned Claude conversation subscribes before its transcript exists). Rethrow other stat errors. (2) src/dashboard/server/ws-rpc.ts streamClaudeTranscript (lines 168-247): module-level `const claudeInitialSnapshot = sharedTranscriptParser('claude-initial');`, replace the runDashboardDbJob('parseTranscriptSnapshot', { sessionFile, parser: 'claude-initial' }) call with `await claudeInitialSnapshot(sessionFile)`, and replace the priorState literal with parseStateFromSnapshot(initial). Remove imports this leaves unused. ws-rpc.ts must not grow past 1219 lines (last allowlist row). (3) Tests in src/dashboard/server/services/__tests__/shared-transcript-parser.test.ts."
+        },
+        "items": [
+          {
+            "id": "claude-initial-snapshot.ac1",
+            "title": "Given an unchanged stat signature, when sharedTranscriptParser('claude-initial') runs twice, then it dispatches exactly one parseTranscriptSnapshot job with parser 'claude-initial'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-initial-snapshot.ac2",
+            "title": "Given two concurrent calls for the same file, when both resolve, then they receive the same ParseResult from one job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-initial-snapshot.ac3",
+            "title": "Given a session file that does not exist yet (stat rejects with ENOENT), when the claude-initial parser runs, then it dispatches the parse job, returns its result, and caches nothing, so a later call dispatches again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-initial-snapshot.ac4",
+            "title": "parseStateFromSnapshot returns containers that are distinct objects: deleting a key from one subscriber's pendingToolUse preserves the snapshot's map and a second subscriber's map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-initial-snapshot.ac5",
+            "title": "ws-rpc.ts streamClaudeTranscript contains no direct runDashboardDbJob('parseTranscriptSnapshot') call and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diffs-batch-per-repo",
+        "title": "Run one git diff pair per repo in getConversationDiffs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "src/lib/overdeck/__tests__/conversation-diffs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-diffs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-diffs.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In src/lib/overdeck/conversation-diffs.ts getConversationDiffs (lines 149-222): group each turn's edits by repo once (groupFilesByRepo per turn, remember turn -> repo -> paths), build the per-repo union of paths, resolve baseCommit once per repo (existing baseCommitCache), run ONE diffFilesSinceBase(repoRoot, baseCommit, union) or diffFilesAgainstHead(repoRoot, union) per repo inside the existing per-repo try/catch, index the result by path, then emit per-turn summaries in fileEditsByAssistantId order with the same turnId/completedAt/status/assistantMessageId fields, pushing only when files.length > 0. A path edited in two turns appears in both summaries with the same numbers (today's behavior). rev-parse per unique dir and findCommitAtTime per repo still spawn; only the diff pairs are batched. New test src/lib/overdeck/__tests__/conversation-diffs.test.ts mocking node:child_process exec and ../checkpoint/checkpoint-manager.js."
+        },
+        "items": [
+          {
+            "id": "diffs-batch-per-repo.ac1",
+            "title": "Given 5 assistant turns editing 5 files in one repo, when getConversationDiffs runs, then it spawns exactly one 'git diff --numstat' and one 'git diff --name-status' command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffs-batch-per-repo.ac2",
+            "title": "Each returned summary contains only the paths its own turn edited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffs-batch-per-repo.ac3",
+            "title": "Given one path edited in two turns, when getConversationDiffs runs, then both summaries list that path with the same additions and deletions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "diffs-result-cache",
+        "title": "Cache getConversationDiffs results for 30 s on an unchanged transcript",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/overdeck/conversation-diffs.ts",
+            "src/lib/overdeck/__tests__/conversation-diffs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-diffs.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-diffs.test.ts reports all cases green including the three cache cases"
+          ],
+          "traces": [
+            "FR-10",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and Decision 8. In src/lib/overdeck/conversation-diffs.ts add a module-level Map keyed by `${conv.name}\\0${sessionFile}` holding { size, mtimeMs, at, body }, capped at 32 entries (evict oldest insertion). After resolving sessionFile, await stat() from node:fs/promises (never a sync call); return the cached body when size and mtimeMs match and Date.now() - at < DIFFS_CACHE_TTL_MS (30000); otherwise compute, store the { summaries } body, return it. Never cache 404/500 results. Repo HEAD is deliberately not in the key: git diff <base> -- <paths> compares against the working tree. Tests with vi.useFakeTimers() in src/lib/overdeck/__tests__/conversation-diffs.test.ts."
+        },
+        "items": [
+          {
+            "id": "diffs-result-cache.ac1",
+            "title": "Given an unchanged transcript size and mtimeMs within 30 s, when getConversationDiffs runs again, then it spawns zero git processes and returns the same summaries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffs-result-cache.ac2",
+            "title": "Given 30 s of fake time have passed, when getConversationDiffs runs again, then it spawns the git diff pair again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "diffs-result-cache.ac3",
+            "title": "Given a changed transcript mtimeMs, when getConversationDiffs runs again, then it recomputes and returns the new summaries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-architecture",
+        "title": "Document the poll lane, the lane rule and the conversation-open sequence",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-09-28T14:06:54Z",
+        "metadata": {
+          "issueLabel": "pan-4312",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n \"'poll'\\|poll lane\\|\\`poll\\`\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'MESSAGES_HTTP_FALLBACK_MS' docs/DASHBOARD-ARCHITECTURE.md",
+            "git -C /home/eltmon/Projects/overdeck-knowledge log -1 --stat"
+          ],
+          "expected_outputs": [
+            "grep prints the lanes bullet naming the poll lane",
+            "grep prints the streaming bullet naming MESSAGES_HTTP_FALLBACK_MS",
+            "the latest overdeck-knowledge commit lists frontend/conversation-ui.md and frontend/data-flow.md"
+          ],
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 and Decision 10. docs/DASHBOARD-ARCHITECTURE.md: (a) the 'DB job worker lanes' bullets (line 181): five lanes; read = point lookups only; poll = the four polling aggregates by name; add the rule that an aggregate or scan never shares a lane with a lookup on an interactive path; say the cost/ledger/search snapshots run on poll and search counters read lastIndexedAt from file_cursors. (b) The subscribeConversationMessages bullet (line 229): read-lane row lookup, claude-initial snapshot reused through sharedTranscriptParser with per-subscriber parse-state copies, skeleton until first payload, HTTP /messages only after MESSAGES_HTTP_FALLBACK_MS (1500 ms) without one, fetchQuery re-reads on resume/switch-model/fork completion, context usage from the parse result on WS and /messages and memoized computeContextUsage on GET /api/conversations/:id, /diffs polls live conversations only with one diff pair per repo and a 30 s cache. Also update the OKF pages frontend/conversation-ui.md and frontend/data-flow.md in /home/eltmon/Projects/overdeck-knowledge through /okf author, then commit and push in that repo (its commit cannot carry this item's Item: trailer; the feature-branch commit is the DASHBOARD-ARCHITECTURE.md change)."
+        },
+        "items": [
+          {
+            "id": "docs-architecture.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md 'DB job worker lanes' section contains the poll lane, its four operations, and the rule that aggregates never share a lane with interactive lookups",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-architecture.ac2",
+            "title": "The subscribeConversationMessages bullet contains the 1500 ms HTTP fallback (MESSAGES_HTTP_FALLBACK_MS) and states that context usage comes from the parse result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-architecture.ac3",
+            "title": "The overdeck-knowledge repo commits frontend/conversation-ui.md and frontend/data-flow.md with the conversation-open critical path and the fallback rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "poll-lane",
+        "to": "messages-http-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "diffs-poll-live-only",
+        "to": "messages-http-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "diffs-batch-per-repo",
+        "to": "diffs-result-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "poll-lane",
+        "to": "docs-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "search-stats-cursor",
+        "to": "docs-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "messages-read-context-usage",
+        "to": "docs-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "context-usage-memo",
+        "to": "docs-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "diffs-poll-live-only",
+        "to": "docs-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "messages-http-fallback",
+        "to": "docs-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-initial-snapshot",
+        "to": "docs-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "diffs-batch-per-repo",
+        "to": "docs-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "diffs-result-cache",
+        "to": "docs-architecture",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
