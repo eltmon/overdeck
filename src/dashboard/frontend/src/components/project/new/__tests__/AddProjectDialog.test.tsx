@@ -112,6 +112,31 @@ describe('AddProjectDialog', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('Esc does not close the modal while a clone is running', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/projects/resolve') return Promise.resolve(json(cloneIntent));
+      if (url === '/api/projects') return Promise.resolve(json({ jobId: 'job-1' }, 202));
+      if (url.startsWith('/api/projects/create-jobs/')) {
+        return Promise.resolve(json({ status: 'cloning', phase: 'Receiving objects', percent: 10 }));
+      }
+      return Promise.resolve(json({}));
+    });
+    act(() => useAddProjectDialog.getState().show('clone'));
+    renderHost();
+
+    await user.type(screen.getByLabelText('Repository URL'), 'acme/widget');
+    const cta = screen.getByRole('button', { name: 'Clone repository' });
+    await waitFor(() => expect(cta).toBeEnabled());
+    await user.click(cta);
+    await screen.findByRole('button', { name: 'Cancel clone' });
+
+    await user.keyboard('{Escape}');
+
+    expect(useAddProjectDialog.getState().open).toBe(true);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it("show('clone') opens straight into the clone step", () => {
     routeFetch();
     act(() => useAddProjectDialog.getState().show('clone'));

@@ -30,6 +30,9 @@ interface AddProjectDialogProps {
 
 export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: AddProjectDialogProps) {
   const [step, setStep] = useState<Step>(initialMode ? STEP_FOR_MODE[initialMode] : 'start');
+  // A running clone or batch keeps the modal open: closing it would stop
+  // watching an operation the server is still carrying out.
+  const [busy, setBusy] = useState(false);
   const titleId = useId();
   const backToStart = useCallback(() => setStep('start'), []);
 
@@ -49,6 +52,7 @@ export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: 
         onCreated={onCreated}
         onChange={backToStart}
         onCancel={onCancel}
+        onBusyChange={setBusy}
       />
     ) : (
       <AddProjectFormStep
@@ -58,6 +62,7 @@ export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: 
         onCreated={onCreated}
         onChange={backToStart}
         onCancel={onCancel}
+        onBusyChange={setBusy}
       />
     );
 
@@ -73,7 +78,7 @@ export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: 
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') {
+          if (event.key === 'Escape' && !busy) {
             event.preventDefault();
             onCancel();
           }

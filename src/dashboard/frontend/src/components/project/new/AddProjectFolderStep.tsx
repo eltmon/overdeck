@@ -38,13 +38,27 @@ interface AddProjectFolderStepProps {
   /** "Change": back to the start step. */
   onChange: () => void;
   onCancel: () => void;
+  /** True while an add is running, so the dialog keeps itself open. */
+  onBusyChange?: (busy: boolean) => void;
 }
 
 type Phase = 'pick' | 'waiting' | 'review';
 
-export function AddProjectFolderStep({ titleId, showGuide, onCreated, onChange, onCancel }: AddProjectFolderStepProps) {
+export function AddProjectFolderStep({
+  titleId,
+  showGuide,
+  onCreated,
+  onChange,
+  onCancel,
+  onBusyChange,
+}: AddProjectFolderStepProps) {
   const create = useProjectCreateIntent({ initialMode: 'existing', onCreated });
-  const { path, setPath, intent, checking, resolveError, canCreate, submit, submission } = create;
+  const { path, setPath, intent, checking, resolveError, canCreate, submit, submission, frozen } = create;
+  const [nestedRunning, setNestedRunning] = useState(false);
+  useEffect(() => {
+    onBusyChange?.(frozen || nestedRunning);
+    return () => onBusyChange?.(false);
+  }, [frozen, nestedRunning, onBusyChange]);
   const suggestions = useProjectSuggestions();
 
   const folderId = useId();
@@ -123,6 +137,7 @@ export function AddProjectFolderStep({ titleId, showGuide, onCreated, onChange, 
           onCreated={onCreated}
           onBack={backToPicker}
           onCancel={onCancel}
+          onRunningChange={setNestedRunning}
         />
       );
     }

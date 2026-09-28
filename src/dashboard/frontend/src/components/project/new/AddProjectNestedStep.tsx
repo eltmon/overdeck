@@ -9,7 +9,7 @@
  * and closes; otherwise it stays open with per-row results and a Done button.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { buttonClass } from './ProjectCreateForm.js';
 import { resolveThenCreateProject } from './resolveThenCreate.js';
@@ -25,6 +25,8 @@ interface AddProjectNestedStepProps {
   /** Back to choosing a folder. */
   onBack: () => void;
   onCancel: () => void;
+  /** True while adds are running, so the dialog keeps itself open. */
+  onRunningChange?: (running: boolean) => void;
 }
 
 type RowState = { kind: 'adding' } | { kind: 'added' } | { kind: 'failed'; message: string };
@@ -37,6 +39,7 @@ export function AddProjectNestedStep({
   onCreated,
   onBack,
   onCancel,
+  onRunningChange,
 }: AddProjectNestedStepProps) {
   const queryClient = useQueryClient();
   const [checked, setChecked] = useState<Set<string>>(() => new Set(repositories.map((repo) => repo.path)));
@@ -45,6 +48,11 @@ export function AddProjectNestedStep({
   /** Set after a batch with a failure: the last project that did get added. */
   const [finished, setFinished] = useState<{ lastAdded: CreatedProject | null } | null>(null);
   const [folderError, setFolderError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onRunningChange?.(running);
+    return () => onRunningChange?.(false);
+  }, [running, onRunningChange]);
 
   const selected = repositories.filter((repo) => checked.has(repo.path));
   const count = selected.length;
