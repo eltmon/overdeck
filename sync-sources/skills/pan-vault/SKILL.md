@@ -18,6 +18,7 @@ Session Vault stores agent transcripts, encrypted, in a git remote the user owns
 
 ```bash
 pan vault setup <git-url>          # enable; prints the 24-word recovery phrase ONCE
+pan vault setup <git-url> --hooks  # also register the Claude Code Stop hook (saves after each turn)
 pan vault join <git-url>           # second machine: enter the phrase
 pan vault join <git-url> --phrase-file <path>
 pan vault status                   # backend, this machine, owned records, last sync, machines

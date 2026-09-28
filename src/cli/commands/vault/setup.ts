@@ -20,7 +20,9 @@ import { DIR_BACKEND_PREFIX, defaultIo, type CliIo } from './shared.js';
 export const KEY_LOSS_WARNING =
   'Anyone with these words can read your vault. Losing every device and these words loses the vault.';
 
-export interface SetupOptions {}
+export interface SetupOptions {
+  hooks?: boolean;
+}
 
 async function openOrInitStore(url: string): Promise<VaultStore> {
   if (url.startsWith(DIR_BACKEND_PREFIX)) return DirVaultStore.open(url.slice(DIR_BACKEND_PREFIX.length));
@@ -32,7 +34,7 @@ async function openOrInitStore(url: string): Promise<VaultStore> {
   }
 }
 
-export async function setupCommand(url: string, _options: SetupOptions = {}, io: CliIo = defaultIo): Promise<void> {
+export async function setupCommand(url: string, options: SetupOptions = {}, io: CliIo = defaultIo): Promise<void> {
   const config = await readVaultConfig();
   if (config.backend && config.backend !== url) {
     io.err(`Session Vault is already enabled with backend ${config.backend}. Run pan vault status, or remove that backend from vault/config.json first.`);
@@ -41,6 +43,7 @@ export async function setupCommand(url: string, _options: SetupOptions = {}, io:
   const existingKey = await loadVaultKey();
   if (config.backend === url && existingKey) {
     io.out(`Session Vault is already set up with ${url}. The recovery phrase is shown only at setup.`);
+    if (options.hooks) await installHooks(io);
     return;
   }
 
@@ -92,4 +95,10 @@ export async function setupCommand(url: string, _options: SetupOptions = {}, io:
     io.out('');
     io.out(KEY_LOSS_WARNING);
   }
+  if (options.hooks) await installHooks(io);
+}
+
+async function installHooks(io: CliIo): Promise<void> {
+  const { installVaultStopHook } = await import('./hooks.js');
+  await installVaultStopHook(io);
 }
