@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:01:32.256Z",
+  "updated": "2026-09-28T01:01:44.462Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "dod-teardown-row.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T01:01:32.256Z"
+    },
+    "dod-teardown-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:01:44.461Z"
     }
   }
 }
