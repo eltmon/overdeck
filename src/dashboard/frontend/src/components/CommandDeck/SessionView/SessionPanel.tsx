@@ -10,6 +10,8 @@ import { XTerminal } from '../../XTerminal';
 import { AwaitingInputIndicator } from '../../AwaitingInputIndicator';
 import { useAskUserQuestionUiStore } from '../../../lib/askUserQuestionUiStore';
 import { useDashboardStore, selectPendingPermissionAgentIds } from '../../../lib/store';
+import { useSessionNodeOutcome } from '../../../lib/useSessionOutcome';
+import { SESSION_ENDED_FALLBACK } from '../../../lib/sessionOutcome';
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
@@ -308,6 +310,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   const tmuxName = session.tmuxSession || (session.presence === 'active' ? session.sessionId : undefined);
   const hasTerminal = !!tmuxName && session.presence !== 'ended';
   const isEnded = session.presence === 'ended';
+  const outcome = useSessionNodeOutcome(session, issueId);
   const roundData = useMemo(() => deriveRoundData(session.roundMetadata), [session.roundMetadata]);
   const hasFindings = roundData.length > 0;
 
@@ -514,8 +517,11 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
           ) : hasTerminal && tmuxName ? (
             <XTerminal sessionName={tmuxName} />
           ) : (
-            <div className={styles.sessionPanelEmpty}>
-              {isEnded ? 'Session ended' : 'No terminal session available.'}
+            <div
+              className={`${styles.sessionPanelEmpty} ${outcome?.tone === 'attention' ? 'text-destructive' : ''}`}
+              data-outcome-tone={outcome?.tone}
+            >
+              {isEnded ? (outcome ?? SESSION_ENDED_FALLBACK).label : 'No terminal session available.'}
             </div>
           )
         )}
