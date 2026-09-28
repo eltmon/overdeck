@@ -128,6 +128,12 @@ export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
   }
 
   if (options.afterSettle) await options.afterSettle(report);
+  else if (config.evict) {
+    // FR-20: with eviction opted in, every sync refreshes the pending-deletion
+    // batch. This adds entries only; nothing is deleted without confirmation.
+    const { scanEligible } = await import('./evict.js');
+    await scanEligible({ store, keys, config, now });
+  }
   return report;
 }
 
