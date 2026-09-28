@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4290",
   "created": "2026-09-28T12:19:35.919Z",
-  "updated": "2026-09-28T14:02:07.563Z",
+  "updated": "2026-09-28T14:02:20.292Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "drawer-outcome.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T14:02:07.563Z"
+    },
+    "drawer-outcome.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:20.291Z"
     }
   }
 }
