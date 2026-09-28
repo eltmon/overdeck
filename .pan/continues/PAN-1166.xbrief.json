@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:56:15.875Z",
+  "updated": "2026-09-28T13:56:28.770Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "ws-terminal-gate.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T13:56:15.874Z"
+    },
+    "ws-rpc-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:28.770Z"
     }
   }
 }
