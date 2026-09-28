@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T02:19:06.667Z",
+  "updated": "2026-09-28T02:19:27.683Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -248,6 +248,10 @@
     "close-out-docs.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T02:19:06.666Z"
+    },
+    "close-out-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:19:27.683Z"
     }
   }
 }
