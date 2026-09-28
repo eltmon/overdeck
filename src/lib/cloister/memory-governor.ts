@@ -4,6 +4,7 @@ import { cpus, loadavg } from 'node:os';
 import { promisify } from 'node:util';
 import { readProcMemory } from '../../dashboard/server/services/system-health-service.js';
 import { loadConfigSync } from '../config-yaml/load.js';
+import { readCpuPsi } from '../system-health/cpu-psi.js';
 import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
@@ -58,7 +59,9 @@ export function classifyMemoryPressure(
 // memoryBlockGb, which belong to the unrelated HTTP-path predicate above) and
 // a small state machine so it never oscillates. Memory pressure can hold or
 // shed. CPU saturation only holds admissions because running work self-heals
-// as it finishes; re-admission waits for lower load as well as memory runway.
+// as it finishes; re-admission waits for lower CPU pressure as well as memory
+// runway. PAN-4311: the CPU signal is PSI `some avg60` (it excludes IO wait,
+// which inflates load average); load per core applies only without PSI.
 //
 // PAN-4267: macOS has no PSI and allocates swap on demand, so a low free-swap
 // share is not pressure there (swapGrowsOnDemand disables the swap/PSI hold
@@ -79,6 +82,8 @@ export interface GovernorRunway {
   swapFreeBytes: number;
   psiFullAvg10: number | null;
   loadPerCore: number | null;
+  /** PAN-4311: CPU PSI `some avg60`, percent; null/absent falls back to loadPerCore. */
+  psiCpuSomeAvg60?: number | null;
   macPressureLevel?: 'normal' | 'warn' | 'critical' | null;
   swapGrowsOnDemand?: boolean;
 }
@@ -89,6 +94,8 @@ export interface GovernorRunwayThresholds {
   psiFullShedAvg10: number;
   cpuSoftLoadPerCore: number;
   cpuRecoveryLoadPerCore: number;
+  cpuPsiHoldAvg60: number;
+  cpuPsiRecoveryAvg60: number;
 }
 
 export interface GovernorPsiCalmConfig {
@@ -104,6 +111,9 @@ export interface GovernorTriggerSeed {
   kind: GovernorTriggerKind;
   readingBytes: number;
   thresholdBytes: number;
+  cpuSignal?: 'psi-some-avg60' | 'load-per-core';
+  cpuReading?: number;
+  cpuThreshold?: number;
 }
 
 export interface GovernorTransition {
@@ -141,6 +151,8 @@ function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
     psiFullShedAvg10: resources.governorPsiFullShedAvg10,
     cpuSoftLoadPerCore: resources.governorCpuSoftLoadPerCore,
     cpuRecoveryLoadPerCore: resources.governorCpuRecoveryLoadPerCore,
+    cpuPsiHoldAvg60: resources.governorCpuPsiHoldAvg60,
+    cpuPsiRecoveryAvg60: resources.governorCpuPsiRecoveryAvg60,
   };
 }
 
@@ -172,7 +184,34 @@ export function nextGovernorMode(
   return 'holding';
 }
 
-function nextGovernorModeWithRunway(
+/**
+ * The CPU reading and the threshold that applies to it: PSI `some avg60` when
+ * present, else load per core. An admitting governor compares against the
+ * hold threshold; a held one against the lower recovery threshold.
+ */
+function cpuPressureAgainst(
+  runway: Pick<GovernorRunway, 'psiCpuSomeAvg60' | 'loadPerCore'>,
+  thresholds: GovernorRunwayThresholds,
+  admitting: boolean,
+): { signal: 'psi-some-avg60' | 'load-per-core'; reading: number; threshold: number } | null {
+  if (runway.psiCpuSomeAvg60 != null) {
+    return {
+      signal: 'psi-some-avg60',
+      reading: runway.psiCpuSomeAvg60,
+      threshold: admitting ? thresholds.cpuPsiHoldAvg60 : thresholds.cpuPsiRecoveryAvg60,
+    };
+  }
+  if (runway.loadPerCore != null) {
+    return {
+      signal: 'load-per-core',
+      reading: runway.loadPerCore,
+      threshold: admitting ? thresholds.cpuSoftLoadPerCore : thresholds.cpuRecoveryLoadPerCore,
+    };
+  }
+  return null;
+}
+
+export function nextGovernorModeWithRunway(
   availableBytes: number,
   reserves: GovernorReserves,
   runway: GovernorRunway,
@@ -193,9 +232,19 @@ function nextGovernorModeWithRunway(
   const psiShed = swapLow
     && runway.psiFullAvg10 != null
     && runway.psiFullAvg10 >= runwayThresholds.psiFullShedAvg10;
-  const cpuSaturated = runway.loadPerCore != null && (previousMode === 'admitting'
-    ? runway.loadPerCore >= runwayThresholds.cpuSoftLoadPerCore
-    : runway.loadPerCore >= runwayThresholds.cpuRecoveryLoadPerCore);
+  const cpu = cpuPressureAgainst(runway, runwayThresholds, previousMode === 'admitting');
+  const cpuSaturated = cpu != null && cpu.reading >= cpu.threshold;
+  // PAN-4311 D5: a CPU-caused hold names CPU; while memory also holds, memory wins.
+  const cpuTrigger: GovernorTriggerSeed | null = cpuSaturated && memoryMode !== 'holding'
+    ? {
+        kind: 'cpu',
+        readingBytes: 0,
+        thresholdBytes: 0,
+        cpuSignal: cpu.signal,
+        cpuReading: cpu.reading,
+        cpuThreshold: cpu.threshold,
+      }
+    : null;
 
   if (memoryMode === 'shedding') return { mode: 'shedding', trigger: memoryTrigger };
   if (runway.macPressureLevel === 'critical') {
@@ -224,7 +273,7 @@ function nextGovernorModeWithRunway(
       trigger: { kind: 'psi-unavailable', readingBytes: runway.swapFreeBytes, thresholdBytes: activeSwapThresholdBytes },
     };
   }
-  if (cpuSaturated) return { mode: 'holding', trigger: memoryTrigger };
+  if (cpuSaturated) return { mode: 'holding', trigger: memoryTrigger ?? cpuTrigger };
   return { mode: memoryMode, trigger: memoryTrigger };
 }
 
@@ -247,6 +296,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const psiCalmConfig = readGovernorPsiCalmConfig();
   const snapshot = await readProcMemory();
   const loadPerCore = loadavg()[0] / Math.max(1, cpus().length);
+  const cpuPsi = await readCpuPsi();
   const now = Date.now();
   const psiIsCalm = (snapshot.psiFullAvg10 != null && snapshot.psiFullAvg10 < psiCalmConfig.readmitAvg10)
     || snapshot.macPressureLevel === 'normal';
@@ -259,6 +309,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
       swapFreeBytes: snapshot.swapFree,
       psiFullAvg10: snapshot.psiFullAvg10,
       loadPerCore,
+      psiCpuSomeAvg60: cpuPsi.someAvg60,
       macPressureLevel: snapshot.macPressureLevel,
       swapGrowsOnDemand: snapshot.swapGrowsOnDemand,
     },
@@ -287,12 +338,14 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   } else {
     psiCalmSinceMs = null;
   }
+  const cpuRecovery = cpuPressureAgainst({ psiCpuSomeAvg60: cpuPsi.someAvg60, loadPerCore }, runwayThresholds, false);
+  const cpuBelowRecovery = cpuRecovery == null || cpuRecovery.reading < cpuRecovery.threshold;
   if (
     governorMode === 'holding'
     && psiCalmSinceMs != null
     && now - psiCalmSinceMs >= psiCalmConfig.windowMs
     && snapshot.memAvailable >= reserves.softBytes
-    && loadPerCore < runwayThresholds.cpuRecoveryLoadPerCore
+    && cpuBelowRecovery
   ) {
     governorMode = 'admitting';
     governorTrigger = null;
@@ -307,6 +360,8 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     psiSomeAvg10: snapshot.psiSomeAvg10,
     psiFullAvg10: snapshot.psiFullAvg10,
     loadPerCore,
+    psiCpuSomeAvg10: cpuPsi.someAvg10,
+    psiCpuSomeAvg60: cpuPsi.someAvg60,
     trigger: governorTrigger,
     macPressureLevel: snapshot.macPressureLevel,
   };

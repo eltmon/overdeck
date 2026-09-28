@@ -11,6 +11,10 @@ const getAgentRuntimeStateSyncMock = vi.fn();
 const setAgentPausedMock = vi.fn();
 const stopAgentMock = vi.fn();
 const listLiveAgentIdsMock = vi.fn();
+const readCpuPsiMock = vi.hoisted(() => vi.fn(async (): Promise<{ someAvg10: number | null; someAvg60: number | null }> => ({
+  someAvg10: null,
+  someAvg60: null,
+})));
 const osMocks = vi.hoisted(() => ({
   cpus: vi.fn(),
   loadavg: vi.fn(),
@@ -25,6 +29,11 @@ vi.mock('../../../../src/dashboard/server/services/system-health-service.js', ()
 
 vi.mock('../../../../src/lib/config-yaml/load.js', () => ({
   loadConfigSync: (...args: unknown[]) => loadConfigSyncMock(...args),
+}));
+
+// The host's real /proc/pressure/cpu must not leak into governor tests (PAN-4311).
+vi.mock('../../../../src/lib/system-health/cpu-psi.js', () => ({
+  readCpuPsi: () => readCpuPsiMock(),
 }));
 
 vi.mock('../../../../src/dashboard/server/routes/resources/shared.js', () => ({
@@ -71,7 +80,7 @@ vi.mock('node:os', async (importOriginal) => ({
   loadavg: (...args: unknown[]) => osMocks.loadavg(...args),
 }));
 
-import { assessMemoryPressure, classifyMemoryPressure, nextGovernorMode, resetGovernorModeForTests, getCachedMemoryVerdict, selectStackShedCandidates, selectAgentToPause, shed, type GovernorReserves, readGovernorReserves } from '../../../../src/lib/cloister/memory-governor.js';
+import { assessMemoryPressure, classifyMemoryPressure, nextGovernorMode, nextGovernorModeWithRunway, resetGovernorModeForTests, getCachedMemoryVerdict, selectStackShedCandidates, selectAgentToPause, shed, type GovernorReserves, readGovernorReserves } from '../../../../src/lib/cloister/memory-governor.js';
 import {
   type ResourceStack,
   type StackContainerResource,
@@ -99,6 +108,8 @@ const GOVERNOR_RESOURCES = {
   governorPsiCalmWindowMs: 600_000,
   governorCpuSoftLoadPerCore: 1.5,
   governorCpuRecoveryLoadPerCore: 1,
+  governorCpuPsiHoldAvg60: 50,
+  governorCpuPsiRecoveryAvg60: 25,
 };
 
 function procMemory(
@@ -185,9 +196,69 @@ describe('nextGovernorMode — hysteresis (PAN-2500 hysteresis-bands)', () => {
   });
 });
 
+describe('nextGovernorModeWithRunway — CPU PSI (PAN-4311)', () => {
+  const reserves: GovernorReserves = { softBytes: 8 * GIB, hardBytes: 4 * GIB, recoveryBytes: 12 * GIB };
+  const thresholds = {
+    swapSoftFreePercent: 25,
+    swapRecoveryFreePercent: 50,
+    psiFullShedAvg10: 1,
+    cpuSoftLoadPerCore: 1.5,
+    cpuRecoveryLoadPerCore: 1,
+    cpuPsiHoldAvg60: 50,
+    cpuPsiRecoveryAvg60: 25,
+  };
+  // Memory at the recovery reserve in every row, so only CPU decides.
+  const runway = (psiCpuSomeAvg60: number | null, loadPerCore = 0.1) => ({
+    swapTotalBytes: 8 * GIB,
+    swapFreeBytes: 8 * GIB,
+    psiFullAvg10: 0,
+    loadPerCore,
+    psiCpuSomeAvg60,
+  });
+
+  it('holds an admitting governor at PSI 55 with a cpu trigger', () => {
+    expect(nextGovernorModeWithRunway(12 * GIB, reserves, runway(55), thresholds, 'admitting')).toEqual({
+      mode: 'holding',
+      trigger: {
+        kind: 'cpu',
+        readingBytes: 0,
+        thresholdBytes: 0,
+        cpuSignal: 'psi-some-avg60',
+        cpuReading: 55,
+        cpuThreshold: 50,
+      },
+    });
+  });
+
+  it('stays held at PSI 30 and re-admits at PSI 20', () => {
+    expect(nextGovernorModeWithRunway(12 * GIB, reserves, runway(30), thresholds, 'holding').mode).toBe('holding');
+    expect(nextGovernorModeWithRunway(12 * GIB, reserves, runway(20), thresholds, 'holding').mode).toBe('admitting');
+  });
+
+  it('prefers PSI over a high load per core', () => {
+    expect(nextGovernorModeWithRunway(12 * GIB, reserves, runway(10, 3), thresholds, 'admitting').mode)
+      .toBe('admitting');
+  });
+
+  it('falls back to load per core when PSI is unavailable', () => {
+    expect(nextGovernorModeWithRunway(12 * GIB, reserves, runway(null, 1.6), thresholds, 'admitting')).toMatchObject({
+      mode: 'holding',
+      trigger: { kind: 'cpu', cpuSignal: 'load-per-core', cpuReading: 1.6, cpuThreshold: 1.5 },
+    });
+  });
+
+  it('names the memory trigger when a soft dip and CPU pressure hold together', () => {
+    expect(nextGovernorModeWithRunway(7 * GIB, reserves, runway(55), thresholds, 'admitting')).toMatchObject({
+      mode: 'holding',
+      trigger: { kind: 'soft-dip' },
+    });
+  });
+});
+
 describe('assessMemoryPressure', () => {
   beforeEach(() => {
     resetGovernorModeForTests();
+    readCpuPsiMock.mockResolvedValue({ someAvg10: null, someAvg60: null });
     osMocks.cpus.mockReturnValue([{}, {}, {}, {}]);
     osMocks.loadavg.mockReturnValue([0, 0, 0]);
     loadConfigSyncMock.mockReturnValue({
@@ -247,6 +318,39 @@ describe('assessMemoryPressure', () => {
       await vi.advanceTimersByTimeAsync(600_000);
       osMocks.loadavg.mockReturnValue([4.8, 0, 0]);
       expect((await assessMemoryPressure()).band).toBe('soft');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('records the CPU PSI reading and trigger when CPU pressure holds (PAN-4311)', async () => {
+    readCpuPsiMock.mockResolvedValue({ someAvg10: 70, someAvg60: 55 });
+    readProcMemoryMock.mockResolvedValue(procMemory(20 * GIB));
+
+    await expect(assessMemoryPressure()).resolves.toMatchObject({
+      band: 'soft',
+      psiCpuSomeAvg10: 70,
+      psiCpuSomeAvg60: 55,
+      trigger: { kind: 'cpu', cpuSignal: 'psi-some-avg60', cpuReading: 55, cpuThreshold: 50 },
+    });
+  });
+
+  it('re-admits a CPU hold on calm memory PSI only after the calm window, once CPU PSI is below recovery (PAN-4311)', async () => {
+    vi.useFakeTimers();
+    try {
+      // Memory between SOFT and RECOVERY: memory alone would keep holding.
+      readProcMemoryMock.mockResolvedValue(procMemory(9 * GIB));
+      readCpuPsiMock.mockResolvedValue({ someAvg10: 60, someAvg60: 55 });
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      readCpuPsiMock.mockResolvedValue({ someAvg10: 10, someAvg60: 20 });
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      await vi.advanceTimersByTimeAsync(599_000);
+      expect((await assessMemoryPressure()).band).toBe('soft');
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(assessMemoryPressure()).resolves.toMatchObject({ band: 'ok', trigger: null });
     } finally {
       vi.useRealTimers();
     }
