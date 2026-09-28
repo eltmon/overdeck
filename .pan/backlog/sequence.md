@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:55:47.278022Z · model: claude-opus-5-5 · open: 787_
+_Last sequenced: 2026-09-28T13:01:15.515487Z · model: claude-opus-5-5 · open: 787_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -593,7 +593,7 @@ _Last sequenced: 2026-09-28T12:55:47.278022Z · model: claude-opus-5-5 · open: 
 | 660 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
 | 661 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 662 | PAN-4293 | L | low | ok |  |  | Anywhere step 6: overdeck.ai account + GitHub OAuth + device tokens; prerequisite for relay, Shared Sessions, hosted vault |
-| 663 | PAN-4294 | L | low | needs-refinement |  | PAN-4293 | Anywhere paid tier: Stripe + entitlement API + quotas; price and bundle scope still open pending pricing research |
+| 663 | PAN-4294 | L | low | ok |  | PAN-4293 | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 664 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 666 | PAN-3957 | L | low | ok |  |  | Parked: Overdeck-owned project memory in the repo replacing per-harness auto-memory; needs a PRD deciding the store location |
@@ -612,7 +612,7 @@ _Last sequenced: 2026-09-28T12:55:47.278022Z · model: claude-opus-5-5 · open: 
 | 679 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
 | 680 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
 | 681 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 682 | PAN-4297 | L | low | needs-refinement |  | PAN-2609, PAN-4293, PAN-4294 | Session Vault Phase B: hosted encrypted vault on overdeck.ai (R2 + Durable Objects); needs Phase A, account service, billing |
+| 682 | PAN-4297 | L | low | ok |  | PAN-2609, PAN-4293, PAN-4294 | Session Vault Phase B: hosted encrypted vault on overdeck.ai (R2 + Durable Objects); pricing decided; needs Phase A, account, billing |
 | 683 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
 | 684 | PAN-2356 | M | low | needs-refinement |  | PAN-4293, PAN-4297 | Overdeck Anywhere P3: relay service |
 | 685 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
@@ -1102,7 +1102,7 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:55:47.278022Z",
+  "generatedAt": "2026-09-28T13:01:15.515487Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 787,
@@ -4307,7 +4307,7 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Epic rebaselined 2026-09-28: PAN-3762 per-machine server is default; adds Vault/Fly/paid tracks. Children carry the order.",
-      "rationale": "Rank held at 317; the 2026-09-28 rebaseline answered the prior open question by making PAN-3762 the default architecture and listing the Session Vault, SSH-host, Fly and paid-tier tracks as children with an explicit build order, so contains edges and order edges were re-derived; it stays needs-refinement while the needs-rescope label remains, and the operator gate stays blocked.",
+      "rationale": "Rank held at 317; the 2026-09-28 edits swap the billing provider to Creem and record the decided pricing but add no children and change no order, so contains and order edges are unchanged; it stays needs-refinement while the needs-rescope label remains, and the operator gate stays blocked.",
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
@@ -10688,12 +10688,12 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "size": "L",
       "importance": "low",
       "score": 22,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-4293"
       ],
-      "why": "Anywhere paid tier: Stripe + entitlement API + quotas; price and bundle scope still open pending pricing research",
-      "rationale": "Rank 682->663 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved.",
+      "why": "Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service",
+      "rationale": "Rank held at 663; the body now records decided pricing, Creem as merchant of record and hosted compute billed separately, which closes every open decision, so the condition moves from needs-refinement to ok while the PAN-4293 dependency still holds its slot in step 6.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10746,14 +10746,14 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "size": "L",
       "importance": "low",
       "score": 23,
-      "condition": "needs-refinement",
+      "condition": "ok",
       "dependsOn": [
         "PAN-2609",
         "PAN-4293",
         "PAN-4294"
       ],
-      "why": "Session Vault Phase B: hosted encrypted vault on overdeck.ai (R2 + Durable Objects); needs Phase A, account service, billing",
-      "rationale": "Rank 684->682 (slot swap within the Anywhere set) to follow PAN-2350's 2026-09-28 recommended order; no other node moved.",
+      "why": "Session Vault Phase B: hosted encrypted vault on overdeck.ai (R2 + Durable Objects); pricing decided; needs Phase A, account, billing",
+      "rationale": "Rank held at 682; the pricing placeholder is replaced by the decided plan table and HB-1..HB-5 are concrete, so the condition moves from needs-refinement to ok, but it still waits on PAN-2609, PAN-4293 and PAN-4294 in step 6.",
       "gate": "auto",
       "planning": "auto"
     },
