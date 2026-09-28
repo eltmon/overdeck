@@ -114,8 +114,10 @@ The `reauth-*` terminal one-time token (`consumeReauthTerminalToken`,
 
 The dashboard shows a destructive **"Dashboard session could not be
 established (HTTP 401)"** banner (`data-phase="unauthorized"`) when
-`ensureDashboardSession()` gets a 401 from every mint host. Two distinct
-causes produce different symptoms:
+`ensureDashboardSession()` gets a 401 from any mint host — with the two-host
+mint (PAN-3711), a 401 from either host is a failure (D-4), since a socket on
+that host would otherwise fail regardless of the other host's mint. Two
+distinct causes produce different symptoms:
 
 - **Missing trusted-origin configuration** (`OVERDECK_TRAEFIK_*` /
   `OVERDECK_TRUSTED_ORIGINS` not set for this launch) — the *mint itself*

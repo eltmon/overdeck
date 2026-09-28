@@ -13,6 +13,7 @@ import { RpcClient, RpcSerialization } from 'effect/unstable/rpc'
 import * as Socket from 'effect/unstable/socket/Socket'
 import { PanRpcGroup } from '@overdeck/contracts'
 import { useConnectionState } from './connectionState'
+import { DashboardSessionUnauthorizedError } from './dashboardSessionError'
 
 // ─── Protocol setup ───────────────────────────────────────────────────────────
 
@@ -55,12 +56,10 @@ function dashboardSessionUrls(url?: string): string[] {
 let dashboardSessionPromise: Promise<void> | null = null
 let dashboardCsrfToken: string | null = null
 
-export class DashboardSessionUnauthorizedError extends Error {
-  constructor(readonly sessionUrl: string) {
-    super(`Dashboard session mint was refused (HTTP 401) at ${sessionUrl}`)
-    this.name = 'DashboardSessionUnauthorizedError'
-  }
-}
+// Re-exported for backward compatibility: existing callers that import this
+// from wsTransport (e.g. wsTransport.test.ts) keep working. XTerminal.tsx
+// imports it from ./dashboardSessionError directly — see that module's header.
+export { DashboardSessionUnauthorizedError }
 
 function consumeDashboardBootstrapToken(): string | null {
   if (typeof window === 'undefined') return null

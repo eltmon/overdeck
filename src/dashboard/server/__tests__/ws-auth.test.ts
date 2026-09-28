@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
@@ -63,11 +67,27 @@ describe('authorizeDashboardUpgrade', () => {
   });
 
   it('rejects with 503 when no internal token is configured', () => {
+    // getInternalToken() falls back to reading <OVERDECK_HOME>/internal-token
+    // when the env var is unset. The shared per-worker OVERDECK_HOME (see
+    // tests/setup/overdeck-home.ts) can already have that file from an
+    // earlier test in the same worker (e.g. one that calls
+    // ensureInternalToken()), which would make this "unconfigured" case see a
+    // configured token and return 401 instead of 503. A fresh, empty home for
+    // just this test keeps it hermetic regardless of run order.
+    const previousHome = process.env.OVERDECK_HOME;
+    const emptyHome = mkdtempSync(join(tmpdir(), 'ws-auth-no-token-home-'));
+    process.env.OVERDECK_HOME = emptyHome;
     delete process.env.OVERDECK_INTERNAL_TOKEN;
     _resetInternalTokenCacheForTests();
-    const result = authorizeDashboardUpgrade({ origin: TRUSTED_ORIGIN }, 'GET');
-    expect(result.ok).toBe(false);
-    expect((result as { status: number }).status).toBe(503);
+    try {
+      const result = authorizeDashboardUpgrade({ origin: TRUSTED_ORIGIN }, 'GET');
+      expect(result.ok).toBe(false);
+      expect((result as { status: number }).status).toBe(503);
+    } finally {
+      process.env.OVERDECK_HOME = previousHome;
+      _resetInternalTokenCacheForTests();
+      rmSync(emptyHome, { recursive: true, force: true });
+    }
   });
 
   it('rejects a cookie minted under a different internal token (401)', () => {

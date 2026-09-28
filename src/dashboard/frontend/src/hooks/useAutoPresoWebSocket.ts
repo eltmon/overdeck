@@ -40,6 +40,11 @@ export function useAutoPresoWebSocket() {
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
   const whiteboardSocketRef = useRef<WebSocket | null>(null);
   const voiceSocketRef = useRef<WebSocket | null>(null);
+  // Bumped on every connectWhiteboard() call, snapshotted by that call's
+  // async mint continuation, so a stale continuation from a call this one
+  // superseded (e.g. React StrictMode's double effect invocation in dev)
+  // never opens a second socket (review advisory, PAN-1166).
+  const connectGeneration = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
   const reconnectAttemptRef = useRef(0);
   const shouldReconnectRef = useRef(true);
@@ -52,17 +57,25 @@ export function useAutoPresoWebSocket() {
 
   const connectWhiteboard = useCallback(() => {
     whiteboardSocketRef.current?.close();
+    const generation = ++connectGeneration.current;
     // The upgrade requires the session cookie (PAN-1166 ws-auth.ts gate), so the
     // mint must complete before the socket opens. On any mint rejection, do not
-    // open the socket and do not retry — a later manual retry (the connection
-    // store's Retry action) re-mints and can call connectWhiteboard() again.
+    // open the socket and do not retry (spec'd behavior for this item). Note
+    // this is a real gap: the connection store's Retry action only re-mints
+    // via EventRouter.forceReconnect — it never calls connectWhiteboard()
+    // again — so a transient mint failure at page load (e.g. the server
+    // restarting) leaves the whiteboard socket closed until this component
+    // remounts. Before this change the socket's own onclose backoff would
+    // have recovered it; that backoff still runs for a socket that opened and
+    // later dropped, just not for a mint that failed before the socket ever
+    // opened.
     void (async () => {
       try {
         await ensureDashboardSession();
       } catch {
         return;
       }
-      if (!shouldReconnectRef.current) return;
+      if (!shouldReconnectRef.current || generation !== connectGeneration.current) return;
 
       const socket = new WebSocket(websocketUrl('/ws/autopreso'));
       whiteboardSocketRef.current = socket;

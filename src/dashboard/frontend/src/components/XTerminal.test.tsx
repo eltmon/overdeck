@@ -5,6 +5,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { PATIENT_WINDOW_MS } from '../lib/terminalReconnectPolicy';
 import { ensureDashboardSession } from '../lib/wsTransport';
+import { DashboardSessionUnauthorizedError } from '../lib/dashboardSessionError';
 import { XTerminal } from './XTerminal';
 
 // XTerminal awaits the session mint before opening a socket (PAN-1166 W8).
@@ -696,7 +697,6 @@ describe('XTerminal - session mint (PAN-1166 W8)', () => {
   });
 
   it('never opens a socket when the session mint is refused (401)', async () => {
-    const { DashboardSessionUnauthorizedError } = await vi.importActual<typeof import('../lib/wsTransport')>('../lib/wsTransport');
     vi.mocked(ensureDashboardSession).mockRejectedValue(new DashboardSessionUnauthorizedError('http://localhost/api/dashboard/session'));
 
     render(<XTerminal sessionName="test-session" />);
