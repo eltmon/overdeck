@@ -37,6 +37,7 @@ import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
 import { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 import { deliveryVerifyLine, type PaneViewport } from './pane-composer.js';
+import { tmuxSubmitKeys, type SubmitMode } from './terminal-backends/steer-keys.js';
 
 export { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 export { deliveryVerifyLine } from './pane-composer.js';
@@ -1028,10 +1029,16 @@ export const sendKeys = (
   sessionName: string,
   keys: string,
   caller?: string,
+  options?: { readonly submit?: SubmitMode },
 ): Effect.Effect<void, TmuxError | MessageDeliveryFailed> =>
   Effect.tryPromise({
     try: async () => {
       validateSessionName(sessionName);
+      // PAN-4292: a steer submits with Claude Code's send-now chord (C-x C-s)
+      // instead of Enter, on the first submit and on the resend chaser.
+      const steer = options?.submit === 'steer';
+      const submitKeys = tmuxSubmitKeys(options?.submit);
+      const submitLabel = steer ? 'Steer' : 'Enter';
       logSendKeys(sessionName, keys, caller);
 
       const sendId = randomUUID();
@@ -1120,8 +1127,8 @@ export const sendKeys = (
           console.warn(`[tmux] Paste verification failed for ${sessionName} after ${PASTE_MAX_ATTEMPTS} attempts × ${VERIFY_TIMEOUT_MS}ms. Sending Enter anyway to avoid orphaned input. Snapshot:\n${snapshot.slice(0, 500)}`);
         }
 
-        await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-        logSendKeys(sessionName, pasteVerified ? '[Enter sent]' : '[Enter sent (unverified paste)]', caller);
+        await tmuxExecAsync(['send-keys', '-t', sessionName, ...submitKeys], { encoding: 'utf-8' });
+        logSendKeys(sessionName, pasteVerified ? `[${submitLabel} sent]` : `[${submitLabel} sent (unverified paste)]`, caller);
 
         if (verifyLine.length >= 3) {
           const SUBMIT_TIMEOUT_MS = 2_000;
@@ -1136,9 +1143,9 @@ export const sendKeys = (
             await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
           }
           if (stillPendingSubmit) {
-            console.warn(`[tmux] Submitted text still visible on ${sessionName} after ${SUBMIT_TIMEOUT_MS}ms; sending Enter once more.`);
-            await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-            logSendKeys(sessionName, '[Enter resent after submit verification timeout]', caller);
+            console.warn(`[tmux] Submitted text still visible on ${sessionName} after ${SUBMIT_TIMEOUT_MS}ms; sending ${submitLabel} once more.`);
+            await tmuxExecAsync(['send-keys', '-t', sessionName, ...submitKeys], { encoding: 'utf-8' });
+            logSendKeys(sessionName, `[${submitLabel} resent after submit verification timeout]`, caller);
           }
         }
       } finally {
