@@ -2,7 +2,7 @@
  * PAN-2908 · C-SIMPLE — "My work" home (simple mode default).
  *
  * Sections in fixed order: Needs you → Working now → Ready to merge →
- * Finished, plus a plain-words hand-off composer. One primary action per
+ * Finished, plus the Home composer (PAN-4280). One primary action per
  * card; destructive actions do not exist here (Advanced only).
  * Data: dashboard store (issues, agents, review status, pending input).
  */
@@ -16,7 +16,7 @@ import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { useSimpleActions } from '../../lib/simple/useSimpleActions';
 import { useUiMode, syncSimpleIssueUrl } from '../../lib/simple/uiMode';
 import { ModeToggle, PrimaryButton, ProgressBar, QuietButton } from './parts';
-import { TalkItThrough } from './TalkItThrough';
+import { HomeComposer } from '../home/HomeComposer';
 import { GetSetUpCard } from '../home/GetSetUpCard';
 
 const S = SIMPLE_STRINGS.home;
@@ -257,7 +257,7 @@ export function SimpleHomePage() {
           <ModeToggle />
         </div>
 
-        <TalkItThrough />
+        <div className="mt-4"><HomeComposer mode="simple" /></div>
 
         <div className="mt-6"><GetSetUpCard /></div>
 

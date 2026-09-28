@@ -1,5 +1,6 @@
 import { ConversationPanel, type ViewMode } from '../../chat/ConversationPanel'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
+import { UnscopedConversationChip } from '../../CommandDeck/UnscopedConversationChip'
 import { usePanesStore } from '../../../lib/panesStore'
 import type { PaneWrapperProps } from '../types'
 import styles from '../stage.module.css'
@@ -25,7 +26,7 @@ export function AgentPane({ pane, ctx }: PaneWrapperProps) {
 
   if (data?.conversation) {
     const viewMode: ViewMode = pane.viewMode === 'terminal' ? 'terminal' : 'conversation'
-    return (
+    const panel = (
       <ConversationPanel
         conversation={data.conversation}
         viewMode={viewMode}
@@ -42,6 +43,13 @@ export function AgentPane({ pane, ctx }: PaneWrapperProps) {
           targetSubagentId: undefined,
         })}
       />
+    )
+    if (data.readOnly) return panel
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <UnscopedConversationChip conversation={data.conversation} />
+        <div className="min-h-0 flex-1">{panel}</div>
+      </div>
     )
   }
 

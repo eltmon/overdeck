@@ -34,6 +34,7 @@ import { PaneBar, type NewPaneAction } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
 import { TerminalDrawer } from '../terminal/TerminalDrawer'
 import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
+import { PENDING_TERMINAL_EVENT, peekPendingTerminal } from '../home/pendingTerminal'
 import { TerminalPane } from './panes/TerminalPane'
 import { CommitsPane } from './panes/CommitsPane'
 import { PlanPane } from './panes/PlanPane'
@@ -180,6 +181,24 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     () => setTerminalOpen(deckKey, !terminalOpen),
     [setTerminalOpen, deckKey, terminalOpen],
   )
+  const openTerminalDrawer = useCallback(
+    () => setTerminalOpen(deckKey, true),
+    [setTerminalOpen, deckKey],
+  )
+
+  // PAN-4280 (D5a): open the drawer for a terminal hand-off pending for this
+  // deck — on mount (a hand-off written just before the hard navigation that
+  // mounted this Stage) and on the same-tab event (a hand-off written while
+  // this Stage is already live).
+  useEffect(() => {
+    if (peekPendingTerminal(deckKey)) setTerminalOpen(deckKey, true)
+    const onPendingTerminal = (e: Event) => {
+      const detail = (e as CustomEvent<{ deckKey: string }>).detail
+      if (detail?.deckKey === deckKey) setTerminalOpen(deckKey, true)
+    }
+    window.addEventListener(PENDING_TERMINAL_EVENT, onPendingTerminal)
+    return () => window.removeEventListener(PENDING_TERMINAL_EVENT, onPendingTerminal)
+  }, [deckKey, setTerminalOpen])
 
   useEffect(() => {
     ensureHome(deckKey)
@@ -263,8 +282,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   )
 
   const api: StageApi = useMemo(
-    () => ({ deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal }),
-    [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal],
+    () => ({ deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer }),
+    [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal, openTerminalDrawer],
   )
 
   const deckContextValue: StageDeckContextValue = useMemo(

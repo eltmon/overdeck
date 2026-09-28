@@ -588,6 +588,23 @@ by `spawn.ts` and by recovery's relaunch); a state with no `backend` falls back 
 only detected agents: a pane-bound harness (codex, ACP, kimi) has no Herdr agent record.
 `--session` is required on every Herdr command, since Herdr's own default session is `default`.
 
+## Ad-hoc terminals
+
+The terminal drawer's ad-hoc shells (started from the Home composer, a deck
+Launcher, or the drawer's own "+") always run over tmux, whatever the host
+terminal backend is (Herdr or tmux) — they are plain shells, not agent panes,
+so they never route through the host backend's agent/session model.
+`POST /api/terminals` creates one: `{ cwd?, command? }`. With no `cwd` it
+starts in `getDefaultCwd()` (`~/Projects` if it exists, else the home
+directory); an optional single-line `command` (at most 2000 characters) is
+typed into the fresh shell with `send-keys -l` then Enter once the session
+exists, and the response reports whether that send succeeded
+(`commandSent`). Because ad-hoc terminals stay on tmux regardless of the
+`terminal.backend` setting, tmux remains a soft dependency under Herdr even
+when you never launch an agent pane directly through it — only skip it
+entirely if you never open a plain terminal either. Moving the drawer onto
+the host terminal backend is tracked as a separate issue.
+
 ## Companion terminals (PAN-3974)
 
 A **companion terminal** is a second terminal session next to a conversation's own (owner)

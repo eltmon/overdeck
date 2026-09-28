@@ -33,6 +33,9 @@ export interface StageApi {
   openOrFocusAgentPane: (conversationId: string, label: string) => void
   /** Toggle the terminal drawer stacked below the deck (PAN-1561). */
   toggleTerminal: () => void
+  /** Open (never toggle closed) the terminal drawer (PAN-4280 D5a) — used
+   * after writing a terminal hand-off so the drawer is guaranteed visible. */
+  openTerminalDrawer: () => void
 }
 
 /**
