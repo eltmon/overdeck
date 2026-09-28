@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:03:04.085Z",
+  "updated": "2026-09-28T13:03:15.140Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-1166",
       "claimedAt": "2026-09-28T12:54:00.907Z",
       "doneAt": "2026-09-28T13:03:04.085Z"
+    },
+    "ws-rpc-gate": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:03:15.139Z"
     }
   }
 }
