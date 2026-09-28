@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T13:59:56.236Z",
+  "updated": "2026-09-28T14:00:10.260Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
     "sidebar-hidden-tabs.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T13:59:56.236Z"
+    },
+    "project-scope-by-conversation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:10.259Z"
     }
   }
 }
