@@ -293,7 +293,9 @@ door that does not exist; a real record read door would be a separate change.
   A pending user bubble's `deliveryState` renders one of: `pending` ("Sending…"),
   `unknown` ("Delivery not confirmed"), `accepted` ("Sent · waiting for transcript"), or
   `subagent` ("Delivered to subagent · `<description>`" — Claude Code routed the message
-  into a running subagent instead of this conversation; PAN-4247). Before pasting, the
+  into a running subagent instead of this conversation; PAN-4247), or `held` ("Waiting:
+  the agent needs a permission answer first"; see "Terminal permission prompts and held
+  messages" below, PAN-4278). Before pasting, the
   composer route checks Claude Code's agent selector and switches input back to the main
   agent (PAN-4268); if that cannot be confirmed the route answers 409
   `input-target-not-main`, the toast shows the reason, and the draft stays in the editor.
@@ -370,6 +372,65 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## Terminal permission prompts and held messages (PAN-4278)
+
+Claude Code draws a blocking tool-permission prompt in a conversation's pane (`Bash command`,
+the command, sometimes a reason such as `Dangerous rm operation …`, then `Do you want to
+proceed?` with `1. Yes`, optionally `2. Yes, and always allow …`, and `No`). It fires even
+under `--permission-mode bypassPermissions`, and a background subagent's prompt draws in the
+main view too, titled `Bash command · from the <type> agent`. This applies to Claude Code
+**conversations** only; work, review and test agents keep the "blocked on a terminal dialog —
+open its terminal" toast.
+
+**Two sources, the pane decides.** `src/lib/agents/permission-prompt.ts` parses the prompt from
+a plain-text screen (fixtures in `src/lib/agents/__fixtures__/claude-code-2.1.280/`). The
+`PermissionRequest` hook (`POST /api/hooks/permission-event`) records, per conversation and per
+agent key (`agent_id ?? 'main'`), the tool, an input preview, the subagent's description
+(`subagents/agent-<id>.meta.json`) and the request time in an in-memory registry
+(`src/lib/overdeck/conversation-permission-registry.ts`); a clearing hook removes only its own
+agent's entry. `conversationPendingPermission` (`src/lib/overdeck/conversation-permission.ts`)
+reads the pane through `resolveAgentPaneIo` (Herdr or tmux) and joins the two:
+`pendingPermission.answerable` is true only when the prompt is on screen. A registry entry
+without a prompt on screen is `answerable: false`. The registry is lost on a dashboard restart;
+the dialog then labels the agent from the prompt's title. `GET /api/conversations/pending-input`
+carries `pendingPermission` (and skips the PAN-3113 pane-choice check while one is pending);
+`GET /api/conversations/:id` adds `permissionRequest` to `pendingInputKinds`.
+
+**The dialog.** `TerminalPermissionDialog` opens for the oldest pending permission and names
+the conversation, the agent (`Main agent` or `Subagent: <description>`), the tool, the command
+and the reason. It offers **Allow once**, **Allow always** (only when the prompt offers it) and
+**Deny**; a non-answerable one offers only **Open terminal** and **Dismiss**. An answer posts
+`POST /api/conversations/:id/permission {signature, choice}`, which re-reads the pane, refuses
+without sending keys when the prompt is gone (`prompt-gone`) or differs (`prompt-changed`), then
+sends **arrow keys to the chosen row and Enter** — never digits, never Escape — and confirms the
+prompt left the screen (`delivery-unconfirmed` otherwise). The dialog stays in "Confirming…"
+until the feed stops reporting that prompt's signature.
+
+**Needs you and notifications.** A pending permission is a blocking `permissionRequest` row in
+Needs you, described `<agent> · <tool>` and showing `waiting <relative time>`; rows sort oldest
+first. A desktop notification fires when a prompt is first seen and again 5 and 30 minutes after
+it started waiting, while it is still pending.
+
+**Held messages.** The composer route checks for an on-screen prompt **before** switching the
+agent selector to main (PAN-4268), because that switch's `Down`/`Enter` would answer the menu.
+With a prompt up it pastes nothing and answers 409 `permission-pending`. A registry-only entry
+never holds a message: the hook is best-effort, so a lost clearing post must not block every
+send. The composer keeps the message as a `held` bubble ("Waiting: the agent needs a permission
+answer first", with Discard) and resends it once a feed read newer than the hold shows no
+`pendingPermission` for that conversation, with a fresh `clientMessageId` and no `retry` flag —
+the receipts cache holds the 409 under the old id. A second `permission-pending` holds it again.
+Held bubbles live in memory only: a page reload drops them.
+
+**Not delivered.** When `deliverAgentMessage` returns `ok: false` (for example a Herdr refusal,
+or a Herdr client failure before `agent.prompt`), the composer route logs `[conversations]
+<name>: not delivered via <path>: <failure>` and answers 502 `not-delivered`; a delivered send
+logs `delivered via <path>`. The outbox shows **Not delivered — resend**, and Resend uses a fresh
+`clientMessageId`. The eaten-message watcher counts a redelivery only when it returned `ok: true`.
+One silent path remains by design: Herdr reports `agent_prompt_stalled`/`timeout` on an
+`agent.prompt` wait as delivered, because it types the text and Enter before it watches, and
+its contract says never to re-send. The frontend's 4-minute "Not found in transcript" timer is
+the only cover for that case.
+
 ## Agents page: Live and History (PAN-3920, PAN-4197)
 
 `/agents` opens the **Live view** (`components/Agents/live/`): what is running and progressing,
@@ -441,7 +502,7 @@ The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `w
 
 | # | Condition | Reason | Section | Tone |
 | --- | --- | --- | --- | --- |
-| 1 | `blocked` | question waiting / permission prompt / plan approval | Needs you | needs-you |
+| 1 | `blocked` | question waiting / permission prompt / plan approval (a conversation's terminal permission prompt, main agent or subagent, also has its own dialog: see "Terminal permission prompts and held messages") | Needs you | needs-you |
 | 2 | operator pause | paused by you | Needs you | needs-you |
 | 3 | issue agent, attention `api-error`, or any entry with `providerError` | API error or usage limit | Needs you | stuck |
 | 4 | issue agent, attention `stuck`, `idle` | stuck · idle `<age>` | Needs you | stuck |
