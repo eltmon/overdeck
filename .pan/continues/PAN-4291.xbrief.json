@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:17:24.718Z",
+  "updated": "2026-09-28T14:18:12.528Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "sampler-graphql-source.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T14:17:24.718Z"
+    },
+    "sampler-graphql-source.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:18:12.528Z"
     }
   }
 }
