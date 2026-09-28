@@ -7,9 +7,12 @@
  * is read-only, looks one level deep only, and spawns no child process (NFR-2):
  * a child counts as a repository when `<child>/.git` exists, as a directory or
  * as a linked worktree's file.
+ *
+ * The same scan feeds onboarding suggestions: the repositories already sitting
+ * in the default projects folder that are not registered yet.
  */
 
-import { readdir, stat } from 'fs/promises';
+import { readdir, realpath, stat } from 'fs/promises';
 import { join } from 'path';
 
 export interface NestedRepository {
@@ -40,4 +43,21 @@ export async function findNestedRepositories(dir: string, limit = 50): Promise<N
     .sort((a, b) => a.localeCompare(b))
     .slice(0, limit)
     .map((name) => ({ path: join(dir, name), name }));
+}
+
+/**
+ * Unregistered repositories directly under `root`, for the Add-project dialog.
+ * `registeredPaths` holds canonical paths; each candidate is canonicalized the
+ * same way (it exists, so `realpath` is exact) before the comparison.
+ */
+export async function listSuggestedRepositories(
+  root: string,
+  registeredPaths: Set<string>,
+  limit = 20,
+): Promise<NestedRepository[]> {
+  const found = await findNestedRepositories(root, 50);
+  const canonical = await Promise.all(
+    found.map(async (repo) => ({ ...repo, path: await realpath(repo.path).catch(() => repo.path) })),
+  );
+  return canonical.filter((repo) => !registeredPaths.has(repo.path)).slice(0, limit);
 }
