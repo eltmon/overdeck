@@ -18,7 +18,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/cloister/agents/health
  */
 
-import { Effect, Layer } from 'effect';
+import { Data, Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
@@ -52,6 +52,16 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
+
+/** Tagged catch for the close-out routes (PAN-4283) — httpHandler's catchCause fallback still reads .message. */
+class CloseOutRouteError extends Data.TaggedError('CloseOutRouteError')<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+function toCloseOutRouteError(err: unknown): CloseOutRouteError {
+  return new CloseOutRouteError({ message: err instanceof Error ? err.message : String(err), cause: err });
+}
 
 // ─── Route: GET /api/cloister/status ─────────────────────────────────────────
 
@@ -222,7 +232,7 @@ const getCloisterCloseOutRoute = HttpRouter.add(
   '/api/cloister/close-out',
   httpHandler(Effect.tryPromise({
     try: async () => jsonResponse(await readCloseOutSettings()),
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    catch: toCloseOutRouteError,
   })),
 );
 
@@ -247,7 +257,7 @@ const putCloisterCloseOutRoute = HttpRouter.add(
           throw err;
         }
       },
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+      catch: toCloseOutRouteError,
     });
   })),
 );
@@ -259,7 +269,7 @@ const getCloisterCloseOutDiskRoute = HttpRouter.add(
   '/api/cloister/close-out/disk',
   httpHandler(Effect.tryPromise({
     try: async () => jsonResponse(await collectClosedIssueWorkspaces()),
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    catch: toCloseOutRouteError,
   })),
 );
 
@@ -270,7 +280,7 @@ const postCloisterCloseOutCleanupRoute = HttpRouter.add(
   '/api/cloister/close-out/cleanup',
   httpHandler(Effect.tryPromise({
     try: async () => jsonResponse(await cleanupClosedIssueWorkspaces()),
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    catch: toCloseOutRouteError,
   })),
 );
 

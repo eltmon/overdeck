@@ -223,12 +223,12 @@ export async function cleanupClosedIssueWorkspaces(
       }
     }
 
-    const mergeStatus = await resolved.isMerged(row.issueId, row.projectPath);
-    if (mergeStatus !== 'merged') {
+    const mergeState = await resolved.isMerged(row.issueId, row.projectPath);
+    if (mergeState !== 'merged') {
       return {
         skipped: {
           issueId: row.issueId,
-          reason: mergeStatus === 'unmerged' ? 'branch not merged' : 'merge state unknown (no local or remote branch)',
+          reason: mergeState === 'unmerged' ? 'branch not merged' : 'merge state unknown (no local or remote branch)',
         },
       };
     }

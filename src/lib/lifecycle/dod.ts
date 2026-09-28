@@ -1,7 +1,5 @@
 /** Shared Definition-of-Done row definitions and gate result types. */
 
-import type { StepResult } from './types.js';
-
 export type DodRowId =
   | 'review'
   | 'tests'
@@ -88,7 +86,7 @@ export const DOD_ROWS: readonly DodRowDef[] = [
  * occurred (PAN-4283).
  */
 export function describeTeardownObserved(
-  steps: ReadonlyArray<Pick<StepResult, 'step' | 'success' | 'skipped' | 'details'>>,
+  steps: ReadonlyArray<{ step: string; success: boolean; skipped?: boolean; details?: string[] }>,
   opts: { removeWorkspace: boolean; deleteBranches: boolean }
 ): string {
   const clauses: string[] = [];
