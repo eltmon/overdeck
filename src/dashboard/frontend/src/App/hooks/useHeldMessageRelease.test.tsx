@@ -113,6 +113,14 @@ describe('held composer messages', () => {
     expect(messagePosts().map((body) => body.message)).toEqual(['BTW How can I launch Orca?']);
   });
 
+  it('held messages release when only a non-answerable registry entry remains', async () => {
+    holdMessage('BTW How can I launch Orca?', 'orig-1');
+    renderRelease();
+    const stale = { name: CONV, pendingPermission: { ...PERMISSION_ROW.pendingPermission, answerable: false, signature: null } };
+    await feed([stale], T0.getTime() + 4000);
+    expect(messagePosts().map((body) => body.message)).toEqual(['BTW How can I launch Orca?']);
+  });
+
   it('the resend uses a new clientMessageId', async () => {
     holdMessage('BTW How can I launch Orca?', 'orig-1');
     renderRelease();

@@ -4,9 +4,8 @@
  * The composer route answers 409 `permission-pending` while a conversation's
  * pane shows a permission prompt, and the composer keeps that message as a
  * 'held' bubble. This hook watches the pending-input feed: once a feed read
- * NEWER than the hold shows no pendingPermission for the conversation (the
- * feed omits conversations with nothing pending), it resends the held
- * messages. Requiring a newer read keeps a stale feed from releasing — and
+ * NEWER than the hold shows no on-screen (answerable) pendingPermission for
+ * the conversation, it resends the held messages. Requiring a newer read keeps a stale feed from releasing — and
  * re-holding — in a loop. Held bubbles live in memory only: a page reload
  * drops them.
  */
@@ -25,8 +24,11 @@ export function useHeldMessageRelease(): void {
   const releaseHeld = useComposerStore((s) => s.releaseHeld);
 
   useEffect(() => {
+    // Only a prompt on screen blocks (Decision 11): a registry-only entry
+    // (answerable: false) can be stale — no hook clears a main-thread Deny — and
+    // the server re-holds with a second 409 if the prompt really is back.
     const blocked = new Set(
-      (Array.isArray(rows) ? rows : []).filter((row) => row.pendingPermission).map((row) => row.name),
+      (Array.isArray(rows) ? rows : []).filter((row) => row.pendingPermission?.answerable).map((row) => row.name),
     );
     for (const [conversationName, slice] of Object.entries(byConversation)) {
       const held = slice.optimistic.filter((message) => message.deliveryState === 'held');
