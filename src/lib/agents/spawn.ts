@@ -96,6 +96,7 @@ import {
   withAutoSpawnConsentClaim,
   type AcceptAutoSpawnConsent,
 } from '../planning/auto-spawn-consent.js';
+import { assertSpawnAdmittedForCpu } from './cpu-dispatch-hold.js';
 import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
@@ -610,6 +611,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   if (role !== 'work') return spawnAgentWithoutConsentClaim(options);
 
   const startedBy = resolveAgentStartedBy(options.startedBy);
+  await assertSpawnAdmittedForCpu(startedBy); // PAN-4311: opt-in, Flywheel spawns only
   const resolvedOptions = { ...options, startedBy };
   if (isOperatorStartedBy(startedBy) || options.autoSpawnConsentRequired !== true) {
     return spawnAgentWithoutConsentClaim(resolvedOptions);
