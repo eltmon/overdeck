@@ -1,0 +1,994 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T12:36:39Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1166: Re-introduce /ws/terminal auth gate with a working bootstrap path",
+    "updated": "2026-09-28T12:41:48.586Z"
+  },
+  "plan": {
+    "id": "pan-1166",
+    "title": "Re-introduce /ws/terminal auth gate with a working bootstrap path",
+    "status": "proposed",
+    "uid": "6efa3987-9478-49ac-9c0e-3a914193590b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-28T12:36:39Z",
+    "updated": "2026-09-28T12:41:48.586Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1166",
+        "label": "PAN-1166",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1166/.pan/drafts/pan-1166.md",
+        "label": "PRD draft (.pan/drafts/pan-1166.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2351",
+        "label": "PAN-2351 scoped tokens (deferred parts)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4299",
+        "label": "PAN-4299 Traefik LAN exposure follow-up",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "security",
+      "dashboard",
+      "websocket",
+      "auth"
+    ],
+    "narratives": {
+      "Problem": "/ws/terminal, /ws/rpc, /ws/voice and /ws/autopreso authorize upgrades by origin only, and validateOriginHeaders passes a GET with no Origin header. The API binds 0.0.0.0, so any LAN client that omits Origin gets a live PTY on /ws/terminal and full RPC on /ws/rpc. The PAN-457 cookie gate was removed in 2026-05 because it broke Traefik terminals; two of its three root causes (no zero-step mint, per-boot session token) are fixed on main, and the third (frontend silently swallows a mint 401 at wsTransport.ts:80) remains.",
+      "Proposal": "Add one shared authorizer, authorizeDashboardUpgrade in src/dashboard/server/ws-auth.ts (origin -> 403, no internal token -> 503, hasDashboardAuthHeaders cookie-or-internal-token -> 401), and route all four WebSocket endpoints through it. Peer trust stays only in the session mint. On the frontend, make ensureDashboardSession reject with a typed DashboardSessionUnauthorizedError on any 401, surface it as a new 'unauthorized' connection phase with a banner pointing at docs/DASHBOARD-AUTH.md, and make XTerminal and the voice/autopreso hooks await the mint before opening sockets. Document the threat model, including what the gate does not close (local processes; Traefik on all interfaces, PAN-4299). Prove it with unit tests per endpoint and a Playwright spec on an isolated dashboard.",
+      "NonGoals": "- Scoped access tokens on upgrades (?token=, verifyAccessToken, per-surface scopes, the read:events -> 403 matrix) — deferred to PAN-2351\n- require_token_mint config — deferred to PAN-2351\n- Trusting a loopback/Docker-bridge peer directly on WebSocket upgrades\n- Gating HTTP GET read routes (GET /api/agents and siblings)\n- Binding the API to 127.0.0.1 instead of 0.0.0.0\n- Changing Traefik port publishing (PAN-4299)\n- Changing the knowledge-viewer WebSocket proxy, which has its own access-token gate\n- Changing the reauth one-time-token flow\n- Widening session cookie attributes (Domain=, SameSite=Lax)\n- Rate limiting\n- Carrying any credential in a WebSocket URL\n- Restarting or reloading the operator's live dashboard from the workspace"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ship the WebSocket gate without PAN-2351 scoped tokens; leave a single extension-point comment in ws-auth.ts",
+        "rationale": "PAN-2351 is OPEN with no code (git grep verifyAccessToken src is empty). The LAN PTY hole is live now, and the authorizer has one obvious place for 2351 to add ?token= scopes. An unmet dependency is not a contradiction between inputs."
+      },
+      {
+        "summary": "Upgrade credential is session cookie OR internal token only; the authorizer never consults isLoopbackPeer",
+        "rationale": "Keeps peer trust in exactly one place (the session mint), so PAN-2351's require_token_mint closes it everywhere. Loopback browsers already auto-mint, so standard flows are unaffected."
+      },
+      {
+        "summary": "Include /ws/autopreso in the gate even though the issue does not name it",
+        "rationale": "Issue acceptance criterion #4 forbids a half-gated state; /ws/autopreso was added after the issue was written and uses the same origin-only pattern."
+      },
+      {
+        "summary": "Any 401 from either mint host (PAN-3711 two-host mint) rejects ensureDashboardSession",
+        "rationale": "XTerminal connects to window.location.host, which can be the second host, so a 401 there means a socket will fail."
+      },
+      {
+        "summary": "Relax /ws/voice and /ws/autopreso to validateOriginHeaders (absent Origin allowed through to the credential check)",
+        "rationale": "One origin rule for all four endpoints; a credential-less request still gets 401, and browsers always send Origin on upgrades, so cross-site hijacking stays blocked."
+      },
+      {
+        "summary": "Do not fix Traefik all-interface port publishing here; filed PAN-4299 and document it in the threat model",
+        "rationale": "It is a pre-existing template change with its own blast radius (LAN/device access to workspace stacks)."
+      },
+      {
+        "summary": "Restart-stability of the session cookie needs no new work",
+        "rationale": "The HMAC derivation already exists (dashboard-auth.ts:43-46) and is locked by dashboard-auth.test.ts:51."
+      }
+    ],
+    "items": [
+      {
+        "id": "ws-auth-helper",
+        "title": "Add shared WebSocket upgrade authorizer ws-auth.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "ws-terminal-gate",
+            "ws-rpc-gate",
+            "ws-voice-gate",
+            "ws-autopreso-gate"
+          ],
+          "files_scope": [
+            "src/dashboard/server/ws-auth.ts",
+            "src/dashboard/server/__tests__/ws-auth.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-auth.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ws-auth.test.ts passes all 8 cases",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. Create src/dashboard/server/ws-auth.ts exporting authorizeDashboardUpgrade(headers: HeaderMap, method: string): { ok: true } | { ok: false; status: 401|403|503; message } and rejectUpgrade(socket, status, message), exactly as the PRD W1 snippet: validateOriginHeaders -> 403; getInternalToken() empty -> 503; hasDashboardAuthHeaders(headers) false -> 401 'Unauthorized'. Do NOT consult isLoopbackPeer (FR-3). Keep one comment line at the credential step: '// PAN-2351 adds scoped access tokens (?token=) here.' Module header comment names FR-1/FR-3 and points to docs/DASHBOARD-AUTH.md. Add src/dashboard/server/__tests__/ws-auth.test.ts with the 8 cases listed in PRD W1."
+        },
+        "items": [
+          {
+            "id": "ws-auth-helper.ac1",
+            "title": "Given a trusted Origin and no credential, authorizeDashboardUpgrade returns { ok: false, status: 401 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-auth-helper.ac2",
+            "title": "Given an untrusted Origin with a valid session cookie, authorizeDashboardUpgrade returns status 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-auth-helper.ac3",
+            "title": "Given no Origin header and the internal token as x-overdeck-internal-token or Authorization Bearer, authorizeDashboardUpgrade returns { ok: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-auth-helper.ac4",
+            "title": "Given no internal token configured, authorizeDashboardUpgrade returns status 503",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-auth-helper.ac5",
+            "title": "Given a loopback-looking request with no cookie or token, authorizeDashboardUpgrade rejects it with 401 because ws-auth.ts contains no isLoopbackPeer reference (git grep -n isLoopbackPeer src/dashboard/server/ws-auth.ts prints nothing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-terminal-gate",
+        "title": "Gate /ws/terminal upgrades through authorizeDashboardUpgrade",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/__tests__/ws-terminal-auth.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-terminal-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/__tests__/ws-terminal-auth.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. In src/dashboard/server/ws-terminal.ts, replace the origin-only upgrade check with authorizeDashboardUpgrade(request.headers, request.method ?? 'GET') from ./ws-auth.js and reject failures with rejectUpgrade(socket, auth.status, auth.message) from ./ws-auth.js. Delete authorizeTerminalUpgrade (search '// Hotfix for #1166'), the local rejectUpgrade, and the now-unused validateOriginHeaders import. Leave the reauth-* one-time token block unchanged; it runs after the authorizer. Add src/dashboard/server/__tests__/ws-terminal-auth.test.ts: http.createServer(), call the setup function, server.listen(0), then connect with the `ws` client to /ws/terminal using header origin: http://localhost:3011. Reset internal-token, session-token and trusted-origin caches in beforeEach/afterEach as in src/dashboard/server/routes/__tests__/dashboard-auth.test.ts:37-49. Real sockets on port 0; no timers."
+        },
+        "items": [
+          {
+            "id": "ws-terminal-gate.ac1",
+            "title": "Given a trusted Origin and no cookie or internal token, when a client upgrades /ws/terminal, then the server rejects it with HTTP 401 (src/dashboard/server/__tests__/ws-terminal-auth.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-terminal-gate.ac2",
+            "title": "Given a trusted Origin and the cookie from dashboardSessionCookieHeader(), when a client upgrades /ws/terminal, then the server accepts the upgrade",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-terminal-gate.ac3",
+            "title": "Given Origin https://evil.example and a valid cookie, when a client upgrades /ws/terminal, then the server rejects it with HTTP 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-terminal-gate.ac4",
+            "title": "git grep -n 'Hotfix for #1166' src/dashboard/server/ws-terminal.ts prints nothing, and the reauth-* pan_codex_reauth check still rejects a missing token with close code 1008",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-rpc-gate",
+        "title": "Gate /ws/rpc upgrades through authorizeDashboardUpgrade",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/__tests__/ws-rpc-auth.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc-auth.test.ts src/dashboard/server/__tests__/ws-rpc.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "ws-rpc-auth.test.ts and ws-rpc.test.ts pass",
+            "typecheck completes without errors",
+            "file-size lint exits 0"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In src/dashboard/server/ws-rpc.ts export rejectUnauthorizedRpcUpgrade(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | null that calls authorizeDashboardUpgrade(request.headers as HeaderMap, request.method) and returns jsonResponse({ error: auth.message }, { status: auth.status }) on failure. Replace the inline origin check in the GET /ws/rpc route (search '// Hotfix for #1166') with it. Remove the validateOrigin import if nothing else in the file uses it. ws-rpc.ts is allowlisted at 1219 lines (scripts/file-size-allowlist.txt, # PAN-3668); if it grows past 1219, append '<lines> src/dashboard/server/ws-rpc.ts # PAN-1166' to the allowlist in the same commit. Add src/dashboard/server/__tests__/ws-rpc-auth.test.ts using fake request objects ({ headers, method: 'GET' } cast), pattern dashboard-auth.test.ts:24-29."
+        },
+        "items": [
+          {
+            "id": "ws-rpc-gate.ac1",
+            "title": "Given a trusted Origin and no credential, rejectUnauthorizedRpcUpgrade returns a response with status 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-rpc-gate.ac2",
+            "title": "Given a trusted Origin and a valid session cookie, rejectUnauthorizedRpcUpgrade returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-rpc-gate.ac3",
+            "title": "Given Origin https://evil.example, rejectUnauthorizedRpcUpgrade returns a response with status 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-rpc-gate.ac4",
+            "title": "git grep -n 'Hotfix for #1166' src/dashboard/server/ws-rpc.ts prints nothing and the GET /ws/rpc route calls rejectUnauthorizedRpcUpgrade before rpcWebSocketHttp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-voice-gate",
+        "title": "Gate /ws/voice upgrades through authorizeDashboardUpgrade",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/ws-voice.ts",
+            "src/dashboard/server/__tests__/ws-voice-auth.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-voice-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/__tests__/ws-voice-auth.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In src/dashboard/server/ws-voice.ts, replace the origin-only upgrade check with authorizeDashboardUpgrade(request.headers, request.method ?? 'GET') from ./ws-auth.js and reject failures with rejectUpgrade(socket, auth.status, auth.message) from ./ws-auth.js. Delete the private isTrustedWebSocketOrigin and the isTrustedOriginForHost import; replace the raw 'HTTP/1.1 403 Forbidden' write. Leave isTrustedOriginForHost in origin-validation.ts (still tested by routes/__tests__/agent-permissions.test.ts). Add src/dashboard/server/__tests__/ws-voice-auth.test.ts: http.createServer(), call the setup function, server.listen(0), then connect with the `ws` client to /ws/voice using header origin: http://localhost:3011. Reset internal-token, session-token and trusted-origin caches in beforeEach/afterEach as in src/dashboard/server/routes/__tests__/dashboard-auth.test.ts:37-49. Real sockets on port 0; no timers."
+        },
+        "items": [
+          {
+            "id": "ws-voice-gate.ac1",
+            "title": "Given a trusted Origin and no cookie or internal token, when a client upgrades /ws/voice, then the server rejects it with HTTP 401 (src/dashboard/server/__tests__/ws-voice-auth.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-voice-gate.ac2",
+            "title": "Given a trusted Origin and the cookie from dashboardSessionCookieHeader(), when a client upgrades /ws/voice, then the server accepts the upgrade",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-voice-gate.ac3",
+            "title": "Given Origin https://evil.example and a valid cookie, when a client upgrades /ws/voice, then the server rejects it with HTTP 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-voice-gate.ac4",
+            "title": "git grep -n 'isTrustedWebSocketOrigin' src/dashboard/server/ws-voice.ts prints nothing, and git grep -n authorizeDashboardUpgrade src/dashboard/server/ws-voice.ts prints one call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-autopreso-gate",
+        "title": "Gate /ws/autopreso upgrades through authorizeDashboardUpgrade",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/ws-autopreso.ts",
+            "src/dashboard/server/__tests__/ws-autopreso-auth.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-autopreso-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/__tests__/ws-autopreso-auth.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In src/dashboard/server/ws-autopreso.ts, replace the origin-only upgrade check with authorizeDashboardUpgrade(request.headers, request.method ?? 'GET') from ./ws-auth.js and reject failures with rejectUpgrade(socket, auth.status, auth.message) from ./ws-auth.js. Delete the private isTrustedWebSocketOrigin and the isTrustedOriginForHost import; replace the raw 'HTTP/1.1 403 Forbidden' write. Leave isTrustedOriginForHost in origin-validation.ts (still tested by routes/__tests__/agent-permissions.test.ts). Add src/dashboard/server/__tests__/ws-autopreso-auth.test.ts: http.createServer(), call the setup function, server.listen(0), then connect with the `ws` client to /ws/autopreso using header origin: http://localhost:3011. Reset internal-token, session-token and trusted-origin caches in beforeEach/afterEach as in src/dashboard/server/routes/__tests__/dashboard-auth.test.ts:37-49. Real sockets on port 0; no timers."
+        },
+        "items": [
+          {
+            "id": "ws-autopreso-gate.ac1",
+            "title": "Given a trusted Origin and no cookie or internal token, when a client upgrades /ws/autopreso, then the server rejects it with HTTP 401 (src/dashboard/server/__tests__/ws-autopreso-auth.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-autopreso-gate.ac2",
+            "title": "Given a trusted Origin and the cookie from dashboardSessionCookieHeader(), when a client upgrades /ws/autopreso, then the server accepts the upgrade",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-autopreso-gate.ac3",
+            "title": "Given Origin https://evil.example and a valid cookie, when a client upgrades /ws/autopreso, then the server rejects it with HTTP 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-autopreso-gate.ac4",
+            "title": "git grep -n 'isTrustedWebSocketOrigin' src/dashboard/server/ws-autopreso.ts prints nothing, and git grep -n authorizeDashboardUpgrade src/dashboard/server/ws-autopreso.ts prints one call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unauthorized-phase",
+        "title": "Add unauthorized connection phase and banner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/connectionState.ts",
+            "src/dashboard/frontend/src/components/DegradedModeBanner.tsx",
+            "src/dashboard/frontend/src/App/BackendConnectionBoundary.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/connectionState-unauthorized.test.ts",
+            "src/dashboard/frontend/src/components/__tests__/DegradedModeBanner.test.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/connectionState-unauthorized.test.ts src/dashboard/frontend/src/components/__tests__/DegradedModeBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In src/dashboard/frontend/src/lib/connectionState.ts add 'unauthorized' to ConnectionPhase, sessionAuthFailed: boolean to ConnectionInputs (default false) with setter setSessionAuthFailed, derive 'unauthorized' right after the restarting check (precedence restarting > unauthorized > unreachable > delayed > live), and make isWriteBlockedPhase true for it. In DegradedModeBanner.tsx add case 'unauthorized': destructive tone, AlertTriangle, message 'Dashboard session could not be established (HTTP 401) — see docs/DASHBOARD-AUTH.md', Retry button only. In App/BackendConnectionBoundary.tsx add sessionAuthFailed to the useShallow selection and give FirstLoadScreen the heading 'Dashboard session could not be established' for phase 'unauthorized'. Tests: new src/dashboard/frontend/src/lib/__tests__/connectionState-unauthorized.test.ts and a new case in src/dashboard/frontend/src/components/__tests__/DegradedModeBanner.test.tsx."
+        },
+        "items": [
+          {
+            "id": "unauthorized-phase.ac1",
+            "title": "Given sessionAuthFailed true and restarting false, deriveConnectionPhase returns 'unauthorized'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unauthorized-phase.ac2",
+            "title": "Given sessionAuthFailed true and restarting true, deriveConnectionPhase returns 'restarting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unauthorized-phase.ac3",
+            "title": "isWriteBlockedPhase('unauthorized') returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unauthorized-phase.ac4",
+            "title": "Given the store has sessionAuthFailed true, DegradedModeBanner renders data-phase=\"unauthorized\" with text containing docs/DASHBOARD-AUTH.md and a Retry button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-mint-loud-401",
+        "title": "Make ensureDashboardSession reject loudly on a 401 mint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "xterminal-mint-first"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/wsTransport.ts",
+            "src/dashboard/frontend/src/lib/__tests__/wsTransport.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/wsTransport.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "wsTransport.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. In src/dashboard/frontend/src/lib/wsTransport.ts export class DashboardSessionUnauthorizedError (name 'DashboardSessionUnauthorizedError', readonly sessionUrl). Replace 'if (response.status === 401) return null' with 'throw new DashboardSessionUnauthorizedError(sessionUrl)' — a 401 from EITHER mint host rejects (PRD D-4). On success call useConnectionState.getState().setSessionAuthFailed(false); in the catch branch, when err instanceof DashboardSessionUnauthorizedError, call setSessionAuthFailed(true) before re-throwing, and keep 'dashboardSessionPromise = null'. Extend src/dashboard/frontend/src/lib/__tests__/wsTransport.test.ts 'dashboard session bootstrap' block; replace any existing expectation that a 401 resolves."
+        },
+        "items": [
+          {
+            "id": "session-mint-loud-401.ac1",
+            "title": "Given the API mint host returns 401, ensureDashboardSession() rejects with DashboardSessionUnauthorizedError and the connection store has sessionAuthFailed === true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-mint-loud-401.ac2",
+            "title": "Given two mint hosts where the API host returns 200 and the frontend host returns 401, ensureDashboardSession() rejects with DashboardSessionUnauthorizedError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-mint-loud-401.ac3",
+            "title": "Given a prior 401, when a later call gets 200 from every host, ensureDashboardSession() resolves and sessionAuthFailed becomes false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-mint-loud-401.ac4",
+            "title": "git grep -n 'status === 401) return null' src/dashboard/frontend/src/lib/wsTransport.ts prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xterminal-mint-first",
+        "title": "XTerminal awaits the session mint and stops on 401",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/XTerminal.tsx",
+            "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/XTerminal.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "XTerminal.test.tsx passes",
+            "typecheck completes without errors",
+            "file-size lint exits 0"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. In src/dashboard/frontend/src/components/XTerminal.tsx connect(), await ensureDashboardSession() before 'new WebSocket(wsUrl)' (search 'let wsUrl = `${protocol}//${window.location.host}/ws/terminal'). Guard the async continuation with the existing disposal/cancel checks so nothing happens after unmount. On DashboardSessionUnauthorizedError: setConnectionStatus('failed') and schedule no reconnect timer. On any other mint error: use the existing reconnect policy. Each reconnect calls connect() again, so each attempt re-ensures the session. XTerminal.tsx is allowlisted at 1031 lines (# PAN-3921); if it grows, append '<lines> src/dashboard/frontend/src/components/XTerminal.tsx # PAN-1166' to scripts/file-size-allowlist.txt in the same commit. Tests in XTerminal.test.tsx use vi.useFakeTimers() + vi.advanceTimersByTimeAsync (repo rule: fake timers for retry tests)."
+        },
+        "items": [
+          {
+            "id": "xterminal-mint-first.ac1",
+            "title": "Given ensureDashboardSession rejects with DashboardSessionUnauthorizedError, XTerminal never calls the WebSocket constructor, even after vi.advanceTimersByTimeAsync(30_000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-mint-first.ac2",
+            "title": "Given ensureDashboardSession rejects with DashboardSessionUnauthorizedError, XTerminal's connection status becomes 'failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-mint-first.ac3",
+            "title": "Given ensureDashboardSession resolves, XTerminal calls the WebSocket constructor once with a URL containing /ws/terminal?session=",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-hook-mint-first",
+        "title": "useAutoPresoWebSocket mints before opening its sockets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useAutoPresoWebSocket-session.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/hooks/__tests__/useAutoPresoWebSocket-session.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useAutoPresoWebSocket-session.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. In src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts await ensureDashboardSession() (import from ../lib/wsTransport) before new WebSocket(websocketUrl('/ws/autopreso')) and before new WebSocket(websocketUrl('/ws/voice')). Voice path: on rejection call setVoiceError(err.message) and return. Autopreso path: on rejection do not open the socket and do not retry. New test src/dashboard/frontend/src/hooks/__tests__/useAutoPresoWebSocket-session.test.ts mocking ensureDashboardSession and the global WebSocket."
+        },
+        "items": [
+          {
+            "id": "autopreso-hook-mint-first.ac1",
+            "title": "Given ensureDashboardSession rejects, the hook never calls the WebSocket constructor for /ws/autopreso",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-hook-mint-first.ac2",
+            "title": "Given ensureDashboardSession resolves, the hook calls the WebSocket constructor with a URL ending /ws/autopreso",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-hook-mint-first.ac3",
+            "title": "Given ensureDashboardSession rejects when voice starts, the hook sets its voiceError and never opens /ws/voice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "voice-hook-mint-first",
+        "title": "useVoiceTranscription mints before opening /ws/voice",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useVoiceTranscription.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useVoiceTranscription-session.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/hooks/__tests__/useVoiceTranscription-session.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useVoiceTranscription-session.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. In src/dashboard/frontend/src/hooks/useVoiceTranscription.ts await ensureDashboardSession() (import from ../lib/wsTransport) BEFORE navigator.mediaDevices.getUserMedia, so a refused session never prompts for the microphone. On rejection call setError(err.message) and return. New test src/dashboard/frontend/src/hooks/__tests__/useVoiceTranscription-session.test.ts mocking ensureDashboardSession, getUserMedia and the global WebSocket."
+        },
+        "items": [
+          {
+            "id": "voice-hook-mint-first.ac1",
+            "title": "Given ensureDashboardSession rejects, starting voice sets the hook error and calls neither getUserMedia nor the WebSocket constructor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-hook-mint-first.ac2",
+            "title": "Given ensureDashboardSession resolves, starting voice calls the WebSocket constructor with a URL ending /ws/voice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auth-docs",
+        "title": "Document dashboard auth and the WebSocket gate threat model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "verify_commands": [
+            "test -f docs/DASHBOARD-AUTH.md",
+            "grep -n 'PAN-4299' docs/DASHBOARD-AUTH.md",
+            "grep -n 'unauthorized' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "docs/DASHBOARD-AUTH.md exists",
+            "grep finds PAN-4299 in the Threat model section",
+            "grep finds the unauthorized phase row and precedence line"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11. Create docs/DASHBOARD-AUTH.md with sections in this order: Credentials, Session mint, WebSocket gate, Threat model, Troubleshooting, 2026-05 post-mortem — content as listed in PRD W11 item 1 (Threat model must name what the gate defends, what it does NOT defend: any local process can mint as a loopback peer; LAN clients via Traefik with a forged Host because sync-sources/templates/traefik/docker-compose.yml publishes 80/443/8080 on all interfaces, tracked in PAN-4299 with mitigation 'publish on 127.0.0.1'; tunnel exposure needs PAN-2351 require_token_mint). In docs/DASHBOARD-ARCHITECTURE.md replace the '**Two WebSocket endpoints:**' block with '**WebSocket endpoints:**' listing /ws/rpc, /ws/terminal, /ws/voice, /ws/autopreso plus the one-sentence authorizeDashboardUpgrade pointer to DASHBOARD-AUTH.md; add the 'unauthorized' row to the connection-phase table and change the precedence line to restarting > unauthorized > unreachable > delayed > live."
+        },
+        "items": [
+          {
+            "id": "auth-docs.ac1",
+            "title": "docs/DASHBOARD-AUTH.md contains a 'Threat model' section that names PAN-4299 and the 127.0.0.1 Traefik port-publishing mitigation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-docs.ac2",
+            "title": "docs/DASHBOARD-AUTH.md 'WebSocket gate' section lists all four endpoints and states that authorizeDashboardUpgrade returns 403, 503, then 401 in that order and never consults isLoopbackPeer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auth-docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md lists four WebSocket endpoints and its connection-phase table contains an 'unauthorized' row with precedence restarting > unauthorized > unreachable > delayed > live",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-ws-auth-spec",
+        "title": "Playwright spec proving the gate on an isolated dashboard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:36:39Z",
+        "metadata": {
+          "issueLabel": "pan-1166",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-1166-ws-auth.spec.ts"
+          ],
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-1166-ws-auth.spec.ts"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "all four pan-1166-ws-auth.spec.ts journeys pass"
+          ],
+          "traces": [
+            "NFR-1",
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W12. Add src/dashboard/frontend/tests/pan-1166-ws-auth.spec.ts using startIsolatedDashboard from ./fixtures/isolated-dashboard.js (pattern: tests/pan-4279-degraded-mode.spec.ts; never the live :3011 dashboard). Run 'npm run build' first. Four journeys, each in a fresh browser context: (1) zero-step bootstrap — load with no hash, context.cookies() has overdeck_session, no unauthorized banner, take and inspect a screenshot; (2) gate present — Node ws client upgrades /ws/terminal?session=x, /ws/rpc, /ws/voice, /ws/autopreso with the fixture Origin and no cookie, each gets unexpected-response 401; (3) cookie accepted — same upgrades with the journey-1 cookie are accepted; (4) loud 401 — route.fulfill({ status: 401 }) on POST **/api/dashboard/session shows data-phase=\"unauthorized\" or the first-load heading 'Dashboard session could not be established'. Implementation checkpoint (PRD W12): if a workspace dev stack with VITE_API_URL on a different host is available, verify a terminal connects there; if it does not, record the host pair in the PR description and file a follow-up issue — do not widen cookie attributes."
+        },
+        "items": [
+          {
+            "id": "e2e-ws-auth-spec.ac1",
+            "title": "Given an isolated dashboard loaded with no URL hash, the browser context holds an overdeck_session cookie and no unauthorized banner renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-ws-auth-spec.ac2",
+            "title": "Given no cookie, Node upgrades to /ws/terminal, /ws/rpc, /ws/voice and /ws/autopreso each receive HTTP 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-ws-auth-spec.ac3",
+            "title": "Given the browser's overdeck_session cookie, the same four upgrades are accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-ws-auth-spec.ac4",
+            "title": "Given the mint route is fulfilled with 401, the page renders data-phase=\"unauthorized\" or the heading 'Dashboard session could not be established'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ws-auth-helper",
+        "to": "ws-terminal-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-auth-helper",
+        "to": "ws-rpc-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-auth-helper",
+        "to": "ws-voice-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-auth-helper",
+        "to": "ws-autopreso-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "unauthorized-phase",
+        "to": "session-mint-loud-401",
+        "type": "blocks"
+      },
+      {
+        "from": "session-mint-loud-401",
+        "to": "xterminal-mint-first",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-auth-helper",
+        "to": "auth-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "unauthorized-phase",
+        "to": "auth-docs",
+        "type": "informs"
+      },
+      {
+        "from": "ws-terminal-gate",
+        "to": "e2e-ws-auth-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-rpc-gate",
+        "to": "e2e-ws-auth-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-voice-gate",
+        "to": "e2e-ws-auth-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-autopreso-gate",
+        "to": "e2e-ws-auth-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "session-mint-loud-401",
+        "to": "e2e-ws-auth-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "xterminal-mint-first",
+        "to": "e2e-ws-auth-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-hook-mint-first",
+        "to": "e2e-ws-auth-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-hook-mint-first",
+        "to": "e2e-ws-auth-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-rpc-gate",
+        "to": "xterminal-mint-first",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "27 files across 4 subsystems (src/dashboard, scripts, docs x2). Issue acceptance criterion #4 forbids a half-gated state, so all four WebSocket endpoint gates must ship in one change, and the client mint-before-connect ordering (wsTransport, XTerminal, voice/autopreso hooks) must ship with them or terminals break the moment the gate is on. Splitting into sibling issues would leave main either half-gated or with a gate the client cannot pass. 12 of the 27 files are test files (9 new, one per slice).",
+      "canonicalFilename": "2026-09-28-PAN-1166-re-introduce-ws-terminal-auth-gate-with-a-working-bootstrap-path.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
