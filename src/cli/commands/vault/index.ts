@@ -30,4 +30,18 @@ export function registerVaultCommands(program: Command): void {
     .description('Show backend, this machine, owned records, last sync and the machine list')
     .option('--json', 'Output in JSON format')
     .action(lazyAction(() => import('./status.js'), 'statusCommand'));
+
+  vault
+    .command('save [session-id-or-path]')
+    .description('Settle one transcript (by session id or path) or many into the vault')
+    .option('--all', 'Settle every discovered transcript')
+    .option('--since <date>', 'With --all: only transcripts modified on or after this date')
+    .option('--harness <harness>', 'With --all: only this harness (claude-code, codex, ...)')
+    .option('--hook', 'Claude Code Stop-hook mode: read {session_id, transcript_path} JSON from stdin, print nothing, exit 0')
+    .action(lazyAction(() => import('./save.js'), 'saveCommand'));
+
+  vault
+    .command('sync')
+    .description('Settle owned transcripts that grew, register this machine and refresh the list')
+    .action(lazyAction(() => import('./sync.js'), 'syncCommand'));
 }
