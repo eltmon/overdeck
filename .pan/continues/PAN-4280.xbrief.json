@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:12:47.116Z",
+  "updated": "2026-09-28T01:12:59.862Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "pending-terminal.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T01:12:47.116Z"
+    },
+    "pending-terminal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:12:59.861Z"
     }
   }
 }
