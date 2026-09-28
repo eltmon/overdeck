@@ -10,8 +10,7 @@
  * the card (D4).
  */
 import { laneActivityOf, type LaneActivity } from '@overdeck/contracts';
-import type { ConversationFeedRow } from './useConversationFeed';
-import type { GauntletRunLane, GauntletRunSessionFeedEntry } from './types';
+import type { ConversationFeedRow, GauntletRunLane, GauntletRunSessionFeedEntry } from './types';
 
 type LaneRole = GauntletRunLane['role'];
 

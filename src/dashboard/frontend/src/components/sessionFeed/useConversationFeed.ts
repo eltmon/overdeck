@@ -2,48 +2,19 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getHarnessBehavior,
+  isSingletonConversation,
   type HarnessFeedKind,
   type IssueId,
 } from '@overdeck/contracts';
-import type { ConversationSessionFeedEntry } from './types';
+import { groupGauntletRuns, isLaneRow } from './gauntletRunEntries';
+import type { ConversationFeedRow, ConversationSessionFeedEntry, GauntletRunSessionFeedEntry } from './types';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 
-export interface ConversationFeedRow {
-  id: number;
-  name: string;
-  createdAt: string;
-  lastAttachedAt: string | null;
-  /** PAN-1556: transcript JSONL mtime — bumps on every message, unlike lastAttachedAt. */
-  lastActivityAt?: string | null;
-  issueId: string | null;
-  cwd?: string | null;
-  title?: string | null;
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | null;
-  archivedAt?: string | null;
-  messageCount?: number;
-  status?: 'active' | 'ended' | null;
-  endedAt?: string | null;
-  sessionAlive?: boolean;
-  isWorking?: boolean;
-  pendingInputCount?: number;
-  /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
-  projectKey?: string | null;
-  spawnError?: string | null;
-  /** PAN-4223: legacy id of the launching (lane) or source (successor) conversation. Null = root. */
-  parentConversationId?: number | null;
-  parentConversationName?: string | null;
-  /** PAN-4223: gauntlet lane facts; null unless the row is a lane. */
-  gauntletRun?: string | null;
-  laneKey?: string | null;
-  laneRole?: 'builder' | 'critic' | 'verifier' | 'play' | 'orchestrator' | null;
-  laneIteration?: number | null;
-  laneReport?: { seq: number; at: string; status: 'done' | 'blocked' | 'failed'; verdict?: string | null } | null;
-  /** PAN-4223 D26: legacy id of the builder row a critic or verifier lane judges. */
-  criticOfConversationId?: number | null;
-}
+export type { ConversationFeedRow } from './types';
+
 
 export interface UseConversationFeedResult {
-  entries: ConversationSessionFeedEntry[];
+  entries: Array<ConversationSessionFeedEntry | GauntletRunSessionFeedEntry>;
   isLoading: boolean;
   error: Error | null;
 }
@@ -83,10 +54,19 @@ export function mapConversationToFeedEntry(conversation: ConversationFeedRow): C
   };
 }
 
-export function mapConversationsToFeedEntries(conversations: readonly ConversationFeedRow[]): ConversationSessionFeedEntry[] {
-  return conversations
-    .filter((conversation) => conversation.archivedAt == null)
-    .map(mapConversationToFeedEntry);
+/**
+ * PAN-4301: archived rows and singleton runners (FR-4) never render; lane rows
+ * never render as conversation cards but fold into one run card per
+ * (projectKey, gauntletRun) (FR-6).
+ */
+export function mapConversationsToFeedEntries(
+  conversations: readonly ConversationFeedRow[],
+  now: number = Date.now(),
+): Array<ConversationSessionFeedEntry | GauntletRunSessionFeedEntry> {
+  const visible = conversations.filter((row) => row.archivedAt == null && !isSingletonConversation(row));
+  const lanes = visible.filter(isLaneRow);
+  const roots = visible.filter((row) => !isLaneRow(row));
+  return [...roots.map(mapConversationToFeedEntry), ...groupGauntletRuns(lanes, visible, now)];
 }
 
 export function useConversationFeed(): UseConversationFeedResult {
