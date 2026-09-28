@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ensureDashboardSession } from '../lib/wsTransport';
 
 export type AutoPresoMode = 'staging' | 'live';
 export type WarmupStatus = 'idle' | 'warming' | 'ready' | 'failed';
@@ -51,26 +52,39 @@ export function useAutoPresoWebSocket() {
 
   const connectWhiteboard = useCallback(() => {
     whiteboardSocketRef.current?.close();
-    const socket = new WebSocket(websocketUrl('/ws/autopreso'));
-    whiteboardSocketRef.current = socket;
-
-    socket.onopen = () => {
-      reconnectAttemptRef.current = 0;
-    };
-    socket.onmessage = (event) => {
-      const message = JSON.parse(String(event.data)) as AutoPresoMessage;
-      if (message.type === 'whiteboard:snapshot' || message.type === 'whiteboard:update') {
-        if (message.elements) setElements(message.elements);
-        if (message.mode) setMode(message.mode);
-        if (message.warmupStatus) setWarmupStatus(message.warmupStatus);
+    // The upgrade requires the session cookie (PAN-1166 ws-auth.ts gate), so the
+    // mint must complete before the socket opens. On any mint rejection, do not
+    // open the socket and do not retry — a later manual retry (the connection
+    // store's Retry action) re-mints and can call connectWhiteboard() again.
+    void (async () => {
+      try {
+        await ensureDashboardSession();
+      } catch {
+        return;
       }
-    };
-    socket.onclose = () => {
-      if (!shouldReconnectRef.current || whiteboardSocketRef.current !== socket) return;
-      const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 10000);
-      reconnectAttemptRef.current += 1;
-      reconnectTimerRef.current = window.setTimeout(connectWhiteboard, delay);
-    };
+      if (!shouldReconnectRef.current) return;
+
+      const socket = new WebSocket(websocketUrl('/ws/autopreso'));
+      whiteboardSocketRef.current = socket;
+
+      socket.onopen = () => {
+        reconnectAttemptRef.current = 0;
+      };
+      socket.onmessage = (event) => {
+        const message = JSON.parse(String(event.data)) as AutoPresoMessage;
+        if (message.type === 'whiteboard:snapshot' || message.type === 'whiteboard:update') {
+          if (message.elements) setElements(message.elements);
+          if (message.mode) setMode(message.mode);
+          if (message.warmupStatus) setWarmupStatus(message.warmupStatus);
+        }
+      };
+      socket.onclose = () => {
+        if (!shouldReconnectRef.current || whiteboardSocketRef.current !== socket) return;
+        const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 10000);
+        reconnectAttemptRef.current += 1;
+        reconnectTimerRef.current = window.setTimeout(connectWhiteboard, delay);
+      };
+    })();
   }, []);
 
   const closeVoiceResources = useCallback((closeSocket: boolean) => {
@@ -132,6 +146,9 @@ export function useAutoPresoWebSocket() {
     let socket: WebSocket | null = null;
 
     try {
+      // Mint before prompting for the microphone, so a refused session never
+      // triggers a getUserMedia permission prompt the socket can't use anyway.
+      await ensureDashboardSession();
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const AudioContextCtor = window.AudioContext;
       audioContext = new AudioContextCtor({ sampleRate: 24000 });
