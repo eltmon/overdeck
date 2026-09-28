@@ -59,6 +59,8 @@ export const DerivedPrState = Schema.Struct({
   checks: PrChecksState,
   /** Forge mergeability. `null` when the forge has not computed it yet. */
   mergeable: Schema.NullOr(Schema.Boolean),
+  /** Present only when true; survives state: closed (PAN-4290). */
+  merged: Schema.optional(Schema.Boolean),
 })
 export type DerivedPrState = typeof DerivedPrState.Type
 
