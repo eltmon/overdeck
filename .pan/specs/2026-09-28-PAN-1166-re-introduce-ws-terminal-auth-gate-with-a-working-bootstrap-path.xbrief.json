@@ -4,17 +4,17 @@
     "created": "2026-09-28T12:36:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1166: Re-introduce /ws/terminal auth gate with a working bootstrap path",
-    "updated": "2026-09-28T12:41:48.586Z"
+    "updated": "2026-09-28T12:43:51.694Z"
   },
   "plan": {
     "id": "pan-1166",
     "title": "Re-introduce /ws/terminal auth gate with a working bootstrap path",
-    "status": "proposed",
+    "status": "running",
     "uid": "6efa3987-9478-49ac-9c0e-3a914193590b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-28T12:36:39Z",
-    "updated": "2026-09-28T12:41:48.586Z",
+    "updated": "2026-09-28T12:43:51.694Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1166",
