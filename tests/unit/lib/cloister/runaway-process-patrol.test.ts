@@ -282,3 +282,18 @@ describe('createRunawayPatrol (PAN-4311 AC-4, AC-5)', () => {
     expect(patrol.snapshot()!.runaways).toEqual([expect.objectContaining({ pgid: 402, reason: 'outlived-tool-call' })]);
   });
 });
+
+describe('dashboard wiring (PAN-4311 runaway-wiring.ac4)', () => {
+  it('starts the patrol beside the resources snapshot service and stops it on the same shutdown path', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { fileURLToPath } = await import('node:url');
+    const source = await readFile(
+      fileURLToPath(new URL('../../../../src/dashboard/server/main.ts', import.meta.url)),
+      'utf8',
+    );
+
+    expect(source).toContain("import { startRunawayPatrol, stopRunawayPatrol } from '../../lib/cloister/runaway-process-patrol.js';");
+    expect(source).toMatch(/const stopResourcesSnapshot = startResourcesSnapshotService\(\);[\s\S]{0,200}startRunawayPatrol\(\);/);
+    expect(source).toMatch(/stopResourcesSnapshot\(\);\s*stopRunawayPatrol\(\);/);
+  });
+});
