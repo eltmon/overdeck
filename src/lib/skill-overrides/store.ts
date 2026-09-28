@@ -11,16 +11,16 @@
  * the skill catalog and reject core skills.
  */
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { isMap, parse as parseYaml, parseDocument, stringify as stringifyYaml, type Document } from 'yaml';
 import { getGlobalConfigPath } from '../config-yaml/load.js';
 import { commitPlanArtifacts, pushPlanArtifacts } from '../overdeck/plan-artifact-commit.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { resolvePlanHome } from '../pan-dir/paths.js';
 import {
   listProjectsAsync,
+  resolveInfraRepo,
   resolveProjectFromIssueSync,
   updateProjectsConfigAsync,
   type ProjectConfig,
@@ -114,6 +114,19 @@ export function issueSkillOverridesPath(planHome: string, issueId: string): stri
   return join(planHome, PAN_DIRNAME, 'skill-overrides', `${issueId.toUpperCase()}.yaml`);
 }
 
+/**
+ * The checkout holding a registered project's `.pan/` — what `resolvePlanHome`
+ * returns for the project root, computed from the config without re-reading
+ * projects.yaml.
+ */
+function planHomeFor(project: ProjectConfig): string {
+  try {
+    return resolveInfraRepo(project, resolve(project.path)).repoPath;
+  } catch {
+    return resolve(project.path);
+  }
+}
+
 /** The registered project that owns an issue, with its key. */
 async function projectForIssue(issueId: string): Promise<{ projectKey: string; project: ProjectConfig } | null> {
   const resolved = resolveProjectFromIssueSync(issueId);
@@ -130,7 +143,7 @@ async function readIssueFile(path: string): Promise<Record<string, boolean>> {
 export async function readIssueSkillOverrides(issueId: string): Promise<Record<string, boolean>> {
   const owner = await projectForIssue(issueId);
   if (!owner) return {};
-  return readIssueFile(issueSkillOverridesPath(resolvePlanHome(owner.project.path), issueId));
+  return readIssueFile(issueSkillOverridesPath(planHomeFor(owner.project), issueId));
 }
 
 /**
@@ -180,6 +193,43 @@ export async function listSkillStates(ctx: { projectKey?: string; issueId?: stri
     loadSkillOverrideLayers({ projectKey, issueId }),
   ]);
   return { project: projectKey ?? null, issue: issueId ?? null, skills: resolveSkillStates(catalog, layers) };
+}
+
+export interface LowerLevelOverrides {
+  projects: string[];
+  issues: string[];
+}
+
+/**
+ * For each skill, the projects and issues that override it (either way).
+ * Answers "why is this off for my agent" on the global page.
+ */
+export async function listLowerLevelOverrides(): Promise<Record<string, LowerLevelOverrides>> {
+  const out: Record<string, LowerLevelOverrides> = {};
+  const entry = (name: string): LowerLevelOverrides => (out[name] ??= { projects: [], issues: [] });
+  const planHomes = new Set<string>();
+  for (const { key, config } of await listProjectsAsync()) {
+    if (!config.path) continue;
+    for (const name of Object.keys(booleanEntries((config as ProjectWithSkillOverrides).skill_overrides))) {
+      entry(name).projects.push(key);
+    }
+    planHomes.add(planHomeFor(config));
+  }
+  for (const planHome of planHomes) {
+    const dir = join(planHome, PAN_DIRNAME, 'skill-overrides');
+    let files: string[];
+    try {
+      files = await readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const file of files.filter(name => name.endsWith('.yaml')).sort()) {
+      const issue = file.slice(0, -'.yaml'.length);
+      for (const name of Object.keys(await readIssueFile(join(dir, file)))) entry(name).issues.push(issue);
+    }
+  }
+  for (const value of Object.values(out)) value.projects.sort();
+  return out;
 }
 
 // ── writes ───────────────────────────────────────────────────────────────
@@ -295,7 +345,7 @@ async function setIssue(issueId: string, skill: string, enabled: boolean | null)
   const issue = issueId.toUpperCase();
   const owner = await projectForIssue(issue);
   if (!owner) throw new SkillOverrideError('unknown-issue', `no registered project owns issue ${issue}`);
-  const planHome = resolvePlanHome(owner.project.path);
+  const planHome = planHomeFor(owner.project);
   const path = issueSkillOverridesPath(planHome, issue);
   const skills = await readIssueFile(path);
   const had = Object.prototype.hasOwnProperty.call(skills, skill);

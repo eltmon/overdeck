@@ -36,6 +36,7 @@ vi.mock('../../overdeck/plan-artifact-commit.js', async importOriginal => ({
 import { invalidateProjectsConfigCache } from '../../projects.js';
 import {
   issueSkillOverridesPath,
+  listLowerLevelOverrides,
   loadSkillOverrideLayers,
   parseSkillOverrideUpdate,
   readGlobalSkillOverrides,
@@ -169,6 +170,19 @@ describe('issue overrides', () => {
 
   it('rejects an issue no project owns', async () => {
     await expectCode(setSkillOverride({ level: 'issue', issueId: 'ZZZ-1', skill: 'grilling', enabled: false }), 'unknown-issue');
+  });
+});
+
+describe('listLowerLevelOverrides', () => {
+  it('reports the projects and issues that override each skill', async () => {
+    await setSkillOverride({ level: 'project', projectKey: 'tst', skill: 'grilling', enabled: true });
+    await setSkillOverride({ level: 'issue', issueId: 'TST-2', skill: 'grilling', enabled: false });
+    await setSkillOverride({ level: 'issue', issueId: 'TST-1', skill: 'codebase-design', enabled: false });
+
+    expect(await listLowerLevelOverrides()).toEqual({
+      grilling: { projects: ['tst'], issues: ['TST-2'] },
+      'codebase-design': { projects: [], issues: ['TST-1'] },
+    });
   });
 });
 
