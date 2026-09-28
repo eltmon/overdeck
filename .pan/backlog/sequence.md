@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T13:42:00.018251Z · model: claude-opus-5-5 · open: 789_
+_Last sequenced: 2026-09-28T13:52:27.354410Z · model: claude-opus-5-5 · open: 789_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1104,7 +1104,7 @@ Every path that starts a new Claude session for an existing agent must repoint s
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T13:42:00.018251Z",
+  "generatedAt": "2026-09-28T13:52:27.354410Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 789,
