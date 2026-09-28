@@ -35,7 +35,7 @@ const KNOWN_CALL_SITES = new Set([
   'dashboard/server/routes/agents/lifecycle-restart.ts|console.log(`[agents/resume] ${id} dispatching resumeAgent() with opts=${JSON.stringify(resumeOpts)}`);',
   'dashboard/server/routes/agents/lifecycle-restart.ts|const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));',
   'dashboard/server/routes/agents/lifecycle-stop.ts|.then(({ resumeAgent }) => resumeAgent(id))',
-  'dashboard/server/routes/agents/messaging.ts|await messageAgent(id, message, \'dashboard:user-message\');',
+  'dashboard/server/routes/agents/messaging.ts|const outcome = await messageAgent(id, message, \'dashboard:user-message\');',
   'dashboard/server/routes/agents/messaging.ts|yield* Effect.promise(() => messageAgent(id, pokeMsg));',
   // PAN-3960: a live planner's user message goes through the backend-aware
   // delivery door (it was a raw tmux sendKeys, which cannot reach a Herdr pane).
@@ -133,6 +133,11 @@ const mocks = vi.hoisted(() => ({
   // implementation; the caller-escalation fixtures substitute a failure.
   messageAgentDispatch: vi.fn(),
   realMessageAgent: undefined as undefined | ((...args: unknown[]) => Promise<unknown>),
+}));
+
+// PAN-4268: the selector check reads a real pane; these fixtures have none.
+vi.mock('../../../../src/lib/agents/input-target.js', () => ({
+  ensureMainInputTarget: vi.fn(async () => ({ ok: true, check: 'no-selector' })),
 }));
 
 vi.mock('../../../../src/lib/agents/messaging.js', async (importOriginal) => {
@@ -363,6 +368,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
         delivered: true,
         queuedToMail: true,
         confirmed: true,
+        inputTarget: 'main',
       });
     });
   });
@@ -483,6 +489,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
         delivered: true,
         queuedToMail: true,
         confirmed: true,
+        inputTarget: 'main',
       });
     });
   });

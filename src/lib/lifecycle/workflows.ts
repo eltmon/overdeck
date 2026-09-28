@@ -41,7 +41,7 @@ import {
   resolvePipelineTelemetryContext,
   type PipelineTelemetryContext,
 } from '../telemetry/pipeline.js';
-import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, buildResidueDodGate, DOD_ROWS, type DodGateResult, type DodRowId, type DodRowResult } from './dod.js';
+import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, buildResidueDodGate, describeTeardownObserved, DOD_ROWS, type DodGateResult, type DodRowId, type DodRowResult } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -332,9 +332,11 @@ export function closeOut(
       }
     });
     const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
+    const removeWorkspace = closeOutConfig?.remove_workspace ?? true;
+    const deleteBranches = closeOutConfig?.delete_feature_branch ?? false;
     const teardownSteps = yield* teardownWorkspace(ctx, {
-      deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
-      deleteBranches: closeOutConfig?.delete_feature_branch ?? false,
+      deleteWorkspace: removeWorkspace,
+      deleteBranches,
     });
     allSteps.push(...teardownSteps);
     if (hasBlockingFailure(teardownSteps)) {
@@ -346,7 +348,7 @@ export function closeOut(
     dodGate.rows.push({
       ...teardownDef,
       status: 'pass',
-      observed: teardownSteps.flatMap(step => step.details ?? []).join('; ') || 'close-out teardown completed',
+      observed: describeTeardownObserved(teardownSteps, { removeWorkspace, deleteBranches }),
     });
 
     // Update the gate with verified residue evidence before it is published.

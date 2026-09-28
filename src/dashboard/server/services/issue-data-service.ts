@@ -28,6 +28,8 @@ import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/xbrief/io.js';
 import type { XBriefDocument } from '../../../lib/xbrief/types.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
+import { withGitHubCaller } from '../../../lib/github-quota/caller-context.js';
+import { patRestPauseDelayMs, recordOctokitFailure, recordOctokitPage } from '../../../lib/github-quota/rest-meter.js';
 
 /**
  * Compute task progress counts from a cached plan document.
@@ -694,6 +696,8 @@ export class IssueDataService {
       console.error(`[IssueDataService] Cache read failed for ${tracker}; falling back to default interval:`, err.message);
       delayMs = intervals.default;
     }
+    // PAN-4264: while the PAT REST bucket is paused, the GitHub poll waits for the pause end.
+    if (tracker === 'github') delayMs = Math.max(delayMs, patRestPauseDelayMs());
     state.currentInterval = delayMs;
 
     state.timer = setTimeout(async () => {
@@ -1064,6 +1068,12 @@ export class IssueDataService {
   // ---------------------------------------------------------------
 
   private async pollGitHub(): Promise<void> {
+    // PAN-4264: the issue poller is non-essential — skip GitHub during a PAT REST pause.
+    if (patRestPauseDelayMs() > 0) return;
+    return withGitHubCaller('issue-poller', () => this.pollGitHubRepos());
+  }
+
+  private async pollGitHubRepos(): Promise<void> {
     const config = getGitHubConfig();
     if (!config) {
       this.trackers.github.lastFetchedIssues = [];
@@ -1149,6 +1159,7 @@ export class IssueDataService {
       // Use paginate to fetch ALL pages (not just the first 100)
       let newEtag: string | undefined;
       const allData = await octokit.paginate(octokit.issues.listForRepo, requestParams, (response) => {
+        void recordOctokitPage('issue-poller', response.headers);
         // Extract rate limit from each response
         const remaining = parseInt(response.headers['x-ratelimit-remaining'] as string);
         const total = parseInt(response.headers['x-ratelimit-limit'] as string);
@@ -1236,6 +1247,7 @@ export class IssueDataService {
           return issue;
         });
       }
+      await recordOctokitFailure('issue-poller', err);
       throw err;
     }
   }

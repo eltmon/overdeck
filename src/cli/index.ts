@@ -1185,11 +1185,16 @@ program
   .action(lazyAction(() => import('./commands/system-health.js'), 'systemHealthCommand'));
 
 // Doctor command
-program
+const doctorCmd = program
   .command('doctor')
   .description('Check system health and dependencies')
   .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
   .action(lazyAction(() => import('./commands/doctor.js'), 'doctorCommand'));
+doctorCmd
+  .command('github-quota')
+  .description('Show GitHub API quota use per caller, active pauses, and skipped projects')
+  .option('--json', 'Print JSON')
+  .action(lazyAction(() => import('./commands/doctor-github-quota.js'), 'doctorGithubQuotaCommand'));
 
 await groups.register('resources');
 

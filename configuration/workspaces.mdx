@@ -103,6 +103,31 @@ Issue workspaces show none of these: Overdeck's pipeline owns their worktree.
 Deleting a workspace and purging its memory stay CLI-only
 (`pan workspace destroy`), behind their typed confirmations.
 
+## Cleaning up after close-out
+
+Settings → Close-out controls what `pan close <id>` and the dashboard's Close
+Out button do to an issue's workspace and feature branch once its PR has
+merged: **Remove the workspace** (on by default) and **Delete the feature
+branch** (off by default). Two more controls, **Close out merged issues
+automatically** and its delay, render disabled — automatic close-out was
+removed and nothing reads those keys.
+
+<ThemedImage
+  light="/images/dashboard/close-out-settings-light.png"
+  dark="/images/dashboard/close-out-settings-dark.png"
+  alt="Settings Close-out section with the four controls, the closed-issue disk line, and the Clean up now button"
+/>
+
+Below the workspace toggle, the section reports how many closed issues still
+have a workspace on disk and its total size. **Clean up now** runs `pan
+workspace destroy` (which also deletes the local branch) for every closed
+issue whose branch is merged and whose workspace has no uncommitted changes;
+polyrepo projects are counted but skipped, with the reason shown so you can
+destroy them by hand. This is the backstop for when the background reaper
+that normally clears merged workspaces cannot run — for example while
+automatic dispatch is globally paused or GitHub reads are rate-limited — so
+closed-issue workspaces do not silently pile up on disk.
+
 ## CLI
 
 ```bash

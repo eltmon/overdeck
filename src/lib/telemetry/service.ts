@@ -6,6 +6,7 @@ import type { TelemetryEventName, TelemetryPropertiesFor } from '@overdeck/contr
 import { packageRoot } from '../paths.js';
 import { resolveTelemetryEnabled } from './config.js';
 import { getOrCreateInstallId } from './install-id.js';
+import { getOperatorHashIfEnabled } from './operator-hash.js';
 
 const DEFAULT_POSTHOG_API_KEY = 'phc_pwvHeDutnCmAm8tZh5hRaQ7mMoho3T9gb4t4qRjK2Zjt';
 const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
@@ -72,6 +73,7 @@ export class AnalyticsService {
     if (!client) return;
 
     try {
+      const operatorHash = getOperatorHashIfEnabled();
       client.capture({
         distinctId: getOrCreateInstallId(),
         event,
@@ -82,6 +84,8 @@ export class AnalyticsService {
           arch: process.arch,
           overdeckVersion: getOverdeckVersion(),
           clientType: this.clientType,
+          // PAN-4264: opt-in pseudonymous grouping of one operator's installs.
+          ...(operatorHash ? { operatorHash } : {}),
         },
       });
     } catch {
@@ -98,6 +102,7 @@ export class AnalyticsService {
     sanitized.stack = undefined;
 
     try {
+      const operatorHash = getOperatorHashIfEnabled();
       client.captureException(
         sanitized,
         getOrCreateInstallId(),
@@ -108,6 +113,7 @@ export class AnalyticsService {
           arch: process.arch,
           overdeckVersion: getOverdeckVersion(),
           clientType: this.clientType,
+          ...(operatorHash ? { operatorHash } : {}),
         },
       );
     } catch {

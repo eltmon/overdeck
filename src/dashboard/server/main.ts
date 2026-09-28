@@ -15,8 +15,9 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
-  enqueueProjectsResourceRefresh,
+  enqueueProjectsResourceRefreshStaggered,
   getProjectResourceRefreshQueueState,
+  PROJECT_RESOURCE_BOOT_STAGGER_WINDOW_MS,
   startProjectResourceConvergence,
   stopProjectResourceRefreshQueue,
   whenProjectResourceRefreshIdle,
@@ -62,6 +63,10 @@ import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { startConversationRescanScheduler, stopConversationRescanScheduler } from './services/conversation-rescan-scheduler.js';
 import { startPullRequestSyncService, stopPullRequestSyncService } from './services/pull-request-sync-service.js';
+import { startGitHubQuotaSampler } from '../../lib/github-quota/sampler.js';
+import { startGitHubQuotaPublisher } from './services/github-quota.js';
+import { registerGitHubRateLimitedTelemetry, startGitHubQuotaTelemetry } from '../../lib/telemetry/github-quota-telemetry.js';
+import { ensureOperatorHash } from '../../lib/telemetry/operator-hash.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { startSyncAutoService, stopSyncAutoService } from './services/sync-auto-service.js';
@@ -595,6 +600,16 @@ if (!isPeerDashboard) {
   console.log('[pr-sync] started (boot +30s, 60s sweep)');
 }
 
+// PAN-4264: sample GitHub /rate_limit into the quota ledger (boot +2 min, then every 5 min)
+// and publish the quota snapshot to the read model every 30 s when it changes.
+const stopGitHubQuotaSampler = isPeerDashboard ? () => undefined : startGitHubQuotaSampler();
+const stopGitHubQuotaPublisher = isPeerDashboard ? () => undefined : startGitHubQuotaPublisher();
+// PAN-4264: hourly bucketed github_quota_sample, and a throttled github_rate_limited per refusal.
+const stopGitHubQuotaTelemetry = isPeerDashboard ? () => undefined : startGitHubQuotaTelemetry();
+const stopGitHubRateLimitedTelemetry = registerGitHubRateLimitedTelemetry();
+// PAN-4264: derive the opt-in operatorHash once, when operator grouping is on.
+void ensureOperatorHash();
+
 let stopResourceRefreshServices = () => undefined;
 
 void (async () => {
@@ -616,10 +631,12 @@ void (async () => {
     console.log('[overdeck] Project resource refresh queue and resources snapshot service started');
 
     const warmStart = Date.now();
-    enqueueProjectsResourceRefresh(
+    // PAN-4264: one project at a time over 60 s, not one burst of GitHub calls.
+    await enqueueProjectsResourceRefreshStaggered(
       listProjectsSync().map((entry) => entry.config),
       'boot-warm',
-    );
+      PROJECT_RESOURCE_BOOT_STAGGER_WINDOW_MS,
+    ).done;
     await whenProjectResourceRefreshIdle();
     const queueState = getProjectResourceRefreshQueueState();
     if (queueState.lastError) {
@@ -741,6 +758,10 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   await stopConversationRescanScheduler();
   stopPullRequestSyncService();
+  stopGitHubQuotaSampler();
+  stopGitHubQuotaPublisher();
+  stopGitHubQuotaTelemetry();
+  stopGitHubRateLimitedTelemetry();
   closeConversationSearchService();
   closeMemoryFtsDatabases();
   process.exit(0);

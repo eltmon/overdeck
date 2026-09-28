@@ -19,14 +19,11 @@
  * `available: false` with a reason — never an error.
  */
 
-import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import { listProjectsSync, type ProjectConfig } from '../projects.js';
-
-const execFileAsync = promisify(execFile);
+import { projectCiGhApi } from '../ci/project-ci-github.js';
 
 export interface ReleaseWorkflowJob {
   name: string;
@@ -96,14 +93,8 @@ function inferReleaseWorkflow(config: ProjectConfig): string | null {
 
 type GhApi = (path: string) => Promise<unknown>;
 
-const defaultGhApi: GhApi = async (path) => {
-  const { stdout } = await execFileAsync(
-    'gh',
-    ['api', path, '-H', 'Accept: application/vnd.github+json'],
-    { encoding: 'utf-8', timeout: 15_000, maxBuffer: 8 * 1024 * 1024 },
-  );
-  return JSON.parse(stdout);
-};
+/** PAN-4264: the same metered `gh api` read as CI repair (caller ci-repair). */
+const defaultGhApi: GhApi = projectCiGhApi;
 
 type FetchJson = (url: string) => Promise<unknown>;
 

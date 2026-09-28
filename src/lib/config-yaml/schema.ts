@@ -457,7 +457,18 @@ export interface IssuesConfig {
   closed_window_days?: number;
 }
 
-export interface TelemetryConfig { enabled?: boolean }
+export interface TelemetryConfig {
+  enabled?: boolean;
+  /**
+   * PAN-4264: opt in to a pseudonymous `operatorHash` on every event, so one
+   * operator's installs can be grouped (a salted hash of the GitHub user id).
+   */
+  operator_grouping?: boolean;
+  /** PAN-4264: PostHog personal API key for `pan doctor github-quota`'s remote view. */
+  posthog_read_key?: string;
+  /** PAN-4264: PostHog project id for the doctor remote view. */
+  posthog_project_id?: string;
+}
 
 /**
  * Dashboard UI behavior. Two independent theme axes live here:
@@ -989,7 +1000,7 @@ export interface NormalizedConfig {
   };
 
   /** Anonymous product telemetry configuration, normalised (always defined). */
-  telemetry: Required<TelemetryConfig>;
+  telemetry: Required<Pick<TelemetryConfig, 'enabled' | 'operator_grouping'>> & Pick<TelemetryConfig, 'posthog_read_key' | 'posthog_project_id'>;
 
   /** Dashboard UI behavior, normalised (always defined; null when unset). */
   ui: { openInEditorCommand: string | null; theme: DesignLanguage };

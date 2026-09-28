@@ -29,3 +29,19 @@ export interface CloisterConfig {
   };
   [key: string]: unknown;
 }
+
+/** Mirrors src/lib/cloister/close-out-settings.ts's CloseOutSettingsView (PAN-4283). */
+export type CloseOutSource = 'default' | 'cloister.toml';
+
+export interface CloseOutSettingView<T> {
+  value: T;
+  source: CloseOutSource;
+  inert?: true;
+}
+
+export interface CloseOutSettingsView {
+  remove_workspace: CloseOutSettingView<boolean>;
+  delete_feature_branch: CloseOutSettingView<boolean>;
+  auto: CloseOutSettingView<boolean>;
+  auto_delay_minutes: CloseOutSettingView<number>;
+}

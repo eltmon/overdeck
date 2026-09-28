@@ -1,0 +1,215 @@
+{
+  "version": "1",
+  "issueId": "PAN-4268",
+  "created": "2026-09-27T15:53:42.673Z",
+  "updated": "2026-09-27T16:45:28.518Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "selector-parser": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T15:53:42.673Z",
+      "doneAt": "2026-09-27T15:55:43.654Z"
+    },
+    "pane-key-sender": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T15:55:53.071Z",
+      "doneAt": "2026-09-27T15:56:51.319Z"
+    },
+    "ensure-main": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T15:56:59.599Z",
+      "doneAt": "2026-09-27T16:01:44.846Z"
+    },
+    "composer-route-ensure": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T16:01:49.821Z",
+      "doneAt": "2026-09-27T16:03:41.260Z"
+    },
+    "message-agent-ensure": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T16:03:46.934Z",
+      "doneAt": "2026-09-27T16:07:43.731Z"
+    },
+    "tell-main-output": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T16:07:48.115Z",
+      "doneAt": "2026-09-27T16:08:36.183Z"
+    },
+    "read-model-input-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T16:08:41.458Z",
+      "doneAt": "2026-09-27T16:10:39.676Z"
+    },
+    "composer-notice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T16:10:44.955Z",
+      "doneAt": "2026-09-27T16:18:41.852Z"
+    },
+    "docs-selector-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4268",
+      "claimedAt": "2026-09-27T16:18:46.748Z",
+      "doneAt": "2026-09-27T16:20:12.500Z"
+    },
+    "selector-parser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:39:05.933Z"
+    },
+    "selector-parser.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:39:16.368Z"
+    },
+    "selector-parser.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:39:26.310Z"
+    },
+    "selector-parser.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:39:36.256Z"
+    },
+    "selector-parser.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:39:46.214Z"
+    },
+    "pane-key-sender.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:39:57.248Z"
+    },
+    "pane-key-sender.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:40:08.388Z"
+    },
+    "ensure-main.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:40:20.204Z"
+    },
+    "ensure-main.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:40:30.062Z"
+    },
+    "ensure-main.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:40:39.717Z"
+    },
+    "ensure-main.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:40:50.180Z"
+    },
+    "ensure-main.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:40:59.922Z"
+    },
+    "composer-route-ensure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:41:10.314Z"
+    },
+    "composer-route-ensure.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:41:20.676Z"
+    },
+    "composer-route-ensure.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:41:30.677Z"
+    },
+    "composer-route-ensure.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:41:40.888Z"
+    },
+    "message-agent-ensure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:41:50.526Z"
+    },
+    "message-agent-ensure.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:42:01.010Z"
+    },
+    "message-agent-ensure.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:42:11.353Z"
+    },
+    "message-agent-ensure.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:42:21.429Z"
+    },
+    "message-agent-ensure.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:42:31.040Z"
+    },
+    "tell-main-output.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:42:40.863Z"
+    },
+    "tell-main-output.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:42:50.791Z"
+    },
+    "tell-main-output.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:43:00.517Z"
+    },
+    "read-model-input-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:43:10.883Z"
+    },
+    "read-model-input-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:43:21.555Z"
+    },
+    "read-model-input-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:43:31.676Z"
+    },
+    "read-model-input-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:43:42.335Z"
+    },
+    "composer-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:43:52.066Z"
+    },
+    "composer-notice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:44:02.086Z"
+    },
+    "composer-notice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:44:13.385Z"
+    },
+    "composer-notice.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:44:24.941Z"
+    },
+    "docs-selector-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:44:36.281Z"
+    },
+    "docs-selector-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:44:48.296Z"
+    },
+    "docs-selector-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:44:59.668Z"
+    },
+    "docs-selector-check.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:45:12.268Z"
+    },
+    "pane-key-sender.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:45:28.518Z"
+    }
+  }
+}

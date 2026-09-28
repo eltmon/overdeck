@@ -195,3 +195,80 @@ describe('RootErrorBoundary recovery policy', () => {
     expect(document.getElementById('pan-recovery-overlay')).not.toBeNull();
   });
 });
+
+describe('asset-recovery overlay scope (PAN-4279)', () => {
+  type RecoveryModule = typeof import('./recovery');
+
+  async function freshRecovery(): Promise<RecoveryModule> {
+    // The in-flight latch is module state; each case needs its own copy.
+    vi.resetModules();
+    return import('./recovery');
+  }
+
+  function stubReload() {
+    const reload = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, reload } });
+    return { reload, restore: () => Object.defineProperty(window, 'location', { configurable: true, value: original }) };
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('polls without a modal for a chunk preload failure, then reloads', async () => {
+    vi.useFakeTimers();
+    const { reload, restore } = stubReload();
+    try {
+      const fetchMock = vi.fn()
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockResolvedValue({ ok: true });
+      vi.stubGlobal('fetch', fetchMock);
+      const recovery = await freshRecovery();
+
+      const done = recovery.waitForServerThenReload({ trigger: 'vite_preload_error', resource: '/assets/App.js' });
+      expect(document.getElementById('pan-recovery-overlay')).toBeNull();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(document.getElementById('pan-recovery-overlay')).toBeNull();
+      await vi.advanceTimersByTimeAsync(5_000);
+      await done;
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(document.getElementById('pan-recovery-overlay')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it('shows the modal while polling when the React tree is down', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)));
+    const recovery = await freshRecovery();
+
+    void recovery.waitForServerThenReload({ trigger: 'root_error_boundary' });
+
+    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Reconnecting to the dashboard…');
+  });
+
+  it('still shows the circuit-breaker overlay for a chunk failure after repeated reloads', async () => {
+    vi.useFakeTimers();
+    const { reload, restore } = stubReload();
+    try {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+      const recovery = await freshRecovery();
+      recovery.recordRecoveryReload();
+      recovery.recordRecoveryReload();
+      recovery.recordRecoveryReload();
+
+      const done = recovery.waitForServerThenReload({ trigger: 'asset_load_error', resource: '/assets/App.js' });
+      await vi.advanceTimersByTimeAsync(5_000);
+      await done;
+
+      expect(reload).not.toHaveBeenCalled();
+      expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('stopped automatic recovery');
+    } finally {
+      restore();
+    }
+  });
+});

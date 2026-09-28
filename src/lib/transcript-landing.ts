@@ -368,10 +368,11 @@ export async function readSidechainHumanInputs(
 
 /**
  * Directory Claude Code writes a conversation's subagent transcripts and meta
- * files under. Kept local to this module (never imported from src/dashboard) so
- * the sidechain probe has no dependency on the dashboard's own subagent discovery.
+ * files under. Defined here (never imported from src/dashboard) so the sidechain
+ * probe has no dependency on the dashboard's own subagent discovery. The
+ * conversation read model's selector check reuses it (PAN-4268).
  */
-function subagentsDirFor(sessionFile: string): string {
+export function subagentsDirFor(sessionFile: string): string {
   return join(sessionFile.replace(/\.jsonl$/, ''), 'subagents');
 }
 

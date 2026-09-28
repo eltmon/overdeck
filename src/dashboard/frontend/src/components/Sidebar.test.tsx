@@ -109,6 +109,11 @@ describe('Sidebar navigation', () => {
     expect(await screen.findByTestId('sidebar-flywheel-live')).toHaveTextContent('live');
   });
 
+  it('renders the No-project row with zero conversations', async () => {
+    renderSidebar({ activeTab: 'command-deck' });
+    expect(await screen.findByTestId('sidebar-project-no-project')).toBeInTheDocument();
+  });
+
   it('routes the expanded logo to Home', () => {
     const { onTabChange } = renderSidebar({ activeTab: 'kanban' });
 

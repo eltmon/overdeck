@@ -544,3 +544,64 @@ describe('startPullRequestSyncService — schedule', () => {
     expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(4);
   });
 });
+
+// PAN-4264 Work Item 10: during a user GraphQL quota pause the sweep is
+// skipped and a paused (null) read never feeds the 3-strike backoff.
+describe('runPullRequestSyncOnce — GitHub quota pause (PAN-4264)', () => {
+  const T0 = Date.parse('2026-09-27T15:00:00Z');
+  const MINUTE = 60_000;
+  let quotaDir = '';
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const { getGitHubQuotaDir } = await import('../../../../lib/github-quota/ledger.js');
+    quotaDir = getGitHubQuotaDir();
+  });
+
+  afterEach(async () => {
+    const { flushLedgerWrites } = await import('../../../../lib/github-quota/ledger.js');
+    await flushLedgerWrites();
+    rmSync(quotaDir, { recursive: true, force: true });
+    listRepoPullRequestsMock.mockImplementation(async () => prRows);
+  });
+
+  async function pauseUserGraphql(): Promise<void> {
+    const { recordGitHubRefusal } = await import('../../../../lib/github-quota/pause-gate.js');
+    await recordGitHubRefusal({ pool: 'user', bucket: 'graphql', caller: 'pr-cache', refusal: { kind: 'secondary', retryAfterSec: 60 } });
+  }
+
+  it('skips the sweep during a pause without reading the listing or the fallback', async () => {
+    const name = conversation('feature/paused');
+    linkConversationPullRequest(name, {
+      host: 'github.com', repository: 'eltmon/overdeck', number: 910, url: 'https://github.com/eltmon/overdeck/pull/910',
+    }, 'manual', T0);
+    await pauseUserGraphql();
+    const read = vi.fn(async () => pr(910, 'feature/paused') as never);
+
+    expect(await runPullRequestSyncOnce(Date.now(), read)).toEqual({ inserted: 0, updated: 0 });
+    expect(listRepoPullRequestsMock).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('never counts a read that failed because a pause began mid-sweep', async () => {
+    conversation('feature/paused-mid-sweep');
+    // The listing read hits the limit: the pause starts and the read fails.
+    listRepoPullRequestsMock.mockImplementation(async () => {
+      await pauseUserGraphql();
+      return null;
+    });
+
+    for (let sweep = 0; sweep < 3; sweep += 1) {
+      await runPullRequestSyncOnce(Date.now(), async () => null);
+      // Let the pause lapse so the next sweep runs.
+      vi.setSystemTime(Date.now() + 2 * MINUTE);
+    }
+    expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(3);
+
+    // Three counted failures would back the project off for 15 minutes; none were counted.
+    listRepoPullRequestsMock.mockImplementation(async () => []);
+    await runPullRequestSyncOnce(Date.now(), async () => null);
+    expect(listRepoPullRequestsMock).toHaveBeenCalledTimes(4);
+  });
+});

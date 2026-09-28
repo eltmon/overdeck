@@ -2,7 +2,12 @@
  * Terminal routes (PAN-1545 / PAN-1561) — ad-hoc tmux sessions for the
  * terminal drawer and the standalone terminal view.
  *
- *   POST   /api/terminals          — create a fresh tmux session, returns { sessionName, cwd }
+ *   POST   /api/terminals          — create a fresh tmux session, returns
+ *                                    { sessionName, cwd, commandSent? }. An
+ *                                    optional single-line `command` (PAN-4280,
+ *                                    ≤2000 chars) is typed into the new shell
+ *                                    and run with Enter; `commandSent` reports
+ *                                    whether that send succeeded.
  *   DELETE /api/terminals/:name    — kill a session
  *
  * Each "terminal" in the T3-style drawer is one of these tmux sessions; the
@@ -15,12 +20,12 @@
 import { existsSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
-import { Effect, Layer } from 'effect';
+import { Data, Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { createSession, killSession, sessionExists } from '../../../lib/tmux.js';
+import { createSession, killSession, sessionExists, tmuxExecAsync, exactPaneTarget } from '../../../lib/tmux.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import { validateOrigin } from './origin-validation.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
@@ -55,6 +60,38 @@ function generateTerminalSessionName(): string {
   return `term-${Date.now()}-${randomUUID().slice(0, 8)}`;
 }
 
+type CommandValidation =
+  | { ok: true; command: string | undefined }
+  | { ok: false; error: string };
+
+/** Validate an optional `command` body field (PAN-4280, D6): trimmed, a
+ * single line, at most 2000 characters. Empty after trim means "no command". */
+function validateCommand(raw: unknown): CommandValidation {
+  if (typeof raw !== 'string') return { ok: true, command: undefined };
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: true, command: undefined };
+  if (/[\n\r]/.test(trimmed)) return { ok: false, error: 'command must be a single line' };
+  if (trimmed.length > 2000) return { ok: false, error: 'command must be at most 2000 characters' };
+  return { ok: true, command: trimmed };
+}
+
+class SendLiteralLineError extends Data.TaggedError('SendLiteralLineError')<{
+  readonly cause: unknown;
+}> {}
+
+/** Type one literal line into a fresh shell and press Enter (the shell reads
+ * it from pty typeahead once it starts). Local on purpose: tmux.ts is at its
+ * allowlisted ceiling. */
+function sendLiteralLine(sessionName: string, text: string) {
+  return Effect.tryPromise({
+    try: async () => {
+      await tmuxExecAsync(['send-keys', '-t', exactPaneTarget(sessionName), '-l', text]);
+      await tmuxExecAsync(['send-keys', '-t', exactPaneTarget(sessionName), 'Enter']);
+    },
+    catch: (cause) => new SendLiteralLineError({ cause }),
+  });
+}
+
 const postTerminalRoute = HttpRouter.add(
   'POST',
   '/api/terminals',
@@ -66,13 +103,28 @@ const postTerminalRoute = HttpRouter.add(
 
       const body = yield* readJsonBody;
       const cwd = resolveCwd(body.cwd);
+
+      const commandValidation = validateCommand(body.command);
+      if (!commandValidation.ok) {
+        return jsonResponse({ error: commandValidation.error }, { status: 400 });
+      }
+
       const sessionName = generateTerminalSessionName();
 
       yield* createSession(sessionName, cwd, undefined, {
         env: { PATH: process.env.PATH || '' },
       });
 
-      return jsonResponse({ sessionName, cwd });
+      const { command } = commandValidation;
+      if (!command) {
+        return jsonResponse({ sessionName, cwd });
+      }
+
+      const commandSent = yield* Effect.match(sendLiteralLine(sessionName, command), {
+        onFailure: () => false,
+        onSuccess: () => true,
+      });
+      return jsonResponse({ sessionName, cwd, commandSent });
     }),
   ),
 );

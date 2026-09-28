@@ -16,6 +16,9 @@ export const TELEMETRY_EVENT_NAMES = [
   "server_boot",
   "cli_command_run",
   "pipeline_stage_changed",
+  "github_quota_sample",
+  "github_rate_limited",
+  "instance_heartbeat",
 ] as const
 
 export type TelemetryEventName = typeof TELEMETRY_EVENT_NAMES[number]
@@ -84,6 +87,24 @@ export const TELEMETRY_CLI_VERBS = [
 
 const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse"] as const satisfies readonly Harness[]
 
+/**
+ * PAN-4264: GitHub quota callers as telemetry values (`-` → `_`). Mirrors
+ * `GITHUB_QUOTA_CALLERS` in ./github-quota; a unit test keeps them in step.
+ */
+const TELEMETRY_GITHUB_CALLERS = [
+  "pipeline_membership",
+  "pr_cache",
+  "pr_sync",
+  "ci_repair",
+  "issue_poller",
+  "close_out",
+  "tracker_client",
+  "app_rest",
+  "quota_sampler",
+  "agent",
+  "other",
+] as const
+
 export const TELEMETRY_PROPERTY_DOMAINS = {
   agent_spawn_mode: ["spawn-and-send", "spawn-work-and-send"],
   answer_type: ["custom", "selection"],
@@ -123,6 +144,7 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   duration_bucket: ["under_100ms", "100ms-999ms", "1s-9s", "10s+"],
   forge: ["github", "gitlab"],
   fork_kind: ["summary", "handoff", "plain"],
+  github_caller: TELEMETRY_GITHUB_CALLERS,
   harness: TELEMETRY_HARNESSES,
   merge_kind: ["pipeline"],
   model_family: ["claude", "gpt", "gemini", "kimi", "minimax", "glm", "mimo", "other"],
@@ -130,6 +152,9 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   // "clone" ships with PAN-3836; without it the dimension cannot show whether
   // cloning is actually used, which is the reason the event carries a mode.
   project_mode: ["clone", "existing", "new"],
+  quota_points_bucket: ["0", "1-49", "50-199", "200-499", "500-999", "1000-2499", "2500+"],
+  quota_remaining_bucket: ["0", "1-99", "100-499", "500-999", "1000-2499", "2500+", "unknown"],
+  rate_limit_kind: ["primary", "secondary"],
 } as const
 
 export type TelemetryPropertyDomainName = keyof typeof TELEMETRY_PROPERTY_DOMAINS
@@ -159,6 +184,35 @@ export const TELEMETRY_EVENT_CATALOG = {
   server_boot: { project_count: "count_bucket", active_agent_count: "count_bucket" },
   cli_command_run: { verb: "cli_verb", ok: "boolean", duration_ms: "duration_bucket" },
   pipeline_stage_changed: { stage: "pipeline_stage", harness: "harness", model: "model_family" },
+  github_quota_sample: {
+    graphql_pipeline_membership: "quota_points_bucket",
+    rest_pipeline_membership: "quota_points_bucket",
+    graphql_pr_cache: "quota_points_bucket",
+    rest_pr_cache: "quota_points_bucket",
+    graphql_pr_sync: "quota_points_bucket",
+    rest_pr_sync: "quota_points_bucket",
+    graphql_ci_repair: "quota_points_bucket",
+    rest_ci_repair: "quota_points_bucket",
+    graphql_issue_poller: "quota_points_bucket",
+    rest_issue_poller: "quota_points_bucket",
+    graphql_close_out: "quota_points_bucket",
+    rest_close_out: "quota_points_bucket",
+    graphql_tracker_client: "quota_points_bucket",
+    rest_tracker_client: "quota_points_bucket",
+    graphql_app_rest: "quota_points_bucket",
+    rest_app_rest: "quota_points_bucket",
+    graphql_agent: "quota_points_bucket",
+    rest_agent: "quota_points_bucket",
+    graphql_other: "quota_points_bucket",
+    rest_other: "quota_points_bucket",
+    graphql_unattributed: "quota_points_bucket",
+    min_remaining_graphql: "quota_remaining_bucket",
+    min_remaining_rest: "quota_remaining_bucket",
+    primary_limit_errors: "count_bucket",
+    secondary_limit_errors: "count_bucket",
+  },
+  github_rate_limited: { caller: "github_caller", kind: "rate_limit_kind", own_usage_low: "boolean" },
+  instance_heartbeat: { project_count: "count_bucket", active_agent_count: "count_bucket", dashboard_running: "boolean" },
 } as const satisfies Record<TelemetryEventName, Record<string, TelemetryPropertyDomainName>>
 
 type TelemetryPropertyValue<Domain extends TelemetryPropertyDomainName> =
@@ -191,6 +245,34 @@ export type AgentQuestionAnsweredProperties = EventProperties<"agent_question_an
 export type ServerBootProperties = EventProperties<"server_boot">
 export type CliCommandRunProperties = EventProperties<"cli_command_run">
 export type PipelineStageChangedProperties = EventProperties<"pipeline_stage_changed">
+export type GitHubQuotaSampleProperties = EventProperties<"github_quota_sample">
+export type GitHubRateLimitedProperties = EventProperties<"github_rate_limited">
+export type InstanceHeartbeatProperties = EventProperties<"instance_heartbeat">
+export type TelemetryQuotaPointsBucket = TelemetryPropertyValue<"quota_points_bucket">
+export type TelemetryQuotaRemainingBucket = TelemetryPropertyValue<"quota_remaining_bucket">
+export type TelemetryGitHubCaller = TelemetryPropertyValue<"github_caller">
+
+/** PAN-4264: GitHub quota points as a coarse bucket (raw counts are never sent). */
+export function bucketQuotaPoints(points: number): TelemetryQuotaPointsBucket {
+  if (!(points > 0)) return "0"
+  if (points < 50) return "1-49"
+  if (points < 200) return "50-199"
+  if (points < 500) return "200-499"
+  if (points < 1000) return "500-999"
+  if (points < 2500) return "1000-2499"
+  return "2500+"
+}
+
+/** PAN-4264: GitHub quota remaining as a coarse bucket; `unknown` without a sample. */
+export function bucketQuotaRemaining(remaining: number | undefined): TelemetryQuotaRemainingBucket {
+  if (remaining === undefined || !Number.isFinite(remaining)) return "unknown"
+  if (remaining <= 0) return "0"
+  if (remaining < 100) return "1-99"
+  if (remaining < 500) return "100-499"
+  if (remaining < 1000) return "500-999"
+  if (remaining < 2500) return "1000-2499"
+  return "2500+"
+}
 
 export type TelemetryEventProperties = {
   readonly [Event in TelemetryEventName]: EventProperties<Event>

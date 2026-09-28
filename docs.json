@@ -104,6 +104,7 @@
               "configuration/local-models",
               "configuration/effort",
               "configuration/terminal-backend",
+              "configuration/memory-governor",
               "configuration/context-layers",
               "configuration/appearance",
               "configuration/state-branch",

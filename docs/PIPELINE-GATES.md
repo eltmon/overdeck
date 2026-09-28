@@ -602,20 +602,42 @@ Auto-resume is intentionally suppressible:
   leaves it unset so autonomous recovery stays eligible. Recording an OOM
   kill as an operator stop is what once turned a transient resource event
   into a permanent stall.
-- **Memory gate (PAN-2500):** the hysteresis resource governor
-  (`assessMemoryPressure` in `cloister/memory-governor.ts`) has two
-  consumers: the preemptive scheduler (`preemption.ts`) and the
-  memory-pressure patrol (`memory-pressure-patrol.ts`). Below the SOFT
-  reserve they defer new admissions; below HARD the patrol sheds (stops
-  merged/closed Docker stacks, then pauses idle work agents); neither
-  re-admits until memory clears RECOVERY. It does **not** gate every
-  dispatch path: no spawn path reads `getCachedMemoryVerdict`. POST
-  `/api/agents` — the operator's start, the planning auto-handoff and its
-  deferred retry — sees memory only through `evaluateSpawnGuardrails`
-  (`routes/agents/shared.ts`), which classifies free RAM against the
-  `memoryWarnGb`/`memoryBlockGb` thresholds with no hysteresis. This is
-  separate from `--no-resume`, which suppresses resume outright regardless
-  of memory.
+- **Memory gate (PAN-2500, scaled defaults PAN-4267):** the hysteresis
+  resource governor (`assessMemoryPressure` in `cloister/memory-governor.ts`)
+  gates exactly one caller: the preemptive scheduler's
+  `preemption.ts:resumeYieldedAgents`. It also feeds the memory-pressure
+  patrol (`memory-pressure-patrol.ts`), which only reports the band to the
+  activity feed — `shed()` (stack-stop / idle-agent-pause reclaim) has no
+  caller anywhere in the codebase. The governor never gates conversations,
+  `pan start`, or dashboard Start. Below the SOFT reserve the governor
+  defers `resumeYieldedAgents`; below HARD it reports `shedding`; neither
+  re-admits until memory clears RECOVERY. Reserve defaults are a share of
+  RAM with an absolute floor and a cap (hard &le; 10%, soft &le; 20%,
+  watch &le; 25%, recovery &le; 35% of total RAM; see
+  `src/lib/config-yaml/governor-reserves.ts`), so a small host (an 8-16 GB
+  Mac) gets workable reserves instead of a recovery reserve at or above its
+  total RAM; hosts at or above 40 GB keep the pre-PAN-4267 values. It does
+  **not** gate every dispatch path: no spawn path reads
+  `getCachedMemoryVerdict`. POST `/api/agents` — the operator's start, the
+  planning auto-handoff and its deferred retry — sees memory only through
+  `evaluateSpawnGuardrails` (`routes/agents/shared.ts`), which classifies
+  free RAM against the `memoryWarnGb`/`memoryBlockGb` thresholds with no
+  hysteresis; these defaults are also scaled, `min(4, RAM/8)` GB warn and
+  `min(2, RAM/16)` GB block. This is separate from `--no-resume`, which
+  suppresses resume outright regardless of memory.
+- **macOS measurement (PAN-4267):** the header collector
+  (`system-health/darwin.ts`) and the governor's reader
+  (`readProcMemoryDarwin` in `dashboard/server/services/proc-memory.ts`)
+  share one available-memory calculation
+  (`computeDarwinAvailableMemoryBytes`): `memory_pressure -Q`'s free
+  percentage of total RAM first, falling back to the Activity Monitor
+  `vm_stat` formula (`total - (anonymous - purgeable + wired + compressor)`)
+  when memory_pressure is unavailable. macOS has no PSI and allocates swap
+  on demand, so the governor ignores swap runway there
+  (`swapGrowsOnDemand`) and instead reads the kernel's own
+  `kern.memorystatus_vm_pressure_level` sysctl as its stall signal: level 4
+  (critical) sheds immediately regardless of the memory reserves, and level
+  1 (normal) counts as calm for the holding re-admit window.
 - **Operator-started exemption (PAN-1812, PAN-3634):** when
   `exempt_operator_started` is on, the emergency brake
   (`concurrency.ts:emergencyBrake`) and the memory governor's shed
@@ -655,6 +677,66 @@ Auto-resume is intentionally suppressible:
 
 These gates are orthogonal to deacon-lite's own start/stop toggle
 (`pan admin cloister start|stop`).
+
+## GitHub quota policy (PAN-4264)
+
+GitHub limits each identity to 5,000 points per hour per bucket (GraphQL and
+REST, which GitHub calls `core`), plus a burst ("secondary") limit. Overdeck
+meters its own GitHub calls, backs off when GitHub refuses one, and never
+reads a refused or skipped call as "no data".
+
+**The ledger.** Every metered call and every `/rate_limit` sample appends one
+JSON line to `~/.overdeck/github-quota/ledger-<YYYYMMDDHH>.jsonl` (UTC hour):
+`{ ts, pid, kind: 'call' | 'sample', caller, pool, bucket, cost, estimated,
+outcome, remaining?, limit?, resetAt?, agent? }`. The pool is the identity
+spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or `app` (GitHub
+App installation tokens). Readers aggregate the last 60 minutes from the
+current and previous hour files; files older than 3 hours are deleted on the
+hour rollover. The dashboard, the deacon child, CLI processes and the agent
+`gh` shim (beside the agent git guard, count-only) all write it.
+`src/lib/github-quota/` owns it: `runGh` (metered `gh` exec),
+`withGitHubCaller` (the caller context), the App/PAT metering in
+`rest-meter.ts`, and the pause gate.
+
+**Pause rules.** A rate-limit or secondary-limit refusal observed by any
+process writes `~/.overdeck/github-quota/pause.json` for that pool and bucket
+(atomic tmp + rename). Duration rules:
+
+- Primary limit with a visible reset (the refused bucket's latest sample shows `remaining == 0`): pause until that sample's `resetAt`.
+- Primary limit hidden (the sample shows `remaining > 0`, or no sample within 10 minutes): pause 10 minutes, capped at the sample's `resetAt` when that is sooner. The floor is 60 seconds.
+- Secondary limit: pause for `retry-after` seconds when present. Otherwise pause 60 seconds, doubling on each consecutive secondary refusal within 30 minutes, capped at 15 minutes.
+- For a **primary** refusal only, an `x-ratelimit-reset` header on the refused response wins over the sample-based rules. A **secondary** refusal ignores `x-ratelimit-reset`, because that header describes the hourly window, not the burst limit.
+
+A pause blocks only its exact `(pool, bucket)`: a GraphQL pause never stops
+REST calls, and a `pat` pause never stops the `user` or `app` pools.
+
+**Who is paused.** Only the non-essential read-model pollers skip GitHub
+during a pause: `pipeline-membership`, `pr-cache`, `pr-sync`, `ci-repair`,
+`issue-poller` and `close-out` (the deacon's 60-second closed-issue reaper).
+Every other caller is essential and is never paused: `tracker-client`,
+`app-rest`, `quota-sampler`, `agent` and `other` — merges, verdict recording,
+tracker writes, agents, `closeOut()` and `pan close`.
+
+**Never "no data".** A skipped call throws `GitHubQuotaPausedError` and a
+refused call throws `GitHubRateLimitedError`. Callers keep their "failed"
+signal: pipeline membership reports `forge_transient`, `readRepoPullRequests`
+returns `null`, PR sync skips its sweep without counting repository
+failures, and the closed-issue reaper treats the issue as not closed.
+
+**Wasted calls removed.**
+
+- A project with no resolvable tracker (no `tracker`, `rally_project`, `github_repo`, `issue_prefix` or `gitlab_repo`) is skipped by every membership refresh, logged once per `projects.yaml` mtime, and listed by `pan doctor` as a warn row.
+- A 404 from a GitHub App issue listing marks the repo App-not-installed for 6 hours (`repo-notes.json`); its issues are listed through the `gh` user token meanwhile.
+- A minted App installation token is reused until 5 minutes before it expires.
+- Boot-warm refreshes are staggered over 60 seconds and periodic convergence over 4 minutes, one project per refresh batch; the first CI refill runs at boot + 2 minutes.
+
+**Where to look.** The app-bar pill shows `GH <remaining>/<limit>` for the
+user GraphQL budget and lists the top callers; a banner in the system notices
+row names the pause end time and whether this machine's own use explains it;
+`pan doctor github-quota [--json]` prints the caller table, latest samples,
+the active pause, skipped projects and repos without the App.
+`GET /api/github-quota` returns the dashboard's snapshot. Calls from the ~35
+unmigrated `gh` sites show up only as the snapshot's `unattributed` points.
 
 ## The pipeline journal (post-Cut follow-up to PAN-3917)
 

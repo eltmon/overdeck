@@ -1,17 +1,16 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T15:31:51.166078Z · model: claude-opus-5-5 · open: 780_
+_Last sequenced: 2026-09-28T01:33:32.399750Z · model: claude-opus-5-5 · open: 778_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 16 | PAN-4267 | M | high | ok |  |  | In-pipeline: memory governor fixed 4/12 GB floors + macOS free-memory measure lock small Macs in permanent shedding. |
-| 17 | PAN-4223 | L | high | ok |  |  | In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator |
-| 18 | PAN-4222 | M | high | ok |  |  | Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors |
-| 19 | PAN-4263 | M | critical | ok |  |  | In-pipeline: PR lookup reads rate limits as 'no PR' and picks a closed PR, so approved verdicts are lost and merges fail |
-| 20 | PAN-4266 | S | medium | ok |  |  | In-pipeline: Command Deck model picker dropdown clipped by overflow-hidden column; focus scroll shifts the column left |
-| 21 | PAN-4264 | L | high | ok |  |  | In-pipeline: GraphQL quota exhaustion stalls verdicts, close-outs and merges; measure per caller, surface, back off, stop waste. |
-| 22 | PAN-4268 | M | high | ok |  |  | In-pipeline: composer and pan tell guess subagent routing; parse Claude Code's agent selector and deliver to main or fail loudly. |
+| 15 | PAN-4278 | L | high | ok |  |  | In-pipeline: terminal permission prompts block agents for hours with no dashboard dialog; composer sends near them get lost. |
+| 16 | PAN-4279 | M | high | ok |  |  | In-pipeline: a false "Server unreachable" modal and several outage screens block the whole UI; replace with one degraded-mode banner. |
+| 17 | PAN-4280 | L | high | ok |  |  | In-pipeline: part 1 of Type-and-go onboarding; start a conversation or terminal from Home with no project; Simple mode default sticks. |
+| 18 | PAN-4281 | L | medium | ok |  |  | In-pipeline: part 2 of onboarding; Add Project dialog snaps to repo root, imports folder-of-repos as separate or one polyrepo project. |
+| 19 | PAN-4282 | M | medium | ok |  |  | In-pipeline: part 3 of onboarding; first-run "Get set up" checklist on Home; pan install/doctor warn, not fail, on optional tools. |
+| 20 | PAN-4283 | M | medium | ok |  |  | In-pipeline: close-out settings in the dashboard, disk cost + cleanup of kept workspaces (~47 GB), honest DoD teardown row |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -269,7 +268,6 @@ _Last sequenced: 2026-09-27T15:31:51.166078Z · model: claude-opus-5-5 · open: 
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 322 | PAN-4265 | M | medium | ok |  |  | 'Setup changed' sync banner shows after most merges; auto-run light sync after reload and say what changed when it does show |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
@@ -657,6 +655,7 @@ _Last sequenced: 2026-09-27T15:31:51.166078Z · model: claude-opus-5-5 · open: 
 | 733 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
 | 734 | PAN-4248 | L | medium | ok |  | PAN-1641 | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; starts after PAN-1641 merges. |
 | 735 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 736 | PAN-4275 | S | low | ok |  | PAN-1641 | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge |
 | 737 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
 | 738 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
 | 739 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
@@ -745,7 +744,6 @@ _Last sequenced: 2026-09-27T15:31:51.166078Z · model: claude-opus-5-5 · open: 
 | 826 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 827 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 829 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-3634 | S | high | ok |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 832 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 834 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
 | 835 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
@@ -788,33 +786,29 @@ _Last sequenced: 2026-09-27T15:31:51.166078Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-4267 (rank 16)
+### PAN-4278 (rank 15)
 
-New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 16, the slot vacated by PAN-4266 (now labeled in-progress and out of the backlog manifest). A permanent admission lockout makes Overdeck unusable on 8-16 GB Macs, so importance is high; the body names the exact defaults function, a four-part fix and testable acceptance criteria, so condition is ok.
+New since the prior run and already in the pipeline, so it is pinned at rank 15, directly ahead of the in-pipeline cluster, without displacing any existing rank. A subagent sat blocked on an unanswerable permission prompt for 7.5 hours and two operator messages vanished, which breaks the core supervise-from-the-dashboard loop, so importance is high; the body gives a four-part fix with fixture-testable acceptance criteria, so condition is ok. It shares the composer-to-pane delivery path with PAN-4268 and PAN-3630, recorded as advisory informs edges.
 
-### PAN-4223 (rank 17)
+### PAN-4279 (rank 16)
 
-New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.
+New since the prior run and already in the pipeline, so it is pinned at rank 16 in a free slot next to PAN-4278 without displacing any existing rank. A healthy server still triggered a full-screen modal over a conversation, which cuts the operator off from the dashboard during exactly the moments supervision matters, so importance is high. The body names each outage surface by file and gives a concrete single-banner design with a health-probe check, so condition is ok. It overlaps the reconnect-loop and restart-banner work in PAN-3778 and PAN-3616, recorded as advisory informs edges.
 
-### PAN-4222 (rank 18)
+### PAN-4280 (rank 17)
 
-New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.
+New since the prior run and already in the pipeline, so it is pinned at rank 17 in a free slot. It removes the need to register a project and workspace before spawning a terminal, which the operator named as the main out-of-the-box blocker, so importance is high. The PRD-grade body carries operator decisions, per-item files and before/after code, so condition is ok. It holds the shared glossary and decisions that parts 2 and 3 (PAN-4281, PAN-4282) cite, recorded as advisory informs edges.
 
-### PAN-4263 (rank 19)
+### PAN-4281 (rank 18)
 
-New in-pipeline issue, pinned in the top tier at a free rank. One function (getExistingGitHubArtifact in src/lib/forge.ts) swallows gh errors so a rate-limited lookup reads as 'no PR', refusing reviewer verdicts, and the App path takes prs[0], which can be an older closed PR, so merges target the wrong PR. It already stalled PAN-4222, PAN-3634 and PAN-3668 with approved reviews the merge gate never saw, so it is critical pipeline substrate; the fix and acceptance criteria are concrete.
+New since the prior run and already in the pipeline, so it is pinned at rank 18 in a free slot. It improves project registration for new users but has a working path today, so importance is medium. The body states it depends on nothing in part 1 and gives file-level work items W6 to W9, so it carries no hard dependency and condition is ok. It shares the Orca-style onboarding direction with PAN-3863, recorded as a low-confidence informs edge.
 
-### PAN-4266 (rank 20)
+### PAN-4282 (rank 19)
 
-New in-pipeline issue with a measured cause and mechanical Playwright AC; pinned into the free in-pipeline slot at rank 20 without moving any other node, medium importance because it is dashboard UX rather than pipeline substrate.
+New since the prior run and already in the pipeline, so it is pinned at rank 19 in a free slot. Turning hard install failures on optional tools into warnings and adding a first-run checklist lowers the setup barrier, so importance is medium. The governor-threshold dependency it cites (#4267) is already merged, and the body gives file-level work items W10 to W12, so condition is ok. It overlaps the older onboarding checklist request in PAN-2625, recorded as an advisory informs edge.
 
-### PAN-4264 (rank 21)
+### PAN-4283 (rank 20)
 
-New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the free rank 21 beside PAN-4263, which it generalizes. Rate-limit refusals several times a day stall review verdicts, close-outs and merges, so importance is high; the body gives a five-part fix with mechanically checkable acceptance criteria, so condition is ok.
-
-### PAN-4268 (rank 22)
-
-New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 22, the free slot between PAN-4264 and PAN-4217. Messages silently landing in a subagent is a delivery-correctness bug on the operator's main input path, so importance is high; the body gives a five-step fix, captured pane evidence and fixture-testable acceptance criteria, so condition is ok. Its predecessor PAN-4247 is closed, so no dependency edge is emitted.
+New issue, already in the pipeline, so it is pinned in the free slot right after the other in-pipeline work (rank 20). It exposes the four [close_out] keys in Settings, shows the disk held by closed issues' kept workspaces with a Clean up now action, and fixes DoD row 9 claiming teardown when the workspace was kept; the body has clear acceptance criteria and no cross-references.
 
 ### PAN-4217 (rank 23)
 
@@ -1088,6 +1082,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 
 Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
 
+### PAN-3900 (rank 113)
+
+patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1095,86 +1093,86 @@ Every path that starts a new Claude session for an existing agent must repoint s
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T15:31:51.166078Z",
+  "generatedAt": "2026-09-28T01:33:32.399750Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 780,
+  "openCount": 778,
   "nodes": [
     {
-      "issue": "PAN-4267",
+      "issue": "PAN-4278",
+      "rank": 15,
+      "size": "L",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: terminal permission prompts block agents for hours with no dashboard dialog; composer sends near them get lost.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 15, directly ahead of the in-pipeline cluster, without displacing any existing rank. A subagent sat blocked on an unanswerable permission prompt for 7.5 hours and two operator messages vanished, which breaks the core supervise-from-the-dashboard loop, so importance is high; the body gives a four-part fix with fixture-testable acceptance criteria, so condition is ok. It shares the composer-to-pane delivery path with PAN-4268 and PAN-3630, recorded as advisory informs edges.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4279",
       "rank": 16,
       "size": "M",
       "importance": "high",
       "score": 78,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In-pipeline: memory governor fixed 4/12 GB floors + macOS free-memory measure lock small Macs in permanent shedding.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 16, the slot vacated by PAN-4266 (now labeled in-progress and out of the backlog manifest). A permanent admission lockout makes Overdeck unusable on 8-16 GB Macs, so importance is high; the body names the exact defaults function, a four-part fix and testable acceptance criteria, so condition is ok.",
+      "why": "In-pipeline: a false \"Server unreachable\" modal and several outage screens block the whole UI; replace with one degraded-mode banner.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 16 in a free slot next to PAN-4278 without displacing any existing rank. A healthy server still triggered a full-screen modal over a conversation, which cuts the operator off from the dashboard during exactly the moments supervision matters, so importance is high. The body names each outage surface by file and gives a concrete single-banner design with a health-probe check, so condition is ok. It overlaps the reconnect-loop and restart-banner work in PAN-3778 and PAN-3616, recorded as advisory informs edges.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4223",
+      "issue": "PAN-4280",
       "rank": 17,
       "size": "L",
       "importance": "high",
       "score": 74,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In-pipeline operator request: pan lane door so gauntlet lanes launch from any harness and nest under their orchestrator",
-      "rationale": "New in-pipeline issue with an operator-approved PRD. It replaces hand-launched, flat gauntlet lane conversations with a pan lane door that records parent, run, and role at launch and nests lanes under their orchestrator in Command Deck. It also fixes the pan tell conv- prefix harness lookup. It is pinned in the top tier with the other in-pipeline work at a free rank slot, so no existing node moved.",
+      "why": "In-pipeline: part 1 of Type-and-go onboarding; start a conversation or terminal from Home with no project; Simple mode default sticks.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 17 in a free slot. It removes the need to register a project and workspace before spawning a terminal, which the operator named as the main out-of-the-box blocker, so importance is high. The PRD-grade body carries operator decisions, per-item files and before/after code, so condition is ok. It holds the shared glossary and decisions that parts 2 and 3 (PAN-4281, PAN-4282) cite, recorded as advisory informs edges.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4222",
+      "issue": "PAN-4281",
       "rank": 18,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
+      "size": "L",
+      "importance": "medium",
+      "score": 66,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Agents page follow-up to PAN-4197: live rows show no activity line, 1280px preview unusable, false 'quiet' alarms, billing errors",
-      "rationale": "New in-pipeline issue filed after PAN-4197's PR merged before the UX critic's round-2 notes landed. Its P0 item (Herdr agent rows never render the current-step line) makes the Agents page blind to live work, so it ranks high beside the other in-pipeline tier; it is dashboard UX rather than pipeline substrate, so it stays below the critical pipeline-stall fixes.",
+      "why": "In-pipeline: part 2 of onboarding; Add Project dialog snaps to repo root, imports folder-of-repos as separate or one polyrepo project.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 18 in a free slot. It improves project registration for new users but has a working path today, so importance is medium. The body states it depends on nothing in part 1 and gives file-level work items W6 to W9, so it carries no hard dependency and condition is ok. It shares the Orca-style onboarding direction with PAN-3863, recorded as a low-confidence informs edge.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4263",
+      "issue": "PAN-4282",
       "rank": 19,
       "size": "M",
-      "importance": "critical",
-      "score": 88,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: PR lookup reads rate limits as 'no PR' and picks a closed PR, so approved verdicts are lost and merges fail",
-      "rationale": "New in-pipeline issue, pinned in the top tier at a free rank. One function (getExistingGitHubArtifact in src/lib/forge.ts) swallows gh errors so a rate-limited lookup reads as 'no PR', refusing reviewer verdicts, and the App path takes prs[0], which can be an older closed PR, so merges target the wrong PR. It already stalled PAN-4222, PAN-3634 and PAN-3668 with approved reviews the merge gate never saw, so it is critical pipeline substrate; the fix and acceptance criteria are concrete.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4266",
-      "rank": 20,
-      "size": "S",
       "importance": "medium",
-      "score": 62,
+      "score": 64,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In-pipeline: Command Deck model picker dropdown clipped by overflow-hidden column; focus scroll shifts the column left",
-      "rationale": "New in-pipeline issue with a measured cause and mechanical Playwright AC; pinned into the free in-pipeline slot at rank 20 without moving any other node, medium importance because it is dashboard UX rather than pipeline substrate.",
+      "why": "In-pipeline: part 3 of onboarding; first-run \"Get set up\" checklist on Home; pan install/doctor warn, not fail, on optional tools.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 19 in a free slot. Turning hard install failures on optional tools into warnings and adding a first-run checklist lowers the setup barrier, so importance is medium. The governor-threshold dependency it cites (#4267) is already merged, and the body gives file-level work items W10 to W12, so condition is ok. It overlaps the older onboarding checklist request in PAN-2625, recorded as an advisory informs edge.",
       "gate": "auto",
       "planning": "auto"
     },
     {
-      "issue": "PAN-4268",
-      "rank": 22,
+      "issue": "PAN-4283",
+      "rank": 20,
       "size": "M",
-      "importance": "high",
-      "score": 72,
+      "importance": "medium",
+      "score": 70,
       "condition": "ok",
       "dependsOn": [],
-      "why": "In-pipeline: composer and pan tell guess subagent routing; parse Claude Code's agent selector and deliver to main or fail loudly.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at rank 22, the free slot between PAN-4264 and PAN-4217. Messages silently landing in a subagent is a delivery-correctness bug on the operator's main input path, so importance is high; the body gives a five-step fix, captured pane evidence and fixture-testable acceptance criteria, so condition is ok. Its predecessor PAN-4247 is closed, so no dependency edge is emitted.",
+      "why": "In-pipeline: close-out settings in the dashboard, disk cost + cleanup of kept workspaces (~47 GB), honest DoD teardown row",
+      "rationale": "New issue, already in the pipeline, so it is pinned in the free slot right after the other in-pipeline work (rank 20). It exposes the four [close_out] keys in Settings, shows the disk held by closed issues' kept workspaces with a Clean up now action, and fixes DoD row 9 claiming teardown when the workspace was kept; the body has clear acceptance criteria and no cross-references.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1976,6 +1974,19 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "dependsOn": [],
       "why": "planning finalizes (issue→planned) but work agent does not auto-spawn",
       "rationale": "Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4269",
+      "rank": 99,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find).",
+      "rationale": "New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4418,18 +4429,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "dependsOn": [],
       "why": "Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived",
       "rationale": "Triage: the record anchor is gone but convergence still reads round artifacts; the SHA-derivation fragility may still apply. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4265",
-      "rank": 322,
-      "size": "M",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "'Setup changed' sync banner shows after most merges; auto-run light sync after reload and say what changed when it does show",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9161,6 +9160,21 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "interactive"
     },
     {
+      "issue": "PAN-4275",
+      "rank": 736,
+      "size": "S",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-1641"
+      ],
+      "why": "Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge",
+      "rationale": "New follow-up carved from PAN-1641's cancelled e2e item; ranked just below its in-pipeline parent as low-importance local-model work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-791",
       "rank": 737,
       "size": "XS",
@@ -10234,19 +10248,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "planning": "auto"
     },
     {
-      "issue": "PAN-3634",
-      "rank": 831,
-      "size": "S",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close",
-      "rationale": "Demoted from rank 162: the component this issue targets (flywheelRunId stamping) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3505",
       "rank": 832,
       "size": "XS",
@@ -10728,32 +10729,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "dependsOn": [],
       "why": "Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content.",
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4264",
-      "rank": 21,
-      "size": "L",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: GraphQL quota exhaustion stalls verdicts, close-outs and merges; measure per caller, surface, back off, stop waste.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned into the in-pipeline cluster at the free rank 21 beside PAN-4263, which it generalizes. Rate-limit refusals several times a day stall review verdicts, close-outs and merges, so importance is high; the body gives a five-part fix with mechanically checkable acceptance criteria, so condition is ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4269",
-      "rank": 99,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find).",
-      "rationale": "New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -11628,13 +11603,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 0.9
     },
     {
-      "from": "PAN-4223",
-      "to": "PAN-3536",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-3935",
       "to": "PAN-4225",
       "type": "informs",
@@ -11654,13 +11622,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.9
-    },
-    {
-      "from": "PAN-4222",
-      "to": "PAN-4229",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-3557",
@@ -11761,46 +11722,67 @@ Every path that starts a new Claude session for an existing agent must repoint s
       "confidence": 0.6
     },
     {
-      "from": "PAN-4263",
-      "to": "PAN-4222",
+      "from": "PAN-1641",
+      "to": "PAN-4275",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4275",
+      "to": "PAN-3684",
+      "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
     },
     {
-      "from": "PAN-4263",
-      "to": "PAN-3634",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4263",
-      "to": "PAN-3668",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
-      "from": "PAN-4263",
-      "to": "PAN-3946",
+      "from": "PAN-3630",
+      "to": "PAN-4278",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
     },
     {
-      "from": "PAN-4264",
-      "to": "PAN-4263",
+      "from": "PAN-4279",
+      "to": "PAN-3778",
       "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
+      "source": "ai-inferred",
+      "confidence": 0.6
     },
     {
-      "from": "PAN-4267",
-      "to": "PAN-4269",
+      "from": "PAN-4279",
+      "to": "PAN-3616",
       "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4280",
+      "to": "PAN-4281",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4280",
+      "to": "PAN-4282",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-4281",
+      "to": "PAN-3863",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4282",
+      "to": "PAN-2625",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

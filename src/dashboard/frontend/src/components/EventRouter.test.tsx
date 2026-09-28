@@ -2,8 +2,9 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardSnapshot, DomainEvent } from '@overdeck/contracts'
 import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts'
-import { EventRouter, eventRouterReconnectDelayMs } from './EventRouter'
+import { BOOTSTRAP_TIMEOUT_MS, EventRouter, eventRouterReconnectDelayMs } from './EventRouter'
 import { useDashboardStore } from '../lib/store'
+import { deriveConnectionPhase, useConnectionState } from '../lib/connectionState'
 import { installStrictFetchMock } from '../test-utils/strictFetchMock'
 import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents'
 
@@ -34,7 +35,7 @@ vi.mock('../lib/wsTransport', () => ({
 }))
 
 vi.mock('../lib/snapshotCache', () => ({
-  loadSnapshotFromCache: () => null,
+  loadSnapshotCacheEntry: () => null,
   saveSnapshotToCache: vi.fn(),
 }))
 
@@ -54,6 +55,25 @@ function resetDashboardStore() {
     bootstrapComplete: false,
     snapshotTimestamp: null,
   })
+}
+
+function resetConnectionState() {
+  useConnectionState.setState({
+    serverReachable: true,
+    streamLive: false,
+    restarting: false,
+    hasSnapshot: false,
+    lastLiveAt: null,
+    reconnect: null,
+  })
+}
+
+function connectionPhase() {
+  return deriveConnectionPhase(useConnectionState.getState())
+}
+
+function recoveryOverlay() {
+  return document.getElementById('pan-recovery-overlay')
 }
 
 function memoryObservationEvent(sequence: number, id = 'obs-live'): DomainEvent {
@@ -95,11 +115,14 @@ function systemHeartbeatEvent(): DomainEvent {
 
 describe('EventRouter memory updates', () => {
   let fetchControl: ReturnType<typeof installStrictFetchMock>
+  let healthResponse: () => Response | Promise<Response>
 
   beforeEach(() => {
     vi.useFakeTimers()
+    healthResponse = () => Response.json({ status: 'ok' })
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/activity') return Response.json([])
+      if (method === 'GET' && url === '/api/health') return healthResponse()
       return undefined
     })
     request.mockReset()
@@ -112,6 +135,7 @@ describe('EventRouter memory updates', () => {
     wsTransport.subscribeOptions = null
     document.body.innerHTML = ''
     resetDashboardStore()
+    resetConnectionState()
   })
 
   afterEach(async () => {
@@ -317,7 +341,7 @@ describe('EventRouter memory updates', () => {
     warn.mockRestore()
   })
 
-  it('keeps early retries banner-only and escalates to the blocking overlay when unreachable', async () => {
+  it('never shows the recovery overlay, however many stream retries fail', async () => {
     const reconnecting = vi.fn()
     window.addEventListener(BACKEND_RECONNECTING_EVENT, reconnecting)
     render(<EventRouter />)
@@ -326,29 +350,56 @@ describe('EventRouter memory updates', () => {
       await Promise.resolve()
     })
     expect(wsTransport.subscribeOptions?.onRetry).toBeTypeOf('function')
-    expect(wsTransport.subscribeOptions?.onReconnect).toBeTypeOf('function')
 
-    // Early transient retries: reconnecting event fires (non-blocking banner),
-    // but the full-screen recovery overlay must NOT appear.
+    for (const attempt of [1, 6, 20]) {
+      act(() => {
+        wsTransport.subscribeOptions!.onRetry!(attempt)
+      })
+      expect(recoveryOverlay()).toBeNull()
+    }
+    expect(reconnecting).toHaveBeenCalledTimes(3)
+    window.removeEventListener(BACKEND_RECONNECTING_EVENT, reconnecting)
+  })
+
+  it('reports delayed, not unreachable, when the stream fails while /api/health answers JSON', async () => {
+    healthResponse = () => Response.json({ status: 'incoherent' }, { status: 503 })
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(connectionPhase()).toBe('live')
+
+    // The App poll already reported the server down; the probe must clear it.
+    useConnectionState.setState({ serverReachable: false })
     act(() => {
       wsTransport.subscribeOptions!.onRetry!(1)
     })
-    expect(reconnecting).toHaveBeenCalled()
-    expect(document.getElementById('pan-recovery-overlay')).toBeNull()
-
-    // Persistent failure escalates to the blocking unreachable overlay.
-    act(() => {
-      wsTransport.subscribeOptions!.onRetry!(6)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
     })
-    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry')
+
+    expect(connectionPhase()).toBe('delayed')
+    expect(recoveryOverlay()).toBeNull()
+  })
+
+  it('reports unreachable when the stream fails and /api/health answers a proxy error page', async () => {
+    healthResponse = () => new Response('<html>Bad Gateway</html>', { status: 502, headers: { 'Content-Type': 'text/html' } })
+    render(<EventRouter />)
 
     await act(async () => {
-      wsTransport.subscribeOptions!.onReconnect!()
-      await Promise.resolve()
       await Promise.resolve()
     })
-    expect(document.getElementById('pan-recovery-overlay')).toBeNull()
-    window.removeEventListener(BACKEND_RECONNECTING_EVENT, reconnecting)
+
+    act(() => {
+      wsTransport.subscribeOptions!.onRetry!(1)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(connectionPhase()).toBe('unreachable')
+    expect(recoveryOverlay()).toBeNull()
   })
 
   it('re-bootstraps through the live transport before announcing recovery', async () => {
@@ -489,43 +540,54 @@ describe('EventRouter memory updates', () => {
     window.removeEventListener(BACKEND_RECONNECTED_EVENT, reconnected)
   })
 
-  it('shows an actionable retry overlay after repeated reconnect failures', async () => {
-    let resolveBootstrap: (value: DashboardSnapshot) => void = () => undefined
+  it('requestReconnect starts a fresh bootstrap while one is in flight and ignores the stale result', async () => {
+    const realSyncSnapshot = useDashboardStore.getState().syncSnapshot
+    const syncSnapshot = vi.fn(realSyncSnapshot)
+    useDashboardStore.setState({ syncSnapshot })
+    let resolveStale: (value: DashboardSnapshot) => void = () => undefined
     request.mockReturnValueOnce(new Promise<DashboardSnapshot>((resolve) => {
-      resolveBootstrap = resolve
+      resolveStale = resolve
     }))
-    render(<EventRouter />)
+    try {
+      render(<EventRouter />)
 
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(request).toHaveBeenCalledTimes(1)
+
+      act(() => {
+        useConnectionState.getState().requestReconnect()
+      })
+      expect(resetTransport).toHaveBeenCalledTimes(1)
+      expect(request).toHaveBeenCalledTimes(2)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      const syncCallsAfterFresh = syncSnapshot.mock.calls.length
+      expect(syncCallsAfterFresh).toBe(1)
+      expect(connectionPhase()).toBe('live')
+
+      await act(async () => {
+        resolveStale({ ...snapshot, sequence: 99 })
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(syncSnapshot).toHaveBeenCalledTimes(syncCallsAfterFresh)
+      expect(syncSnapshot).not.toHaveBeenCalledWith(expect.objectContaining({ sequence: 99 }))
+    } finally {
+      useDashboardStore.setState({ syncSnapshot: realSyncSnapshot })
+    }
+  })
+
+  it('unregisters its reconnect handler on unmount', async () => {
+    const { unmount } = render(<EventRouter />)
     await act(async () => {
       await Promise.resolve()
     })
-
-    act(() => {
-      wsTransport.subscribeOptions!.onRetry!(6)
-    })
-
-    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry')
-    const button = document.querySelector<HTMLButtonElement>('button')
-    expect(button?.textContent).toBe('Retry')
-
-    act(() => {
-      button!.click()
-    })
-
-    expect(resetTransport).not.toHaveBeenCalled()
-    expect(subscribe).toHaveBeenCalledTimes(1)
-
-    await act(async () => {
-      resolveBootstrap(snapshot)
-      await Promise.resolve()
-    })
-
-    act(() => {
-      button!.click()
-    })
-
-    expect(resetTransport).toHaveBeenCalledTimes(1)
-    expect(subscribe).toHaveBeenCalledTimes(2)
+    expect(useConnectionState.getState().reconnect).toBeTypeOf('function')
+    unmount()
+    expect(useConnectionState.getState().reconnect).toBeNull()
   })
 
   it('drops deferred live events that are covered by replay', async () => {
@@ -614,7 +676,58 @@ describe('EventRouter memory updates', () => {
     expect(observations.map((item) => item.id)).toEqual(['obs-replay-1', 'obs-replay-2', 'obs-live-3'])
   })
 
-  it('stops snapshot fallback polling after three minutes', async () => {
+  it('times out a getSnapshot that never settles and retries after backoff, never showing the overlay', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    request.mockReturnValue(new Promise<DashboardSnapshot>(() => {}))
+
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(request).toHaveBeenCalledTimes(1)
+
+    // Fallback polls while the attempt is pending reuse it: no new request.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(BOOTSTRAP_TIMEOUT_MS - 1)
+    })
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(recoveryOverlay()).toBeNull()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(useConnectionState.getState().streamLive).toBe(false)
+    expect(recoveryOverlay()).toBeNull()
+
+    // Backoff (2 s) → full transport reset and a second getSnapshot.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000)
+    })
+    expect(resetTransport).toHaveBeenCalledTimes(1)
+    expect(request).toHaveBeenCalledTimes(2)
+
+    // No give-up window: attempts continue well past three minutes.
+    for (let elapsed = 0; elapsed < 240_000; elapsed += 30_000) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000)
+      })
+      expect(recoveryOverlay()).toBeNull()
+    }
+    const callsAtFourMinutes = request.mock.calls.length
+    expect(callsAtFourMinutes).toBeGreaterThan(2)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(BOOTSTRAP_TIMEOUT_MS + 30_000)
+    })
+    expect(request.mock.calls.length).toBeGreaterThan(callsAtFourMinutes)
+    expect(recoveryOverlay()).toBeNull()
+
+    random.mockRestore()
+    error.mockRestore()
+  })
+
+  it('keeps polling past three minutes without an overlay when getSnapshot keeps failing', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     request.mockRejectedValue(new Error('offline'))
 
@@ -624,23 +737,26 @@ describe('EventRouter memory updates', () => {
       await Promise.resolve()
     })
     expect(request).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(2_000)
-    expect(request).toHaveBeenCalledTimes(2)
 
-    for (let elapsed = 0; elapsed < 178_000; elapsed += 30_000) {
+    for (let elapsed = 0; elapsed < 180_000; elapsed += 30_000) {
       act(() => {
         wsTransport.subscribed!(systemHeartbeatEvent())
       })
-      await vi.advanceTimersByTimeAsync(Math.min(30_000, 178_000 - elapsed))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000)
+      })
     }
-    const callsAtWindowEnd = request.mock.calls.length
-    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry')
+    const callsAtThreeMinutes = request.mock.calls.length
+    expect(recoveryOverlay()).toBeNull()
     act(() => {
       wsTransport.subscribed!(systemHeartbeatEvent())
     })
-    await vi.advanceTimersByTimeAsync(4_000)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000)
+    })
 
-    expect(request.mock.calls.length).toBe(callsAtWindowEnd)
+    expect(request.mock.calls.length).toBeGreaterThan(callsAtThreeMinutes)
+    expect(recoveryOverlay()).toBeNull()
     error.mockRestore()
   })
 })

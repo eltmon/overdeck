@@ -117,9 +117,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
-  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts executeCloseOut`
-  is dead (no production caller; PAN-3968 deletes it) — only `isBranchMerged` there is
-  live. Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
+  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
+  merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
+  only `close_out.remove_workspace` and `delete_feature_branch`; `close_out.auto` and
+  `auto_delay_minutes` have had no consumer since PAN-3917 W4 (`94255f055fe`). The
+  closed-issue reaper (`cloister/reap-issue-residue.ts`, every 60 s) removes the
+  workspace and deletes local+remote branches of any closed, merged issue regardless of
+  `[close_out]` (PAN-4283). Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
   (keeps `state.json`/`sessions.json`); `removeAgentStateDir` is the destructive door
   for deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
   (`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
@@ -147,6 +151,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
+- **The memory governor gates almost nothing** (PAN-4267) — the governor band
+  (`assessMemoryPressure`, `cloister/memory-governor.ts`) is read only by the
+  memory-pressure patrol (activity feed) and `preemption.ts resumeYieldedAgents`;
+  `shed()` has no callers. Conversations and `POST /api/agents` never read it —
+  agent starts are gated by `evaluateSpawnGuardrails` (`routes/agents/shared.ts`)
+  against `memoryWarnGb`/`memoryBlockGb`, a separate threshold pair. On macOS the
+  governor reader (`readProcMemoryDarwin`, `system-health-service.ts`) and the
+  header collector (`system-health/darwin.ts`) measured available memory with
+  different formulas until PAN-4267 unified them.
+
 - **`git log --all` is not "the repository's history" here.** Overdeck keeps
   tens of thousands of turn-checkpoint refs under `refs/pan/turn/*` (planning and
   work sessions snapshot their trees there). `--all` walks them, so any file a
@@ -173,6 +187,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   deacon-lite runs only in the deacon child, where
   `getRequestReviewStarter()` is always null — reach the review pipeline via
   `requestReviewThroughRoute`.
+- **Claude Code's agent selector decides where typed input goes** (PAN-4268) —
+  the `● main` / `◯ <type>  <description>` rows under the prompt box. Pasting
+  into a pane whose `●` is on a subagent misroutes; with footer focus (`❯` on a
+  row) text is swallowed and `x` stops a subagent. Only `Down/Up/Enter/Escape`.
 
 - **Forge PR lookups: failure vs absence, and stale stored URLs** (PAN-4263) —
   `discoverArtifact` (`src/lib/forge.ts`) is called without `repository` by
@@ -184,4 +202,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   long-closed first PR. Treat stored artifact URLs as hints, never as the PR the
   gate judged.
 
-<!-- last-verified: 2026-09-27 -->
+- **New GitHub callers must go through the quota meter** (PAN-4264) — exec
+  `gh` with `runGh` (`src/lib/github-quota/run-gh.ts`) and name the caller
+  with `withGitHubCaller`, or its spend only shows up as `unattributed` and it
+  keeps calling during a pause. The pause gate is per pool and bucket
+  (`user`/`pat`/`app` × `graphql`/`rest`), and only the read-model pollers
+  are paused. Agent `gh` calls are counted by a shim that lives beside the
+  git guard (`launcher-git-guard.ts`), not by `runGh`.
+
+<!-- last-verified: 2026-09-28 -->

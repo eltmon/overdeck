@@ -101,7 +101,7 @@ describe('issue closed detection', () => {
       'eltmon/overdeck',
       '--json',
       'state',
-    ], { encoding: 'utf-8', timeout: 10_000 });
+    ], expect.objectContaining({ encoding: 'utf-8', timeout: 10_000 }));
   });
 
   it('returns true through the GitHub App REST tracker fallback when configured', async () => {

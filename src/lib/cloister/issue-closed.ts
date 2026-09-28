@@ -1,5 +1,3 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { Effect } from 'effect';
 
 import { getShadowState } from '../shadow-state.js';
@@ -13,8 +11,9 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { createTracker } from '../tracker/factory.js';
 import { LinearTracker } from '../tracker/linear.js';
 import type { IssueTracker } from '../tracker/interface.js';
+import { GitHubQuotaPausedError, GitHubRateLimitedError } from '../github-quota/pause-gate.js';
+import { runGh } from '../github-quota/run-gh.js';
 
-const execFileAsync = promisify(execFile);
 export const TRACKER_CLOSED_CACHE_TTL_MS = 5 * 60 * 1000;
 const trackerClosedCache = new Map<string, { closed: boolean; checkedAt: number }>();
 
@@ -42,7 +41,9 @@ export async function readLiveTrackerIssueState(issueId: string): Promise<LiveTr
       return issue.state === 'closed' ? 'closed' : 'open';
     }
 
-    const { stdout } = await execFileAsync('gh', [
+    // PAN-4264: metered with the caller from context — the reaper's
+    // `close-out` (non-essential) or, for closeOut()/`pan close`, `other`.
+    const { stdout } = await runGh([
       'issue',
       'view',
       String(resolved.number),
@@ -50,7 +51,7 @@ export async function readLiveTrackerIssueState(issueId: string): Promise<LiveTr
       `${resolved.owner}/${resolved.repo}`,
       '--json',
       'state',
-    ], { encoding: 'utf-8', timeout: 10_000 });
+    ], { timeout: 10_000 });
     const parsed = JSON.parse(stdout) as { state?: unknown };
     if (typeof parsed.state !== 'string') {
       throw new Error(`Tracker state response for ${issueId} did not contain a state`);
@@ -102,7 +103,9 @@ export async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
       return closed;
     }
 
-    const { stdout } = await execFileAsync('gh', [
+    // PAN-4264: metered with the caller from context — the reaper's
+    // `close-out` (non-essential) or, for closeOut()/`pan close`, `other`.
+    const { stdout } = await runGh([
       'issue',
       'view',
       String(resolved.number),
@@ -110,12 +113,15 @@ export async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
       `${resolved.owner}/${resolved.repo}`,
       '--json',
       'state',
-    ], { encoding: 'utf-8', timeout: 10_000 });
+    ], { timeout: 10_000 });
     const parsed = JSON.parse(stdout) as { state?: unknown };
     const closed = typeof parsed.state === 'string' && parsed.state.toLowerCase() === 'closed';
     trackerClosedCache.set(issueId, { closed, checkedAt: now });
     return closed;
-  } catch {
+  } catch (error) {
+    // A quota pause or refusal is "unknown", not "open": answer false (never
+    // reap) but do not cache it, so the next check asks GitHub again.
+    if (error instanceof GitHubQuotaPausedError || error instanceof GitHubRateLimitedError) return false;
     trackerClosedCache.set(issueId, { closed: false, checkedAt: now });
     return false;
   }

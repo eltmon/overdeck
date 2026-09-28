@@ -10,6 +10,8 @@ interface TelemetrySettingsResponse {
     enabled?: boolean;
     effectiveEnabled?: boolean;
     installId?: string;
+    /** PAN-4264: present only when operator grouping is on and a hash exists. */
+    operatorHash?: string;
   };
 }
 
@@ -123,6 +125,14 @@ export async function initTelemetry(): Promise<void> {
     });
     if (settings.telemetry?.installId) {
       posthog.register({ install_id: settings.telemetry.installId });
+    }
+    // PAN-4264: the server sends operatorHash only while operator grouping is
+    // on. posthog-js persists super properties (localStorage + cookie), so an
+    // opt-out must remove the stored hash, not merely skip registering it.
+    if (settings.telemetry?.operatorHash) {
+      posthog.register({ operatorHash: settings.telemetry.operatorHash });
+    } else {
+      posthog.unregister('operatorHash');
     }
     initialized = true;
   } catch {

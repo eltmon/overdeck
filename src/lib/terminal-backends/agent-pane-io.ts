@@ -95,3 +95,42 @@ export async function sendHerdrPaneKeys(
 ): Promise<void> {
   await api.call('pane.send_keys', { pane_id: paneId, keys: tmuxKeys.map(toHerdrKey) });
 }
+
+/** The keys ensure-main may send (PAN-4268). Never printable text, `x`, or `Left`. */
+export type SelectorKey = 'Up' | 'Down' | 'Enter' | 'Escape';
+
+/** Read and key one agent's pane, bound to whichever backend holds it. */
+export interface AgentPaneIo {
+  readonly backend: 'herdr' | 'tmux';
+  read(lines: number): Promise<string>;
+  sendKey(key: SelectorKey): Promise<void>;
+}
+
+/**
+ * Resolve the pane once (PAN-4268). On a Herdr host with a Herdr pane for the
+ * agent: `pane.read` (source `visible`) and `pane.send_keys`. Otherwise — a tmux
+ * host, or a Herdr host whose agent Herdr does not hold (legacy tmux agents on
+ * `tmux -L overdeck`, the same fallback `deliverAgentMessage` takes) — tmux
+ * `capturePane` and `sendKeysAsync`.
+ */
+export async function resolveAgentPaneIo(agentId: string, backend?: TerminalBackend): Promise<AgentPaneIo> {
+  const { resolveLaunchBackend } = await import('./launch.js');
+  const resolved = backend ?? (await resolveLaunchBackend());
+  if (resolved.name === 'herdr') {
+    const { findHerdrAgentPane, readHerdrPaneText } = await import('./herdr.js');
+    const pane = await findHerdrAgentPane(agentId);
+    if (pane) {
+      return {
+        backend: 'herdr',
+        read: (lines) => readHerdrPaneText(pane.paneId, lines, 'visible'),
+        sendKey: (key) => sendHerdrPaneKeys(pane.paneId, [key]),
+      };
+    }
+  }
+  const { capturePane, sendKeysAsync } = await import('../tmux.js');
+  return {
+    backend: 'tmux',
+    read: (lines) => capturePane(agentId, lines),
+    sendKey: (key) => sendKeysAsync(agentId, key, 'input-target'),
+  };
+}

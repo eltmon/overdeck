@@ -49,8 +49,6 @@ type SelectProjectHandler = (projectName: string | null, opts?: { updateUrl?: bo
 
 interface AppRoutesProps {
   activeTab: Tab;
-  backendDown: boolean;
-  restarting: boolean;
   issues: Issue[];
   selectedConvId: string | null;
   conversationViewMode: ConversationViewMode;
@@ -84,8 +82,6 @@ interface AppRoutesProps {
 
 export function AppRoutes({
   activeTab,
-  backendDown,
-  restarting,
   issues,
   selectedConvId,
   conversationViewMode,
@@ -115,7 +111,7 @@ export function AppRoutes({
   keyboardShortcutsDisabled = false,
 }: AppRoutesProps) {
   return (
-    <BackendConnectionBoundary backendDown={backendDown} restarting={restarting}>
+    <BackendConnectionBoundary>
       {activeTab === 'home' && (
         <div className="w-full h-full overflow-hidden">
           <HomeSwitch

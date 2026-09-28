@@ -3,6 +3,7 @@ import { render, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BackendConnectionBoundary } from '../../App/BackendConnectionBoundary'
 import { useStageShortcuts } from './useStageShortcuts'
+import { useConnectionState } from '../../lib/connectionState'
 import {
   usePanesStore,
   selectPanesForWorkspace,
@@ -107,28 +108,23 @@ describe('useStageShortcuts', () => {
     expect(panes()).toHaveLength(1) // ⌘T suppressed
   })
 
-  it('does not fire while the backend-outage boundary hides the page (PAN-3867)', () => {
+  it('keeps working during an outage, because degraded mode keeps the page visible (PAN-4279)', () => {
     const homeId = panes()[0].paneId
-    const d = usePanesStore.getState().addPane(WS, { paneType: 'docs', label: 'D' })
-    const open = () => selectThreadTerminalState(useTerminalStateStore.getState().terminalStateByThreadId, WS).terminalOpen
-    const queryClient = new QueryClient()
-    const page = (backendDown: boolean) => (
-      <QueryClientProvider client={queryClient}>
-        <BackendConnectionBoundary backendDown={backendDown} restarting={false}><Host /></BackendConnectionBoundary>
-      </QueryClientProvider>
-    )
-    const { rerender } = render(page(true))
+    usePanesStore.getState().addPane(WS, { paneType: 'docs', label: 'D' })
+    useConnectionState.setState({ hasSnapshot: true, serverReachable: false })
+    try {
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <BackendConnectionBoundary><Host /></BackendConnectionBoundary>
+        </QueryClientProvider>,
+      )
 
-    meta('w')
-    meta('t')
-    expect(panes()).toHaveLength(2) // ⌘W suppressed: the hidden pane survives
-    expect(activeId()).toBe(d)
-    expect(open()).toBe(false) // ⌘T suppressed
-
-    rerender(page(false))
-    meta('w')
-    expect(panes()).toHaveLength(1)
-    expect(activeId()).toBe(homeId)
+      meta('w')
+      expect(panes()).toHaveLength(1)
+      expect(activeId()).toBe(homeId)
+    } finally {
+      useConnectionState.setState({ hasSnapshot: false, serverReachable: true })
+    }
   })
 
   it('ignores combos without the meta key', () => {

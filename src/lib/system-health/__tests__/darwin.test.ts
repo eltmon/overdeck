@@ -1,14 +1,20 @@
 import type { CpuInfo } from 'node:os';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 import {
+  computeDarwinAvailableMemoryBytes,
   createDarwinHostHealthCollector,
   parseDarwinMemoryPressure,
+  parseDarwinPressureLevel,
   parseDarwinSwapUsage,
   parseDarwinVmStat,
   type DarwinCollectorAdapters,
 } from '../darwin.js';
+
+const VM_STAT_16GB_MAC_FIXTURE = fileURLToPath(new URL('./fixtures/vm-stat-16gb-mac.txt', import.meta.url));
 
 const GIB = 1024 ** 3;
 const PRESSURE_COLON = [
@@ -155,5 +161,61 @@ describe('macOS host health collector', () => {
     expect(first.cpuPercent.status).toBe('unavailable');
     expectAvailable(second.cpuPercent, 50);
     expectAvailable(second.loadPerCore1m, 6);
+  });
+});
+
+describe('parseDarwinVmStat activity-monitor formula', () => {
+  it('uses the Activity Monitor formula when a total is given and all its fields are present', async () => {
+    const content = await readFile(VM_STAT_16GB_MAC_FIXTURE, 'utf-8');
+    const totalMemoryBytes = 16 * GIB;
+
+    const withTotal = parseDarwinVmStat(content, totalMemoryBytes);
+    expect(withTotal?.availableMemoryBytes).toBe(2_576_973_824);
+    expect(withTotal?.availableSource).toBe('activity-monitor');
+
+    const withoutTotal = parseDarwinVmStat(content);
+    expect(withoutTotal?.availableMemoryBytes).toBe(1_073_741_824);
+    expect(withoutTotal?.availableSource).toBe('free-inactive-speculative');
+  });
+});
+
+describe('computeDarwinAvailableMemoryBytes', () => {
+  it('prefers the memory_pressure free percentage of total', () => {
+    const result = computeDarwinAvailableMemoryBytes({
+      pressureOutput: 'System-wide memory free percentage: 15%',
+      vmStatOutput: VM_STAT_FIRST,
+      totalMemoryBytes: 16 * GIB,
+    });
+    expect(result).toBe(Math.round(16 * GIB * 15 / 100));
+  });
+
+  it('falls back to vm_stat when the pressure output is null', () => {
+    const result = computeDarwinAvailableMemoryBytes({
+      pressureOutput: null,
+      vmStatOutput: VM_STAT_FIRST,
+      totalMemoryBytes: 16 * GIB,
+    });
+    expect(result).toBe(350 * 4096);
+  });
+
+  it('returns null when both outputs are null', () => {
+    const result = computeDarwinAvailableMemoryBytes({
+      pressureOutput: null,
+      vmStatOutput: null,
+      totalMemoryBytes: 16 * GIB,
+    });
+    expect(result).toBeNull();
+  });
+});
+
+describe('parseDarwinPressureLevel', () => {
+  it.each([
+    ['1\n', 'normal'],
+    ['2', 'warn'],
+    ['4', 'critical'],
+    ['0', null],
+    ['', null],
+  ])('parses %j as %s', (input, expected) => {
+    expect(parseDarwinPressureLevel(input)).toBe(expected);
   });
 });

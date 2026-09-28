@@ -50,9 +50,16 @@ import {
   mergePullRequestWithApp,
   postOverdeckTestsStatus,
   resetAppBotLoginCache,
+  resetInstallationTokenCacheForTests,
   resolveAppBotLogin,
   verifyAppCanMerge,
 } from '../../../src/lib/github-app.js';
+
+// PAN-4264: installation tokens are memoized per process; every test starts
+// without one so its fetch mock sees the mint it expects.
+beforeEach(() => {
+  resetInstallationTokenCacheForTests();
+});
 
 // #4066 review (R3-2): the bot whose reviews approve a merge is the installed
 // App's (here `overdeck-agent`, App 4205044), never a hard-coded login.
@@ -669,5 +676,135 @@ describe('GitHub App request timeout (PAN-4047)', () => {
 
     await expect(getIssueState('eltmon', 'overdeck', 4047)).resolves.toEqual({ state: 'open' });
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+// PAN-4264 Work Item 4: the App REST door is metered in the `app` pool and a
+// rate-limit refusal becomes a typed error plus a pause.
+describe('App REST quota metering (PAN-4264)', () => {
+  const fetchMock = vi.fn();
+  const originalHome = process.env.OVERDECK_HOME;
+  let home: string;
+
+  beforeEach(async () => {
+    const { mkdtemp } = await import('fs/promises');
+    const { tmpdir } = await import('os');
+    home = await mkdtemp(`${tmpdir()}/pan-app-quota-`);
+    process.env.OVERDECK_HOME = home;
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    const { flushLedgerWrites } = await import('../../../src/lib/github-quota/ledger.js');
+    await flushLedgerWrites();
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    const { rm } = await import('fs/promises');
+    await rm(home, { recursive: true, force: true });
+  });
+
+  function tokenResponse() {
+    return new Response(JSON.stringify({ token: 'token', expires_at: '2099-06-10T00:00:00Z' }), { status: 201 });
+  }
+
+  async function readLedgerLines(): Promise<Array<Record<string, unknown>>> {
+    const { readFile } = await import('fs/promises');
+    const { flushLedgerWrites, ledgerFilePath } = await import('../../../src/lib/github-quota/ledger.js');
+    await flushLedgerWrites();
+    const raw = await readFile(ledgerFilePath(Date.now()), 'utf8');
+    return raw.trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
+  }
+
+  it('appends an app-pool ledger line with the rate-limit headers for a 200', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ state: 'open' }), {
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '4990', 'x-ratelimit-limit': '5000', 'x-ratelimit-reset': '1790000000' },
+      }));
+
+    await expect(getIssueState('eltmon', 'overdeck', 4264)).resolves.toEqual({ state: 'open' });
+
+    const [line] = await readLedgerLines();
+    expect(line).toMatchObject({
+      kind: 'call', caller: 'app-rest', pool: 'app', bucket: 'rest', cost: 1, estimated: false, outcome: 'ok',
+      remaining: 4990, limit: 5000, resetAt: new Date(1790000000 * 1000).toISOString(),
+    });
+  });
+
+  it('throws GitHubRateLimitedError and writes an app REST pause for a 403 with zero remaining', async () => {
+    const { GitHubRateLimitedError } = await import('../../../src/lib/github-quota/pause-gate.js');
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response('{"message":"API rate limit exceeded for installation ID 67890."}', {
+        status: 403,
+        headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 600) },
+      }));
+
+    await expect(getIssueState('eltmon', 'overdeck', 4264)).rejects.toBeInstanceOf(GitHubRateLimitedError);
+
+    const { readFile } = await import('fs/promises');
+    const { getGitHubQuotaDir } = await import('../../../src/lib/github-quota/ledger.js');
+    const pauseFile = JSON.parse(await readFile(`${getGitHubQuotaDir()}/pause.json`, 'utf8'));
+    expect(pauseFile.pauses['app:rest']).toMatchObject({ pool: 'app', bucket: 'rest', kind: 'primary', caller: 'app-rest' });
+    expect((await readLedgerLines()).map((l) => l.outcome)).toEqual(['rate_limited']);
+  });
+
+  it('keeps the existing error for a non-rate-limit failure and records an error line', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
+
+    await expect(getIssueState('eltmon', 'overdeck', 4264))
+      .rejects.toThrow('GitHub API GET /repos/eltmon/overdeck/issues/4264 failed: 404 Not Found');
+    expect((await readLedgerLines()).map((l) => l.outcome)).toEqual(['error']);
+  });
+});
+
+// PAN-4264 Work Item 5: one installation token serves every App call until
+// 5 minutes before it expires.
+describe('installation token cache (PAN-4264)', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 8, 27, 15, 0));
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/access_tokens')) {
+        const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+        return new Response(JSON.stringify({ token: 'token', expires_at: expiresAt }), { status: 201 });
+      }
+      return new Response(JSON.stringify({ state: 'open' }), { status: 200 });
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function mintCount(): number {
+    return fetchMock.mock.calls.filter((call) => String(call[0]).endsWith('/access_tokens')).length;
+  }
+
+  it('mints one token for two App calls within its lifetime', async () => {
+    await getIssueState('eltmon', 'overdeck', 1);
+    await getIssueState('eltmon', 'overdeck', 2);
+    expect(mintCount()).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('mints again 56 minutes after a 60-minute token was minted', async () => {
+    await getIssueState('eltmon', 'overdeck', 1);
+    await vi.advanceTimersByTimeAsync(54 * 60_000);
+    await getIssueState('eltmon', 'overdeck', 2);
+    expect(mintCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
+    await getIssueState('eltmon', 'overdeck', 3);
+    expect(mintCount()).toBe(2);
   });
 });

@@ -168,7 +168,10 @@ export function hideOverlay(): void {
 export async function waitForServerThenReload(details: RecoveryDetails): Promise<void> {
   if (reconnecting) return;
   reconnecting = true;
-  showOverlay('Reconnecting to the dashboard…');
+  // Only a dead React tree needs the modal. For asset and chunk failures the
+  // mounted UI stays usable and the degraded-mode banner already reports the
+  // server's state, so poll silently (PAN-4279).
+  if (details.trigger === 'root_error_boundary') showOverlay('Reconnecting to the dashboard…');
 
   const lastReload = Number(sessionStorage.getItem(LAST_RELOAD_KEY) || '0');
 

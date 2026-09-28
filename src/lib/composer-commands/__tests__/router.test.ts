@@ -102,6 +102,7 @@ function dependencies() {
     generateAiTitle: vi.fn(async () => {}),
     shouldInterceptManualCompact: vi.fn(() => false),
     transformMessageForHarness: vi.fn((message: string) => message),
+    ensureMainInputTarget: vi.fn(async () => ({ ok: true as const, check: 'no-selector' as const })),
   };
 }
 
@@ -255,7 +256,7 @@ describe('conversation composer command routing', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(decodeJsonResponse(response)).toEqual({ ok: true });
+    expect(decodeJsonResponse(response)).toEqual({ ok: true, inputTarget: 'main' });
     expect(deps.shouldInterceptManualCompact).toHaveBeenCalledWith(message);
     expect(deps.transformMessageForHarness).toHaveBeenCalledWith(message, 'claude-code', []);
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(

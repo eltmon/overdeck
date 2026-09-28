@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { BackendPane } from "./backend-pane"
 import { DerivedIssueState } from "./derived-issue-state"
+import { GitHubQuotaSnapshot } from "./github-quota"
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -583,6 +584,8 @@ export const DashboardSnapshot = Schema.Struct({
   embedProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EmbedProgressSnapshot)),
   ciByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectCiSnapshot)),
   restartGate: Schema.optional(RestartGateSnapshot),
+  /** PAN-4264 — GitHub API quota use, samples and pauses; derived, never stored. */
+  githubQuota: Schema.optional(GitHubQuotaSnapshot),
   /** PAN-3751 — in-flight deploys keyed by project key. */
   deployByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectDeploySnapshot)),
   timestamp: Schema.String,

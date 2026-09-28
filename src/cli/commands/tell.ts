@@ -68,6 +68,13 @@ export async function tellCommand(id: string, message: string, options: TellOpti
     const outcome = await messageAgent(agentId, message, 'pan-tell', {
       owesRework: await issueOwesRework(issueId),
     });
+    if (outcome.inputTargetRefusal) {
+      console.error(chalk.red(`Message NOT delivered to ${agentId}: Claude Code's typed input could not be moved to the main agent.`));
+      console.error(chalk.dim(`  "${message}"`));
+      console.error(chalk.dim(`  ${outcome.inputTargetRefusal.reason}`));
+      console.error(chalk.dim(`  The text is saved under ~/.overdeck/agents/${agentId}/mail/ for manual delivery.`));
+      return exitCli(1);
+    }
     if (outcome.landedInSubagent) {
       const { agentId: subagentId, description } = outcome.landedInSubagent;
       console.error(chalk.red(
@@ -86,8 +93,11 @@ export async function tellCommand(id: string, message: string, options: TellOpti
       }
       return exitCli(1);
     }
-    console.log(chalk.green(`Message delivered to ${agentId}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
+    console.log(chalk.green(`Message delivered to ${agentId}${outcome.inputTarget === 'main' ? "'s main agent" : ''}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
     console.log(chalk.dim(`  "${message}"`));
+    if (outcome.switchedFromSubagent) {
+      console.log(chalk.dim(`  Switched Claude Code's input from subagent "${outcome.switchedFromSubagent}" back to the main agent first.`));
+    }
     // PAN-3736: when the delivery door explains itself — a busy agent whose
     // message went to its mail file, a dedup — print that reason. It names the
     // mail file, so the reader can check or hand-deliver the message.

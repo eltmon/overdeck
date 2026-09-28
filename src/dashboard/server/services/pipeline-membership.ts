@@ -5,7 +5,9 @@ import {
   mapPipelineProjects,
   PipelineMembershipUnavailableError,
   PIPELINE_PROJECT_CONCURRENCY,
+  tryResolveProjectTrackerType,
 } from '../../../lib/pipeline-membership-gather.js';
+import { recordMembershipTrackerSkip } from '../../../lib/github-quota/skipped-projects.js';
 import type { ProjectConfig } from '../../../lib/projects.js';
 import { resolvePipelineMembership, type IssueLensSignals, type PipelineMembership } from '../../../lib/pipeline-membership.js';
 
@@ -85,6 +87,16 @@ function refreshMembershipSnapshot(
   now: () => number,
 ): Promise<void> {
   if (snapshot.refresh) return snapshot.refresh;
+  // PAN-4264: a project with no resolvable tracker is skipped, not refreshed:
+  // no gather, no warning, no failure. Consumers still see the reason.
+  const trackerUnresolvable = tryResolveProjectTrackerType(project) === null;
+  recordMembershipTrackerSkip(project, trackerUnresolvable);
+  if (trackerUnresolvable) {
+    snapshot.lastError = `No tracker configured for ${project.name ?? project.path} (set tracker: or issue_prefix: in projects.yaml)`;
+    snapshot.lastErrorReason = 'tracker_unconfigured';
+    snapshot.lastErrorAt = now();
+    return Promise.resolve();
+  }
   snapshot.refresh = scheduleMembershipRefresh(() => getMembership(project)).then((value) => {
     snapshot.value = value;
     snapshot.refreshedAt = now();

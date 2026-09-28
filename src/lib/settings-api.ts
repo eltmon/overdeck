@@ -32,16 +32,16 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
-import { validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
+import { telemetrySettingsFromConfig, validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
 import { hasModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import { isEffortLevel } from '@overdeck/contracts';
 import { effortConfigErrors } from './agents/effort-support.js';
-import { resolveTelemetryEnabled, telemetryEnvironmentForcesOff } from './telemetry/config.js';
-import { getOrCreateInstallId } from './telemetry/install-id.js';
+import { telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
+import { ensureOperatorHash } from './telemetry/operator-hash.js';
 
 export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
 
@@ -699,11 +699,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         enabled: config.tldr?.enabled ?? true,
       },
     },
-    telemetry: {
-      enabled: config.telemetry?.enabled ?? true,
-      effectiveEnabled: resolveTelemetryEnabled(),
-      installId: getOrCreateInstallId(),
-    },
+    telemetry: telemetrySettingsFromConfig(config.telemetry),
     tts: toApiTtsConfig(config.tts),
     tts_summarizer: {
       model: config.ttsSummarizer?.model,
@@ -1016,7 +1012,15 @@ async function saveSettingsApiPromiseUnlocked(
         }
       : undefined,
     tracker_keys: settings.tracker_keys,
-    telemetry: settings.telemetry ? { enabled: settings.telemetry.enabled } : undefined,
+    telemetry: settings.telemetry
+      ? {
+          enabled: settings.telemetry.enabled,
+          // PAN-4264: written only when it is or was on, so saves do not add the key everywhere.
+          ...(settings.telemetry.operatorGrouping === true || currentConfig.telemetry?.operator_grouping
+            ? { operator_grouping: settings.telemetry.operatorGrouping === true }
+            : {}),
+        }
+      : undefined,
     experimental: settings.experimental
       ? {
           experimentalFeatures: settings.experimental.experimentalFeatures,
@@ -1044,6 +1048,8 @@ async function saveSettingsApiPromiseUnlocked(
   // Clear the cache because rapid writes or coarse filesystem mtime resolution can miss invalidation.
   clearConfigCache();
   await synchronizeAnalyticsServices();
+  // PAN-4264: turning operator grouping on derives the hash (one gh call).
+  if (settings.telemetry?.operatorGrouping === true) void ensureOperatorHash();
 }
 
 /** Merge `updates` into the current API settings and persist them. */
@@ -1132,6 +1138,8 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
       enabled: updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true,
       effectiveEnabled: !telemetryEnvironmentForcesOff() && (updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true),
       installId: current.telemetry?.installId,
+      operatorGrouping: updates.telemetry?.operatorGrouping ?? current.telemetry?.operatorGrouping ?? false,
+      ...(current.telemetry?.operatorHash ? { operatorHash: current.telemetry.operatorHash } : {}),
     },
     experimental: {
       ...current.experimental,
