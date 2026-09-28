@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4290",
+  "created": "2026-09-28T12:19:35.919Z",
+  "updated": "2026-09-28T12:19:35.919Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pr-merged-flag": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T12:19:35.919Z"
+    }
+  }
+}
