@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4300",
   "created": "2026-09-28T12:54:38.633Z",
-  "updated": "2026-09-28T13:47:27.454Z",
+  "updated": "2026-09-28T13:47:42.151Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "dead-agent-guard.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T13:47:27.453Z"
+    },
+    "dead-agent-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:42.151Z"
     }
   }
 }
