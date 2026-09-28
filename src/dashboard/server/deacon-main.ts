@@ -33,6 +33,7 @@ function buildAgentStatusChangedPayload(
     issueId: state.issueId,
     status: toAgentStatusPayload(state.status),
     previousStatus: previousStatus ? toAgentStatusPayload(previousStatus) : undefined,
+    stoppedByUser: state.stoppedByUser === true,
     paused: state.paused === true,
     pausedReason: state.pausedReason ?? null,
     pausedAt: state.pausedAt ?? null,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentSnapshot, DerivedIssueState, SessionNode } from '@overdeck/contracts';
+import type { AgentSnapshot, DerivedIssueState, DomainEvent, SessionNode } from '@overdeck/contracts';
+import { INITIAL_READ_MODEL_STATE, applyEvent } from '@overdeck/contracts';
 import {
   SESSION_ENDED_FALLBACK,
   deriveSessionOutcome,
@@ -293,5 +294,97 @@ describe('outcomeFactsFromAgent — drawer role mapping', () => {
 
     const paused = outcomeFactsFromAgent({ id: 'a', status: 'stopped', role: 'work', paused: true }, derived({ state: 'working' }));
     expect(deriveSessionOutcome(paused)).toEqual(SESSION_ENDED_FALLBACK);
+  });
+});
+
+describe('regression: an operator stop delivers stoppedByUser to the live store (PAN-4290 review)', () => {
+  // The stop route (src/dashboard/server/routes/agents/lifecycle-stop.ts) emits
+  // `agent.stopped` (agentId/issueId only) and then `agent.status_changed`
+  // (carrying stoppedByUser) for the same transition. Replaying that exact
+  // event pair through the shared reducer must fold stoppedByUser into
+  // agentsById, or a live operator Stop renders red "Ended unexpectedly"
+  // instead of "Stopped by operator" until the next dashboard restart.
+  it('agent.stopped followed by agent.status_changed folds stoppedByUser, so the outcome is Stopped by operator', () => {
+    const agentId = 'agent-pan-9';
+    const issueId = 'PAN-9';
+
+    // Seed a live running agent directly — applyEvent's agent.status_changed
+    // case ignores events for an unknown agentId (except role 'strike'), so a
+    // seed event would be a silent no-op here.
+    const seeded = {
+      ...INITIAL_READ_MODEL_STATE,
+      agentsById: {
+        ...INITIAL_READ_MODEL_STATE.agentsById,
+        [agentId]: { id: agentId, issueId, status: 'running', role: 'work' },
+      },
+    };
+
+    const agentStopped = {
+      sequence: 1,
+      type: 'agent.stopped',
+      timestamp: '2026-01-01T00:01:00Z',
+      payload: { agentId, issueId },
+    } as unknown as DomainEvent;
+
+    const agentStatusChanged = {
+      sequence: 2,
+      type: 'agent.status_changed',
+      timestamp: '2026-01-01T00:01:00Z',
+      payload: {
+        agentId,
+        issueId,
+        status: 'stopped',
+        previousStatus: 'running',
+        hasLivePane: false,
+        hasLiveTmuxSession: false,
+        stoppedByUser: true,
+        paused: false,
+        troubled: false,
+        consecutiveFailures: 0,
+      },
+    } as unknown as DomainEvent;
+
+    let state = seeded;
+    state = applyEvent(state, agentStopped);
+    state = applyEvent(state, agentStatusChanged);
+
+    const agent = state.agentsById[agentId];
+    expect(agent?.stoppedByUser).toBe(true);
+    expect(agent?.status).toBe('stopped');
+
+    const outcomeNode = node({ type: 'work', sessionId: agentId, status: 'stopped', presence: 'ended' });
+    const outcomeDerived = derived({ issueId, state: 'working' });
+    const facts = outcomeFactsFromSessionNode(outcomeNode, outcomeDerived, agent);
+    expect(deriveSessionOutcome(facts).label).toBe('Stopped by operator');
+  });
+
+  it('without the agent.status_changed fold, the same transition renders red Ended unexpectedly (documents the pre-fix bug)', () => {
+    const agentId = 'agent-pan-10';
+    const issueId = 'PAN-10';
+
+    const seeded = {
+      ...INITIAL_READ_MODEL_STATE,
+      agentsById: {
+        ...INITIAL_READ_MODEL_STATE.agentsById,
+        [agentId]: { id: agentId, issueId, status: 'running', role: 'work' },
+      },
+    };
+
+    const agentStoppedOnly = {
+      sequence: 1,
+      type: 'agent.stopped',
+      timestamp: '2026-01-01T00:01:00Z',
+      payload: { agentId, issueId },
+    } as unknown as DomainEvent;
+
+    const state = applyEvent(seeded, agentStoppedOnly);
+
+    const agent = state.agentsById[agentId];
+    expect(agent?.stoppedByUser).toBeUndefined();
+
+    const outcomeNode = node({ type: 'work', sessionId: agentId, status: 'stopped', presence: 'ended' });
+    const outcomeDerived = derived({ issueId, state: 'working' });
+    const facts = outcomeFactsFromSessionNode(outcomeNode, outcomeDerived, agent);
+    expect(deriveSessionOutcome(facts).label).toBe('Ended unexpectedly');
   });
 });
