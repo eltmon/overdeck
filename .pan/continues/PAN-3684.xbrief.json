@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3684",
   "created": "2026-09-28T12:12:20.568Z",
-  "updated": "2026-09-28T13:08:55.457Z",
+  "updated": "2026-09-28T13:08:56.611Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,7 +10,7 @@
   "sessionHistory": [],
   "items": {
     "auto-start": {
-      "status": "completed",
+      "status": "cancelled",
       "claimedBy": "agent-pan-3684",
       "claimedAt": "2026-09-28T12:12:20.568Z",
       "doneAt": "2026-09-28T12:43:51.352Z"
