@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:05:24.267Z",
+  "updated": "2026-09-28T16:05:36.198Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -312,6 +312,10 @@
     "runaway-patrol.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T16:05:24.267Z"
+    },
+    "runaway-patrol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:05:36.198Z"
     }
   }
 }
