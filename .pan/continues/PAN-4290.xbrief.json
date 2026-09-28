@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4290",
   "created": "2026-09-28T12:19:35.919Z",
-  "updated": "2026-09-28T14:00:20.252Z",
+  "updated": "2026-09-28T14:00:33.551Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "outcome-hooks.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T14:00:20.252Z"
+    },
+    "outcome-hooks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:33.551Z"
     }
   }
 }
