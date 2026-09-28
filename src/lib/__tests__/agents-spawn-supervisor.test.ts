@@ -368,7 +368,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(createSessionMock).toHaveBeenCalledWith(
       'agent-pan-1405',
       workspace,
-      `bash ${join(agentDir, 'launcher.sh')}`,
+      `nice -n 10 -- bash ${join(agentDir, 'launcher.sh')}`,
       expect.objectContaining({
         env: expect.objectContaining({ OVERDECK_AGENT_STARTED_BY: 'test:agents-spawn-supervisor' }),
       }),
@@ -1008,7 +1008,7 @@ describe('Prime Agent work launch (PAN-3668 WI-12)', () => {
     expect(createSessionMock).toHaveBeenCalledWith(
       'agent-pan-1405',
       workspace,
-      `bash ${join(agentDir, 'launcher.sh')}`,
+      `nice -n 10 -- bash ${join(agentDir, 'launcher.sh')}`,
       expect.objectContaining({ env: expect.objectContaining({ OPENAI_API_KEY: 'sk-prime-test' }) }),
     );
     expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405', 'prime-agent', 30);
