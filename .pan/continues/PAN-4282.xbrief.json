@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:39:45.333Z",
+  "updated": "2026-09-28T00:39:57.343Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "docs-first-run.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T00:39:45.332Z"
+    },
+    "docs-first-run.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:57.342Z"
     }
   }
 }
