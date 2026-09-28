@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:27:06.669Z",
+  "updated": "2026-09-28T00:34:22.473Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4282",
       "claimedAt": "2026-09-28T00:26:04.287Z",
       "doneAt": "2026-09-28T00:27:06.668Z"
+    },
+    "first-run-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:34:22.473Z"
     }
   }
 }
