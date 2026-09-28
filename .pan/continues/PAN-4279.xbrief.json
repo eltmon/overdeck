@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:42:18.954Z",
+  "updated": "2026-09-28T00:42:30.278Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,10 @@
     "asset-recovery-overlay.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:42:18.953Z"
+    },
+    "asset-recovery-overlay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:42:30.278Z"
     }
   }
 }
