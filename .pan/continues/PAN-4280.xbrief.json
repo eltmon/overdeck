@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:21:22.845Z",
+  "updated": "2026-09-28T01:21:33.773Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -346,6 +346,10 @@
     "unscoped-move-chip.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T01:21:22.845Z"
+    },
+    "unscoped-move-chip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:21:33.773Z"
     }
   }
 }
