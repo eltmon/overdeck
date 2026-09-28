@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4300",
   "created": "2026-09-28T12:54:38.633Z",
-  "updated": "2026-09-28T13:16:40.146Z",
+  "updated": "2026-09-28T13:16:43.690Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4300",
       "claimedAt": "2026-09-28T13:08:50.150Z",
       "doneAt": "2026-09-28T13:16:40.146Z"
+    },
+    "deacon-main-uses-builder": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4300",
+      "claimedAt": "2026-09-28T13:16:43.690Z"
     }
   }
 }
