@@ -41,6 +41,15 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...actual, execFile: execFileStub };
 });
 
+// PAN-4291: this file exercises the batched branch read, not the
+// no-remote/no-tracker skip gate (covered in derived-issue-state-quota.test.ts).
+// Without this, the new `git remote` probe shows up as an extra, uncounted
+// invocation in `git.calls` and breaks the exact-count assertions below.
+vi.mock('../../../../src/lib/overdeck/pr-cache-policy.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/overdeck/pr-cache-policy.js')>();
+  return { ...actual, shouldListPullRequests: async () => true };
+});
+
 import { loadIssueStatesForProject } from '../../../../src/lib/overdeck/derived-issue-state.js';
 
 const sha = (ch: string) => ch.repeat(40);
