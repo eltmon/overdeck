@@ -58,7 +58,7 @@ export function WorkspaceCard({ issueId }: { issueId: string }) {
 
   const wsActions = ['syncMain', 'createWorkspace']
     .map((key) => actions.all.find((v) => v.action.key === key))
-    .filter((v): v is IssueActionView => !!v && v.enabled)
+    .filter((v): v is IssueActionView => !!v && (v.enabled || v.blockedOffline))
 
   return (
     <CockpitCard tone="info" title="Workspace">
@@ -116,7 +116,8 @@ export function WorkspaceCard({ issueId }: { issueId: string }) {
             <button
               key={v.action.key}
               type="button"
-              disabled={v.isPending}
+              disabled={v.isPending || v.blockedOffline}
+              title={v.blockedOffline ? v.disabledReason : undefined}
               onClick={v.invoke}
               className="inline-flex items-center rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-accent disabled:opacity-50"
             >

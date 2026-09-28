@@ -32,6 +32,7 @@ function actionViews(enabledKeys: IssueActionKey[], actionKeys?: IssueActionKey[
     return {
       action,
       enabled: enabled.has(action.key),
+      blockedOffline: false,
       disabledReason: enabled.has(action.key) ? undefined : `${action.label} is gated for this test.`,
       isPending: false,
       invoke,

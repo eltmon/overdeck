@@ -1322,7 +1322,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // content parsed, the row is interrupted, not starting.
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking
     && isWithinSpawnWindow(conversation.createdAt) && !hasTimelineActivity;
-  const isFirstMessage = !isLoading && !isDiscovering && !awaitingFirstPayload && !hasTimelineActivity && conversation.sessionAlive;
+  const isFirstMessage = !isLoading && !isDiscovering && !awaitingFirstPayload && !hasTimelineActivity && failedMessages.length === 0 && conversation.sessionAlive;
   // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
   // successful empty response. Rendering it as "no saved history" (the old
   // behavior) falsely tells the user their history is gone, e.g. during a

@@ -37,8 +37,17 @@ import { fileURLToPath } from 'node:url';
 
 export interface IsolatedDashboard {
   baseUrl: string;
+  port: number;
   home: string;
-  stop: () => Promise<void>;
+  /** `keepHome` leaves the temp home in place so the server can restart on it. */
+  stop: (opts?: { keepHome?: boolean }) => Promise<void>;
+}
+
+export interface IsolatedDashboardOptions {
+  /** Reuse a port — restart a stopped fixture where the open page expects it. */
+  port?: number;
+  /** Reuse a home from a server stopped with `keepHome` (PAN-4279). */
+  home?: string;
 }
 
 // ESM: no __dirname here.
@@ -84,9 +93,9 @@ function readLog(logPath: string): string {
  * Boot a dashboard nothing else shares. Always `await stop()` in teardown —
  * a leaked server holds its port and its temp home for the life of the machine.
  */
-export async function startIsolatedDashboard(): Promise<IsolatedDashboard> {
-  const home = mkdtempSync(join(tmpdir(), 'overdeck-e2e-home-'));
-  const port = pickPort();
+export async function startIsolatedDashboard(opts: IsolatedDashboardOptions = {}): Promise<IsolatedDashboard> {
+  const home = opts.home ?? mkdtempSync(join(tmpdir(), 'overdeck-e2e-home-'));
+  const port = opts.port ?? pickPort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const logPath = join(home, 'server.log');
 
@@ -109,7 +118,7 @@ export async function startIsolatedDashboard(): Promise<IsolatedDashboard> {
   child.stdout?.on('data', (c: Buffer) => chunks.push(c.toString()));
   child.stderr?.on('data', (c: Buffer) => chunks.push(c.toString()));
 
-  const stop = async (): Promise<void> => {
+  const stop = async (stopOpts: { keepHome?: boolean } = {}): Promise<void> => {
     if (child.exitCode === null) {
       child.kill('SIGTERM');
       await new Promise<void>((done) => {
@@ -123,7 +132,7 @@ export async function startIsolatedDashboard(): Promise<IsolatedDashboard> {
         });
       });
     }
-    rmSync(home, { recursive: true, force: true });
+    if (!stopOpts.keepHome) rmSync(home, { recursive: true, force: true });
   };
 
   try {
@@ -136,5 +145,5 @@ export async function startIsolatedDashboard(): Promise<IsolatedDashboard> {
     throw err;
   }
 
-  return { baseUrl, home, stop };
+  return { baseUrl, port, home, stop };
 }
