@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:39:00.158Z",
+  "updated": "2026-09-28T00:39:11.795Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "degraded-banner.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T00:39:00.158Z"
+    },
+    "degraded-banner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:11.794Z"
     }
   }
 }
