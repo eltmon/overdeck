@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4300",
   "created": "2026-09-28T12:54:38.633Z",
-  "updated": "2026-09-28T12:54:38.633Z",
+  "updated": "2026-09-28T13:08:43.846Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "dead-agent-guard": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4300",
-      "claimedAt": "2026-09-28T12:54:38.633Z"
+      "claimedAt": "2026-09-28T12:54:38.633Z",
+      "doneAt": "2026-09-28T13:08:43.846Z"
     }
   }
 }
