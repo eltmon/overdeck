@@ -234,7 +234,11 @@ describe('project-create routes', () => {
         const { status, body } = await requestProjectsRoute('/api/projects/suggestions');
 
         expect(status).toBe(200);
-        expect(body).toEqual({ root, repositories: [{ name: 'beta', path: join(root, 'beta') }] });
+        expect(body).toEqual({
+          root,
+          homeDir: expect.any(String),
+          repositories: [{ name: 'beta', path: join(root, 'beta') }],
+        });
         expect(routeMocks.registerProject).not.toHaveBeenCalled();
         expect(routeMocks.performProjectCreate).not.toHaveBeenCalled();
       } finally {

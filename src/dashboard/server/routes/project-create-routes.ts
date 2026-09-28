@@ -30,6 +30,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -68,7 +69,8 @@ import { readProjectJsonBody } from './project-body.js';
 // ─── Route: GET /api/projects/suggestions ───────────────────────────────────
 // PAN-4281 (D10): repositories already sitting in the default projects folder
 // that are not registered yet, for the Add-project dialog. Read-only; `root` is
-// also where the dialog's folder picker starts.
+// also where the dialog's folder picker starts, and `homeDir` lets the browser
+// show paths under home as `~` (it cannot infer a server's home).
 
 const getProjectSuggestionsRoute = HttpRouter.add(
   'GET',
@@ -84,7 +86,7 @@ const getProjectSuggestionsRoute = HttpRouter.add(
       yield* Effect.promise(() => Promise.all(projects.map((project) => canonicalizePath(project.config.path)))),
     );
     const repositories = yield* Effect.promise(() => listSuggestedRepositories(root, registered));
-    return jsonResponse({ root, repositories });
+    return jsonResponse({ root, homeDir: homedir(), repositories });
   })),
 );
 

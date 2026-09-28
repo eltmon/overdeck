@@ -37,6 +37,7 @@ export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: 
         titleId={titleId}
         showGuide={variant === 'page'}
         onChoose={(mode) => setStep(STEP_FOR_MODE[mode])}
+        onCreated={onCreated}
         onCancel={onCancel}
       />
     ) : (
