@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:09:52.045Z",
+  "updated": "2026-09-28T13:09:53.881Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -23,7 +23,7 @@
     "supervisor-steer-submit": {
       "status": "in_progress",
       "claimedBy": "agent-pan-4292",
-      "claimedAt": "2026-09-28T13:06:19.463Z"
+      "claimedAt": "2026-09-28T13:09:53.881Z"
     },
     "herdr-steer-submit": {
       "status": "in_progress",
