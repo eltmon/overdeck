@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:25:20.974Z",
+  "updated": "2026-09-28T14:25:32.143Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,10 @@
     "docs-quota-source.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T14:25:20.974Z"
+    },
+    "docs-quota-source.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:25:32.142Z"
     }
   }
 }
