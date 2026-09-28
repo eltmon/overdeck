@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4312",
   "created": "2026-09-28T14:11:29.588Z",
-  "updated": "2026-09-28T15:47:14.784Z",
+  "updated": "2026-09-28T15:47:25.003Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "context-usage-memo.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T15:47:14.784Z"
+    },
+    "diffs-poll-live-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:47:25.003Z"
     }
   }
 }
