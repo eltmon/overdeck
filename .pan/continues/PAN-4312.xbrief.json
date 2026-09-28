@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4312",
   "created": "2026-09-28T14:11:29.588Z",
-  "updated": "2026-09-28T15:51:08.199Z",
+  "updated": "2026-09-28T15:51:20.472Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "docs-architecture.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T15:51:08.199Z"
+    },
+    "docs-architecture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:51:20.472Z"
     }
   }
 }
