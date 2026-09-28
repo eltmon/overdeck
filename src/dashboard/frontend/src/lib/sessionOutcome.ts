@@ -22,7 +22,23 @@ import type {
   PrReviewState,
   SessionNode,
 } from '@overdeck/contracts';
-import type { SessionAgent } from './agentConversation';
+
+/**
+ * The minimal drawer-agent shape `outcomeFactsFromAgent` needs. Deliberately
+ * not `SessionAgent` from `./agentConversation` — that module imports
+ * `Conversation` from `ConversationList.tsx`, which sits upstream of
+ * `AgentStepRow.tsx` in the ProjectTree render chain, so importing it back
+ * here would close a circular dependency. A real `SessionAgent` satisfies
+ * this structurally.
+ */
+export interface SessionOutcomeAgent {
+  id: string;
+  status: string;
+  role?: string | null;
+  issueId?: string | null;
+  stoppedByUser?: boolean;
+  paused?: boolean;
+}
 
 export type SessionOutcomeKind =
   | 'merged'
@@ -286,9 +302,9 @@ export function outcomeFactsFromSessionNode(
   };
 }
 
-/** Build outcome facts for a drawer `SessionAgent` (DrawerAgentSession). */
+/** Build outcome facts for a drawer agent (DrawerAgentSession). */
 export function outcomeFactsFromAgent(
-  agent: SessionAgent & { stoppedByUser?: boolean; paused?: boolean },
+  agent: SessionOutcomeAgent,
   derived: DerivedIssueState | undefined,
 ): SessionOutcomeFacts {
   let role: SessionOutcomeRole;
