@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4290",
   "created": "2026-09-28T12:19:35.919Z",
-  "updated": "2026-09-28T14:03:17.044Z",
+  "updated": "2026-09-28T14:03:29.439Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "docs-outcome-labels.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T14:03:17.043Z"
+    },
+    "docs-outcome-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:29.439Z"
     }
   }
 }
