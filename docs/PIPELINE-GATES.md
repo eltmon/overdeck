@@ -733,6 +733,14 @@ REST, which GitHub calls `core`), plus a burst ("secondary") limit. Overdeck
 meters its own GitHub calls, backs off when GitHub refuses one, and never
 reads a refused or skipped call as "no data".
 
+**Quota source.** The user pool's `graphql` bucket is sampled from GitHub
+GraphQL's own `rateLimit(dryRun: true)` field, not REST `/rate_limit`: a
+2026-09-28 comparison found REST's `resources.graphql.used` reporting 45
+against GraphQL's own reported 2,424 at the same moment — REST's GraphQL
+count does not track what `/graphql` actually charges (PAN-4291). REST
+`/rate_limit` remains the source for the `rest` (`core`) bucket and for the
+App pool's usage, which has no separate GraphQL source wired up.
+
 **The ledger.** Every metered call and every `/rate_limit` sample appends one
 JSON line to `~/.overdeck/github-quota/ledger-<YYYYMMDDHH>.jsonl` (UTC hour):
 `{ ts, pid, kind: 'call' | 'sample', caller, pool, bucket, cost, estimated,
@@ -750,10 +758,11 @@ hour rollover. The dashboard, the deacon child, CLI processes and the agent
 process writes `~/.overdeck/github-quota/pause.json` for that pool and bucket
 (atomic tmp + rename). Duration rules:
 
-- Primary limit with a visible reset (the refused bucket's latest sample shows `remaining == 0`): pause until that sample's `resetAt`.
-- Primary limit hidden (the sample shows `remaining > 0`, or no sample within 10 minutes): pause 10 minutes, capped at the sample's `resetAt` when that is sooner. The floor is 60 seconds.
+- Primary limit, the latest sample for that `(pool, bucket)` has a `resetAt` later than now: pause until that `resetAt` when the sample also shows `remaining == 0`; otherwise pause 10 minutes, capped at that `resetAt` when it is sooner. The sample's age does not matter — its `resetAt` is the current window's real reset either way (PAN-4291; there is no 60-second floor here).
+- Primary limit, no sample or the sample's `resetAt` has already passed: pause 10 minutes.
+- Every new sample reconciles the active primary pause on its exact `(pool, bucket)`: a sample showing headroom (`remaining > 0`) lifts the pause immediately, and a still-exhausted sample with a future `resetAt` moves the pause to that `resetAt` instead of riding out the original 10-minute guess.
 - Secondary limit: pause for `retry-after` seconds when present. Otherwise pause 60 seconds, doubling on each consecutive secondary refusal within 30 minutes, capped at 15 minutes.
-- For a **primary** refusal only, an `x-ratelimit-reset` header on the refused response wins over the sample-based rules. A **secondary** refusal ignores `x-ratelimit-reset`, because that header describes the hourly window, not the burst limit.
+- For a **primary** refusal only, an `x-ratelimit-reset` header on the refused response wins over the sample-based rules, floored at 60 seconds. A **secondary** refusal ignores `x-ratelimit-reset`, because that header describes the hourly window, not the burst limit.
 
 A pause blocks only its exact `(pool, bucket)`: a GraphQL pause never stops
 REST calls, and a `pat` pause never stops the `user` or `app` pools.
@@ -777,6 +786,11 @@ failures, and the closed-issue reaper treats the issue as not closed.
 - A 404 from a GitHub App issue listing marks the repo App-not-installed for 6 hours (`repo-notes.json`); its issues are listed through the `gh` user token meanwhile.
 - A minted App installation token is reused until 5 minutes before it expires.
 - Boot-warm refreshes are staggered over 60 seconds and periodic convergence over 4 minutes, one project per refresh batch; the first CI refill runs at boot + 2 minutes.
+- The close-out merged-PR lookup (`isSquashMergedViaPr`) runs through `runGh` instead of a raw unmetered exec, and a "not merged" answer for a `(project, branch, tip SHA)` is cached for one hour so the deacon's 60-second closed-issue reaper does not re-ask GitHub every tick for a still-unmerged branch (PAN-4291).
+- `readRepoPullRequests` skips the `gh pr list` call entirely — no exec, no ledger line — for a repo with no git remote or a project with no resolvable tracker.
+- The PR-cache listing is capped at 100 rows, not 200, and a listing with no OPEN PR is cached for `PR_CACHE_IDLE_TTL_MS` (5 minutes) instead of the flat 30 seconds, since nothing in it can change without a new PR opening.
+- `gh pr list`/`gh issue list` calls are priced by the GraphQL pages they actually walk (`priceGhListCall`), weighted by which `--json` fields GitHub joins in, instead of a flat 1 point.
+- A `gh` failure GitHub never saw (bad args, no git remote, `gh` missing) costs 0, not 1; only a failure whose stderr shows GitHub actually answered (an HTTP status or a `GraphQL:` error) still costs 1.
 
 **Where to look.** The app-bar pill shows `GH <remaining>/<limit>` for the
 user GraphQL budget and lists the top callers; a banner in the system notices
@@ -784,7 +798,8 @@ row names the pause end time and whether this machine's own use explains it;
 `pan doctor github-quota [--json]` prints the caller table, latest samples,
 the active pause, skipped projects and repos without the App.
 `GET /api/github-quota` returns the dashboard's snapshot. Calls from the ~35
-unmigrated `gh` sites show up only as the snapshot's `unattributed` points.
+unmigrated `gh` sites show up only as the snapshot's `unattributed` points
+(migrating them is tracked in PAN-4302).
 
 ## The pipeline journal (post-Cut follow-up to PAN-3917)
 

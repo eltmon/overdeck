@@ -10,10 +10,12 @@ import { join } from 'path';
 
 import { appendLedgerEntry, getGitHubQuotaDir, readLedgerWindow } from '../../../../src/lib/github-quota/ledger.js';
 import {
+  activeGitHubPause,
   assertGitHubCallAllowed,
   GitHubQuotaPausedError,
   onGitHubRefusal,
   readActivePause,
+  reconcileGitHubPauseWithSample,
   recordGitHubRefusal,
 } from '../../../../src/lib/github-quota/pause-gate.js';
 
@@ -58,9 +60,9 @@ describe('GitHub pause gate (PAN-4264)', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('pauses a visible primary limit until the exhausted sample resets', async () => {
-    const resetAt = NOW + 25 * MINUTE;
-    await writeUserGraphqlSample(0, resetAt);
+  it('pauses a visible primary limit until the exhausted sample resets, even from a sample taken 15 minutes ago (PAN-4291 AC1)', async () => {
+    const resetAt = NOW + 40 * MINUTE;
+    await writeUserGraphqlSample(0, resetAt, 15 * MINUTE);
 
     const pause = await recordGitHubRefusal({
       pool: 'user', bucket: 'graphql', caller: 'pipeline-membership', refusal: { kind: 'primary' },
@@ -87,18 +89,28 @@ describe('GitHub pause gate (PAN-4264)', () => {
     expect(untilMs(capped)).toBe(soonReset);
   });
 
-  it('pauses a hidden primary limit for 10 minutes when no fresh sample exists, never under 60 seconds', async () => {
+  it('pauses a hidden primary limit for 10 minutes when no sample exists', async () => {
     const noSample = await recordGitHubRefusal({
       pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
     });
     expect(untilMs(noSample)).toBe(NOW + 10 * MINUTE);
+  });
 
-    await vi.advanceTimersByTimeAsync(11 * MINUTE);
-    await writeUserGraphqlSample(4900, Date.now() + 10_000);
-    const floored = await recordGitHubRefusal({
+  it('pauses a hidden primary limit for 10 minutes when the only sample has an already-passed resetAt (PAN-4291 AC3)', async () => {
+    await writeUserGraphqlSample(4900, Date.now() - 5 * MINUTE);
+    const pause = await recordGitHubRefusal({
       pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
     });
-    expect(untilMs(floored)).toBe(Date.now() + MINUTE);
+    expect(untilMs(pause)).toBe(NOW + 10 * MINUTE);
+  });
+
+  it('pauses until a sample reset only 10 seconds away, with no 60-second floor (PAN-4291 AC2)', async () => {
+    const resetAt = Date.now() + 10_000;
+    await writeUserGraphqlSample(4900, resetAt);
+    const pause = await recordGitHubRefusal({
+      pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
+    });
+    expect(untilMs(pause)).toBe(resetAt);
   });
 
   it('lets an x-ratelimit-reset header win for a primary refusal', async () => {
@@ -217,5 +229,50 @@ describe('GitHub pause gate (PAN-4264)', () => {
     writeFileSync(join(getGitHubQuotaDir(), 'pause.json'), '{"pauses":');
     expect(readActivePause()).toEqual([]);
     expect(() => assertGitHubCallAllowed('pr-sync', 'user', 'graphql')).not.toThrow();
+  });
+
+  describe('reconcileGitHubPauseWithSample (PAN-4291)', () => {
+    it('lifts an active primary pause when the sample shows headroom (AC1)', async () => {
+      await recordGitHubRefusal({
+        pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
+      });
+      expect(activeGitHubPause('user', 'graphql')).toBeDefined();
+
+      await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 2576 });
+
+      expect(activeGitHubPause('user', 'graphql')).toBeUndefined();
+    });
+
+    it('moves an active primary pause to the sample\'s own future resetAt when still exhausted (AC2)', async () => {
+      await recordGitHubRefusal({
+        pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
+      });
+      const resetAt = Date.now() + 40 * MINUTE;
+
+      await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 0, resetAt: new Date(resetAt).toISOString() });
+
+      expect(untilMs(activeGitHubPause('user', 'graphql')!)).toBe(resetAt);
+    });
+
+    it('leaves an active secondary pause unchanged for any sample (AC3)', async () => {
+      const before = await recordGitHubRefusal({
+        pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'secondary' },
+      });
+
+      await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 4956, resetAt: new Date(Date.now() + 40 * MINUTE).toISOString() });
+
+      expect(activeGitHubPause('user', 'graphql')).toEqual(before);
+    });
+
+    it('does nothing when there is no active pause on that bucket', async () => {
+      await expect(reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 4956 })).resolves.toBeUndefined();
+      expect(activeGitHubPause('user', 'graphql')).toBeUndefined();
+    });
+
+    it('never throws, even with a corrupt pause.json', async () => {
+      mkdirSync(getGitHubQuotaDir(), { recursive: true });
+      writeFileSync(join(getGitHubQuotaDir(), 'pause.json'), '{"pauses":');
+      await expect(reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 2576 })).resolves.toBeUndefined();
+    });
   });
 });

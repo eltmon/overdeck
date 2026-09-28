@@ -237,6 +237,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`user`/`pat`/`app` × `graphql`/`rest`), and only the read-model pollers
   are paused. Agent `gh` calls are counted by a shim that lives beside the
   git guard (`launcher-git-guard.ts`), not by `runGh`.
+- **REST `/rate_limit` misreports the GraphQL budget** (PAN-4291) — its
+  `resources.graphql` said `used: 45` while GraphQL `rateLimit` said
+  `used: 2424` at the same moment (2026-09-28), and its `reset` differs too.
+  Read the GraphQL bucket with `rateLimit(dryRun: true)` (free). GitHub
+  prices `gh pr list` per 100-row page: with `reviewRequests` +
+  `statusCheckRollup` a full page costs 3 points, so `--limit 200` costs 6.
 
 - **Two terminal-permission detectors coexist** (PAN-4278) — agents are
   detected by `src/lib/agent-input-detection.ts` (the `1. Yes / 2. Yes, and … /

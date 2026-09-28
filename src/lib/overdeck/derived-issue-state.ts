@@ -73,6 +73,7 @@ import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { inferProjectForge } from '../project-repos.js';
 import { cachedApprovalAtHead } from '../cloister/approval-at-head.js';
 import { runGh } from '../github-quota/run-gh.js';
+import { prListingTtlMs, shouldListPullRequests } from './pr-cache-policy.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -304,8 +305,16 @@ export interface GhPrRow {
 
 const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
-/** One `gh pr list` per repo, cached briefly — the batch door's forge read. */
-const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[] | null>(PR_CACHE_TTL_MS);
+/**
+ * One `gh pr list` per repo, cached briefly — the batch door's forge read.
+ * PAN-4291: a listing with no open PR is cached for `PR_CACHE_IDLE_TTL_MS`
+ * instead, since nothing in it can change without a new PR opening.
+ */
+const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[] | null>(
+  PR_CACHE_TTL_MS,
+  undefined,
+  (rows) => prListingTtlMs(rows, PR_CACHE_TTL_MS),
+);
 
 /** The last listing each repo answered successfully, and when (PAN-3925). */
 const lastRepoPullRequests = new Map<string, { readonly rows: readonly GhPrRow[]; readonly settledAt: number }>();
@@ -322,10 +331,15 @@ export async function listRepoPullRequests(projectPath: string): Promise<readonl
 export async function readRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[] | null> {
   return cachedRepoPullRequests(projectPath, async () => {
     try {
+      // PAN-4291: no tracker means gh could never answer; a `git remote`
+      // failure reads as failed too (never cached as a false "no remote"),
+      // landing in the catch below like a pause or refusal — "failed" (null),
+      // never "no PRs".
+      if (!(await shouldListPullRequests(projectPath))) return [];
       // PAN-4264: metered as caller pr-cache; a pause or refusal lands in the
       // catch below and reads as "failed" (null), never as "no PRs".
       const { stdout } = await runGh([
-        'pr', 'list', '--state', 'all', '--limit', '200', '--json', GH_PR_FIELDS,
+        'pr', 'list', '--state', 'all', '--limit', '100', '--json', GH_PR_FIELDS,
       ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
       const rows = JSON.parse(stdout || '[]') as GhPrRow[];
       lastRepoPullRequests.set(projectPath, { rows, settledAt: Date.now() });

@@ -40,8 +40,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
 - `github-quota/` (PAN-4264) — GitHub API quota metering: the per-hour ledger,
   `runGh` (metered `gh` exec), `withGitHubCaller`, App/PAT metering
-  (`rest-meter.ts`), the cross-process pause gate, the `/rate_limit` sampler
-  and the quota snapshot. Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
+  (`rest-meter.ts`), the cross-process pause gate, the GraphQL `rateLimit`
+  sampler (REST `/rate_limit` for the REST bucket) and the quota snapshot.
+  Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
 - `agents/permission-prompt.ts` + `overdeck/conversation-permission*.ts` (PAN-4278) —
   parse Claude Code's terminal permission prompt from a pane, the in-memory
   PermissionRequest hook registry, the conversation `pendingPermission` feed field,

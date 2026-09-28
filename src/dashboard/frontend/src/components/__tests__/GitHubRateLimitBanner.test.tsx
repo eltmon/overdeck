@@ -84,6 +84,36 @@ describe('GitHubRateLimitBanner (PAN-4264)', () => {
     expect(bannerText()).toBe(`GitHub rate limit for your account: calls paused until ${HHMM}.`);
   });
 
+  it('reports the GitHub-side points used for a primary pause with a matching sample, top-caller variant (PAN-4291 AC1)', () => {
+    useDashboardStore.setState({ githubQuota: quota({ samples: [{ pool: 'user', bucket: 'graphql', ts: '2026-09-27T15:00:00.000Z', remaining: 35, limit: 5000 }] }) });
+    render(<GitHubRateLimitBanner />);
+    expect(bannerText()).toBe(
+      `GitHub rate limit for octo-login: calls paused until ${HHMM}. GitHub reports 4965 of 5000 points used this hour. This machine used 740 points in the last hour; top caller: pipeline-membership (700 points).`,
+    );
+  });
+
+  it('reports the GitHub-side points used for a primary pause with a matching sample, own-usage-low variant (PAN-4291 AC1)', () => {
+    useDashboardStore.setState({ githubQuota: quota({ ownUsageLow: true, samples: [{ pool: 'user', bucket: 'graphql', ts: '2026-09-27T15:00:00.000Z', remaining: 35, limit: 5000 }] }) });
+    render(<GitHubRateLimitBanner />);
+    expect(bannerText()).toBe(
+      `GitHub rate limit for octo-login: calls paused until ${HHMM}. GitHub reports 4965 of 5000 points used this hour. Not caused by this machine (this machine used 740 points in the last hour). Another tool or Overdeck install using this account is spending the shared limit.`,
+    );
+  });
+
+  it('omits the "GitHub reports" clause with no matching sample (PAN-4291 AC2)', () => {
+    useDashboardStore.setState({ githubQuota: quota({ samples: [{ pool: 'user', bucket: 'rest', ts: '2026-09-27T15:00:00.000Z', remaining: 35, limit: 5000 }] }) });
+    render(<GitHubRateLimitBanner />);
+    expect(bannerText()).not.toContain('GitHub reports');
+  });
+
+  it('returns the secondary text unchanged even with a matching sample (PAN-4291 AC3)', () => {
+    useDashboardStore.setState({ githubQuota: quota({ pauses: [pause('secondary')], samples: [{ pool: 'user', bucket: 'graphql', ts: '2026-09-27T15:00:00.000Z', remaining: 35, limit: 5000 }] }) });
+    render(<GitHubRateLimitBanner />);
+    expect(bannerText()).toBe(
+      `GitHub secondary rate limit for octo-login: calls paused until ${HHMM}. Overdeck sent requests too fast; pollers resume automatically.`,
+    );
+  });
+
   it('names the PAT or App identity for a pause outside the user pool, never the gh login', () => {
     const patPause = { ...pause('primary'), pool: 'pat' as const };
     useDashboardStore.setState({ githubQuota: quota({ ownUsageLow: true, pauses: [patPause] }) });
