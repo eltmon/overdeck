@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:29:39.857870Z · model: claude-opus-5-5 · open: 772_
+_Last sequenced: 2026-09-28T12:35:26.472736Z · model: claude-opus-5-5 · open: 774_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -569,6 +569,7 @@ _Last sequenced: 2026-09-28T12:29:39.857870Z · model: claude-opus-5-5 · open: 
 | 648 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
 | 649 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
 | 650 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 651 | PAN-4293 | L | low | ok |  |  | Anywhere step 6: overdeck.ai account + GitHub OAuth + device tokens; prerequisite for relay, Shared Sessions, hosted vault |
 | 652 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
 | 653 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
 | 654 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
@@ -576,7 +577,7 @@ _Last sequenced: 2026-09-28T12:29:39.857870Z · model: claude-opus-5-5 · open: 
 | 656 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
 | 657 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
 | 658 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 659 | PAN-2356 | M | low | needs-refinement |  |  | Overdeck Anywhere P3: relay service |
+| 659 | PAN-2356 | M | low | needs-refinement |  | PAN-4293 | Overdeck Anywhere P3: relay service |
 | 660 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
 | 661 | PAN-2354 | M | low | needs-refinement |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
 | 662 | PAN-2352 | M | low | needs-refinement |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
@@ -599,6 +600,7 @@ _Last sequenced: 2026-09-28T12:29:39.857870Z · model: claude-opus-5-5 · open: 
 | 679 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
 | 680 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
 | 681 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 682 | PAN-4294 | L | low | needs-refinement |  | PAN-4293 | Anywhere paid tier: Stripe + entitlement API + quotas; price and bundle scope still open pending pricing research |
 | 683 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
 | 685 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 686 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
@@ -676,7 +678,7 @@ _Last sequenced: 2026-09-28T12:29:39.857870Z · model: claude-opus-5-5 · open: 
 | 761 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
 | 762 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
 | 763 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 764 | PAN-658 | M | low | ok |  | PAN-2356 | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
+| 764 | PAN-658 | M | low | ok |  | PAN-2356, PAN-4293 | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
 | 765 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
 | 766 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
 | 767 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
@@ -1087,10 +1089,10 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:29:39.857870Z",
+  "generatedAt": "2026-09-28T12:35:26.472736Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 772,
+  "openCount": 774,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -8170,9 +8172,11 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "importance": "low",
       "score": 26,
       "condition": "needs-refinement",
-      "dependsOn": [],
+      "dependsOn": [
+        "PAN-4293"
+      ],
       "why": "Overdeck Anywhere P3: relay service",
-      "rationale": "Triage: verify the PRD is retrievable under .pan/drafts before starting P3. Epic child; rank held.",
+      "rationale": "Rank unchanged; new github-ref from PAN-4293, whose body lists the relay as blocked on the overdeck.ai account service (GitHub OAuth, D-R2).",
       "gate": "auto",
       "planning": "skip"
     },
@@ -9397,10 +9401,11 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "score": 15,
       "condition": "ok",
       "dependsOn": [
-        "PAN-2356"
+        "PAN-2356",
+        "PAN-4293"
       ],
       "why": "Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport",
-      "rationale": "Re-derived github-ref membership and ordering this pass: PAN-2350's phase checklist reads 'Phase 4 - Shared Sessions v0 = #658, built ON the #2356 relay', so it is a child of the Anywhere epic and gated on the relay. Rank unchanged - the cross-reference is not new.",
+      "rationale": "Re-derived github-ref membership and ordering this pass: PAN-2350's phase checklist reads 'Phase 4 - Shared Sessions v0 = #658, built ON the #2356 relay', so it is a child of the Anywhere epic and gated on the relay. Rank unchanged - the cross-reference is not new. New github-ref this pass: PAN-4293 (account service) also blocks it; rank unchanged.",
       "gate": "auto",
       "planning": "skip"
     },
@@ -10643,6 +10648,34 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "rationale": "New issue already in the pipeline with a live workspace, so it is pinned in the in-pipeline tier at a free top slot rather than ranked against the queue; it extends the existing Pi-only steer delivery to Claude Code and Codex and carries an explicit implementation checkpoint on keystroke mechanics.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4293",
+      "rank": 651,
+      "size": "L",
+      "importance": "low",
+      "score": 27,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Anywhere step 6: overdeck.ai account + GitHub OAuth + device tokens; prerequisite for relay, Shared Sessions, hosted vault",
+      "rationale": "New child of the PAN-2350 epic; slotted just ahead of the PAN-2356 relay because its body says it blocks the relay (GitHub OAuth, D-R2) and PAN-658, while the epic tier itself stays low.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4294",
+      "rank": 682,
+      "size": "L",
+      "importance": "low",
+      "score": 22,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4293"
+      ],
+      "why": "Anywhere paid tier: Stripe + entitlement API + quotas; price and bundle scope still open pending pricing research",
+      "rationale": "New child of the PAN-2350 epic; ranked after the relay cluster because it depends on the PAN-4293 account service and its price and bundle decisions are still open.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11587,6 +11620,55 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
     {
       "from": "PAN-2767",
       "to": "PAN-4292",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4293",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2350",
+      "to": "PAN-4294",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4293",
+      "to": "PAN-4294",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4293",
+      "to": "PAN-2356",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4293",
+      "to": "PAN-658",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4294",
+      "to": "PAN-2356",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
+    },
+    {
+      "from": "PAN-4294",
+      "to": "PAN-2354",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
