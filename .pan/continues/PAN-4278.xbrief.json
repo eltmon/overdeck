@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4278",
   "created": "2026-09-27T23:29:11.482Z",
-  "updated": "2026-09-28T00:26:02.412Z",
+  "updated": "2026-09-28T00:26:13.743Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "permission-answer-route.ac5": {
       "status": "completed",
       "doneAt": "2026-09-28T00:26:02.412Z"
+    },
+    "permission-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:26:13.742Z"
     }
   }
 }
