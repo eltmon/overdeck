@@ -54,6 +54,16 @@ pan vault resume <id> --on-drift note
 
 `resume` compares the target directory's git state with the saved state. On a difference it asks on a TTY; `--on-drift continue|note|cancel` answers non-interactively and a non-TTY run without the flag cancels. Claude Code and Codex resume natively; other harnesses get a seed digest file in the target directory.
 
+## Exclusions and secrets
+
+```bash
+pan vault exclude /work/secret-proj
+pan vault exclude --origin git@github.com:org/private.git
+pan vault exclude --session <id>    # tombstones an already-saved record
+pan vault include /work/secret-proj
+pan vault allow-secret <id-or-path> <line>
+```
+
 ## Eviction (opt-in, confirmation required)
 
 ```bash

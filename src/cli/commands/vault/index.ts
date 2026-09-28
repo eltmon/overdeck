@@ -66,6 +66,25 @@ export function registerVaultCommands(program: Command): void {
     .action(lazyAction(() => import('./resume.js'), 'resumeCommand'));
 
   vault
+    .command('exclude [path]')
+    .description('Exclude conversations by cwd path, git origin or session id; an excluded saved record becomes a tombstone')
+    .option('--origin <url>', 'Exclude conversations whose git origin is this URL')
+    .option('--session <id>', 'Exclude one session by native session id or vault id')
+    .action(lazyAction(() => import('./exclude.js'), 'excludeCommand'));
+
+  vault
+    .command('include [path]')
+    .description('Remove an exclusion added with pan vault exclude')
+    .option('--origin <url>', 'Include conversations whose git origin is this URL again')
+    .option('--session <id>', 'Include one session again')
+    .action(lazyAction(() => import('./exclude.js'), 'includeCommand'));
+
+  vault
+    .command('allow-secret <id-or-path> <line>')
+    .description('Allow one line that the secret scan blocked, for that record only')
+    .action(lazyAction(() => import('./allow-secret.js'), 'allowSecretCommand'));
+
+  vault
     .command('evict')
     .description('Review the pending-deletion batch (default) or act on it; nothing is deleted without --confirm')
     .option('--review', 'Scan and print the batch with its fingerprint (default)')

@@ -204,7 +204,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
   if (continuity.verdict === 'diverged') return { verdict: 'diverged', vaultId, reason: continuity.reason };
 
   const newLines = continuity.newLines;
-  const hits = await scanNewLines(vaultId, newLines, tail.lineCount + 1);
+  const hits = await scanNewLines([vaultId, nativePath], newLines, tail.lineCount + 1);
   if (hits.length > 0) return { verdict: 'blocked', vaultId, hits };
 
   try {

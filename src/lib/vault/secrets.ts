@@ -91,11 +91,15 @@ export async function allowedSecretHashes(vaultId: string): Promise<ReadonlySet<
  * for this record are skipped. One hit per (line, pattern), sorted by line.
  */
 export async function scanNewLines(
-  vaultId: string,
+  vaultId: string | readonly string[],
   lines: readonly string[],
   firstLineNumber: number,
 ): Promise<SecretHit[]> {
-  const allowed = await allowedSecretHashes(vaultId);
+  // A transcript that has never settled has no durable vaultId yet, so the
+  // caller may also pass its native path as an allow-list key.
+  const keys = typeof vaultId === 'string' ? [vaultId] : vaultId;
+  const allowed = new Set<string>();
+  for (const key of keys) for (const hash of await allowedSecretHashes(key)) allowed.add(hash);
   const hits: SecretHit[] = [];
   lines.forEach((line, index) => {
     const matches = findSecretMatches(line);
