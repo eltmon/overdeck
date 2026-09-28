@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:26:24.193720Z · model: claude-opus-5-5 · open: 771_
+_Last sequenced: 2026-09-28T12:29:39.857870Z · model: claude-opus-5-5 · open: 772_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4290 | M | medium | ok |  |  | In-pipeline (live workspace): ended sessions show derived outcome (Merged, Approved, Stopped) instead of bare 'Session ended' |
 | 2 | PAN-4291 | L | high | ok |  |  | In-pipeline (live workspace): own polling drains GitHub GraphQL budget hourly, pausing calls; sampler reads wrong counter |
+| 3 | PAN-4292 | M | medium | ok |  |  | In-pipeline (live workspace): steer running Claude Code/Codex turns from composer (Ctrl+Enter) and pan tell --steer, not only Pi. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -787,6 +788,10 @@ New issue already in the pipeline with a live workspace, so it is pinned at the 
 
 New issue already in the pipeline with a live workspace, so it is pinned at the free rank 2 slot rather than ranked against the backlog. The hourly GraphQL exhaustion pauses every GitHub call Overdeck makes (PR state, merges, close-out), so it degrades the pipeline itself; causes are verified, the fix list is ranked, and ACs are mechanical, so condition is ok at high importance.
 
+### PAN-4292 (rank 3)
+
+New issue already in the pipeline with a live workspace, so it is pinned in the in-pipeline tier at a free top slot rather than ranked against the queue; it extends the existing Pi-only steer delivery to Claude Code and Codex and carries an explicit implementation checkpoint on keystroke mechanics.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1075,10 +1080,6 @@ codex-resume replays a rotated-out revoked refresh token, wedging every codex re
 
 Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
 
-### PAN-2333 (rank 117)
-
-Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1086,10 +1087,10 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:26:24.193720Z",
+  "generatedAt": "2026-09-28T12:29:39.857870Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 771,
+  "openCount": 772,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -10629,6 +10630,19 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4292",
+      "rank": 3,
+      "size": "M",
+      "importance": "medium",
+      "score": 60,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): steer running Claude Code/Codex turns from composer (Ctrl+Enter) and pan tell --steer, not only Pi.",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned in the in-pipeline tier at a free top slot rather than ranked against the queue; it extends the existing Pi-only steer delivery to Claude Code and Codex and carries an explicit implementation checkpoint on keystroke mechanics.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11569,6 +11583,13 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
+    },
+    {
+      "from": "PAN-2767",
+      "to": "PAN-4292",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
