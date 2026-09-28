@@ -28,6 +28,18 @@ export interface ConversationFeedRow {
   pendingInputCount?: number;
   /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
   projectKey?: string | null;
+  spawnError?: string | null;
+  /** PAN-4223: legacy id of the launching (lane) or source (successor) conversation. Null = root. */
+  parentConversationId?: number | null;
+  parentConversationName?: string | null;
+  /** PAN-4223: gauntlet lane facts; null unless the row is a lane. */
+  gauntletRun?: string | null;
+  laneKey?: string | null;
+  laneRole?: 'builder' | 'critic' | 'verifier' | 'play' | 'orchestrator' | null;
+  laneIteration?: number | null;
+  laneReport?: { seq: number; at: string; status: 'done' | 'blocked' | 'failed'; verdict?: string | null } | null;
+  /** PAN-4223 D26: legacy id of the builder row a critic or verifier lane judges. */
+  criticOfConversationId?: number | null;
 }
 
 export interface UseConversationFeedResult {
