@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4320",
   "created": "2026-09-28T15:34:16.087Z",
-  "updated": "2026-09-28T16:27:09.222Z",
+  "updated": "2026-09-28T16:27:21.359Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "refresh-trigger-agent-key.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T16:27:09.222Z"
+    },
+    "event-path-agent-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:27:21.359Z"
     }
   }
 }
