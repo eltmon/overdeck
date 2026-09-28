@@ -343,6 +343,7 @@ program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
+  .option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')
   .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
 program
   .command('answer <id> [option]')

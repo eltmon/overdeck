@@ -220,3 +220,59 @@ describe('tellCommand main-agent input target (PAN-4268)', () => {
     logSpy.mockRestore();
   });
 });
+
+describe('tellCommand --steer (PAN-4292)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    agentMocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: true, confirmed: true });
+    remoteMocks.loadRemoteAgentState.mockReturnValue(null);
+  });
+
+  it('passes steer: true to messageAgent and reports the steer', async () => {
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'change course', { steer: true });
+
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-123', 'change course', 'pan-tell', {
+      owesRework: false,
+      steer: true,
+    });
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Message steered into agent-pan-123's running turn"));
+  });
+
+  it('passes no steer option without the flag', async () => {
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'queue this');
+
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-123', 'queue this', 'pan-tell', { owesRework: false });
+  });
+
+  it('refuses --steer for a remote agent with exit 1 and nothing sent', async () => {
+    const { exitCli } = await import('../../exit.js');
+    remoteMocks.loadRemoteAgentState.mockReturnValue({ location: 'remote', vmName: 'fly-vm-1' } as never);
+    const { tellCommand } = await import('../tell.js');
+
+    await tellCommand('PAN-123', 'change course', { steer: true });
+
+    expect(remoteMocks.sendToRemoteAgent).not.toHaveBeenCalled();
+    expect(agentMocks.messageAgent).not.toHaveBeenCalled();
+    expect(exitCli).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('--steer is not supported for remote agents'));
+  });
+
+  it('exits 1 with the reason when messageAgent refuses the steer', async () => {
+    const { exitCli } = await import('../../exit.js');
+    agentMocks.messageAgent.mockResolvedValue({
+      delivered: false,
+      queuedToMail: false,
+      reason: 'steer is supported for Claude Code only; agent-pan-123 runs Codex. Drop --steer to send a normal message.',
+    });
+    const { tellCommand } = await import('../tell.js');
+
+    await tellCommand('PAN-123', 'change course', { steer: true });
+
+    expect(exitCli).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('runs Codex'));
+  });
+});
