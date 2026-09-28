@@ -1,12 +1,10 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T08:40:21.251647Z · model: claude-opus-5-5 · open: 774_
+_Last sequenced: 2026-09-28T10:34:38.673616Z · model: claude-opus-5-5 · open: 771_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
-| 15 | PAN-4278 | L | high | ok |  |  | In-pipeline: terminal permission prompts block agents for hours with no dashboard dialog; composer sends near them get lost. |
-| 18 | PAN-4281 | L | medium | ok |  |  | In-pipeline: part 2 of onboarding; Add Project dialog snaps to repo root, imports folder-of-repos as separate or one polyrepo project. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -133,7 +131,6 @@ _Last sequenced: 2026-09-28T08:40:21.251647Z · model: claude-opus-5-5 · open: 
 | 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
 | 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
 | 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 176 | PAN-3668 | L | medium | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
 | 177 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
 | 178 | PAN-3942 | L | high | ok |  |  | First-class skill bundles: named manifests activated at global/project/issue/conversation scope with layered resolution and provenance |
 | 179 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
@@ -782,14 +779,6 @@ _Last sequenced: 2026-09-28T08:40:21.251647Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
-### PAN-4278 (rank 15)
-
-New since the prior run and already in the pipeline, so it is pinned at rank 15, directly ahead of the in-pipeline cluster, without displacing any existing rank. A subagent sat blocked on an unanswerable permission prompt for 7.5 hours and two operator messages vanished, which breaks the core supervise-from-the-dashboard loop, so importance is high; the body gives a four-part fix with fixture-testable acceptance criteria, so condition is ok. It shares the composer-to-pane delivery path with PAN-4268 and PAN-3630, recorded as advisory informs edges.
-
-### PAN-4281 (rank 18)
-
-New since the prior run and already in the pipeline, so it is pinned at rank 18 in a free slot. It improves project registration for new users but has a working path today, so importance is medium. The body states it depends on nothing in part 1 and gives file-level work items W6 to W9, so it carries no hard dependency and condition is ok. It shares the Orca-style onboarding direction with PAN-3863, recorded as a low-confidence informs edge.
-
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1082,6 +1071,14 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 
 Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
 
+### PAN-4184 (rank 118)
+
+New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
+
+### PAN-2511 (rank 119)
+
+Work agents burn 20+ min on false test failures — sandbox denies spawnSync git (EPERM); a per-issue cycle-time sink.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1089,37 +1086,11 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T08:40:21.251647Z",
+  "generatedAt": "2026-09-28T10:34:38.673616Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 774,
+  "openCount": 771,
   "nodes": [
-    {
-      "issue": "PAN-4278",
-      "rank": 15,
-      "size": "L",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: terminal permission prompts block agents for hours with no dashboard dialog; composer sends near them get lost.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 15, directly ahead of the in-pipeline cluster, without displacing any existing rank. A subagent sat blocked on an unanswerable permission prompt for 7.5 hours and two operator messages vanished, which breaks the core supervise-from-the-dashboard loop, so importance is high; the body gives a four-part fix with fixture-testable acceptance criteria, so condition is ok. It shares the composer-to-pane delivery path with PAN-4268 and PAN-3630, recorded as advisory informs edges.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4281",
-      "rank": 18,
-      "size": "L",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: part 2 of onboarding; Add Project dialog snaps to repo root, imports folder-of-repos as separate or one polyrepo project.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 18 in a free slot. It improves project registration for new users but has a working path today, so importance is medium. The body states it depends on nothing in part 1 and gives file-level work items W6 to W9, so it carries no hard dependency and condition is ok. It shares the Orca-style onboarding direction with PAN-3863, recorded as a low-confidence informs edge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
     {
       "issue": "PAN-4217",
       "rank": 23,
@@ -2745,18 +2716,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
-    },
-    {
-      "issue": "PAN-3668",
-      "rank": 176,
-      "size": "L",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts)",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-1868",
@@ -11239,13 +11198,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "confidence": 0.8
     },
     {
-      "from": "PAN-3668",
-      "to": "PAN-3901",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-3862",
       "to": "PAN-3863",
       "type": "informs",
@@ -11678,20 +11630,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-3630",
-      "to": "PAN-4278",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-4281",
-      "to": "PAN-3863",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
     }
   ]
 }
