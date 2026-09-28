@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:04:23.536Z",
+  "updated": "2026-09-28T16:04:35.539Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -292,6 +292,10 @@
     "history-psi.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T16:04:23.536Z"
+    },
+    "runaway-classify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:04:35.539Z"
     }
   }
 }
