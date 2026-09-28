@@ -57,6 +57,7 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
   let home: string;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     home = mkdtempSync(join(tmpdir(), 'pan-pr-cache-quota-'));
     process.env.OVERDECK_HOME = home;
     gh.calls.length = 0;
@@ -65,6 +66,7 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await flushLedgerWrites();
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
@@ -123,5 +125,33 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
     const rows = await readRepoPullRequests(path);
     expect(rows).toEqual([]);
     expect(gh.calls).toEqual([]);
+  });
+
+  it('caches a listing with no open PR for 5 minutes instead of the flat 30 s (PAN-4291 idle-ttl AC1)', async () => {
+    gh.stdout = JSON.stringify([{ number: 1, state: 'MERGED' }]);
+    const path = `/repos/quota-${++repoSeq}`;
+
+    await readRepoPullRequests(path);
+    expect(gh.calls).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await readRepoPullRequests(path);
+    expect(gh.calls).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await readRepoPullRequests(path);
+    expect(gh.calls).toHaveLength(2);
+  });
+
+  it('keeps the flat 30 s TTL for a listing with an open PR (PAN-4291 idle-ttl AC2)', async () => {
+    gh.stdout = JSON.stringify([{ number: 1, state: 'OPEN' }]);
+    const path = `/repos/quota-${++repoSeq}`;
+
+    await readRepoPullRequests(path);
+    expect(gh.calls).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(31_000);
+    await readRepoPullRequests(path);
+    expect(gh.calls).toHaveLength(2);
   });
 });

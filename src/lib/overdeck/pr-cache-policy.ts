@@ -40,3 +40,18 @@ export async function shouldListPullRequests(projectPath: string): Promise<boole
   if (project && tryResolveProjectTrackerType(project) === null) return false;
   return hasGitRemote(projectPath);
 }
+
+/** How long a PR listing with no open PR is trusted: nothing there can change without a new PR. */
+export const PR_CACHE_IDLE_TTL_MS = 5 * 60_000;
+
+/**
+ * `activeTtlMs`, or `PR_CACHE_IDLE_TTL_MS` when `rows` is a listing with no
+ * OPEN row: a repo with only merged/closed PRs in its window can't produce a
+ * state change until a new PR opens, so the next read need not hit the forge
+ * as often as one still tracking an open PR.
+ */
+export function prListingTtlMs(rows: readonly { state?: string }[] | null, activeTtlMs: number): number {
+  if (!rows) return activeTtlMs;
+  const hasOpenPr = rows.some((row) => row.state?.toUpperCase() === 'OPEN');
+  return hasOpenPr ? activeTtlMs : PR_CACHE_IDLE_TTL_MS;
+}
