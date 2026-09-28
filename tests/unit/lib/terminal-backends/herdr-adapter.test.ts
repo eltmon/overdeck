@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Effect } from 'effect';
 
 import { HerdrBackend, toAgentState, toBackendEvents, tokenPayload } from '../../../../src/lib/terminal-backends/herdr.js';
@@ -251,5 +251,65 @@ describe('HerdrBackend.prompt when the target metadata cannot be read', () => {
     );
 
     expect(result).toMatchObject({ delivered: true });
+  });
+});
+
+describe('HerdrBackend.prompt steer submit (PAN-4292)', () => {
+  const sender = { id: 'conv-4292' };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('types the text in bracketed paste, then presses ctrl+x ctrl+s, never agent.prompt', async () => {
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'working', tokens: {} } };
+      return {};
+    });
+
+    const pending = Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'change course', { messageId: 's1', sender, submit: 'steer' }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    // The chord waits for the settle delay after the text.
+    expect(log.map((call) => call.method)).toEqual(['agent.get', 'pane.send_text']);
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(pending).resolves.toEqual({ delivered: true, messageId: 's1' });
+    expect(log.map((call) => call.method)).toEqual(['agent.get', 'pane.send_text', 'pane.send_keys']);
+    expect(log[1]?.params).toEqual({ pane_id: 'w1:p2', text: '\x1b[200~change course\x1b[201~' });
+    expect(log[2]?.params).toEqual({ pane_id: 'w1:p2', keys: ['ctrl+x', 'ctrl+s'] });
+  });
+
+  it('refuses a blocked agent without sending anything', async () => {
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'blocked', tokens: {} } };
+      return {};
+    });
+
+    const result = await Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'change course', { messageId: 's2', sender, submit: 'steer' }),
+    );
+
+    expect(result).toEqual({ refused: true, reason: 'agent_blocked' });
+    expect(log.map((call) => call.method)).toEqual(['agent.get']);
+  });
+
+  it('keeps agent.prompt when submit is absent', async () => {
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'working', tokens: {} } };
+      return {};
+    });
+
+    const result = await Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'queue this', { messageId: 's3', sender }),
+    );
+
+    expect(result).toMatchObject({ delivered: true, messageId: 's3' });
+    expect(log.map((call) => call.method)).toEqual(['agent.get', 'agent.prompt']);
   });
 });

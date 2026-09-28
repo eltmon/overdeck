@@ -573,6 +573,26 @@ Spawn guards are backend-aware too: "is this agent already running" is `agentPan
 tmux session or a live Herdr agent of that name, and the tmux-only session options
 (`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
 
+### Steer submit (`PromptOptions.submit`, PAN-4292)
+
+`prompt()` takes `submit: 'enter' | 'steer'` (default `enter`). `steer` finishes the prompt with
+Claude Code's send-now chord, **Ctrl+X Ctrl+S** (`chat:sendNow`), which interrupts the running turn
+and sends the message at once. Every spelling of the chord lives in
+`src/lib/terminal-backends/steer-keys.ts`:
+
+| Path | Steer submit |
+| --- | --- |
+| tmux (`sendKeys`) | paste, then `send-keys C-x C-s` (also for the resend chaser) |
+| Herdr | `pane.send_text` with the text in bracketed-paste markers, a 300 ms settle, then `pane.send_keys ctrl+x ctrl+s`. `agent.prompt` always ends with Enter, so a steer bypasses it; a `blocked` agent is refused. |
+| PTY supervisor | writes `\x18\x13` instead of `\r` and answers `{"ok":true,"submit":"steer"}` |
+
+Claude Code also binds Ctrl+Enter to send-now, but no multiplexer carries it. A byte probe showed
+that tmux `send-keys C-Enter` emits no bytes, and Herdr `send-keys ctrl+enter` emits `\r` (a plain
+submit). So Overdeck never sends Ctrl+Enter. Claude Code runs its tty in raw mode, so the `0x13`
+(XOFF) byte reaches it. The app-server, ACP/Prime host and Channels tiers cannot carry a steer, so
+they answer `steer-unsupported: <tier>` instead of delivering a plain submit. A keyed (`dedupKey`)
+steer is rejected.
+
 ## Reaching an agent from a shell (PAN-3928)
 
 | Backend | Command |

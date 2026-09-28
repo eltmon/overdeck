@@ -22,6 +22,12 @@ vi.mock('../../../dashboard/server/http-helpers.js', () => ({
   }),
 }));
 
+const { controlChannelMock } = vi.hoisted(() => ({ controlChannelMock: vi.fn(async () => undefined) }));
+vi.mock('../conversation-delivery.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  deliverConversationViaControlChannel: controlChannelMock,
+}));
+
 let testHome: string;
 
 beforeEach(() => {
@@ -97,5 +103,86 @@ describe('handleConversationMessage delivery result', () => {
     const { response } = await send({ ok: true, path: 'herdr', deduplicated: true, failure: 'dropped: duplicate message id' });
     expect(response.status).toBe(200);
     expect(log).toHaveBeenCalledWith('[conversations] delivery-conv: delivered via herdr (deduplicated)');
+  });
+});
+
+describe('handleConversationMessage steer delivery (PAN-4292)', () => {
+  async function sendAs(harness: 'claude-code' | 'codex' | 'ohmypi', body: Record<string, unknown>, result: DeliveryResult = { ok: true, path: 'tmux', steered: true }) {
+    const { createConversation } = await import('../conversations.js');
+    const { handleConversationMessage } = await import('../conversation-message.js');
+    createConversation({
+      name: `steer-${harness}`,
+      tmuxSession: `conv-steer-${harness}`,
+      cwd: '/tmp',
+      harness,
+      status: 'active',
+      titleSource: 'manual',
+      title: 'Manual',
+    });
+    const deliver = vi.fn(async () => result);
+    const response = (await handleConversationMessage(`steer-${harness}`, { message: 'change course now', ...body }, {
+      resolveSessionFile: async () => null,
+      generateAiTitle: async () => {},
+      ensureMainInputTarget: async () => ({ ok: true, inputTarget: 'main' }),
+      conversationPendingPermission: async () => null,
+      deliverAgentMessage: deliver,
+    })) as unknown as { status: number; body: Record<string, unknown> };
+    return { response, deliver };
+  }
+
+  beforeEach(() => {
+    controlChannelMock.mockClear();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  it('a Claude Code steer delivers with submit steer', async () => {
+    const { response, deliver } = await sendAs('claude-code', { deliverAs: 'steer' });
+    expect(response.status).toBe(200);
+    expect(deliver).toHaveBeenCalledWith('conv-steer-claude-code', 'change course now', 'conversation-message', expect.anything(), { submit: 'steer' });
+  });
+
+  it('a Claude Code message without deliverAs delivers without a submit option', async () => {
+    const { response, deliver } = await sendAs('claude-code', {}, { ok: true, path: 'tmux' });
+    expect(response.status).toBe(200);
+    expect(deliver).toHaveBeenCalledWith('conv-steer-claude-code', 'change course now', 'conversation-message', expect.anything());
+    expect(deliver.mock.calls[0]).toHaveLength(4);
+  });
+
+  it('reports steerDegraded when the delivery fell back to a normal submit', async () => {
+    const { response } = await sendAs('claude-code', { deliverAs: 'steer' }, {
+      ok: true,
+      path: 'supervisor',
+      steered: false,
+      failure: 'supervisor predates steer; delivered as a normal submit',
+    });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ ok: true, steerDegraded: 'supervisor predates steer; delivered as a normal submit' });
+  });
+
+  it('a Codex steer is refused with 422 steer-unsupported and nothing is delivered', async () => {
+    const { response, deliver } = await sendAs('codex', { deliverAs: 'steer' });
+    expect(response).toEqual({
+      status: 422,
+      body: { error: 'Codex has no steer delivery', code: 'steer-unsupported', deliveryUnknown: false, retryable: false },
+    });
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it('a Claude Code follow-up is refused with 422 steer-unsupported', async () => {
+    const { response, deliver } = await sendAs('claude-code', { deliverAs: 'follow_up' });
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({ code: 'steer-unsupported', error: 'Claude Code has no follow-up delivery' });
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
+  it('a Pi steer still goes over the control channel', async () => {
+    const { response, deliver } = await sendAs('ohmypi', { deliverAs: 'steer' });
+    expect(response.status).toBe(200);
+    expect(deliver).not.toHaveBeenCalled();
+    expect(controlChannelMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'steer-ohmypi' }),
+      'change course now',
+      { source: 'operator', deliverAs: 'steer' },
+    );
   });
 });

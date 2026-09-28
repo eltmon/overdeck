@@ -506,6 +506,21 @@ export async function handleConversationMessage(
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
   const behavior = getHarnessBehavior(harness);
+  // PAN-4292: Pi routes deliverAs over its control channel (pickDeliverAs).
+  // Every other harness steers only with send-now keys, and has no
+  // follow-up mode; refuse rather than deliver a plain submit (D13).
+  const requestedDeliverAs = body['deliverAs'];
+  const steer = requestedDeliverAs === 'steer' && !isPiControlChannelHarness(harness);
+  if (!isPiControlChannelHarness(harness) && (requestedDeliverAs === 'steer' || requestedDeliverAs === 'follow_up')) {
+    if (requestedDeliverAs === 'follow_up' || behavior.steerKind !== 'send-now-keys') {
+      return jsonResponse({
+        error: `${behavior.displayName} has no ${requestedDeliverAs === 'steer' ? 'steer' : 'follow-up'} delivery`,
+        code: 'steer-unsupported',
+        deliveryUnknown: false,
+        retryable: false,
+      }, { status: 422 });
+    }
+  }
   const supportsImages = modelSupportsImages(conv.model ?? '');
   const partition = partitionAttachmentsForModel(message, managedAttachmentPaths, supportsImages);
   const outboundMessage = partition.outboundMessage;
@@ -529,6 +544,7 @@ export async function handleConversationMessage(
   }
 
   let switchedFromSubagent: string | undefined;
+  let steerDegraded: string | undefined;
   if (isPiControlChannelHarness(harness)) {
     await deliverConversationViaControlChannel(conv, deliveredMessage, {
       source: 'operator',
@@ -595,6 +611,8 @@ export async function handleConversationMessage(
           method,
           { kimiContext: { workspace: conv.cwd, sessionId: kimiSessionId } },
         );
+      } else if (steer) {
+        delivery = await deliver(conv.tmuxSession, deliveredMessage, 'conversation-message', method, { submit: 'steer' });
       } else {
         delivery = await deliver(conv.tmuxSession, deliveredMessage, 'conversation-message', method);
       }
@@ -617,7 +635,8 @@ export async function handleConversationMessage(
         retryable: true,
       }, { status: 502 });
     }
-    console.log(`[conversations] ${conv.name}: delivered via ${delivery.path}${delivery.deduplicated ? ' (deduplicated)' : ''}`);
+    console.log(`[conversations] ${conv.name}: delivered via ${delivery.path}${delivery.deduplicated ? ' (deduplicated)' : ''}${steer ? (delivery.steered === false ? ` (steer degraded: ${delivery.failure})` : ' (steered)') : ''}`);
+    if (steer && delivery.steered === false) steerDegraded = delivery.failure ?? 'delivered as a normal submit';
 
     if (watchFromByteOffset !== null && conv.claudeSessionId) {
       void watchForEatenConversationMessage({
@@ -627,6 +646,7 @@ export async function handleConversationMessage(
         sessionId: conv.claudeSessionId,
         message: deliveredMessage,
         deliveryMethod: resolveConversationDeliveryMethod(conv),
+        ...(steer ? { submit: 'steer' as const } : {}),
         fromByteOffset: watchFromByteOffset,
       }).then((outcome) => {
         if (outcome === 'redelivered') {
@@ -655,5 +675,6 @@ export async function handleConversationMessage(
     ...(droppedImageCount > 0 ? { imagesDropped: droppedImageCount } : {}),
     ...(harness === 'claude-code' ? { inputTarget: 'main' } : {}),
     ...(switchedFromSubagent ? { switchedFromSubagent } : {}),
+    ...(steerDegraded ? { steerDegraded } : {}),
   });
 }
