@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T00:47:18.373Z",
+  "updated": "2026-09-28T00:47:33.946Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
     "default-remove-workspace.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T00:47:18.373Z"
+    },
+    "close-out-settings-routes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T00:47:33.946Z"
     }
   }
 }
