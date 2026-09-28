@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
-import { getAgentState, type AgentState } from '../../lib/agents.js';
+import { getAgentState } from '../../lib/agents.js';
 import { setCloisterEventStoreProvider, getCloisterService } from '../../lib/cloister/service.js';
 import {
   runDeaconLitePatrol,
@@ -8,6 +8,7 @@ import {
   setAgentStatusChangedNotifier,
   setPatrolRunObserver,
 } from '../../lib/cloister/deacon-lite.js';
+import { buildAgentStatusChangedPayload, buildConfirmedDeadAgentEvents } from '../../lib/cloister/agent-status-events.js';
 import { createDeaconEventClient } from '../../lib/cloister/deacon-event-client.js';
 import { ensureInternalToken } from '../../lib/internal-token.js';
 import type { DomainEvent } from '@overdeck/contracts';
@@ -15,37 +16,6 @@ import type { DomainEvent } from '@overdeck/contracts';
 function internalDashboardUrl(): string {
   const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? '3011', 10);
   return process.env.OVERDECK_INTERNAL_DASHBOARD_URL ?? `http://127.0.0.1:${port}`;
-}
-
-function toAgentStatusPayload(status: AgentState['status']): 'starting' | 'running' | 'stopped' | 'error' | 'unknown' {
-  return status === 'starting' || status === 'running' || status === 'stopped' || status === 'error'
-    ? status
-    : 'unknown';
-}
-
-function buildAgentStatusChangedPayload(
-  state: AgentState,
-  previousStatus?: AgentState['status'],
-  hasLiveTmuxSession?: boolean,
-) {
-  const payload = {
-    agentId: state.id,
-    issueId: state.issueId,
-    status: toAgentStatusPayload(state.status),
-    previousStatus: previousStatus ? toAgentStatusPayload(previousStatus) : undefined,
-    paused: state.paused === true,
-    pausedReason: state.pausedReason ?? null,
-    pausedAt: state.pausedAt ?? null,
-    troubled: state.troubled === true,
-    troubledAt: state.troubledAt ?? null,
-    consecutiveFailures: state.consecutiveFailures ?? 0,
-    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
-    lastFailureAt: state.lastFailureAt ?? null,
-    lastFailureReason: state.lastFailureReason ?? null,
-    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
-  };
-  // `hasLiveTmuxSession` is the deprecated alias of `hasLivePane` (#4105).
-  return hasLiveTmuxSession === undefined ? payload : { ...payload, hasLivePane: hasLiveTmuxSession, hasLiveTmuxSession };
 }
 
 const eventClient = createDeaconEventClient({
@@ -69,21 +39,13 @@ setActivityEventStoreProvider(() => eventClient);
 setCloisterEventStoreProvider(() => eventClient);
 
 setAgentStoppedNotifier((agentId) => {
-  void (async () => {
-    try {
-      const state = getAgentState(agentId);
-      if (state) {
-        append(domainEvent('agent.heartbeat_dead', { agentId, issueId: state.issueId, sessionId: state.sessionId }));
-        // PAN-2633: heartbeat_dead means the deacon has determined the tmux
-        // session is gone, so assert hasLiveTmuxSession: false explicitly.
-        append(domainEvent('agent.status_changed', buildAgentStatusChangedPayload(state, undefined, false)));
-        return;
-      }
-      append(domainEvent('agent.heartbeat_dead', { agentId }));
-    } catch (err) {
-      console.error('[deacon-child] Failed to append agent stopped/status event:', err);
-    }
-  })();
+  try {
+    // PAN-2633: heartbeat_dead means deacon-lite confirmed the session gone,
+    // so the status event asserts no live pane.
+    for (const event of buildConfirmedDeadAgentEvents(agentId, getAgentState(agentId))) append(event);
+  } catch (err) {
+    console.error('[deacon-child] Failed to append agent stopped/status event:', err);
+  }
 });
 
 setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
