@@ -50,9 +50,9 @@ vi.mock('../components/drawer/DrawerAgentSession', () => ({
   pickDefaultDrawerAgent: vi.fn((agents: any) => agents?.[0] ?? null),
 }));
 
-// Mock TalkItThrough to avoid unrelated requests
-vi.mock('../components/simple/TalkItThrough', () => ({
-  TalkItThrough: () => <div data-testid="talk-it-through" />,
+// Mock HomeComposer to avoid unrelated requests
+vi.mock('../components/home/HomeComposer', () => ({
+  HomeComposer: () => <div data-testid="home-composer" />,
 }));
 
 // Now import after all mocks are in place

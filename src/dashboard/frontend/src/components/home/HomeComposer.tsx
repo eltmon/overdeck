@@ -83,7 +83,7 @@ export function HomeComposer({ mode }: HomeComposerProps) {
     staleTime: 5 * 60_000,
     retry: false,
   });
-  const codexAvailable = prerequisitesQuery.data?.checks.find((c) => c.id === 'codex')?.found === true;
+  const codexAvailable = prerequisitesQuery.data?.checks?.find((c) => c.id === 'codex')?.found === true;
 
   const intents = useMemo(
     () => buildHomeIntents({ mode, harness, codexAvailable }),

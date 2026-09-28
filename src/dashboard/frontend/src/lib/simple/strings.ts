@@ -47,7 +47,6 @@ export const SIMPLE_STRINGS = {
     readyTitle: 'Ready to merge',
     doneTitle: 'Finished',
     composerPlaceholder: 'Ask for anything, or describe what you want built, in plain words…',
-    composerButton: 'Talk it through',
     chipIn: 'In: ',
     chipNoProject: 'Not in a project',
     chipAddProject: 'Add a project…',

@@ -82,7 +82,7 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('SimpleHomePage (C-SIMPLE)', () => {
   beforeEach(() => {
     useUiMode.setState({ mode: 'simple', simpleIssueId: null });
-    // ModelPicker (TalkItThrough composer) fetches model catalogs on mount.
+    // ModelPicker (Home composer) fetches model catalogs on mount.
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/settings/available-models') return Response.json({});
@@ -91,6 +91,7 @@ describe('SimpleHomePage (C-SIMPLE)', () => {
       if (url.includes('/api/settings/harness-policy')) return Response.json({ decisions: {} });
       if (url === '/api/issues/resource-allocated') return Response.json([]);
       if (url === '/api/registered-projects') return Response.json([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/tmp' }]);
+      if (url === '/api/prerequisites') return Response.json({ platform: 'linux', allRequiredFound: true, checks: [] });
       return Response.json({});
     }));
   });
@@ -136,6 +137,14 @@ describe('SimpleHomePage (C-SIMPLE)', () => {
     expect(screen.getByText('Ready to merge')).toBeInTheDocument();
     const merges = screen.getAllByRole('button', { name: 'Merge to main' });
     expect(merges).toHaveLength(1);
+  });
+
+  it('simple home renders the composer with the talk row', async () => {
+    seed({ issues: [] });
+    renderWithProviders(<SimpleHomePage />);
+    const input = screen.getByTestId('home-composer-input');
+    fireEvent.change(input, { target: { value: 'hello' } });
+    expect(await screen.findByText('Talk it through first:')).toBeInTheDocument();
   });
 
   it('backlog issues do not clutter the home (not-started stays out)', () => {
