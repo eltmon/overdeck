@@ -4,6 +4,9 @@
  *
  * Three levels: ok → watch (warn), holding (soft band, warn), shedding (hard band, error).
  * Transition-only emit: one row per level change, never repeats while the level persists.
+ * A hold is keyed by its trigger kind too, so a CPU hold after a memory hold
+ * (or the reverse) gets its own row (PAN-4311). Every 5 minutes the patrol
+ * logs one CPU pressure calibration line to the deacon log.
  * No frontend changes needed — activity.entry already renders in ActivityPanel.
  */
 
@@ -11,6 +14,7 @@ import { MemoryPressureBand, MemoryVerdict, assessMemoryPressure, readGovernorPs
 import { RuntimeCensus, getRuntimeCensus } from '../runtime-census.js';
 import { emitActivityEntry, EmitActivityOptions } from '../activity-logger.js';
 import { logDeaconEvent } from '../persistent-logger.js';
+import { loadConfigSync } from '../config-yaml/load.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
@@ -46,11 +50,35 @@ function formatPsi(value: number | null | undefined): string {
 }
 
 /**
- * PAN-4267: the governor only gates the automatic resume of preemptively
- * yielded agents (resumeYieldedAgents) — never conversations, `pan start`, or
- * dashboard Start. The activity-feed text used to imply otherwise.
+ * PAN-4267/PAN-4311: what a hold actually affects. The governor's own verdict
+ * gates nothing; the dispatch doors read CPU pressure directly (stateless
+ * assessCpuPressure). The activity-feed text used to imply otherwise.
  */
-const GOVERNOR_SCOPE = 'The governor only holds the automatic resume of agents the preemptive scheduler paused; conversations, pan start, and dashboard Start are not blocked by it.';
+const GOVERNOR_SCOPE = 'The governor itself only reports. CPU pressure also refuses new lane launches (unless --force), warns before an agent start, and — only when resources.governor_cpu_hold_dispatch is on — holds Flywheel-started agents. Conversations, operator pan start, and dashboard Start are never blocked.';
+
+const CALIBRATION_LOG_INTERVAL_MS = 5 * 60_000;
+
+export interface CpuRecoveryThresholds {
+  psiAvg60: number;
+  loadPerCore: number;
+}
+
+function readCpuRecoveryThresholds(): CpuRecoveryThresholds {
+  const { resources } = loadConfigSync().config;
+  return { psiAvg60: resources.governorCpuPsiRecoveryAvg60, loadPerCore: resources.governorCpuRecoveryLoadPerCore };
+}
+
+function formatCpuTrigger(trigger: NonNullable<MemoryVerdict['trigger']>, since: string): string {
+  const reading = trigger.cpuReading ?? 0;
+  const crossed = trigger.cpuSignal === 'psi-some-avg60'
+    ? `CPU pressure (PSI some avg60) reached ${reading.toFixed(1)}%`
+    : `load per core reached ${reading.toFixed(2)}`;
+  return `The resource governor started holding at ${since} UTC because ${crossed}, at or above the ${trigger.cpuThreshold} hold threshold.`;
+}
+
+function formatCalibrationValue(value: number | null | undefined): string {
+  return value == null ? 'n/a' : value.toFixed(2);
+}
 
 function formatTrigger(verdict: MemoryVerdict): string {
   const trigger = verdict.trigger;
@@ -61,6 +89,7 @@ function formatTrigger(verdict: MemoryVerdict): string {
   }
 
   const since = new Date(trigger.at).toISOString().slice(11, 16);
+  if (trigger.kind === 'cpu') return formatCpuTrigger(trigger, since);
   if (trigger.kind === 'soft-dip') {
     return `The memory governor started holding at ${since} UTC when available memory dipped to ${formatGib(trigger.readingBytes)}, under the ${formatGib(trigger.thresholdBytes)} soft reserve.`;
   }
@@ -131,10 +160,21 @@ export interface MemoryPressurePatrolDeps {
   census: () => Promise<RuntimeCensus>;
   readNewKernelJournal: () => Promise<string>;
   emit: (entry: EmitActivityOptions) => void;
+  /** PAN-4311: CPU recovery thresholds named in a CPU hold's message. */
+  readCpuRecovery: () => CpuRecoveryThresholds;
+  /** PAN-4311: clock and sink for the 5-minute CPU pressure calibration line. */
+  now: () => number;
+  logCalibration: (line: string) => void;
 }
 
-// Module-level state for transition-only emission
-let lastLevel: MemoryFeedLevel | null = null;
+// Module-level state for transition-only emission: the level, plus the
+// trigger kind while holding (PAN-4311 D13).
+let lastKey: string | null = null;
+let lastCalibrationLogMs: number | null = null;
+
+function feedKey(level: MemoryFeedLevel, verdict: MemoryVerdict): string {
+  return level === 'holding' ? `holding:${verdict.trigger?.kind ?? 'none'}` : level;
+}
 
 // Module-level state for OOM canary: disabled if journal reading fails
 let oomCanaryDisabled = false;
@@ -194,6 +234,9 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     census: deps.census || (() => getRuntimeCensus()),
     readNewKernelJournal: deps.readNewKernelJournal || readNewKernelJournal,
     emit: deps.emit || emitActivityEntry,
+    readCpuRecovery: deps.readCpuRecovery || readCpuRecoveryThresholds,
+    now: deps.now || Date.now,
+    logCalibration: deps.logCalibration || logDeaconEvent,
   };
 
   const verdict = await d.assess();
@@ -203,6 +246,18 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
   const recoveryBytes = d.readRecoveryReserveBytes();
   const psiCalmConfig = d.readPsiCalmConfig();
   const actions: string[] = [];
+
+  // PAN-4311 FR-13: a durable CPU pressure sample every 5 minutes, so the PSI
+  // hold threshold can be calibrated from the deacon log.
+  const nowMs = d.now();
+  if (lastCalibrationLogMs == null || nowMs - lastCalibrationLogMs >= CALIBRATION_LOG_INTERVAL_MS) {
+    lastCalibrationLogMs = nowMs;
+    d.logCalibration(
+      `[deacon] cpu-pressure sample psi_some_avg10=${formatCalibrationValue(verdict.psiCpuSomeAvg10)} `
+      + `psi_some_avg60=${formatCalibrationValue(verdict.psiCpuSomeAvg60)} `
+      + `load_per_core=${formatCalibrationValue(verdict.loadPerCore)}`,
+    );
+  }
 
   // WI-4: Check for new OOM kills in the journal (runs even if level unchanged)
   const journalText = await d.readNewKernelJournal();
@@ -268,13 +323,15 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
   }
 
   const level = memoryFeedLevel(verdict.band, verdict.availableBytes, watchBytes);
+  const key = feedKey(level, verdict);
 
   // Transition-only: if level hasn't changed, emit nothing for level transition
-  if (level === lastLevel) {
+  if (key === lastKey) {
     return oomKills.length > 0 ? actions : [];
   }
 
-  lastLevel = level;
+  const previousKey = lastKey;
+  lastKey = key;
 
   // Fetch the runtime census for top-consumer attribution
   const census = await d.census();
@@ -320,6 +377,27 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     const action = `memory-pressure-patrol: watch-level (${formatGib(verdict.availableBytes)} available)`;
     actions.push(action);
     logDeaconEvent(`[deacon] ${action}`);
+  } else if (level === 'holding' && verdict.trigger?.kind === 'cpu') {
+    const cpuRecovery = d.readCpuRecovery();
+    const recovery = verdict.trigger.cpuSignal === 'psi-some-avg60'
+      ? `${cpuRecovery.psiAvg60}% (PSI some avg60)`
+      : `${cpuRecovery.loadPerCore} load per core`;
+    const message =
+      `${formatTrigger(verdict)} Holding clears when CPU pressure falls below the ${recovery} recovery threshold. ` +
+      `Nothing has been stopped or killed. ${GOVERNOR_SCOPE}`;
+
+    d.emit({
+      level: 'warn',
+      source: 'cloister',
+      link: '/resources',
+      message,
+      details,
+      desktop: false,
+    });
+
+    const action = `memory-pressure-patrol: cpu-hold (${verdict.trigger.cpuSignal} ${verdict.trigger.cpuReading})`;
+    actions.push(action);
+    logDeaconEvent(`[deacon] ${action}`);
   } else if (level === 'holding') {
     const calmClause = verdict.macPressureLevel != null
       ? `macOS memory pressure stays normal for ${formatCalmWindow(psiCalmConfig.windowMs)}`
@@ -360,9 +438,10 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
     actions.push(action);
     logDeaconEvent(`[deacon] ${action}`);
   } else if (level === 'ok') {
-    const message =
-      `Memory pressure cleared — ${formatGib(verdict.availableBytes)} available, at or above the ${formatGib(watchBytes)} watch reserve. ` +
-      `The governor has released its hold.`;
+    const message = previousKey === 'holding:cpu'
+      ? `CPU pressure cleared — the governor has released its hold. ${formatGib(verdict.availableBytes)} of memory is available.`
+      : `Memory pressure cleared — ${formatGib(verdict.availableBytes)} available, at or above the ${formatGib(watchBytes)} watch reserve. ` +
+        `The governor has released its hold.`;
 
     d.emit({
       level: 'info',
@@ -385,7 +464,8 @@ export async function patrolMemoryPressure(deps: Partial<MemoryPressurePatrolDep
  * Test-only: reset the module-level state between test cases.
  */
 export function __resetMemoryPressurePatrolState(): void {
-  lastLevel = null;
+  lastKey = null;
+  lastCalibrationLogMs = null;
   oomCanaryDisabled = false;
 }
 
