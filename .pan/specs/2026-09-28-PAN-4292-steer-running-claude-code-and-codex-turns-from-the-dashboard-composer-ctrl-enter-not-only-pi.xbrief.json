@@ -1,0 +1,1066 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T13:10:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4292: Steer running Claude Code and Codex turns from the dashboard composer (Ctrl+Enter), not only Pi",
+    "updated": "2026-09-28T12:48:34.449Z"
+  },
+  "plan": {
+    "id": "pan-4292",
+    "title": "Steer running Claude Code and Codex turns from the dashboard composer (Ctrl+Enter), not only Pi",
+    "status": "proposed",
+    "uid": "d63a5a0c-0a37-4d81-adc9-253c6d949c5f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-28T13:10:00Z",
+    "updated": "2026-09-28T12:48:34.449Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4292",
+        "label": "PAN-4292",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4303",
+        "label": "PAN-4303 (Codex sibling)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "composer",
+      "delivery",
+      "claude-code",
+      "steer",
+      "pan-tell",
+      "terminal-backend"
+    ],
+    "narratives": {
+      "Problem": "The dashboard composer can steer a running turn only for Pi. To steer a Claude Code conversation or agent the operator must switch to the terminal. pan tell has no steer either.",
+      "Proposal": "Add a submit mode ('enter' | 'steer') threaded through the terminal-backend prompt contract, the tmux paste path, the PTY supervisor and the Herdr adapter into deliverAgentMessage. Steer replaces the final Enter with Claude Code's send-now chord Ctrl+X Ctrl+S (bytes 18 13), which interrupts the running turn and sends immediately (verified live on tmux; bytes verified on Herdr). A HarnessBehavior.steerKind field gates the composer selector, Ctrl+Enter/Cmd+Enter, the conversation and agent routes, and pan tell --steer. Codex moves to sibling PAN-4303.",
+      "NonGoals": "- Codex steer (moved to PAN-4303; codex app-server 0.158 turn/start may already steer a busy turn and needs its own verification)\n- A Follow-up / chat:queueSubmit (ctrl+x enter) option for Claude Code\n- Steer for ACP, OpenCode, Kimi Code, Muse, Prime Agent, or remote (Fly) agents\n- The Home composer (components/home/HomeComposer.tsx)\n- Any change to Enter, Shift+Enter or default delivery behavior on any tier\n- Upgrading already-running PTY supervisors; they report steerDegraded until the agent restarts\n- Sending ctrl+enter / C-Enter on any backend\n- Silently delivering a requested steer as a normal queued submit without telling the operator"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Steer for Claude Code = chat:sendNow (interrupt the running turn and send now), labelled 'Steer' with a tooltip that says it interrupts.",
+        "rationale": "The issue says 'the same way the TUI's Ctrl+Enter does'; Claude Code 2.1.280 binds ctrl+enter to chat:sendNow, whose changelog and a live probe both show it interrupts the turn."
+      },
+      {
+        "summary": "Use the chord Ctrl+X Ctrl+S on every backend, never Ctrl+Enter.",
+        "rationale": "Claude Code binds ctrl+x ctrl+s to the same action; probes showed tmux 3.4 emits no bytes for C-Enter and Herdr 0.9.1 emits plain Enter (0d) for ctrl+enter, while ctrl+x ctrl+s arrives as 18 13 on both."
+      },
+      {
+        "summary": "Split Codex into sibling issue PAN-4303.",
+        "rationale": "Codex uses the app-server transport, shares no code with the keystroke path, and its turn/start may already steer a busy turn per the 0.158 schema, so it needs its own verification-first plan."
+      },
+      {
+        "summary": "Capability lives in HarnessBehavior.steerKind ('send-now-keys' | 'control-channel' | null).",
+        "rationale": "One source that both the frontend and server already read via getHarnessBehavior, matching how other per-harness behavior is declared."
+      },
+      {
+        "summary": "Ctrl+Enter/Cmd+Enter always sends deliverAs 'steer' on steer-capable harnesses, busy or idle.",
+        "rationale": "An idle send-now is a plain submit (verified), so this is safe and does not depend on a possibly stale agentBusy flag."
+      },
+      {
+        "summary": "Claude Code selector offers Auto and Steer only; Pi keeps Auto/Steer/Follow-up.",
+        "rationale": "ctrl+x enter (chat:queueSubmit) was not verified, and the issue only asks to keep queue-after-turn, which Auto already does."
+      },
+      {
+        "summary": "Steer never silently degrades: unsupported tiers return steer-unsupported, old supervisors report steerDegraded, unsupported harnesses get 422 / exit 1.",
+        "rationale": "An interrupt the operator asked for that silently turns into a queued message is worse than a visible refusal."
+      },
+      {
+        "summary": "Herdr steer uses pane.send_text (bracketed paste) + settle + pane.send_keys instead of agent.prompt, with agent_blocked refusal.",
+        "rationale": "agent.prompt always ends with Enter; send_text writes raw bytes with no bracketed paste (probed), so explicit markers mirror tmux paste-buffer -p. Checkpoint with raw-text fallback."
+      },
+      {
+        "summary": "pan tell --steer is refused for remote, non-Claude, paused, suspended and stopped targets, with nothing delivered or mailed.",
+        "rationale": "Steer has nothing to interrupt on a non-running agent and no transport on those harnesses; a clear refusal beats a surprising queue."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One new parameter (submit mode) threaded through one delivery door: prompt contract, tmux, PTY supervisor, Herdr, deliverAgentMessage, the two message routes, messageAgent/pan tell, and the composer. Codex was already split out (PAN-4303). The subsystem count is inflated because each doc target (docs/*.md, configuration/*.mdx, sync-sources/skills) counts as its own subsystem under the lint heuristic; the code spans src/lib, src/dashboard, src/cli and packages/contracts.",
+      "canonicalFilename": "2026-09-28-PAN-4292-steer-running-claude-code-and-codex-turns-from-the-dashboard-composer-ctrl-enter-not-only-pi.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "steer-kind",
+        "title": "Add HarnessBehavior.steerKind capability field",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-behavior.ts",
+            "packages/contracts/src/harness-behavior.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npm run typecheck",
+            "npx vitest run packages/contracts/src/harness-behavior.test.ts"
+          ],
+          "expected_outputs": [
+            "contracts build succeeds",
+            "typecheck completes without errors",
+            "harness-behavior.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In packages/contracts/src/harness-behavior.ts add `export type HarnessSteerKind = \"send-now-keys\" | \"control-channel\" | null` and `readonly steerKind: HarnessSteerKind` on HarnessBehavior. Set send-now-keys on CLAUDE_CODE_BEHAVIOR, control-channel on OHMYPI_BEHAVIOR, null on CODEX/ACP/KIMI_CODE/MUSE/PRIME_AGENT (OPENCODE inherits via spread). Add tests in harness-behavior.test.ts. Run `npm run build:contracts` before typecheck."
+        },
+        "items": [
+          {
+            "id": "steer-kind.ac1",
+            "title": "Given getHarnessBehavior('claude-code'), when steerKind is read, then it returns 'send-now-keys' (asserted in harness-behavior.test.ts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "steer-kind.ac2",
+            "title": "Given getHarnessBehavior('ohmypi') and getHarnessBehavior('pi'), when steerKind is read, then each returns 'control-channel'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "steer-kind.ac3",
+            "title": "Given getHarnessBehavior('codex'), 'acp', 'opencode', 'kimi-code', 'muse' and 'prime-agent', when steerKind is read, then each returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmux-steer-submit",
+        "title": "Add steer chord module and tmux sendKeys submit mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/steer-keys.ts",
+            "src/lib/tmux.ts",
+            "src/lib/terminal-backends/types.ts",
+            "src/lib/terminal-backends/tmux.ts",
+            "src/lib/__tests__/tmux-sendkeys-steer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/tmux-sendkeys-steer.test.ts src/lib/__tests__/tmux-dedup.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tmux-sendkeys-steer.test.ts and tmux-dedup.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/terminal-backends/steer-keys.ts exporting SubmitMode, STEER_TMUX_KEYS ['C-x','C-s'], STEER_HERDR_KEYS ['ctrl+x','ctrl+s'], STEER_PTY_BYTES '\\x18\\x13', STEER_SETTLE_MS 300 and tmuxSubmitKeys(mode). Add `options?: { submit?: SubmitMode }` as the 4th parameter of sendKeys in src/lib/tmux.ts and use tmuxSubmitKeys(options?.submit) at BOTH `'send-keys', '-t', sessionName, 'C-m'` sites (first submit and the resend chaser). Add `readonly submit?: SubmitMode` to PromptOptions in src/lib/terminal-backends/types.ts and pass it from the tmux backend prompt() in src/lib/terminal-backends/tmux.ts. New test src/lib/__tests__/tmux-sendkeys-steer.test.ts modelled on tmux-dedup.test.ts, fake timers. Never send C-Enter (it emits no bytes through tmux 3.4)."
+        },
+        "items": [
+          {
+            "id": "tmux-steer-submit.ac1",
+            "title": "Given sendKeys(session, text) with no options, when it submits, then it runs `send-keys -t <session> C-m` exactly as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-steer-submit.ac2",
+            "title": "Given sendKeys(session, text, caller, { submit: 'steer' }), when it submits, then it runs `send-keys -t <session> C-x C-s` and never C-m.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-steer-submit.ac3",
+            "title": "Given a steer paste whose text stays visible past the submit window, when the resend chaser fires, then it resends C-x C-s (fake timers drive the window).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-steer-submit.ac4",
+            "title": "Given the tmux backend prompt() called with options.submit 'steer', when it delivers, then sendKeys receives { submit: 'steer' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-steer-submit",
+        "title": "PTY supervisor writes the send-now chord for steer payloads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/channels/pty-supervisor.ts",
+            "src/lib/channels/__tests__/pty-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/channels/__tests__/pty-supervisor.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "pty-supervisor.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/channels/pty-supervisor.ts add `submit?: 'enter' | 'steer'` to PtySupervisorPayload, validate it in parsePayload (other values → payload null → 400), write STEER_PTY_BYTES instead of '\\r' at both child.write('\\r') sites in injectPtyMessage when submit is 'steer', and answer writeJson(res, 200, { ok: true, submit: 'steer' }) on both keyed and unkeyed success paths for steer payloads (keep 'ok' otherwise). Tests in src/lib/channels/__tests__/pty-supervisor.test.ts with fake timers."
+        },
+        "items": [
+          {
+            "id": "supervisor-steer-submit.ac1",
+            "title": "Given a payload with submit 'steer', when injectPtyMessage runs, then the fake PTY receives the content followed by '\\x18\\x13' and never '\\r'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-steer-submit.ac2",
+            "title": "Given a payload without submit, when injectPtyMessage runs, then the fake PTY still receives '\\r' after the content.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-steer-submit.ac3",
+            "title": "Given a payload with submit 'x', when the server parses it, then it responds 400 and writes nothing to the PTY.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-steer-submit.ac4",
+            "title": "Given a successful steer injection, when the server responds, then the body is JSON {\"ok\":true,\"submit\":\"steer\"}; a non-steer success still returns 'ok'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "herdr-steer-submit",
+        "title": "Herdr backend prompt() steer branch (send_text + ctrl+x ctrl+s)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr.ts",
+            "tests/unit/lib/terminal-backends/herdr-adapter.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-adapter.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "herdr-adapter.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and decision D10. In HerdrBackend.prompt() (src/lib/terminal-backends/herdr.ts ~L764), after the checkPrompt verdict and before the agent.prompt call: when options.submit === 'steer', return unsupported if no agent pane id; return { refused: true, reason: 'agent_blocked' } when agent_status is 'blocked'; else call pane.send_text with the text wrapped in '\\x1b[200~' … '\\x1b[201~', await setTimeout(STEER_SETTLE_MS), then pane.send_keys with [...STEER_HERDR_KEYS]; return delivered. Never call agent.prompt for steer and never send 'ctrl+enter' (Herdr encodes it as plain Enter). Tests in tests/unit/lib/terminal-backends/herdr-adapter.test.ts with fake timers. The bracketed-paste choice is an implementation checkpoint settled in live-steer-verification."
+        },
+        "items": [
+          {
+            "id": "herdr-steer-submit.ac1",
+            "title": "Given prompt() with submit 'steer' on an idle or working agent, when it delivers, then the fake API receives pane.send_text (text wrapped in bracketed-paste markers) and then pane.send_keys ['ctrl+x','ctrl+s'], and never agent.prompt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-steer-submit.ac2",
+            "title": "Given prompt() with submit 'steer' on an agent whose agent_status is 'blocked', when it runs, then it returns { refused: true, reason: 'agent_blocked' } and sends no input.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-steer-submit.ac3",
+            "title": "Given prompt() without submit, when it delivers, then it calls agent.prompt exactly as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery-door-steer",
+        "title": "Thread the submit mode through deliverAgentMessage and transcript confirmation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/delivery.ts",
+            "src/lib/__tests__/deliver-agent-message.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/deliver-agent-message.test.ts src/lib/agents/__tests__/delivery.test.ts src/lib/agents/__tests__/delivery-herdr-result.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deliver-agent-message, delivery and delivery-herdr-result tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "conversation-route-steer",
+            "message-agent-steer",
+            "live-steer-verification"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and decisions D8/D9. In src/lib/agents/delivery.ts: add `submit?: SubmitMode` to DeliverAgentMessageOptions and `steered?: boolean` to DeliveryResult; pass submit to herdrBackend.prompt; throw MessageDeliveryFailed when dedupKey and submit 'steer' are combined; app-server, ACP/Prime host and Channels tiers return { ok:false, failure:'steer-unsupported: <tier>' } for steer without posting; the supervisor tier adds submit:'steer' to the POST body only when steering and returns steered:false with failure 'supervisor predates steer; delivered as a normal submit' when the response body is not {ok:true,submit:'steer'}; all three tmux sendKeys sites pass { submit }. deliverMessageWithTranscriptConfirmation gains submit and forwards it, keeping the exact old call shape when absent. Tests in src/lib/__tests__/deliver-agent-message.test.ts."
+        },
+        "items": [
+          {
+            "id": "delivery-door-steer.ac1",
+            "title": "Given submit 'steer' and a supervisor that answers {ok:true,submit:'steer'}, when deliverAgentMessage runs, then the POST body carries submit 'steer' and the result is { ok: true, path: 'supervisor', steered: true }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-door-steer.ac2",
+            "title": "Given submit 'steer' and a supervisor that answers the bare string 'ok', when deliverAgentMessage runs, then the result is ok:true with steered:false and failure 'supervisor predates steer; delivered as a normal submit'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-door-steer.ac3",
+            "title": "Given submit 'steer' routed to the Channels or app-server tier, when deliverAgentMessage runs, then it returns ok:false with failure starting 'steer-unsupported' and posts nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-door-steer.ac4",
+            "title": "Given submit 'steer' with a dedupKey, when deliverAgentMessage runs, then it throws MessageDeliveryFailed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-door-steer.ac5",
+            "title": "Given no submit option, when deliverAgentMessage and deliverMessageWithTranscriptConfirmation run, then every tier receives the same arguments as before (existing tests pass unchanged).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-route-steer",
+        "title": "Conversation message route delivers deliverAs 'steer' for Claude Code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/__tests__/conversation-message-delivery-result.test.ts",
+            "src/dashboard/server/services/conversation-eaten-message-watcher.ts",
+            "src/dashboard/server/services/__tests__/conversation-eaten-message-watcher.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-message-delivery-result.test.ts src/lib/overdeck/__tests__/conversation-message-permission-hold.test.ts src/lib/overdeck/__tests__/conversation-message-input-target.test.ts src/dashboard/server/services/__tests__/conversation-eaten-message-watcher.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three conversation-message test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and decision D13. In src/lib/overdeck/conversation-message.ts, read body['deliverAs']; for non-Pi harnesses answer 422 { code: 'steer-unsupported' } (deliver nothing) when deliverAs is 'follow_up', or 'steer' on a harness whose steerKind is not 'send-now-keys'. For claude-code + 'steer', call deliver(..., { submit: 'steer' }) and add steerDegraded: delivery.failure to the JSON when delivery.steered === false. Pi routing (pickDeliverAs) is unchanged. Tests in src/lib/overdeck/__tests__/conversation-message-delivery-result.test.ts. Also add `submit?: SubmitMode` to EatenMessageWatchArgs in src/dashboard/server/services/conversation-eaten-message-watcher.ts, pass submit from the route when steering, and make the redelivery call pass { submit } as the 5th argument only when set (4-argument call otherwise), so a steer eaten by submit-time compaction is redelivered as a steer, never as a plain Enter."
+        },
+        "items": [
+          {
+            "id": "conversation-route-steer.ac1",
+            "title": "Given a claude-code conversation and body deliverAs 'steer', when the route delivers, then the injected deliverAgentMessage receives { submit: 'steer' }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-route-steer.ac2",
+            "title": "Given a claude-code conversation and no deliverAs, when the route delivers, then deliverAgentMessage is called without a submit option.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-route-steer.ac3",
+            "title": "Given a codex conversation and deliverAs 'steer', when the route runs, then it returns 422 with code 'steer-unsupported' and deliverAgentMessage is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-route-steer.ac4",
+            "title": "Given an ohmypi conversation and deliverAs 'steer', when the route runs, then the control channel receives type 'steer' as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-route-steer.ac5",
+            "title": "Given a steer message eaten by submit-time compaction, when the eaten-message watcher redelivers it, then the redelivery passes { submit: 'steer' } to deliverAgentMessage.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "message-agent-steer",
+        "title": "messageAgent steer option with refusals and no idle wait",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/lib/agents/agent-state.ts",
+            "src/lib/agents/__tests__/messaging-steer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/messaging-steer.test.ts src/lib/agents/__tests__/messaging-busy-agent-mail.test.ts src/lib/agents/__tests__/messaging-conversation-harness.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "messaging-steer, messaging-busy-agent-mail and messaging-conversation-harness tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and decisions D11/D12. Add `steer?: boolean` to MessageAgentRedriveOptions (src/lib/agents/agent-state.ts). In messageAgent (src/lib/agents/messaging.ts): when opts.steer, refuse with { delivered:false, queuedToMail:false, reason } and write no mail when the target harness steerKind is not 'send-now-keys', the agent is paused, suspended or stopped, or a remote state exists; skip waitForAgentIdle(normalizedId, 5000); keep ensureMainInputTarget; pass submit 'steer' to deliverMessageWithTranscriptConfirmation and the unkeyed deliverWithOptionalKey path; surface steered:false as the outcome reason. New test src/lib/agents/__tests__/messaging-steer.test.ts modelled on messaging-busy-agent-mail.test.ts."
+        },
+        "items": [
+          {
+            "id": "message-agent-steer.ac1",
+            "title": "Given a running claude-code agent and steer: true, when messageAgent runs, then waitForAgentIdle is not called and deliverMessageWithTranscriptConfirmation receives submit 'steer'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-agent-steer.ac2",
+            "title": "Given a codex, kimi-code or ohmypi target and steer: true, when messageAgent runs, then it returns delivered:false with a reason naming the harness and writes no mail file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-agent-steer.ac3",
+            "title": "Given a paused or stopped claude-code agent and steer: true, when messageAgent runs, then it returns delivered:false and does not resume the agent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-agent-steer.ac4",
+            "title": "Given no steer option, when messageAgent runs, then the idle wait and delivery arguments are unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-tell-steer",
+        "title": "pan tell --steer flag and pan-tell skill section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/tell.ts",
+            "src/cli/commands/__tests__/tell.test.ts",
+            "sync-sources/skills/pan-tell/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/tell.test.ts src/cli/commands/__tests__/tell-lane-guard.test.ts",
+            "npm run build",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tell tests pass",
+            "build succeeds",
+            "lint-skills.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add `.option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')` to the tell command in src/cli/index.ts; add steer to TellOptions in src/cli/commands/tell.ts; refuse --steer for remote agents (exit 1 before sendToRemoteAgent); pass { steer: true } to messageAgent; print 'Message steered into <id>'s running turn' on success plus any degradation reason. Update sync-sources/skills/pan-tell/SKILL.md in the SAME commit with a 'Steer a running turn' section (scripts/lint-skills.sh compares it to pan tell --help). Tests in src/cli/commands/__tests__/tell.test.ts."
+        },
+        "items": [
+          {
+            "id": "pan-tell-steer.ac1",
+            "title": "Given `pan tell --steer PAN-1 \"msg\"`, when tellCommand runs, then messageAgent receives { steer: true } in its options.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tell-steer.ac2",
+            "title": "Given `pan tell PAN-1 \"msg\"` without the flag, when tellCommand runs, then messageAgent receives no steer option.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tell-steer.ac3",
+            "title": "Given a remote agent and --steer, when tellCommand runs, then it exits 1 and sendToRemoteAgent is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tell-steer.ac4",
+            "title": "Given the built CLI, when `pan tell --help` runs, then it lists --steer and scripts/lint-skills.sh exits 0 against the updated SKILL.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-route-steer",
+        "title": "Dashboard agent message route honors deliverAs 'steer'",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/messaging.ts",
+            "src/dashboard/server/routes/__tests__/agent-message-steer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/agent-message-steer.test.ts src/dashboard/server/routes/__tests__/operator-interventions.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-message-steer and operator-interventions tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and decision D14. In src/dashboard/server/routes/agents/messaging.ts read deliverAs from the body in postAgentMessageLikeRoute, pass { steer: deliverAs === 'steer' } through handleAgentMessage → sendAgentMessage → messageAgent, and answer 422 { code: 'steer-unsupported', error: reason } when a steer is refused (delivered:false and not queued to mail). New test src/dashboard/server/routes/__tests__/agent-message-steer.test.ts (mock messageAgent as operator-interventions.test.ts does)."
+        },
+        "items": [
+          {
+            "id": "agent-route-steer.ac1",
+            "title": "Given POST /api/agents/:id/message with deliverAs 'steer', when handled, then messageAgent is called with { steer: true }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-route-steer.ac2",
+            "title": "Given the same route without deliverAs, when handled, then messageAgent is called without a steer option.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-route-steer.ac3",
+            "title": "Given messageAgent refuses the steer (delivered:false, queuedToMail:false), when handled, then the route responds 422 with code 'steer-unsupported'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-steer-selector",
+        "title": "Composer delivery selector for every steer-capable harness",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/lib/composerSend.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx src/dashboard/frontend/src/components/chat/__tests__/composerHeldMessages.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ComposerFooter and composerHeldMessages tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 and decisions D1/D6/D7. In src/dashboard/frontend/src/components/chat/ComposerFooter.tsx derive steerKind from getHarnessBehavior(harness) (@overdeck/contracts); render the existing deliveryMethodSelect when steerKind !== null and the session is alive, for conversations AND agents (drop the !agentId gate); options Auto + Steer, plus Follow-up only for 'control-channel'; Compact button stays Pi-only; replace the three `piConversation && deliverAs !== 'auto' ? deliverAs : undefined` expressions with an effectiveDeliverAs(override?) helper; Claude Code title uses the D1 tooltip text. In src/dashboard/frontend/src/lib/composerSend.ts stop dropping deliverAs for agents. Tests in src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx. Follow the pan-style-guide (reuse styles.deliveryMethodSelect)."
+        },
+        "items": [
+          {
+            "id": "composer-steer-selector.ac1",
+            "title": "Given a live claude-code conversation, when the composer renders, then the delivery select renders with exactly the options Auto and Steer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-steer-selector.ac2",
+            "title": "Given a live ohmypi conversation, when the composer renders, then the select renders Auto, Steer and Follow-up as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-steer-selector.ac3",
+            "title": "Given a live codex conversation, when the composer renders, then no delivery select renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-steer-selector.ac4",
+            "title": "Given a claude-code agent session (agentId set) with Steer selected, when Enter submits, then the POST to /api/agents/<id>/message carries deliverAs 'steer'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-ctrl-enter",
+        "title": "Ctrl+Enter / Cmd+Enter in the composer sends as steer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ComposerPromptEditor and ComposerFooter tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 and decision D5. In src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx widen onCommandKeyDown to (key: 'Enter' | 'SteerEnter') in InnerPluginProps and ComposerPromptEditorProps; in the KEY_ENTER_COMMAND handler keep Shift+Enter as newline and emit 'SteerEnter' when event.ctrlKey || event.metaKey, else 'Enter'; update the header comment. In ComposerFooter.tsx give handleSubmit a deliverAsOverride parameter and make handleCommandKey('SteerEnter') submit with 'steer' when steerKind !== null (plain submit otherwise). Label the Steer option 'Steer (Ctrl+Enter)' or 'Steer (⌘+Enter)' on macOS. Tests in ComposerPromptEditor.test.tsx and ComposerFooter.test.tsx."
+        },
+        "items": [
+          {
+            "id": "composer-ctrl-enter.ac1",
+            "title": "Given the editor, when ctrl+Enter or meta+Enter is pressed, then onCommandKeyDown receives 'SteerEnter'; plain Enter still yields 'Enter' and Shift+Enter still inserts a newline.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-ctrl-enter.ac2",
+            "title": "Given a claude-code conversation with the selector on Auto, when Ctrl+Enter is pressed, then the POST body carries deliverAs 'steer'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-ctrl-enter.ac3",
+            "title": "Given a codex conversation, when Ctrl+Enter is pressed, then the POST body carries no deliverAs (same as Enter).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-steering",
+        "title": "Document steering in harness, dashboard and terminal-backend docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Steering a running turn' configuration/harnesses.mdx",
+            "grep -n 'PAN-4292' docs/DASHBOARD-ARCHITECTURE.md docs/TERMINAL-BACKENDS.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep prints the new heading",
+            "grep prints a match in both docs",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-13",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. configuration/harnesses.mdx: add `## Steering a running turn` after `## Composer commands across harnesses` with a per-harness table (Claude Code: Auto + Steer, Steer interrupts and sends now via Ctrl+X Ctrl+S; Pi: Auto/Steer/Follow-up; Codex: not yet, PAN-4303; others: none), the Ctrl+Enter / Cmd+Enter shortcut, and pan tell --steer. docs/DASHBOARD-ARCHITECTURE.md: add a 'Delivery modes (PAN-4292)' bullet in the conversation composer bullets covering steerKind, deliverAs on both routes, 422 steer-unsupported and steerDegraded. docs/TERMINAL-BACKENDS.md: document PromptOptions.submit, the per-backend chord, and why ctrl+enter is never sent (tmux emits no bytes, Herdr emits plain Enter)."
+        },
+        "items": [
+          {
+            "id": "docs-steering.ac1",
+            "title": "Given configuration/harnesses.mdx, when a reader opens 'Steering a running turn', then the table lists Claude Code (Auto, Steer), Pi (Auto, Steer, Follow-up), Codex as not yet supported with a PAN-4303 link, and states that Steer interrupts the running turn.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-steering.ac2",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when grepped for 'steer-unsupported', then the delivery-modes bullet names the 422 code and the steerDegraded field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-steering.ac3",
+            "title": "Given docs/TERMINAL-BACKENDS.md, when grepped for 'ctrl+x', then it documents PromptOptions.submit and the per-backend chord.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-steer-verification",
+        "title": "Verify steer end to end on live tmux and Herdr Claude Code panes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4292",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-4292.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "grep -n 'Live verification log' .pan/drafts/pan-4292.md"
+          ],
+          "expected_outputs": [
+            "build succeeds",
+            "the PRD contains the live verification log with tmux and Herdr excerpts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. After npm run build, use a throwaway probe script (scratch dir, not committed) against an isolated tmux socket (OVERDECK_TMUX_SOCKET_NAME=pan4292e2e) and an isolated Herdr session started with a clean env (env -i HOME=$HOME PATH=$PATH TERM=xterm-256color herdr session attach pan4292e2e inside a throwaway tmux pane; HERDR_SOCKET_PATH pointing at ~/.config/herdr/sessions/pan4292e2e/herdr.sock). Run claude --model haiku in each, make it busy with a Bash sleep, then deliver via sendKeys(..., { submit: 'steer' }) and HerdrBackend.prompt(..., { submit: 'steer' }); also a default (Enter) delivery and a two-line steer on Herdr. Read the probe JSONL to settle the transcript-landing checkpoint. Append a '## Live verification log' section with pane excerpts and the chosen Herdr text encoding to .pan/drafts/pan-4292.md. Tear down with literal paths; never touch the overdeck tmux socket or the operator's Herdr session. If the bracketed-paste markers render literally, switch herdr-steer-submit to raw text and record it."
+        },
+        "items": [
+          {
+            "id": "live-steer-verification.ac1",
+            "title": "Given a busy Claude Code pane on the isolated tmux socket, when a steer is delivered, then the captured pane shows 'Interrupted' followed by the steered message and a reply, recorded in the log.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-steer-verification.ac2",
+            "title": "Given a busy Claude Code pane in the isolated Herdr session, when a steer is delivered, then the captured pane shows 'Interrupted' followed by the steered message and a reply, recorded in the log.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-steer-verification.ac3",
+            "title": "Given a busy Claude Code pane, when a default (Enter) delivery is made, then the captured pane shows no 'Interrupted' line, recorded in the log.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-steer-verification.ac4",
+            "title": "Given the probe session's JSONL after a steer, when inspected, then the log states whether the steered user record is classified as a main-transcript landing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tmux-steer-submit",
+        "to": "supervisor-steer-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-steer-submit",
+        "to": "herdr-steer-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-steer-submit",
+        "to": "delivery-door-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-steer-submit",
+        "to": "delivery-door-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "herdr-steer-submit",
+        "to": "delivery-door-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "steer-kind",
+        "to": "conversation-route-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-door-steer",
+        "to": "conversation-route-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "steer-kind",
+        "to": "message-agent-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-door-steer",
+        "to": "message-agent-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "message-agent-steer",
+        "to": "pan-tell-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "message-agent-steer",
+        "to": "agent-route-steer",
+        "type": "blocks"
+      },
+      {
+        "from": "steer-kind",
+        "to": "composer-steer-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-steer-selector",
+        "to": "composer-ctrl-enter",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-door-steer",
+        "to": "live-steer-verification",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
