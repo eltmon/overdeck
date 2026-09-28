@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:21:46.145Z",
+  "updated": "2026-09-28T14:21:57.478Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "close-out-negative-cache.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T14:21:46.145Z"
+    },
+    "tracker-type-leaf.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:21:57.478Z"
     }
   }
 }
