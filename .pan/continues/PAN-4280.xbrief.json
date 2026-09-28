@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:06:37.243Z",
+  "updated": "2026-09-28T01:10:05.418Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
       "claimedBy": "agent-pan-4280",
       "claimedAt": "2026-09-28T00:42:39.399Z",
       "doneAt": "2026-09-28T01:06:37.243Z"
+    },
+    "ui-mode-default.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:10:05.418Z"
     }
   }
 }
