@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:36:21.363Z",
+  "updated": "2026-09-28T13:36:26.121Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-1166",
       "claimedAt": "2026-09-28T13:32:29.733Z",
       "doneAt": "2026-09-28T13:36:21.363Z"
+    },
+    "voice-hook-mint-first": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:36:26.121Z"
     }
   }
 }
