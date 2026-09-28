@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:47:47.347998Z · model: claude-opus-5-5 · open: 783_
+_Last sequenced: 2026-09-28T12:49:03.863031Z · model: claude-opus-5-5 · open: 784_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -339,6 +339,7 @@ _Last sequenced: 2026-09-28T12:47:47.347998Z · model: claude-opus-5-5 · open: 
 | 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
 | 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
 | 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
+| 396 | PAN-4305 | S | medium | ok |  |  | Composer marks mid-turn queued messages Not found (pasted_content wrap/merge mismatch); invites a duplicate Resend. |
 | 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
 | 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
 | 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
@@ -1098,10 +1099,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:47:47.347998Z",
+  "generatedAt": "2026-09-28T12:49:03.863031Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 783,
+  "openCount": 784,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -10828,6 +10829,19 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "rationale": "New issue split from in-pipeline PAN-4292; it cannot start until PAN-4292 adds HarnessBehavior.steerKind, and its first step is an open verification question, so it sits in the free rank 374 slot among comparable medium conversation-delivery fixes.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4305",
+      "rank": 396,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Composer marks mid-turn queued messages Not found (pasted_content wrap/merge mismatch); invites a duplicate Resend.",
+      "rationale": "New issue: false-negative landing check on queued prompts in transcript-landing.ts; clear AC and fixtures, ranked beside PAN-3121 (same double-send risk).",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12024,6 +12038,13 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
     {
       "from": "PAN-2580",
       "to": "PAN-4303",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-4305",
+      "to": "PAN-3121",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
