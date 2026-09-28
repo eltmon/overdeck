@@ -27,7 +27,13 @@ import {
 } from '../projects.js';
 import { runSettingsWriteSerialized } from '../settings-api.js';
 import { listSkillCatalog } from './catalog.js';
-import { isCoreSkill, type SkillOverrideLayers, type SkillOverrideLevel } from './resolve.js';
+import {
+  isCoreSkill,
+  resolveSkillStates,
+  type SkillOverrideLayers,
+  type SkillOverrideLevel,
+  type SkillState,
+} from './resolve.js';
 
 export type SkillOverrideErrorCode = 'core-skill' | 'unknown-skill' | 'unknown-project' | 'unknown-issue' | 'bad-request';
 
@@ -143,6 +149,37 @@ export async function loadSkillOverrideLayers(ctx: { projectKey?: string; issueI
     ...(project ? { project } : {}),
     ...(issue ? { issue } : {}),
   };
+}
+
+export interface SkillStateList {
+  project: string | null;
+  issue: string | null;
+  skills: SkillState[];
+}
+
+/**
+ * Effective state of every catalog skill for a context. An issue alone
+ * resolves its own project; the catalog includes that project's
+ * `.pan/skills`, so project skills appear only in project and issue context.
+ */
+export async function listSkillStates(ctx: { projectKey?: string; issueId?: string }): Promise<SkillStateList> {
+  const issueId = ctx.issueId?.toUpperCase();
+  let projectKey = ctx.projectKey;
+  let project: ProjectConfig | null = null;
+  if (projectKey) {
+    project = await findProject(projectKey);
+    if (!project) throw new SkillOverrideError('unknown-project', `unknown project: ${projectKey}`);
+  } else if (issueId) {
+    const owner = await projectForIssue(issueId);
+    if (!owner) throw new SkillOverrideError('unknown-issue', `no registered project owns issue ${issueId}`);
+    projectKey = owner.projectKey;
+    project = owner.project;
+  }
+  const [catalog, layers] = await Promise.all([
+    listSkillCatalog(project ? { projectRoot: project.path } : {}),
+    loadSkillOverrideLayers({ projectKey, issueId }),
+  ]);
+  return { project: projectKey ?? null, issue: issueId ?? null, skills: resolveSkillStates(catalog, layers) };
 }
 
 // ── writes ───────────────────────────────────────────────────────────────

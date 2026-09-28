@@ -41,6 +41,7 @@ import { lazyAction } from './lazy-action.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
+import { registerSkillsCommands } from './commands/skills.js';
 import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
 import { COMMAND_GROUPS } from './command-groups.js';
 import { exitCli, runCliWithTelemetry } from './telemetry.js';
@@ -219,11 +220,7 @@ backup
   .option('--keep <count>', 'Number of backups to keep', '10')
   .action(lazyAction(() => import('./commands/backup.js'), 'backupCleanCommand'));
 
-program
-  .command('skills')
-  .description('List and manage skills')
-  .option('--json', 'Output as JSON')
-  .action(lazyAction(() => import('./commands/skills.js'), 'skillsCommand'));
+registerSkillsCommands(program);
 
 // pan issues — list and triage work
 program
