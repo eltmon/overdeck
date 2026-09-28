@@ -47,7 +47,7 @@ import { controlTerminal, observeTerminal } from './herdr-stream.js';
 import { adoptIssueWorkspace, listIssueWorkspaces, type HerdrWorkspaceInfo } from './herdr-workspaces.js';
 import { checkPrompt } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
-import { STEER_HERDR_KEYS, STEER_SETTLE_MS } from './steer-keys.js';
+import { steerHerdrPane } from './steer-keys.js';
 import {
   isUnsupported,
   TerminalBackendError,
@@ -804,18 +804,10 @@ export class HerdrBackend implements TerminalBackend {
       if ('refused' in verdict) return { refused: true, reason: verdict.reason };
       if ('dropped' in verdict) return { dropped: true, reason: verdict.reason };
 
-      if (options.submit === 'steer') {
-        // PAN-4292: `agent.prompt` always ends with Enter, which queues behind
-        // a running turn. A steer types the text itself, then presses Claude
-        // Code's send-now chord. `pane.send_text` writes raw bytes with no
-        // bracketed-paste wrapping, so the text is wrapped here: a multi-line
-        // message must not submit at its first newline.
-        const paneId = info.agent?.pane_id;
-        if (!paneId) return unsupported('herdr steer needs a detected agent pane');
-        if (info.agent?.agent_status === 'blocked') return { refused: true, reason: 'agent_blocked' };
-        await this.api.call('pane.send_text', { pane_id: paneId, text: `\x1b[200~${text}\x1b[201~` });
-        await new Promise((resolve) => setTimeout(resolve, STEER_SETTLE_MS));
-        await this.api.call('pane.send_keys', { pane_id: paneId, keys: [...STEER_HERDR_KEYS] });
+      if (options.submit === 'steer') { // PAN-4292: agent.prompt ends with Enter, so a steer bypasses it
+        if (!info.agent?.pane_id) return unsupported('herdr steer needs a detected agent pane');
+        if (info.agent.agent_status === 'blocked') return { refused: true, reason: 'agent_blocked' };
+        await steerHerdrPane(this.api, info.agent.pane_id, text);
         return { delivered: true, messageId: options.messageId };
       }
 

@@ -9,6 +9,8 @@
  * This module is the one place that spells the chord for each backend.
  */
 
+import type { HerdrApiClient } from './herdr-api.js';
+
 /** How a delivery finishes: Enter (queue while busy) or the send-now chord (steer). */
 export type SubmitMode = 'enter' | 'steer';
 
@@ -27,4 +29,20 @@ export const STEER_SETTLE_MS = 300;
 /** The tmux `send-keys` names that submit the composer in the given mode. */
 export function tmuxSubmitKeys(mode: SubmitMode = 'enter'): readonly string[] {
   return mode === 'steer' ? STEER_TMUX_KEYS : ['C-m'];
+}
+
+/**
+ * Steer a Herdr agent pane. `agent.prompt` always ends with Enter, so a steer
+ * types the text itself and presses the chord. `pane.send_text` writes raw
+ * bytes with no bracketed-paste wrapping, so the text is wrapped here: a
+ * multi-line message must not submit at its first newline.
+ */
+export async function steerHerdrPane(
+  api: Pick<HerdrApiClient, 'call'>,
+  paneId: string,
+  text: string,
+): Promise<void> {
+  await api.call('pane.send_text', { pane_id: paneId, text: `\x1b[200~${text}\x1b[201~` });
+  await new Promise((resolve) => setTimeout(resolve, STEER_SETTLE_MS));
+  await api.call('pane.send_keys', { pane_id: paneId, keys: [...STEER_HERDR_KEYS] });
 }
