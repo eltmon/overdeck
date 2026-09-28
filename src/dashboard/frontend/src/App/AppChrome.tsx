@@ -19,6 +19,8 @@ import { SystemHealthPill } from '../components/SystemHealthPill';
 import { StaleBuildChip } from '../components/StaleBuildChip';
 import { triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from '../components/EmergencyStopOverlay';
 import type { Tab } from '../components/Header';
+import { AddProjectDialogHost } from '../components/project/new/AddProjectDialog';
+import type { CreatedProject } from '../components/project/new/projectCreateTypes';
 import type { TrackerStatusItem } from './api';
 
 interface DashboardLifecycleView {
@@ -48,6 +50,8 @@ interface AppChromeProps {
   onToggleSessionFeedSidebar: () => void;
   /** Open the Flywheel page; the indicator has already asked it to reveal the block. */
   onNavigateNeedsYou?: () => void;
+  /** A project was added through the Add-project modal this chrome hosts. */
+  onProjectCreated: (project: CreatedProject) => void;
 }
 
 export function AppChrome({
@@ -70,9 +74,11 @@ export function AppChrome({
   onRestartCliproxy,
   onToggleSessionFeedSidebar,
   onNavigateNeedsYou,
+  onProjectCreated,
 }: AppChromeProps) {
   return (
     <>
+      <AddProjectDialogHost onCreated={onProjectCreated} />
       {/* PAN-2908 C-FRESH: system notices render in ONE slim row instead of
           stacked full-width banners. */}
       <div data-component="system-notices-row" className="flex flex-wrap items-stretch border-b border-border">

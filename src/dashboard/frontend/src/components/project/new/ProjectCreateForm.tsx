@@ -22,6 +22,8 @@ import type {
 
 interface ProjectCreateFormProps {
   create: ReturnType<typeof useProjectCreateIntent>;
+  /** Id for the title, so a dialog can label itself with it. */
+  titleId?: string;
   /** "Change": go back to choosing how to add the project. */
   onChange: () => void;
   onCancel: () => void;
@@ -58,7 +60,7 @@ function Findings({ findings, id }: { findings: ProjectIntentFinding[]; id: stri
   );
 }
 
-export function ProjectCreateForm({ create, onChange, onCancel }: ProjectCreateFormProps) {
+export function ProjectCreateForm({ create, titleId, onChange, onCancel }: ProjectCreateFormProps) {
   const ids = useId();
   const urlId = `${ids}-url`;
   const pathId = `${ids}-path`;
@@ -170,7 +172,9 @@ export function ProjectCreateForm({ create, onChange, onCancel }: ProjectCreateF
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-xl font-semibold text-foreground">Add a project</h1>
+        <h1 id={titleId} className="text-xl font-semibold text-foreground">
+          Add a project
+        </h1>
         <button
           type="button"
           disabled={frozen}

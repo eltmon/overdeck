@@ -28,6 +28,7 @@ import { FlywheelPage } from '../pages/FlywheelPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
 import { NewWorkspacePage } from '../pages/NewWorkspacePage';
+import { getNewWorkspaceProjectFromSearch } from './routes';
 import { NewProjectPage } from '../pages/NewProjectPage';
 import { WorkspaceView } from '../components/workspace/WorkspaceView';
 import type { Tab } from '../components/Header';
@@ -143,7 +144,13 @@ export function AppRoutes({
       )}
       {activeTab === 'workspace-new' && (
         <div className="w-full h-full overflow-hidden">
-          <NewWorkspacePage onCancel={() => onTabChange('home')} onCreated={onWorkspaceCreated} />
+          {/* Keyed on ?project=: adding a project from a chip pushes it, and the
+              page's project preset is read once on mount (PAN-4281 WI-6). */}
+          <NewWorkspacePage
+            key={getNewWorkspaceProjectFromSearch() ?? ''}
+            onCancel={() => onTabChange('home')}
+            onCreated={onWorkspaceCreated}
+          />
         </div>
       )}
       {activeTab === 'project-new' && (
