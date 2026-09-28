@@ -593,3 +593,18 @@ describe('Smart workspace field (PAN-4281 FR-12)', () => {
     expect(screen.getByTestId('new-workspace-branch-preview')).toHaveTextContent('Branch: scratch/fix-login');
   });
 });
+
+describe('returning from Add project (PAN-4281)', () => {
+  it('selects the project named by ?project= when the page mounts', async () => {
+    window.history.replaceState(null, '', '/workspaces/new?project=widget');
+    mockProjectData([
+      { key: 'other', name: 'Other', path: '/other' },
+      { key: 'widget', name: 'Widget', path: '/widget' },
+    ]);
+    render(<NewWorkspacePage />);
+
+    const chip = await screen.findByRole('button', { name: 'Widget' });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(mockUseWorkspaceCreateIntent).toHaveBeenCalledWith(expect.objectContaining({ initialProjectKey: 'widget' }));
+  });
+});

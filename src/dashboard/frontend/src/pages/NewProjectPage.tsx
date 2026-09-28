@@ -5,6 +5,7 @@
  * The page is the Add-project dialog rendered full-page (PAN-4281 D11): the same
  * steps the modal shows, so a deep link or `?mode=` preset keeps working. With
  * no preset it opens on the start step; `?mode=` skips straight to that mode.
+ * The mode steps render the shared `ProjectCreateForm`.
  */
 
 import { getNewProjectModeFromSearch } from '../App/routes.js';
