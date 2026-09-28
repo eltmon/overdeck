@@ -32,6 +32,7 @@
 1612 src/dashboard/frontend/src/components/CommandDeck/index.tsx # PAN-3660
 1010 src/dashboard/frontend/src/App.tsx # PAN-3330
 1019 src/dashboard/frontend/src/App.tsx # PAN-3660
+1020 src/dashboard/frontend/src/App.tsx # PAN-4281
 1053 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3330
 1092 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3704
 1096 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3705

@@ -19,6 +19,7 @@ import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import type { CreatedProject } from './components/project/new/useProjectCreateIntent';
 import { takeAddProjectReturnTo, useAddProjectDialog } from './components/project/new/addProjectDialogStore';
+import { requestLauncherFocusAfterCreate } from './components/Stage/launcherFocusStore';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -241,6 +242,7 @@ export default function App() {
     // deck path, which would clobber the /workspaces/new?project= return path.
     setConversationRoute(null, 'conversation', target.tab === 'command-deck');
     usePanesStore.getState().ensureHome(project.key);
+    requestLauncherFocusAfterCreate(target.tab, project.key);
   }, [queryClient, setConversationRoute]);
   const seenWorkspaceActivityIds = useRef(new Set<string>());
 

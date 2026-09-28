@@ -1,7 +1,8 @@
-import { useState, type ReactNode, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from 'react'
 import { Terminal, Globe } from 'lucide-react'
 import { AgentIcon } from './AgentIcon'
 import { orderIntents } from './launcherOrdering'
+import { useLauncherFocusStore } from '../launcherFocusStore'
 import styles from '../stage.module.css'
 
 export type LauncherIntentKind = 'agent' | 'terminal' | 'web'
@@ -59,6 +60,8 @@ export interface LauncherProps {
   errorText?: string
   /** Id of the last-run agent in this workspace; floats it to position 1. */
   lastUsedAgentId?: string | null
+  /** This Launcher's deck key; it takes a pending focus request for that deck. */
+  focusKey?: string
 }
 
 /**
@@ -76,8 +79,16 @@ export function Launcher({
   busy = false,
   errorText,
   lastUsedAgentId,
+  focusKey,
 }: LauncherProps) {
   const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const pendingDeckKey = useLauncherFocusStore((state) => state.pendingDeckKey)
+  useEffect(() => {
+    if (!focusKey || focusKey !== pendingDeckKey) return
+    inputRef.current?.focus()
+    useLauncherFocusStore.getState().clear()
+  }, [focusKey, pendingDeckKey])
   const [selected, setSelected] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const hasQuery = query.length > 0
@@ -133,6 +144,7 @@ export function Launcher({
     <div className={styles.launcher}>
       <div className={styles.launchBar}>
         <input
+          ref={inputRef}
           className={styles.launchInput}
           value={query}
           placeholder={placeholder}
