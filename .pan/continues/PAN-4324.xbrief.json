@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4324",
   "created": "2026-09-28T17:28:58.075Z",
-  "updated": "2026-09-28T17:41:06.289Z",
+  "updated": "2026-09-28T17:41:16.751Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,10 @@
     "row5-liveness.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T17:41:06.289Z"
+    },
+    "row5-liveness.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T17:41:16.751Z"
     }
   }
 }
