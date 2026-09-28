@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T00:46:55.518Z",
+  "updated": "2026-09-28T00:47:06.394Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,10 @@
     "default-remove-workspace.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:46:55.517Z"
+    },
+    "default-remove-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:47:06.394Z"
     }
   }
 }
