@@ -25,7 +25,13 @@ Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the fir
 
 ### Requirements
 
-- **Node.js 22+** — the only prerequisite
+- **Node.js 22+** and **Claude Code** (signed in) are required.
+- **git** is required.
+- **Herdr** — the default terminal backend — is installed by `pan install`.
+- **tmux** is needed only for plain terminals in the dashboard (and for agents when `terminal.backend: tmux`).
+- **Docker**, **gh**, and **ast-grep** are optional; `pan install` warns instead of failing when they are missing.
+
+The dashboard's Home page shows a **Get set up** card with what is still missing and the command to fix it.
 
 ## What Happens Next
 
