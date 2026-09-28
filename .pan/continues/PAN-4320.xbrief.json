@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4320",
   "created": "2026-09-28T15:34:16.087Z",
-  "updated": "2026-09-28T15:38:09.744Z",
+  "updated": "2026-09-28T15:44:14.081Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-28T15:38:04.941Z"
     },
     "listing-agent-key": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4320",
-      "claimedAt": "2026-09-28T15:38:09.744Z"
+      "claimedAt": "2026-09-28T15:38:09.744Z",
+      "doneAt": "2026-09-28T15:44:14.081Z"
     }
   }
 }
