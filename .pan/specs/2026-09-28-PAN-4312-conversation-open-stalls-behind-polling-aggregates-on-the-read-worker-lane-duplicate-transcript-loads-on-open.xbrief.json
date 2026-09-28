@@ -61,8 +61,8 @@
         "rationale": "The issue proposes ~1.5 s; a separate file keeps ConversationPanel.tsx under its 1531-line allowlist row."
       },
       {
-        "summary": "Resume, switch-model and fork completion re-read /messages with queryClient.fetchQuery instead of invalidateQueries.",
-        "rationale": "invalidateQueries does not refetch a disabled query, and those events are when the stream may still watch an old session file; fetchQuery preserves today's HTTP refresh."
+        "summary": "Resume, switch-model and fork completion re-read /messages with queryClient.fetchQuery({ ..., staleTime: 0 }) instead of invalidateQueries.",
+        "rationale": "invalidateQueries does not refetch a disabled query, and those events are when the stream may still watch an old session file; fetchQuery preserves today's HTTP refresh but still honors staleTime, so without staleTime: 0 it is a no-op whenever a recent stream event left the query fresh under the app's default 30s staleTime."
       },
       {
         "summary": "The claude-initial snapshot shares sharedTranscriptParser's existing cache and budget, with per-subscriber copies of parse-state containers.",

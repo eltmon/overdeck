@@ -449,7 +449,8 @@ export function openEmbeddingsDb(
 
     getStats(): EmbeddingsDbStats {
       // Aggregating indexed_at over the chunks table scans every row (~9s on a 3GB DB);
-      // file_cursors.updated_at tracks the same recency and is indexed, so read it from there instead.
+      // file_cursors.updated_at tracks the same recency and file_cursors is small (~0.4ms
+      // to scan), so read it from there instead.
       const chunks = db.prepare(`SELECT count(*) AS chunkCount FROM chunks`).get() as { chunkCount: number };
       const cursors = db.prepare(`SELECT count(*) AS indexedFileCount, max(updated_at) AS lastIndexedAt FROM file_cursors WHERE byte_offset > 0`).get() as { indexedFileCount: number; lastIndexedAt: string | null };
       return {

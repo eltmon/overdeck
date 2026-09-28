@@ -116,12 +116,15 @@ async function diffFilesSinceBase(
   filePaths: string[],
 ): Promise<TurnDiffFileChange[]> {
   const quotedPaths = filePaths.map(p => JSON.stringify(p)).join(' ');
+  // --no-renames: a per-turn lookup keyed by the input path would otherwise drop a
+  // file entirely when git's rename detection folds "a.ts => b.ts" into one line.
+  // -c core.quotePath=false: keep non-ASCII paths unquoted so the lookup key matches.
   const { stdout: numstat } = await promisify(exec)(
-    `git diff --numstat --no-color ${baseCommit} -- ${quotedPaths}`,
+    `git -c core.quotePath=false diff --no-renames --numstat --no-color ${baseCommit} -- ${quotedPaths}`,
     { cwd: repoRoot, encoding: 'utf-8' },
   );
   const { stdout: nameStatus } = await promisify(exec)(
-    `git diff --name-status --no-color ${baseCommit} -- ${quotedPaths}`,
+    `git -c core.quotePath=false diff --no-renames --name-status --no-color ${baseCommit} -- ${quotedPaths}`,
     { cwd: repoRoot, encoding: 'utf-8' },
   );
   const statusMap = new Map<string, string>();

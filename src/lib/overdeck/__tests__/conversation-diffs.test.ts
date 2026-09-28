@@ -55,12 +55,14 @@ describe('getConversationDiffs', () => {
     let revParseCalls = 0;
     let numstatCalls = 0;
     let nameStatusCalls = 0;
+    const diffCommands: string[] = [];
     execMock.mockImplementation((command: string, _options: unknown, callback: ExecCallback) => {
       if (/git rev-parse --show-toplevel/.test(command)) {
         revParseCalls += 1;
         callback(null, { stdout: '/repo\n', stderr: '' });
-      } else if (/git diff --numstat/.test(command)) {
+      } else if (/--numstat/.test(command)) {
         numstatCalls += 1;
+        diffCommands.push(command);
         callback(null, {
           stdout: [
             '3\t1\tfile1.ts',
@@ -71,8 +73,9 @@ describe('getConversationDiffs', () => {
           ].join('\n'),
           stderr: '',
         });
-      } else if (/git diff --name-status/.test(command)) {
+      } else if (/--name-status/.test(command)) {
         nameStatusCalls += 1;
+        diffCommands.push(command);
         callback(null, {
           stdout: [
             'M\tfile1.ts',
@@ -114,6 +117,14 @@ describe('getConversationDiffs', () => {
     expect(nameStatusCalls).toBe(1);
     expect(revParseCalls).toBe(1);
 
+    // Both diff commands disable rename detection and quoted paths — a per-turn
+    // lookup keyed by the input path would otherwise drop a renamed or
+    // non-ASCII file entirely.
+    for (const command of diffCommands) {
+      expect(command).toContain('--no-renames');
+      expect(command).toContain('core.quotePath=false');
+    }
+
     // AC2 — each summary lists only the paths its own turn edited.
     expect(body.summaries).toHaveLength(5);
     const byTurn = new Map(body.summaries.map(s => [s.assistantMessageId, s]));
@@ -148,10 +159,10 @@ describe('getConversationDiffs result cache (PAN-4312)', () => {
     execMock.mockImplementation((command: string, _options: unknown, callback: ExecCallback) => {
       if (/git rev-parse --show-toplevel/.test(command)) {
         callback(null, { stdout: '/repo\n', stderr: '' });
-      } else if (/git diff --numstat/.test(command)) {
+      } else if (/--numstat/.test(command)) {
         counts.numstat += 1;
         callback(null, { stdout: numstat, stderr: '' });
-      } else if (/git diff --name-status/.test(command)) {
+      } else if (/--name-status/.test(command)) {
         counts.nameStatus += 1;
         callback(null, { stdout: nameStatus, stderr: '' });
       } else {

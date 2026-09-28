@@ -1097,9 +1097,9 @@ describe('ConversationPanel HTTP /messages fallback (PAN-4312)', () => {
     localStorage.clear();
   });
 
-  function renderStreamingPanel(conversation = mockConversation) {
+  function renderStreamingPanel(conversation = mockConversation, staleTime: number = Infinity) {
     const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } },
+      defaultOptions: { queries: { retry: false, staleTime }, mutations: { retry: false } },
     });
     queryClients.push(client);
     const view = render(
@@ -1145,6 +1145,21 @@ describe('ConversationPanel HTTP /messages fallback (PAN-4312)', () => {
 
   it('sends one GET …/messages through fetchQuery when resume succeeds on a streaming conversation', async () => {
     renderStreamingPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(messagesCallCount()).toBe(1);
+  });
+
+  it('still re-reads over HTTP on resume when a recent stream event left the cache fresh', async () => {
+    // Matches the production QueryClient's 30s default staleTime (main.tsx). Without
+    // `staleTime: 0` on the fetchQuery call, this is a no-op: fetchQuery returns the
+    // fresh cached data without invoking queryFn at all.
+    renderStreamingPanel(mockConversation, 30_000);
+
+    const listener = streamTransportMock.listeners.get('test-conv');
+    act(() => { listener?.({ kind: 'messages', snapshot: true, messages: [], workLog: [], streaming: false }); });
 
     fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
     await act(() => vi.advanceTimersByTimeAsync(0));

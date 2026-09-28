@@ -268,7 +268,9 @@ export function ConversationPanel({
     return fetched;
   }, [conversation.name, agentId, queryClient, messagesQueryKey]);
   const refreshMessagesOverHttp = useCallback(() => {
-    void queryClient.fetchQuery({ queryKey: messagesQueryKey, queryFn: messagesQueryFn }).catch(() => {});
+    // staleTime: 0 forces the refetch past the app's default 30s staleTime, since
+    // fetchQuery otherwise returns fresh cached data without calling queryFn.
+    void queryClient.fetchQuery({ queryKey: messagesQueryKey, queryFn: messagesQueryFn, staleTime: 0 }).catch(() => {});
   }, [queryClient, messagesQueryKey, messagesQueryFn]);
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,

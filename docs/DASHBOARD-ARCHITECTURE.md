@@ -253,8 +253,11 @@ door that does not exist; a real record read door would be a separate change.
   - The client shows the loading skeleton until the first WS payload arrives, and falls
     back to HTTP `GET .../messages` only after `MESSAGES_HTTP_FALLBACK_MS` (1500 ms) pass
     without one (`useMessagesHttpFallback`, PAN-4312). Resume, switch-model, and fork
-    completion re-read over HTTP with `queryClient.fetchQuery` rather than
-    `invalidateQueries`, since `invalidateQueries` does not refetch a disabled query.
+    completion re-read over HTTP with `queryClient.fetchQuery({ ..., staleTime: 0 })`
+    rather than `invalidateQueries`, since `invalidateQueries` does not refetch a
+    disabled query, and `fetchQuery` without `staleTime: 0` would return cached data
+    without a request whenever a recent stream event left the query fresh under the
+    app's default 30 s `staleTime`.
   - Context usage comes from the parse result (`contextUsageFromParseResult`) on both the
     WS path and HTTP `/messages`, instead of a second file parse. `GET
     /api/conversations/:id` uses a memoized `computeContextUsage`, keyed by session file
