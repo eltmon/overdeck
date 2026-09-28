@@ -25,10 +25,16 @@ import { validateOrigin } from '../origin-validation.js';
 import { readJsonBody } from './shared.js';
 
 type SendAgentMessageResult =
-  | { kind: 'sent'; body: { success: true; remote?: true } }
-  | { kind: 'refused'; refusal: NonNullable<MessageDeliveryOutcome['inputTargetRefusal']> };
+  | { kind: 'sent'; body: { success: true; remote?: true; steerDegraded?: string } }
+  | { kind: 'refused'; refusal: NonNullable<MessageDeliveryOutcome['inputTargetRefusal']> }
+  | { kind: 'steer-refused'; reason: string };
 
-async function sendAgentMessage(id: string, message: string): Promise<SendAgentMessageResult> {
+/** PAN-4292: `steer` interrupts the running turn (the body's `deliverAs: 'steer'`). */
+export interface AgentMessageOptions {
+  steer?: boolean;
+}
+
+async function sendAgentMessage(id: string, message: string, options: AgentMessageOptions = {}): Promise<SendAgentMessageResult> {
   const agentStateDir = join(homedir(), '.overdeck', 'agents', id);
   const remoteStateFile = join(agentStateDir, 'remote-state.json');
   let isRemote = false;
@@ -40,16 +46,25 @@ async function sendAgentMessage(id: string, message: string): Promise<SendAgentM
     } catch {}
   }
 
-  const outcome = await messageAgent(id, message, 'dashboard:user-message');
+  const outcome = options.steer
+    ? await messageAgent(id, message, 'dashboard:user-message', { steer: true })
+    : await messageAgent(id, message, 'dashboard:user-message');
   // PAN-4268: Claude Code's input could not be moved to the main agent.
   if (outcome.inputTargetRefusal) return { kind: 'refused', refusal: outcome.inputTargetRefusal };
-  return { kind: 'sent', body: isRemote ? { success: true, remote: true } : { success: true } };
+  // PAN-4292: a steer that cannot reach a running Claude Code turn is refused
+  // outright — nothing delivered, nothing mailed.
+  if (options.steer && !outcome.delivered && !outcome.queuedToMail) {
+    return { kind: 'steer-refused', reason: outcome.reason ?? 'steer is not available for this agent' };
+  }
+  const steerDegraded = options.steer && outcome.delivered && outcome.reason ? { steerDegraded: outcome.reason } : {};
+  return { kind: 'sent', body: isRemote ? { success: true, remote: true, ...steerDegraded } : { success: true, ...steerDegraded } };
 }
 
 export async function handleAgentMessage(
   id: string,
   message: string,
   confirmation?: ComposerCommandConfirmationInput,
+  options: AgentMessageOptions = {},
 ) {
   try {
     if (isComposerCommandMessage(message)) {
@@ -106,7 +121,15 @@ export async function handleAgentMessage(
     }, { status });
   }
 
-  const sent = await sendAgentMessage(id, message);
+  const sent = await sendAgentMessage(id, message, options);
+  if (sent.kind === 'steer-refused') {
+    return jsonResponse({
+      error: sent.reason,
+      code: 'steer-unsupported',
+      deliveryUnknown: false,
+      retryable: false,
+    }, { status: 422 });
+  }
   if (sent.kind === 'refused') {
     return jsonResponse({
       error: sent.refusal.reason,
@@ -143,7 +166,7 @@ function postAgentMessageLikeRoute(path: `/${string}`) {
       const id = params['id'] ?? '';
       const body = yield* readJsonBody;
 
-      const { message } = body as any;
+      const { message, deliverAs } = body as any;
       if (!message) {
         return jsonResponse({ error: 'Message required' }, { status: 400 });
       }
@@ -152,6 +175,7 @@ function postAgentMessageLikeRoute(path: `/${string}`) {
         id,
         message,
         composerCommandConfirmationFromBody(body as Record<string, unknown>),
+        deliverAs === 'steer' ? { steer: true } : {},
       ));
     })),
   );

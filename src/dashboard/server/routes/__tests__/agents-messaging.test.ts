@@ -147,3 +147,46 @@ describe('agent message composer routing', () => {
     });
   });
 });
+
+describe('handleAgentMessage steer (PAN-4292)', () => {
+  it('asks messageAgent to steer', async () => {
+    agentMocks.messageAgent.mockResolvedValueOnce({ delivered: true, queuedToMail: true, confirmed: true });
+
+    const response = await handleAgentMessage('agent-pan-42', 'change course', undefined, { steer: true });
+
+    expect(response.status).toBe(200);
+    expect(decodeJsonResponse(response)).toEqual({ success: true });
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-42', 'change course', 'dashboard:user-message', { steer: true });
+  });
+
+  it('answers 422 steer-unsupported when messageAgent refuses the steer', async () => {
+    const reason = 'steer is supported for Claude Code only; agent-pan-42 runs Codex. Drop --steer to send a normal message.';
+    agentMocks.messageAgent.mockResolvedValueOnce({ delivered: false, queuedToMail: false, reason });
+
+    const response = await handleAgentMessage('agent-pan-42', 'change course', undefined, { steer: true });
+
+    expect(response.status).toBe(422);
+    expect(decodeJsonResponse(response)).toEqual({
+      error: reason,
+      code: 'steer-unsupported',
+      deliveryUnknown: false,
+      retryable: false,
+    });
+  });
+
+  it('reports steerDegraded when the steer was delivered as a normal submit', async () => {
+    agentMocks.messageAgent.mockResolvedValueOnce({
+      delivered: true,
+      queuedToMail: true,
+      confirmed: true,
+      reason: 'supervisor predates steer; delivered as a normal submit',
+    });
+
+    const response = await handleAgentMessage('agent-pan-42', 'change course', undefined, { steer: true });
+
+    expect(decodeJsonResponse(response)).toEqual({
+      success: true,
+      steerDegraded: 'supervisor predates steer; delivered as a normal submit',
+    });
+  });
+});
