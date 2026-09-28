@@ -328,7 +328,7 @@ export async function readRepoPullRequests(projectPath: string): Promise<readonl
       // PAN-4264: metered as caller pr-cache; a pause or refusal lands in the
       // catch below and reads as "failed" (null), never as "no PRs".
       const { stdout } = await runGh([
-        'pr', 'list', '--state', 'all', '--limit', '200', '--json', GH_PR_FIELDS,
+        'pr', 'list', '--state', 'all', '--limit', '100', '--json', GH_PR_FIELDS,
       ], { caller: 'pr-cache', cwd: projectPath, timeout: 20_000 });
       const rows = JSON.parse(stdout || '[]') as GhPrRow[];
       lastRepoPullRequests.set(projectPath, { rows, settledAt: Date.now() });

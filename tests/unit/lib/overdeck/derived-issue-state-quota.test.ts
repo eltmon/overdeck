@@ -92,6 +92,18 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
     })]);
   });
 
+  it('lists 100 PRs and records the per-page price (PAN-4291)', async () => {
+    gh.stdout = JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i, state: 'OPEN' })));
+
+    await readRepoPullRequests(`/repos/quota-${++repoSeq}`);
+    expect(gh.calls).toHaveLength(1);
+    expect(gh.calls[0]).toContain('100');
+    expect(gh.calls[0]).not.toContain('200');
+
+    await flushLedgerWrites();
+    expect(readLedgerWindow(Date.now())).toEqual([expect.objectContaining({ caller: 'pr-cache', cost: 3 })]);
+  });
+
   it('returns [] and execs gh zero times for a repo with no git remote (PAN-4291 AC1)', async () => {
     git.remoteStdout = '';
 

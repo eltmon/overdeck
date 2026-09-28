@@ -11,7 +11,7 @@
  * `trend` compares the window with the preceding window of equal length. The
  * default issue reader shells `gh issue list` once for both windows (execFile,
  * 20 s timeout) and caches the answer for 60 s per project. The merged-PR
- * reader wraps `listRepoPullRequests`, which is capped at 200 PRs — a 90-day
+ * reader wraps `listRepoPullRequests`, which is capped at 100 PRs — a 90-day
  * window on a busy repo undercounts the denominator.
  */
 
