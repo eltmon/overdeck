@@ -258,6 +258,14 @@ pressure) also runs from a plain interval scheduler independent of any
 issue's merge — check `pan workspace list --stale [--all]` for merged
 branches still on disk and reclaim with `pan workspace destroy <id>`.
 
+Close-out's DoD row 5 (post-merge) asks the liveness oracle
+([`src/lib/agents/liveness.ts`](../src/lib/agents/liveness.ts)) about every work or planning
+agent whose stored status still says `starting` or `running`. The stored status is a
+spawn-time snapshot, so an agent that exited on its own (after `pan done`, or when planning
+finalized) keeps it. A stored `running` agent with no live pane does not block the row; a live
+pane does, and so does a probe that cannot answer (`runtime-indeterminate`). The row only
+reads; it never writes agent status (PAN-4324).
+
 Close-out prunes only regenerable agent-directory weight: `pending.lock`,
 `*.sock`, and each `codex-home*/` entry except `sessions/`. It keeps
 `state.json`, the append-only `sessions.json` index, lifecycle and activity

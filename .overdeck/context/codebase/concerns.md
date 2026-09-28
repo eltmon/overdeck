@@ -90,6 +90,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   forever, so any patrol that iterates it and emits per agent must dedupe per
   death — deacon-lite's `reconcileAgentLiveness` did not, and emitted ~50k
   events/day (PAN-4300).
+  Close-out's DoD row 5 (`checkPostMergeRow`, `lifecycle/dod-gate.ts`) trusted
+  the label and blocked every close-out on exited agents; PAN-4324 confirms
+  claimed-live rows with `isAlive` (indeterminate still blocks).
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
   dies under Bun; circular ESM imports die under tsx/Node source mode).
 - **`execSync` freezes the server** — anything reachable from the dashboard event
