@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:59:31.458Z",
+  "updated": "2026-09-28T15:59:43.234Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "cpu-psi-reader.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T15:59:31.457Z"
+    },
+    "cpu-psi-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:59:43.233Z"
     }
   }
 }
