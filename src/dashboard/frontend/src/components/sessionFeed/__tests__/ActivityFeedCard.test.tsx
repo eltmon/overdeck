@@ -40,6 +40,18 @@ describe('ActivityFeedCard', () => {
     expect(screen.getByText('workspace-a · PAN-1389')).toBeTruthy();
   });
 
+  it('appends the step count of a collapsed per-issue card — PAN-4301 FR-14', () => {
+    render(<ActivityFeedCard entry={entry({ stepCount: 4 })} onSelect={vi.fn()} now={new Date('2026-05-23T01:05:00.000Z')} />);
+
+    expect(screen.getByText('workspace-a · PAN-1389 · 4 steps')).toBeTruthy();
+  });
+
+  it('shows no step count for a single-step card', () => {
+    render(<ActivityFeedCard entry={entry({ stepCount: 1 })} onSelect={vi.fn()} now={new Date('2026-05-23T01:05:00.000Z')} />);
+
+    expect(screen.queryByText(/steps/)).toBeNull();
+  });
+
   it('shows relative timestamp in a time element', () => {
     render(<ActivityFeedCard entry={entry()} onSelect={vi.fn()} now={new Date('2026-05-23T01:05:00.000Z')} />);
 
