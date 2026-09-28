@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:37:53.133Z",
+  "updated": "2026-09-28T00:38:04.242Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "home-mount-card.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:37:53.132Z"
+    },
+    "install-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:04.242Z"
     }
   }
 }
