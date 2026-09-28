@@ -111,16 +111,40 @@ export function contextUsageFromParseResult(
   return buildContextUsage(capability, result.contextActiveBytes, result.latestAssistantUsage);
 }
 
+const CONTEXT_USAGE_CACHE_MAX = 16;
+const contextUsageCache = new Map<string, { size: number; mtimeMs: number; usage: ContextUsage | null }>();
+
+function contextUsageCacheKey(sessionFile: string, model: string | null): string {
+  return `${sessionFile}\0${model ?? ''}`;
+}
+
 export async function computeContextUsage(sessionFile: string, model: string | null): Promise<ContextUsage | null> {
   const capability = resolveContextCapability(model);
   if (!capability) return null;
 
-  const boundaryOffset = await findLastCompactBoundary(sessionFile);
   const fileStats = await stat(sessionFile);
+  const cacheKey = contextUsageCacheKey(sessionFile, model);
+  const cached = contextUsageCache.get(cacheKey);
+  if (cached && cached.size === fileStats.size && cached.mtimeMs === fileStats.mtimeMs) {
+    return cached.usage;
+  }
+
+  const boundaryOffset = await findLastCompactBoundary(sessionFile);
   const activeBytes = Math.max(0, fileStats.size - boundaryOffset);
 
   const usageSummary = await readLatestAssistantUsage(sessionFile, boundaryOffset, activeBytes);
-  return buildContextUsage(capability, activeBytes, usageSummary);
+  const usage = buildContextUsage(capability, activeBytes, usageSummary);
+
+  contextUsageCache.set(cacheKey, { size: fileStats.size, mtimeMs: fileStats.mtimeMs, usage });
+  if (contextUsageCache.size > CONTEXT_USAGE_CACHE_MAX) {
+    const firstKey = contextUsageCache.keys().next().value;
+    if (firstKey !== undefined) contextUsageCache.delete(firstKey);
+  }
+  return usage;
+}
+
+export function __resetContextUsageCacheForTests(): void {
+  contextUsageCache.clear();
 }
 
 /**
