@@ -15,7 +15,7 @@ import { toast } from 'sonner';
  * sudo/user consent.
  */
 
-interface PrerequisiteCheck {
+export interface PrerequisiteCheck {
   id: string;
   name: string;
   required: boolean;
@@ -25,7 +25,7 @@ interface PrerequisiteCheck {
   install: { linux: string; mac: string; win: string };
 }
 
-interface PrerequisitesReport {
+export interface PrerequisitesReport {
   platform: string;
   allRequiredFound: boolean;
   checks: PrerequisiteCheck[];
@@ -33,13 +33,13 @@ interface PrerequisitesReport {
 
 const DISMISS_KEY = 'overdeck-setup-checklist-dismissed';
 
-function installHintFor(check: PrerequisiteCheck, platform: string): string {
+export function installHintFor(check: PrerequisiteCheck, platform: string): string {
   if (platform === 'darwin') return check.install.mac;
   if (platform === 'win32') return check.install.win;
   return check.install.linux;
 }
 
-function CopyableCommand({ command }: { command: string }) {
+export function CopyableCommand({ command }: { command: string }) {
   const copy = () => {
     void navigator.clipboard.writeText(command).then(
       () => toast.success('Copied'),
