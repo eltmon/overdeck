@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:14:55.942Z",
+  "updated": "2026-09-28T01:15:08.233Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "drawer-pending-consumer.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T01:14:55.941Z"
+    },
+    "stage-terminal-open.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:15:08.233Z"
     }
   }
 }
