@@ -56,11 +56,14 @@ export class MessageSendError extends Error {
   readonly reason?: string;
   readonly retryable: boolean;
   readonly deliveryUnknown: boolean;
-  constructor(message: string, opts: { status?: number; reason?: string; deliveryUnknown?: boolean; retryable?: boolean }) {
+  /** Server failure code when present, e.g. 'not-delivered' or 'permission-pending' (PAN-4278). */
+  readonly code?: string;
+  constructor(message: string, opts: { status?: number; reason?: string; deliveryUnknown?: boolean; retryable?: boolean; code?: string }) {
     super(message);
     this.name = 'MessageSendError';
     this.status = opts.status;
     this.reason = opts.reason;
+    this.code = opts.code;
     this.deliveryUnknown = opts.deliveryUnknown ?? (opts.status === undefined || opts.status >= 500 || opts.status === 408);
     this.retryable = opts.retryable ?? (opts.status === undefined
       || opts.status >= 500
@@ -75,12 +78,18 @@ export interface SendFailureDetails {
   deliveryUnknown?: boolean;
   clientMessageId?: string;
   deliverAs?: 'steer' | 'follow_up';
+  code?: string;
 }
 
 /** Extract the display reason + retryability the outbox preserves from any send failure. */
 export function sendFailureDetails(err: unknown): SendFailureDetails {
   if (err instanceof MessageSendError) {
-    return { error: err.reason ?? err.message, retryable: err.retryable, deliveryUnknown: err.deliveryUnknown };
+    return {
+      error: err.reason ?? err.message,
+      retryable: err.retryable,
+      deliveryUnknown: err.deliveryUnknown,
+      ...(err.code ? { code: err.code } : {}),
+    };
   }
   return { error: err instanceof Error ? err.message : String(err), retryable: true, deliveryUnknown: true };
 }
@@ -163,6 +172,7 @@ export async function sendConversationMessage(
       throw new MessageSendError(
         `${deliveryUnknown ? 'Delivery not confirmed' : 'Failed to send message'} (${res.status})${error ? `: ${error}` : ''}`,
         { status: res.status, reason: error || undefined, deliveryUnknown,
+          ...(typeof details.code === 'string' ? { code: details.code } : {}),
           ...(deliveryUnknown && (agentId || !options?.clientMessageId) ? { retryable: false }
             : typeof details.retryable === 'boolean' ? { retryable: details.retryable } : {}),
         },

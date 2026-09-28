@@ -538,8 +538,10 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     // send may still land, so this must read as a distinct message rather
     // than a retry of one the server might already be processing (PAN-4247).
     // Reusing the stale createdAt would also immediately re-trip the same
-    // 4-minute stall timer on the new optimistic bubble.
-    const isFreshIdentity = failed.notFoundInTranscript === true;
+    // 4-minute stall timer on the new optimistic bubble. A 'not-delivered'
+    // failure needs one too: the server cached that 502 under the old
+    // clientMessageId, so a retry with it would replay the failure (PAN-4278).
+    const isFreshIdentity = failed.notFoundInTranscript === true || failed.code === 'not-delivered';
     const clientMessageId = isFreshIdentity ? crypto.randomUUID() : (failed.clientMessageId ?? crypto.randomUUID());
     if (kind === 'prompt') {
       // Preserve the ordinary prompt path byte-for-byte: move the text onto a

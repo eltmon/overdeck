@@ -96,6 +96,20 @@ describe('MessagesTimeline — search', () => {
     expect(discard).toHaveBeenCalledWith('unknown');
   });
 
+  it('renders Not delivered — resend for a not-delivered failure (PAN-4278)', () => {
+    const retry = vi.fn();
+    render(<MessagesTimeline messages={[]} workLog={[]} streaming={false}
+      failedMessages={[
+        { id: 'not-delivered', text: 'BTW How can I launch Orca?', kind: 'prompt', createdAt: '', code: 'not-delivered',
+          error: 'Not delivered: refused: agent_blocked', deliveryUnknown: false, retryable: true },
+      ]} onRetryFailed={retry} />);
+
+    expect(screen.getByText('Not delivered — resend')).toBeInTheDocument();
+    expect(screen.getByText('Not delivered: refused: agent_blocked')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Resend' }));
+    expect(retry).toHaveBeenCalledWith('not-delivered', 'BTW How can I launch Orca?');
+  });
+
   it('renders a not-found outbox entry with Resend and copies its text to the clipboard (PAN-4247 AC4)', () => {
     const originalClipboard = navigator.clipboard;
     Object.defineProperty(navigator, 'clipboard', {

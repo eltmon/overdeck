@@ -44,6 +44,8 @@ export interface FailedMessage {
   deliverAs?: 'steer' | 'follow_up';
   /** True for an accepted bubble moved to the outbox after staying unmatched too long (PAN-4247). */
   notFoundInTranscript?: boolean;
+  /** Server failure code, e.g. 'not-delivered' when the terminal refused the message (PAN-4278). */
+  code?: string;
 }
 
 export interface WorkLogEntry {
