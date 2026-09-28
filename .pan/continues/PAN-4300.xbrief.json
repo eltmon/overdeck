@@ -1,0 +1,95 @@
+{
+  "version": "1",
+  "issueId": "PAN-4300",
+  "created": "2026-09-28T12:54:38.633Z",
+  "updated": "2026-09-28T13:49:57.717Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "dead-agent-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4300",
+      "claimedAt": "2026-09-28T12:54:38.633Z",
+      "doneAt": "2026-09-28T13:08:43.846Z"
+    },
+    "status-event-builder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4300",
+      "claimedAt": "2026-09-28T13:08:50.150Z",
+      "doneAt": "2026-09-28T13:16:40.146Z"
+    },
+    "deacon-main-uses-builder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4300",
+      "claimedAt": "2026-09-28T13:16:43.690Z",
+      "doneAt": "2026-09-28T13:28:08.816Z"
+    },
+    "main-uses-builder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4300",
+      "claimedAt": "2026-09-28T13:28:14.237Z",
+      "doneAt": "2026-09-28T13:42:22.709Z"
+    },
+    "docs-emission-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4300",
+      "claimedAt": "2026-09-28T13:42:26.643Z",
+      "doneAt": "2026-09-28T13:42:55.920Z"
+    },
+    "dead-agent-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:01.808Z"
+    },
+    "dead-agent-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:27.453Z"
+    },
+    "dead-agent-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:42.151Z"
+    },
+    "dead-agent-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:58.056Z"
+    },
+    "status-event-builder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:48:13.246Z"
+    },
+    "status-event-builder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:48:26.523Z"
+    },
+    "status-event-builder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:48:39.481Z"
+    },
+    "deacon-main-uses-builder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:48:53.211Z"
+    },
+    "deacon-main-uses-builder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:06.249Z"
+    },
+    "main-uses-builder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:19.799Z"
+    },
+    "main-uses-builder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:33.134Z"
+    },
+    "docs-emission-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:45.635Z"
+    },
+    "docs-emission-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:57.717Z"
+    }
+  }
+}
