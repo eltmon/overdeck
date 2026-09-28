@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:58:56.649Z",
+  "updated": "2026-09-28T15:59:08.799Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "lane-cpu-class.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T15:58:56.649Z"
+    },
+    "cpu-psi-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:59:08.798Z"
     }
   }
 }
