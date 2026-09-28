@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4290",
   "created": "2026-09-28T12:19:35.919Z",
-  "updated": "2026-09-28T14:03:03.655Z",
+  "updated": "2026-09-28T14:03:17.044Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -148,6 +148,10 @@
     "fallback-surfaces.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T14:03:03.654Z"
+    },
+    "docs-outcome-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:17.043Z"
     }
   }
 }
