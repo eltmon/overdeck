@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Compass, Plus, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { type IssueCostBreakdown } from './ProjectOverview';
@@ -37,6 +37,8 @@ import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
+import { DeckEmptyState } from './DeckEmptyState';
+import { useDefaultDeckSelection } from './useDefaultDeckSelection';
 import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
 import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
 import { usePriorityConversation } from './usePriorityConversation';
@@ -298,6 +300,7 @@ export function CommandDeck({
     queryFn: fetchRegisteredProjects,
     staleTime: 60000,
   });
+  useDefaultDeckSelection({ selectedProject, registeredProjects, loaded: registeredProjectsFetched, onSelectProject });
 
   const { data: versionData } = useQuery({
     queryKey: ['version'],
@@ -1546,12 +1549,7 @@ export function CommandDeck({
               }}
             />
           ) : (
-            <div className={styles.contentEmpty}>
-              <div style={{ textAlign: 'center' }}>
-                <Compass size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
-                <p>Select a project to open its deck</p>
-              </div>
-            </div>
+            <DeckEmptyState onStartWithoutProject={() => onSelectProject?.(NO_PROJECT_KEY)} />
           )}
         </div>
 
