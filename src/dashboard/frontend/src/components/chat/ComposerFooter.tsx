@@ -503,7 +503,9 @@ export function ComposerFooter({
     // control-plane lane and leave any uploaded attachments pending.
     const submissionMessage = isPortableCommand ? messageText : composedMessage;
     const clientMessageId = crypto.randomUUID();
-    const sendDeliverAs = deliverAsOverride ?? (showDeliverySelector && deliverAs !== 'auto' ? deliverAs : undefined);
+    // Follow-up exists only on the Pi control channel.
+    const selectedDeliverAs = deliverAs === 'follow_up' && steerKind !== 'control-channel' ? undefined : deliverAs;
+    const sendDeliverAs = deliverAsOverride ?? (showDeliverySelector && selectedDeliverAs !== 'auto' ? selectedDeliverAs : undefined);
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
       // This auto-switch silently killed a running agent's live session (the Opus
@@ -552,7 +554,11 @@ export function ComposerFooter({
         agentId,
         sendDeliverAs,
         undefined,
-        { clientMessageId },
+        {
+          clientMessageId,
+          // PAN-4292 NFR-4: never let a steer degrade to a queued message silently.
+          onSteerDegraded: (reason) => toast.warning(`Sent without interrupting: ${reason}`),
+        },
       );
       if (commandResult?.kind === 'ui') {
         openComposerUi(
@@ -609,7 +615,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, sending, setSendingFor, showDeliverySelector]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, sending, setSendingFor, showDeliverySelector, steerKind]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -625,6 +631,10 @@ export function ComposerFooter({
     // own finally clears its sending flag by submitConversationName.
     setModel(conversation.model ?? getDefaultConversationModel());
     setHarness((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
+    // PAN-4292: a delivery mode belongs to the conversation it was picked in.
+    // A Steer or Follow-up choice must not carry over to the next conversation
+    // this reused pane shows.
+    setDeliverAs('auto');
     // Do NOT clear the editor here. The inner LexicalComposer is keyed by
     // conversation.name, so it already remounts on a conversation switch and
     // seeds the new conversation's saved draft via initialConfig. Calling

@@ -834,6 +834,43 @@ describe('ComposerFooter attachments', () => {
     );
   });
 
+  it('resets the delivery mode when a reused composer switches conversations (PAN-4292)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+
+    const view = render(<ComposerFooter conversation={{ ...conversation, harness: 'ohmypi' as const }} onSendAcknowledged={onSendAcknowledged} />);
+    fireEvent.change(screen.getByLabelText('Pi delivery mode'), { target: { value: 'follow_up' } });
+
+    view.rerender(<ComposerFooter conversation={{ ...secondConversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
+
+    await waitFor(() => expect(screen.getByLabelText('Delivery mode')).toHaveValue('auto'));
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'plain message' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('plain message', 'image-1'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/other-conv/message',
+      expect.objectContaining({ body: JSON.stringify({ message: 'plain message', clientMessageId: 'image-1' }) }),
+    );
+  });
+
+  it('warns when the server delivered a steer as a normal submit (PAN-4292)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response(
+      JSON.stringify({ ok: true, steerDegraded: 'supervisor predates steer; delivered as a normal submit' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    const onSendAcknowledged = vi.fn();
+
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
+    editorState.onCommandKeyDown?.('SteerEnter');
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalled());
+    expect(mockToastWarning).toHaveBeenCalledWith('Sent without interrupting: supervisor predates steer; delivered as a normal submit');
+  });
+
   it('posts live thinking-level changes for Codex conversations', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));

@@ -109,14 +109,20 @@ export async function sendConversationMessage(
   agentId?: string,
   deliverAs?: 'steer' | 'follow_up',
   confirmation?: ComposerCommandConfirmation,
-  options?: { clientMessageId?: string; retry?: boolean },
+  options?: {
+    clientMessageId?: string;
+    retry?: boolean;
+    /** PAN-4292: told when the server delivered a requested steer as a normal submit (`steerDegraded`). */
+    onSteerDegraded?: (reason: string) => void;
+  },
 ): Promise<ComposerCommandResult | null> {
+  const { onSteerDegraded, ...bodyOptions } = options ?? {};
   const endpoint = agentId
     ? `/api/agents/${encodeURIComponent(agentId)}/message`
     : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
   const payload = {
     message,
-    ...options,
+    ...bodyOptions,
     ...(deliverAs ? { deliverAs } : {}),
     ...(confirmation ? {
       confirmationNonce: confirmation.nonce,
@@ -177,6 +183,10 @@ export async function sendConversationMessage(
             : typeof details.retryable === 'boolean' ? { retryable: details.retryable } : {}),
         },
       );
+    }
+    if (responseBody && typeof responseBody === 'object' && 'steerDegraded' in responseBody
+      && typeof responseBody.steerDegraded === 'string') {
+      onSteerDegraded?.(responseBody.steerDegraded);
     }
     return null;
   } finally {
