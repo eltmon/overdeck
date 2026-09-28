@@ -18,7 +18,10 @@ export interface ChatMessage {
   /** Local send identity and transcript reconciliation metadata. */
   clientMessageId?: string;
   echoBaselineIds?: string[];
-  deliveryState?: 'pending' | 'accepted' | 'unknown' | 'subagent';
+  deliveryState?: 'pending' | 'accepted' | 'unknown' | 'subagent' | 'held';
+  /** When deliveryState is 'held': epoch ms the server refused the paste because a
+   * permission prompt was up (PAN-4278). Release waits for a newer feed read. */
+  heldAt?: number;
   /** Set when deliveryState is 'subagent': the message routed into this running
    * subagent instead of the main conversation (PAN-4247). */
   deliveredToSubagent?: { agentId: string; description: string };
@@ -44,6 +47,10 @@ export interface FailedMessage {
   deliverAs?: 'steer' | 'follow_up';
   /** True for an accepted bubble moved to the outbox after staying unmatched too long (PAN-4247). */
   notFoundInTranscript?: boolean;
+  /** Server failure code, e.g. 'not-delivered' when the terminal refused the message (PAN-4278). */
+  code?: string;
+  /** Submitted while the server was unreachable: never POSTed, sent on reconnect (PAN-4279). */
+  heldOffline?: boolean;
 }
 
 export interface WorkLogEntry {

@@ -28,6 +28,7 @@ import { FlywheelPage } from '../pages/FlywheelPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
 import { NewWorkspacePage } from '../pages/NewWorkspacePage';
+import { getNewWorkspaceProjectFromSearch } from './routes';
 import { NewProjectPage } from '../pages/NewProjectPage';
 import { WorkspaceView } from '../components/workspace/WorkspaceView';
 import type { Tab } from '../components/Header';
@@ -49,8 +50,6 @@ type SelectProjectHandler = (projectName: string | null, opts?: { updateUrl?: bo
 
 interface AppRoutesProps {
   activeTab: Tab;
-  backendDown: boolean;
-  restarting: boolean;
   issues: Issue[];
   selectedConvId: string | null;
   conversationViewMode: ConversationViewMode;
@@ -84,8 +83,6 @@ interface AppRoutesProps {
 
 export function AppRoutes({
   activeTab,
-  backendDown,
-  restarting,
   issues,
   selectedConvId,
   conversationViewMode,
@@ -115,7 +112,7 @@ export function AppRoutes({
   keyboardShortcutsDisabled = false,
 }: AppRoutesProps) {
   return (
-    <BackendConnectionBoundary backendDown={backendDown} restarting={restarting}>
+    <BackendConnectionBoundary>
       {activeTab === 'home' && (
         <div className="w-full h-full overflow-hidden">
           <HomeSwitch
@@ -143,7 +140,13 @@ export function AppRoutes({
       )}
       {activeTab === 'workspace-new' && (
         <div className="w-full h-full overflow-hidden">
-          <NewWorkspacePage onCancel={() => onTabChange('home')} onCreated={onWorkspaceCreated} />
+          {/* Keyed on ?project=: adding a project from a chip pushes it, and the
+              page's project preset is read once on mount (PAN-4281 WI-6). */}
+          <NewWorkspacePage
+            key={getNewWorkspaceProjectFromSearch() ?? ''}
+            onCancel={() => onTabChange('home')}
+            onCreated={onWorkspaceCreated}
+          />
         </div>
       )}
       {activeTab === 'project-new' && (

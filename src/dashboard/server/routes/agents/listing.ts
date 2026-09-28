@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
-import type { DerivedIssueState } from '@overdeck/contracts';
+import { indexPanesByAgentKey, type DerivedIssueState } from '@overdeck/contracts';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
@@ -76,7 +76,7 @@ export const getAgentsRoute = HttpRouter.add(
         // role, harness, model, branch); every liveness and state answer below
         // comes from the pane.
         const panes = yield* Effect.promise(() => getBackendPanes());
-        const paneById = new Map(panes.map((pane) => [pane.terminalId ?? pane.id, pane]));
+        const paneById = indexPanesByAgentKey(panes);
         const specialistIssues = new Set(
           panes
             .filter((pane) => pane.state !== 'exited' && (pane.role === 'review' || pane.role === 'test' || pane.role === 'uat'))
@@ -327,7 +327,7 @@ export const getAgentTmuxAliveRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const agentId = params['id'] ?? '';
     const panes = yield* Effect.promise(() => getBackendPanes());
-    const pane = panes.find((candidate) => (candidate.terminalId ?? candidate.id) === agentId);
+    const pane = indexPanesByAgentKey(panes).get(agentId);
     return jsonResponse({ alive: pane !== undefined && pane.state !== 'exited' });
   }),
 );

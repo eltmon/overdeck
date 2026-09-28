@@ -14,7 +14,9 @@ import { waitForManagedKimiSessionId } from '../runtimes/kimi-context-envelope.j
 import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
+import type { DeliveryResult } from '../agents/delivery.js';
 import { ensureMainInputTarget, type EnsureMainResult } from '../agents/input-target.js';
+import { conversationPendingPermission, type PendingPermission } from './conversation-permission.js';
 import {
   ComposerCommandConfirmationError,
   composerCommandConfirmationFromBody,
@@ -209,6 +211,10 @@ export interface ConversationMessageDependencies {
   transformMessageForHarness?(message: string, harness: RuntimeName, attachmentPaths: string[]): string;
   /** PAN-4268: move Claude Code's input to the main agent before pasting. */
   ensureMainInputTarget?: (agentId: string) => Promise<EnsureMainResult>;
+  /** PAN-4278: the permission prompt check that runs before ensure-main. */
+  conversationPendingPermission?: (conv: Conversation) => Promise<PendingPermission | null>;
+  /** PAN-4278: injectable for tests; the route inspects its DeliveryResult. */
+  deliverAgentMessage?: typeof deliverAgentMessage;
 }
 
 export function safeUploadExtension(filename: string, mimeType: string): string {
@@ -500,6 +506,21 @@ export async function handleConversationMessage(
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
   const behavior = getHarnessBehavior(harness);
+  // PAN-4292: Pi routes deliverAs over its control channel (pickDeliverAs).
+  // Every other harness steers only with send-now keys, and has no
+  // follow-up mode; refuse rather than deliver a plain submit (D13).
+  const requestedDeliverAs = body['deliverAs'];
+  const steer = requestedDeliverAs === 'steer' && !isPiControlChannelHarness(harness);
+  if (!isPiControlChannelHarness(harness) && (requestedDeliverAs === 'steer' || requestedDeliverAs === 'follow_up')) {
+    if (requestedDeliverAs === 'follow_up' || behavior.steerKind !== 'send-now-keys') {
+      return jsonResponse({
+        error: `${behavior.displayName} has no ${requestedDeliverAs === 'steer' ? 'steer' : 'follow-up'} delivery`,
+        code: 'steer-unsupported',
+        deliveryUnknown: false,
+        retryable: false,
+      }, { status: 422 });
+    }
+  }
   const supportsImages = modelSupportsImages(conv.model ?? '');
   const partition = partitionAttachmentsForModel(message, managedAttachmentPaths, supportsImages);
   const outboundMessage = partition.outboundMessage;
@@ -523,6 +544,7 @@ export async function handleConversationMessage(
   }
 
   let switchedFromSubagent: string | undefined;
+  let steerDegraded: string | undefined;
   if (isPiControlChannelHarness(harness)) {
     await deliverConversationViaControlChannel(conv, deliveredMessage, {
       source: 'operator',
@@ -530,6 +552,20 @@ export async function handleConversationMessage(
     });
   } else {
     if (harness === 'claude-code') {
+      // PAN-4278: never paste into a permission prompt. Checked BEFORE
+      // ensure-main, whose Down/Enter would move the menu cursor and answer it.
+      // Only a prompt on the pane holds the message — a stale hook entry alone
+      // must never block sends.
+      const pendingPermission = await (deps.conversationPendingPermission ?? conversationPendingPermission)(conv);
+      if (pendingPermission?.answerable) {
+        console.log(`[conversations] ${conv.name}: holding message — permission prompt pending (${pendingPermission.agentLabel})`);
+        return jsonResponse({
+          error: 'Waiting: the agent needs a permission answer first',
+          code: 'permission-pending',
+          deliveryUnknown: false,
+          retryable: true,
+        }, { status: 409 });
+      }
       const ensure = deps.ensureMainInputTarget ?? ensureMainInputTarget;
       const target = await ensure(conv.tmuxSession);
       if (!target.ok) {
@@ -550,6 +586,8 @@ export async function handleConversationMessage(
       watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
     }
 
+    const deliver = deps.deliverAgentMessage ?? deliverAgentMessage;
+    let delivery: DeliveryResult;
     try {
       const method = resolveConversationDeliveryMethod(conv);
       // PAN-4185: a bare Kimi conversation gets the operator's text without the context envelope.
@@ -566,15 +604,17 @@ export async function handleConversationMessage(
             { status: 503 },
           );
         }
-        await deliverAgentMessage(
+        delivery = await deliver(
           conv.tmuxSession,
           deliveredMessage,
           'conversation-message',
           method,
           { kimiContext: { workspace: conv.cwd, sessionId: kimiSessionId } },
         );
+      } else if (steer) {
+        delivery = await deliver(conv.tmuxSession, deliveredMessage, 'conversation-message', method, { submit: 'steer' });
       } else {
-        await deliverAgentMessage(conv.tmuxSession, deliveredMessage, 'conversation-message', method);
+        delivery = await deliver(conv.tmuxSession, deliveredMessage, 'conversation-message', method);
       }
     } catch (deliveryErr: unknown) {
       const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
@@ -583,6 +623,20 @@ export async function handleConversationMessage(
       }
       throw deliveryErr;
     }
+    // PAN-4278: a returned failure (a Herdr refusal or throw, a guard refusal)
+    // used to be dropped here, so the composer showed "Sent" for a message
+    // nothing typed. Report it; the operator resends.
+    if (!delivery.ok) {
+      console.warn(`[conversations] ${conv.name}: not delivered via ${delivery.path}: ${delivery.failure ?? 'unknown failure'}`);
+      return jsonResponse({
+        error: `Not delivered: ${delivery.failure ?? 'the terminal refused the message'}`,
+        code: 'not-delivered',
+        deliveryUnknown: false,
+        retryable: true,
+      }, { status: 502 });
+    }
+    console.log(`[conversations] ${conv.name}: delivered via ${delivery.path}${delivery.deduplicated ? ' (deduplicated)' : ''}${steer ? (delivery.steered === false ? ` (steer degraded: ${delivery.failure})` : ' (steered)') : ''}`);
+    if (steer && delivery.steered === false) steerDegraded = delivery.failure ?? 'delivered as a normal submit';
 
     if (watchFromByteOffset !== null && conv.claudeSessionId) {
       void watchForEatenConversationMessage({
@@ -592,6 +646,7 @@ export async function handleConversationMessage(
         sessionId: conv.claudeSessionId,
         message: deliveredMessage,
         deliveryMethod: resolveConversationDeliveryMethod(conv),
+        ...(steer ? { submit: 'steer' as const } : {}),
         fromByteOffset: watchFromByteOffset,
       }).then((outcome) => {
         if (outcome === 'redelivered') {
@@ -620,5 +675,6 @@ export async function handleConversationMessage(
     ...(droppedImageCount > 0 ? { imagesDropped: droppedImageCount } : {}),
     ...(harness === 'claude-code' ? { inputTarget: 'main' } : {}),
     ...(switchedFromSubagent ? { switchedFromSubagent } : {}),
+    ...(steerDegraded ? { steerDegraded } : {}),
   });
 }

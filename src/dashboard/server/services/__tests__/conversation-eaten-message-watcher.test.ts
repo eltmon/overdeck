@@ -115,3 +115,23 @@ describe('watchForEatenConversationMessage', () => {
     expect(deliver).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('watchForEatenConversationMessage steer redelivery (PAN-4292)', () => {
+  it('redelivers an eaten steer as a steer, never a plain Enter', async () => {
+    let matchedAfterRedelivery = false;
+    const deliver = vi.fn(async () => {
+      matchedAfterRedelivery = true;
+      return { ok: true } as never;
+    });
+    const probe = vi.fn(async (): Promise<TranscriptWatchProbe> => ({
+      matchedUserRecord: matchedAfterRedelivery,
+      compactBoundaryCount: 1,
+    }));
+
+    const outcome = watchForEatenConversationMessage(watcherArgs({ deliver, probe, submit: 'steer' }));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(outcome).resolves.toBe('redelivered');
+    expect(deliver).toHaveBeenCalledWith('conv-test', 'deploy the fix now', 'conversation-message-redelivery', undefined, { submit: 'steer' });
+  });
+});

@@ -28,6 +28,10 @@ const tmux = vi.hoisted(() => ({
 
 const backendSelection = vi.hoisted(() => ({ name: 'herdr' as 'herdr' | 'tmux' }));
 
+const reapPrimeAgentDaemon = vi.hoisted(() => vi.fn(async (_agentId: string) => 'terminated' as const));
+
+vi.mock('../prime-agent/daemon.js', () => ({ reapPrimeAgentDaemon }));
+
 vi.mock('../paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../paths.js')>();
   return {
@@ -538,5 +542,61 @@ describe('closeIssuePanes', () => {
   it('is a no-op on tmux, whose callers scan session names themselves', async () => {
     expect(await closeIssuePanes('PAN-3947', {}, tmuxBackend)).toEqual([]);
     expect(tmux.killed).toEqual([]);
+  });
+});
+
+describe('stopAgent reaps the Prime Agent daemon (PAN-3668 WI-16, D3)', () => {
+  function saveState(harness: 'prime-agent' | 'claude-code'): void {
+    saveAgentStateSync({
+      id: AGENT,
+      issueId: 'PAN-3947',
+      workspace: '/tmp/workspaces/feature-pan-3947',
+      harness,
+      role: 'work',
+      model: 'gpt-5.4',
+      status: 'running',
+      startedAt: '2026-09-25T00:00:00.000Z',
+    });
+  }
+
+  beforeEach(() => {
+    reapPrimeAgentDaemon.mockClear();
+  });
+
+  it('reaps exactly once, after the backend close, for a Prime Agent', async () => {
+    backendSelection.name = 'herdr';
+    herdrWithDetectedAgent();
+    saveState('prime-agent');
+    let closesAtReap = -1;
+    reapPrimeAgentDaemon.mockImplementationOnce(async () => {
+      closesAtReap = herdrPaneCloses().length;
+      return 'terminated';
+    });
+
+    await Effect.runPromise(stopAgent(AGENT, 'operator'));
+
+    expect(reapPrimeAgentDaemon).toHaveBeenCalledTimes(1);
+    expect(reapPrimeAgentDaemon).toHaveBeenCalledWith(AGENT);
+    expect(closesAtReap).toBe(1);
+  });
+
+  it('never reaps for a claude-code agent', async () => {
+    backendSelection.name = 'herdr';
+    herdrWithDetectedAgent();
+    saveState('claude-code');
+
+    await Effect.runPromise(stopAgent(AGENT, 'operator'));
+
+    expect(reapPrimeAgentDaemon).not.toHaveBeenCalled();
+  });
+
+  it('still completes the stop when the reap fails', async () => {
+    backendSelection.name = 'herdr';
+    herdrWithDetectedAgent();
+    saveState('prime-agent');
+    reapPrimeAgentDaemon.mockRejectedValueOnce(new Error('status --json failed'));
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(Effect.runPromise(stopAgent(AGENT, 'operator'))).resolves.toEqual({ outcome: 'closed' });
   });
 });

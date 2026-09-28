@@ -7,6 +7,7 @@ import { dashboardMutationJsonHeaders } from './lib/wsTransport';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
+import { TerminalPermissionDialog } from './components/TerminalPermissionDialog';
 import { AskUserQuestionDialog } from './components/AskUserQuestionDialog';
 import { PlanApprovalDialog } from './components/PlanApprovalDialog';
 import { EventRouter } from './components/EventRouter';
@@ -18,6 +19,8 @@ import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import type { CreatedProject } from './components/project/new/useProjectCreateIntent';
+import { takeAddProjectReturnTo, useAddProjectDialog } from './components/project/new/addProjectDialogStore';
+import { requestLauncherFocusAfterCreate } from './components/Stage/launcherFocusStore';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -29,6 +32,7 @@ import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { CostWarningStyles } from './components/shared/costWarning';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgents, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { useConnectionState } from './lib/connectionState';
 import { usePanesStore } from './lib/panesStore';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from './lib/experimentalFeatures';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
@@ -224,16 +228,13 @@ export default function App() {
   const queryClient = useQueryClient();
   const recentActivity = useDashboardStore((state) => (state.recentActivity ?? []) as Array<Record<string, unknown>>);
 
-  const handleNewProject = useCallback(() => {
-    setActiveTabState('project-new');
-    window.history.pushState({ tab: 'project-new' }, '', '/projects/new');
-  }, []);
+  const handleNewProject = useCallback(() => useAddProjectDialog.getState().show(), []);
 
   const handleProjectCreated = useCallback((project: CreatedProject) => {
     void queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] });
     void queryClient.invalidateQueries({ queryKey: ['registered-projects'] });
     setSelectedProjectKey(project.key);
-    const target = getProjectCreatedNavigation(project.key); // PAN-3836: honors returnTo=/workspaces/new from the chips
+    const target = getProjectCreatedNavigation(project.key, takeAddProjectReturnTo()); // honors returnTo=/workspaces/new from the chips
     setActiveTabState(target.tab);
     if (target.tab === 'command-deck') commandDeckPathRef.current = target.path;
     if (window.location.pathname !== target.path) window.history.pushState(target.state, '', target.path);
@@ -243,6 +244,7 @@ export default function App() {
     // deck path, which would clobber the /workspaces/new?project= return path.
     setConversationRoute(null, 'conversation', target.tab === 'command-deck');
     usePanesStore.getState().ensureHome(project.key);
+    requestLauncherFocusAfterCreate(target.tab, project.key);
   }, [queryClient, setConversationRoute]);
   const seenWorkspaceActivityIds = useRef(new Set<string>());
 
@@ -280,7 +282,7 @@ export default function App() {
   const dashboardLifecycle = useDashboardStore(selectDashboardLifecycle);
 
   // Backend health check — poll every 5s so we catch outages quickly
-  const { isError: backendDown, failureCount: backendFailureCount } = useQuery({
+  const { isError: backendDown, failureCount: backendFailureCount, dataUpdatedAt, errorUpdatedAt } = useQuery({
     queryKey: ['backend-health'],
     queryFn: fetchBackendHealth,
     refetchInterval: 5000,
@@ -289,37 +291,15 @@ export default function App() {
     retryDelay: 1000,
     staleTime: 0,
   });
-  // Banner state machine for the backend health indicator.
-  //   'down'        — red banner, retrying, force-restart available
-  //   'recovering'  — yellow banner, "back up", auto-hides after a short pause
-  //   null          — hidden (steady state)
-  // The "down" entry threshold is still 2 failed polls so a single hiccup
-  // doesn't latch the banner. Recovery is one success — but rather than
-  // snapping closed we transition to a yellow confirmation that fades on a
-  // timer, so the user gets explicit feedback that things are back instead
-  // of having the banner just disappear.
-  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [bannerState, setBannerState] = useState<'down' | 'recovering' | null>(null);
+  // Feed the connection store (PAN-4279) on every poll: 2 failed polls ⇒
+  // unreachable, one success ⇒ reachable, so a single hiccup never latches it.
+  const backendUnreachable = backendDown && backendFailureCount >= 2;
   useEffect(() => {
-    if (backendDown) {
-      if (recoveryTimerRef.current) {
-        clearTimeout(recoveryTimerRef.current);
-        recoveryTimerRef.current = null;
-      }
-      if (backendFailureCount >= 2) setBannerState('down');
-    } else if (bannerState === 'down') {
-      setBannerState('recovering');
-      recoveryTimerRef.current = setTimeout(() => {
-        setBannerState(null);
-        recoveryTimerRef.current = null;
-      }, 2500);
-    }
-  }, [backendDown, backendFailureCount, bannerState]);
-  useEffect(() => () => {
-    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
-  }, []);
-  // Restart banner: shown when dashboard is in a planned restart (lifecycle active)
-  const showRestartBanner = dashboardLifecycle.active;
+    useConnectionState.getState().setServerReachable(!backendUnreachable);
+  }, [backendUnreachable, dataUpdatedAt, errorUpdatedAt]);
+  useEffect(() => {
+    useConnectionState.getState().setRestarting(dashboardLifecycle.active);
+  }, [dashboardLifecycle.active]);
 
   // Check tracker status for missing API keys
   const { data: trackerStatus } = useQuery({
@@ -647,6 +627,7 @@ export default function App() {
     isChannelPermissionSubmitting,
     handleAllowChannelPermission,
     handleDenyChannelPermission,
+    terminalPermissionDialog,
     currentAskUserQuestionSubject,
     isAskUserQuestionSubmitting,
     handleSubmitAskUserQuestion,
@@ -870,8 +851,6 @@ export default function App() {
           selectedProjectKey={selectedProjectKey}
           runningAgentCount={runningAgentCount}
           dashboardLifecycle={dashboardLifecycle}
-          showRestartBanner={showRestartBanner}
-          bannerState={bannerState}
           missingKeyTrackers={missingKeyTrackers}
           trackerBannerDismissed={trackerBannerDismissed}
           showCliproxyBanner={showCliproxyBanner}
@@ -885,6 +864,7 @@ export default function App() {
           onRestartCliproxy={() => restartCliproxyMutation.mutate()}
           onToggleSessionFeedSidebar={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
           onNavigateNeedsYou={() => setActiveTab('flywheel')}
+          onProjectCreated={handleProjectCreated}
         />
 
         <div className="min-h-0 flex flex-1 overflow-hidden">
@@ -892,7 +872,7 @@ export default function App() {
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
-          <AppRoutes backendDown={bannerState === 'down'} restarting={showRestartBanner}
+          <AppRoutes
             activeTab={activeTab}
             issues={issues}
             selectedConvId={selectedConvId}
@@ -954,6 +934,7 @@ export default function App() {
         onAllow={handleAllowChannelPermission}
         onDeny={handleDenyChannelPermission}
       />
+      <TerminalPermissionDialog {...terminalPermissionDialog} />
 
       {/* PAN-1520 — AskUserQuestion interactive dialog (covers both work
           agents and conversation sessions — same modal, same code path). */}

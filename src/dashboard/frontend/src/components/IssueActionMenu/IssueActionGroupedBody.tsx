@@ -195,8 +195,10 @@ export function IssueActionGroupedBody({
   // PAN-4198 (FR-1): a menu lists only the enabled, menu-placed actions.
   // Contextual entries belong to their cards, and a gated action is noise —
   // the operator cannot act on it and cannot tell what it would have done.
-  const menuActions = actions.all.filter((view) => view.enabled && (ignorePlacement || view.action.placement === 'menu'));
-  const phasePrimary = actions.primary.filter((view) => view.enabled);
+  // An action blocked only by an outage stays, disabled with its reason (PAN-4279).
+  const listed = (view: IssueActionView) => view.enabled || view.blockedOffline;
+  const menuActions = actions.all.filter((view) => listed(view) && (ignorePlacement || view.action.placement === 'menu'));
+  const phasePrimary = actions.primary.filter(listed);
   // FR-3: a primary renders once, under "Next step", never again in its group.
   const primaryKeys = new Set(phasePrimary.map((view) => view.action.key));
   const groupedActions = menuActions.filter((view) => !primaryKeys.has(view.action.key));

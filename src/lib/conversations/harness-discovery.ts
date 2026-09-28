@@ -14,7 +14,7 @@ import { codexAgentSessionsDir, codexDefaultHome, codexSessionsRoot } from '../r
 import { piSessionsRoot, piUserAgentDir } from '../runtimes/storage/pi.js';
 import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 
-export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
 
 export interface DiscoveredFile {
   jsonlPath: string;

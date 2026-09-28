@@ -11,6 +11,7 @@ import { ActionDock } from './HomePane/ActionDock'
 import { Timeline } from './HomePane/Timeline'
 import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
+import { writePendingTerminal } from '../home/pendingTerminal'
 import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
 import { ProjectReleasePanel } from './HomePane/ProjectReleasePanel'
@@ -115,10 +116,14 @@ export function ProjectHome({
       busy={launchBusy}
       errorText={launchError ?? undefined}
       lastUsedAgentId={readLastUsedAgent(api.deckKey)}
+      focusKey={api.deckKey}
       onSelect={(intent, query) =>
         dispatchLauncherIntent(intent, query, {
           openAgent: (i, query) => onAgentSelected(i.id, query),
-          openTerminal: () => api.openTypedPane('terminal'),
+          openTerminal: (query) => {
+            writePendingTerminal({ deckKey: api.deckKey, command: query.trim() })
+            api.openTerminalDrawer()
+          },
           openWeb: (_q, url) =>
             api.openPane({ paneType: 'browser', label: 'Web', browserInitialUrl: url }),
           onAgentRun: (id) => writeLastUsedAgent(api.deckKey, id),

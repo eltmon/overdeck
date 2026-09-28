@@ -1,0 +1,379 @@
+{
+  "version": "1",
+  "issueId": "PAN-4280",
+  "created": "2026-09-27T23:49:56.773Z",
+  "updated": "2026-09-28T01:22:44.699Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ui-mode-default": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-27T23:49:56.773Z",
+      "doneAt": "2026-09-27T23:51:35.372Z"
+    },
+    "launcher-talk-props": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-27T23:52:09.800Z",
+      "doneAt": "2026-09-27T23:55:14.125Z"
+    },
+    "home-intents": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-27T23:55:20.692Z",
+      "doneAt": "2026-09-27T23:57:33.575Z"
+    },
+    "pending-terminal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-27T23:57:36.949Z",
+      "doneAt": "2026-09-27T23:58:50.288Z"
+    },
+    "terminals-command-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-27T23:58:53.983Z",
+      "doneAt": "2026-09-28T00:04:04.508Z"
+    },
+    "drawer-pending-consumer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:04:08.774Z",
+      "doneAt": "2026-09-28T00:06:35.417Z"
+    },
+    "stage-terminal-open": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:06:39.490Z",
+      "doneAt": "2026-09-28T00:09:21.817Z"
+    },
+    "composer-project-chip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:09:25.571Z",
+      "doneAt": "2026-09-28T00:11:36.955Z"
+    },
+    "type-to-focus": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:11:41.159Z",
+      "doneAt": "2026-09-28T00:12:53.656Z"
+    },
+    "home-composer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:12:57.469Z",
+      "doneAt": "2026-09-28T00:17:36.754Z"
+    },
+    "mount-simple-home": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:17:40.307Z",
+      "doneAt": "2026-09-28T00:23:17.589Z"
+    },
+    "mount-advanced-home": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:23:21.134Z",
+      "doneAt": "2026-09-28T00:25:15.845Z"
+    },
+    "sidebar-no-project-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:25:19.624Z",
+      "doneAt": "2026-09-28T00:27:18.087Z"
+    },
+    "home-e2e-spec": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:27:22.371Z",
+      "doneAt": "2026-09-28T00:28:11.755Z"
+    },
+    "deck-default-no-project": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:28:15.313Z",
+      "doneAt": "2026-09-28T00:30:53.915Z"
+    },
+    "projecthome-terminal-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:30:58.342Z",
+      "doneAt": "2026-09-28T00:33:44.343Z"
+    },
+    "unscoped-move-chip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:33:47.898Z",
+      "doneAt": "2026-09-28T00:41:05.591Z"
+    },
+    "docs-slice-a": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:41:09.647Z",
+      "doneAt": "2026-09-28T00:42:35.029Z"
+    },
+    "ci-frontend-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4280",
+      "claimedAt": "2026-09-28T00:42:39.399Z",
+      "doneAt": "2026-09-28T01:06:37.243Z"
+    },
+    "ui-mode-default.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:10:05.418Z"
+    },
+    "ui-mode-default.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:10:23.120Z"
+    },
+    "ui-mode-default.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:11:05.910Z"
+    },
+    "ui-mode-default.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:11:16.059Z"
+    },
+    "launcher-talk-props.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:11:26.721Z"
+    },
+    "launcher-talk-props.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:11:37.557Z"
+    },
+    "launcher-talk-props.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:11:48.661Z"
+    },
+    "home-intents.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:11:59.832Z"
+    },
+    "home-intents.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:12:10.339Z"
+    },
+    "home-intents.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:12:22.081Z"
+    },
+    "home-intents.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:12:34.573Z"
+    },
+    "pending-terminal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:12:47.116Z"
+    },
+    "pending-terminal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:12:59.861Z"
+    },
+    "pending-terminal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:13:11.802Z"
+    },
+    "pending-terminal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:13:23.902Z"
+    },
+    "pending-terminal.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:13:35.941Z"
+    },
+    "terminals-command-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:13:46.808Z"
+    },
+    "terminals-command-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:13:57.657Z"
+    },
+    "terminals-command-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:14:08.714Z"
+    },
+    "terminals-command-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:14:20.293Z"
+    },
+    "drawer-pending-consumer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:14:32.069Z"
+    },
+    "drawer-pending-consumer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:14:44.148Z"
+    },
+    "drawer-pending-consumer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:14:55.941Z"
+    },
+    "stage-terminal-open.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:15:08.233Z"
+    },
+    "stage-terminal-open.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:15:20.779Z"
+    },
+    "stage-terminal-open.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:15:32.925Z"
+    },
+    "composer-project-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:15:46.363Z"
+    },
+    "composer-project-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:15:57.585Z"
+    },
+    "composer-project-chip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:16:09.036Z"
+    },
+    "composer-project-chip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:16:20.789Z"
+    },
+    "type-to-focus.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:16:33.277Z"
+    },
+    "type-to-focus.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:16:45.695Z"
+    },
+    "type-to-focus.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:16:57.899Z"
+    },
+    "type-to-focus.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:17:10.046Z"
+    },
+    "home-composer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:17:22.018Z"
+    },
+    "home-composer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:17:34.076Z"
+    },
+    "home-composer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:17:47.194Z"
+    },
+    "home-composer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:17:58.601Z"
+    },
+    "mount-simple-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:10.861Z"
+    },
+    "mount-simple-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:21.532Z"
+    },
+    "mount-simple-home.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:32.314Z"
+    },
+    "mount-advanced-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:43.022Z"
+    },
+    "mount-advanced-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:54.298Z"
+    },
+    "sidebar-no-project-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:19:05.253Z"
+    },
+    "sidebar-no-project-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:19:16.089Z"
+    },
+    "home-e2e-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:19:26.475Z"
+    },
+    "home-e2e-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:19:36.668Z"
+    },
+    "home-e2e-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:19:47.158Z"
+    },
+    "deck-default-no-project.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:19:58.902Z"
+    },
+    "deck-default-no-project.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:20:12.350Z"
+    },
+    "deck-default-no-project.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:20:24.594Z"
+    },
+    "deck-default-no-project.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:20:36.887Z"
+    },
+    "projecthome-terminal-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:20:49.111Z"
+    },
+    "projecthome-terminal-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:21:00.761Z"
+    },
+    "unscoped-move-chip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:21:12.159Z"
+    },
+    "unscoped-move-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:21:22.845Z"
+    },
+    "unscoped-move-chip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:21:33.773Z"
+    },
+    "docs-slice-a.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:21:45.714Z"
+    },
+    "docs-slice-a.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:21:57.938Z"
+    },
+    "docs-slice-a.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:22:09.365Z"
+    },
+    "docs-slice-a.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:22:20.766Z"
+    },
+    "ci-frontend-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:22:33.140Z"
+    },
+    "ci-frontend-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:22:44.698Z"
+    }
+  }
+}

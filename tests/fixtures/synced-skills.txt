@@ -33,6 +33,7 @@ pan-admin-tracker
 pan-agent-activity
 pan-close
 pan-code-review
+pan-consolidate-conversations
 pan-conversations
 pan-dev
 pan-diagnose

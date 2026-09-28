@@ -1,9 +1,9 @@
 /** Coalesce full-parser jobs and reuse unchanged snapshots across browser subscribers. */
 import { stat } from 'node:fs/promises';
-import type { ParseResult } from './conversation/types.js';
+import type { ParseResult, ParseState } from './conversation/types.js';
 import { runDashboardDbJob } from './dashboard-db-task.js';
 
-type Parser = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'muse' | 'kimi';
+type Parser = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'muse' | 'kimi' | 'prime-agent' | 'claude-initial';
 interface CachedParse {
   signature: string;
   bytes: number;
@@ -11,9 +11,38 @@ interface CachedParse {
 }
 const snapshots = new Map<string, CachedParse>();
 
+/** A cached snapshot is shared; the incremental parser mutates priorState containers in place. */
+export function parseStateFromSnapshot(initial: ParseResult): ParseState {
+  return {
+    pendingToolUse: new Map(initial.pendingToolUse),
+    unresolvedResults: new Map(initial.unresolvedResults),
+    lastSequence: initial.lastSequence,
+    planToolUseIds: new Set(initial.planToolUseIds),
+    proposedPlan: initial.proposedPlan,
+    latestAssistantUsage: initial.latestAssistantUsage,
+    contextBoundaryOffset: initial.contextBoundaryOffset,
+    permissionMode: initial.permissionMode,
+    countedUsageIds: new Set(initial.countedUsageIds),
+    fileEditsByAssistantId: new Map([...(initial.fileEditsByAssistantId ?? [])].map(([id, edits]) => [id, [...edits]])),
+    pendingAssistantId: initial.pendingAssistantId,
+    orphanToolUseIds: new Set(initial.orphanToolUseIds),
+  };
+}
+
 export function sharedTranscriptParser(parser: Parser) {
   return async (sessionFile: string): Promise<ParseResult> => {
-    const info = await stat(sessionFile);
+    let info: Awaited<ReturnType<typeof stat>>;
+    try {
+      info = await stat(sessionFile);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        // A freshly spawned conversation subscribes before its transcript exists.
+        // The worker parser tolerates this (returns an empty result) and
+        // watchConversation then polls, so dispatch uncached rather than throw.
+        return runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', { sessionFile, parser });
+      }
+      throw error;
+    }
     const key = `${parser}:${sessionFile}`;
     const signature = `${info.dev}:${info.ino}:${info.size}:${info.mtimeMs}`;
     const cached = snapshots.get(key);

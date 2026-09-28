@@ -7,6 +7,7 @@ import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { ensureOpenAICompatibleProxyRunning } from '../openai-compatible-proxy.js';
 import { validateProviderHealth } from '../provider-health.js';
 import { getProviderEnv, getProviderForModel } from '../providers.js';
+import { getOllamaLaunchEnv } from './ollama-launch-env.js';
 import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, hasModelCapability, getModelCapability, resolveModelId } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -41,6 +42,11 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
   }
 
   const { config } = loadYamlConfig();
+
+  // Local Ollama needs no API key and builds its whole env from a live preflight.
+  if (provider.name === 'ollama') {
+    return getOllamaLaunchEnv(model, config.ollama);
+  }
 
   // OpenRouter API key is stored in config.yaml under providers.openrouter.api_key
   if (provider.name === 'openrouter') {
@@ -142,6 +148,9 @@ interface ClaudeCodeContextPolicy {
 
 export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeContextPolicy {
   const provider = getProviderForModel(model);
+  // Ollama's pins come from the warm-loaded window in getOllamaLaunchEnv; returning
+  // a policy here too would export a second, contradictory pair of the same vars.
+  if (provider.name === 'ollama') return {};
   if (provider.name === 'anthropic') {
     return hasModelCapability(model)
       ? { autoCompactWindow: getModelCapability(resolveModelId(model)).contextWindow }

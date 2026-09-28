@@ -8,6 +8,10 @@ import { HomePage } from './HomePage';
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore } from '../lib/store';
 
+vi.mock('../components/home/HomeComposer', () => ({
+  HomeComposer: ({ mode }: { mode: string }) => <div data-testid="home-composer" data-mode={mode} />,
+}));
+
 function makeEntry(overrides: Partial<FeatureRegistryEntry> = {}): FeatureRegistryEntry {
   return {
     featureId: 'feature-1',
@@ -393,5 +397,11 @@ describe('HomePage', () => {
     const section = await screen.findByTestId('home-projects');
     const alert = await within(section).findByRole('alert');
     expect(alert).toHaveTextContent('Projects could not be loaded. The rest of Home is still available.');
+  });
+
+  it('renders the home composer', async () => {
+    vi.stubGlobal('fetch', homeFetchStub());
+    renderHomePage();
+    expect(await screen.findByTestId('home-composer')).toHaveAttribute('data-mode', 'advanced');
   });
 });

@@ -52,6 +52,12 @@
             "pages": [
               "vision"
             ]
+          },
+          {
+            "group": "Overdeck Anywhere",
+            "pages": [
+              "anywhere"
+            ]
           }
         ]
       },
@@ -101,6 +107,7 @@
               "configuration/telemetry",
               "configuration/knowledge",
               "configuration/harnesses",
+              "configuration/local-models",
               "configuration/effort",
               "configuration/terminal-backend",
               "configuration/memory-governor",

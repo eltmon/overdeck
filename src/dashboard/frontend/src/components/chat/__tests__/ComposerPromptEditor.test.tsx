@@ -664,3 +664,41 @@ describe('SlashMenu filter', () => {
     expect(match).toHaveClass('slashMenuMatch');
   });
 });
+
+describe('ComposerPromptEditor Enter keys (PAN-4292)', () => {
+  const onCommandKeyDown = vi.fn();
+
+  function enterHandler(): (event: Partial<KeyboardEvent> | null) => boolean {
+    render(<ComposerPromptEditor conversationName="test-conversation" onCommandKeyDown={onCommandKeyDown} />);
+    const calls = mockEditor.registerCommand.mock.calls as unknown as Array<[string, (event: Partial<KeyboardEvent> | null) => boolean]>;
+    const call = calls.filter(([command]) => command === 'enter').at(-1);
+    if (!call) throw new Error('no Enter command registered');
+    return call[1];
+  }
+
+  function keyEvent(init: Partial<KeyboardEvent>): Partial<KeyboardEvent> {
+    return { preventDefault: vi.fn(), shiftKey: false, ctrlKey: false, metaKey: false, ...init };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorageMock.getItem.mockReturnValue(null);
+  });
+
+  it('submits on plain Enter', () => {
+    expect(enterHandler()(keyEvent({}))).toBe(true);
+    expect(onCommandKeyDown).toHaveBeenCalledWith('Enter');
+  });
+
+  it('steers on Ctrl+Enter and Cmd+Enter', () => {
+    const handler = enterHandler();
+    handler(keyEvent({ ctrlKey: true }));
+    handler(keyEvent({ metaKey: true }));
+    expect(onCommandKeyDown.mock.calls).toEqual([['SteerEnter'], ['SteerEnter']]);
+  });
+
+  it('leaves Shift+Enter to insert a newline', () => {
+    expect(enterHandler()(keyEvent({ shiftKey: true }))).toBe(false);
+    expect(onCommandKeyDown).not.toHaveBeenCalled();
+  });
+});

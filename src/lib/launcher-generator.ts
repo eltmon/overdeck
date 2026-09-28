@@ -17,7 +17,7 @@ import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
 
 export interface LauncherConfig extends CodexNativeEndpointOption {
   role: Role;
@@ -91,6 +91,20 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
   acpContextFile?: string;
   /** Requested effort applied after the ACP model is selected. */
   acpEffort?: string;
+
+  /**
+   * Prime Agent host fields (PAN-3668). Required for harness='prime-agent'. The
+   * launcher runs `node dist/prime-agent-host.js`, which spawns `prime-agent --mode rpc`.
+   */
+  primeAgent?: {
+    agentId: string;
+    binaryPath: string;
+    provider: string;
+    workspace: string;
+    contextFile?: string;
+    thinking?: string;
+    resumeSessionFile?: string;
+  };
 
   /**
    * Native Kimi Code CLI model alias (e.g. 'k3'), passed as `kimi -m <model>`.
@@ -178,6 +192,8 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
   setTerminalEnv?: boolean;
   providerExports?: string;
   unsetProviderEnv?: boolean;
+  /** Provider env names `unsetProviderEnv` keeps: their values come from the pane's launch env. */
+  preserveProviderEnv?: string[];
   cavemanExports?: string;
   overdeckEnv?: { agentId?: string; issueId?: string; sessionType?: string };
   /**
@@ -387,6 +403,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   const receiptFiles = [
     ...preparedContext.sources,
     ...(config.acpContextFile ? [config.acpContextFile] : []),
+    ...(config.primeAgent?.contextFile ? [config.primeAgent.contextFile] : []),
   ];
   if (receiptKey && receiptFiles.length > 0) {
     const receiptPath = join(getOverdeckHome(), 'agents', receiptKey, 'context-receipt.json');
@@ -398,7 +415,9 @@ export function generateLauncherScript(config: LauncherConfig): string {
           ? 'initial-message-envelope'
         : config.harness === 'acp'
           ? 'acp-initial-context'
-          : 'append-system-prompt-file';
+          : config.harness === 'prime-agent'
+            ? 'prime-agent-append-system-prompt'
+            : 'append-system-prompt-file';
     const receiptScript = 'const fs=require("fs"),c=require("crypto"),p=require("path");const [out,ch,...files]=process.argv.slice(1);const sources=files.filter(f=>fs.existsSync(f)).map(path=>{const b=fs.readFileSync(path);return{path,bytes:b.length,estimatedTokens:Math.ceil(b.length/4),sha256:c.createHash("sha256").update(b).digest("hex")}});fs.mkdirSync(p.dirname(out),{recursive:true});const t=out+".tmp-"+process.pid;fs.writeFileSync(t,JSON.stringify({version:1,generatedAt:new Date().toISOString(),deliveryChannel:ch,sources},null,2)+"\\n",{mode:384});fs.renameSync(t,out)';
     lines.push(`node -e ${shellQuote(receiptScript)} ${shellQuote(receiptPath)} ${shellQuote(receiptChannel)} ${receiptFiles.map(shellQuote).join(' ')}`);
   }
@@ -417,6 +436,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // Unset provider env (must happen before re-exporting)
   if (config.unsetProviderEnv) {
     for (const key of PROVIDER_ENV_UNSETS) {
+      if (config.preserveProviderEnv?.includes(key)) continue;
       lines.push(`unset ${key}`);
     }
   }
@@ -543,6 +563,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (behavior.launchCommandKind === 'acp-host') {
       return buildAcpCommand(config, false);
     }
+    if (behavior.launchCommandKind === 'prime-agent-host') {
+      return buildPrimeAgentCommand(config, false);
+    }
     if (behavior.launchCommandKind === 'kimi-code-tui') {
       return buildKimiCodeCommand(config, false);
     }
@@ -658,6 +681,9 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   }
   if (behavior.launchCommandKind === 'acp-host') {
     return buildAcpCommand(config, useExec);
+  }
+  if (behavior.launchCommandKind === 'prime-agent-host') {
+    return buildPrimeAgentCommand(config, useExec);
   }
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     return buildKimiCodeCommand(config, useExec);
@@ -884,6 +910,33 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
     const effort = resolveKimiNativeEffort(config.model, config.acpEffort);
     if (effort) tokens.push('--effort', shellQuote(effort));
   }
+
+  const cmd = tokens.join(' ');
+  return [useExec ? `exec ${cmd}` : cmd];
+}
+
+/**
+ * Build the Prime Agent host command (PAN-3668 WI-12): `node dist/prime-agent-host.js`
+ * with every value shell-quoted. The host spawns `prime-agent --mode rpc` itself, so
+ * no credential or context text appears on this line (FR-14, D8).
+ */
+function buildPrimeAgentCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const prime = config.primeAgent;
+  if (!prime) throw new Error('prime-agent launcher requires primeAgent fields');
+  if (!config.model) throw new Error('prime-agent launcher requires model');
+
+  const tokens = [
+    'node',
+    shellQuote(join(packageRoot, 'dist', 'prime-agent-host.js')),
+    '--agent', shellQuote(prime.agentId),
+    '--binary-path', shellQuote(prime.binaryPath),
+    '--workspace', shellQuote(prime.workspace),
+    '--provider', shellQuote(prime.provider),
+    '--model', shellQuoteModelId(config.model),
+  ];
+  if (prime.contextFile) tokens.push('--context-file', shellQuote(prime.contextFile));
+  if (prime.thinking) tokens.push('--thinking', shellQuote(prime.thinking));
+  if (prime.resumeSessionFile) tokens.push('--resume', shellQuote(prime.resumeSessionFile));
 
   const cmd = tokens.join(' ');
   return [useExec ? `exec ${cmd}` : cmd];

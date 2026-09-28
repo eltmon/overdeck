@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Effect } from 'effect';
 
 import { HerdrBackend, toAgentState, toBackendEvents, tokenPayload } from '../../../../src/lib/terminal-backends/herdr.js';
@@ -54,12 +54,35 @@ describe('toBackendEvents', () => {
 
   it('maps creation, exit and workspace close', () => {
     expect(toBackendEvents('pane_created', { pane: { pane_id: 'w1:p1', terminal_id: 't', workspace_id: 'w1' } }))
-      .toEqual([{ kind: 'pane-created', paneId: 'w1:p1', workspaceId: 'w1' }]);
+      .toEqual([{ kind: 'pane-created', paneId: 'w1:p1', workspaceId: 'w1', terminalId: 't' }]);
     expect(toBackendEvents('pane_exited', { pane_id: 'w1:p1' }))
       .toEqual([{ kind: 'pane-exited', paneId: 'w1:p1', code: null }]);
     expect(toBackendEvents('workspace_closed', { workspace_id: 'w1' }))
       .toEqual([{ kind: 'workspace-closed', workspaceId: 'w1' }]);
     expect(toBackendEvents('layout_updated', {})).toEqual([]);
+  });
+
+  // PAN-4320: the pane-created and metadata events must carry agentId (and
+  // pane-created its real terminalId), or a Herdr pane cannot be joined to
+  // its agent until the next 5s list refresh.
+  it('carries agentId and terminalId into pane-created and metadata events', () => {
+    const pane = {
+      pane_id: 'wKZ:p3',
+      terminal_id: 'term_1',
+      workspace_id: 'wKZ',
+      tokens: { agentId: 'agent-pan-4311', role: 'work', issue: 'PAN-4311', harness: 'claude-code', model: 'm' },
+    };
+
+    expect(toBackendEvents('pane_created', { pane }))
+      .toEqual([{ kind: 'pane-created', paneId: 'wKZ:p3', workspaceId: 'wKZ', terminalId: 'term_1', agentId: 'agent-pan-4311' }]);
+
+    const updated = toBackendEvents('pane_updated', { pane: { ...pane, agent_status: undefined } });
+    expect(updated).toEqual([{
+      kind: 'metadata',
+      paneId: 'wKZ:p3',
+      tokens: pane.tokens,
+      agentId: 'agent-pan-4311',
+    }]);
   });
 
   it('keeps Herdr states and reserves unknown for anything else', () => {
@@ -251,5 +274,65 @@ describe('HerdrBackend.prompt when the target metadata cannot be read', () => {
     );
 
     expect(result).toMatchObject({ delivered: true });
+  });
+});
+
+describe('HerdrBackend.prompt steer submit (PAN-4292)', () => {
+  const sender = { id: 'conv-4292' };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('types the text in bracketed paste, then presses ctrl+x ctrl+s, never agent.prompt', async () => {
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'working', tokens: {} } };
+      return {};
+    });
+
+    const pending = Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'change course', { messageId: 's1', sender, submit: 'steer' }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    // The chord waits for the settle delay after the text.
+    expect(log.map((call) => call.method)).toEqual(['agent.get', 'pane.send_text']);
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(pending).resolves.toEqual({ delivered: true, messageId: 's1' });
+    expect(log.map((call) => call.method)).toEqual(['agent.get', 'pane.send_text', 'pane.send_keys']);
+    expect(log[1]?.params).toEqual({ pane_id: 'w1:p2', text: '\x1b[200~change course\x1b[201~' });
+    expect(log[2]?.params).toEqual({ pane_id: 'w1:p2', keys: ['ctrl+x', 'ctrl+s'] });
+  });
+
+  it('refuses a blocked agent without sending anything', async () => {
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'blocked', tokens: {} } };
+      return {};
+    });
+
+    const result = await Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'change course', { messageId: 's2', sender, submit: 'steer' }),
+    );
+
+    expect(result).toEqual({ refused: true, reason: 'agent_blocked' });
+    expect(log.map((call) => call.method)).toEqual(['agent.get']);
+  });
+
+  it('keeps agent.prompt when submit is absent', async () => {
+    const { api, log } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return { agent: { pane_id: 'w1:p2', agent_status: 'working', tokens: {} } };
+      return {};
+    });
+
+    const result = await Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'a' }, 'queue this', { messageId: 's3', sender }),
+    );
+
+    expect(result).toMatchObject({ delivered: true, messageId: 's3' });
+    expect(log.map((call) => call.method)).toEqual(['agent.get', 'agent.prompt']);
   });
 });

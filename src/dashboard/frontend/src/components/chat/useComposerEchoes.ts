@@ -25,7 +25,8 @@ export function useComposerEchoes(
     reconcile(conversationName, messages, subagents);
   }, [conversationName, messages, subagents, optimistic, failed, reconcile]);
   useEffect(() => {
-    const pending = optimistic.find((message) => !message.acknowledged && message.deliveryState !== 'unknown');
+    // A held message (PAN-4278) is waiting on purpose, not stalled.
+    const pending = optimistic.find((message) => !message.acknowledged && message.deliveryState !== 'unknown' && message.deliveryState !== 'held');
     if (!pending) return;
     const timer = setTimeout(() => markUnknown(conversationName, pending.id),
       Math.max(0, Date.parse(pending.createdAt) + TURN_STALL_MS - Date.now()));

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DialogProvider } from '../DialogProvider';
 import { ISSUE_ACTIONS } from '../../lib/issueActions';
 import { useDashboardStore } from '../../lib/store';
+import { OFFLINE_ACTION_REASON, useConnectionState } from '../../lib/connectionState';
 import type { Agent, Issue } from '../../types';
 import { IssueActionMenu } from './IssueActionMenu';
 
@@ -96,6 +97,7 @@ describe('IssueActionMenu', () => {
     cleanup();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
+    useConnectionState.setState({ serverReachable: true, streamLive: false, restarting: false });
   });
 
   it('renders inline ghost buttons for the primary set', () => {
@@ -483,4 +485,50 @@ describe('IssueActionMenu', () => {
     });
   });
 
+
+  describe('while the server is unreachable (PAN-4279)', () => {
+    function openRunningAgentMenu() {
+      mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'running' }) });
+      renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+      fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+      return screen.getByTestId('issue-action-overflow-menu');
+    }
+
+    it('keeps Message agent visible but disabled, with the offline reason', () => {
+      useConnectionState.setState({ serverReachable: false, streamLive: false, restarting: false });
+      const menu = openRunningAgentMenu();
+
+      const item = within(menu).getByTestId('issue-action-tell');
+      expect(item).toBeDisabled();
+      expect(within(menu).getByTestId('issue-action-disabled-tell')).toHaveAttribute('title', OFFLINE_ACTION_REASON);
+      expect(OFFLINE_ACTION_REASON).toBe("Can't reach the Overdeck server — available again when it reconnects.");
+    });
+
+    it('disables Message agent during a planned restart too', () => {
+      useConnectionState.setState({ serverReachable: true, streamLive: false, restarting: true });
+      const menu = openRunningAgentMenu();
+      expect(within(menu).getByTestId('issue-action-tell')).toBeDisabled();
+    });
+
+    it('keeps Message agent enabled while only live updates are delayed', () => {
+      useConnectionState.setState({ serverReachable: true, streamLive: false, restarting: false });
+      const menu = openRunningAgentMenu();
+      expect(within(menu).getByTestId('issue-action-tell')).toBeEnabled();
+      expect(within(menu).queryByTestId('issue-action-disabled-tell')).toBeNull();
+    });
+
+    it('keeps actions without a server endpoint enabled', () => {
+      useConnectionState.setState({ serverReachable: false, streamLive: false, restarting: false });
+      mockStore({
+        currentIssue: issue({ hasPlan: true }),
+        derived: { 'PAN-1': { issueId: 'PAN-1', state: 'planned' } },
+        panes: { 'pane-plan': { id: 'pane-plan', issue: 'PAN-1', role: 'plan', harness: 'claude-code', model: 'claude-opus-5', state: 'working' } },
+      });
+      renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+      fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+
+      const menu = screen.getByTestId('issue-action-overflow-menu');
+      expect(within(menu).getAllByTestId('issue-action-watchPlanning')[0]).toBeEnabled();
+    });
+  });
 });

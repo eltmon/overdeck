@@ -1,5 +1,6 @@
-import { AlertTriangle, CheckCircle2, History, RefreshCw, Search, StopCircle } from 'lucide-react';
+import { AlertTriangle, History, Search, StopCircle } from 'lucide-react';
 import { DeaconPauseToggle } from '../components/DeaconPauseToggle';
+import { DegradedModeBanner } from '../components/DegradedModeBanner';
 import { LowCostModePill } from '../components/LowCostModePill';
 import { DecisionsIndicator } from '../components/DecisionsIndicator';
 import { NeedsYouIndicator } from '../components/flywheel/NeedsYouIndicator';
@@ -19,6 +20,8 @@ import { SystemHealthPill } from '../components/SystemHealthPill';
 import { StaleBuildChip } from '../components/StaleBuildChip';
 import { triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from '../components/EmergencyStopOverlay';
 import type { Tab } from '../components/Header';
+import { AddProjectDialogHost } from '../components/project/new/AddProjectDialog';
+import type { CreatedProject } from '../components/project/new/projectCreateTypes';
 import type { TrackerStatusItem } from './api';
 
 interface DashboardLifecycleView {
@@ -32,8 +35,6 @@ interface AppChromeProps {
   selectedProjectKey: string | null;
   runningAgentCount: number;
   dashboardLifecycle: DashboardLifecycleView;
-  showRestartBanner: boolean;
-  bannerState: 'down' | 'recovering' | null;
   missingKeyTrackers: TrackerStatusItem[];
   trackerBannerDismissed: boolean;
   showCliproxyBanner: boolean | undefined;
@@ -48,6 +49,8 @@ interface AppChromeProps {
   onToggleSessionFeedSidebar: () => void;
   /** Open the Flywheel page; the indicator has already asked it to reveal the block. */
   onNavigateNeedsYou?: () => void;
+  /** A project was added through the Add-project modal this chrome hosts. */
+  onProjectCreated: (project: CreatedProject) => void;
 }
 
 export function AppChrome({
@@ -55,8 +58,6 @@ export function AppChrome({
   selectedProjectKey,
   runningAgentCount,
   dashboardLifecycle,
-  showRestartBanner,
-  bannerState,
   missingKeyTrackers,
   trackerBannerDismissed,
   showCliproxyBanner,
@@ -70,9 +71,11 @@ export function AppChrome({
   onRestartCliproxy,
   onToggleSessionFeedSidebar,
   onNavigateNeedsYou,
+  onProjectCreated,
 }: AppChromeProps) {
   return (
     <>
+      <AddProjectDialogHost onCreated={onProjectCreated} />
       {/* PAN-2908 C-FRESH: system notices render in ONE slim row instead of
           stacked full-width banners. */}
       <div data-component="system-notices-row" className="flex flex-wrap items-stretch border-b border-border">
@@ -84,8 +87,9 @@ export function AppChrome({
         <GitHubRateLimitBanner />
 
         {/* Setup checklist — shown while a required host tool (tmux, git, node,
-            claude) is missing from the server's PATH (PAN-774) */}
-        <SetupChecklistBanner />
+            claude) is missing from the server's PATH (PAN-774). Hidden on the
+            Home tab, which shows the "Get set up" card instead (PAN-4282). */}
+        <SetupChecklistBanner activeTab={activeTab} />
 
         {/* Package/context inputs changed since the last pan sync. */}
         <SyncRequiredBanner />
@@ -105,50 +109,13 @@ export function AppChrome({
         <LinearMcpAuthBanner />
       </div>
 
-      {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
-      {showRestartBanner && (
-        <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
-          <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />
-          <p className="text-primary text-sm font-semibold flex-1">
-            Dashboard is restarting
-            {dashboardLifecycle.issueId && (
-              <> — <span className="font-mono">{dashboardLifecycle.issueId}</span></>
-            )}
-            {dashboardLifecycle.reason && (
-              <span className="font-normal ml-1 text-primary/70">({dashboardLifecycle.reason})</span>
-            )}
-          </p>
-          <span className="text-primary/60 text-xs shrink-0 animate-pulse">● Restarting…</span>
-        </div>
-      )}
-
-      {/* Backend Offline Banner — shown when /api/version fails repeatedly AND not in a planned restart */}
-      {bannerState === 'down' && !showRestartBanner && (
-        <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
-          <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-          <p className="text-destructive text-sm font-semibold flex-1">
-            Backend is unreachable — waiting for it to come back.
-          </p>
-          <span className="text-destructive/60 text-xs shrink-0 animate-pulse">● Retrying…</span>
-          <button
-            onClick={onRestartBackend}
-            disabled={isRestartBackendPending}
-            className="px-4 py-1.5 bg-destructive/20 hover:bg-destructive/30 text-destructive text-sm font-bold rounded-md border border-destructive/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-          >
-            {isRestartBackendPending ? 'Restarting…' : 'Force Restart'}
-          </button>
-        </div>
-      )}
-
-      {/* Backend Recovered Banner — yellow confirmation, auto-hides */}
-      {bannerState === 'recovering' && !showRestartBanner && (
-        <div className="bg-warning/15 border-b-2 border-warning/50 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
-          <CheckCircle2 className="w-5 h-5 text-warning-foreground shrink-0" />
-          <p className="text-warning-foreground text-sm font-semibold flex-1">
-            Backend is back up.
-          </p>
-        </div>
-      )}
+      {/* Degraded mode (PAN-4279) — the one outage indicator: restarting,
+          unreachable, delayed live updates, then a brief "Reconnected". */}
+      <DegradedModeBanner
+        lifecycle={dashboardLifecycle}
+        onRestartBackend={onRestartBackend}
+        isRestartBackendPending={isRestartBackendPending}
+      />
 
       {/* Missing Tracker API Key Banner */}
       {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (

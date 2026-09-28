@@ -1,0 +1,287 @@
+{
+  "version": "1",
+  "issueId": "PAN-4292",
+  "created": "2026-09-28T12:50:00.908Z",
+  "updated": "2026-09-28T13:54:38.357Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "steer-kind": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T12:50:00.908Z",
+      "doneAt": "2026-09-28T12:52:40.778Z"
+    },
+    "tmux-steer-submit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:09:52.045Z",
+      "doneAt": "2026-09-28T13:10:28.834Z"
+    },
+    "supervisor-steer-submit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:09:53.881Z",
+      "doneAt": "2026-09-28T13:10:41.131Z"
+    },
+    "herdr-steer-submit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:09:55.593Z",
+      "doneAt": "2026-09-28T13:10:53.491Z"
+    },
+    "delivery-door-steer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:09:57.673Z",
+      "doneAt": "2026-09-28T13:11:06.923Z"
+    },
+    "conversation-route-steer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:09:59.396Z",
+      "doneAt": "2026-09-28T13:11:19.862Z"
+    },
+    "message-agent-steer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:39:11.347Z",
+      "doneAt": "2026-09-28T13:39:24.721Z"
+    },
+    "pan-tell-steer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:39:37.117Z",
+      "doneAt": "2026-09-28T13:39:49.721Z"
+    },
+    "agent-route-steer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:40:01.616Z",
+      "doneAt": "2026-09-28T13:40:15.132Z"
+    },
+    "composer-steer-selector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:40:28.009Z",
+      "doneAt": "2026-09-28T13:40:40.084Z"
+    },
+    "composer-ctrl-enter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:40:52.341Z",
+      "doneAt": "2026-09-28T13:41:05.121Z"
+    },
+    "docs-steering": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:41:18.820Z",
+      "doneAt": "2026-09-28T13:41:33.685Z"
+    },
+    "live-steer-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4292",
+      "claimedAt": "2026-09-28T13:41:46.920Z",
+      "doneAt": "2026-09-28T13:42:02.631Z"
+    },
+    "steer-kind.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:44:17.229Z"
+    },
+    "steer-kind.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:44:31.829Z"
+    },
+    "steer-kind.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:44:47.362Z"
+    },
+    "tmux-steer-submit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:45:01.542Z"
+    },
+    "tmux-steer-submit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:45:18.057Z"
+    },
+    "tmux-steer-submit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:45:31.094Z"
+    },
+    "tmux-steer-submit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:45:43.124Z"
+    },
+    "supervisor-steer-submit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:45:56.759Z"
+    },
+    "supervisor-steer-submit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:46:09.633Z"
+    },
+    "supervisor-steer-submit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:46:23.220Z"
+    },
+    "supervisor-steer-submit.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:46:35.531Z"
+    },
+    "herdr-steer-submit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:46:47.709Z"
+    },
+    "herdr-steer-submit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:46:59.466Z"
+    },
+    "herdr-steer-submit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:12.681Z"
+    },
+    "delivery-door-steer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:25.510Z"
+    },
+    "delivery-door-steer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:39.922Z"
+    },
+    "delivery-door-steer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:55.518Z"
+    },
+    "delivery-door-steer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:48:10.484Z"
+    },
+    "delivery-door-steer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:48:24.034Z"
+    },
+    "conversation-route-steer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:48:36.957Z"
+    },
+    "conversation-route-steer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:48:50.324Z"
+    },
+    "conversation-route-steer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:02.959Z"
+    },
+    "conversation-route-steer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:17.233Z"
+    },
+    "conversation-route-steer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:31.120Z"
+    },
+    "message-agent-steer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:43.332Z"
+    },
+    "message-agent-steer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:54.916Z"
+    },
+    "message-agent-steer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:50:08.146Z"
+    },
+    "message-agent-steer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:50:21.022Z"
+    },
+    "pan-tell-steer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:50:32.557Z"
+    },
+    "pan-tell-steer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:50:44.659Z"
+    },
+    "pan-tell-steer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:50:56.320Z"
+    },
+    "pan-tell-steer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:51:09.246Z"
+    },
+    "agent-route-steer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:51:23.435Z"
+    },
+    "agent-route-steer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:51:35.085Z"
+    },
+    "agent-route-steer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:51:47.499Z"
+    },
+    "composer-steer-selector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:51:59.780Z"
+    },
+    "composer-steer-selector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:52:12.235Z"
+    },
+    "composer-steer-selector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:52:24.537Z"
+    },
+    "composer-steer-selector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:52:36.766Z"
+    },
+    "composer-ctrl-enter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:52:48.693Z"
+    },
+    "composer-ctrl-enter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:00.185Z"
+    },
+    "composer-ctrl-enter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:12.461Z"
+    },
+    "docs-steering.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:24.062Z"
+    },
+    "docs-steering.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:35.860Z"
+    },
+    "docs-steering.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:47.620Z"
+    },
+    "live-steer-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:00.937Z"
+    },
+    "live-steer-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:13.885Z"
+    },
+    "live-steer-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:26.148Z"
+    },
+    "live-steer-verification.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:38.356Z"
+    }
+  }
+}

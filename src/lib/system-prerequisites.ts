@@ -22,6 +22,8 @@ import {
   resolveHarnessBinaryDetailed,
   type ExecutableResolution,
 } from './harness-binary.js';
+import { hostTerminalBackendName } from './terminal-backends/select.js';
+import type { TerminalBackendName } from './terminal-backends/types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -70,13 +72,25 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
   {
     id: 'tmux',
     name: 'tmux',
-    required: true,
-    purpose: 'Hosts every agent and conversation terminal session',
+    required: true, // overridden per host backend by requiredFor()
+    purpose: 'Plain terminals (the terminal drawer); hosts agents when terminal.backend is tmux',
     versionArgs: ['-V'],
     install: {
       linux: 'sudo apt install tmux',
       mac: 'brew install tmux',
       win: 'Use WSL2 — inside your distro: sudo apt install tmux',
+    },
+  },
+  {
+    id: 'herdr',
+    name: 'Herdr',
+    required: true, // overridden per host backend by requiredFor()
+    purpose: 'Hosts agent and conversation terminal sessions (the default terminal backend)',
+    versionArgs: ['--version'],
+    install: {
+      linux: 'pan install',
+      mac: 'pan install',
+      win: 'pan install',
     },
   },
   {
@@ -178,6 +192,18 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
     },
   },
   {
+    id: 'prime-agent',
+    name: 'Prime Agent',
+    required: false,
+    purpose: 'Prime Agent harness (RPC)',
+    versionArgs: ['--version'],
+    install: {
+      linux: 'npm install -g prime-agent@0.8',
+      mac: 'npm install -g prime-agent@0.8',
+      win: 'npm install -g prime-agent@0.8',
+    },
+  },
+  {
     id: 'kimi',
     name: 'Kimi Code CLI',
     required: false,
@@ -209,8 +235,9 @@ function normalizeResolution(result: string | null | ExecutableResolution): Exec
 }
 
 const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
-  const { stdout } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
-  return stdout;
+  const { stdout, stderr } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
+  // Some tools (prime-agent 0.8.0) print `--version` on stderr.
+  return stdout.trim() ? stdout : stderr;
 };
 
 const defaultResolver: PrerequisiteResolver = async (command, options) => {
@@ -312,33 +339,49 @@ export async function collectSetupDiagnostics(
   return { schemaVersion: 1, markdown: markdown.slice(0, 16_384) };
 }
 
+/**
+ * Whether `definition` is required for `backend` (PAN-4282 D2): `tmux` is
+ * required only under the tmux backend, `herdr` only under Herdr, and every
+ * other prerequisite keeps its static catalog `required` flag.
+ */
+export function requiredFor(definition: PrerequisiteDefinition, backend: TerminalBackendName): boolean {
+  if (definition.id === 'tmux') return backend === 'tmux';
+  if (definition.id === 'herdr') return backend === 'herdr';
+  return definition.required;
+}
+
 export async function checkSystemPrerequisite(
   id: string,
   probe: PrerequisiteProbe = defaultProbe,
   resolver: PrerequisiteResolver = defaultResolver,
+  options?: { backend?: TerminalBackendName },
 ): Promise<PrerequisiteCheck> {
   const definition = PREREQUISITES.find((candidate) => candidate.id === id);
   if (!definition) {
     throw new Error(`Unknown system prerequisite: ${id}`);
   }
 
+  const backend = options?.backend ?? (await hostTerminalBackendName());
+  const required = requiredFor(definition, backend);
   const { versionArgs, ...checkDefinition } = definition;
   try {
     const { path: executable } = await resolvePrerequisiteExecutable(id, resolver);
-    if (!executable) return { ...checkDefinition, found: false, version: null };
+    if (!executable) return { ...checkDefinition, required, found: false, version: null };
     const output = await probe(executable, versionArgs);
-    return { ...checkDefinition, found: true, version: firstLine(output) };
+    return { ...checkDefinition, required, found: true, version: firstLine(output) };
   } catch {
-    return { ...checkDefinition, found: false, version: null };
+    return { ...checkDefinition, required, found: false, version: null };
   }
 }
 
 export async function checkSystemPrerequisites(
   probe: PrerequisiteProbe = defaultProbe,
   resolver: PrerequisiteResolver = defaultResolver,
+  options?: { backend?: TerminalBackendName },
 ): Promise<PrerequisitesReport> {
+  const backend = options?.backend ?? (await hostTerminalBackendName());
   const checks = await Promise.all(
-    PREREQUISITES.map(({ id }) => checkSystemPrerequisite(id, probe, resolver)),
+    PREREQUISITES.map(({ id }) => checkSystemPrerequisite(id, probe, resolver, { backend })),
   );
   return {
     platform: process.platform,

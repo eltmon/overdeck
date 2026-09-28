@@ -8,6 +8,8 @@
  */
 import { isMuseSessionPath, resolveMuseSessionPath } from '../runtimes/storage/muse.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
+import { isPrimeAgentSessionPath, readPrimeAgentSessionFile } from '../runtimes/storage/prime-agent.js';
+import { parsePrimeAgentConversationMessages } from '../../dashboard/server/services/prime-agent-conversation-parser.js';
 import { existsSync } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
 import { basename } from 'node:path';
@@ -47,6 +49,7 @@ import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import {
   computeContextUsage,
+  contextUsageFromParseResult,
   parseConversationMessages,
   parseFromLastCompactBoundary,
   type ParseState,
@@ -73,6 +76,7 @@ import { listConversationPullRequests } from './conversation-pull-requests.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
+import { conversationPendingPermission, readConversationPermission, type PendingPermission } from './conversation-permission.js';
 import { findClaudeSessionFileById } from './claude-session-file-search.js';
 import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
 import { isKimiWirePath } from '../runtimes/storage/kimi-code.js';
@@ -115,6 +119,7 @@ async function resolveUnregisteredClaudeSessionFile(name: string): Promise<strin
 
 export async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   if (conv.harness === 'muse') return resolveMuseSessionPath(conv.tmuxSession);
+  if (conv.harness === 'prime-agent') return readPrimeAgentSessionFile(conv.tmuxSession);
   // Pi work/review agents write per-run JSONL in the agent-dir root (PAN-1908);
   // conversations use sessions/. The shared resolver checks both and skips sidecars.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'ohmypi-jsonl') {
@@ -267,6 +272,8 @@ export async function getCachedMessages(
     parsed = await parseCodexConversationMessages(sessionFile);
   } else if (isAcpSessionFile(sessionFile)) {
     parsed = await parseAcpConversationMessages(sessionFile);
+  } else if (isPrimeAgentSessionPath(sessionFile)) {
+    parsed = await parsePrimeAgentConversationMessages(sessionFile);
   } else if (isOhmypiSessionFile(sessionFile)) {
     parsed = await parseOhmypiConversationMessages(sessionFile);
   } else if (isMuseSessionPath(sessionFile)) {
@@ -406,11 +413,18 @@ export async function getConversationsPendingInputFeed(
         // PAN-3113 — blocking numbered-choice menus (the Claude Code
         // session-resume gate et al.) never reach the JSONL transcript, so
         // the scan above cannot see them; they exist only in the pane.
+        // PAN-4278 — a terminal permission prompt (main thread or subagent)
+        // is pane-only too. One pane read serves both checks on tmux; when a
+        // permission is pending the pane-choice check is skipped so one
+        // decision surface shows at a time.
+        const permission = await readConversationPermission(conv);
+        const pendingPermission = permission.pendingPermission;
         let paneChoice: PendingPaneChoice | null = null;
-        if (!pending && !pendingPlan) {
-          paneChoice = await claudeConversationPaneChoice(conv);
+        if (!pending && !pendingPlan && !pendingPermission) {
+          const sharedPane = permission.tmuxPaneText;
+          paneChoice = await claudeConversationPaneChoice(conv, sharedPane !== null ? { capture: async () => sharedPane } : {});
         }
-        if (!pending && !pendingPlan && !paneChoice) return null;
+        if (!pending && !pendingPlan && !paneChoice && !pendingPermission) return null;
         return {
           name: conv.name,
           title: conv.title ?? null,
@@ -421,6 +435,7 @@ export async function getConversationsPendingInputFeed(
           ...(pending ? { pendingAskUserQuestion: pending } : {}),
           ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
           ...(paneChoice ? { pendingPaneChoice: paneChoice } : {}),
+          ...(pendingPermission ? { pendingPermission } : {}),
         };
       }),
       8,
@@ -481,6 +496,16 @@ export async function getConversationRead(
         if (codex.approval) pendingAskUserQuestion = codex.approval;
       }
     }
+    // PAN-4278 — a terminal permission prompt on the pane (or a hook entry
+    // for one) blocks the conversation whatever else is pending.
+    let pendingPermission: PendingPermission | null = null;
+    if (sessionAlive) {
+      pendingPermission = await conversationPendingPermission(conv);
+      if (pendingPermission) {
+        pendingInputKinds = [...pendingInputKinds, 'permissionRequest'];
+        pendingInputCount = pendingInputKinds.length;
+      }
+    }
     // PAN-3113 — pane choice menus are pane-only; check them when nothing
     // else is pending so one decision surface shows at a time.
     let pendingPaneChoice: PendingPaneChoice | null = null;
@@ -506,6 +531,7 @@ export async function getConversationRead(
       pendingInputKinds,
       pendingAskUserQuestion,
       ...(pendingPaneChoice ? { pendingPaneChoice } : {}),
+      ...(pendingPermission ? { pendingPermission } : {}),
       transcriptMissing: conversationTranscriptMissing(conv, sessionAlive, convSf),
       needsTerminal: await conversationNeedsTerminal(conv, sessionAlive, convSf),
     });
@@ -557,14 +583,7 @@ export async function getConversationMessagesRead(
         updateConversationCost(name, parsed.totalCost, parsed.totalTokens);
       }
 
-      let contextUsage = null;
-      if (conv) {
-        try {
-          contextUsage = await computeContextUsage(sessionFile, conv.model);
-        } catch {
-          contextUsage = null;
-        }
-      }
+      const contextUsage = conv ? contextUsageFromParseResult(parsed, conv.model) : null;
       const subagents = agentId === undefined
         ? isCodexSessionFile(parentSessionFile)
           ? await listCodexSubagents(parentSessionFile, parsed.workLog)

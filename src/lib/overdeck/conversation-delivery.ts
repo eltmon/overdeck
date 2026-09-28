@@ -17,6 +17,7 @@ import {
   type LegacyConversation as Conversation,
 } from './conversations.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { hostTransportFor, type HostTransport } from '../runtimes/host-transport.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { loadConfigSync } from '../config-yaml.js';
 import {
@@ -282,7 +283,7 @@ export function pickDeliverAs(bodyDeliverAs: unknown): ConversationControlDelive
 
 export function resolveConversationDeliveryMethod(conv: Pick<Conversation, 'harness' | 'deliveryMethod'>): 'auto' | 'channels' | 'tmux' {
   const harness = conv.harness ?? 'claude-code';
-  if (harness === 'acp' || harness === 'opencode') return 'auto';
+  if (hostTransportFor(harness) !== null) return 'auto';
   if (isPiControlChannelHarness(harness)) return 'auto';
   if (harness === 'codex' && loadConfigSync().config.codex?.transport !== 'tui') return 'auto';
   return conv.deliveryMethod ?? (getHarnessBehavior(harness).deliveryKind === 'rpc-fifo' ? 'tmux' : 'auto');
@@ -366,20 +367,21 @@ export async function handleConversationThinkingLevel(
   if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
   const harness: RuntimeName = conv.harness ?? 'claude-code';
-  if (harness !== 'codex' && harness !== 'acp' && harness !== 'opencode' && !isPiControlChannelHarness(harness)) {
-    return jsonResponse({ error: 'Thinking level control is supported for Codex, ACP, OpenCode, and Pi conversations' }, { status: 400 });
+  const hostTransport = hostTransportFor(harness);
+  if (harness !== 'codex' && hostTransport === null && !isPiControlChannelHarness(harness)) {
+    return jsonResponse({ error: 'Thinking level control is supported for Codex, ACP, OpenCode, Prime Agent, and Pi conversations' }, { status: 400 });
   }
   if (conv.status === 'ended') {
     return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
   }
 
-  const level = harness === 'codex' || harness === 'acp' || harness === 'opencode'
+  const level = harness === 'codex' || hostTransport !== null
     ? (typeof body['level'] === 'string' && ['low', 'medium', 'high', 'xhigh', 'max'].includes(body['level']) ? body['level'] : null)
     : parseThinkingLevel(body['level']);
   if (!level) return jsonResponse({ error: 'Invalid thinking level' }, { status: 400 });
 
-  if (harness === 'acp' || harness === 'opencode') {
-    const result = await postCodexAppServerOp<{ effort: string }>(conv.tmuxSession, { op: 'set-effort', effort: level }, 'acp');
+  if (hostTransport !== null) {
+    const result = await postCodexAppServerOp<{ effort: string }>(conv.tmuxSession, { op: 'set-effort', effort: level }, hostTransport);
     setConversationEffort(name, result.effort);
     return jsonResponse({ ok: true, effort: result.effort });
   }
@@ -527,7 +529,7 @@ function formatAppServerApprovalQuestion(request: CodexAppServerPendingRequest):
   return `Codex requests approval for ${request.method}`;
 }
 
-export async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>, transport: 'appserver' | 'acp' = 'appserver'): Promise<T> {
+export async function postCodexAppServerOp<T = Record<string, unknown>>(tmuxSession: string, body: Record<string, unknown>, transport: 'appserver' | HostTransport = 'appserver'): Promise<T> {
   const socketPath = join(getOverdeckHome(), 'sockets', `${transport}-${tmuxSession}.sock`);
   const tokenPath = join(getOverdeckHome(), 'agents', tmuxSession, `${transport}-token`);
   if (!existsSync(socketPath)) throw new Error(`app-server socket missing for ${tmuxSession}`);

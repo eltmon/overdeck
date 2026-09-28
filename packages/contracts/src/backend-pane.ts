@@ -27,3 +27,26 @@ export const BackendPane = Schema.Struct({
   workspace: Schema.optional(Schema.String),
 })
 export type BackendPane = typeof BackendPane.Type
+
+/**
+ * The agent id a pane answers for (PAN-4320). On Herdr `id` (`w1:p1`) and
+ * `terminalId` (`term_…`) are backend handles, never agent ids, so the
+ * `agentId` token decides; tmux panes carry `agentId` = session name.
+ */
+export function paneAgentKey(pane: BackendPane): string {
+  return pane.agentId ?? pane.terminalId ?? pane.id
+}
+
+/**
+ * Panes by agent key. When two panes answer for one agent (a restarted Herdr
+ * agent beside its exited pane), a non-exited pane wins, never the reverse.
+ */
+export function indexPanesByAgentKey(panes: Iterable<BackendPane>): Map<string, BackendPane> {
+  const byKey = new Map<string, BackendPane>()
+  for (const pane of panes) {
+    const key = paneAgentKey(pane)
+    const prior = byKey.get(key)
+    if (!prior || (prior.state === "exited" && pane.state !== "exited")) byKey.set(key, pane)
+  }
+  return byKey
+}

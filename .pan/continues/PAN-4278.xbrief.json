@@ -1,0 +1,277 @@
+{
+  "version": "1",
+  "issueId": "PAN-4278",
+  "created": "2026-09-27T23:29:11.482Z",
+  "updated": "2026-09-28T00:30:04.949Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "permission-prompt-parser": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:29:11.482Z",
+      "doneAt": "2026-09-27T23:38:38.904Z"
+    },
+    "permission-registry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:40:30.503Z",
+      "doneAt": "2026-09-27T23:40:42.036Z"
+    },
+    "permission-feed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:40:46.764Z",
+      "doneAt": "2026-09-27T23:43:37.089Z"
+    },
+    "permission-answer-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:43:41.266Z",
+      "doneAt": "2026-09-27T23:46:37.178Z"
+    },
+    "permission-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:46:43.043Z",
+      "doneAt": "2026-09-27T23:51:11.325Z"
+    },
+    "permission-needs-you": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:51:15.230Z",
+      "doneAt": "2026-09-27T23:53:39.559Z"
+    },
+    "permission-notify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:54:05.845Z",
+      "doneAt": "2026-09-27T23:55:59.885Z"
+    },
+    "delivery-result": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:56:04.371Z",
+      "doneAt": "2026-09-27T23:58:27.432Z"
+    },
+    "hold-server": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-27T23:58:36.555Z",
+      "doneAt": "2026-09-28T00:00:07.709Z"
+    },
+    "not-delivered-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-28T00:00:13.220Z",
+      "doneAt": "2026-09-28T00:01:35.205Z"
+    },
+    "hold-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-28T00:01:40.056Z",
+      "doneAt": "2026-09-28T00:07:59.686Z"
+    },
+    "root-cause-probe": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-28T00:08:07.069Z",
+      "doneAt": "2026-09-28T00:12:26.951Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-28T00:12:32.211Z",
+      "doneAt": "2026-09-28T00:13:22.591Z"
+    },
+    "codebase-map": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4278",
+      "claimedAt": "2026-09-28T00:13:27.750Z",
+      "doneAt": "2026-09-28T00:13:54.852Z"
+    },
+    "permission-prompt-parser.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:21:47.482Z"
+    },
+    "codebase-map.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:22:05.227Z"
+    },
+    "codebase-map.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:22:17.286Z"
+    },
+    "delivery-result.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:22:28.111Z"
+    },
+    "delivery-result.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:22:39.079Z"
+    },
+    "delivery-result.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:22:49.498Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:22:59.999Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:23:10.634Z"
+    },
+    "hold-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:23:22.387Z"
+    },
+    "hold-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:23:33.602Z"
+    },
+    "hold-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:23:44.711Z"
+    },
+    "hold-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:23:56.322Z"
+    },
+    "hold-server.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:24:08.048Z"
+    },
+    "hold-server.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:24:19.594Z"
+    },
+    "hold-server.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:24:31.166Z"
+    },
+    "hold-server.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:24:43.036Z"
+    },
+    "not-delivered-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:24:54.847Z"
+    },
+    "not-delivered-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:25:05.927Z"
+    },
+    "permission-answer-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:25:17.756Z"
+    },
+    "permission-answer-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:25:28.814Z"
+    },
+    "permission-answer-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:25:40.304Z"
+    },
+    "permission-answer-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:25:51.544Z"
+    },
+    "permission-answer-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:26:02.412Z"
+    },
+    "permission-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:26:13.742Z"
+    },
+    "permission-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:26:24.887Z"
+    },
+    "permission-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:26:36.321Z"
+    },
+    "permission-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:26:48.132Z"
+    },
+    "permission-feed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:26:59.582Z"
+    },
+    "permission-feed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:27:10.966Z"
+    },
+    "permission-feed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:27:21.637Z"
+    },
+    "permission-feed.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:27:32.596Z"
+    },
+    "permission-needs-you.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:27:43.350Z"
+    },
+    "permission-needs-you.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:27:54.564Z"
+    },
+    "permission-needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:28:05.342Z"
+    },
+    "permission-notify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:28:16.340Z"
+    },
+    "permission-notify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:28:27.206Z"
+    },
+    "permission-notify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:28:37.954Z"
+    },
+    "permission-prompt-parser.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:28:47.623Z"
+    },
+    "permission-prompt-parser.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:28:57.955Z"
+    },
+    "permission-prompt-parser.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:29:08.303Z"
+    },
+    "permission-registry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:29:18.475Z"
+    },
+    "permission-registry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:29:29.055Z"
+    },
+    "permission-registry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:29:40.551Z"
+    },
+    "root-cause-probe.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:29:52.960Z"
+    },
+    "root-cause-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:30:04.949Z"
+    }
+  }
+}

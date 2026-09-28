@@ -10,9 +10,7 @@ interface ConversationFeedCardProps {
   now?: Date;
 }
 
-type AgentState = 'active' | 'waiting' | 'idle';
-
-const STATUS_DOT_COLORS: Record<AgentState, string> = {
+const STATUS_DOT_COLORS: Record<ConversationSessionFeedEntry['agentState'], string> = {
   active: 'bg-info', // v1.2: blue = machine working
   waiting: 'bg-warning',
   idle: 'bg-muted-foreground/60',
@@ -25,11 +23,11 @@ const AGENT_LABELS: Record<string, string> = {
   codex: 'Codex',
   kimi_code: 'Kimi Code',
   acp: 'Kimi',
+  prime_agent: 'Prime Agent',
   unknown: 'Unknown',
 };
 
 export function ConversationFeedCard({ entry, onSelect, now = new Date() }: ConversationFeedCardProps) {
-  const agentState = readAgentState(entry);
   const agentLabel = AGENT_LABELS[entry.agent] ?? entry.agent;
   const harness = harnessForFeedAgent(entry.agent);
 
@@ -43,12 +41,16 @@ export function ConversationFeedCard({ entry, onSelect, now = new Date() }: Conv
         <span data-testid="conversation-feed-agent-icon" className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
           <HarnessLogo harness={harness} className="h-4 w-4" />
         </span>
-        <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT_COLORS[agentState]}`} />
+        <span
+          data-testid="conversation-feed-status-dot"
+          data-state={entry.agentState}
+          className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT_COLORS[entry.agentState]}`}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <span className="max-w-[120px] truncate font-medium text-foreground">{agentLabel}</span>
-            <time dateTime={entry.lastMessageDate} className="shrink-0 text-[10px] text-muted-foreground">
-              {formatRelativeTime(entry.lastMessageDate, now)}
+            <time dateTime={entry.timestamp} className="shrink-0 text-[10px] text-muted-foreground">
+              {`${entry.timestampLabel} ${formatRelativeTime(entry.timestamp, now)}`}
             </time>
           </div>
           <p className="mt-1 line-clamp-2 text-muted-foreground">{entry.lastMessageSnippet}</p>
@@ -78,10 +80,6 @@ function harnessForFeedAgent(agent: string): Harness {
   if (agent === 'codex') return 'codex';
   if (agent === 'acp') return 'acp';
   if (agent === 'kimi_code' || agent === 'kimi-code') return 'kimi-code';
+  if (agent === 'prime_agent' || agent === 'prime-agent') return 'prime-agent';
   return 'claude-code';
-}
-
-function readAgentState(entry: ConversationSessionFeedEntry): AgentState {
-  const state = (entry as ConversationSessionFeedEntry & { agentState?: AgentState }).agentState;
-  return state === 'active' || state === 'waiting' || state === 'idle' ? state : 'idle';
 }

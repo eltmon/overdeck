@@ -1,4 +1,5 @@
 import { resolveMuseSessionPath } from '../../lib/runtimes/storage/muse.js';
+import { readPrimeAgentSessionFile } from '../../lib/runtimes/storage/prime-agent.js';
 /**
  * WebSocket RPC handlers — implements PanRpcGroup using Effect (PAN-428 B5)
  *
@@ -19,7 +20,7 @@ import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
-import { contextUsageFromParseResult, gateSnapshotEmission, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, watchConversation, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import {
   listAgentTranscriptCandidates,
@@ -56,7 +57,7 @@ import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFee
 import { listCodexSubagents, resolveCodexSubagentTranscript } from './services/conversation/codex-subagents.js';
 import { startSubagentListPolling, subagentTranscriptPath } from './services/conversation/subagents.js';
 
-import { sharedTranscriptParser } from './services/shared-transcript-parser.js';
+import { sharedTranscriptParser, parseStateFromSnapshot } from './services/shared-transcript-parser.js';
 import { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
 export { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
 
@@ -154,11 +155,17 @@ export function streamHarnessFullParseSnapshots(
       () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),
       sharedTranscriptParser('kimi'),
     );
+    case 'prime-agent-jsonl': return streamResolved(
+      () => readPrimeAgentSessionFile(sessionName),
+      sharedTranscriptParser('prime-agent'),
+    );
     // Claude uses the worker-backed initial parse plus incremental watcher below.
     case 'claude-jsonl': return null;
     default: return null;
   }
 }
+
+const claudeInitialSnapshot = sharedTranscriptParser('claude-initial');
 
 function streamClaudeTranscript(
   sessionFile: string,
@@ -172,30 +179,14 @@ function streamClaudeTranscript(
         const offer = (event: ConversationEvent) => {
           try { Queue.offerUnsafe(queue, event); } catch { /* disconnected */ }
         };
-        const initial = await runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', {
-          sessionFile,
-          parser: 'claude-initial',
-        });
+        const initial = await claudeInitialSnapshot(sessionFile);
         let currentByteOffset = initial.byteOffset;
         let currentContextUsage = contextUsageFromParseResult(initial, model);
         let highWaterCount = initial.messages.length;
         if (initial.messages.length === 0 && initial.workLog.length === 0 && currentByteOffset > 0) {
           console.warn(`[conv-stream] initial parse of ${conversationName} yielded no transcript content despite byteOffset=${currentByteOffset}`);
         }
-        const priorState: ParseState = {
-          pendingToolUse: initial.pendingToolUse,
-          unresolvedResults: initial.unresolvedResults,
-          lastSequence: initial.lastSequence,
-          planToolUseIds: initial.planToolUseIds,
-          proposedPlan: initial.proposedPlan,
-          latestAssistantUsage: initial.latestAssistantUsage,
-          contextBoundaryOffset: initial.contextBoundaryOffset,
-          permissionMode: initial.permissionMode,
-          countedUsageIds: initial.countedUsageIds,
-          fileEditsByAssistantId: initial.fileEditsByAssistantId,
-          pendingAssistantId: initial.pendingAssistantId,
-          orphanToolUseIds: initial.orphanToolUseIds,
-        };
+        const priorState = parseStateFromSnapshot(initial);
         offer({
           kind: 'messages',
           messages: initial.messages,

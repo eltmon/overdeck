@@ -9,6 +9,7 @@ Complete guide to configuring Overdeck's multi-model routing system.
 - [Permission Mode](#permission-mode)
 - [Removed: Presets, Work-Type Overrides, Thinking Levels](#removed-presets-work-type-overrides-thinking-levels)
 - [Provider Management](#provider-management)
+- [Local Models (Ollama)](#local-models-ollama)
 - [Deprecated Model IDs](#deprecated-model-ids)
 - [Provider Fallback](#provider-fallback)
 - [Advanced Configuration](#advanced-configuration)
@@ -329,6 +330,38 @@ enabled (`provider-not-enabled` in `src/lib/agents/tier-fitness.ts`).
 
 To move a role off a provider, change its model: `roles.<role>.model`,
 `roles.review.sub.<lane>.model`, or the `workhorses` slot it references.
+
+---
+
+## Local Models (Ollama)
+
+Models served by a local Ollama (0.14.0 or newer) are addressed as
+`ollama:<tag>` — for example `ollama:gemma4:12b` — and run on the `claude-code`
+harness, which speaks the Anthropic Messages API that Ollama serves natively.
+Local runs record `$0`.
+
+The optional top-level `ollama:` block tunes the endpoint:
+
+```yaml
+ollama:
+  base_url: http://localhost:11434   # default
+  context_length: 65536              # default
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `base_url` | `http://localhost:11434` | Where the Ollama server listens; a URL with no port gets `11434`. **Must be a localhost address** (`localhost`, `127.x.x.x`, or `[::1]` — bracketed, since a bare `::1` is not a parseable URL); anything else is a config-load error, because the point of a local model is that no prompt leaves the machine. A trailing slash is stripped. No `/v1` suffix — Claude Code appends `/v1/messages` itself. |
+| `context_length` | `65536` | The window Overdeck asks for as `OLLAMA_CONTEXT_LENGTH` when **it** starts `ollama serve`. It cannot change a server someone else started — set `OLLAMA_CONTEXT_LENGTH` on that server yourself and let `pan doctor` check it. Must be an integer of at least 2048. |
+
+The server, not this setting, is the authority on the window. Overdeck warm-loads the
+model and pins Claude Code to the window `/api/ps` reports, so the harness's own
+compaction matches what the server will actually serve. Getting the window wrong is
+quiet: Ollama truncates a prompt past it rather than erroring, or rejects the turn
+with `Prompt is too long`.
+
+Full setup — GPU requirements, installing Ollama, pulling a model, and setting
+`OLLAMA_CONTEXT_LENGTH` on a server Overdeck does not own — is in
+[configuration/local-models.mdx](../configuration/local-models.mdx).
 
 ---
 

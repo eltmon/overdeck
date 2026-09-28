@@ -125,6 +125,7 @@ function resolvedIntent(overrides: Record<string, unknown> = {}) {
     isGitRepository: true,
     wouldCreateWorktree: false,
     unregisteredTargetPath: false,
+    branchCandidates: [],
     findings: [],
     ...overrides,
   };
@@ -198,6 +199,7 @@ describe('POST /api/workspace-registry/resolve (AC-2)', () => {
       name: 'lens',
       targetPath: '/elsewhere',
       parentBranch: 'develop',
+      branchQuery: 'feat',
     });
 
     expect(routeMocks.resolveWorkspaceCreateIntent).toHaveBeenCalledWith({
@@ -207,6 +209,7 @@ describe('POST /api/workspace-registry/resolve (AC-2)', () => {
       targetPath: '/elsewhere',
       isolated: false,
       parentBranch: 'develop',
+      branchQuery: 'feat',
     });
   });
 

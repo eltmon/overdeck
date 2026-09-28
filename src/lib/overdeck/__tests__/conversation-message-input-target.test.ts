@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EnsureMainResult } from '../../agents/input-target.js';
 
-const deliverAgentMessage = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => undefined));
+const deliverAgentMessage = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => ({ ok: true, path: 'tmux' })));
 const callOrder = vi.hoisted(() => [] as string[]);
 
 vi.mock('../../agents.js', () => ({
@@ -60,6 +60,7 @@ async function send(harness: 'claude-code' | 'codex', ensure: (agentId: string) 
     resolveSessionFile: async () => null,
     generateAiTitle: async () => {},
     ensureMainInputTarget: ensure,
+    conversationPendingPermission: async () => null,
   })) as unknown as { status: number; body: Record<string, unknown> };
 }
 

@@ -48,7 +48,7 @@ vi.mock('../agents/shared.js', async (importOriginal) => {
 const { getAgentsRoute } = await import('../agents/listing.js');
 const { agentsCache } = await import('../agents/shared.js');
 
-type Row = { id: string; hasLivePane?: boolean; hasLiveTmuxSession?: boolean };
+type Row = { id: string; hasLivePane?: boolean; hasLiveTmuxSession?: boolean; status?: string };
 
 async function getAgents(): Promise<Row[]> {
   const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/agents'));
@@ -85,5 +85,28 @@ describe('GET /api/agents hasLivePane (#4105)', () => {
 
     expect(rows.get('agent-pan-4105')).toMatchObject({ hasLivePane: true, hasLiveTmuxSession: true });
     expect(rows.get('strike-pan-4105')).toMatchObject({ hasLivePane: false, hasLiveTmuxSession: false });
+  });
+});
+
+describe('GET /api/agents joins Herdr panes by agentId (PAN-4320)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    agentsCache.data = null;
+    agentsCache.timestamp = 0;
+    mocks.listAgentStates.mockReturnValue([agent('agent-pan-4311'), agent('agent-pan-4312')]);
+    // Herdr-shaped panes: `id`/`terminalId` are backend handles, not agent ids.
+    mocks.getBackendPanes.mockResolvedValue([
+      { id: 'wKZ:p1', terminalId: 'term_65c8b78d3f05a5df', agentId: 'agent-pan-4311', issue: 'PAN-4105', role: 'work', state: 'working', harness: 'claude-code', model: 'unknown' },
+      { id: 'wKZ:p2', terminalId: 'term_9a1c02ee40b1e7f2', agentId: 'agent-pan-4312', issue: 'PAN-4105', role: 'work', state: 'exited', harness: 'claude-code', model: 'unknown' },
+    ]);
+  });
+
+  it('finds the live pane by agentId and reports the exited pane as stopped', async () => {
+    const rows = new Map((await getAgents()).map((row) => [row.id, row]));
+
+    const live = rows.get('agent-pan-4311');
+    expect(live).toMatchObject({ hasLivePane: true });
+    expect(['healthy', 'warning']).toContain(live?.status);
+    expect(rows.get('agent-pan-4312')).toMatchObject({ status: 'stopped', hasLivePane: false });
   });
 });

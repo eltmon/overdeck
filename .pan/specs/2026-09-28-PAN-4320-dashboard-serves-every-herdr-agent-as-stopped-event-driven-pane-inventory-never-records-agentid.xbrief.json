@@ -1,0 +1,758 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T15:22:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4320: Dashboard serves every Herdr agent as stopped: event-driven pane inventory never records agentId",
+    "updated": "2026-09-28T15:34:00.462Z"
+  },
+  "plan": {
+    "id": "pan-4320",
+    "title": "Dashboard serves every Herdr agent as stopped: event-driven pane inventory never records agentId",
+    "status": "running",
+    "uid": "7a6b2daf-dbe2-4a69-90e9-3cf17c1fb5f6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-28T15:22:37Z",
+    "updated": "2026-09-28T15:34:00.462Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4320",
+        "label": "PAN-4320",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4320.md",
+        "label": "PRD draft (.pan/drafts/pan-4320.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "herdr",
+      "terminal-backend",
+      "read-model",
+      "agent-liveness",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "On the Herdr backend the dashboard serves every managed agent as stopped. GET /api/agents returned 86 rows, all stopped/exited, while herdr agent list showed live agent panes with agentId tokens. The /ws/rpc snapshot carried those panes with agentId, but the 14 agents started after dashboard boot were missing from agentsById entirely. Root cause: six server sites join an agent id to a BackendPane by `pane.terminalId ?? pane.id`, which on Herdr are backend handles (`term_…`, `wKZ:p3`), never agent ids, violating the documented rule in docs/TERMINAL-BACKENDS.md. Because Herdr work agents run without the PTY supervisor, the enrichment poller's agent.created is the only way a post-boot agent enters agentsById, and that poller filters by the wrong key. Secondary defects: the Herdr event path (pane-created, metadata) drops agentId and the real terminalId until the next 5 s list refresh, and the enrichment poller skips every cycle on a Herdr host with no tmux server.",
+      "Proposal": "Add paneAgentKey(pane) = agentId ?? terminalId ?? id and indexPanesByAgentKey(panes) (non-exited pane wins a key collision) to packages/contracts/src/backend-pane.ts. Move every violating join onto it: routes/agents/listing.ts (GET /api/agents and /tmux-alive), agent-enrichment-service.ts livePaneIds, agent-state-service.ts runtime seed, agent-projection.ts paneAlreadyExited, resource-refresh-triggers.ts issueForAgent. Make the Herdr pane-created and metadata events carry agentId (via agentIdOf, the list() rule) and pane-created carry terminalId; BackendPaneCache.apply records them. Make shouldSkipEnrichmentCycle follow the host backend policy: under Herdr skip only while the backend inventory is degraded. Update docs/DASHBOARD-ARCHITECTURE.md and docs/TERMINAL-BACKENDS.md. Verify live on a peer dashboard (port 3497) and record the probe in the PR.",
+      "NonGoals": "- Changing deriveServedAgentStatuses() in src/dashboard/server/read-model.ts (it already matches pane.agentId)\n- Any frontend change, including src/dashboard/frontend/src/components/GodView/confluence/liveness.ts\n- Changing the Herdr semantic that a token-stamped pane with no detected agent counts as live (PAN-3966)\n- Putting Herdr work agents under the PTY supervisor or adding a new agent.started emitter\n- Fixing God View shelf/Doldrums placement beyond verifying it; a persisting misplacement becomes a follow-up issue\n- Changing tmux-host behavior (tmux panes already carry agentId = session name)\n- Restarting or reloading the primary :3011 dashboard from the workspace"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The primary fix is the agent-to-pane join key at six server sites, not only the event path the issue title names.",
+        "rationale": "Live evidence: /ws/rpc backendPanes already carried agentId from the list path, yet 14 live agents were absent from agentsById and GET /api/agents showed all stopped; both trace to `terminalId ?? id` joins. Fixing only the event path would leave the bug in place."
+      },
+      {
+        "summary": "Shared helper lives in @overdeck/contracts with key agentId ?? terminalId ?? id.",
+        "rationale": "Server code already imports BackendPane from contracts; tmux panes always carry agentId and Herdr handles never equal agent ids, so the fallback is harmless and keeps existing tmux-shaped fixtures valid."
+      },
+      {
+        "summary": "On a key collision the non-exited pane wins, never the reverse.",
+        "rationale": "A restarted Herdr agent can leave an exited pane with the same agentId token beside its live pane; last-wins Map construction could serve a live agent as stopped."
+      },
+      {
+        "summary": "The enrichment census skip gate is in scope and follows the host backend policy.",
+        "rationale": "On a Herdr host with no tmux server the poller never runs, so no post-boot agent would ever get agent.created and issue AC 1 would stay false; the PAN-3055 'no evidence, no claims' rationale is preserved by using inventory degradation as Herdr's evidence."
+      },
+      {
+        "summary": "herdr.ts edit is net-zero lines; allowlist row only as a fallback.",
+        "rationale": "src/lib/terminal-backends/herdr.ts is exactly at the 1000-line file-size ceiling."
+      },
+      {
+        "summary": "Live verification (issue AC 4) runs on a peer dashboard on port 3497 started from the workspace build and killed by PID afterward.",
+        "rationale": "Only the flywheel deploys the primary :3011 dashboard; peer mode (OVERDECK_DISABLE_DEACON=1) is the supported read-only second dashboard and emits enrichment events in memory only."
+      },
+      {
+        "summary": "The enrichment poller announces an agent only when its stored status is running or starting, in addition to having a live pane.",
+        "rationale": "On Herdr pan kill leaves the pane alive and agent.created hardcodes running over the stored row; without this gate the fix would serve every killed agent with a residue pane as running."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-28-PAN-4320-dashboard-serves-every-herdr-agent-as-stopped-event-driven-pane-inventory-never-records-agentid.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pane-agent-key-helper",
+        "title": "Add paneAgentKey and indexPanesByAgentKey to @overdeck/contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4320",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "listing-agent-key",
+            "enrichment-agent-key",
+            "state-seed-agent-key",
+            "projection-agent-key",
+            "refresh-trigger-agent-key"
+          ],
+          "files_scope": [
+            "packages/contracts/src/backend-pane.ts",
+            "packages/contracts/src/__tests__/backend-pane.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/backend-pane.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "backend-pane.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Append two exported functions to packages/contracts/src/backend-pane.ts after `export type BackendPane`: paneAgentKey(pane) returns `pane.agentId ?? pane.terminalId ?? pane.id`; indexPanesByAgentKey(panes: Iterable<BackendPane>) returns Map<string, BackendPane> where a pane replaces a prior pane with the same key only when the prior is exited and the new one is not (first non-exited pane seen is kept). Use the exact code in the PRD, in the file's style (no semicolons). The file is already re-exported from packages/contracts/src/index.ts line 29. Create packages/contracts/src/__tests__/backend-pane.test.ts with Herdr-shaped fixtures (id 'wKZ:p3', terminalId 'term_65c8b78d3f05a5df', agentId 'agent-pan-4311')."
+        },
+        "items": [
+          {
+            "id": "pane-agent-key-helper.ac1",
+            "title": "Given a Herdr pane {id 'wKZ:p3', terminalId 'term_65c8b78d3f05a5df', agentId 'agent-pan-4311'}, paneAgentKey returns 'agent-pan-4311'; with no agentId it returns terminalId, and with neither it returns id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-agent-key-helper.ac2",
+            "title": "When an exited pane and a live pane share one agentId, indexPanesByAgentKey returns the live pane for that key in both insertion orders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-agent-key-helper.ac3",
+            "title": "When the only pane for an agent is exited, indexPanesByAgentKey returns that exited pane for the key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "listing-agent-key",
+        "title": "GET /api/agents and /tmux-alive find panes by agent key",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/listing.ts",
+            "src/dashboard/server/routes/__tests__/agents-listing-live-pane.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-listing-live-pane.test.ts src/dashboard/server/routes/__tests__/agents-listing-derived-batch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both listing test files report all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/dashboard/server/routes/agents/listing.ts replace line 79 `const paneById = new Map(panes.map((pane) => [pane.terminalId ?? pane.id, pane]));` with `const paneById = indexPanesByAgentKey(panes);` and line 330 `panes.find((candidate) => (candidate.terminalId ?? candidate.id) === agentId)` with `indexPanesByAgentKey(panes).get(agentId)`. Import indexPanesByAgentKey from @overdeck/contracts. Add a test case (keep existing cases) to agents-listing-live-pane.test.ts with a Herdr-shaped live pane for agent-pan-4311 and a Herdr-shaped exited pane for a second registered agent."
+        },
+        "items": [
+          {
+            "id": "listing-agent-key.ac1",
+            "title": "Given a registered agent-pan-4311 and a live Herdr-shaped pane (terminalId 'term_…', agentId 'agent-pan-4311'), GET /api/agents returns its row with hasLivePane true and status 'healthy' or 'warning'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "listing-agent-key.ac2",
+            "title": "Given a registered agent whose only Herdr-shaped pane is exited, GET /api/agents returns its row with status 'stopped' and hasLivePane false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "listing-agent-key.ac3",
+            "title": "`git grep -n \"terminalId ?? pane.id\\|terminalId ?? candidate.id\" src/dashboard/server/routes/agents/listing.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enrichment-agent-key",
+        "title": "Enrichment poller treats stored-running agents with a live pane (by agent key) as live",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service-herdr-panes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-enrichment-service-herdr-panes.test.ts src/dashboard/server/services/__tests__/agent-enrichment-service-peer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both enrichment test files report all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In pollOnce() of src/dashboard/server/services/agent-enrichment-service.ts (lines 194-197) build livePaneIds from indexPanesByAgentKey(panes), keeping only keys whose pane is not exited, exactly as in the PRD after-snippet. Create agent-enrichment-service-herdr-panes.test.ts by copying the mock harness of agent-enrichment-service-peer.test.ts (vi.mock targets, vi.useFakeTimers, vi.advanceTimersByTimeAsync(10_000) per tick). Use Herdr-shaped panes and a distinct agent id per case because the service remembers announced ids per process. Never use real timers. ALSO (required, same item): change the activeAgents filter (line 208) to `runningAgents.filter(a => livePaneIds.has(a.id) && (a.status === 'running' || a.status === 'starting'))` with the PAN-4320 comment from the PRD. Reason: listRunningAgents() returns every state.json and agent.created hardcodes status running; on Herdr pan kill leaves the pane alive, so without the gate every killed agent with a residue pane would be rewritten to running."
+        },
+        "items": [
+          {
+            "id": "enrichment-agent-key.ac1",
+            "title": "Given a registered agent 'agent-pan-herdr-live' with a live Herdr-shaped pane, one poll emits an agent.created event whose payload.agentId is 'agent-pan-herdr-live'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-agent-key.ac2",
+            "title": "Given a registered agent 'agent-pan-herdr-dead' whose only Herdr-shaped pane is exited, a poll emits no agent.created for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-agent-key.ac3",
+            "title": "When the change lands, agent-enrichment-service-peer.test.ts passes unchanged with its tmux-shaped panes (the fallback key preserves tmux matching)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-agent-key.ac4",
+            "title": "Given a registered agent whose stored status is 'stopped' and a live Herdr-shaped pane, a poll emits no agent.created and no agent.enrichment_changed for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-seed-agent-key",
+        "title": "Agent-state runtime seed keys snapshots by agent id",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-state-service.ts",
+            "src/dashboard/server/services/__tests__/agent-state-service-seed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-state-service-seed.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-state-service-seed.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/dashboard/server/services/agent-state-service.ts extract the loop in seedFromBackend (lines 134-150) into an exported pure function seedRuntimeFromPanes(panes) that iterates indexPanesByAgentKey(panes) and returns { seeded, liveById } keyed by the agent key; keep the snapshot object literal fields unchanged; seedFromBackend calls it. Create agent-state-service-seed.test.ts with Herdr-shaped panes."
+        },
+        "items": [
+          {
+            "id": "state-seed-agent-key.ac1",
+            "title": "Given a live Herdr-shaped pane for agent-pan-4311, seedRuntimeFromPanes returns seeded['agent-pan-4311'] and liveById['agent-pan-4311'] === true, and no key starting with 'term_'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-seed-agent-key.ac2",
+            "title": "Given an exited and a live pane for one agent, seedRuntimeFromPanes returns liveById true for that agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "projection-agent-key",
+        "title": "Agent projection paneAlreadyExited finds the pane by agent key",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-projection.ts",
+            "tests/unit/dashboard/server/services/agent-projection-herdr-pane.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/agent-projection-herdr-pane.test.ts tests/unit/dashboard/server/services/agent-projection.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both agent-projection test files report all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/dashboard/server/services/agent-projection.ts paneAlreadyExited (lines 218-222) replace `panes.find((candidate) => candidate.id === agentId || candidate.terminalId === agentId)` with `indexPanesByAgentKey(panes).get(agentId)`. Test in the new file tests/unit/dashboard/server/services/agent-projection-herdr-pane.test.ts (a separate file so its module-level vi.mock of src/dashboard/server/services/backend-inventory.js does not disturb agent-projection.test.ts): call applyAgentLifecycleEventWithDeps WITHOUT a hasExited dep, with stub readAgentState and event store, and getBackendPanes mocked to Herdr-shaped panes."
+        },
+        "items": [
+          {
+            "id": "projection-agent-key.ac1",
+            "title": "Given only an exited Herdr-shaped pane for the agent, a session-started lifecycle event returns { applied: false, reason: 'already-stopped' } and appends no agent.started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "projection-agent-key.ac2",
+            "title": "Given a live Herdr-shaped pane for the agent, a session-started lifecycle event returns { applied: true, status: 'running' } and appends agent.started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "refresh-trigger-agent-key",
+        "title": "Resource refresh issueForAgent reads the issue from the pane found by agent key",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-refresh-triggers.ts",
+            "tests/unit/dashboard/resource-refresh-triggers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/resource-refresh-triggers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resource-refresh-triggers.test.ts reports all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/dashboard/server/services/resource-refresh-triggers.ts export issueForAgentFromPanes(panes, agentId) returning `indexPanesByAgentKey(panes).get(agentId)?.issue ?? null`, and make the default issueForAgent (lines 85-91) call it inside the existing try. Add describe('issueForAgentFromPanes') to tests/unit/dashboard/resource-refresh-triggers.test.ts."
+        },
+        "items": [
+          {
+            "id": "refresh-trigger-agent-key.ac1",
+            "title": "Given a Herdr-shaped pane with agentId 'agent-pan-4311' and issue 'PAN-4311', issueForAgentFromPanes(panes, 'agent-pan-4311') returns 'PAN-4311'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "refresh-trigger-agent-key.ac2",
+            "title": "Given no pane for the agent, issueForAgentFromPanes returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "event-path-agent-id",
+        "title": "Herdr pane-created and metadata events carry agentId into the pane cache",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/types.ts",
+            "src/lib/terminal-backends/herdr.ts",
+            "src/dashboard/server/services/backend-inventory.ts",
+            "tests/unit/lib/terminal-backends/herdr-adapter.test.ts",
+            "src/dashboard/server/services/__tests__/backend-inventory.test.ts",
+            "src/dashboard/server/__tests__/read-model-served-agent-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-adapter.test.ts src/dashboard/server/services/__tests__/backend-inventory.test.ts src/dashboard/server/__tests__/read-model-served-agent-status.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the three test files report all cases green",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0 with herdr.ts at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. (1) src/lib/terminal-backends/types.ts lines 207/209: add optional `terminalId?` and `agentId?` to the pane-created variant and optional `agentId?` to the metadata variant. (2) src/lib/terminal-backends/herdr.ts toBackendEvents (lines 173-190): on the existing pane_created return line add `terminalId: pane.terminal_id` and `...(agentIdOf(pane) ? { agentId: agentIdOf(pane) } : {})`; on the existing metadata push line add the same agentId spread. NET-ZERO line change: herdr.ts is exactly at the 1000-line ceiling. Only if impossible, add `<lines> src/lib/terminal-backends/herdr.ts # PAN-4320` to scripts/file-size-allowlist.txt in the same commit. (3) src/dashboard/server/services/backend-inventory.ts BackendPaneCache.apply: pane-created uses `terminalId: event.terminalId ?? event.paneId` and copies event.agentId when present; metadata sets next.agentId when event.agentId is present. Run `git grep -n \"kind: 'pane-created'\\|kind: 'metadata'\" src` to confirm no other producer breaks. Tests: herdr-adapter.test.ts (toBackendEvents), backend-inventory.test.ts (cache fold), read-model-served-agent-status.test.ts (issue AC 3: events through BackendPaneCache into deriveServedAgentStatuses)."
+        },
+        "items": [
+          {
+            "id": "event-path-agent-id.ac1",
+            "title": "Given a pane_updated record whose tokens carry agentId 'agent-pan-4311', toBackendEvents returns a metadata event with agentId 'agent-pan-4311'; a pane_created record returns terminalId from terminal_id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-path-agent-id.ac2",
+            "title": "When BackendPaneCache applies pane-created then metadata with agentId, the cached pane records agentId 'agent-pan-4311' and the event's terminalId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-path-agent-id.ac3",
+            "title": "Given a stored-running agent-pan-4311 row and a trusted inventory built from pane-created + metadata events, deriveServedAgentStatuses returns it running; after a pane-exited event it returns it stopped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-path-agent-id.ac4",
+            "title": "bash scripts/lint-file-size.sh exits 0 and `wc -l src/lib/terminal-backends/herdr.ts` prints 1000 or fewer lines (or an audited PAN-4320 allowlist row exists)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enrichment-census-gate",
+        "title": "Enrichment skip gate follows the host backend policy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service-peer.test.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service-herdr-panes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts src/dashboard/server/services/__tests__/agent-enrichment-service-peer.test.ts src/dashboard/server/services/__tests__/agent-enrichment-service-herdr-panes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three enrichment test files report all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Change shouldSkipEnrichmentCycle(census, inventory: { backend: TerminalBackendName; degraded: boolean }) to return `inventory.backend === 'herdr' ? inventory.degraded : !census.tmuxAvailable`, with the PAN-3055/PAN-4320 comment from the PRD. In pollOnce() pass `{ backend: await hostTerminalBackendName(), degraded: isBackendInventoryDegraded() }` (imports: hostTerminalBackendName from ../../../lib/terminal-backends/select.js, isBackendInventoryDegraded from ./backend-inventory.js). Update agent-enrichment-service.test.ts shouldSkipEnrichmentCycle cases; in agent-enrichment-service-peer.test.ts add `isBackendInventoryDegraded: () => false` to the backend-inventory mock and mock select.js hostTerminalBackendName to 'tmux'; in the herdr-panes test mock hostTerminalBackendName to 'herdr' and getRuntimeCensus to { tmuxAvailable: false } and add a case proving agent.created still fires."
+        },
+        "items": [
+          {
+            "id": "enrichment-census-gate.ac1",
+            "title": "shouldSkipEnrichmentCycle returns false for backend 'herdr', degraded false, tmuxAvailable false; and true for backend 'herdr', degraded true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-census-gate.ac2",
+            "title": "shouldSkipEnrichmentCycle returns true for backend 'tmux' with tmuxAvailable false and false for backend 'tmux' with tmuxAvailable true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-census-gate.ac3",
+            "title": "Given host backend 'herdr', a census with tmuxAvailable false, and a live Herdr-shaped pane, a poll still emits agent.created for the agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-agent-key-rule",
+        "title": "Document the agent-key join rule and immediate event-path agentId",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"indexPanesByAgentKey\" docs/DASHBOARD-ARCHITECTURE.md docs/TERMINAL-BACKENDS.md",
+            "grep -c \"at most 5 s\" docs/TERMINAL-BACKENDS.md"
+          ],
+          "expected_outputs": [
+            "grep prints at least one indexPanesByAgentKey line in each doc",
+            "grep -c prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. docs/DASHBOARD-ARCHITECTURE.md lines 57-67 (#4098 served-status bullet): replace 'matched by terminal id, pane id or the agentId token, the way GET /api/agents matches' with the indexPanesByAgentKey rule (key agentId ?? terminalId ?? id, non-exited pane wins a collision) and add that on Herdr the enrichment poller's agent.created is the only way a post-boot agent enters agentsById and that under Herdr the poller skips only while the backend inventory is degraded. docs/TERMINAL-BACKENDS.md 'Pane metadata (FR-5)' section line 327: replace the 'at most 5 s' sentence with the immediate event-path agentId/terminalId statement, and name indexPanesByAgentKey as the one join in the 'must match pane.agentId === agent.id' sentence."
+        },
+        "items": [
+          {
+            "id": "docs-agent-key-rule.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains indexPanesByAgentKey, the key 'agentId ?? terminalId ?? id', and the non-exited-wins collision rule in the served-status bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-key-rule.ac2",
+            "title": "docs/TERMINAL-BACKENDS.md contains the statement that Herdr pane-created and metadata events carry agentId, and `grep -c \"at most 5 s\" docs/TERMINAL-BACKENDS.md` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-key-rule.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains the sentence that under Herdr the enrichment poller skips only while the backend inventory is degraded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-herdr-verification",
+        "title": "Verify served agent statuses against herdr agent list on a peer dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T15:22:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4320",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/listing.ts"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "npm run build",
+            "curl -s -o /dev/null -w '%{http_code}' localhost:3497/api/health"
+          ],
+          "expected_outputs": [
+            "build completes and emits dist/dashboard/server.js",
+            "health check prints 200 while the peer dashboard runs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ],
+          "acJustification": "Manual live check required by issue AC 4; no source edits are expected (files_scope names the verified route only)."
+        },
+        "narrative": {
+          "Action": "PRD WI-10. No source edits. After every code item is committed: npm run build; start `API_PORT=3497 OVERDECK_DISABLE_DEACON=1 node dist/dashboard/server.js > /tmp/pan-4320-peer.log 2>&1 &` from the workspace and record its PID; wait for /api/health 200 plus 20 s; run the PRD's /ws/rpc probe against :3497, `curl -s localhost:3497/api/agents`, and `herdr agent list`; open http://localhost:3497/god-view in an isolated Playwright browser profile and screenshot it; then `kill <pid>` and confirm nothing listens on 3497. Never restart, reload or signal the :3011 dashboard. Paste outputs and the screenshot into the PR description under 'Live verification (PAN-4320)'. If God View shelf/Doldrums misplacement persists, file a follow-up issue and link it; do not fix it here. The /ws/rpc probe cannot prove FR-3 on a freshly booted peer (it seeds agentsById at boot with every agent already stored running); FR-3 is proven by the enrichment-agent-key unit tests. If the flywheel happens to start an agent while the peer is up, re-probe and record that agent; never start an agent just for this check."
+        },
+        "items": [
+          {
+            "id": "live-herdr-verification.ac1",
+            "title": "The PR description contains GET /api/agents rows from the :3497 peer dashboard showing hasLivePane true for every agent herdr agent list reports as a live managed pane (the FR-2 regression check)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-herdr-verification.ac2",
+            "title": "The PR description contains the /ws/rpc probe output from :3497 in which every live managed Herdr pane prints '→ served running' and none prints 'MISSING', plus the God View screenshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-herdr-verification.ac3",
+            "title": "When verification ends, `ss -ltn` shows no listener on port 3497 and the :3011 dashboard preserves its original PID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pane-agent-key-helper",
+        "to": "listing-agent-key",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-agent-key-helper",
+        "to": "enrichment-agent-key",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-agent-key-helper",
+        "to": "state-seed-agent-key",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-agent-key-helper",
+        "to": "projection-agent-key",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-agent-key-helper",
+        "to": "refresh-trigger-agent-key",
+        "type": "blocks"
+      },
+      {
+        "from": "enrichment-agent-key",
+        "to": "enrichment-census-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "listing-agent-key",
+        "to": "live-herdr-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "enrichment-census-gate",
+        "to": "live-herdr-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "state-seed-agent-key",
+        "to": "live-herdr-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "projection-agent-key",
+        "to": "live-herdr-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "refresh-trigger-agent-key",
+        "to": "live-herdr-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "event-path-agent-id",
+        "to": "live-herdr-verification",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

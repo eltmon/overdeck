@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { ConversationPanel } from '../ConversationPanel';
 import { DialogProvider } from '../../DialogProvider';
+import { MESSAGES_HTTP_FALLBACK_MS } from '../useMessagesHttpFallback';
 
 const streamTransportMock = vi.hoisted(() => ({
   listeners: new Map<string, (event: unknown) => void>(),
@@ -1015,5 +1016,154 @@ describe('ConversationPanel subagent message target (PAN-3982)', () => {
       expect(props).toMatchObject({ targetMessageId: undefined, targetMessageIndex: undefined, targetMessageNonce: undefined, onTargetMessageHandled: undefined });
     }
     expect(window.location.search).not.toContain('subagent=');
+  });
+});
+
+describe('ConversationPanel /diffs polling (PAN-4312)', () => {
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    window.history.replaceState(null, '', '/');
+    localStorage.clear();
+  });
+
+  function diffsCallCount(): number {
+    return fetchControl.fetchMock.mock.calls.filter(([input]) => {
+      const url = input instanceof Request ? input.url : String(input);
+      return /\/api\/conversations\/test-conv\/diffs$/.test(url);
+    }).length;
+  }
+
+  it('polls /diffs exactly once for an ended conversation over 15s', async () => {
+    renderPanel({ ...mockConversation, sessionAlive: false });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(diffsCallCount()).toBe(1);
+
+    await act(() => vi.advanceTimersByTimeAsync(15_000));
+    expect(diffsCallCount()).toBe(1);
+  });
+
+  it('keeps polling /diffs for a live conversation', async () => {
+    renderPanel({ ...mockConversation, sessionAlive: true });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(diffsCallCount()).toBeGreaterThan(1);
+  });
+});
+
+describe('ConversationPanel HTTP /messages fallback (PAN-4312)', () => {
+  beforeEach(() => {
+    queryClients = [];
+    // Unlike renderPanel()/makeClient(), these tests need to observe whether
+    // the WS stream delivers a first payload before the HTTP fallback fires,
+    // so they must not pre-seed the stream's initial event for 'test-conv'.
+    streamTransportMock.initialEvents.delete('test-conv');
+    streamTransportMock.listeners.delete('test-conv');
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      const defaultResponse = defaultConversationResponse(method, url);
+      if (defaultResponse) return defaultResponse;
+      if (method === 'GET' && url === '/api/conversations/test-conv/messages') {
+        return Response.json({ messages: [], workLog: [], streaming: false });
+      }
+      if (method === 'POST' && url === '/api/conversations/test-conv/resume') {
+        return Response.json({ ...mockConversation, status: 'active', sessionAlive: true });
+      }
+      return undefined;
+    });
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    window.history.replaceState(null, '', '/');
+    localStorage.clear();
+  });
+
+  function renderStreamingPanel(conversation = mockConversation, staleTime: number = Infinity) {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime }, mutations: { retry: false } },
+    });
+    queryClients.push(client);
+    const view = render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationPanel conversation={conversation} viewMode="conversation" onArchived={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    return { client, ...view };
+  }
+
+  function messagesCallCount(): number {
+    return fetchControl.fetchMock.mock.calls.filter(([input]) => {
+      const url = input instanceof Request ? input.url : String(input);
+      return /\/api\/conversations\/test-conv\/messages$/.test(url);
+    }).length;
+  }
+
+  it('sends zero GET …/messages when the stream payload arrives before the fallback delay', async () => {
+    renderStreamingPanel();
+
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    const listener = streamTransportMock.listeners.get('test-conv');
+    act(() => { listener?.({ kind: 'messages', snapshot: true, messages: [], workLog: [], streaming: false }); });
+
+    await act(() => vi.advanceTimersByTimeAsync(4_500));
+    expect(messagesCallCount()).toBe(0);
+  });
+
+  it('sends exactly one GET …/messages when no stream payload arrives within the fallback delay', async () => {
+    renderStreamingPanel();
+
+    await act(() => vi.advanceTimersByTimeAsync(MESSAGES_HTTP_FALLBACK_MS - 1));
+    expect(messagesCallCount()).toBe(0);
+
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(messagesCallCount()).toBe(1);
+
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    expect(messagesCallCount()).toBe(1);
+  });
+
+  it('sends one GET …/messages through fetchQuery when resume succeeds on a streaming conversation', async () => {
+    renderStreamingPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(messagesCallCount()).toBe(1);
+  });
+
+  it('still re-reads over HTTP on resume when a recent stream event left the cache fresh', async () => {
+    // Matches the production QueryClient's 30s default staleTime (main.tsx). Without
+    // `staleTime: 0` on the fetchQuery call, this is a no-op: fetchQuery returns the
+    // fresh cached data without invoking queryFn at all.
+    renderStreamingPanel(mockConversation, 30_000);
+
+    const listener = streamTransportMock.listeners.get('test-conv');
+    act(() => { listener?.({ kind: 'messages', snapshot: true, messages: [], workLog: [], streaming: false }); });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(messagesCallCount()).toBe(1);
   });
 });

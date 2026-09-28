@@ -46,14 +46,30 @@ entry point navigates to `/workspaces/new`; a project overview adds
 
 The page keeps the complete creation intent in one view:
 
-- The **project chip row** selects a registered project or opens the existing
-  project-registration flow. Recently used projects appear first.
-- The large **workspace title** is the name that will be created.
+- The **project chip row** selects a registered project, or opens the
+  **Add a project** dialog over this page (clone repo, add existing, new
+  project). Recently used projects appear first. A project you add there comes
+  back selected.
+- The large **workspace title** is the name that will be created. It is a
+  **Smart** field: it also reads what you type and suggests what you probably
+  meant:
+  - An **issue reference** — `#12`, `PAN-12`, or a GitHub issue or pull request
+    URL — offers **Open PAN-12 and start work**, which opens that issue. A bare
+    `#12` uses the selected project's issue prefix.
+  - Text that matches **branch names** in the selected project lists them;
+    picking one sets it as the parent branch and opens **Advanced** so you can
+    see it.
+  - Text that cannot be a workspace name as typed (spaces, punctuation) offers
+    `Use "fix-login-redirect-bug" as the name`. Names allow letters, numbers
+    and hyphens.
+
+  The arrow keys move through the suggestions, Enter picks one, and Esc closes
+  the list. When nothing is highlighted, Enter starts the workspace as usual.
 - **Shared directory** (the default) targets the project's primary path,
   another registered target, or a directory chosen with **Browse…**.
 - **Isolated worktree** creates `workspaces/scratch-<name>` on a
-  `scratch/<name>` branch. It derives its own path, so target selection is
-  disabled in this mode.
+  `scratch/<name>` branch, shown under the title as **Branch: scratch/<name>**.
+  It derives its own path, so target selection is disabled in this mode.
 - **Advanced** reveals a parent-branch override; otherwise Overdeck infers the
   project's current branch.
 
@@ -65,7 +81,8 @@ The page keeps the complete creation intent in one view:
 </Note>
 
 Names are validated by that same resolution, not by a separate browser rule.
-An invalid name, missing directory, or ambiguous project appears inline, and
+An invalid name, missing directory, or ambiguous project appears inline. With
+no projects registered at all, the page says **Add a project first.**, and
 **Start workspace** stays disabled until the findings are clear and the status
 is current. On success the registry is invalidated immediately, the new row is
 activated, and its workspace view opens.
@@ -80,7 +97,7 @@ recognize them in logs.
 
 | Route | What it does |
 | --- | --- |
-| `POST /api/workspace-registry/resolve` | Dry-runs the intent and returns the resolved outcome plus any validation findings. Writes nothing — this is what the live preview calls. |
+| `POST /api/workspace-registry/resolve` | Dry-runs the intent and returns the resolved outcome plus any validation findings. Writes nothing — this is what the live preview calls. An optional `branchQuery` (2+ characters) adds `branchCandidates`: up to 20 matching local and remote branches, prefix matches first. |
 | `POST /api/workspace-registry` | Creates the workspace. Returns `422` with the findings when the intent is invalid, otherwise `201 {id}`. |
 | `POST /api/workspace-registry/:id/relocate` | Body `{path, force?}`. Re-points a workspace; `409` carries the refusal message when the rules below say no. |
 | `GET /api/workspace-registry/project-targets?project=<key>` | The project's primary path plus its registered targets — the target-directory dropdown. |
@@ -102,6 +119,31 @@ Open a workspace's view (`/workspace/:id`) and its header carries:
 Issue workspaces show none of these: Overdeck's pipeline owns their worktree.
 Deleting a workspace and purging its memory stay CLI-only
 (`pan workspace destroy`), behind their typed confirmations.
+
+## Cleaning up after close-out
+
+Settings → Close-out controls what `pan close <id>` and the dashboard's Close
+Out button do to an issue's workspace and feature branch once its PR has
+merged: **Remove the workspace** (on by default) and **Delete the feature
+branch** (off by default). Two more controls, **Close out merged issues
+automatically** and its delay, render disabled — automatic close-out was
+removed and nothing reads those keys.
+
+<ThemedImage
+  light="/images/dashboard/close-out-settings-light.png"
+  dark="/images/dashboard/close-out-settings-dark.png"
+  alt="Settings Close-out section with the four controls, the closed-issue disk line, and the Clean up now button"
+/>
+
+Below the workspace toggle, the section reports how many closed issues still
+have a workspace on disk and its total size. **Clean up now** runs `pan
+workspace destroy` (which also deletes the local branch) for every closed
+issue whose branch is merged and whose workspace has no uncommitted changes;
+polyrepo projects are counted but skipped, with the reason shown so you can
+destroy them by hand. This is the backstop for when the background reaper
+that normally clears merged workspaces cannot run — for example while
+automatic dispatch is globally paused or GitHub reads are rate-limited — so
+closed-issue workspaces do not silently pile up on disk.
 
 ## CLI
 

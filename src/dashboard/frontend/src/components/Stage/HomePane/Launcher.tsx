@@ -1,10 +1,11 @@
-import { useState, type ReactNode, type KeyboardEvent } from 'react'
-import { Terminal, Globe } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type KeyboardEvent, type Ref } from 'react'
+import { Terminal, Globe, MessagesSquare } from 'lucide-react'
 import { AgentIcon } from './AgentIcon'
 import { orderIntents } from './launcherOrdering'
+import { useLauncherFocusStore } from '../launcherFocusStore'
 import styles from '../stage.module.css'
 
-export type LauncherIntentKind = 'agent' | 'terminal' | 'web'
+export type LauncherIntentKind = 'agent' | 'terminal' | 'web' | 'talk'
 
 export interface LauncherIntent {
   /** Stable id — 'claude-code' | 'terminal' | 'web' | 'codex' | an agent id. */
@@ -33,6 +34,8 @@ export function intentLabel(intent: LauncherIntent): string {
       return 'Run in terminal:'
     case 'web':
       return 'Search the web:'
+    case 'talk':
+      return 'Talk it through first:'
     case 'agent':
       return `Ask ${intent.agentName ?? 'agent'}:`
   }
@@ -40,6 +43,7 @@ export function intentLabel(intent: LauncherIntent): string {
 
 function IntentIcon({ kind, id, label }: { kind: LauncherIntentKind; id: string; label?: string }) {
   if (kind === 'agent') return <AgentIcon id={id} label={label} size={14} />
+  if (kind === 'talk') return <MessagesSquare size={14} />
   const Icon = kind === 'terminal' ? Terminal : Globe
   return <Icon size={14} />
 }
@@ -59,6 +63,14 @@ export interface LauncherProps {
   errorText?: string
   /** Id of the last-run agent in this workspace; floats it to position 1. */
   lastUsedAgentId?: string | null
+  /** This Launcher's deck key; it takes a pending focus request for that deck. */
+  focusKey?: string
+  /** Forwarded to the underlying input's ref, for callers that need focus control. */
+  inputRef?: Ref<HTMLInputElement>
+  /** Forwarded to the underlying input's autoFocus. */
+  autoFocus?: boolean
+  /** Forwarded to the underlying input's data-testid. */
+  inputTestId?: string
 }
 
 /**
@@ -76,8 +88,29 @@ export function Launcher({
   busy = false,
   errorText,
   lastUsedAgentId,
+  focusKey,
+  inputRef,
+  autoFocus,
+  inputTestId,
 }: LauncherProps) {
   const [query, setQuery] = useState('')
+  // The input serves both the caller's inputRef and this Launcher's own
+  // focus-request handling, so one callback ref feeds both.
+  const ownInputRef = useRef<HTMLInputElement | null>(null)
+  const setInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      ownInputRef.current = node
+      if (typeof inputRef === 'function') inputRef(node)
+      else if (inputRef) (inputRef as { current: HTMLInputElement | null }).current = node
+    },
+    [inputRef],
+  )
+  const pendingDeckKey = useLauncherFocusStore((state) => state.pendingDeckKey)
+  useEffect(() => {
+    if (!focusKey || focusKey !== pendingDeckKey) return
+    ownInputRef.current?.focus()
+    useLauncherFocusStore.getState().clear()
+  }, [focusKey, pendingDeckKey])
   const [selected, setSelected] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const hasQuery = query.length > 0
@@ -133,6 +166,9 @@ export function Launcher({
     <div className={styles.launcher}>
       <div className={styles.launchBar}>
         <input
+          ref={setInputRef}
+          autoFocus={autoFocus}
+          data-testid={inputTestId}
           className={styles.launchInput}
           value={query}
           placeholder={placeholder}

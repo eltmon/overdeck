@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { Stage, type StageApi } from './index'
 import { usePanesStore } from '../../lib/panesStore'
-import { useTerminalStateStore } from '../terminal/terminalStateStore'
+import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
+import { writePendingTerminal } from '../home/pendingTerminal'
 
 // AgentPane pulls in ConversationPanel (heavy, needs many providers); stub it so
 // this test stays focused on the Stage's pane open/switch mechanics.
@@ -43,6 +44,7 @@ function renderStage(ui: ReactElement) {
 
 beforeEach(() => {
   localStorage.clear()
+  sessionStorage.clear()
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
   useTerminalStateStore.setState({ terminalStateByThreadId: {} })
 })
@@ -106,6 +108,18 @@ describe('Stage', () => {
     fireEvent.click(screen.getByLabelText('Open new tab'))
     fireEvent.click(screen.getByRole('menuitem', { name: /New terminal/ }))
     expect(screen.getByTestId('terminal-drawer')).toBeTruthy()
+  })
+
+  it('opens the terminal drawer when a hand-off is pending for this deck', () => {
+    writePendingTerminal({ deckKey: DECK, command: 'npm test' })
+    renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
+    expect(screen.getByTestId('terminal-drawer')).toBeTruthy()
+  })
+
+  it("does not open the drawer for another deck's hand-off", () => {
+    writePendingTerminal({ deckKey: 'some-other-deck', command: 'npm test' })
+    renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
+    expect(screen.queryByTestId('terminal-drawer')).toBeNull()
   })
 
   // Drag-to-detach (PAN-1591 ↔ detach affordance): dragging a conversation tab

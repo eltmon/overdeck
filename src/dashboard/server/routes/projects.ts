@@ -899,6 +899,7 @@ const postProjectsResolveRoute = HttpRouter.add(
       parentDir?: unknown;
       name?: unknown;
       issuePrefix?: unknown;
+      repos?: unknown;
     };
 
     // Validate mode
@@ -919,6 +920,10 @@ const postProjectsResolveRoute = HttpRouter.add(
       parentDir: typeof body.parentDir === 'string' ? body.parentDir : undefined,
       name: typeof body.name === 'string' ? body.name : undefined,
       issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
+      repos:
+        Array.isArray(body.repos) && body.repos.every((repo) => typeof repo === 'string')
+          ? (body.repos as string[])
+          : undefined,
       homeBoundary: true,
       // No refreshRemote: this route is called once per settled keystroke, so it
       // must read the 60 s probe memo rather than force a fresh `git ls-remote`

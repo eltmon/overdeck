@@ -258,6 +258,14 @@ pressure) also runs from a plain interval scheduler independent of any
 issue's merge — check `pan workspace list --stale [--all]` for merged
 branches still on disk and reclaim with `pan workspace destroy <id>`.
 
+Close-out's DoD row 5 (post-merge) asks the liveness oracle
+([`src/lib/agents/liveness.ts`](../src/lib/agents/liveness.ts)) about every work or planning
+agent whose stored status still says `starting` or `running`. The stored status is a
+spawn-time snapshot, so an agent that exited on its own (after `pan done`, or when planning
+finalized) keeps it. A stored `running` agent with no live pane does not block the row; a live
+pane does, and so does a probe that cannot answer (`runtime-indeterminate`). The row only
+reads; it never writes agent status (PAN-4324).
+
 Close-out prunes only regenerable agent-directory weight: `pending.lock`,
 `*.sock`, and each `codex-home*/` entry except `sessions/`. It keeps
 `state.json`, the append-only `sessions.json` index, lifecycle and activity
@@ -269,6 +277,51 @@ deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
 (`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
 — all of them route through `removeAgentStateDir`. Transcript retention
 deletes only `*.jsonl` transcripts and keeps `state.json`.
+
+### Close-out settings
+
+The dashboard's **Settings → Close-out** section (`src/dashboard/frontend/src/components/Settings/sections/CloseOutSection.tsx`)
+controls the `[close_out]` table in `~/.overdeck/cloister.toml` through narrow
+`GET`/`PUT /api/cloister/close-out` endpoints (`src/lib/cloister/close-out-settings.ts`) —
+unlike `PUT /api/cloister/config`, the write touches only the one key it is
+given and never materializes the rest of the config into the file. Four keys:
+
+- `remove_workspace` — removes the workspace worktree at close-out. Default
+  **`true`** since PAN-4283 (previously `false`); the new default applies to
+  every install whose file does not already set the key, not only fresh
+  installs.
+- `delete_feature_branch` — deletes the local and remote feature branch.
+  Default `false`.
+- `auto` and `auto_delay_minutes` — **inert since PAN-3917.** Automatic
+  close-out was removed with the old `deacon.ts`; nothing in `src/` reads
+  either key. The dashboard renders both controls disabled, and the PUT
+  endpoint rejects writes to them with HTTP 400. The keys stay in
+  `CloseOutConfig` only so existing `cloister.toml` files keep parsing.
+
+DoD row 9 ("Close-out teardown verified") always reports `pass` — a workspace
+or branch kept on purpose is not a miss — but its `observed` text
+(`describeTeardownObserved` in `src/lib/lifecycle/dod.ts`) says what actually
+happened: `workspace kept (close_out.remove_workspace is off)` or `workspace
+removed`, and `feature branch kept (close_out.delete_feature_branch is off)`
+when that setting is off.
+
+The section also shows how many closed issues still have a workspace on disk
+and their total size (`GET /api/cloister/close-out/disk`,
+`collectClosedIssueWorkspaces` in `src/lib/workspaces/closed-issue-workspaces.ts`),
+with a "Clean up now" button (`POST /api/cloister/close-out/cleanup`,
+`cleanupClosedIssueWorkspaces`) that runs `pan workspace destroy <id>` — which
+also deletes the local branch — for every issue that is closed, merged, and
+has no uncommitted changes. Polyrepo projects are counted in the disk line but
+skipped by cleanup with the reason "polyrepo workspace — run pan workspace
+destroy by hand"; destroy it by hand there.
+
+This dashboard-triggered cleanup does not replace the **closed-issue reaper**
+(`reconcileClosedIssueAgents`, run by deacon-lite every 60s): the reaper
+removes the workspace and deletes the local and remote feature branch of any
+closed issue whose branch is merged, **independent of these settings**. The
+disk line and "Clean up now" are the backstop for when the reaper cannot run —
+for example while `deacon.globally_paused` is set (PAN-4210) or during a
+GitHub quota pause, either of which lets closed workspaces accumulate.
 
 When the merge-train flag (`flywheel.merge_train_enabled`, default off) is
 ON, a merge-train reconcile pass rebases/re-verifies ready sibling branches

@@ -86,6 +86,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   only appends an event, so complete-planning's "Marked planning-… as stopped"
   never reaches `state.json`. Never gate behavior on that label; use the live
   inventory (`liveness.ts` / `liveAgentInventory`) and `startedAt`/`stoppedAt`.
+  Consequence: a dead agent stays in `listAgentStates({ status: 'running' })`
+  forever, so any patrol that iterates it and emits per agent must dedupe per
+  death — deacon-lite's `reconcileAgentLiveness` did not, and emitted ~50k
+  events/day (PAN-4300).
+  Close-out's DoD row 5 (`checkPostMergeRow`, `lifecycle/dod-gate.ts`) trusted
+  the label and blocked every close-out on exited agents; PAN-4324 confirms
+  claimed-live rows with `isAlive` (indeterminate still blocks).
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
   dies under Bun; circular ESM imports die under tsx/Node source mode).
 - **`execSync` freezes the server** — anything reachable from the dashboard event
@@ -117,9 +124,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
-  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts executeCloseOut`
-  is dead (no production caller; PAN-3968 deletes it) — only `isBranchMerged` there is
-  live. Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
+  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
+  merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
+  only `close_out.remove_workspace` and `delete_feature_branch`; `close_out.auto` and
+  `auto_delay_minutes` have had no consumer since PAN-3917 W4 (`94255f055fe`). The
+  closed-issue reaper (`cloister/reap-issue-residue.ts`, every 60 s) removes the
+  workspace and deletes local+remote branches of any closed, merged issue regardless of
+  `[close_out]` (PAN-4283). Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
   (keeps `state.json`/`sessions.json`); `removeAgentStateDir` is the destructive door
   for deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
   (`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
@@ -147,6 +158,21 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `deny` — widening the pre-allow keys widens what a user's own denial can no
   longer block.
 
+- **Unknown harness strings silently behave like Claude Code** — `getHarnessBehavior`
+  (`packages/contracts/src/harness-behavior.ts`) and `getTranscriptAdapter`
+  (`src/lib/conversations/transcript-adapter.ts`) fall back to Claude, and ~40
+  hand-copied harness unions/guard chains (not imported from contracts) compile fine
+  when a new literal is missing. Only 7 Records are type-forced (BEHAVIORS,
+  POLICY_RUNTIME_NAMES, harness-policy `unlisted: never`, policy decisions,
+  HARNESS_BINARY_BY_RUNTIME, HARNESS_MARKERS, frontend HARNESS_BRANDS/HARNESS_LABELS).
+  Adding a harness needs a full grep, not typecheck (PAN-3668 PRD has the list).
+- **`AcpRuntimeSync.spawnAgent`/`killAgent` are tmux-only** (`src/lib/runtimes/acp.ts`
+  `tmuxCreateSession`, `tmux list-panes`) — Cloister crash respawn/kill miss ACP and
+  OpenCode panes on a Herdr host. Host-backed harnesses are also hardcoded as
+  `acp || opencode` pairs across delivery/messaging/recovery/conversation-runtime.
+- **Prime Agent RPC mode spawns a detached per-user daemon** (verified 0.8.0) that
+  outlives its client and is restarted by resident workers; managed launches must use
+  a private `--daemon-socket` and reap its process group (PAN-3668 D2/D3).
 - **The memory governor gates almost nothing** (PAN-4267) — the governor band
   (`assessMemoryPressure`, `cloister/memory-governor.ts`) is read only by the
   memory-pressure patrol (activity feed) and `preemption.ts resumeYieldedAgents`;
@@ -205,5 +231,39 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`user`/`pat`/`app` × `graphql`/`rest`), and only the read-model pollers
   are paused. Agent `gh` calls are counted by a shim that lives beside the
   git guard (`launcher-git-guard.ts`), not by `runGh`.
+- **REST `/rate_limit` misreports the GraphQL budget** (PAN-4291) — its
+  `resources.graphql` said `used: 45` while GraphQL `rateLimit` said
+  `used: 2424` at the same moment (2026-09-28), and its `reset` differs too.
+  Read the GraphQL bucket with `rateLimit(dryRun: true)` (free). GitHub
+  prices `gh pr list` per 100-row page: with `reviewRequests` +
+  `statusCheckRollup` a full page costs 3 points, so `--limit 200` costs 6.
 
-<!-- last-verified: 2026-09-27 -->
+- **Two terminal-permission detectors coexist** (PAN-4278) — agents are
+  detected by `src/lib/agent-input-detection.ts` (the `1. Yes / 2. Yes, and … /
+  3. No` shape); Claude Code conversations use `src/lib/agents/permission-prompt.ts`
+  (2- or 3-option prompts, the ` · from the <type> agent` subagent title, the
+  `│` reason line). They were deliberately not unified; a Claude Code UI change
+  must update both, and the 2.1.280 fixtures pin the second.
+- **Check for a permission prompt before ensure-main** (PAN-4278) —
+  `ensureMainInputTarget` sends `Down`/`Up`/`Enter`/`Escape`; with a permission
+  menu up, `Down` moves the menu cursor and `Enter` answers it. Anything that
+  keys a Claude Code pane before pasting must consult
+  `conversationPendingPermission` (pane-confirmed `answerable`) first, as the
+  composer route does. Never hold or block on a hook-registry entry alone: the
+  hook is a best-effort `curl --max-time 1`, so entries can go stale.
+- **Composer receipts cache every response for 24 h** (PAN-4278) —
+  `withConversationMessageReceipt` replays any response, including a 409 or a
+  502, for the same `(name, clientMessageId)`. A resend after a
+  `permission-pending` hold or a `not-delivered` failure must mint a fresh
+  `clientMessageId` and send no `retry` flag, like the not-found Resend.
+- **Agent-to-pane joins must key by `agentId`** (PAN-4320) — on Herdr a
+  `BackendPane`'s `id` (`wKZ:p3`) and `terminalId` (`term_…`) are backend
+  handles, never agent ids. Six server sites joined by `terminalId ?? id` and
+  served every Herdr agent as stopped. Use `indexPanesByAgentKey` /
+  `paneAgentKey` from `@overdeck/contracts` (non-exited pane wins a key
+  collision). Test fixtures must be Herdr-shaped; a tmux-shaped pane
+  (`terminalId` = agent id) hides the bug. Herdr work agents run without the
+  PTY supervisor, so the enrichment poller's `agent.created` is the only way a
+  post-boot agent enters the read model's `agentsById`.
+
+<!-- last-verified: 2026-09-28 -->

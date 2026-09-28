@@ -25,6 +25,7 @@
 
 import { deliverAgentMessage } from '../../../lib/agents.js';
 import { probeTranscriptSince } from '../../../lib/transcript-landing.js';
+import type { SubmitMode } from '../../../lib/terminal-backends/steer-keys.js';
 
 const WATCH_TIMEOUT_MS = 5 * 60_000;
 const WATCH_INTERVAL_MS = 3_000;
@@ -40,6 +41,8 @@ export interface EatenMessageWatchArgs {
   /** The delivered message text, used for content-matched landing detection. */
   message: string;
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux';
+  /** PAN-4292: a steer eaten by compaction is redelivered as a steer, never as a plain Enter. */
+  submit?: SubmitMode;
   /** Transcript byte offset captured BEFORE the original delivery. */
   fromByteOffset: number;
   timeoutMs?: number;
@@ -80,7 +83,14 @@ export async function watchForEatenConversationMessage(
       `delivered message — submit-time compaction ate it; redelivering once (PAN-1635).`,
     );
     try {
-      await deliver(args.tmuxSession, args.message, 'conversation-message-redelivery', args.deliveryMethod);
+      const result = args.submit
+        ? await deliver(args.tmuxSession, args.message, 'conversation-message-redelivery', args.deliveryMethod, { submit: args.submit })
+        : await deliver(args.tmuxSession, args.message, 'conversation-message-redelivery', args.deliveryMethod);
+      // PAN-4278: only a delivery that reports ok counts as a redelivery.
+      if (!result.ok) {
+        console.error(`[conversation-eaten-message-watcher] ${args.conversationName}: redelivery failed: ${result.failure ?? `not delivered via ${result.path}`}`);
+        return 'redelivery-failed';
+      }
       redelivered = true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

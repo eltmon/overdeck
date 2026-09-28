@@ -5,7 +5,8 @@
 # only by src/lib/runtimes/storage/<harness>.ts; every other file asks those
 # modules. This guard fails when a storage path literal (a Claude project dir, a
 # Codex sessions dir or per-agent codex-home, a Kimi home or wire file, the ACP
-# transcript file name, a Muse data dir, a Pi sessions dir) appears in src/
+# transcript file name, a Muse data dir, a Pi sessions dir, a Prime Agent
+# session dir, session-file pointer or per-agent daemon socket) appears in src/
 # outside that directory.
 #
 # Tests and comment lines are ignored. A line that must keep a literal for a
@@ -41,6 +42,9 @@ PATTERN+="|acp-session\\.jsonl"
 PATTERN+="|muse-data"
 PATTERN+="|[\"']\\.pi[\"'][[:space:]]*,[[:space:]]*[\"']agent[\"'][[:space:]]*,[[:space:]]*[\"']sessions[\"']"
 PATTERN+="|\\.pi/agent/sessions"
+PATTERN+="|prime-sessions"
+PATTERN+="|prime-agent-session-file"
+PATTERN+="|[\"'\`]pd-"
 
 # Parallel arrays of allowlist rows: file and anchor.
 allow_files=()

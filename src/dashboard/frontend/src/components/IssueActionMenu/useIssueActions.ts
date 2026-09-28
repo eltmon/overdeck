@@ -18,6 +18,7 @@ import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { recoveryFromBody, useResumeRecovery } from '../../lib/resumeRecovery';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { pauseOutcomeNotice, toastPauseOutcome, unpauseOutcomeNotice } from '../../lib/pauseOutcome';
+import { isWriteBlockedPhase, OFFLINE_ACTION_REASON, useConnectionPhase } from '../../lib/connectionState';
 import { selectAgents, selectBackendPanes, selectDerivedIssueState, selectIssues, useDashboardStore } from '../../lib/store';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '../../types';
@@ -36,6 +37,8 @@ export type IssueActionSubmenuOption = {
 export type IssueActionView = {
   action: IssueActionEntry;
   enabled: boolean;
+  /** Allowed by issue state, but a server write while the server is unreachable or restarting (PAN-4279). */
+  blockedOffline: boolean;
   disabledReason?: string;
   isPending: boolean;
   invoke: () => void;
@@ -467,13 +470,17 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     submitDialogAction(action);
   }, [confirm, issueId, openIssue, state, submitDialogAction]);
 
+  const writeBlocked = isWriteBlockedPhase(useConnectionPhase());
   const all = useMemo<IssueActionView[]>(() => ISSUE_ACTIONS.map((action) => {
-    const enabled = action.enabledWhen(state);
+    const stateEnabled = action.enabledWhen(state);
+    const blockedOffline = stateEnabled && action.endpoint !== null && writeBlocked;
+    const enabled = stateEnabled && !blockedOffline;
     const invoke = () => { void runAction(action); };
     return {
       action,
       enabled,
-      disabledReason: enabled ? undefined : disabledReasonForAction(action),
+      blockedOffline,
+      disabledReason: blockedOffline ? OFFLINE_ACTION_REASON : enabled ? undefined : disabledReasonForAction(action),
       isPending: isActionPending(action.key),
       invoke,
       submenu: action.key === 'addToOrderBook' && enabled
@@ -493,7 +500,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
             }))
           : undefined,
     };
-  }), [activeOrderBooks, addIssueToOrderBook, isActionPending, runAction, state, submitDialogAction]);
+  }), [activeOrderBooks, addIssueToOrderBook, isActionPending, runAction, state, submitDialogAction, writeBlocked]);
 
   const layout = useMemo<IssueActionLayout>(() => {
     const byKey = new Map(all.map((view) => [view.action.key, view]));
@@ -502,8 +509,9 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       .filter((view): view is IssueActionView => !!view);
     const primaryKeys = new Set(primary.map((view) => view.action.key));
     // PAN-4198 (FR-1): the strip and its overflow offer only what the operator
-    // can act on right now, and only actions that belong in a menu.
-    const rest = all.filter((view) => !primaryKeys.has(view.action.key) && view.enabled && view.action.placement === 'menu');
+    // can act on right now, and only actions that belong in a menu. Actions
+    // blocked only by an outage stay visible, disabled, with the reason (PAN-4279).
+    const rest = all.filter((view) => !primaryKeys.has(view.action.key) && (view.enabled || view.blockedOffline) && view.action.placement === 'menu');
     const secondary = rest.filter((view) => view.action.kind !== 'destructive' && view.action.group !== 'danger').slice(0, 4);
     const secondaryKeys = new Set(secondary.map((view) => view.action.key));
     const overflow = rest.filter((view) => !secondaryKeys.has(view.action.key));

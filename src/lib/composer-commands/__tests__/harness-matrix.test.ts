@@ -4,7 +4,7 @@ import type { RuntimeName } from '../../runtimes/types.js';
 
 const mocks = vi.hoisted(() => ({
   activeHarness: 'claude-code' as string,
-  deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
+  deliverAgentMessage: vi.fn().mockResolvedValue({ ok: true, path: 'tmux' }),
   deliverControl: vi.fn().mockResolvedValue(undefined),
   getAgentState: vi.fn(),
   getConversationByName: vi.fn(),

@@ -15,8 +15,6 @@ try {
 beforeEach(async () => {
   const { useMenuOpen } = await import('./lib/menuOpenState');
   useMenuOpen.setState({ openMenuKey: null });
-  const { useBackendOutage } = await import('./lib/backendOutageState');
-  useBackendOutage.setState({ outage: false });
 });
 
 const environmentFetch = globalThis.fetch;

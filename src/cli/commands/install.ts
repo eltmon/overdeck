@@ -28,8 +28,11 @@ import { setupHooksCommand } from './setup/hooks.js';
 import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
 import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
 import { readHerdrVersion } from '../../lib/herdr-setup/binary.js';
-import { probeHerdrAvailability } from '../../lib/terminal-backends/select.js';
+import { hostTerminalBackendName, probeHerdrAvailability } from '../../lib/terminal-backends/select.js';
+import type { TerminalBackendName } from '../../lib/terminal-backends/types.js';
 import { renderHerdrReport } from '../herdr-report.js';
+import { setupOllamaForInstall } from './install-ollama.js';
+import { evaluatePrereqGate, forgivenPrereqNames, type PrereqResult } from './install-prereqs.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -42,6 +45,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-moonshine', 'Skip Moonshine voice sidecar build (AutoPreso + Voice STT will not work without it)')
     .option('--skip-tts-daemon', 'Skip Qwen TTS daemon venv install (CUDA torch download is large)')
     .option('--skip-herdr', 'Skip Herdr terminal backend install/verify (tmux-only hosts)')
+    .option('--skip-ollama', 'Skip Ollama local-model detection and optional gemma4:12b pull')
     .action(installCommand);
 }
 
@@ -53,13 +57,7 @@ interface InstallOptions {
   skipMoonshine?: boolean;
   skipTtsDaemon?: boolean;
   skipHerdr?: boolean;
-}
-
-interface PrereqResult {
-  name: string;
-  passed: boolean;
-  message: string;
-  fix?: string;
+  skipOllama?: boolean;
 }
 
 // Effect.runSync(detectPlatform()) is now in src/lib/platform.ts
@@ -108,7 +106,10 @@ async function probeHerdrPrereq(): Promise<HerdrPrereq> {
   return { binary, version: binary ? await readHerdrVersion(binary) : null };
 }
 
-function checkPrerequisites(herdr: HerdrPrereq): { results: PrereqResult[]; allPassed: boolean } {
+function checkPrerequisites(
+  herdr: HerdrPrereq,
+  backend: TerminalBackendName,
+): { results: PrereqResult[]; allPassed: boolean; warnings: string[] } {
   const results: PrereqResult[] = [];
 
   // Node.js
@@ -199,19 +200,18 @@ function checkPrerequisites(herdr: HerdrPrereq): { results: PrereqResult[]; allP
     fix: 'curl -fsSL https://herdr.dev/install.sh | sh',
   });
 
-  return {
-    results,
-    // These are auto-installed later or optional. jq must not block before
-    // setupHooksCommand gets the chance to install it.
-    allPassed: results.filter((r) => !['mkcert', 'ttyd', 'jq', 'Herdr'].includes(r.name)).every((r) => r.passed),
-  };
+  return { results, ...evaluatePrereqGate(results, backend) };
 }
 
-function printPrereqStatus(prereqs: { results: PrereqResult[]; allPassed: boolean }): void {
+function printPrereqStatus(
+  prereqs: { results: PrereqResult[]; allPassed: boolean; warnings: string[] },
+  backend: TerminalBackendName,
+): void {
   console.log(chalk.bold('Prerequisites:\n'));
 
+  const forgiven = new Set(forgivenPrereqNames(backend));
   for (const result of prereqs.results) {
-    const icon = result.passed ? chalk.green('✓') : chalk.red('✗');
+    const icon = result.passed ? chalk.green('✓') : forgiven.has(result.name) ? chalk.yellow('⚠') : chalk.red('✗');
     const msg = result.passed ? chalk.dim(result.message) : chalk.yellow(result.message);
     console.log(`  ${icon} ${result.name}: ${msg}`);
     if (!result.passed && result.fix) {
@@ -219,6 +219,11 @@ function printPrereqStatus(prereqs: { results: PrereqResult[]; allPassed: boolea
     }
   }
   console.log('');
+
+  for (const warning of prereqs.warnings) {
+    console.log(chalk.yellow(`  ⚠ ${warning}`));
+  }
+  if (prereqs.warnings.length > 0) console.log('');
 }
 
 async function installCommand(options: InstallOptions): Promise<void> {
@@ -228,14 +233,15 @@ async function installCommand(options: InstallOptions): Promise<void> {
   console.log(`Platform: ${chalk.cyan(plat)}\n`);
 
   // Step 1: Check prerequisites
-  const prereqs = checkPrerequisites(await probeHerdrPrereq());
+  const backend = await hostTerminalBackendName();
+  const prereqs = checkPrerequisites(await probeHerdrPrereq(), backend);
 
   if (options.check) {
-    printPrereqStatus(prereqs);
+    printPrereqStatus(prereqs, backend);
     return exitCli(prereqs.allPassed ? 0 : 1);
   }
 
-  printPrereqStatus(prereqs);
+  printPrereqStatus(prereqs, backend);
 
   if (!prereqs.allPassed) {
     console.log(chalk.red('Fix prerequisites above before continuing.'));
@@ -439,6 +445,15 @@ async function installCommand(options: InstallOptions): Promise<void> {
   } catch (error) {
     spinner.fail(`Herdr setup failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  // Step 5f: Ollama — detection and guidance for local-GPU agents (PAN-1641).
+  // Never fails the install; never runs an installer on the operator's behalf.
+  await setupOllamaForInstall({
+    skip: options.skipOllama,
+    platform: await Effect.runPromise(detectPlatform()),
+    spinner,
+    isTty: Boolean(process.stdin.isTTY),
+  });
 
   // Step 5d: Build Moonshine voice sidecar (AutoPreso + Voice STT)
   // Linux x64 only — the build script enforces this. Skip silently on other platforms.

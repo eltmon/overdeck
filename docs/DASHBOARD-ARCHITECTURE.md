@@ -18,6 +18,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Deacon child process** (PAN-3922):
 - The dashboard forks `dist/dashboard/deacon.js` (`src/dashboard/server/deacon-main.ts`) through `services/deacon-supervisor.ts`. Cloister and deacon-lite run only in that child, never in the dashboard process.
 - IPC, parent to child: `{type:'patrol'}` (run one patrol now) and `{type:'reload-config'}`. Child to parent: `{type:'patrol-done', at, error}` after every completed deacon-lite tick, scheduled or manual.
+- Dead-agent events (PAN-4300): each deacon-lite tick checks agents whose `state.json` says `running`. When one is absent from the backend inventory and the liveness oracle confirms it dead, the child emits `agent.heartbeat_dead` and then `agent.status_changed` with `status: stopped`, `previousStatus` set to the recorded status, and `hasLivePane: false`. It emits this pair once per death: it remembers the agent id and launch generation (`startedAt` + `lastResumeAt`) in memory and emits again only after the agent is seen alive, is resumed, or leaves the `running` list. `state.json` is not changed. A deacon child restart emits the pair once more for each agent that is still dead.
 - The supervisor keeps the latest `patrol-done` report in memory, across child restarts. Nothing is written to disk.
 - `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
 - The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
@@ -56,16 +57,22 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
 - The snapshot's agent `status` is derived when it is served, not copied from the stored
   record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
-  backend inventory (matched by terminal id, pane id or the `agentId` token, the way
-  `GET /api/agents` matches) is served `stopped`. Before the inventory has answered even
-  once (Herdr not up at dashboard boot), such rows are served `unknown`, never dead; after
-  that, a failed read keeps the last-good panes. Stored `stopped`/`error` and the `paused`
-  / `stoppedByUser` intent fields pass through unchanged. Only `agent-`, `planning-` and
-  `strike-` ids are derived, the set the inventory answers for
-  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`). A row served
-  `stopped` this way also has `hasLivePane` (and its deprecated alias
+  backend inventory is served `stopped`. Every agent-to-pane join in the server, including
+  this one, goes through `indexPanesByAgentKey` in `packages/contracts/src/backend-pane.ts`
+  (PAN-4320): the key is `agentId ?? terminalId ?? id`, and when two panes share a key —
+  a restarted Herdr agent beside its exited pane — the non-exited pane wins. On Herdr, the
+  enrichment poller's `agent.created` is the only way an agent started after dashboard boot
+  enters `agentsById` (Herdr work agents run without the PTY supervisor), and under Herdr
+  the poller skips a cycle only while the backend inventory is degraded, never for lack of a
+  tmux census. Before the inventory has answered even once (Herdr not up at dashboard boot),
+  such rows are served `unknown`, never dead; after that, a failed read keeps the last-good
+  panes. Stored `stopped`/`error` and the `paused` / `stoppedByUser` intent fields pass
+  through unchanged. Only `agent-`, `planning-` and `strike-` ids are derived, the set the
+  inventory answers for (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`).
+  A row served `stopped` this way also has `hasLivePane` (and its deprecated alias
   `hasLiveTmuxSession`) served `false`; a row served `unknown` keeps its stored flags.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
+- Outage handling never blocks the UI: see [Degraded mode (PAN-4279)](#degraded-mode-pan-4279).
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 - The Command Deck project list (`command-deck-projects`), project registry
   (`registered-projects`) and conversation list (`conversations`) still load over
@@ -89,14 +96,25 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   another HTTP error is a settled answer and shows the alert with its Retry
   button. The membership query also joins the reconnect refetch above.
 
-**Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
-starts a discuss-first conversation through `POST /api/conversations` and opens
-`/conv/:name`. The description uses a full row, with the project selector, model
-picker, and action wrapping below it. The model picker follows the configured
-provider harness unless explicit harness permutations are enabled. Click and
-Enter share a pending-launch guard. Launch errors appear below the controls;
-the draft stays available for retry. Browser coverage lives in
-`src/dashboard/frontend/tests/talk-it-through.spec.ts`.
+**Home composer** (PAN-4280): `components/home/HomeComposer.tsx`, mounted on
+both Simple and Advanced Home. It wraps the existing Launcher with the Home
+intent order from `buildHomeIntents` (agent, terminal, optional codex,
+Simple-only "Talk it through first:"), a project chip, and type-to-focus.
+Enter posts the raw typed text to `POST /api/conversations` (no `projectKey`
+when no project is chosen) and opens `/conv/:name`; the Simple discuss-first
+flow sends `seedDiscussPrompt(text)` instead. Ctrl+Enter (or the terminal row)
+writes a terminal hand-off through `components/home/pendingTerminal.ts` — a
+sessionStorage record plus a same-tab `CustomEvent` — then navigates to the
+deck; `Stage` peeks it (non-consuming) to open the drawer, and
+`TerminalDrawer` consumes it to run the command in a fresh shell, so it runs
+exactly once.
+Launch errors appear below the input; the draft stays available for retry.
+Browser coverage lives in `src/dashboard/frontend/tests/home-type-and-go.spec.ts`
+and `tests/talk-it-through.spec.ts`.
+
+`POST /api/terminals` also accepts an optional `command` (a single line, at
+most 2000 characters): once the tmux session exists, it is typed in with
+`send-keys -l` then Enter, and the response reports `commandSent`.
 
 **Pipeline retrospective button:** the Command Deck header's
 `RetrospectiveButton` (`components/CommandDeck/RetrospectiveButton.tsx`) POSTs
@@ -167,11 +185,17 @@ so neither reaches `feedback`, `scopeDrift`, `sessionHistory`, or
 door that does not exist; a real record read door would be a separate change.
 
 **DB job worker lanes:**
-- The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
-  reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
-  The `parse` lane runs `parseTranscriptSnapshot`. Transcript parsing is CPU-bound and
-  can take seconds, so its own lane cannot block interactive reads or wait behind bulk
-  sweeps.
+- Five lanes. The `read` lane handles interactive point lookups only (e.g.
+  `getConversationByName`). The `poll` lane runs the four polling aggregates —
+  `getCostsByIssueSnapshot`, `getConversationSearchStats`, `getConversationLedgerCosts`,
+  and `getAgentCostStats` — so their multi-second refreshes never queue behind, or ahead
+  of, an interactive lookup. The `long` lane handles bulk scans and reconciliation, and
+  the `semantic` lane isolates embedding and semantic-search work. The `parse` lane runs
+  `parseTranscriptSnapshot`. Transcript parsing is CPU-bound and can take seconds, so its
+  own lane cannot block interactive reads or wait behind bulk sweeps. Rule: an aggregate
+  or scan never shares a lane with a lookup that sits on an interactive path (PAN-4312 —
+  before this, the polling aggregates shared `read` with `getConversationByName`, so a
+  live conversation subscribe could wait behind a 13-second search-stats refresh).
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.
@@ -205,21 +229,50 @@ door that does not exist; a real record read door would be a separate change.
   transfer memory without repeated parsing while preserving EventBus publication and
   durable skip-cache updates.
 - Cost polling, conversation-list ledger totals, and search counters use shared worker
-  snapshots. Concurrent refreshes coalesce. Cost snapshots refresh after 15 seconds;
-  search counters refresh after 60 seconds. Successful values remain usable for at most
-  five minutes during refresh failures, with a five-second retry backoff. Search
-  configuration, provider availability, and runtime health are still read per request.
+  snapshots on the `poll` lane. Concurrent refreshes coalesce. Cost snapshots refresh
+  after 15 seconds; search counters refresh after 60 seconds and read `lastIndexedAt`
+  from `max(file_cursors.updated_at)` rather than scanning every row of the `chunks`
+  table (PAN-4312 — that scan cost ~9s on a 3GB embeddings DB). Successful values remain
+  usable for at most five minutes during refresh failures, with a five-second retry
+  backoff. Search configuration, provider availability, and runtime health are still
+  read per request.
 - Agent resource costs use one grouped worker query and a 15-second shared snapshot,
   invalidated when agent membership changes. Hourly burn remains twice the sum in the
   last 30 minutes, with the inclusive cutoff and rounding to cents preserved. SQLite's
   more accurate summation can correct a cent at a half-cent floating-point boundary.
   Resource polling no longer materializes each agent's full ledger history.
-- `subscribeConversationMessages` resolves transcript paths on the main thread and
-  shares worker parse results across subscribers. Codex consumes appended records;
-  other full-parser harnesses still parse changed files in the worker. Clients receive
-  complete initial history, then changed message/tool rows and metadata. Explicit resets
-  replace history after truncation/replacement, and metadata snapshots clear removed
-  plans or compact boundaries. Full tool results remain accessible.
+- `subscribeConversationMessages` resolves the conversation row with a `read`-lane point
+  lookup (`getConversationByName`), then resolves transcript paths on the main thread and
+  shares worker parse results across subscribers. The Claude initial transcript snapshot
+  goes through `sharedTranscriptParser('claude-initial')`: reused while the file's stat
+  signature is unchanged, with each subscriber getting its own copy of the mutable
+  parse-state containers (`parseStateFromSnapshot`), since the incremental parser mutates
+  those containers in place and a shared copy would corrupt other subscribers. A missing
+  session file (a freshly spawned conversation subscribing before its transcript exists)
+  still dispatches an uncached parse rather than throwing; `watchConversation` then polls
+  until the file appears. Codex consumes appended records; other full-parser harnesses
+  still parse changed files in the worker. Clients receive complete initial history, then
+  changed message/tool rows and metadata. Explicit resets replace history after
+  truncation/replacement, and metadata snapshots clear removed plans or compact
+  boundaries. Full tool results remain accessible.
+  - The client shows the loading skeleton until the first WS payload arrives, and falls
+    back to HTTP `GET .../messages` only after `MESSAGES_HTTP_FALLBACK_MS` (1500 ms) pass
+    without one (`useMessagesHttpFallback`, PAN-4312). Resume, switch-model, and fork
+    completion re-read over HTTP with `queryClient.fetchQuery({ ..., staleTime: 0 })`
+    rather than `invalidateQueries`, since `invalidateQueries` does not refetch a
+    disabled query, and `fetchQuery` without `staleTime: 0` would return cached data
+    without a request whenever a recent stream event left the query fresh under the
+    app's default 30 s `staleTime`.
+  - Context usage comes from the parse result (`contextUsageFromParseResult`) on both the
+    WS path and HTTP `/messages`, instead of a second file parse. `GET
+    /api/conversations/:id` uses a memoized `computeContextUsage`, keyed by session file
+    and model and validated against file size and mtime, so a repeat read with an
+    unchanged transcript never reopens the file.
+  - `/diffs` polls only while the conversation's session is alive (an ended conversation
+    cannot gain new edits), runs one `git diff` pair per repo across every edited turn
+    instead of one pair per turn, and caches its result for 30 seconds keyed by the
+    transcript's size and mtime (repo `HEAD` is not part of the key, since `git diff
+    <base> -- <paths>` compares against the working tree either way).
 - Global issue updates use `issues.delta`: complete changed rows at their original
   array positions plus the resulting length. Initial/reconnect snapshots retain all
   rows and descriptions. Shared reducers preserve order, removal, and arbitrary tracker
@@ -286,6 +339,15 @@ door that does not exist; a real record read door would be a separate change.
   lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
   names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
   subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
+- Delivery modes (PAN-4292). `HarnessBehavior.steerKind` (`packages/contracts/src/harness-behavior.ts`)
+  says how a harness can be steered: `send-now-keys` (Claude Code), `control-channel` (Pi), or
+  `null`. The composer shows its delivery selector only for a steer-capable harness (Pi only on
+  conversations), and Ctrl/Cmd+Enter sends with `deliverAs: 'steer'`; elsewhere Ctrl+Enter is
+  Enter. Both `POST /api/conversations/:name/message` and `POST /api/agents/:id/message` accept
+  the `deliverAs` body field. A Claude Code steer reaches the delivery door as
+  `submit: 'steer'`. A harness without steer, or `follow_up` on Claude Code, answers **422**
+  `steer-unsupported` and delivers nothing. When an old PTY supervisor pressed Enter instead, the
+  response carries `steerDegraded` with the reason.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
@@ -293,7 +355,9 @@ door that does not exist; a real record read door would be a separate change.
   A pending user bubble's `deliveryState` renders one of: `pending` ("Sending…"),
   `unknown` ("Delivery not confirmed"), `accepted` ("Sent · waiting for transcript"), or
   `subagent` ("Delivered to subagent · `<description>`" — Claude Code routed the message
-  into a running subagent instead of this conversation; PAN-4247). Before pasting, the
+  into a running subagent instead of this conversation; PAN-4247), or `held` ("Waiting:
+  the agent needs a permission answer first"; see "Terminal permission prompts and held
+  messages" below, PAN-4278). Before pasting, the
   composer route checks Claude Code's agent selector and switches input back to the main
   agent (PAN-4268); if that cannot be confirmed the route answers 409
   `input-target-not-main`, the toast shows the reason, and the draft stays in the editor.
@@ -370,6 +434,149 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## Terminal permission prompts and held messages (PAN-4278)
+
+Claude Code draws a blocking tool-permission prompt in a conversation's pane (`Bash command`,
+the command, sometimes a reason such as `Dangerous rm operation …`, then `Do you want to
+proceed?` with `1. Yes`, optionally `2. Yes, and always allow …`, and `No`). It fires even
+under `--permission-mode bypassPermissions`, and a background subagent's prompt draws in the
+main view too, titled `Bash command · from the <type> agent`. This applies to Claude Code
+**conversations** only; work, review and test agents keep the "blocked on a terminal dialog —
+open its terminal" toast.
+
+**Two sources, the pane decides.** `src/lib/agents/permission-prompt.ts` parses the prompt from
+a plain-text screen (fixtures in `src/lib/agents/__fixtures__/claude-code-2.1.280/`). The
+`PermissionRequest` hook (`POST /api/hooks/permission-event`) records, per conversation and per
+agent key (`agent_id ?? 'main'`), the tool, an input preview, the subagent's description
+(`subagents/agent-<id>.meta.json`) and the request time in an in-memory registry
+(`src/lib/overdeck/conversation-permission-registry.ts`); a clearing hook removes only its own
+agent's entry. Hooks alone cannot keep it current — a user Deny fires neither `PostToolUse` nor
+`Stop` — so the pane is the evidence: an entry whose prompt the pane showed and no longer shows
+is dropped on the next read, and a confirmed dashboard answer clears its entry. `conversationPendingPermission` (`src/lib/overdeck/conversation-permission.ts`)
+reads the pane through `resolveAgentPaneIo` (Herdr or tmux) and joins the two:
+`pendingPermission.answerable` is true only when the prompt is on screen. A registry entry
+without a prompt on screen is `answerable: false`. The registry is lost on a dashboard restart;
+the dialog then labels the agent from the prompt's title. `GET /api/conversations/pending-input`
+carries `pendingPermission` (and skips the PAN-3113 pane-choice check while one is pending);
+`GET /api/conversations/:id` adds `permissionRequest` to `pendingInputKinds`.
+
+**The dialog.** `TerminalPermissionDialog` opens for the oldest pending permission and names
+the conversation, the agent (`Main agent` or `Subagent: <description>`), the tool, the command
+and the reason. It offers **Allow once**, **Allow always** (only when the prompt offers it) and
+**Deny**; a non-answerable one offers only **Open terminal** and **Dismiss**. An answer posts
+`POST /api/conversations/:id/permission {signature, choice}`, which re-reads the pane, refuses
+without sending keys when the prompt is gone (`prompt-gone`) or differs (`prompt-changed`), then
+sends **arrow keys to the chosen row and Enter** — never digits, never Escape — and confirms the
+prompt left the screen (`delivery-unconfirmed` otherwise). The dialog stays in "Confirming…"
+until the feed stops reporting that prompt's signature.
+
+**Needs you and notifications.** A pending permission is a blocking `permissionRequest` row in
+Needs you, described `<agent> · <tool>` and showing `waiting <relative time>`; rows sort oldest
+first. A desktop notification fires when a prompt is first seen and again 5 and 30 minutes after
+it started waiting, while it is still pending.
+
+**Held messages.** The composer route checks for an on-screen prompt **before** switching the
+agent selector to main (PAN-4268), because that switch's `Down`/`Enter` would answer the menu.
+With a prompt up it pastes nothing and answers 409 `permission-pending`. A registry-only entry
+never holds a message: the hook is best-effort, so a lost clearing post must not block every
+send. The composer keeps the message as a `held` bubble ("Waiting: the agent needs a permission
+answer first", with Discard) and resends it once a feed read newer than the hold shows no
+on-screen (`answerable`) `pendingPermission` for that conversation, with a fresh `clientMessageId`
+and no `retry` flag —
+the receipts cache holds the 409 under the old id. A second `permission-pending` holds it again.
+Held bubbles live in memory only: a page reload drops them.
+
+**Not delivered.** When `deliverAgentMessage` returns `ok: false` (for example a Herdr refusal,
+or a Herdr client failure before `agent.prompt`), the composer route logs `[conversations]
+<name>: not delivered via <path>: <failure>` and answers 502 `not-delivered`; a delivered send
+logs `delivered via <path>`. The outbox shows **Not delivered — resend**, and Resend uses a fresh
+`clientMessageId`. The eaten-message watcher counts a redelivery only when it returned `ok: true`.
+One silent path remains by design: Herdr reports `agent_prompt_stalled`/`timeout` on an
+`agent.prompt` wait as delivered, because it types the text and Enter before it watches, and
+its contract says never to re-send. The frontend's 4-minute "Not found in transcript" timer is
+the only cover for that case.
+
+## Degraded mode (PAN-4279)
+
+When a tab loses touch with its server, the dashboard never blocks the UI. The
+last-known pages stay mounted, visible and navigable, and one banner reports
+the outage. `lib/connectionState.ts` is the single source of truth: a Zustand
+store that holds the inputs and derives one **connection phase** from them.
+
+| Phase | Meaning | Banner (`components/DegradedModeBanner.tsx`) |
+| --- | --- | --- |
+| `restarting` | A planned restart is in progress (`dashboardLifecycle.active`). | "Overdeck server is restarting — showing data from HH:MM", plus the lifecycle issue and reason. |
+| `unreachable` | The server does not answer HTTP. | "Can't reach the Overdeck server — showing data from HH:MM", with **Retry** and **Force Restart**. |
+| `delayed` | HTTP answers, but the `/ws/rpc` domain stream is reconnecting or has not bootstrapped. | "Live updates are delayed — reconnecting · showing data from HH:MM", with **Retry**. |
+| `live` | HTTP answers and the stream has bootstrapped. | Nothing. After any degraded phase, "Reconnected" shows for 2.5 s. |
+
+Precedence is `restarting` > `unreachable` > `delayed` > `live`.
+
+- **Reachability rule.** A response is *reachable* when its body is JSON with a
+  string `status` field, at any HTTP status. `/api/health` answers 503 with
+  JSON in its "incoherent" states, and the server is still up then. A network
+  error, a 3 s timeout, or a non-JSON body (a proxy's 502/503/504 HTML page) is
+  *unreachable*. Two sources write reachability: the App's 5 s `/api/version`
+  poll (2 failed polls mean unreachable, one success means reachable) and
+  EventRouter's `probeServerHealth()` (`GET /api/health`). EventRouter probes on
+  every stream retry, staleness strike and bootstrap failure, so a stream
+  outage reads `delayed`, never `unreachable`, while HTTP still works.
+- **Freshness stamp.** `HH:MM` is `lastLiveAt`: the time of the last successful
+  bootstrap or applied domain-event batch. Before any bootstrap it is the
+  cached snapshot's timestamp (`loadSnapshotCacheEntry()` in
+  `lib/snapshotCache.ts`). The clause is omitted when no time is known.
+- **First-load screen.** `App/BackendConnectionBoundary.tsx` renders the
+  first-load screen ("Can't reach the Overdeck server" or "Overdeck server is
+  restarting", "The dashboard will load as soon as the server answers.",
+  Retry) only when the tab has no snapshot at all (no cache, no bootstrap) and
+  the phase is `unreachable` or `restarting`. It is the only full-page outage
+  state. With a snapshot, the boundary always renders its children. It keeps
+  one duty: when the phase leaves `unreachable`/`restarting`, it invalidates
+  every React Query so queries that failed during the outage refetch.
+- **Bootstrap.** EventRouter races `getSnapshot` against a 20 s timeout
+  (`BOOTSTRAP_TIMEOUT_MS`). A timed-out or failed attempt sets the stream
+  down, probes health, and schedules a reconnect on a fresh transport with the
+  existing backoff (2 s doubling, 30 s cap, ±20 % jitter). Retries continue
+  forever; there is no give-up window. A generation counter makes a superseded
+  attempt a no-op, so a late answer never overwrites newer state. The 2 s
+  fallback poller runs until the first bootstrap succeeds, and it stands down
+  while a backoff reconnect is scheduled.
+- **Retry.** The banner's and first-load screen's Retry calls
+  `requestReconnect()`. EventRouter registers that on mount: it abandons any
+  in-flight attempt (even one that will never settle), resets the backoff, and
+  reconnects on a fresh transport. The banner's Retry also refetches the
+  `backend-health` poll.
+- **Write actions.** While the phase is `unreachable` or `restarting`, every
+  issue action with a server endpoint (`ISSUE_ACTIONS` entries with
+  `endpoint !== null`) is disabled but stays visible, with the reason "Can't
+  reach the Overdeck server — available again when it reconnects."
+  (`blockedOffline` in `useIssueActions.ts`). `delayed` blocks nothing, because
+  HTTP works. Mutations outside the issue-action registry keep failing with
+  their own error toasts.
+- **Held composer messages.** A prompt submitted while `unreachable` or
+  `restarting` is not POSTed. `holdSend` keeps it in the composer outbox as
+  "Waiting to send — will send when the server reconnects", and it is sent
+  once, oldest first, when the phase returns to `live`, keeping its
+  `clientMessageId`. A `/pan` command is not held: it shows "Can't reach the
+  Overdeck server — commands need a live connection" and keeps the draft. Held
+  messages live in the in-memory composer store, so a full page reload drops
+  them; drafts already persist in localStorage.
+- **Asset recovery.** `recovery.tsx`'s "Reconnecting to the dashboard…" modal
+  shows only for the `root_error_boundary` trigger, when React itself is down.
+  Chunk and asset load failures poll `/` silently, then reload.
+
+Outage surfaces that PAN-4279 removed or folded into the banner: the
+`display: none` route wrapper and "Waiting for backend data" page, the
+"Connection lost — reconnecting…" pill, both EventRouter "Server unreachable —
+Retry" overlays (the 3-minute fallback window and the 6-retry escalation), and
+the AppChrome restart, "Backend is unreachable" and "Backend is back up"
+banners. Kept on purpose: the `RootErrorBoundary` crash fallback and the reload
+circuit-breaker overlay (crashes, not connectivity), `XTerminal.tsx`'s inline
+reconnecting status, and region-scoped boundaries (`LoadingBoundary`,
+`ProjectMembershipBoundary`, the Flywheel unreachable chip). Browser coverage
+is `src/dashboard/frontend/tests/pan-4279-degraded-mode.spec.ts`, which runs on
+an isolated dashboard.
+
 ## Agents page: Live and History (PAN-3920, PAN-4197)
 
 `/agents` opens the **Live view** (`components/Agents/live/`): what is running and progressing,
@@ -441,7 +648,7 @@ The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `w
 
 | # | Condition | Reason | Section | Tone |
 | --- | --- | --- | --- | --- |
-| 1 | `blocked` | question waiting / permission prompt / plan approval | Needs you | needs-you |
+| 1 | `blocked` | question waiting / permission prompt / plan approval (a conversation's terminal permission prompt, main agent or subagent, also has its own dialog: see "Terminal permission prompts and held messages") | Needs you | needs-you |
 | 2 | operator pause | paused by you | Needs you | needs-you |
 | 3 | issue agent, attention `api-error`, or any entry with `providerError` | API error or usage limit | Needs you | stuck |
 | 4 | issue agent, attention `stuck`, `idle` | stuck · idle `<age>` | Needs you | stuck |
@@ -557,3 +764,60 @@ open with `O_NONBLOCK` and re-check the descriptor with `fstat`, so a FIFO never
 thread. A registration is written to a temp file, fsynced and `link()`ed to `registration.json`,
 so the name only appears with complete content; a file that does not parse counts as absent and
 is replaced. The transcript link is appended with the async `appendSessionIdToHistoryAsync`.
+
+## Awareness feed (PAN-4301)
+
+The Command Deck's right-hand rail is `SessionFeedSidebar`
+(`src/dashboard/frontend/src/components/sessionFeed/`) with three scopes, Needs
+you, Project and Global. Needs you is the `DecisionsPanel`. Project and Global
+show one merged feed with three tabs: All, Chats and Activity. The Git, Files and
+Comments tabs are gone because no source ever wrote rows for them; a stored
+hidden tab falls back to All.
+
+Sources, merged in `useMergedFeed.ts`:
+
+- `GET /api/conversations`, polled every 30 s (`useConversationFeed.ts`).
+- `recentActivity`, the `activity.entry` events in the dashboard store, capped
+  at 50 (`useActivityEntryFeed.ts`).
+- Memory observations (`useObservationFeed.ts`).
+
+**All shows transitions.** A conversation card is dated by a lifecycle fact:
+`endedAt` when the conversation ended, otherwise `createdAt`, labelled `ended` or
+`started`. It is never dated by transcript activity (`lastActivityAt`, the
+transcript file mtime), which moves on every write and used to pull every busy
+conversation back to "Just Now" on each poll. All keeps a conversation only when
+that lifecycle timestamp is inside a 24 h window (`FEED_WINDOW_MS`).
+
+**Chats is a recency index.** It keeps root conversations that are alive or were
+active in the last 24 h, re-dated to the recency timestamp
+(`lastActivityAt ?? lastAttachedAt ?? createdAt`, labelled `active`), newest
+first.
+
+**Gauntlet runs are one card.** Lane conversations never render as their own
+cards. `groupGauntletRuns` (`gauntletRunEntries.ts`) folds them into one run card
+per `(projectKey, gauntletRun)` with a counts line (`6 builders · 6 working`), a
+state dot and the latest event. The card's time is the newest lane report,
+failed start, end or launch, never transcript activity. A run card shows in All
+and Chats while any lane is alive or its latest event is inside the window. The
+card opens the launching conversation; its expand control lists the lanes and
+fetches `GET /api/lanes?run=<run>` only on expand, once, with no polling, for git
+facts and archived lanes.
+
+**Other rules.**
+
+- Activity entries that name an issue collapse to one card per issue: the newest
+  entry's headline, plus `N steps` for the entries folded into it.
+- Singleton runners (`flywheel-orchestrator`, `sequencer-runner`,
+  `SINGLETON_AGENT_IDS` in `@overdeck/contracts`) never render.
+- The conversation card's status dot is derived from the row: waiting when the
+  session is alive with pending input, active when it is alive and working,
+  idle otherwise.
+- **Project scope** keeps an entry when it is system-wide activity, its issue is
+  one of the project's issues, it is a conversation in the Command Deck's
+  resolved project conversation set (`projectConvIdSet`, built with
+  `resolveEffectiveProjectKey`), or it is a run card with a lane in that set.
+
+Everything above is a selector over existing rows and events; nothing is stored.
+`activity.entry` is meant for news (something shipped, failed, finished or needs
+the operator); progress telemetry belongs in `activity.detailed`. Moving the
+remaining telemetry emit sites is tracked in PAN-4306.

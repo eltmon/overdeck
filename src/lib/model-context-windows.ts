@@ -97,5 +97,8 @@ export function isGpt56LongContextVariant(modelId: string): boolean {
  * their base API model id, everything else passes through unchanged.
  */
 export function apiLaunchModelId(modelId: string): string {
+  // `ollama:<tag>` is an Overdeck-side id; the server only knows the bare tag. The
+  // literal is inlined deliberately — this module must not import ollama.ts.
+  if (modelId.startsWith('ollama:')) return modelId.slice('ollama:'.length);
   return modelId === 'k3' ? 'k3-256k' : GPT56_LONG_CONTEXT_VARIANTS[modelId] ?? modelId;
 }

@@ -314,7 +314,7 @@ const planCmd = program
   .option('--auto-start', '[deprecated: use pan start <id>] After planning completes, automatically start the work agent — used by autonomous orchestrators')
   .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse | prime-agent (defaults to role/provider settings)')
   .option('--effort <level>', 'Planning effort: low | medium | high')
   .option('--remote', 'Use remote planning workspace (Fly.io)')
   .option('--local', 'Use local planning workspace')
@@ -340,6 +340,7 @@ program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
+  .option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')
   .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
 program
   .command('answer <id> [option]')
@@ -456,7 +457,7 @@ program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Work model for this session (defaults to Cloister config)')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse | prime-agent (defaults to role/provider settings)')
   .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
   .option('--dry-run', 'Show what would be created')
@@ -476,7 +477,7 @@ program
   .command('strike <ids...>')
   .description('Spawn strike agent(s) — implement a fix on a strike branch and open a PR against main for the operator to merge. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse | prime-agent (defaults to role/provider settings)')
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')
   .option('--dry-run', 'Print what would happen without spawning')
   .action(async (ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => (await import('./commands/strike.js')).strikeCommand(ids, options));
@@ -581,6 +582,12 @@ defineUpCommand(program)
     }
 
     console.log(chalk.bold('Starting Overdeck...\n'));
+
+    // PAN-1641: start the local Ollama server only when the config names an
+    // ollama: model. Never fails `pan up`.
+    await (await import('./commands/up-ollama.js')).ensureOllamaForUp(
+      (await import('../lib/config-yaml.js')).loadConfigSync().config,
+    );
 
     // Refuse to start a detached production dashboard on top of a running
     // interactive `pan dev` session — they would fight over the same ports.

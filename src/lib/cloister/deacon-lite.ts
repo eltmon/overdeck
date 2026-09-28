@@ -103,7 +103,8 @@ export async function checkStuckWorkAgents(now = Date.now()): Promise<string[]> 
 // the dashboard's in-memory cache and correct the cache side only, via the
 // same notifier seam deacon.ts used to wire to the server's event-sourced
 // read model (src/dashboard/server/main.ts). Never writes a record or a
-// state file itself.
+// state file itself. Each confirmed death is reported once per launch
+// generation (PAN-4300); see `reportedDeadAgents`.
 // ============================================================================
 
 type AgentStoppedNotifier = (agentId: string) => void;
@@ -126,6 +127,24 @@ export function setAgentStatusChangedNotifier(fn: AgentStatusChangedNotifier | n
   agentStatusChangedNotifier = fn;
 }
 
+/**
+ * PAN-4300: agents this process already reported dead, keyed by id, valued
+ * by launch generation. Nothing writes a dead agent's state.json off
+ * `running` (the supervisor's exit appends `agent.stopped` only), so without
+ * this the same death was reported on every 60s tick — ~50k events/day.
+ * In memory by design: a deacon child restart reports each still-dead
+ * agent once more.
+ */
+const reportedDeadAgents = new Map<string, string>();
+
+function launchGeneration(agent: AgentState): string {
+  return `${agent.startedAt}|${agent.lastResumeAt ?? ''}`;
+}
+
+export function __resetReportedDeadAgentsForTests(): void {
+  reportedDeadAgents.clear();
+}
+
 export async function reconcileAgentLiveness(): Promise<string[]> {
   const actions: string[] = [];
   const runningAgents = listAgentStates({ status: 'running' });
@@ -136,8 +155,16 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
   if (inventory === null) return actions;
   const liveIds = new Set(inventory.panes.map((pane) => pane.agentId));
 
+  const runningIds = new Set(runningAgents.map((agent) => agent.id));
+  for (const id of reportedDeadAgents.keys()) {
+    if (!runningIds.has(id)) reportedDeadAgents.delete(id);
+  }
+
   for (const agent of runningAgents) {
-    if (liveIds.has(agent.id)) continue;
+    if (liveIds.has(agent.id)) {
+      reportedDeadAgents.delete(agent.id);
+      continue;
+    }
     // Absence from the inventory is not yet a death: on tmux it can be a probe
     // that failed, and on Herdr the agent may still run in the tmux session it
     // had before the host switched (review of #4018, L1) — the Herdr inventory
@@ -145,12 +172,19 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
     // never marks stopped an agent `resumeAgent` refuses as healthy. An
     // indeterminate verdict leaves the cache as it is.
     const verdict = await isAlive(agent.id);
-    if (verdict.alive || !isConfirmedDead(verdict)) continue;
+    if (verdict.alive) {
+      reportedDeadAgents.delete(agent.id);
+      continue;
+    }
+    if (!isConfirmedDead(verdict)) continue;
+    const generation = launchGeneration(agent);
+    if (reportedDeadAgents.get(agent.id) === generation) continue;
     const reason = `absent from the ${inventory.backend} inventory; ${verdict.reason}`;
 
     if (agentStoppedNotifier) {
       try {
         agentStoppedNotifier(agent.id);
+        reportedDeadAgents.set(agent.id, generation);
         actions.push(`reconcileAgentLiveness: corrected cache for ${agent.id} (confirmed dead: ${reason})`);
       } catch (err) {
         console.error(`[deacon-lite] Failed to notify cache correction for ${agent.id}:`, err);

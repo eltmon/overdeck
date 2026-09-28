@@ -24,7 +24,7 @@
  * live ephemeral state.
  */
 import type { ComposerCommandResult } from '@overdeck/contracts';
-import { sendConversationMessage, sendFailureDetails, type SendFailureDetails } from './composerSend';
+import { MessageSendError, sendConversationMessage, sendFailureDetails, type SendFailureDetails } from './composerSend';
 import { reconcileComposerEchoes, type SendIdentity } from './composerEchoes';
 import { create } from 'zustand';
 import type { ChatMessage, FailedMessage, SubagentSummary } from '../components/chat/chat-types';
@@ -242,8 +242,28 @@ interface ComposerStore {
   markNotFoundInTranscript(conversationName: string, id: string): void;
   clearOptimistic(conversationName: string): void;
 
+  /**
+   * PAN-4278: the server refused to paste because a permission prompt is up
+   * (409 permission-pending). Keep the bubble as 'held' until the prompt clears.
+   */
+  hold(conversationName: string, clientMessageId: string): void;
+  /**
+   * Resend every held message of a conversation, in order, each with a fresh
+   * clientMessageId (the receipts cache replays the 409 for the old one). A
+   * second permission-pending re-holds; any other failure goes to the outbox.
+   */
+  releaseHeld(conversationName: string): Promise<void>;
+  /** Drop a held bubble without sending it (found by id in any conversation). */
+  discardHeld(id: string): void;
+
   /** A send POST failed: preserve it in the retry outbox with its original lane. */
   failSend(conversationName: string, text: string, kind?: FailedMessage['kind'], details?: SendFailureDetails): void;
+  /** A prompt submitted while the server is unreachable: hold it, unsent, until reconnect (PAN-4279). */
+  holdSend(
+    conversationName: string,
+    text: string,
+    identity: { clientMessageId: string; deliverAs?: FailedMessage['deliverAs'] },
+  ): void;
   removeFailed(conversationName: string, id: string): void;
 
   addCommandResult(
@@ -289,6 +309,39 @@ function mutateSlice(
     result[conversationName] = next;
   }
   return result;
+}
+
+/** Conversations with a held-message release in flight (PAN-4278). */
+const releasingConversations = new Set<string>();
+
+async function releaseHeldMessages(conversationName: string): Promise<void> {
+  const { getState, setState } = useComposerStore;
+  for (;;) {
+    // Re-read each time: a discard or a new hold may have changed the list.
+    const message = getState().byConversation[conversationName]?.optimistic.find((m) => m.deliveryState === 'held');
+    if (!message) return;
+    const clientMessageId = crypto.randomUUID();
+    // Back to a fresh pending send before the await; the stall timer starts from now.
+    setState((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        optimistic: s.optimistic.map((m) => m.id === message.id
+          ? { ...m, clientMessageId, deliveryState: 'pending' as const, heldAt: undefined, createdAt: new Date().toISOString() }
+          : m),
+      })),
+    }));
+    try {
+      await sendConversationMessage(conversationName, message.text, undefined, undefined, undefined, { clientMessageId });
+      getState().acknowledgeOptimistic(conversationName, message.text, clientMessageId);
+    } catch (err) {
+      if (err instanceof MessageSendError && err.code === 'permission-pending') {
+        // The prompt is up again: re-hold and leave the rest held behind it.
+        getState().hold(conversationName, clientMessageId);
+        return;
+      }
+      getState().failSend(conversationName, message.text, 'prompt', { ...sendFailureDetails(err), clientMessageId });
+    }
+  }
 }
 
 export const useComposerStore = create<ComposerStore>((set, get) => ({
@@ -460,6 +513,38 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     }),
   })),
 
+  hold: (conversationName, clientMessageId) => set((state) => ({
+    byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+      ...s,
+      optimistic: s.optimistic.map((message) => message.clientMessageId === clientMessageId
+        ? { ...message, deliveryState: 'held' as const, heldAt: Date.now() } : message),
+    })),
+  })),
+
+  releaseHeld: async (conversationName) => {
+    // One release per conversation at a time keeps held messages in order and
+    // sent once; the store change after it finishes triggers the next one.
+    if (releasingConversations.has(conversationName)) return;
+    releasingConversations.add(conversationName);
+    try {
+      await releaseHeldMessages(conversationName);
+    } finally {
+      releasingConversations.delete(conversationName);
+    }
+  },
+
+  discardHeld: (id) => set((state) => {
+    const conversationName = Object.keys(state.byConversation).find((name) =>
+      state.byConversation[name]!.optimistic.some((message) => message.id === id && message.deliveryState === 'held'));
+    if (!conversationName) return state;
+    return {
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        optimistic: s.optimistic.filter((message) => message.id !== id),
+      })),
+    };
+  }),
+
   failSend: (conversationName, text, kind = 'prompt', details) =>
     set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => {
@@ -480,6 +565,23 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
           }],
         };
       }),
+    })),
+
+  holdSend: (conversationName, text, { clientMessageId, deliverAs }) =>
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        failed: [...s.failed, {
+          id: `failed-${crypto.randomUUID()}`,
+          text,
+          kind: 'prompt',
+          createdAt: new Date().toISOString(),
+          clientMessageId,
+          deliverAs,
+          retryable: true,
+          heldOffline: true,
+        }],
+      })),
     })),
 
   removeFailed: (conversationName, id) =>
@@ -538,20 +640,25 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     // send may still land, so this must read as a distinct message rather
     // than a retry of one the server might already be processing (PAN-4247).
     // Reusing the stale createdAt would also immediately re-trip the same
-    // 4-minute stall timer on the new optimistic bubble.
-    const isFreshIdentity = failed.notFoundInTranscript === true;
+    // 4-minute stall timer on the new optimistic bubble. A 'not-delivered'
+    // failure needs one too: the server cached that 502 under the old
+    // clientMessageId, so a retry with it would replay the failure (PAN-4278).
+    const isFreshIdentity = failed.notFoundInTranscript === true || failed.code === 'not-delivered';
+    // A held message was never POSTed (PAN-4279): its first send keeps its
+    // clientMessageId but is not a retry, and its bubble starts its clock now.
+    const neverSent = failed.heldOffline === true;
     const clientMessageId = isFreshIdentity ? crypto.randomUUID() : (failed.clientMessageId ?? crypto.randomUUID());
     if (kind === 'prompt') {
       // Preserve the ordinary prompt path byte-for-byte: move the text onto a
       // recoverable optimistic surface before clearing the outbox and POSTing.
-      addOptimistic(conversationName, text, serverBaseCount, isFreshIdentity
+      addOptimistic(conversationName, text, serverBaseCount, isFreshIdentity || neverSent
         ? { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds }
         : { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds, createdAt: failed.createdAt });
     }
     removeFailed(conversationName, failedId);
     try {
       const result = await sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
-        isFreshIdentity ? { clientMessageId } : { clientMessageId, retry: true });
+        isFreshIdentity || neverSent ? { clientMessageId } : { clientMessageId, retry: true });
       if (kind === 'prompt') get().acknowledgeOptimistic(conversationName, text, clientMessageId);
       if (kind === 'command' && result && result.kind !== 'ui') {
         addCommandResult(conversationName, text, result);
@@ -611,5 +718,6 @@ export function resetComposerStore(): void {
   uploadQueue.length = 0;
   activeUploads = 0;
   removedAttachmentIds.clear();
+  releasingConversations.clear();
   useComposerStore.setState({ byConversation: {} });
 }

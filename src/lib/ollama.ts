@@ -4,7 +4,33 @@ import { platform } from 'node:os';
 export const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 export const DEFAULT_OLLAMA_MODEL = 'nomic-embed-text';
 
-const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
+/**
+ * The tag `pan install` offers and the local-model docs are written against. It is a
+ * documentation anchor, NOT an endorsement: PAN-1641's live E2E got zero tool calls out
+ * of it in a work agent, and no local model has driven one yet. Model resolution never
+ * falls back to it either (no-hardcoded-model-fallbacks).
+ */
+export const DEFAULT_OLLAMA_AGENT_MODEL = 'gemma4:12b';
+
+/** Oldest Ollama release that serves the Anthropic Messages API claude-code speaks. */
+export const MIN_OLLAMA_VERSION = '0.14.0';
+
+/** Overdeck addresses local tags as `ollama:<tag>`. */
+export const OLLAMA_MODEL_PREFIX = 'ollama:';
+
+/**
+ * Localhost-only guard for a configured Ollama endpoint.
+ *
+ * IPv6 must be bracketed: a bare `http://::1` is not a URL the WHATWG parser accepts, so
+ * it could never produce a usable probe target — admitting it only bought a confusing
+ * timeout later instead of a clear config error at load (PAN-1641 review).
+ */
+export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\])(:\d+)?\/?$/;
+
+const OLLAMA_PROBE_TIMEOUT_MS = 5_000;
+const OLLAMA_START_DEADLINE_MS = 30_000;
+const OLLAMA_START_RETRY_DELAY_MS = 1_000;
+const OLLAMA_WARM_TIMEOUT_MS = 120_000;
 
 export interface EnsureOllamaOptions {
   baseUrl?: string;
@@ -34,6 +60,192 @@ export class OllamaEnsureError extends Error {
   }
 }
 
+export interface OllamaHealth {
+  /** The endpoint answered `/api/version` and `/api/tags` within the probe timeout. */
+  endpointReachable: boolean;
+  /** Version string reported by `/api/version`, when it answered. */
+  version?: string;
+  /** `version` is at least {@link MIN_OLLAMA_VERSION}. */
+  versionSupported: boolean;
+  /** The tag is listed by `/api/tags`. */
+  modelPresent: boolean;
+  /** Actionable operator text whenever any of the flags above is false. */
+  message?: string;
+}
+
+export interface CheckOllamaHealthOptions {
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}
+
+export interface EnsureOllamaServeOptions {
+  baseUrl?: string;
+  /** Exported as `OLLAMA_CONTEXT_LENGTH` to an Overdeck-started `ollama serve`. */
+  contextLength: number;
+  /** Skip the pre-start probe when the caller already knows the endpoint is down. */
+  knownUnhealthy?: boolean;
+  deadlineMs?: number;
+  fetchImpl?: typeof fetch;
+  startServer?: (env: NodeJS.ProcessEnv) => Promise<void>;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+export interface WarmOllamaModelOptions {
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}
+
+interface OllamaTagsResponse {
+  models?: Array<{ name?: string; model?: string }>;
+}
+
+interface OllamaPsResponse {
+  models?: Array<{ name?: string; model?: string; context_length?: number }>;
+}
+
+/** `ollama:gemma4:12b` -> `gemma4:12b`; ids without the prefix are returned unchanged. */
+export function stripOllamaPrefix(model: string): string {
+  return model.startsWith(OLLAMA_MODEL_PREFIX) ? model.slice(OLLAMA_MODEL_PREFIX.length) : model;
+}
+
+export async function isOllamaInstalled(runCommand: CommandRunner = runCommandWithSpawn): Promise<boolean> {
+  return hasOllamaBinary(runCommand);
+}
+
+/**
+ * Probe a local Ollama endpoint for the three facts a launch needs: it answers, it is new
+ * enough to serve the Anthropic Messages API, and it has the tag pulled. One AbortController
+ * bounds both requests including their bodies, so a server that accepts a connection and then
+ * stalls still reports `endpointReachable: false` after `timeoutMs`.
+ */
+export async function checkOllamaHealth(
+  tag: string,
+  baseUrl: string = DEFAULT_OLLAMA_BASE_URL,
+  options: CheckOllamaHealthOptions = {},
+): Promise<OllamaHealth> {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const timeoutMs = options.timeoutMs ?? OLLAMA_PROBE_TIMEOUT_MS;
+  const bareTag = stripOllamaPrefix(tag);
+
+  let version: string | undefined;
+  let tags: OllamaTagsResponse;
+  try {
+    ({ version, tags } = await withAbortTimeout(timeoutMs, async (signal) => {
+      const versionBody = await getJson<{ version?: string }>(`${normalizedBaseUrl}/api/version`, fetchImpl, signal);
+      const tagsBody = await getJson<OllamaTagsResponse>(`${normalizedBaseUrl}/api/tags`, fetchImpl, signal);
+      return { version: versionBody.version, tags: tagsBody };
+    }));
+  } catch {
+    return {
+      endpointReachable: false,
+      versionSupported: false,
+      modelPresent: false,
+      message: `Ollama is not reachable at ${normalizedBaseUrl}. Start it with \`ollama serve\`.`,
+    };
+  }
+
+  const versionSupported = version !== undefined && compareVersions(version, MIN_OLLAMA_VERSION) >= 0;
+  const modelPresent = tagsContain(tags, bareTag);
+
+  let message: string | undefined;
+  if (!versionSupported) {
+    message =
+      `Ollama ${version ?? 'of an unknown version'} at ${normalizedBaseUrl} is older than ${MIN_OLLAMA_VERSION}, ` +
+      `which is the first release that serves the Anthropic Messages API. Upgrade Ollama to ${MIN_OLLAMA_VERSION} or newer.`;
+  } else if (!modelPresent) {
+    message = `Ollama model ${bareTag} is not pulled. Run \`ollama pull ${bareTag}\`.`;
+  }
+
+  return { endpointReachable: true, version, versionSupported, modelPresent, message };
+}
+
+/**
+ * Make sure something is serving at `baseUrl`, starting a detached `ollama serve` when nothing is.
+ * Every probe and gap is charged against one overall deadline, so a server that never comes up
+ * fails in `deadlineMs`, not in `attempts x timeout`.
+ */
+export async function ensureOllamaServeRunning(options: EnsureOllamaServeOptions): Promise<void> {
+  const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_OLLAMA_BASE_URL);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? defaultSleep;
+  const deadlineMs = options.deadlineMs ?? OLLAMA_START_DEADLINE_MS;
+
+  if (!options.knownUnhealthy && (await isOllamaHealthyWithin(baseUrl, fetchImpl, OLLAMA_PROBE_TIMEOUT_MS))) return;
+
+  await (options.startServer ?? startOllamaServerWithSpawn)({
+    ...process.env,
+    OLLAMA_HOST: hostFromBaseUrl(baseUrl),
+    OLLAMA_CONTEXT_LENGTH: String(options.contextLength),
+  });
+
+  const deadline = now() + deadlineMs;
+  while (now() < deadline) {
+    const probeBudget = Math.min(OLLAMA_PROBE_TIMEOUT_MS, deadline - now());
+    if (await isOllamaHealthyWithin(baseUrl, fetchImpl, probeBudget)) return;
+    const retryBudget = deadline - now();
+    if (retryBudget <= 0) break;
+    await sleep(Math.min(OLLAMA_START_RETRY_DELAY_MS, retryBudget));
+  }
+
+  throw new OllamaEnsureError(
+    `Ollama did not become healthy at ${baseUrl} within ${Math.round(deadlineMs / 1_000)}s. ` +
+      'Start it with `ollama serve` and retry.',
+  );
+}
+
+/**
+ * Load a tag into VRAM and report the context window the server actually gave it.
+ *
+ * Deliberately a PLAIN load with no `options.num_ctx`: it has to mirror what the harness
+ * itself sends, because the harness's window is what the pin has to describe. Asking for a
+ * bigger window here was tried and rejected (PAN-1641) — `/api/ps` does report the requested
+ * window afterwards, but the harness's own `/v1/messages` requests carry no `num_ctx`, so
+ * Ollama serves them at the server default and the pin silently over-promises. Verified live
+ * on 0.34.4: a 65536 warm-load read back 65536, then dropped to 32768 once the agent ran.
+ *
+ * So the server is the authority twice over: `OLLAMA_CONTEXT_LENGTH` (a server-launch setting
+ * Overdeck passes only to a serve it starts itself) decides the window, and this function
+ * reports it. `pan doctor` is what tells an operator the window is too small.
+ */
+export async function warmOllamaModel(
+  tag: string,
+  baseUrl: string = DEFAULT_OLLAMA_BASE_URL,
+  options: WarmOllamaModelOptions = {},
+): Promise<{ contextLength: number }> {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const timeoutMs = options.timeoutMs ?? OLLAMA_WARM_TIMEOUT_MS;
+  const bareTag = stripOllamaPrefix(tag);
+
+  return withAbortTimeout(timeoutMs, async (signal) => {
+    const loaded = await fetchImpl(`${normalizedBaseUrl}/api/generate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: bareTag, prompt: '' }),
+      signal,
+    });
+    if (!loaded.ok) {
+      discardBody(loaded);
+      throw new OllamaEnsureError(`Ollama could not load ${bareTag} (HTTP ${loaded.status}) at ${normalizedBaseUrl}.`);
+    }
+    // Drain the load response: Ollama streams it and only finishes once the model is resident.
+    await raceAbort(loaded.text(), signal);
+
+    const running = await getJson<OllamaPsResponse>(`${normalizedBaseUrl}/api/ps`, fetchImpl, signal);
+    const entry = running.models?.find((model) => model.name === bareTag || model.model === bareTag);
+    if (!entry || typeof entry.context_length !== 'number') {
+      throw new OllamaEnsureError(
+        `Ollama did not report a context length for ${bareTag} at ${normalizedBaseUrl}. ` +
+          'Check `ollama ps` and retry.',
+      );
+    }
+    return { contextLength: entry.context_length };
+  });
+}
+
 /**
  * PAN-1641 coordination note: this shared helper is intentionally usable by both
  * OKF embedding flows and the future Pi-harness sidecar bootstrap.
@@ -44,7 +256,7 @@ export async function ensureOllama(options: EnsureOllamaOptions = {}): Promise<E
   const fetchImpl = options.fetchImpl ?? fetch;
   const runCommand = options.runCommand ?? runCommandWithSpawn;
   const startServer = options.startServer ?? startOllamaServerWithSpawn;
-  const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const sleep = options.sleep ?? defaultSleep;
   const retryDelayMs = options.retryDelayMs ?? 1_000;
   const maxHealthAttempts = options.maxHealthAttempts ?? 30;
 
@@ -85,6 +297,18 @@ async function isOllamaHealthy(baseUrl: string, fetchImpl: typeof fetch): Promis
   }
 }
 
+async function isOllamaHealthyWithin(baseUrl: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<boolean> {
+  try {
+    return await withAbortTimeout(timeoutMs, async (signal) => {
+      const response = await fetchImpl(`${baseUrl}/api/tags`, { method: 'GET', signal });
+      discardBody(response);
+      return response.ok;
+    });
+  } catch {
+    return false;
+  }
+}
+
 async function waitForOllamaHealth(
   baseUrl: string,
   fetchImpl: typeof fetch,
@@ -97,6 +321,84 @@ async function waitForOllamaHealth(
     if (attempt < maxAttempts) await sleep(retryDelayMs);
   }
   throw new OllamaEnsureError(`Ollama did not become healthy at ${baseUrl}`);
+}
+
+async function getJson<T>(url: string, fetchImpl: typeof fetch, signal: AbortSignal): Promise<T> {
+  const response = await fetchImpl(url, { method: 'GET', signal });
+  if (!response.ok) {
+    discardBody(response);
+    throw new OllamaEnsureError(`Ollama returned HTTP ${response.status} for ${url}.`);
+  }
+  return (await raceAbort(response.json(), signal)) as T;
+}
+
+/**
+ * Run `work` under a single AbortController that fires after `timeoutMs`. The abort rejects the
+ * returned promise even when the underlying body read never settles on its own.
+ */
+async function withAbortTimeout<T>(timeoutMs: number, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new OllamaEnsureError(`Ollama request timed out after ${timeoutMs}ms.`));
+  }, timeoutMs);
+  try {
+    return await raceAbort(work(controller.signal), controller.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function raceAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
+
+function discardBody(response: Response): void {
+  void response.body?.cancel().catch(() => undefined);
+}
+
+function tagsContain(tags: OllamaTagsResponse, bareTag: string): boolean {
+  const candidates = bareTag.includes(':') ? [bareTag] : [bareTag, `${bareTag}:latest`];
+  return tags.models?.some((entry) =>
+    candidates.some((candidate) => entry.name === candidate || entry.model === candidate),
+  ) ?? false;
+}
+
+function compareVersions(left: string, right: string): number {
+  const leftParts = versionParts(left);
+  const rightParts = versionParts(right);
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) return difference < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
+function versionParts(version: string): number[] {
+  return version
+    .trim()
+    .split('.')
+    .map((part) => {
+      const parsed = Number.parseInt(part, 10);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    });
+}
+
+function hostFromBaseUrl(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return baseUrl.replace(/^https?:\/\//, '');
+  }
+}
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 async function installOllamaWithPlatformCommand(): Promise<void> {
@@ -121,9 +423,9 @@ async function runCommandWithSpawn(command: string, args: string[]): Promise<voi
   });
 }
 
-async function startOllamaServerWithSpawn(): Promise<void> {
+async function startOllamaServerWithSpawn(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('ollama', ['serve'], { stdio: 'ignore', detached: true });
+    const child = spawn('ollama', ['serve'], { stdio: 'ignore', detached: true, env });
     child.once('error', reject);
     child.once('spawn', () => {
       child.unref();

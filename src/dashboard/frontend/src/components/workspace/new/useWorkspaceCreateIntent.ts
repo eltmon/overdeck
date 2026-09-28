@@ -25,6 +25,8 @@ export interface ResolvedWorkspaceIntent {
   isGitRepository: boolean;
   wouldCreateWorktree: boolean;
   unregisteredTargetPath: boolean;
+  /** Branches matching the typed name (PAN-4281 FR-12); absent from older servers. */
+  branchCandidates?: string[];
   findings: WorkspaceIntentFinding[];
 }
 
@@ -63,6 +65,13 @@ export function useWorkspaceCreateIntent({
     ...(parentBranch ? { parentBranch } : {}),
   }), [effectiveTargetPath, mode, name, parentBranch, projectKey]);
 
+  // Resolve also asks for branches matching the typed name, for the Smart
+  // field's suggestions. Create never sends it: it only shapes the preview.
+  const resolveBody = useMemo(
+    () => (name.trim().length >= 2 ? { ...requestBody, branchQuery: name.trim() } : requestBody),
+    [name, requestBody],
+  );
+
   useEffect(() => {
     setIntent(null);
     setStale(true);
@@ -75,7 +84,7 @@ export function useWorkspaceCreateIntent({
             method: 'POST',
             credentials: 'include',
             headers: await dashboardMutationJsonHeaders(),
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(resolveBody),
           });
           if (!response.ok) {
             if (seq === resolveSeq.current) {
@@ -97,7 +106,7 @@ export function useWorkspaceCreateIntent({
     }, RESOLVE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [requestBody]);
+  }, [resolveBody]);
 
   const findingsFor = useCallback(
     (field: WorkspaceIntentFinding['field']) => (intent?.findings ?? []).filter((finding) => finding.field === field),

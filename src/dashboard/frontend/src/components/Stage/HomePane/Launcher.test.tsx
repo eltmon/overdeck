@@ -1,12 +1,17 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Launcher, intentLabel, DEFAULT_INTENTS } from './Launcher'
+import { useLauncherFocusStore } from '../launcherFocusStore'
 
 describe('intentLabel', () => {
   it('follows the terminal/web/agent label rules', () => {
     expect(intentLabel({ id: 't', kind: 'terminal' })).toBe('Run in terminal:')
     expect(intentLabel({ id: 'w', kind: 'web' })).toBe('Search the web:')
     expect(intentLabel({ id: 'c', kind: 'agent', agentName: 'Claude Code' })).toBe('Ask Claude Code:')
+  })
+
+  it('renders the talk row label', () => {
+    expect(intentLabel({ id: 'talk', kind: 'talk' })).toBe('Talk it through first:')
   })
 })
 
@@ -108,6 +113,14 @@ describe('Launcher', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('forwards inputTestId and inputRef to the input', () => {
+    const ref = { current: null as HTMLInputElement | null }
+    render(<Launcher inputRef={ref} inputTestId="home-composer-input" />)
+    const input = screen.getByTestId('home-composer-input')
+    expect(input).toBe(screen.getByRole('textbox'))
+    expect(ref.current).toBe(input)
+  })
+
   it('hides extras in compact mode but shows them otherwise', () => {
     const extras = <div data-testid="history">recent</div>
     const { rerender } = render(<Launcher extras={extras} />)
@@ -118,5 +131,24 @@ describe('Launcher', () => {
     expect(screen.queryByTestId('history')).toBeNull()
     // Quick-action rows still render in compact mode.
     expect(screen.getAllByRole('option')).toHaveLength(DEFAULT_INTENTS.length)
+  })
+})
+
+describe('Launcher focus request (PAN-4281 FR-11)', () => {
+  it('focuses when a focus request matches its deck', () => {
+    useLauncherFocusStore.getState().requestFocus('widget')
+    render(<Launcher focusKey="widget" />)
+
+    expect(screen.getByRole('textbox')).toHaveFocus()
+    expect(useLauncherFocusStore.getState().pendingDeckKey).toBeNull()
+  })
+
+  it('ignores a request for another deck', () => {
+    useLauncherFocusStore.getState().requestFocus('other')
+    render(<Launcher focusKey="widget" />)
+
+    expect(screen.getByRole('textbox')).not.toHaveFocus()
+    expect(useLauncherFocusStore.getState().pendingDeckKey).toBe('other')
+    useLauncherFocusStore.getState().clear()
   })
 })

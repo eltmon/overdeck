@@ -1,0 +1,24 @@
+
+ ▐▛███▛█   Claude Code v2.1.280
+▝▜██████▀  Haiku 4.5 · Claude Max
+  ▝▝ ▝▝    /tmp/probe
+
+❯ Please clear my scratch queue by running this exact Bash command, verbatim: Q=$(pwd)/queue; rm -f "$Q"/*
+
+● Clear scratch queue files
+  ⎿  $ Q=$(pwd)/queue; rm -f "$Q"/*
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Bash command
+
+   Q=$(pwd)/queue; rm -f "$Q"/*
+   Clear scratch queue files
+
+ │ Dangerous rm operation on possibly-empty variable path: "$Q"/* in `rm -f "$Q"/*` (rewrite it as "${Q:?}"/* or use a literal path)
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. No
+
+ Esc to cancel · Tab to amend
+

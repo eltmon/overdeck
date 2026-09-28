@@ -19,6 +19,7 @@ import { PermissionsSection } from './sections/PermissionsSection';
 import { TieredExecutionSection } from './sections/TieredExecutionSection';
 import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
 import { CloisterSection } from './sections/CloisterSection';
+import { CloseOutSection } from './sections/CloseOutSection';
 import { RemoteSection } from './sections/RemoteSection';
 import { MemorySection } from './sections/MemorySection';
 import { BackgroundAiSection } from './sections/BackgroundAiSection';
@@ -525,6 +526,12 @@ export function SettingsPage() {
         markSaveError={markSaveError}
         markSaved={markSaved}
         setCloisterFormData={setCloisterFormData}
+        setSaveStatus={setSaveStatus}
+      />
+
+      <CloseOutSection
+        markSaveError={markSaveError}
+        markSaved={markSaved}
         setSaveStatus={setSaveStatus}
       />
 

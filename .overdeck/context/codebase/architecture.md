@@ -40,8 +40,13 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
 - `github-quota/` (PAN-4264) — GitHub API quota metering: the per-hour ledger,
   `runGh` (metered `gh` exec), `withGitHubCaller`, App/PAT metering
-  (`rest-meter.ts`), the cross-process pause gate, the `/rate_limit` sampler
-  and the quota snapshot. Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
+  (`rest-meter.ts`), the cross-process pause gate, the GraphQL `rateLimit`
+  sampler (REST `/rate_limit` for the REST bucket) and the quota snapshot.
+  Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
+- `agents/permission-prompt.ts` + `overdeck/conversation-permission*.ts` (PAN-4278) —
+  parse Claude Code's terminal permission prompt from a pane, the in-memory
+  PermissionRequest hook registry, the conversation `pendingPermission` feed field,
+  and the arrows + Enter answer route. See `docs/DASHBOARD-ARCHITECTURE.md`.
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
   legacy `model_selection.specialist_harnesses` (PAN-636).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
@@ -131,6 +136,10 @@ no local tmux session — never assume tmux discovery covers them.
 memoized 3 s); entry `state` comes from the pane inventory, never stored
 status. PAN-4197 makes the Live view (`?scope=live`) the default and keeps the
 Directory as `?view=history`.
+
+## Awareness rail (Command Deck right column)
+
+`components/sessionFeed/SessionFeedSidebar.tsx`: Needs you = `DecisionsPanel`; Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Awareness feed".
 
 ## Flywheel (PAN-3964, derived view)
 

@@ -87,6 +87,7 @@ export async function buildHarnessPolicyDecisions(
       opencode: canUseHarness('opencode', model, authMode),
       'kimi-code': canUseHarness('kimi-code', model, authMode),
       muse: canUseHarness('muse', model, authMode),
+      'prime-agent': canUseHarness('prime-agent', model, authMode),
     };
   }
   return decisions;

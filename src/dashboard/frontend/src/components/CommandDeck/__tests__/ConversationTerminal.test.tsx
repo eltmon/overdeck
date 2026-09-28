@@ -73,6 +73,11 @@ describe('ConversationTerminal', () => {
     expect(screen.queryByTestId('context-window-meter')).toBeNull();
   });
 
+  it('renders the fallback outcome label for an ended session (PAN-4290)', () => {
+    renderTerminal({ ...baseConversation, status: 'ended', sessionAlive: false });
+    expect(screen.getByText('Session ended')).toBeInTheDocument();
+  });
+
   it('sends the resume message by default', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ ...baseConversation, sessionAlive: true }));
     vi.stubGlobal('fetch', fetchMock);

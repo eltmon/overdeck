@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import type { AgentSnapshot, BackendPane } from '@overdeck/contracts';
 
 import { deriveServedAgentStatuses } from '../read-model.js';
+import { BackendPaneCache } from '../services/backend-inventory.js';
 
 function row(id: string, status: AgentSnapshot['status'], extra: Partial<AgentSnapshot> = {}): AgentSnapshot {
   return { id, issueId: 'PAN-4098', status, ...extra } as AgentSnapshot;
@@ -144,6 +145,32 @@ describe('deriveServedAgentStatuses', () => {
   it('leaves rows the inventory cannot answer for (non-managed ids) at their stored status', () => {
     const served = deriveServedAgentStatuses([row('sequencer-runner', 'running')], {}, 'trusted');
     expect(served[0]?.status).toBe('running');
+  });
+
+  // PAN-4320 (issue AC 3): drive the cache with the real Herdr event
+  // sequence — pane-created carries no agentId yet, metadata brings it — and
+  // confirm the served status tracks the pane through to its exit.
+  it('serves a Herdr agent running once its pane-created + metadata land, then stopped on exit', () => {
+    const cache = new BackendPaneCache();
+    cache.apply({ kind: 'pane-created', paneId: 'wKZ:p3', workspaceId: 'wKZ', terminalId: 'term_65c8b78d3f05a5df' });
+    cache.apply({
+      kind: 'metadata',
+      paneId: 'wKZ:p3',
+      tokens: { issue: 'PAN-4311', role: 'work', harness: 'claude-code', model: 'm' },
+      agentId: 'agent-pan-4311',
+    });
+    const panes = Object.fromEntries(cache.list().map((p) => [p.id, p]));
+
+    const running = deriveServedAgentStatuses([row('agent-pan-4311', 'running')], panes, 'trusted');
+    expect(running[0]?.status).toBe('running');
+
+    cache.apply({ kind: 'pane-exited', paneId: 'wKZ:p3', code: 0 });
+    const stopped = deriveServedAgentStatuses(
+      [row('agent-pan-4311', 'running')],
+      Object.fromEntries(cache.list().map((p) => [p.id, p])),
+      'trusted',
+    );
+    expect(stopped[0]?.status).toBe('stopped');
   });
 });
 

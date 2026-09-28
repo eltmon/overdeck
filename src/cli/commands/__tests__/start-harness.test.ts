@@ -104,6 +104,16 @@ describe('pan start --harness flag (PAN-636)', () => {
     expect(stderrSpy).not.toHaveBeenCalled()
   })
 
+  it('accepts --harness prime-agent (PAN-3668)', async () => {
+    agentMocks.getProviderAuthMode.mockResolvedValueOnce('api-key')
+    const { __testInternals } = await import('../start.js')
+    await expect(
+      __testInternals.resolveExplicitHarnessFlag('prime-agent', 'gpt-5.4'),
+    ).resolves.toBe('prime-agent')
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+  })
+
   it('rejects --harness pi (invalid value) with non-zero exit and reason on stderr', async () => {
     const { issueCommand } = await import('../start.js')
     await expect(

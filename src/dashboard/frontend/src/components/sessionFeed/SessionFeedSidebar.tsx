@@ -11,6 +11,7 @@ import { usePendingInputSubjects } from '../../lib/useDecisions';
 import { navigateToDecisionSubject } from '../../lib/navigateToDecision';
 import { DecisionsPanel } from '../DecisionsPanel';
 import { describePendingInput } from '../../lib/pendingInput';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { LoadingBoundary } from '../primitives/LoadingBoundary';
 
@@ -37,33 +38,39 @@ interface SessionFeedSidebarProps {
    */
   scopeSwitcher?: boolean;
   projectIssueIds?: readonly string[];
+  /**
+   * PAN-4301: conversations the Command Deck resolved to the selected project via
+   * resolveEffectiveProjectKey; scopes conversation and run entries in Project scope.
+   */
+  projectConversationIds?: ReadonlySet<number>;
 }
 
 type FeedScope = 'needs' | 'project' | 'global';
 const FEED_SCOPE_STORAGE_KEY = 'overdeck.ui.awarenessScope';
 
-const TABS: Array<{ id: SessionFeedTab; label: string }> = [
+/**
+ * PAN-4301 FR-16: the Git, Files and Comments tabs never had a source with
+ * rows, so the bar shows only the tabs that do. A stored hidden tab falls back
+ * to All.
+ */
+type VisibleSessionFeedTab = Extract<SessionFeedTab, 'all' | 'chats' | 'activity'>;
+
+const TABS: Array<{ id: VisibleSessionFeedTab; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'chats', label: 'Chats' },
-  { id: 'files', label: 'Files' },
-  { id: 'git', label: 'Git' },
-  { id: 'comments', label: 'Comments' },
   { id: 'activity', label: 'Activity' },
 ];
 
-const EMPTY_STATES: Record<SessionFeedTab, string> = {
+const EMPTY_STATES: Record<VisibleSessionFeedTab, string> = {
   all: 'No session activity yet.',
   chats: 'No chats yet.',
-  files: 'Files feed coming soon.',
-  git: 'No git activity yet.',
-  comments: 'Comments feed coming soon.',
   activity: 'No activity updates yet.',
 };
 
 let loggedGitNavigationNoop = false;
 
-export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false, scopeSwitcher = false, projectIssueIds }: SessionFeedSidebarProps) {
-  const [activeTab, setActiveTab] = useState<SessionFeedTab>(readStoredTab);
+export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false, scopeSwitcher = false, projectIssueIds, projectConversationIds }: SessionFeedSidebarProps) {
+  const [activeTab, setActiveTab] = useState<VisibleSessionFeedTab>(readStoredTab);
   const [scope, setScope] = useState<FeedScope>(readStoredScope);
 
   useEffect(() => {
@@ -85,6 +92,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
   // honor the legacy issueIds/unscoped props verbatim (backward compatible).
   const effIssueIds = scopeSwitcher ? (scope === 'project' ? projectIssueIds : undefined) : issueIds;
   const effUnscoped = scopeSwitcher ? false : unscoped;
+  const effConversationIds = scopeSwitcher && scope === 'project' ? projectConversationIds : undefined;
   const showFeed = !scopeSwitcher || scope !== 'needs';
 
   return (
@@ -138,7 +146,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         // decision, which is the whole point of having somewhere to find it again.
         <DecisionsPanel />
       ) : (
-        <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} />
+        <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} now={now} />
       )}
 
       {showFeed && (
@@ -161,11 +169,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {isStubTab(activeTab) ? (
-              <StubTabEmptyState tab={activeTab} />
-            ) : (
-              <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} issueIds={effIssueIds} unscoped={effUnscoped} />
-            )}
+            <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} issueIds={effIssueIds} unscoped={effUnscoped} conversationIds={effConversationIds} />
           </div>
         </>
       )}
@@ -184,7 +188,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
  * ChannelPermissionDialog — is reachable). Scoped to `issueIds` (Project
  * Activity) unless `unscoped` (home Activity Feed). PAN-1395 / PAN-1520.
  */
-function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?: readonly string[]; unscoped?: boolean; showEmpty?: boolean }) {
+function NeedsYouSection({ issueIds, unscoped, showEmpty = false, now = new Date() }: { issueIds?: readonly string[]; unscoped?: boolean; showEmpty?: boolean; now?: Date }) {
   const subjects = usePendingInputSubjects();
   const issues = useDashboardStore(selectIssues);
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
@@ -232,6 +236,7 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
       detail: string;
       count: number;
       title: string;
+      since: string;
     }> = [];
     for (const subject of scoped) {
       const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
@@ -248,6 +253,7 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
       const detail =
         (!auqResolved ? q?.questions?.[0]?.question : undefined) ??
         (!planResolved && planToolUseId ? 'Plan awaiting your approval — click to review' : undefined) ??
+        subject.permissionSummary ??
         describePendingInput(subject.kinds);
       const label = formatIssueRef(
         subject.issueId,
@@ -265,9 +271,11 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
         detail,
         count,
         title: describePendingInput(subject.kinds),
+        since: subject.since,
       });
     }
-    return out;
+    // PAN-4278 — oldest wait first; rows without a timestamp keep their order after.
+    return out.sort((a, b) => (a.since && b.since ? a.since.localeCompare(b.since) : Number(!a.since) - Number(!b.since)));
   }, [scoped, answeredToolUseIds, dismissedSubjectIds, resolvedPlanToolUseIds, dismissedPlanSubjectIds, titleByIssueId]);
 
   // Keep the section mounted while any raw subject exists so AnimatePresence can
@@ -318,6 +326,9 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
                 {row.count > 1 ? ` · ${row.count} questions` : ''}
               </span>
               <span className="w-full truncate text-xs text-muted-foreground">{row.detail}</span>
+              {row.since && (
+                <span className="text-[10px] text-muted-foreground">waiting {formatRelativeTime(row.since, now)}</span>
+              )}
             </motion.button>
           ))}
         </AnimatePresence>
@@ -326,37 +337,37 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
   );
 }
 
-type WiredSessionFeedTab = Exclude<SessionFeedTab, 'files' | 'comments'>;
-
-type StubSessionFeedTab = Extract<SessionFeedTab, 'files' | 'comments'>;
-
-function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: WiredSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date; issueIds?: readonly string[]; unscoped?: boolean }) {
-  const feed = useMergedFeed(tab);
+function FeedTabContent({ tab, onSelect, now, issueIds, unscoped, conversationIds }: { tab: VisibleSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date; issueIds?: readonly string[]; unscoped?: boolean; conversationIds?: ReadonlySet<number> }) {
+  const feed = useMergedFeed(tab, now.getTime());
   // PAN-1561 scoping: `unscoped` keeps only entries with no issue (the No-project
   // bucket); otherwise `issueIds` keeps entries for those issues (case-insensitive).
+  // PAN-4301 FR-15: `conversationIds` also keeps the project's own conversations
+  // and any run card with a lane among them, so issue-less lanes show in Project.
   const idSet = useMemo(
     () => (issueIds ? new Set(issueIds.map((id) => id.toLowerCase())) : null),
     [issueIds],
   );
-  const scope = useMemo(() => {
+  const scopedEntries = useMemo(() => {
     const keep = (e: SessionFeedEntry) => {
       // System news (dashboard restarts, supervisor actions) is relevant in
       // every scope — never drop it through the issue filter.
       if (e.kind === 'activity' && e.systemWide) return true;
-      return unscoped ? e.issueId == null : !idSet || (!!e.issueId && idSet.has(e.issueId.toLowerCase()));
+      if (unscoped) return e.issueId == null;
+      if (!idSet && !conversationIds) return true;
+      if (e.issueId && idSet?.has(e.issueId.toLowerCase())) return true;
+      if (e.kind === 'conversation') return conversationIds?.has(e.conversationId) ?? false;
+      if (e.kind === 'gauntlet_run') return e.laneConversationIds.some((id) => conversationIds?.has(id));
+      return false;
     };
-    return {
-      entries: unscoped || idSet ? feed.entries.filter(keep) : feed.entries,
-      allEntries: unscoped || idSet ? feed.allEntries.filter(keep) : feed.allEntries,
-    };
-  }, [feed.entries, feed.allEntries, idSet, unscoped]);
-  const scopedEntries = scope.entries;
-  const scopedAll = scope.allEntries;
+    return unscoped || idSet || conversationIds ? feed.entries.filter(keep) : feed.entries;
+  }, [feed.entries, idSet, unscoped, conversationIds]);
   const groups = useMemo(
     () => groupByContiguousLabel(scopedEntries, (entry) => formatBucketLabel(entry.timestamp, now)),
     [scopedEntries, now],
   );
-  const isEmpty = tab === 'all' ? scopedAll.length === 0 : scopedEntries.length === 0;
+  // PAN-4301: All filters by the 24 h window, so an All view whose entries are
+  // all out of window shows its empty state like every other tab.
+  const isEmpty = scopedEntries.length === 0;
 
   if (feed.error) return <p className="text-xs text-destructive">{feed.error.message}</p>;
   if (feed.isLoading) return <LoadingBoundary label="The activity feed" timeoutMs={8000}><p className="text-xs text-muted-foreground">Loading activity…</p></LoadingBoundary>;
@@ -377,24 +388,7 @@ function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: Wired
   );
 }
 
-function StubTabEmptyState({ tab }: { tab: StubSessionFeedTab }) {
-  const description = tab === 'files'
-    ? 'Aggregate file changes are not wired into the session feed yet.'
-    : 'Issue comments are not cached for the session feed yet.';
-
-  return (
-    <div data-testid={`session-feed-empty-${tab}`} className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-      <p className="font-medium text-foreground">{EMPTY_STATES[tab]}</p>
-      <p className="mt-1">{description}</p>
-    </div>
-  );
-}
-
-function isStubTab(tab: SessionFeedTab): tab is StubSessionFeedTab {
-  return tab === 'files' || tab === 'comments';
-}
-
-function readStoredTab(): SessionFeedTab {
+function readStoredTab(): VisibleSessionFeedTab {
   if (typeof window === 'undefined') return 'all';
   const value = window.localStorage.getItem(SESSION_FEED_TAB_STORAGE_KEY);
   return isSessionFeedTab(value) ? value : 'all';
@@ -406,16 +400,11 @@ function readStoredScope(): FeedScope {
   return value === 'needs' || value === 'project' || value === 'global' ? value : 'project';
 }
 
-function isSessionFeedTab(value: string | null): value is SessionFeedTab {
-  return value === 'all'
-    || value === 'chats'
-    || value === 'files'
-    || value === 'git'
-    || value === 'comments'
-    || value === 'activity';
+function isSessionFeedTab(value: string | null): value is VisibleSessionFeedTab {
+  return value === 'all' || value === 'chats' || value === 'activity';
 }
 
-function navigateToFeedEntry(entry: SessionFeedEntry) {
+export function navigateToFeedEntry(entry: SessionFeedEntry) {
   if (typeof window === 'undefined') return;
 
   switch (entry.kind) {
@@ -429,6 +418,11 @@ function navigateToFeedEntry(entry: SessionFeedEntry) {
       }
       if (entry.issueId) pushRoute(`/command-deck?issue=${encodeURIComponent(entry.issueId)}&tab=activity`);
       return;
+    case 'gauntlet_run': {
+      const target = entry.orchestratorName ?? entry.lanes[0]?.name;
+      if (target) pushRoute(`/conv/${encodeURIComponent(target)}`);
+      return;
+    }
     case 'git':
       if (!loggedGitNavigationNoop) {
         console.debug('Session feed git entries do not have a destination yet.');

@@ -3,8 +3,10 @@ import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
+import type { DerivedIssueState } from '@overdeck/contracts';
 import { SessionPanel } from './SessionPanel';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
+import { useDashboardStore } from '../../../lib/store';
 
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
@@ -92,6 +94,7 @@ describe('SessionPanel', () => {
     await fetchControl.assertNoUnexpectedRequests();
     vi.unstubAllGlobals();
     localStorage.clear();
+    useDashboardStore.setState({ derivedIssueStateByIssueId: {}, agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
   });
 
   it('renders toggle bar with Conversation and Terminal tabs', () => {
@@ -185,9 +188,26 @@ describe('SessionPanel', () => {
   });
 
   it('shows session ended empty state for ended session terminal view', () => {
-    render(<SessionPanel session={makeSession({ presence: 'ended' })} />);
+    // No issueId and no derived state seeded — the outcome derivation has
+    // nothing to work with, so it falls back to the plain label.
+    render(<SessionPanel session={makeSession({ presence: 'ended', status: 'stopped' })} />);
     fireEvent.click(screen.getByText('Terminal'));
     expect(screen.getByText('Session ended')).toBeInTheDocument();
+  });
+
+  it('shows Merged for an ended session whose issue has a merged PR', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'PAN-821': {
+          issueId: 'PAN-821',
+          state: 'closed',
+          pr: { url: 'https://github.com/o/r/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true, merged: true },
+        } as DerivedIssueState,
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    render(<SessionPanel issueId="PAN-821" session={makeSession({ presence: 'ended', status: 'stopped' })} />);
+    fireEvent.click(screen.getByText('Terminal'));
+    expect(screen.getByText('Merged')).toBeInTheDocument();
   });
 
   it('still shows conversation for ended session with transcript', () => {

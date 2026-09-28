@@ -18,6 +18,7 @@ import {
   MAX_TERMINALS_PER_GROUP,
   type ThreadTerminalGroup,
 } from './types'
+import { PENDING_TERMINAL_EVENT, takePendingTerminal } from '../home/pendingTerminal'
 
 /**
  * TerminalDrawer — a resizable terminal drawer stacked below the deck content
@@ -41,13 +42,13 @@ function clampDrawerHeight(height: number): number {
 }
 
 // ─── Backend seam: ad-hoc tmux sessions via /api/terminals (PAN-1545) ──────────
-async function createTerminalSession(cwd?: string): Promise<string | undefined> {
+async function createTerminalSession(cwd?: string, command?: string): Promise<string | undefined> {
   try {
     const res = await fetch('/api/terminals', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cwd ? { cwd } : {}),
+      body: JSON.stringify({ ...(cwd ? { cwd } : {}), ...(command ? { command } : {}) }),
     })
     if (!res.ok) return undefined
     const data = (await res.json()) as { sessionName?: string }
@@ -164,15 +165,16 @@ export function TerminalDrawer({ threadId, cwd }: TerminalDrawerProps) {
   // ── Bootstrap: replace the placeholder "default" with a real tmux session ───
   // Surfaces failures (e.g. an expired dashboard session → 401) with a Retry
   // affordance instead of hanging forever on "Starting terminal…".
+  const hasReal = normalizedTerminalIds.some((id) => id !== DEFAULT_THREAD_TERMINAL_ID)
   const bootstrappingRef = useRef(false)
   const [bootstrapError, setBootstrapError] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   useEffect(() => {
-    const hasReal = normalizedTerminalIds.some((id) => id !== DEFAULT_THREAD_TERMINAL_ID)
     if (hasReal || bootstrappingRef.current) return
     bootstrappingRef.current = true
     setBootstrapError(false)
-    void createTerminalSession(cwd)
+    const command = takePendingTerminal(threadId) ?? undefined
+    void createTerminalSession(cwd, command)
       .then((name) => {
         if (name) {
           newTerminal(threadId, name)
@@ -182,7 +184,32 @@ export function TerminalDrawer({ threadId, cwd }: TerminalDrawerProps) {
         }
       })
       .finally(() => { bootstrappingRef.current = false })
-  }, [normalizedTerminalIds, cwd, threadId, newTerminal, closeTerminal, retryNonce])
+  }, [hasReal, cwd, threadId, newTerminal, closeTerminal, retryNonce])
+
+  // ── Terminal hand-off (PAN-4280, D5b): a typed command from the Home
+  // composer or a deck Launcher can arrive after the drawer already has a
+  // real terminal. Bump `pendingNonce` on the same-tab event so this effect
+  // re-checks; if bootstrap is mid-flight, `hasReal` is still false and this
+  // no-ops, then re-runs once bootstrap flips it to true.
+  const [pendingNonce, setPendingNonce] = useState(0)
+  useEffect(() => {
+    const onPendingTerminal = (e: Event) => {
+      const detail = (e as CustomEvent<{ deckKey: string }>).detail
+      if (detail?.deckKey === threadId) setPendingNonce((n) => n + 1)
+    }
+    window.addEventListener(PENDING_TERMINAL_EVENT, onPendingTerminal)
+    return () => window.removeEventListener(PENDING_TERMINAL_EVENT, onPendingTerminal)
+  }, [threadId])
+
+  useEffect(() => {
+    if (!hasReal) return
+    const command = takePendingTerminal(threadId)
+    if (!command) return
+    void createTerminalSession(cwd, command).then((name) => {
+      if (name) { newTerminal(threadId, name); pokeResize() }
+      else toast.error('Could not start terminal (dashboard session expired?)')
+    })
+  }, [hasReal, pendingNonce, threadId, cwd, newTerminal])
 
   // ── Action handlers ─────────────────────────────────────────────────────────
   const handleNew = useCallback(() => {

@@ -10,6 +10,7 @@ import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycle } from '../persistent-logger.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { hostTransportFor } from '../runtimes/host-transport.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
@@ -148,7 +149,7 @@ const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-m
 export function resolveAgentDeliveryMethod(
   state: Pick<AgentState, 'harness' | 'deliveryMethod'> | null | undefined,
 ): 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined {
-  if (state?.harness === 'acp' || state?.harness === 'opencode') return 'auto';
+  if (hostTransportFor(state?.harness) !== null) return 'auto';
   return resilientDeliveryMethod(state?.deliveryMethod);
 }
 
@@ -187,10 +188,44 @@ function deliverWithOptionalKey(
   caller: string,
   deliveryMethod: DeliveryMethod,
   dedupKey: string | undefined,
+  steer = false,
 ) {
+  if (steer) return deliverAgentMessage(normalizedId, message, caller, deliveryMethod, { submit: 'steer' });
   return dedupKey !== undefined
     ? deliverAgentMessage(normalizedId, message, caller, deliveryMethod, { dedupKey })
     : deliverAgentMessage(normalizedId, message, caller, deliveryMethod);
+}
+
+/**
+ * PAN-4292: why a steer to this target must be refused, or undefined when it
+ * may proceed. A steer interrupts a running Claude Code turn, so it needs the
+ * send-now harness and a live, local, running agent; anything else is refused
+ * outright rather than queued, because a queued steer is just a message.
+ */
+async function steerRefusalReason(
+  normalizedId: string,
+  harness: RuntimeName,
+  agentState: AgentState | null,
+  dedupKey: string | undefined,
+): Promise<string | undefined> {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.steerKind !== 'send-now-keys') {
+    const piHint = behavior.steerKind === 'control-channel' ? ', or steer Pi from the dashboard composer' : '';
+    return `steer is supported for Claude Code only; ${normalizedId} runs ${behavior.displayName}. Send it without steer to deliver a normal message${piHint}.`;
+  }
+  if (dedupKey !== undefined) return `a keyed message cannot steer ${normalizedId}`;
+  const notRunning = agentState?.paused === true ? 'paused'
+    : getAgentRuntimeStateSync(normalizedId)?.state === 'suspended' ? 'suspended'
+      : agentState?.status === 'stopped' ? 'stopped'
+        : undefined;
+  if (notRunning) {
+    return `${normalizedId} is ${notRunning}, so it has no running turn to interrupt. Send it without steer to queue the message.`;
+  }
+  const { loadRemoteAgentState } = await import('../remote/remote-agents.js');
+  if (loadRemoteAgentState(normalizedId)?.vmName) {
+    return `steer is not supported for remote agents (${normalizedId}). Send it without steer to deliver a normal message.`;
+  }
+  return undefined;
 }
 
 /**
@@ -260,6 +295,20 @@ export async function messageAgent(
     } catch {
       // The conversations store may be unavailable in minimal installs or
       // tests — fall through to the agent-state default below.
+    }
+  }
+
+  const steer = opts.steer === true;
+  if (steer) {
+    const refusal = await steerRefusalReason(
+      normalizedId,
+      agentState?.harness ?? conversationHarness ?? 'claude-code',
+      agentState,
+      opts.dedupKey,
+    );
+    if (refusal) {
+      logAgentLifecycle(normalizedId, `messageAgent steer refused: ${refusal}`);
+      return { delivered: false, queuedToMail: false, reason: refusal };
     }
   }
 
@@ -651,10 +700,11 @@ export async function messageAgent(
   // pointer and refuses conv- ids outright, so a conversation is never resumed.
   if (!liveness.alive && isConfirmedDead(liveness)) {
     if (isConversationTarget) {
-      // For opencode/acp/codex the delivery door already routes by harness
-      // (ACP fails loudly on a dead socket instead of typing into a dead
-      // shell), so skip the zombie resume and hand off.
-      if (expectedHarness === 'opencode' || expectedHarness === 'acp' || expectedHarness === 'codex') {
+      // For host-backed harnesses (opencode/acp/prime-agent) and codex the
+      // delivery door already routes by harness (a host transport fails loudly
+      // on a dead socket instead of typing into a dead shell), so skip the
+      // zombie resume and hand off.
+      if (hostTransportFor(expectedHarness) !== null || expectedHarness === 'codex') {
         console.warn(`[agents] ${normalizedId} pane shows no ${expectedHarness} runtime (${liveness.reason}) — skipping the zombie resume and handing off to the harness delivery door`);
         logAgentLifecycle(normalizedId, `messageAgent: pane shows no ${expectedHarness} runtime; handing off to the delivery door (conversations are never resumed, PAN-3879)`);
       } else {
@@ -683,7 +733,8 @@ export async function messageAgent(
   // and further messages queue until the hook reports the next completion.
   // Claude Code continues to use its hook-driven runtime mirror (PAN-1594);
   // on Herdr the pane's agent_status answers as well (PAN-4186).
-  const promptReady = await waitForAgentIdle(normalizedId, 5000);
+  // A steer interrupts the running turn, so it never waits for idle (PAN-4292).
+  const promptReady = steer || await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
@@ -727,7 +778,11 @@ export async function messageAgent(
       deliveryMethod: agentState.deliveryMethod === 'supervisor' || agentState.supervisorEnabled === true
         ? 'supervisor'
         : deliveryMethod,
+      ...(steer ? { submit: 'steer' as const } : {}),
     });
+    const steerDegraded = steer && confirmedDelivery.lastDelivery?.steered === false
+      ? confirmedDelivery.lastDelivery.failure ?? 'delivered as a normal submit'
+      : undefined;
     await appendTellInterventionForUserSource(normalizedId, caller);
     if (confirmedDelivery.landing.kind === 'subagent') {
       const { agentId: subagentId, description } = confirmedDelivery.landing;
@@ -751,7 +806,7 @@ export async function messageAgent(
       return { delivered: false, queuedToMail: true, confirmed: false, reason, ...mainTarget };
     }
     logAgentLifecycle(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
-    return { delivered: true, queuedToMail: true, confirmed: true, ...mainTarget };
+    return { delivered: true, queuedToMail: true, confirmed: true, ...(steerDegraded ? { reason: steerDegraded } : {}), ...mainTarget };
   }
 
   // Claude Code agent without an identifiable transcript: the confirmed-turn
@@ -774,6 +829,7 @@ export async function messageAgent(
     deliveryCaller,
     deliveryMethod,
     opts.dedupKey,
+    steer,
   );
 
   // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook

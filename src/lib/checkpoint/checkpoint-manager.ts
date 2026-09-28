@@ -410,9 +410,12 @@ export async function findCommitAtTime(cwd: string, isoTimestamp: string): Promi
 export async function diffFilesAgainstHead(cwd: string, filePaths: string[]): Promise<TurnDiffFileChange[]> {
   if (filePaths.length === 0) return []
 
+  // --no-renames + core.quotePath=false: a caller that indexes the result by the
+  // input path (getConversationDiffs) would otherwise drop a renamed file and miss
+  // non-ASCII paths that git prints quoted by default.
   const [numstatResult, nameStatusResult] = await Promise.all([
-    execFileAsync('git', ['diff', '--numstat', '--no-color', 'HEAD', '--', ...filePaths], { cwd, encoding: 'utf-8' }),
-    execFileAsync('git', ['diff', '--name-status', '--no-color', 'HEAD', '--', ...filePaths], { cwd, encoding: 'utf-8' }),
+    execFileAsync('git', ['-c', 'core.quotePath=false', 'diff', '--no-renames', '--numstat', '--no-color', 'HEAD', '--', ...filePaths], { cwd, encoding: 'utf-8' }),
+    execFileAsync('git', ['-c', 'core.quotePath=false', 'diff', '--no-renames', '--name-status', '--no-color', 'HEAD', '--', ...filePaths], { cwd, encoding: 'utf-8' }),
   ])
 
   return parseNumstatWithStatus(numstatResult.stdout, nameStatusResult.stdout)

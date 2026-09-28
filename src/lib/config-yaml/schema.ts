@@ -8,6 +8,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table-types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
+import type { NormalizedOllamaConfig, YamlOllamaConfig } from './ollama.js';
 
 export type { SubscriptionPlan, AuthMode };
 
@@ -391,7 +392,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /**
@@ -556,6 +557,9 @@ export interface YamlConfig {
   tmux?: TmuxConfig;
 
   terminal?: { backend?: TerminalBackendName }; // D10; unset auto-selects (terminal-backends/select.ts)
+
+  /** Local Ollama endpoint used by `ollama:<tag>` models (PAN-1641). */
+  ollama?: YamlOllamaConfig;
 
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
@@ -805,6 +809,9 @@ export interface NormalizedConfig {
   };
 
   terminal: { backend?: TerminalBackendName }; // D10; unset means auto-select
+
+  /** Local Ollama endpoint and the context window an Overdeck-started serve gets (PAN-1641). */
+  ollama: NormalizedOllamaConfig;
 
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;

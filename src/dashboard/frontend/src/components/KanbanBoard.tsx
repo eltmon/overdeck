@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { isBackendOutage } from '../lib/backendOutageState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDashboardStore, selectAgents, selectIssuesByCycle } from '../lib/store';
 import {
@@ -334,7 +333,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Keyboard shortcut for undo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isBackendOutage()) return; // page hidden by the outage boundary (PAN-3867)
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
         handleUndo();
@@ -612,7 +610,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     if (!isBoardView) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (keyboardShortcutsDisabled || isBackendOutage()) return;
+      if (keyboardShortcutsDisabled) return;
       const target = e.target as HTMLElement;
       const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       if (inInput || e.defaultPrevented) return;

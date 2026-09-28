@@ -20,15 +20,16 @@
 import { Effect } from 'effect'
 import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
-import { getBackendPanes } from './backend-inventory.js'
+import { getBackendPanes, isBackendInventoryDegraded } from './backend-inventory.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
 import { getEventStore, type EventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js'
-import type { AgentEnrichmentChangedEvent, AgentCreatedEvent } from '@overdeck/contracts'
+import { indexPanesByAgentKey, type AgentEnrichmentChangedEvent, type AgentCreatedEvent, type TerminalBackendName } from '@overdeck/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js'
+import { hostTerminalBackendName } from '../../../lib/terminal-backends/select.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,11 +123,14 @@ export function buildAwaitingInputActivityMessage(
     : `${agentId} is waiting for ${kindList}`
 }
 
-// PAN-3055 — no census evidence means no liveness claims: without it the
-// backend inventory's tmux fallback cannot tell a live pane from a dead one,
-// and the poller would resurrect dead questions with TTS.
-export function shouldSkipEnrichmentCycle(census: Pick<RuntimeCensus, 'tmuxAvailable'>): boolean {
-  return !census.tmuxAvailable
+// PAN-3055 — no liveness evidence means no liveness claims. Under tmux the
+// evidence is the tmux census; under Herdr it is a non-degraded backend
+// inventory — a Herdr host may run no tmux server at all (PAN-4320).
+export function shouldSkipEnrichmentCycle(
+  census: Pick<RuntimeCensus, 'tmuxAvailable'>,
+  inventory: { readonly backend: TerminalBackendName; readonly degraded: boolean },
+): boolean {
+  return inventory.backend === 'herdr' ? inventory.degraded : !census.tmuxAvailable
 }
 
 export function hasReapablePendingInput(enrichment: AgentEnrichment): boolean {
@@ -177,7 +181,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   } catch {
     return
   }
-  if (shouldSkipEnrichmentCycle(census)) return
+  if (shouldSkipEnrichmentCycle(census, { backend: await hostTerminalBackendName(), degraded: isBackendInventoryDegraded() })) return
 
   let runningAgents: RunningAgent[]
   try {
@@ -193,7 +197,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   // role, model, branch) the enrichment event payload carries.
   const panes = await getBackendPanes()
   const livePaneIds = new Set(
-    panes.filter((pane) => pane.state !== 'exited').map((pane) => pane.terminalId ?? pane.id),
+    [...indexPanesByAgentKey(panes)].filter(([, pane]) => pane.state !== 'exited').map(([key]) => key),
   )
   const specialistIssues = new Set(
     panes
@@ -204,7 +208,13 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
   // Only enrich agents the backend reports as live. A pane that exited has no
   // changing state — its enrichment is static.
-  const activeAgents = runningAgents.filter(a => livePaneIds.has(a.id))
+  //
+  // PAN-4320: on Herdr a stopped agent's pane (and idle harness) can outlive the
+  // stop, so a live pane alone is not a claim of life. A stored `stopped`/`error`
+  // is operator or supervisor intent the poller never overrides — the same
+  // claimed-live set `deriveServedAgentStatuses` checks.
+  const activeAgents = runningAgents.filter(a =>
+    livePaneIds.has(a.id) && (a.status === 'running' || a.status === 'starting'))
 
   await withConcurrencyLimit(
     activeAgents.map((agent) => async () => {
