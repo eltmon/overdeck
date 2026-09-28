@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T08:26:23.715Z",
+  "updated": "2026-09-28T08:26:35.365Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,10 @@
     "extract-project-create-form.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T08:26:23.715Z"
+    },
+    "extract-project-create-form.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:26:35.365Z"
     }
   }
 }
