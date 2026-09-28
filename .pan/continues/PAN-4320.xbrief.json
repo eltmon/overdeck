@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4320",
   "created": "2026-09-28T15:34:16.087Z",
-  "updated": "2026-09-28T15:54:32.777Z",
+  "updated": "2026-09-28T16:01:10.631Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-28T15:54:30.009Z"
     },
     "projection-agent-key": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4320",
-      "claimedAt": "2026-09-28T15:54:32.777Z"
+      "claimedAt": "2026-09-28T15:54:32.777Z",
+      "doneAt": "2026-09-28T16:01:10.631Z"
     }
   }
 }
