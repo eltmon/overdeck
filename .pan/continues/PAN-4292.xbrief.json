@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:51:47.500Z",
+  "updated": "2026-09-28T13:51:59.780Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,10 @@
     "agent-route-steer.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T13:51:47.499Z"
+    },
+    "composer-steer-selector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:51:59.780Z"
     }
   }
 }
