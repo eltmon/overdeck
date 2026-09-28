@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4300",
   "created": "2026-09-28T12:54:38.633Z",
-  "updated": "2026-09-28T13:49:06.249Z",
+  "updated": "2026-09-28T13:49:19.799Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "deacon-main-uses-builder.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T13:49:06.249Z"
+    },
+    "main-uses-builder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:19.799Z"
     }
   }
 }
