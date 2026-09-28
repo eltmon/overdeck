@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:44:14.744Z",
+  "updated": "2026-09-28T00:44:26.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "docs-degraded-mode.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T00:44:14.744Z"
+    },
+    "ci-frontend-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:44:26.884Z"
     }
   }
 }
