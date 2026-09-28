@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T14:43:32.438Z",
+  "updated": "2026-09-28T14:45:21.274Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4311",
       "claimedAt": "2026-09-28T14:22:45.988Z",
       "doneAt": "2026-09-28T14:43:32.437Z"
+    },
+    "lane-cpu-class": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T14:45:21.274Z"
     }
   }
 }
