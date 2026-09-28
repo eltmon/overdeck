@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:43:39.513Z",
+  "updated": "2026-09-28T00:43:51.174Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -222,6 +222,10 @@
     "browser-suite.ac5": {
       "status": "completed",
       "doneAt": "2026-09-28T00:43:39.513Z"
+    },
+    "docs-degraded-mode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:43:51.174Z"
     }
   }
 }
