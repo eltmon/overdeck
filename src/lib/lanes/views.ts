@@ -12,6 +12,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { laneActivityOf, type LaneActivity } from '@overdeck/contracts';
+
 import { latestWorkerReport, type WorkerReport, type WorkerReportStatus } from '../agents/worker/report.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { getEnrichedConversationList } from '../overdeck/conversation-list.js';
@@ -22,13 +24,11 @@ import { judgedIteration, pairBuilder, type CriticSummary, type PairingRow, type
 const execFileAsync = promisify(execFile);
 
 const MEMO_TTL_MS = 3_000;
-/** D10 `starting`: not alive, not ended, created less than this long ago. */
-const STARTING_GRACE_MS = 3 * 60_000;
 const GIT_TIMEOUT_MS = 10_000;
 const GIT_CONCURRENCY = 8;
 const GIT_BACKED_ROLES: ReadonlySet<LaneRole> = new Set(['builder', 'critic', 'verifier', 'orchestrator']);
 
-export type LaneActivity = 'failed-to-start' | 'needs-you' | 'working' | 'idle' | 'starting' | 'stopped';
+export type { LaneActivity };
 
 export interface LaneGitFacts {
   branch: string | null;
@@ -113,19 +113,6 @@ export async function readLaneGitFacts(cwd: string): Promise<LaneGitFacts | null
   return { branch, head, ahead: Number.isFinite(ahead) ? ahead : null, dirty };
 }
 
-/** D10, first match wins. */
-function activityOf(row: LegacyConversation, live: EnrichedLiveness | undefined, now: number): LaneActivity {
-  if (row.archivedAt !== null) return 'stopped';
-  if (row.spawnError) return 'failed-to-start';
-  if (live?.sessionAlive) {
-    if ((live.pendingInputCount ?? 0) > 0) return 'needs-you';
-    if (live.isWorking) return 'working';
-    return 'idle';
-  }
-  if (row.status === 'active' && now - Date.parse(row.createdAt) < STARTING_GRACE_MS) return 'starting';
-  return 'stopped';
-}
-
 /**
  * Every lane of each (run, key) the rows belong to, archived included: D7
  * counts over the whole group, and a critic pairs with a builder another
@@ -174,7 +161,7 @@ async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: n
       iteration: iterations.get(row.name) ?? 1,
       createdAt: row.createdAt,
       criticOfId: row.criticOfConversationId,
-      activity: activityOf(row, row.archivedAt === null ? liveness.get(row.name) : undefined, now),
+      activity: laneActivityOf({ ...row, ...(row.archivedAt === null ? liveness.get(row.name) : undefined) }, now),
       report: report ? { status: report.status, ...(report.verdict ? { verdict: report.verdict } : {}) } : null,
     };
   });
@@ -207,7 +194,7 @@ async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: n
       effort: row.effort,
       projectKey: row.projectKey,
       cwd: row.cwd,
-      activity: activityOf(row, live, now),
+      activity: laneActivityOf({ ...row, ...live }, now),
       report: report
         ? { seq: report.seq, at: report.at, status: report.status, head: report.git?.head ?? null, branch: report.git?.branch ?? null }
         : null,
