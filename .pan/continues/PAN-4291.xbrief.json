@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T13:58:58.301Z",
+  "updated": "2026-09-28T14:06:24.257Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,9 +74,10 @@
       "doneAt": "2026-09-28T13:58:40.563Z"
     },
     "banner-account-used": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4291",
-      "claimedAt": "2026-09-28T13:58:58.301Z"
+      "claimedAt": "2026-09-28T13:58:58.301Z",
+      "doneAt": "2026-09-28T14:06:24.257Z"
     }
   }
 }
