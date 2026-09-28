@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T00:56:16.853Z",
+  "updated": "2026-09-28T00:56:38.268Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "close-out-settings-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T00:56:16.853Z"
+    },
+    "dod-teardown-row": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T00:56:38.268Z"
     }
   }
 }
