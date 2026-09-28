@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T13:54:15.266Z",
+  "updated": "2026-09-28T13:54:27.583Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "feed-entry-types.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T13:54:15.265Z"
+    },
+    "feed-entry-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:27.583Z"
     }
   }
 }
