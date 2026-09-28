@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:06:50.858Z",
+  "updated": "2026-09-28T16:07:03.998Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -340,6 +340,10 @@
     "runaway-wiring.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T16:06:50.858Z"
+    },
+    "docs-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:07:03.998Z"
     }
   }
 }
