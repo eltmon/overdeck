@@ -20,7 +20,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
-import { Effect, Layer } from 'effect';
+import { Data, Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { jsonResponse } from '../http-helpers.js';
@@ -75,6 +75,10 @@ function validateCommand(raw: unknown): CommandValidation {
   return { ok: true, command: trimmed };
 }
 
+class SendLiteralLineError extends Data.TaggedError('SendLiteralLineError')<{
+  readonly cause: unknown;
+}> {}
+
 /** Type one literal line into a fresh shell and press Enter (the shell reads
  * it from pty typeahead once it starts). Local on purpose: tmux.ts is at its
  * allowlisted ceiling. */
@@ -84,7 +88,7 @@ function sendLiteralLine(sessionName: string, text: string) {
       await tmuxExecAsync(['send-keys', '-t', exactPaneTarget(sessionName), '-l', text]);
       await tmuxExecAsync(['send-keys', '-t', exactPaneTarget(sessionName), 'Enter']);
     },
-    catch: (cause) => cause,
+    catch: (cause) => new SendLiteralLineError({ cause }),
   });
 }
 
