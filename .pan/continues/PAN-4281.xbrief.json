@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T08:27:16.717Z",
+  "updated": "2026-09-28T08:27:27.143Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "add-project-dialog-shell.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T08:27:16.717Z"
+    },
+    "add-project-dialog-shell.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:27:27.143Z"
     }
   }
 }
