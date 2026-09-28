@@ -99,7 +99,8 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
       "
     `);
   });
@@ -123,7 +124,8 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       export ANTHROPIC_AUTH_TOKEN="tok"
       export CAVEMAN_DEFAULT_MODE="active"
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
       "
     `);
   });
@@ -147,7 +149,8 @@ describe('generateLauncherScript', () => {
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
-      exec claude --agent pan-work-agent --resume 'sess-123' --model 'gpt-5.4'
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --agent pan-work-agent --resume 'sess-123' --model 'gpt-5.4' \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
       "
     `);
   });
@@ -442,7 +445,8 @@ describe('generateLauncherScript', () => {
       trap '' HUP
       prompt=$(cat '/tmp/init-prompt.txt')
       echo "[launcher] Claude starting at $(date)" >> '/tmp/pan-launcher-debug.log'
-      claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} "$prompt"
       CLAUDE_EXIT=$?
       echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> '/tmp/pan-launcher-debug.log'
       echo ""
@@ -650,7 +654,8 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       export CAVEMAN_DEFAULT_MODE="active"
       prompt=$(cat '/tmp/prompt.md')
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-abc' --model 'claude-sonnet-4-6' "$prompt"
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-abc' --model 'claude-sonnet-4-6' \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} "$prompt"
       "
     `);
   });
@@ -666,7 +671,7 @@ describe('generateLauncherScript', () => {
     });
 
     expect(script).not.toContain('prompt=$(cat');
-    expect(script).toContain("exec claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc' < '/tmp/prompt.md'");
+    expect(script).toContain("exec claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} < '/tmp/prompt.md'");
   });
 
   it('review sub-role launcher owns the synthesis signal (PAN-977)', () => {
@@ -697,7 +702,7 @@ describe('generateLauncherScript', () => {
     // Writes its own pid for Deacon's liveness check, removes it after signaling.
     expect(script).toContain("echo $$ > '/agents/agent-pan-1-review-security/reviewer-launcher.pid'");
     expect(script).toContain("timeout 1800 claude --print");
-    expect(script).toContain("--session-id 'sess-rev' < '/agents/agent-pan-1-review-security/initial-prompt.md'");
+    expect(script).toContain("--session-id 'sess-rev' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} < '/agents/agent-pan-1-review-security/initial-prompt.md'");
     expect(script).toContain('CLAUDE_EXIT=$?');
     expect(script).toContain('if [ "$CLAUDE_EXIT" = "124" ]; then');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_TIMEOUT security reviewer exceeded 1800s deadline" || true');
@@ -751,7 +756,8 @@ describe('generateLauncherScript', () => {
       unset CLAUDE_CODE_MAX_CONTEXT_TOKENS
       export ANTHROPIC_BASE_URL="http://proxy"
       prompt=$(cat '/tmp/identity.md')
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model 'claude-sonnet-4-6' "$prompt"
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model 'claude-sonnet-4-6' \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} "$prompt"
       "
     `);
   });
@@ -777,7 +783,8 @@ describe('generateLauncherScript', () => {
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       unset OVERDECK_AGENT_ID OVERDECK_ISSUE_ID OVERDECK_SESSION_TYPE
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
       "
     `);
   });
@@ -813,7 +820,8 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       cd -- '/workspace/project'
       trap '' HUP
-      claude --session-id 'sess-conv' --effort "high"
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} --session-id 'sess-conv' --effort "high"
       echo ""
       echo "Conversation session ended. Close this panel or click Resume to start a new session."
       while true; do sleep 60; done
@@ -832,7 +840,7 @@ describe('generateLauncherScript', () => {
       keepAlive: false,
       execConversationHarness: true,
     });
-    expect(script).toContain("exec claude --session-id 'sess-conv'");
+    expect(script).toContain("exec claude ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} --session-id 'sess-conv'");
     expect(script).not.toContain('while true; do sleep 60; done');
   });
 
@@ -862,7 +870,8 @@ describe('generateLauncherScript', () => {
       export COLORFGBG='15;0'
       cd -- '/workspace/project'
       trap '' HUP
-      claude --resume 'sess-resume'
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} --resume 'sess-resume'
       echo ""
       echo "Conversation session ended. Close this panel or click Resume to start a new session."
       while true; do sleep 60; done
@@ -911,7 +920,8 @@ describe('generateLauncherScript', () => {
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/init-prompt.txt')
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions "$prompt"
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} "$prompt"
       "
     `);
   });
@@ -932,7 +942,8 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 'Please read the continuation prompt and continue.'
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} 'Please read the continuation prompt and continue.'
       "
     `);
   });
@@ -971,7 +982,8 @@ describe('generateLauncherScript', () => {
       export OVERDECK_HOME='<OVERDECK_HOME>'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
-      exec claude --model claude-sonnet-4-6
+      if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      exec claude --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
       "
     `);
   });
@@ -1081,7 +1093,7 @@ describe('generateLauncherScript', () => {
     });
     const execLines = script.split('\n').filter((line) => line.startsWith('exec '));
     expect(execLines).toEqual([
-      "exec node '/opt/pan dist/pty-supervisor.js' claude --agent pan-work-agent --session-id 'sess-supervisor' --model 'gpt-5.5'",
+      "exec node '/opt/pan dist/pty-supervisor.js' claude --agent pan-work-agent --session-id 'sess-supervisor' --model 'gpt-5.5' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"}",
     ]);
   });
 
@@ -1100,7 +1112,7 @@ describe('generateLauncherScript', () => {
       useSupervisor: true,
       supervisorScriptPath: '/opt/pty-supervisor.js',
     });
-    expect(script).toContain("node '/opt/pty-supervisor.js' claude --session-id 'sess-conv' --effort \"high\"");
+    expect(script).toContain("node '/opt/pty-supervisor.js' claude ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} --session-id 'sess-conv' --effort \"high\"");
     expect(script).toContain('echo "Conversation session ended. Close this panel or click Resume to start a new session."');
     expect(script).toContain('while true; do sleep 60; done');
     expect(script).not.toContain('exec node');
@@ -1317,7 +1329,8 @@ describe('generateLauncherWrapper', () => {
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
           'export SKIP_DOCS_INDEX=1',
           "cd -- '/workspace/project'",
-          "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc'",
+          `if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi`,
+          "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"}",
           '',
         ].join('\n'),
       );
@@ -1859,5 +1872,53 @@ describe('pi model provider qualification (PAN-1799)', () => {
     const { qualifyPiModel } = await import('../providers.js');
     expect(qualifyPiModel('gpt-5.5')).toBe('openai-codex/gpt-5.5');
     expect(() => qualifyPiModel('totally-unknown-model')).toThrow('Unknown model "totally-unknown-model".');
+  });
+});
+
+describe('generateLauncherScript — skill overrides (PAN-3942)', () => {
+  const SETTINGS_ARG = '${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}';
+
+  it('claude-code work and conversation launchers resolve and pass the settings', () => {
+    const work = generateLauncherScript({ ...DEFAULT_CONFIG, role: 'work', baseCommand: 'claude --agent pan-work-agent' });
+    const conversation = generateLauncherScript({
+      ...DEFAULT_CONFIG, role: 'work', spawnMode: 'conversation', baseCommand: 'claude', sessionId: 'sess-conv',
+    });
+    for (const script of [work, conversation]) {
+      expect(script).toContain('pan skills launch-settings --harness claude-code');
+      expect(script).toContain(SETTINGS_ARG);
+      expect(script.indexOf('pan skills launch-settings')).toBeLessThan(script.indexOf(SETTINGS_ARG));
+    }
+  });
+
+  it('passes overdeckEnv.issueId as --issue', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG, role: 'review', baseCommand: 'claude --print', overdeckEnv: { issueId: 'PAN-3942' },
+    });
+    expect(script).toContain("--cwd '/workspace/project' --issue 'PAN-3942'");
+  });
+
+  it('codex launchers write the config block right after exporting CODEX_HOME', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG, role: 'work', harness: 'codex', model: 'codex-4o', codexHome: '/agents/a/codex-home-v2',
+    });
+    const lines = script.split('\n');
+    const exportIndex = lines.indexOf("export CODEX_HOME='/agents/a/codex-home-v2'");
+    expect(exportIndex).toBeGreaterThan(-1);
+    expect(lines[exportIndex + 1]).toBe(
+      `pan skills launch-settings --harness codex --cwd '/workspace/project' --codex-home "$CODEX_HOME" || echo "[launcher] WARNING: skill overrides not applied" >&2`,
+    );
+    expect(script).not.toContain('--harness claude-code');
+    expect(script).not.toContain(SETTINGS_ARG);
+  });
+
+  it('remote and ohmypi launchers get no skill-override step', () => {
+    const remote = generateLauncherScript({ ...DEFAULT_CONFIG, role: 'work', spawnMode: 'remote', baseCommand: 'claude' });
+    const ohmypi = generateLauncherScript({
+      ...DEFAULT_CONFIG, role: 'work', harness: 'ohmypi', piMode: 'tui', piSessionDir: '/x/sessions', piExtensionPath: '/x/dist/index.js',
+    });
+    for (const script of [remote, ohmypi]) {
+      expect(script).not.toContain('pan skills launch-settings');
+      expect(script).not.toContain('PAN_SKILL_SETTINGS');
+    }
   });
 });

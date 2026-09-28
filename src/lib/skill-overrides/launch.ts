@@ -6,13 +6,12 @@
  * `[[skills.config]] enabled = false` blocks in the per-agent config.toml.
  * Both hide skills by name, so every copy of a skill hides.
  *
- * Import boundary: launcher-generator.ts imports this module for its pure
- * string builders, so only fs/path/shell-quote load statically. The store and
- * project resolution load lazily inside resolveLaunchDisabledSkills.
+ * The bash the launcher runs is built in `./launcher-lines.ts`, a leaf module,
+ * so launcher-generator.ts never reaches this module or the store. The store
+ * and project resolution load lazily inside resolveLaunchDisabledSkills.
  */
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { shellQuote } from '../shell-quote.js';
 
 export interface LaunchSkillContext {
   cwd: string;
@@ -73,26 +72,4 @@ export async function writeCodexSkillOverrides(codexHome: string, disabled: read
   await mkdir(codexHome, { recursive: true });
   await writeFile(path, next ? `${next}\n` : '', { mode: 0o600 });
   await chmod(path, 0o600);
-}
-
-const WARNING = `echo "[launcher] WARNING: skill overrides not applied" >&2`;
-
-/** Bash for the launcher step that resolves overrides before the harness starts. */
-export function launcherSkillOverrideLines(opts: {
-  harness: 'claude-code' | 'codex';
-  workingDir: string;
-  issueId?: string;
-}): string[] {
-  const args = [`--harness ${opts.harness}`, `--cwd ${shellQuote(opts.workingDir)}`];
-  if (opts.issueId) args.push(`--issue ${shellQuote(opts.issueId)}`);
-  const command = `pan skills launch-settings ${args.join(' ')}`;
-  if (opts.harness === 'claude-code') {
-    return [`if ! PAN_SKILL_SETTINGS="$(${command})"; then ${WARNING}; PAN_SKILL_SETTINGS=''; fi`];
-  }
-  return [`${command} --codex-home "$CODEX_HOME" || ${WARNING}`];
-}
-
-/** The Claude command suffix that passes the resolved settings, when the step was emitted. */
-export function claudeSkillSettingsArg(emitted: boolean): string {
-  return emitted ? ' ${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}' : '';
 }

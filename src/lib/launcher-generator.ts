@@ -11,6 +11,7 @@ import { getOverdeckHome, packageRoot } from './paths.js';
 import { buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
 import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
+import { claudeSkillSettingsArg, launcherSkillOverrideLines } from './skill-overrides/launcher-lines.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
 import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 
@@ -405,6 +406,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // Codex: per-agent CODEX_HOME so each agent has isolated sessions/config
   if (config.codexHome) {
     lines.push(`export CODEX_HOME=${shellQuote(config.codexHome)}`);
+    if (skillOverrideHarness(config) === 'codex') lines.push(...skillOverrideLines(config, 'codex'));
   }
 
   // Change directory (after env setup, before command)
@@ -459,6 +461,8 @@ export function generateLauncherScript(config: LauncherConfig): string {
     lines.push(`echo "[launcher] Claude starting at $(date)" >> ${shellQuote(config.debugLog)}`);
   }
 
+  if (skillOverrideHarness(config) === 'claude-code') lines.push(...skillOverrideLines(config, 'claude-code'));
+
   // Build the main command
   const commandParts = buildCommand(config);
   if (commandParts.length > 0) {
@@ -500,6 +504,17 @@ export function generateLauncherScript(config: LauncherConfig): string {
   return script;
 }
 
+/** PAN-3942: local Claude Code and Codex launches hide skills whose overrides resolve to off. */
+function skillOverrideHarness(config: LauncherConfig): 'claude-code' | 'codex' | null {
+  const harness = config.harness ?? 'claude-code';
+  if (config.spawnMode === 'remote') return null;
+  return harness === 'claude-code' || harness === 'codex' ? harness : null;
+}
+
+function skillOverrideLines(config: LauncherConfig, harness: 'claude-code' | 'codex'): string[] {
+  return launcherSkillOverrideLines({ harness, workingDir: config.workingDir, issueId: config.overdeckEnv?.issueId });
+}
+
 /** Env vars that may leak from a parent tmux server and must be unset. */
 const PROVIDER_ENV_UNSETS = [
   'ANTHROPIC_API_KEY',
@@ -539,6 +554,7 @@ function buildCommand(config: LauncherConfig): string[] {
       for (const file of systemPromptFiles(config)) {
         cmd += ` --append-system-prompt-file ${shellQuote(file)}`;
       }
+      cmd += claudeSkillSettingsArg(skillOverrideHarness(config) === 'claude-code');
       const args: string[] = [];
       if (config.resumeSessionId) {
         args.push(`--resume ${shellQuote(config.resumeSessionId)}`);
@@ -683,6 +699,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   for (const file of systemPromptFiles(config)) {
     cmd += ` --append-system-prompt-file ${shellQuote(file)}`;
   }
+  cmd += claudeSkillSettingsArg(skillOverrideHarness(config) === 'claude-code');
 
   // Append prompt reference
   if (config.promptFile) {

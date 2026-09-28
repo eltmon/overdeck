@@ -12,12 +12,11 @@ vi.mock('../../projects.js', () => ({ resolveProjectKeyForCwdAsync: vi.fn(async 
 import {
   CODEX_SKILL_BLOCK_BEGIN,
   CODEX_SKILL_BLOCK_END,
-  claudeSkillSettingsArg,
   claudeSkillSettingsJson,
-  launcherSkillOverrideLines,
   resolveLaunchDisabledSkills,
   writeCodexSkillOverrides,
 } from '../launch.js';
+import { claudeSkillSettingsArg, launcherSkillOverrideLines } from '../launcher-lines.js';
 
 describe('claudeSkillSettingsJson', () => {
   it('maps every disabled skill to off', () => {
