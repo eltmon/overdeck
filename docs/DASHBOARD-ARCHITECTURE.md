@@ -22,11 +22,16 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
 - The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
 
-**Two WebSocket endpoints:**
+**WebSocket endpoints:**
 - `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
 - `/ws/terminal?session=<name>` — Raw WebSocket: live PTY terminal streaming via `ws` library.
   Terminal data bypasses Effect RPC because the RPC serialization layer can't handle
   high-throughput binary-like terminal data reliably.
+- `/ws/voice` — Raw WebSocket: microphone audio in, transcript events out.
+- `/ws/autopreso` — Raw WebSocket: whiteboard element stream.
+
+Every upgrade passes `authorizeDashboardUpgrade` (`ws-auth.ts`): trusted-or-absent
+Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBOARD-AUTH.md).
 
 **Terminal architecture** (`ws-terminal.ts` + `XTerminal.tsx`):
 - Server: raw `WebSocketServer` with `noServer: true`, deferred PTY spawn (waits for
@@ -456,11 +461,12 @@ store that holds the inputs and derives one **connection phase** from them.
 | Phase | Meaning | Banner (`components/DegradedModeBanner.tsx`) |
 | --- | --- | --- |
 | `restarting` | A planned restart is in progress (`dashboardLifecycle.active`). | "Overdeck server is restarting — showing data from HH:MM", plus the lifecycle issue and reason. |
+| `unauthorized` | The session mint returned 401. | "Dashboard session could not be established (HTTP 401) — see docs/DASHBOARD-AUTH.md", with **Retry**. |
 | `unreachable` | The server does not answer HTTP. | "Can't reach the Overdeck server — showing data from HH:MM", with **Retry** and **Force Restart**. |
 | `delayed` | HTTP answers, but the `/ws/rpc` domain stream is reconnecting or has not bootstrapped. | "Live updates are delayed — reconnecting · showing data from HH:MM", with **Retry**. |
 | `live` | HTTP answers and the stream has bootstrapped. | Nothing. After any degraded phase, "Reconnected" shows for 2.5 s. |
 
-Precedence is `restarting` > `unreachable` > `delayed` > `live`.
+Precedence is `restarting` > `unauthorized` > `unreachable` > `delayed` > `live`.
 
 - **Reachability rule.** A response is *reachable* when its body is JSON with a
   string `status` field, at any HTTP status. `/api/health` answers 503 with
