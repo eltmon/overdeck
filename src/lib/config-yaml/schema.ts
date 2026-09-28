@@ -2,6 +2,7 @@ import type { ConfigurableProvider } from '../configurable-providers.js';
 import type { ModelId } from '../settings.js';
 import type { ModelProvider } from '../model-fallback.js';
 import type { EffortLevel } from '../model-capabilities.js';
+import { EFFORT_LEVELS } from '@overdeck/contracts';
 import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
@@ -156,10 +157,13 @@ export interface ContextConfig {
    * dashboard Context-page preview), so toggling needs a sync + new session.
    */
   rules?: Record<string, boolean>;
+  /** PAN-4265: dashboard runs the light `pan sync` itself when sync inputs change (default true). */
+  auto_sync?: boolean;
 }
 
 export interface NormalizedContextConfig {
   rules: Record<string, boolean>;
+  autoSync: boolean;
 }
 
 export type ManualCompactMode = 'claude-code' | 'overdeck-native';
@@ -374,10 +378,12 @@ export type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
 
 export interface RoleSubConfig {
   model: ModelRef;
+  effort?: RoleEffort;
 }
 
 export type RoleEffort = EffortLevel;
-export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+/** @deprecated use EFFORT_LEVELS from @overdeck/contracts */
+export const ROLE_EFFORTS: readonly RoleEffort[] = EFFORT_LEVELS;
 export type ReviewMode = 'quick' | 'full' | 'none';
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
@@ -450,7 +456,18 @@ export interface IssuesConfig {
   closed_window_days?: number;
 }
 
-export interface TelemetryConfig { enabled?: boolean }
+export interface TelemetryConfig {
+  enabled?: boolean;
+  /**
+   * PAN-4264: opt in to a pseudonymous `operatorHash` on every event, so one
+   * operator's installs can be grouped (a salted hash of the GitHub user id).
+   */
+  operator_grouping?: boolean;
+  /** PAN-4264: PostHog personal API key for `pan doctor github-quota`'s remote view. */
+  posthog_read_key?: string;
+  /** PAN-4264: PostHog project id for the doctor remote view. */
+  posthog_project_id?: string;
+}
 
 /**
  * Dashboard UI behavior. Two independent theme axes live here:
@@ -976,7 +993,7 @@ export interface NormalizedConfig {
   };
 
   /** Anonymous product telemetry configuration, normalised (always defined). */
-  telemetry: Required<TelemetryConfig>;
+  telemetry: Required<Pick<TelemetryConfig, 'enabled' | 'operator_grouping'>> & Pick<TelemetryConfig, 'posthog_read_key' | 'posthog_project_id'>;
 
   /** Dashboard UI behavior, normalised (always defined; null when unset). */
   ui: { openInEditorCommand: string | null; theme: DesignLanguage };

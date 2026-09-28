@@ -10,8 +10,8 @@ import { parse as parseYaml } from 'yaml';
 import { Effect } from 'effect';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getClaudePermissionFlagsString } from '../claude-permissions.js';
-import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
-import type { RoleEffort } from '../config-yaml.js';
+import { loadConfigSync as loadYamlConfig, type RoleEffort } from '../config-yaml.js';
+import { resolveEffort } from './resolve-effort.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -109,7 +109,7 @@ export async function getOhmypiLauncherFields(agentId: string, model: string, ef
   }
   return {
     harness: 'ohmypi',
-    piEffort: effort ?? 'high',
+    piEffort: resolveEffort({ explicit: effort, model, harness: 'ohmypi' }).effort,
     piExtensionPath: ohmypiExtensionPath,
     piFifoPath: await Effect.runPromise(createOhmypiFifo(agentId)),
     piSessionDir: paths.agentDir,
@@ -199,7 +199,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   return {
     harness: 'codex',
     codexMode: codexConfig?.transport === 'tui' ? 'work-tui' : 'app-server',
-    codexEffort: effort ?? 'high',
+    codexEffort: resolveEffort({ explicit: effort, role, model, harness: 'codex' }).effort,
     codexHome,
     codexSessionDir: codexSessionsRoot(codexHome),
     model,
@@ -932,10 +932,10 @@ export async function getRoleRuntimeBaseCommand(
   const nameFlag = ` --name ${agentName}`;
   // PAN-3077: never omit --effort on definition-less runs (review sub-roles,
   // standing supervisor). Omission hands the choice to the harness default —
-  // xhigh on Opus 5 — violating the effort-defaults-to-high policy. An
-  // explicitly passed effort still wins; role-file runs get effort from
-  // frontmatter via roleSystemPromptInjectionSync.
-  const effortFlag = !definitionPath ? ` --effort ${effort ?? 'high'}` : '';
+  // xhigh on Opus 5 — violating the effort-defaults-to-high policy. The
+  // resolver supplies the default when nothing else set it; role-file runs
+  // get effort from frontmatter via roleSystemPromptInjectionSync instead.
+  const effortFlag = !definitionPath ? ` --effort ${resolveEffort({ explicit: effort, role, subRole, model: validatedModel, harness }).effort}` : '';
   // permissionMode now comes from the global permission flags for EVERY role
   // (the old --agent path relied on role frontmatter, which Claude Code no longer
   // applies). This honors the user's bypass/auto setting uniformly.

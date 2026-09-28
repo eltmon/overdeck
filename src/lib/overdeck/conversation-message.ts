@@ -14,6 +14,7 @@ import { waitForManagedKimiSessionId } from '../runtimes/kimi-context-envelope.j
 import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
+import { ensureMainInputTarget, type EnsureMainResult } from '../agents/input-target.js';
 import {
   ComposerCommandConfirmationError,
   composerCommandConfirmationFromBody,
@@ -206,6 +207,8 @@ export interface ConversationMessageDependencies {
   generateAiTitle(name: string, message: string): Promise<void>;
   shouldInterceptManualCompact?(message: string): boolean;
   transformMessageForHarness?(message: string, harness: RuntimeName, attachmentPaths: string[]): string;
+  /** PAN-4268: move Claude Code's input to the main agent before pasting. */
+  ensureMainInputTarget?: (agentId: string) => Promise<EnsureMainResult>;
 }
 
 export function safeUploadExtension(filename: string, mimeType: string): string {
@@ -519,12 +522,28 @@ export async function handleConversationMessage(
     );
   }
 
+  let switchedFromSubagent: string | undefined;
   if (isPiControlChannelHarness(harness)) {
     await deliverConversationViaControlChannel(conv, deliveredMessage, {
       source: 'operator',
       deliverAs: pickDeliverAs(body['deliverAs']),
     });
   } else {
+    if (harness === 'claude-code') {
+      const ensure = deps.ensureMainInputTarget ?? ensureMainInputTarget;
+      const target = await ensure(conv.tmuxSession);
+      if (!target.ok) {
+        return jsonResponse({
+          error: target.reason,
+          code: 'input-target-not-main',
+          inputTarget: target.inputTarget,
+          deliveryUnknown: false,
+          retryable: true,
+        }, { status: 409 });
+      }
+      switchedFromSubagent = target.switchedFromSubagent;
+    }
+
     let watchFromByteOffset: number | null = null;
     if (behavior.transcriptKind === 'claude-jsonl' && conv.claudeSessionId) {
       const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
@@ -596,5 +615,10 @@ export async function handleConversationMessage(
     });
   }
 
-  return jsonResponse({ ok: true, ...(droppedImageCount > 0 ? { imagesDropped: droppedImageCount } : {}) });
+  return jsonResponse({
+    ok: true,
+    ...(droppedImageCount > 0 ? { imagesDropped: droppedImageCount } : {}),
+    ...(harness === 'claude-code' ? { inputTarget: 'main' } : {}),
+    ...(switchedFromSubagent ? { switchedFromSubagent } : {}),
+  });
 }

@@ -10,6 +10,8 @@
  *      conversation with a branch to detect or a link due for refresh. A failed
  *      listing (a rate limit included) counts toward the same 3-strike backoff
  *      as the fallback reads and leaves that project's links for a later sweep.
+ *      During a GitHub quota pause of the user GraphQL bucket (PAN-4264) the
+ *      sweep is skipped and no failure is counted.
  *   3. Branch detection: a PR whose head branch equals the conversation's branch
  *      (`resolveConversationBranch`: a linked worktree's or agent's branch,
  *      never the default branch or the primary checkout's) becomes a
@@ -29,9 +31,6 @@
  * previous one. GitHub only; GitLab projects and MR links are skipped.
  * Started only by a primary dashboard (a peer dashboard never writes).
  */
-
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 
 import type { PullRequestKey, PullRequestLink, PullRequestSnapshot } from '@overdeck/contracts';
 
@@ -62,6 +61,8 @@ import {
 import { getRepoTargetBranch } from '../../../lib/project-repos.js';
 import { findProjectByPath, type ProjectConfig } from '../../../lib/projects.js';
 import { tmuxExecAsync } from '../../../lib/tmux.js';
+import { activeGitHubPause } from '../../../lib/github-quota/pause-gate.js';
+import { runGh } from '../../../lib/github-quota/run-gh.js';
 
 export const PR_SYNC_BOOT_DELAY_MS = 30_000;
 export const PR_SYNC_INTERVAL_MS = 60_000;
@@ -72,7 +73,6 @@ export const PR_SYNC_FAILURE_THRESHOLD = 3;
 const BRANCH_READ_CONCURRENCY = 8;
 const LOG_PREFIX = '[pr-sync]';
 
-const execFileAsync = promisify(execFile);
 const GH_PR_VIEW_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
 
 let bootTimer: ReturnType<typeof setTimeout> | null = null;
@@ -245,7 +245,7 @@ async function syncProject(
   if (repoInBackoff(project.path, ctx.now)) return skipLinks();
   const rows = await readRepoPullRequests(project.path);
   if (rows === null) {
-    recordRepoFailure(project.path, ctx.now);
+    if (!userGraphqlPaused()) recordRepoFailure(project.path, ctx.now);
     return skipLinks();
   }
   repoFailures.delete(project.path);
@@ -296,6 +296,15 @@ async function syncProject(
   return { inserted, updated };
 }
 
+/**
+ * PAN-4264: `gh pr list` / `gh pr view` spend the user GraphQL bucket. While
+ * it is paused the reads are skipped on purpose, so a null read is not a
+ * repository failure and never feeds the 3-strike backoff.
+ */
+function userGraphqlPaused(): boolean {
+  return activeGitHubPause('user', 'graphql') !== undefined;
+}
+
 function repoInBackoff(repo: string, now: number): boolean {
   const failures = repoFailures.get(repo);
   return failures !== undefined && failures.skipUntil > now;
@@ -333,7 +342,7 @@ async function refreshUnlistedLinks(
       if (repoInBackoff(repo, ctx.now)) continue;
       const row = await readPullRequest(link);
       if (!row) {
-        recordRepoFailure(repo, ctx.now);
+        if (!userGraphqlPaused()) recordRepoFailure(repo, ctx.now);
         continue;
       }
       repoFailures.delete(repo);
@@ -346,9 +355,9 @@ async function refreshUnlistedLinks(
 /** `gh pr view` for one PR by key; null when the read fails. */
 async function readGithubPullRequest(key: PullRequestKey): Promise<GhPrRow | null> {
   try {
-    const { stdout } = await execFileAsync('gh', [
+    const { stdout } = await runGh([
       'pr', 'view', String(key.number), '--repo', `${key.host}/${key.repository}`, '--json', GH_PR_VIEW_FIELDS,
-    ], { encoding: 'utf-8', timeout: 20_000 });
+    ], { caller: 'pr-sync', timeout: 20_000 });
     return JSON.parse(stdout) as GhPrRow;
   } catch {
     return null;
@@ -398,6 +407,8 @@ export async function runPullRequestSyncOnce(
   readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
   listLiveSessions: () => Promise<readonly string[] | null> = listLiveConversationSessions,
 ): Promise<PullRequestSyncResult> {
+  // PAN-4264: skip the whole sweep during a user GraphQL pause (non-essential poller).
+  if (userGraphqlPaused()) return { inserted: 0, updated: 0 };
   const conversations = listConversationsForPullRequestSync();
   const ctx: SweepContext = {
     now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set(), settled: new Set(),

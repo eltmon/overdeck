@@ -8,6 +8,7 @@ import { getProviderForModel, PROVIDERS } from '../providers.js';
 import { canUseHarness } from '../harness-policy.js';
 import { derefWorkhorse } from '../config-yaml/roles.js';
 import type { WorkhorsesConfig } from '../config-yaml/schema.js';
+import { effortConfigErrors } from './effort-support.js';
 import {
   TIERED_EXECUTION_CALLOUT_POLICIES,
   TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES,
@@ -391,7 +392,15 @@ export function validateTieredExecutionConfig(
       difficultyOwners[difficulty] = [...(difficultyOwners[difficulty] ?? []), tierName];
     }
 
-    normalizedTiers[tierName] = { model, ...(modelRef ? { modelRef } : {}), harness, difficulties, ...(normalizedDistribution ? { distribution: normalizedDistribution } : {}) };
+    if (tier.effort !== undefined) {
+      const effortModels = normalizedDistribution ? normalizedDistribution.map((entry) => entry.model) : [model];
+      const effortErrors = effortConfigErrors(path, tier.effort, effortModels);
+      if (effortErrors.length > 0) {
+        throw new TieredExecutionConfigError(effortErrors[0]);
+      }
+    }
+
+    normalizedTiers[tierName] = { model, ...(modelRef ? { modelRef } : {}), harness, difficulties, ...(tier.effort ? { effort: tier.effort } : {}), ...(normalizedDistribution ? { distribution: normalizedDistribution } : {}) };
   }
 
   const difficultyToTier: Partial<Record<XBriefDifficulty, string>> = {};

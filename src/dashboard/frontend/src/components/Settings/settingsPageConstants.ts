@@ -18,6 +18,7 @@ import {
   Mic,
   Gauge,
   Globe,
+  Trash2,
 } from 'lucide-react';
 import { type BackgroundAiFeature } from './types';
 import { type NavItem } from './primitives';
@@ -50,6 +51,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'tiered-execution', label: 'Tiered Execution', icon: Route },
   { id: 'swarming', label: 'Swarming', icon: GitBranch },
   { id: 'cloister', label: 'Cloister', icon: Flag },
+  { id: 'close-out', label: 'Close-out', icon: Trash2 },
   { id: 'remote', label: 'Remote', icon: Globe },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },

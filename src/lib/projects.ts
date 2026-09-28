@@ -60,7 +60,7 @@
 
 import { existsSync, readFileSync, statSync } from 'fs';
 import { readFile, stat } from 'fs/promises';
-import { join, resolve } from 'path';
+import { isAbsolute, join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { Effect } from 'effect';
 import { ConfigParseError, FsError } from './errors.js';
@@ -75,6 +75,7 @@ import { extractPrefix, parseIssueId } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
 import { findContainingProject, findContainingProjectAsync } from './projects/path-containment.js';
 import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
+import type { EffortLevel } from '@overdeck/contracts';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
 
@@ -354,6 +355,81 @@ export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationRe
     : { ok: true, config: raw as VersionSyncConfig };
 }
 
+/** Gauntlet lane roles (PAN-4223): mirrors LANE_ROLES without importing it (an import cycle); lanes/config.ts checks they agree. */
+export const GAUNTLET_ROLE_KEYS = ['builder', 'critic', 'verifier', 'play', 'orchestrator'] as const;
+
+export interface GauntletRoleConfig {
+  model?: string;
+  harness?: string;
+  effort?: string;
+}
+
+/** Gauntlet lanes (.pan/drafts/pan-4223.md). All optional; defaults are applied by resolveLaneConfig. */
+export interface GauntletConfig {
+  /** Absolute path under $HOME. Default: <dirname(path)>/<basename(path)>-lanes. */
+  lanes_root?: string;
+  /** Default: origin/<workspace.default_branch ?? 'main'>. */
+  base_ref?: string;
+  /** git sparse-checkout --no-cone patterns applied to builder worktrees. */
+  sparse_checkout?: string[];
+  roles?: Partial<Record<(typeof GAUNTLET_ROLE_KEYS)[number], GauntletRoleConfig>>;
+}
+
+export type GauntletValidationResult =
+  | { ok: true; config: GauntletConfig }
+  | { ok: false; errors: string[] };
+
+export function validateGauntletConfig(raw: unknown): GauntletValidationResult {
+  if (!isRecord(raw)) {
+    return { ok: false, errors: ['gauntlet must be an object'] };
+  }
+
+  const errors: string[] = [];
+  if (raw.lanes_root !== undefined && (typeof raw.lanes_root !== 'string' || !isAbsolute(raw.lanes_root))) {
+    errors.push('gauntlet.lanes_root must be an absolute path');
+  }
+  if (raw.base_ref !== undefined && (typeof raw.base_ref !== 'string' || raw.base_ref.trim() === '')) {
+    errors.push('gauntlet.base_ref must be a non-empty string');
+  }
+  if (raw.sparse_checkout !== undefined) {
+    if (!Array.isArray(raw.sparse_checkout)) {
+      errors.push('gauntlet.sparse_checkout must be an array of non-empty strings');
+    } else {
+      raw.sparse_checkout.forEach((pattern, index) => {
+        if (typeof pattern !== 'string' || pattern.trim() === '') {
+          errors.push(`gauntlet.sparse_checkout[${index}] must be a non-empty string`);
+        }
+      });
+    }
+  }
+  if (raw.roles !== undefined) {
+    if (!isRecord(raw.roles)) {
+      errors.push('gauntlet.roles must be an object');
+    } else {
+      for (const [role, roleConfig] of Object.entries(raw.roles)) {
+        if (!(GAUNTLET_ROLE_KEYS as readonly string[]).includes(role)) {
+          errors.push(`gauntlet.roles.${role} is not a lane role (expected one of: ${GAUNTLET_ROLE_KEYS.join(', ')})`);
+          continue;
+        }
+        if (!isRecord(roleConfig)) {
+          errors.push(`gauntlet.roles.${role} must be an object`);
+          continue;
+        }
+        for (const field of ['model', 'harness', 'effort'] as const) {
+          const value = roleConfig[field];
+          if (value !== undefined && (typeof value !== 'string' || value.trim() === '')) {
+            errors.push(`gauntlet.roles.${role}.${field} must be a non-empty string`);
+          }
+        }
+      }
+    }
+  }
+
+  return errors.length > 0
+    ? { ok: false, errors }
+    : { ok: true, config: raw as GauntletConfig };
+}
+
 /**
  * Project configuration
  */
@@ -450,6 +526,15 @@ export interface ProjectConfig {
    * Defaults to the project repo itself (monorepo) when absent.
    */
   pan_records?: PanRecordsConfig;
+  /** PAN-4223: gauntlet lanes config (lanes root, base ref, sparse checkout, per-role model/harness/effort). */
+  gauntlet?: GauntletConfig;
+  /**
+   * Per-project default reasoning effort, below role/sub-role/tier/plan/item
+   * in resolveEffort's precedence but above the global default. resolveEffort
+   * ignores a non-canonical value here with a warning rather than failing —
+   * this is config, not a validated schema.
+   */
+  effort?: EffortLevel;
 }
 
 /** Resolve the issue prefix for a project. */

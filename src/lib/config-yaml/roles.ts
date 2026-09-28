@@ -1,9 +1,9 @@
 import type { ModelId } from '../settings.js';
-import { getModelEffortLevels, resolveModelId } from '../model-capabilities.js';
+import { resolveModelId } from '../model-capabilities.js';
+import { effortConfigErrors } from '../agents/effort-support.js';
 import { derivePercentPick, pickPercentModelRef, representativeModelRef } from './percent.js';
 import {
   PARENT_MODEL_REF,
-  ROLE_EFFORTS,
   WORKHORSE_SLOTS,
   type ModelRef,
   type NormalizedConfig,
@@ -294,8 +294,9 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'ohmypi' && roleConfig.harness !== 'codex' && roleConfig.harness !== 'acp' && roleConfig.harness !== 'kimi-code' && roleConfig.harness !== 'opencode' && roleConfig.harness !== 'muse' && roleConfig.harness !== 'prime-agent') {
     throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or prime-agent`);
   }
-  if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
-    throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
+  const effortErrors = effortConfigErrors(`roles.${role}`, roleConfig.effort, []);
+  if (effortErrors.length > 0) {
+    throw new Error(`config.yaml: ${effortErrors[0]}`);
   }
   if (roleConfig.mode !== undefined && roleConfig.mode !== 'quick' && roleConfig.mode !== 'full' && roleConfig.mode !== 'none') {
     throw new Error(`config.yaml: roles.${role}.mode must be quick, full, or none`);
@@ -341,18 +342,21 @@ export function validateRoleModelRefs(config: NormalizedConfig): void {
       }
     } else if (roleConfig.model) {
       const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
-      if (roleConfig.effort !== undefined) {
-        const supported = getModelEffortLevels(resolvedModel);
-        if (supported !== undefined && supported.length > 0 && !supported.includes(roleConfig.effort)) {
-          throw new Error(
-            `config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
-          );
-        }
+      const modelEffortErrors = effortConfigErrors(`roles.${role}`, roleConfig.effort, [resolvedModel]);
+      if (modelEffortErrors.length > 0) {
+        throw new Error(`config.yaml: ${modelEffortErrors[0]}`);
       }
     }
     for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) {
       if (subConfig.model && subConfig.model !== PARENT_MODEL_REF) {
         derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
+      }
+      if (subConfig.effort !== undefined) {
+        const resolvedSubModel = resolveModel(role, subRole, config);
+        const subEffortErrors = effortConfigErrors(`roles.${role}.sub.${subRole}`, subConfig.effort, [resolvedSubModel]);
+        if (subEffortErrors.length > 0) {
+          throw new Error(`config.yaml: ${subEffortErrors[0]}`);
+        }
       }
     }
   }

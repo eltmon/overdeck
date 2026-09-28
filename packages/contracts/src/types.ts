@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { BackendPane } from "./backend-pane"
 import { DerivedIssueState } from "./derived-issue-state"
+import { GitHubQuotaSnapshot } from "./github-quota"
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -270,6 +271,7 @@ export const AgentRuntimeSnapshot = Schema.Struct({
   activity: Activity,
   lastActivity: Schema.String,                    // ISO timestamp of last event for this agent
   currentTool: Schema.optional(Schema.String),   // set when activity === "working"
+  currentToolDescription: Schema.optional(Schema.String), // set alongside currentTool when activity === "working"
   thinking: Schema.optional(ThinkingState),       // set when activity === "thinking"
   waiting: Schema.optional(WaitingState),         // set when activity === "waiting"
   claudeSessionId: Schema.optional(Schema.String),
@@ -582,6 +584,8 @@ export const DashboardSnapshot = Schema.Struct({
   embedProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EmbedProgressSnapshot)),
   ciByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectCiSnapshot)),
   restartGate: Schema.optional(RestartGateSnapshot),
+  /** PAN-4264 — GitHub API quota use, samples and pauses; derived, never stored. */
+  githubQuota: Schema.optional(GitHubQuotaSnapshot),
   /** PAN-3751 — in-flight deploys keyed by project key. */
   deployByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectDeploySnapshot)),
   timestamp: Schema.String,

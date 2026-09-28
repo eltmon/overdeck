@@ -8,12 +8,18 @@ import {
   getAnalyticsService,
   setAnalyticsClientTypeForProcess,
   shutdownAnalyticsServices,
+  trackAnalyticsTask,
 } from '../lib/telemetry/service.js';
+import { maybeSendInstanceHeartbeat } from '../lib/telemetry/instance-heartbeat.js';
 import { registerCliExitFinalizer } from './exit.js';
+import { registerGitHubRateLimitedTelemetry } from '../lib/telemetry/github-quota-telemetry.js';
+import { flushLedgerWrites } from '../lib/github-quota/ledger.js';
 
 export { exitCli } from './exit.js';
 
 setAnalyticsClientTypeForProcess('cli');
+// PAN-4264: a CLI process that records a GitHub rate-limit refusal reports it too.
+registerGitHubRateLimitedTelemetry();
 
 const TELEMETRY_CLI_VERB_SET = new Set<string>(TELEMETRY_CLI_VERBS);
 
@@ -36,14 +42,29 @@ export class CliTelemetryLifecycle {
   private readonly analytics: Pick<AnalyticsService, 'capture' | 'shutdown'>;
   private readonly shutdown: () => Promise<void>;
 
+  private readonly heartbeat: (() => Promise<unknown>) | undefined;
+
   constructor(
     analytics?: Pick<AnalyticsService, 'capture' | 'shutdown'>,
     private readonly startedAt = Date.now(),
+    heartbeat?: () => Promise<unknown>,
   ) {
     this.analytics = analytics ?? getAnalyticsService('cli');
     this.shutdown = analytics
       ? () => analytics.shutdown()
       : shutdownAnalyticsServices;
+    // PAN-4264: the daily instance_heartbeat (dashboard_running: false). An
+    // injected analytics client gets none unless the caller passes one.
+    this.heartbeat = heartbeat ?? (analytics ? undefined : async () => {
+      // Loaded on first use to keep projects.ts out of the CLI startup graph.
+      const { listProjectsSync } = await import('../lib/projects.js');
+      return maybeSendInstanceHeartbeat({
+        dashboardRunning: false,
+        listProjects: listProjectsSync,
+        listAgents: () => [],
+        analytics: this.analytics,
+      });
+    });
   }
 
   finish(ok: boolean, argv = process.argv, finishedAt = Date.now()): Promise<void> {
@@ -57,6 +78,11 @@ export class CliTelemetryLifecycle {
       ok,
       duration_ms: bucketCliDuration(Math.max(0, finishedAt - this.startedAt)),
     });
+    // Tracked, not awaited: shutdownAnalyticsServices waits for it within its deadline.
+    if (this.heartbeat) void trackAnalyticsTask(this.heartbeat());
+    // PAN-4264: GitHub quota ledger lines are queued, not awaited; land them
+    // before the process exits (every CLI exit path finishes here).
+    await flushLedgerWrites();
     await this.shutdown();
   }
 }

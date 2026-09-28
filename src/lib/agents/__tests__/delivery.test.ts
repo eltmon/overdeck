@@ -31,7 +31,7 @@ vi.mock('../../paths.js', async (importOriginal) => {
 import { AcpHost, type AcpHostRuntime } from '../../acp/host.js';
 import { writePtyToken } from '../../pty-token.js';
 import { resolveConversationDeliveryMethod } from '../../overdeck/conversation-delivery.js';
-import { deliverAgentMessage } from '../delivery.js';
+import { deliverAgentMessage, deliverMessageWithTranscriptConfirmation } from '../delivery.js';
 import { resolveAgentDeliveryMethod } from '../messaging.js';
 import { sendKeys } from '../../tmux.js';
 import { KIMI_CONTEXT_START, KIMI_TASK_START } from '../../runtimes/kimi-context-envelope.js';
@@ -556,5 +556,148 @@ describe('deliverMessageWithTranscriptConfirmation (PAN-3846)', () => {
     expect(typeof delivery.deliverMessageWithTranscriptConfirmation).toBe('function');
     expect(delivery.deliverResumeMessageWithTranscriptConfirmation)
       .toBe(delivery.deliverMessageWithTranscriptConfirmation);
+  });
+});
+
+describe('deliverMessageWithTranscriptConfirmation subagent landing (PAN-4247)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function stubSnapshot() {
+    return vi.fn(async () => ({
+      sessionFile: '/tmp/pan-4247-session.jsonl',
+      userRecordCount: 0,
+      fileSize: 0,
+      readOffset: 0,
+    }));
+  }
+
+  // Every pre-loop step must be a resolved stub under fake timers: a real
+  // captureSidechainOffsets() readdir races the fake clock's first tick and
+  // makes the settle-window tests flaky/hanging depending on which wins.
+  function stubCaptureOffsets() {
+    return vi.fn(async () => new Map<string, number>());
+  }
+
+  it('returns delivered false with landing.kind subagent and calls deliver exactly once (AC1)', async () => {
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const snapshot = stubSnapshot();
+    const probe = vi.fn(async () => ({ matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 0 }));
+    const probeSidechains = vi.fn(async () => ({ agentId: 'agent-1', description: 'Investigate flaky test' }));
+
+    const result = await deliverMessageWithTranscriptConfirmation({
+      agentId: 'agent-x',
+      workspace: '/tmp/workspace',
+      sessionId: 'session-1',
+      message: 'please pause and check the logs',
+      caller: 'test',
+      deliver,
+      snapshot,
+      probe,
+      probeSidechains,
+      captureOffsets: stubCaptureOffsets(),
+      timeoutMs: 500,
+      intervalMs: 10,
+    });
+
+    expect(result).toEqual({
+      delivered: false,
+      attempts: 1,
+      landing: { kind: 'subagent', agentId: 'agent-1', description: 'Investigate flaky test' },
+      lastDelivery: { ok: true, path: 'tmux' },
+    });
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns delivered true, attempts 1, and landing.kind main when the main probe matches (AC2)', async () => {
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const snapshot = stubSnapshot();
+    const probe = vi.fn(async () => ({ matchedUserRecord: true, realAssistantTurnCount: 0, compactBoundaryCount: 0 }));
+    const probeSidechains = vi.fn(async () => null);
+
+    const result = await deliverMessageWithTranscriptConfirmation({
+      agentId: 'agent-x',
+      workspace: '/tmp/workspace',
+      sessionId: 'session-1',
+      message: 'please pause and check the logs',
+      caller: 'test',
+      deliver,
+      snapshot,
+      probe,
+      probeSidechains,
+      captureOffsets: stubCaptureOffsets(),
+      timeoutMs: 500,
+      intervalMs: 10,
+    });
+
+    expect(result).toEqual({
+      delivered: true,
+      attempts: 1,
+      landing: { kind: 'main' },
+      lastDelivery: { ok: true, path: 'tmux' },
+    });
+  });
+
+  it('defers the assistant-only fallback for the 3s settle window so a later sidechain hit wins (AC4)', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    const startedAt = Date.now();
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const snapshot = stubSnapshot();
+    const probe = vi.fn(async () => ({ matchedUserRecord: false, realAssistantTurnCount: 1, compactBoundaryCount: 0 }));
+    const probeSidechains = vi.fn(async () => (
+      Date.now() - startedAt >= 1_000 ? { agentId: 'agent-1', description: 'Investigate flaky test' } : null
+    ));
+
+    const resultPromise = deliverMessageWithTranscriptConfirmation({
+      agentId: 'agent-x',
+      workspace: '/tmp/workspace',
+      sessionId: 'session-1',
+      message: 'please pause and check the logs',
+      caller: 'test',
+      deliver,
+      snapshot,
+      probe,
+      probeSidechains,
+      captureOffsets: stubCaptureOffsets(),
+      timeoutMs: 10_000,
+      intervalMs: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(1_200);
+    const result = await resultPromise;
+
+    expect(result).toMatchObject({
+      delivered: false,
+      landing: { kind: 'subagent', agentId: 'agent-1', description: 'Investigate flaky test' },
+    });
+  });
+
+  it('falls back to landing.kind main once the assistant-only turn has settled for 3s with no sidechain hit', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const }));
+    const snapshot = stubSnapshot();
+    const probe = vi.fn(async () => ({ matchedUserRecord: false, realAssistantTurnCount: 1, compactBoundaryCount: 0 }));
+    const probeSidechains = vi.fn(async () => null);
+
+    const resultPromise = deliverMessageWithTranscriptConfirmation({
+      agentId: 'agent-x',
+      workspace: '/tmp/workspace',
+      sessionId: 'session-1',
+      message: 'please pause and check the logs',
+      caller: 'test',
+      deliver,
+      snapshot,
+      probe,
+      probeSidechains,
+      captureOffsets: stubCaptureOffsets(),
+      timeoutMs: 10_000,
+      intervalMs: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(3_100);
+    const result = await resultPromise;
+
+    expect(result).toMatchObject({ delivered: true, landing: { kind: 'main' } });
   });
 });

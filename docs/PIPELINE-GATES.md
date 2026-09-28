@@ -207,6 +207,29 @@ delivery and surfaces a needs-you on the second skip, across processes
 torn by a crash is closed off before the next append, so it cannot swallow
 the entry after it.
 
+**Recording retries transient forge failures (PAN-4263).** `pan admin
+specialists done` finds the PR through `discoverArtifact` (`lib/forge.ts`),
+which retries a rate-limit, network or 502/503/504 failure twice, after 2 s
+and 8 s (`lib/forge-transient.ts`). A lookup that still fails is reported as
+`Couldn't reach <forge> to find the review artifact for <branch>: <reason>`,
+never as "No open review artifact": only gh's own "no pull requests found"
+answer (or an empty `glab mr list`) means there is no PR, and a closed PR on
+the branch reads as none. The command checks the caller's identity before it
+calls the forge. A review verdict whose lookup or post still fails for a
+transient reason is journaled as `review.verdict-deferred` (status, run id,
+notes capped at 100 000 bytes, the caller's agent id or `null` for an
+operator, and the reason), and the command exits 1. deacon-lite's
+`recoverStalledReviews` replays it while that entry is the journal's last,
+once it is at least 10 minutes old, by running
+`pan admin specialists done review` again under the original caller, so every
+guard runs again (`cloister/deferred-verdict-replay.ts`). Another transient
+failure journals a fresh deferral, which is the next cooldown. The replay
+stops with `review.verdict-replay-gave-up`: `superseded` when the review
+parent's run id has moved on, `cap` after 7 deferrals of one run (about an
+hour, with an activity warning for the operator), `failed` when the replay
+failed for another reason. Test and UAT verdicts are not deferred; they get
+the same honest error and exit 1.
+
 A failed browser UAT is observed where the test agent records it:
 `pan admin specialists done test <id> --uat-status failed` (or the `uat`
 role). After posting the verdict comment, that command relays the UAT notes
@@ -386,6 +409,13 @@ whose PR-tab cache a PR webhook invalidates at once and which otherwise
 expires after 60 seconds, like the pr-facts cache on top of it. A verdict
 posted from a CLI process therefore reaches a dashboard server's gate within
 about two minutes even with no webhook.
+
+**Which PR merges (PAN-4263).** The branch lookup ranks the head branch's PRs
+open (most recently updated) above merged above closed
+(`selectPullRequestForHead` in `lib/github-pr-selection.ts`), so an older open
+PR wins over a newer closed one. The merge then lands the PR `ensurePRExists`
+resolves (open first); a stale stored merge-set `artifact_url` is overwritten
+and never merged (`routes/workspaces/merge-artifact.ts`).
 
 **Strike branches.** The merge queue used to turn a queued entry into a
 strike landing whenever `origin/strike/<issue>` existed, and skip the gate
@@ -572,20 +602,55 @@ Auto-resume is intentionally suppressible:
   leaves it unset so autonomous recovery stays eligible. Recording an OOM
   kill as an operator stop is what once turned a transient resource event
   into a permanent stall.
-- **Memory gate (PAN-2500):** the hysteresis resource governor
-  (`assessMemoryPressure` in `cloister/memory-governor.ts`) has two
-  consumers: the preemptive scheduler (`preemption.ts`) and the
-  memory-pressure patrol (`memory-pressure-patrol.ts`). Below the SOFT
-  reserve they defer new admissions; below HARD the patrol sheds (stops
-  merged/closed Docker stacks, then pauses idle work agents); neither
-  re-admits until memory clears RECOVERY. It does **not** gate every
-  dispatch path: no spawn path reads `getCachedMemoryVerdict`. POST
-  `/api/agents` — the operator's start, the planning auto-handoff and its
-  deferred retry — sees memory only through `evaluateSpawnGuardrails`
-  (`routes/agents/shared.ts`), which classifies free RAM against the
-  `memoryWarnGb`/`memoryBlockGb` thresholds with no hysteresis. This is
-  separate from `--no-resume`, which suppresses resume outright regardless
-  of memory.
+- **Memory gate (PAN-2500, scaled defaults PAN-4267):** the hysteresis
+  resource governor (`assessMemoryPressure` in `cloister/memory-governor.ts`)
+  gates exactly one caller: the preemptive scheduler's
+  `preemption.ts:resumeYieldedAgents`. It also feeds the memory-pressure
+  patrol (`memory-pressure-patrol.ts`), which only reports the band to the
+  activity feed — `shed()` (stack-stop / idle-agent-pause reclaim) has no
+  caller anywhere in the codebase. The governor never gates conversations,
+  `pan start`, or dashboard Start. Below the SOFT reserve the governor
+  defers `resumeYieldedAgents`; below HARD it reports `shedding`; neither
+  re-admits until memory clears RECOVERY. Reserve defaults are a share of
+  RAM with an absolute floor and a cap (hard &le; 10%, soft &le; 20%,
+  watch &le; 25%, recovery &le; 35% of total RAM; see
+  `src/lib/config-yaml/governor-reserves.ts`), so a small host (an 8-16 GB
+  Mac) gets workable reserves instead of a recovery reserve at or above its
+  total RAM; hosts at or above 40 GB keep the pre-PAN-4267 values. It does
+  **not** gate every dispatch path: no spawn path reads
+  `getCachedMemoryVerdict`. POST `/api/agents` — the operator's start, the
+  planning auto-handoff and its deferred retry — sees memory only through
+  `evaluateSpawnGuardrails` (`routes/agents/shared.ts`), which classifies
+  free RAM against the `memoryWarnGb`/`memoryBlockGb` thresholds with no
+  hysteresis; these defaults are also scaled, `min(4, RAM/8)` GB warn and
+  `min(2, RAM/16)` GB block. This is separate from `--no-resume`, which
+  suppresses resume outright regardless of memory.
+- **macOS measurement (PAN-4267):** the header collector
+  (`system-health/darwin.ts`) and the governor's reader
+  (`readProcMemoryDarwin` in `dashboard/server/services/proc-memory.ts`)
+  share one available-memory calculation
+  (`computeDarwinAvailableMemoryBytes`): `memory_pressure -Q`'s free
+  percentage of total RAM first, falling back to the Activity Monitor
+  `vm_stat` formula (`total - (anonymous - purgeable + wired + compressor)`)
+  when memory_pressure is unavailable. macOS has no PSI and allocates swap
+  on demand, so the governor ignores swap runway there
+  (`swapGrowsOnDemand`) and instead reads the kernel's own
+  `kern.memorystatus_vm_pressure_level` sysctl as its stall signal: level 4
+  (critical) sheds immediately regardless of the memory reserves, and level
+  1 (normal) counts as calm for the holding re-admit window.
+- **Operator-started exemption (PAN-1812, PAN-3634):** when
+  `exempt_operator_started` is on, the emergency brake
+  (`concurrency.ts:emergencyBrake`) and the memory governor's shed
+  (`memory-governor.ts:selectAgentToPause`) reap only agents whose
+  `startedBy` starts with `flywheel:` (`isFlywheelStartedBy` in
+  `agents/provenance.js`) — never on a stale `flywheelRunId` field, which is
+  inert legacy data. The Flywheel conversation mints `flywheel:conv-flywheel`
+  from `OVERDECK_CONVERSATION`; the planning auto-handoff and its deferred
+  retry copy that token only when the planning session it hands off from was
+  itself Flywheel-started, and send `planning-auto-handoff` (an operator
+  origin) otherwise. Every other origin — an operator's `pan start`, a
+  worker, a reconciler — is exempt, which is what lets a deliberate operator
+  spawn survive the cap.
 - **Deferred planning hand-off (PAN-4155):** when planning finalizes with
   auto-start, the first POST `/api/agents` acknowledges tight RAM and a high
   agent count only (PAN-3977). If a guardrail still refuses it (the agent
@@ -595,12 +660,14 @@ Auto-resume is intentionally suppressible:
   acknowledgement at all, so a machine never waives a health warning on a
   retry. Only a refusal whose response carries a guardrail decision is
   deferred; the start gate and the dirty-tree guard also answer 409 and stay
-  failures. A deferral recorded while the Deacon is frozen
-  (`deacon.globally_paused`, the dashboard sidebar's Snowflake toggle) is
-  journaled the same way but held, not retried, until the freeze thaws — the
-  warn activity line, `pan plan finalize`/`pan plan done`'s output, and
-  `pan show` all say so (PAN-4210). See "Deacon-lite" below for the schedule
-  and stop conditions.
+  failures. The retried spawn still runs on the operator's `pan start --model`
+  from planning time (PAN-3022): the model lives in the auto-start consent
+  record the retry spends, not on the deferred request itself. A deferral
+  recorded while the Deacon is frozen (`deacon.globally_paused`, the dashboard
+  sidebar's Snowflake toggle) is journaled the same way but held, not
+  retried, until the freeze thaws — the warn activity line, `pan plan
+  finalize`/`pan plan done`'s output, and `pan show` all say so (PAN-4210).
+  See "Deacon-lite" below for the schedule and stop conditions.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -610,6 +677,66 @@ Auto-resume is intentionally suppressible:
 
 These gates are orthogonal to deacon-lite's own start/stop toggle
 (`pan admin cloister start|stop`).
+
+## GitHub quota policy (PAN-4264)
+
+GitHub limits each identity to 5,000 points per hour per bucket (GraphQL and
+REST, which GitHub calls `core`), plus a burst ("secondary") limit. Overdeck
+meters its own GitHub calls, backs off when GitHub refuses one, and never
+reads a refused or skipped call as "no data".
+
+**The ledger.** Every metered call and every `/rate_limit` sample appends one
+JSON line to `~/.overdeck/github-quota/ledger-<YYYYMMDDHH>.jsonl` (UTC hour):
+`{ ts, pid, kind: 'call' | 'sample', caller, pool, bucket, cost, estimated,
+outcome, remaining?, limit?, resetAt?, agent? }`. The pool is the identity
+spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or `app` (GitHub
+App installation tokens). Readers aggregate the last 60 minutes from the
+current and previous hour files; files older than 3 hours are deleted on the
+hour rollover. The dashboard, the deacon child, CLI processes and the agent
+`gh` shim (beside the agent git guard, count-only) all write it.
+`src/lib/github-quota/` owns it: `runGh` (metered `gh` exec),
+`withGitHubCaller` (the caller context), the App/PAT metering in
+`rest-meter.ts`, and the pause gate.
+
+**Pause rules.** A rate-limit or secondary-limit refusal observed by any
+process writes `~/.overdeck/github-quota/pause.json` for that pool and bucket
+(atomic tmp + rename). Duration rules:
+
+- Primary limit with a visible reset (the refused bucket's latest sample shows `remaining == 0`): pause until that sample's `resetAt`.
+- Primary limit hidden (the sample shows `remaining > 0`, or no sample within 10 minutes): pause 10 minutes, capped at the sample's `resetAt` when that is sooner. The floor is 60 seconds.
+- Secondary limit: pause for `retry-after` seconds when present. Otherwise pause 60 seconds, doubling on each consecutive secondary refusal within 30 minutes, capped at 15 minutes.
+- For a **primary** refusal only, an `x-ratelimit-reset` header on the refused response wins over the sample-based rules. A **secondary** refusal ignores `x-ratelimit-reset`, because that header describes the hourly window, not the burst limit.
+
+A pause blocks only its exact `(pool, bucket)`: a GraphQL pause never stops
+REST calls, and a `pat` pause never stops the `user` or `app` pools.
+
+**Who is paused.** Only the non-essential read-model pollers skip GitHub
+during a pause: `pipeline-membership`, `pr-cache`, `pr-sync`, `ci-repair`,
+`issue-poller` and `close-out` (the deacon's 60-second closed-issue reaper).
+Every other caller is essential and is never paused: `tracker-client`,
+`app-rest`, `quota-sampler`, `agent` and `other` — merges, verdict recording,
+tracker writes, agents, `closeOut()` and `pan close`.
+
+**Never "no data".** A skipped call throws `GitHubQuotaPausedError` and a
+refused call throws `GitHubRateLimitedError`. Callers keep their "failed"
+signal: pipeline membership reports `forge_transient`, `readRepoPullRequests`
+returns `null`, PR sync skips its sweep without counting repository
+failures, and the closed-issue reaper treats the issue as not closed.
+
+**Wasted calls removed.**
+
+- A project with no resolvable tracker (no `tracker`, `rally_project`, `github_repo`, `issue_prefix` or `gitlab_repo`) is skipped by every membership refresh, logged once per `projects.yaml` mtime, and listed by `pan doctor` as a warn row.
+- A 404 from a GitHub App issue listing marks the repo App-not-installed for 6 hours (`repo-notes.json`); its issues are listed through the `gh` user token meanwhile.
+- A minted App installation token is reused until 5 minutes before it expires.
+- Boot-warm refreshes are staggered over 60 seconds and periodic convergence over 4 minutes, one project per refresh batch; the first CI refill runs at boot + 2 minutes.
+
+**Where to look.** The app-bar pill shows `GH <remaining>/<limit>` for the
+user GraphQL budget and lists the top callers; a banner in the system notices
+row names the pause end time and whether this machine's own use explains it;
+`pan doctor github-quota [--json]` prints the caller table, latest samples,
+the active pause, skipped projects and repos without the App.
+`GET /api/github-quota` returns the dashboard's snapshot. Calls from the ~35
+unmigrated `gh` sites show up only as the snapshot's `unattributed` points.
 
 ## The pipeline journal (post-Cut follow-up to PAN-3917)
 
@@ -650,6 +777,8 @@ One piece of stored pipeline state came back, and it is not a status.
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewers`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |
 | `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
+| `review.verdict-deferred` | `pan admin specialists done review`, when recording the verdict hits a transient forge failure (PAN-4263) |
+| `review.verdict-replay-gave-up` | deacon-lite's `recoverStalledReviews`, when a deferred verdict's replay stops: `superseded`, `cap` or `failed` |
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
@@ -674,7 +803,8 @@ observe and nudge — none reconciles a stored copy of anything:
    the selected backend's inventory.
 4. `reapClosedIssueAgents` — reaps agents for issues the tracker has closed.
 5. `recoverStalledReviews` — re-dispatches a review convoy whose reviewers
-   are all gone.
+   are all gone, and replays a deferred review verdict
+   (`cloister/deferred-verdict-replay.ts`, PAN-4263).
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
 7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,
@@ -813,6 +943,9 @@ run 2, 4, 8 and 16 minutes apart, then every 20 minutes. Each one POSTs
 `/api/agents` through `spawnWorkAgentThroughAgentsEndpoint` with
 `autoSpawnConsentRequired: true` and no acknowledgement, so a success spends
 the operator's auto-start consent exactly as the first attempt would have.
+The retried spawn runs on the operator's `pan start --model` from planning
+time (PAN-3022) — the retry carries no model of its own, so it reads the
+consent record's `workModel` and spends it along with the rest of the claim.
 While the Deacon is frozen, `runDeaconLite()` returns before
 `retryDeferredHandoffs` ever runs, so no retry is attempted at all; the
 schedule stays exactly as journaled and resumes on the first tick after the

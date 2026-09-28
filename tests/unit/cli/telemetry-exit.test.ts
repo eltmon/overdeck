@@ -196,3 +196,31 @@ describe('CLI telemetry lifecycle', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+// PAN-4264: queued GitHub quota ledger lines land before the CLI exits.
+describe('CLI exit flushes the GitHub quota ledger (PAN-4264)', () => {
+  it('awaits queued ledger writes before shutting telemetry down', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { queueLedgerEntry, readLedgerWindow } = await import('../../../src/lib/github-quota/ledger.js');
+    const originalHome = process.env.OVERDECK_HOME;
+    const home = mkdtempSync(join(tmpdir(), 'pan-cli-ledger-flush-'));
+    process.env.OVERDECK_HOME = home;
+    try {
+      let linesAtShutdown = -1;
+      const analytics = {
+        capture: vi.fn(),
+        shutdown: vi.fn(async () => { linesAtShutdown = readLedgerWindow(Date.now()).length; }),
+      } as unknown as Pick<AnalyticsService, 'capture' | 'shutdown'>;
+      queueLedgerEntry({ kind: 'call', caller: 'other', pool: 'user', bucket: 'graphql', cost: 1, estimated: true, outcome: 'ok' });
+
+      await new CliTelemetryLifecycle(analytics, 0).finish(true);
+      expect(linesAtShutdown).toBe(1);
+    } finally {
+      if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = originalHome;
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});

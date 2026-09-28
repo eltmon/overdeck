@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createDarwinHostHealthCollector } from '../../../../../src/lib/system-health/darwin.js';
+
 const { execMock, platformMock, readFileMock } = vi.hoisted(() => ({
   execMock: vi.fn(),
   platformMock: vi.fn(),
@@ -96,6 +98,55 @@ describe('readProcMemory PSI fields', () => {
       memAvailable: 8 * 1024 ** 3,
       psiSomeAvg10: null,
       psiFullAvg10: null,
+    });
+  });
+
+  it('matches the header collector\'s available memory bytes for identical darwin outputs', async () => {
+    platformMock.mockReturnValue('darwin');
+    const totalMemoryBytes = 16 * 1024 ** 3;
+    const pressureOutput = 'System-wide memory free percentage: 42%';
+    const vmStatOutput = [
+      'Mach Virtual Memory Statistics: (page size of 4096 bytes)',
+      'Pages free:                              100000.',
+      'Pages inactive:                          150000.',
+      'Pages speculative:                        12144.',
+      'Anonymous pages:                        3000000.',
+      'Pages wired down:                         700000.',
+      'Pages purgeable:                          200000.',
+      'Pages occupied by compressor:              65160.',
+    ].join('\n');
+    const swapOutput = 'total = 4096.00M  used = 2048.00M  free = 2048.00M  (encrypted)';
+
+    execMock.mockImplementation((
+      command: string,
+      _options: unknown,
+      callback: (error: Error | null, result?: { stdout: string }) => void,
+    ) => {
+      if (command.startsWith('memory_pressure')) return callback(null, { stdout: pressureOutput });
+      if (command === 'vm_stat') return callback(null, { stdout: vmStatOutput });
+      if (command.startsWith('sysctl')) return callback(null, { stdout: swapOutput });
+      return callback(new Error(`unexpected command: ${command}`));
+    });
+
+    const collector = createDarwinHostHealthCollector({
+      execFile: async (cmd) => {
+        if (cmd === 'memory_pressure') return pressureOutput;
+        if (cmd === 'vm_stat') return vmStatOutput;
+        if (cmd === 'sysctl') return swapOutput;
+        throw new Error(`unexpected command: ${cmd}`);
+      },
+      cpus: () => [],
+      loadAverage1m: () => 0,
+      totalMemoryBytes: () => totalMemoryBytes,
+      now: () => 0,
+    });
+    const collectorSample = await collector.sample();
+    const snapshot = await readProcMemory();
+
+    expect(collectorSample.availableMemoryBytes.status).toBe('available');
+    expect(collectorSample.availableMemoryBytes).toEqual({
+      status: 'available',
+      value: snapshot.memAvailable,
     });
   });
 });

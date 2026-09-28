@@ -6,8 +6,9 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
-import { usePickerPosition } from './usePickerPosition';
+import { useFloatingPickerPosition } from './useFloatingPickerPosition';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Effort definitions ───────────────────────────────────────────────────────
@@ -55,7 +56,8 @@ interface EffortPickerProps {
 export function EffortPicker({ value, onChange, disabled = false, availableLevels, unverified = false, title }: EffortPickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { openUp, align, maxHeight } = usePickerPosition(open, ref, { preferredHeight: 240 });
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { style: dropdownStyle } = useFloatingPickerPosition(open, ref, dropdownRef, { preferredHeight: 240 });
 
   // If model doesn't support effort, show a hint instead
   const noEffort = availableLevels !== undefined && availableLevels.length === 0;
@@ -72,9 +74,9 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -107,13 +109,12 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
         <ChevronDown size={11} />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className={`${styles.pickerDropdown} ${openUp ? styles.pickerDropdownUp : ''}`}
-          style={{
-            maxHeight: `${maxHeight}px`,
-            ...(align === 'right' ? { left: 'auto', right: 0 } : {}),
-          }}
+          ref={dropdownRef}
+          data-testid="effort-picker-dropdown"
+          className={styles.pickerDropdown}
+          style={dropdownStyle}
         >
           {filteredLevels.map((level) => (
             <button
@@ -125,7 +126,8 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
               {level.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

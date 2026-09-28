@@ -1194,3 +1194,58 @@ describe('ComposerFooter attachments', () => {
     expect(await screen.findByText('drop-image.png')).toBeInTheDocument();
   });
 });
+
+describe('ComposerFooter input-target notice (PAN-4268)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetComposerStore();
+    storedEffort.value = 'medium';
+    editorState.text = '';
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('names the subagent receiving typed input', () => {
+    render(<ComposerFooter conversation={conversation} subagentNotice={{ description: 'Counter run' }} />);
+
+    expect(screen.getByText('Typed messages are going to subagent "Counter run", not the main agent.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send to main' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send anyway' })).not.toBeInTheDocument();
+  });
+
+  it('sends the typed draft once through the normal send path when Send to main is clicked', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    render(<ComposerFooter conversation={conversation} subagentNotice={{ description: 'Counter run' }} />);
+
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to main' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/message',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/message'))).toHaveLength(1);
+  });
+
+  it('disables Send to main with an empty draft', () => {
+    render(<ComposerFooter conversation={conversation} subagentNotice={{ description: 'Counter run' }} />);
+
+    expect(screen.getByRole('button', { name: 'Send to main' })).toBeDisabled();
+  });
+
+  it('renders no notice without a subagent input target', () => {
+    const { container } = render(<ComposerFooter conversation={conversation} subagentNotice={null} />);
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(container.textContent ?? '').not.toMatch(/may\s+route/);
+    expect(screen.queryByRole('button', { name: 'Send to main' })).not.toBeInTheDocument();
+  });
+});

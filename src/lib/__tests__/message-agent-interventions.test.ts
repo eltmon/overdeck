@@ -70,7 +70,12 @@ vi.mock('../agents/delivery.js', async (importOriginal) => {
     ...actual,
     deliverMessageWithTranscriptConfirmation: async (args: { agentId: string; message: string; caller: string; deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux' }) => {
       const delivery = await actual.deliverAgentMessage(args.agentId, args.message, args.caller, args.deliveryMethod);
-      return { delivered: delivery.ok, attempts: 1, lastDelivery: delivery };
+      return {
+        delivered: delivery.ok,
+        attempts: 1,
+        lastDelivery: delivery,
+        landing: { kind: delivery.ok ? 'main' as const : 'none' as const },
+      };
     },
   };
 });
@@ -86,6 +91,11 @@ vi.mock('../agents/monitor-transport.js', () => ({
 vi.mock('../tmux-dedup.js', () => ({
   sendKeysDedup: vi.fn(async () => 'pasted'),
   completeKeyedSubmit: vi.fn(async () => undefined),
+}));
+
+// PAN-4268: the selector check reads a real pane; these fixtures have none.
+vi.mock('../agents/input-target.js', () => ({
+  ensureMainInputTarget: vi.fn(async () => ({ ok: true, check: 'no-selector' })),
 }));
 
 // Resume is mocked at its source module so the agents barrel re-exports the

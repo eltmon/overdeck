@@ -1,3 +1,4 @@
+import { totalmem } from 'os';
 import type { AuthMode, SubscriptionPlan } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelProvider } from '../model-fallback.js';
@@ -7,6 +8,7 @@ import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { isTerminalBackendName } from '@overdeck/contracts';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
+import { normalizeGovernorReserves } from './governor-reserves.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
   cloneDocsConfig,
@@ -154,7 +156,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
     swarm: { ...DEFAULT_CONFIG.swarm },
-    context: { rules: { ...DEFAULT_CONFIG.context.rules } },
+    context: { ...DEFAULT_CONFIG.context, rules: { ...DEFAULT_CONFIG.context.rules } },
     tmux: {
       ...DEFAULT_CONFIG.tmux,
     },
@@ -251,6 +253,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     telemetry: {
       enabled: DEFAULT_CONFIG.telemetry.enabled,
+      operator_grouping: DEFAULT_CONFIG.telemetry.operator_grouping,
     },
     ui: {
       openInEditorCommand: DEFAULT_CONFIG.ui.openInEditorCommand,
@@ -287,7 +290,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
   for (const config of validConfigs.reverse()) {
     if (config.swarm) result.swarm = { ...result.swarm, ...config.swarm };
     if (config.context?.rules) {
-      result.context = { rules: { ...result.context.rules, ...config.context.rules } };
+      result.context = { ...result.context, rules: { ...result.context.rules, ...config.context.rules } };
+    }
+    if (config.context?.auto_sync !== undefined) {
+      result.context = { ...result.context, autoSync: config.context.auto_sync };
     }
     // Merge providers
     if (config.models?.providers) {
@@ -811,15 +817,21 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ) {
         result.resources.governorCpuRecoveryLoadPerCore = config.resources.governor_cpu_recovery_load_per_core;
       }
-      // PAN-2500: RECOVERY must exceed SOFT or hysteresis can never re-admit.
-      // Normalize rather than throw — a misconfigured reserve shouldn't crash config load.
-      if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) {
-        result.resources.governorRecoveryReserveGb = result.resources.governorSoftReserveGb + 1;
-      }
-      // PAN-3550: WATCH must exceed SOFT or the warn tier can never fire before the hold.
-      if (result.resources.governorWatchReserveGb <= result.resources.governorSoftReserveGb) {
-        result.resources.governorWatchReserveGb = result.resources.governorSoftReserveGb + 1;
-      }
+      // PAN-4267: normalize hard/soft/watch/recovery ordering and cap all four
+      // against this host's RAM in one place — see governor-reserves.ts.
+      const normalizedGovernorReserves = normalizeGovernorReserves(
+        {
+          hard: result.resources.governorHardReserveGb,
+          soft: result.resources.governorSoftReserveGb,
+          watch: result.resources.governorWatchReserveGb,
+          recovery: result.resources.governorRecoveryReserveGb,
+        },
+        totalmem() / (1024 ** 3),
+      );
+      result.resources.governorHardReserveGb = normalizedGovernorReserves.hard;
+      result.resources.governorSoftReserveGb = normalizedGovernorReserves.soft;
+      result.resources.governorWatchReserveGb = normalizedGovernorReserves.watch;
+      result.resources.governorRecoveryReserveGb = normalizedGovernorReserves.recovery;
       if (result.resources.governorSwapRecoveryFreePercent <= result.resources.governorSwapSoftFreePercent) {
         result.resources.governorSwapRecoveryFreePercent = Math.min(
           result.resources.governorSwapSoftFreePercent + 10,
@@ -836,6 +848,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     if (typeof config.telemetry?.enabled === 'boolean') {
       result.telemetry.enabled = config.telemetry.enabled;
+    }
+    if (typeof config.telemetry?.operator_grouping === 'boolean') {
+      result.telemetry.operator_grouping = config.telemetry.operator_grouping;
+    }
+    if (typeof config.telemetry?.posthog_read_key === 'string' && config.telemetry.posthog_read_key.trim()) {
+      result.telemetry.posthog_read_key = config.telemetry.posthog_read_key.trim();
+    }
+    if (config.telemetry?.posthog_project_id !== undefined && String(config.telemetry.posthog_project_id).trim()) {
+      result.telemetry.posthog_project_id = String(config.telemetry.posthog_project_id).trim();
     }
 
     if (typeof config.ui?.open_in_editor_command === 'string') {

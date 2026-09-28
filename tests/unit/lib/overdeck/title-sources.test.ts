@@ -155,4 +155,34 @@ describe('retitleConversation source', () => {
     expect(updated?.title).toBe('Fallback title');
     expect(updated?.titleSource).toBe('ai-explicit');
   });
+
+  it('ac1: passes the latest compaction summary and only after-summary turns to summarizeTranscriptTitle', async () => {
+    const { retitleConversation } = await import('../../../../src/lib/overdeck/conversation-reads.js');
+    const transcriptSummary = await import('../../../../src/lib/conversations/transcript-summary.js');
+    const summarizeSpy = vi.spyOn(transcriptSummary, 'summarizeTranscriptTitle').mockResolvedValue('Migrate billing to invoicing API');
+
+    createConversation({ name: 'retitle-with-summary', tmuxSession: 'conv-retitle-with-summary', cwd: '/tmp' });
+    const sessionFile = join(testHome, 'retitle-with-summary.jsonl');
+    const summaryText = [
+      'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.',
+      '',
+      'Summary:',
+      '1. Primary Request and Intent: Migrate the billing service to the new invoicing API.',
+    ].join('\n');
+    writeFileSync(sessionFile, `${[
+      JSON.stringify({ type: 'user', message: { role: 'user', content: 'before summary turn' }, timestamp: '2026-01-01T00:00:00.000Z', uuid: 'u-1' }),
+      JSON.stringify({ type: 'system', subtype: 'compact_boundary', timestamp: '2026-01-01T00:00:01.000Z', uuid: 'b-1' }),
+      JSON.stringify({ type: 'user', message: { role: 'user', content: summaryText }, isCompactSummary: true, timestamp: '2026-01-01T00:00:02.000Z', uuid: 'u-2' }),
+      JSON.stringify({ type: 'user', message: { role: 'user', content: 'after summary turn' }, timestamp: '2026-01-01T00:00:03.000Z', uuid: 'u-3' }),
+    ].join('\n')}\n`);
+
+    await retitleConversation('retitle-with-summary', {
+      resolveSessionFile: () => Promise.resolve(sessionFile),
+    });
+
+    const transcriptArg = summarizeSpy.mock.calls.at(-1)![0] as string;
+    expect(transcriptArg).toContain('Primary Request and Intent');
+    expect(transcriptArg).toContain('after summary turn');
+    expect(transcriptArg).not.toContain('before summary turn');
+  });
 });

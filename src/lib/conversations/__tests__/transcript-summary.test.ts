@@ -8,6 +8,10 @@ vi.mock('../../agents.js', () => ({
 }));
 
 import {
+  COMPACT_SUMMARY_LABEL,
+  RECENT_OMITTED_MARKER,
+  RECENT_TURNS_LABEL,
+  derivePromptTitle,
   fallbackTranscriptTitle,
   sanitizeTitle,
   serializeConversationTranscript,
@@ -58,6 +62,124 @@ describe('serializeConversationTranscript', () => {
   });
 });
 
+describe('serializeConversationTranscript — compaction summary', () => {
+  const CONTINUATION_PREAMBLE =
+    'This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.';
+
+  function makeSummaryText(bodyRepeat: number): string {
+    const body = `Summary:\n1. Primary Request and Intent: ${'x'.repeat(bodyRepeat)}`;
+    return `${CONTINUATION_PREAMBLE}\n\n${body}`;
+  }
+
+  it('ac1: puts the summary first under COMPACT_SUMMARY_LABEL, keeps only after-summary turns, and strips the preamble', () => {
+    const summaryText = makeSummaryText(2_000);
+    const messages = [
+      { role: 'user' as const, text: 'before summary turn', sequence: 0 },
+      { role: 'user' as const, text: 'after summary turn', sequence: 2 },
+      { role: 'assistant' as const, text: 'assistant reply after summary', sequence: 3 },
+    ];
+
+    const out = serializeConversationTranscript(messages, {
+      compactSummary: { text: summaryText, sequence: 1 },
+      purpose: 'about',
+    });
+
+    expect(out.startsWith(COMPACT_SUMMARY_LABEL)).toBe(true);
+    expect(out).toContain('Primary Request and Intent');
+    expect(out).toContain('after summary turn');
+    expect(out).toContain('assistant reply after summary');
+    expect(out).not.toContain('before summary turn');
+    expect(out).not.toContain('This session is being continued');
+  });
+
+  it('ac2: purpose title keeps the same properties and stays within titleTranscriptWindow unchanged', () => {
+    const summaryText = makeSummaryText(2_000);
+    const messages = [
+      { role: 'user' as const, text: 'before summary turn', sequence: 0 },
+      { role: 'user' as const, text: 'after summary turn', sequence: 2 },
+      { role: 'assistant' as const, text: 'assistant reply after summary', sequence: 3 },
+    ];
+
+    const out = serializeConversationTranscript(messages, {
+      compactSummary: { text: summaryText, sequence: 1 },
+      purpose: 'title',
+    });
+
+    expect(out).toContain('Primary Request and Intent');
+    expect(out).toContain('after summary turn');
+    expect(out).not.toContain('before summary turn');
+    expect(titleTranscriptWindow(out)).toBe(out);
+  });
+
+  it('ac3: caps an oversized summary per purpose, and trims long recent turns for about with the omitted marker', () => {
+    const hugeSummary = `Summary:\n1. Primary Request and Intent: ${'x'.repeat(20_000)}`;
+    const messages = Array.from({ length: 30 }, (_, i) => ({
+      role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+      text: `turn ${i} `.padEnd(2_000, 'z'),
+      sequence: i + 1,
+    }));
+
+    const aboutOut = serializeConversationTranscript(messages, {
+      compactSummary: { text: hugeSummary, sequence: 0 },
+      purpose: 'about',
+    });
+    const aboutSummaryPart = aboutOut.split(`\n\n${RECENT_TURNS_LABEL}`)[0]!.slice(COMPACT_SUMMARY_LABEL.length + 1);
+    expect(aboutSummaryPart.length).toBe(14_001);
+    expect(aboutSummaryPart.endsWith('…')).toBe(true);
+    expect(aboutOut).toContain(RECENT_OMITTED_MARKER);
+    expect(aboutOut).toContain('turn 29');
+
+    const titleOut = serializeConversationTranscript(messages, {
+      compactSummary: { text: hugeSummary, sequence: 0 },
+      purpose: 'title',
+    });
+    const titleSummaryPart = titleOut.split(`\n\n${RECENT_TURNS_LABEL}`)[0]!.slice(COMPACT_SUMMARY_LABEL.length + 1);
+    expect(titleSummaryPart.length).toBe(4_001);
+    expect(titleSummaryPart.endsWith('…')).toBe(true);
+  });
+
+  it('ac4: without a summary, output is byte-identical regardless of options/purpose', () => {
+    const messages = [
+      { role: 'user' as const, text: 'fix the login bug' },
+      { role: 'assistant' as const, text: 'looking into it now' },
+    ];
+    const base = serializeConversationTranscript(messages);
+    expect(serializeConversationTranscript(messages, {})).toBe(base);
+    expect(serializeConversationTranscript(messages, { compactSummary: null })).toBe(base);
+    expect(serializeConversationTranscript(messages, { compactSummary: null, purpose: 'title' })).toBe(base);
+  });
+});
+
+describe('buildTranscriptTitlePrompt / buildTranscriptAboutPrompt', () => {
+  it('ac1: the title prompt names the overall scope and drops the recency-favoring instruction', async () => {
+    const { buildTranscriptTitlePrompt } = await import('../transcript-summary.js');
+    const prompt = buildTranscriptTitlePrompt('User: do the thing\n\nAssistant: done');
+    expect(prompt).toContain('overall scope');
+    expect(prompt).not.toContain('favor the most recent direction');
+  });
+
+  it('ac2: the About prompt mentions a leading summary of earlier context', async () => {
+    const { buildTranscriptAboutPrompt } = await import('../transcript-summary.js');
+    const prompt = buildTranscriptAboutPrompt('User: do the thing\n\nAssistant: done');
+    expect(prompt).toContain('summary of earlier context');
+  });
+
+  it('ac3: both builders fence the transcript text as untrusted data', async () => {
+    const { buildTranscriptTitlePrompt, buildTranscriptAboutPrompt } = await import('../transcript-summary.js');
+    const transcript = 'User: unique-marker-12345\n\nAssistant: ok';
+
+    for (const prompt of [buildTranscriptTitlePrompt(transcript), buildTranscriptAboutPrompt(transcript)]) {
+      const start = prompt.indexOf('<<<UNTRUSTED_TRANSCRIPT_START>>>');
+      const end = prompt.indexOf('<<<UNTRUSTED_TRANSCRIPT_END>>>');
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      const markerIndex = prompt.indexOf('unique-marker-12345');
+      expect(markerIndex).toBeGreaterThan(start);
+      expect(markerIndex).toBeLessThan(end);
+    }
+  });
+});
+
 describe('sanitizeTitle', () => {
   it('strips surrounding quotes', () => {
     expect(sanitizeTitle('"Refactor the auth flow"')).toBe('Refactor the auth flow');
@@ -105,6 +227,38 @@ describe('fallbackTranscriptTitle', () => {
 
   it('returns empty for transcripts without titleable text', () => {
     expect(fallbackTranscriptTitle('[… middle of the conversation omitted for length …]')).toBe('');
+  });
+
+  it("ac1: prefers the summary's Primary Request bullet over the last user line", () => {
+    const summaryText = [
+      'Summary:',
+      '1. Primary Request and Intent:',
+      '   - Orchestrate the Overdeck cut across parallel agents',
+      '2. Key Technical Concepts:',
+      '   - something else',
+    ].join('\n');
+    const messages = [
+      { role: 'user' as const, text: 'ship the intro video', sequence: 5 },
+    ];
+    const transcript = serializeConversationTranscript(messages, {
+      compactSummary: { text: summaryText, sequence: 0 },
+      purpose: 'title',
+    });
+
+    expect(fallbackTranscriptTitle(transcript)).toBe('Orchestrate the Overdeck cut across parallel agents');
+  });
+
+  it('ac2: falls back to the last user line when the summary lacks a Primary Request section', () => {
+    const summaryText = 'Summary:\nNo structured sections here, just prose.';
+    const messages = [
+      { role: 'user' as const, text: 'ship the intro video', sequence: 5 },
+    ];
+    const transcript = serializeConversationTranscript(messages, {
+      compactSummary: { text: summaryText, sequence: 0 },
+      purpose: 'title',
+    });
+
+    expect(fallbackTranscriptTitle(transcript)).toBe(derivePromptTitle('ship the intro video'));
   });
 });
 

@@ -23,6 +23,9 @@ export function whenEventStoreProjectionReady(): Promise<void> {
   return projectionReadyPromise;
 }
 
+/** PAN-4264: the first refill waits 2 minutes, off the boot burst of GitHub calls. */
+export const PROJECT_CI_REFILL_INITIAL_DELAY_MS = 120_000;
+
 /**
  * Start the periodic project-CI refill once the projection is ready. Returns
  * null, and starts nothing, in a peer dashboard (PAN-3931): a fill polls the
@@ -39,7 +42,7 @@ export async function startProjectCiRefillAfterProjectionReady(
 ): Promise<ReturnType<typeof setInterval> | null> {
   if ((deps.isPeer ?? isPeerDashboardProcess)()) return null;
   await (deps.whenReady ?? whenEventStoreProjectionReady)();
-  return (deps.start ?? startProjectCiRefill)(intervalMs);
+  return (deps.start ?? startProjectCiRefill)(intervalMs, { initialDelayMs: PROJECT_CI_REFILL_INITIAL_DELAY_MS });
 }
 
 export function resetEventStoreProjectionReadyForTests(): void {

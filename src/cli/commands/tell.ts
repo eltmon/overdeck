@@ -4,7 +4,29 @@ import { getAgentState, messageAgent, resolveAgentTarget } from '../../lib/agent
 import { issueOwesRework } from '../../lib/work-agent-lifecycle.js';
 import { loadRemoteAgentState, sendToRemoteAgent } from '../../lib/remote/index.js';
 
-export async function tellCommand(id: string, message: string): Promise<void> {
+export interface TellOptions {
+  /** Deliver to a critic or verifier lane that already filed its verdict (PAN-4223 FR-16). */
+  force?: boolean;
+}
+
+/**
+ * PAN-4223 FR-16: a critic or verifier lane gets one verdict. Re-tasking one
+ * that already filed a done report would un-blind it, so the refusal names the
+ * fresh-lane command instead. Null when delivery may proceed.
+ */
+async function laneVerdictRefusal(agentId: string): Promise<string | null> {
+  if (!agentId.startsWith('conv-')) return null;
+  const { getConversationByName } = await import('../../lib/overdeck/conversations.js');
+  const row = getConversationByName(agentId.slice('conv-'.length));
+  if (row?.laneRole !== 'critic' && row?.laneRole !== 'verifier') return null;
+  // Any done report counts: a later blocked report does not reopen the verdict.
+  const { listWorkerReports } = await import('../../lib/agents/worker/report.js');
+  if (!(await listWorkerReports(agentId)).some((report) => report.status === 'done')) return null;
+  return `conv ${row.id} is a ${row.laneRole} lane that already filed its verdict. ` +
+    `Launch a fresh one: pan lane start --role ${row.laneRole} --for ${row.laneKey} …`;
+}
+
+export async function tellCommand(id: string, message: string, options: TellOptions = {}): Promise<void> {
   // Resolve through the same target path as lifecycle commands so issue IDs can
   // address non-work agents such as strike-pan-* when that is the registered run.
   const agentId = resolveAgentTarget(id);
@@ -17,6 +39,15 @@ export async function tellCommand(id: string, message: string): Promise<void> {
   }
 
   try {
+    if (!options.force) {
+      const refusal = await laneVerdictRefusal(agentId);
+      if (refusal) {
+        console.error(chalk.red(refusal));
+        console.error(chalk.dim('  Pass --force to deliver anyway.'));
+        return exitCli(1);
+      }
+    }
+
     // Remote agents (fly.io) have no local tmux session — deliver via the
     // VM's tmux through the remote provider instead.
     const remoteState = loadRemoteAgentState(agentId);
@@ -37,6 +68,22 @@ export async function tellCommand(id: string, message: string): Promise<void> {
     const outcome = await messageAgent(agentId, message, 'pan-tell', {
       owesRework: await issueOwesRework(issueId),
     });
+    if (outcome.inputTargetRefusal) {
+      console.error(chalk.red(`Message NOT delivered to ${agentId}: Claude Code's typed input could not be moved to the main agent.`));
+      console.error(chalk.dim(`  "${message}"`));
+      console.error(chalk.dim(`  ${outcome.inputTargetRefusal.reason}`));
+      console.error(chalk.dim(`  The text is saved under ~/.overdeck/agents/${agentId}/mail/ for manual delivery.`));
+      return exitCli(1);
+    }
+    if (outcome.landedInSubagent) {
+      const { agentId: subagentId, description } = outcome.landedInSubagent;
+      console.error(chalk.red(
+        `Message NOT delivered to ${agentId}'s main conversation — it went to running subagent "${description}" (${subagentId})`,
+      ));
+      console.error(chalk.dim(`  "${message}"`));
+      console.error(chalk.dim(`  ${outcome.reason ?? 'no reason reported'}`));
+      return exitCli(1);
+    }
     if (!outcome.delivered) {
       console.error(chalk.red(`Message NOT delivered to ${agentId}`));
       console.error(chalk.dim(`  "${message}"`));
@@ -46,8 +93,11 @@ export async function tellCommand(id: string, message: string): Promise<void> {
       }
       return exitCli(1);
     }
-    console.log(chalk.green(`Message delivered to ${agentId}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
+    console.log(chalk.green(`Message delivered to ${agentId}${outcome.inputTarget === 'main' ? "'s main agent" : ''}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
     console.log(chalk.dim(`  "${message}"`));
+    if (outcome.switchedFromSubagent) {
+      console.log(chalk.dim(`  Switched Claude Code's input from subagent "${outcome.switchedFromSubagent}" back to the main agent first.`));
+    }
     // PAN-3736: when the delivery door explains itself — a busy agent whose
     // message went to its mail file, a dedup — print that reason. It names the
     // mail file, so the reader can check or hand-deliver the message.

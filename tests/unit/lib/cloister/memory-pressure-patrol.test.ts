@@ -121,7 +121,7 @@ describe('memory-pressure-patrol', () => {
         level: 'warn',
         source: 'cloister',
       });
-      expect((emitted[0] as any).message).toContain('stopped admitting');
+      expect((emitted[0] as any).message).toContain('started holding');
       expect((emitted[0] as any).message).toContain('recovery reserve');
       expect(actions).toHaveLength(1);
     });
@@ -380,6 +380,74 @@ describe('memory-pressure-patrol', () => {
       expect(emitted[0].details).toContain(
         'PSI some avg10: 0.12 | full avg10: unavailable (pressure stall data not readable)',
       );
+    });
+
+    it('states the governor scope in shedding text instead of claiming it admits nothing', async () => {
+      const emitted: any[] = [];
+      await patrolMemoryPressure({
+        assess: async () => ({
+          band: 'hard',
+          availableBytes: 3 * GIB,
+          thresholds: THRESHOLDS,
+        }),
+        readWatchReserveBytes: () => 12 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].message).not.toContain('admits nothing');
+      expect(emitted[0].message).toContain('conversations, pan start, and dashboard Start are not blocked');
+    });
+
+    it('reports macOS critical memory pressure by name and in the details block', async () => {
+      const emitted: any[] = [];
+      await patrolMemoryPressure({
+        assess: async () => ({
+          band: 'hard',
+          availableBytes: 10 * GIB,
+          thresholds: THRESHOLDS,
+          macPressureLevel: 'critical',
+          trigger: {
+            kind: 'mac-pressure-critical',
+            readingBytes: 10 * GIB,
+            thresholdBytes: 4 * GIB,
+            at: Date.UTC(2026, 0, 1, 14, 22),
+          },
+        }),
+        readWatchReserveBytes: () => 12 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].message).toContain('macOS reported critical memory pressure');
+      expect(emitted[0].details).toContain('macOS memory pressure: critical');
+    });
+
+    it('darwin: uses the macOS pressure clause for the holding calm window, not PSI', async () => {
+      const emitted: any[] = [];
+      await patrolMemoryPressure({
+        assess: async () => ({
+          band: 'soft',
+          availableBytes: 7 * GIB,
+          thresholds: THRESHOLDS,
+          macPressureLevel: 'normal',
+        }),
+        readWatchReserveBytes: () => 12 * GIB,
+        readSoftReserveBytes: () => 8 * GIB,
+        readHardReserveBytes: () => 4 * GIB,
+        readRecoveryReserveBytes: () => 16 * GIB,
+        readPsiCalmConfig: () => ({ readmitAvg10: 0.05, windowMs: 600_000 }),
+        emit: (entry) => emitted.push(entry),
+      });
+
+      expect(emitted[0].message).toContain('macOS memory pressure stays normal for 10 minutes');
+      expect(emitted[0].message).not.toContain('PSI full avg10');
     });
   });
 

@@ -1,5 +1,6 @@
 import { createReadStream, existsSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { sessionFilePath } from './runtimes/storage/claude-code.js';
 
 const DEFAULT_TAIL_BYTES = 512 * 1024;
@@ -134,8 +135,40 @@ export interface TranscriptWatchProbe {
 
 const MATCH_PREFIX_CHARS = 120;
 
+/**
+ * Claude Code writes a background subagent's completion as a `<task-notification>`
+ * record (see docs/CONVERSATION-SUBAGENTS.md). A wake reacting to that notification
+ * is not the operator's own turn, so it must never be counted as one nor mistaken
+ * for a landed copy of the operator's message.
+ */
+const TASK_NOTIFICATION_PREFIX = '<task-notification>';
+
 function normalizeForContentMatch(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Text of a message Claude Code queued rather than landing directly: either the
+ * `queue-operation` `enqueue` record it writes the instant a message is queued, or
+ * the `queued_command` attachment recorded when the parent later takes it. Both
+ * carry the plain string the operator sent.
+ */
+function queuedPromptText(entry: unknown): string | null {
+  if (!entry || typeof entry !== 'object') return null;
+  const record = entry as { type?: unknown; operation?: unknown; content?: unknown; attachment?: unknown };
+
+  if (record.type === 'queue-operation' && record.operation === 'enqueue' && typeof record.content === 'string') {
+    return record.content;
+  }
+
+  if (record.type === 'attachment' && record.attachment && typeof record.attachment === 'object') {
+    const attachment = record.attachment as { type?: unknown; prompt?: unknown };
+    if (attachment.type === 'queued_command' && typeof attachment.prompt === 'string') {
+      return attachment.prompt;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -206,6 +239,7 @@ export async function probeTranscriptSince(
     let matchedUserRecord = false;
     let realAssistantTurnCount = 0;
     let compactBoundaryCount = 0;
+    let afterTaskNotification = false;
     for (const line of content.split('\n')) {
       if (!line.trim()) continue;
       try {
@@ -214,12 +248,25 @@ export async function probeTranscriptSince(
           compactBoundaryCount += 1;
           continue;
         }
+        const queuedText = queuedPromptText(entry);
+        if (queuedText !== null) {
+          if (
+            !queuedText.trimStart().startsWith(TASK_NOTIFICATION_PREFIX)
+            && normalizeForContentMatch(queuedText).includes(needle)
+          ) {
+            matchedUserRecord = true;
+          }
+          continue;
+        }
         if (isRealAssistantTurn(entry)) {
-          realAssistantTurnCount += 1;
+          if (!afterTaskNotification) realAssistantTurnCount += 1;
           continue;
         }
         const text = userRecordText(entry);
         if (text === null) continue;
+        if (isLandedUserRecord(entry)) {
+          afterTaskNotification = text.startsWith(TASK_NOTIFICATION_PREFIX);
+        }
         if (META_USER_CONTENT_PREFIXES.some((prefix) => text.startsWith(prefix))) continue;
         if (normalizeForContentMatch(text).includes(needle)) matchedUserRecord = true;
       } catch {
@@ -230,4 +277,177 @@ export async function probeTranscriptSince(
   } catch {
     return { matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 0 };
   }
+}
+
+/**
+ * When Claude Code routes a queued message into a running subagent instead of the
+ * main conversation, the subagent's own transcript records it as a sidechain
+ * record wrapped in this preamble. Only the operator's own text is useful to a
+ * caller trying to confirm delivery.
+ */
+const SIDECHAIN_HUMAN_PREFIX = 'The user sent a new message while you were working:\n';
+const SIDECHAIN_HUMAN_SUFFIX_MARKER = '\n\nThis is how Claude Code surfaces';
+
+/** Strip Claude Code's sidechain wrapper, if present, to the operator's own text. */
+export function extractSidechainHumanText(content: string): string {
+  if (!content.startsWith(SIDECHAIN_HUMAN_PREFIX)) return content.trim();
+
+  const stripped = content.slice(SIDECHAIN_HUMAN_PREFIX.length);
+  const cutIndex = stripped.indexOf(SIDECHAIN_HUMAN_SUFFIX_MARKER);
+  const body = cutIndex === -1 ? stripped : stripped.slice(0, cutIndex);
+  return body.trim();
+}
+
+export interface SidechainHumanInput {
+  readonly id: string;
+  readonly text: string;
+  readonly createdAt: string;
+}
+
+function sidechainRecordContentText(entry: unknown): string | null {
+  if (!entry || typeof entry !== 'object') return null;
+  const record = entry as {
+    type?: unknown;
+    isSidechain?: unknown;
+    origin?: { kind?: unknown };
+    message?: { role?: unknown; content?: unknown };
+  };
+  if (record.type !== 'user' || record.isSidechain !== true) return null;
+  if (!record.origin || typeof record.origin !== 'object' || record.origin.kind !== 'human') return null;
+  if (record.message?.role !== 'user') return null;
+
+  const content = record.message.content;
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return null;
+  return content
+    .filter((item): item is { type?: unknown; text?: unknown } => !!item && typeof item === 'object')
+    .filter((item) => item.type === 'text' && typeof item.text === 'string')
+    .map((item) => item.text as string)
+    .join('\n');
+}
+
+function sidechainHumanInputFrom(entry: unknown): SidechainHumanInput | null {
+  const rawText = sidechainRecordContentText(entry);
+  if (rawText === null) return null;
+
+  const record = entry as { uuid?: unknown; timestamp?: unknown };
+  return {
+    id: typeof record.uuid === 'string' ? record.uuid : '',
+    text: extractSidechainHumanText(rawText),
+    createdAt: typeof record.timestamp === 'string' ? record.timestamp : '',
+  };
+}
+
+/**
+ * Read human-origin sidechain records appended to a subagent transcript since
+ * `fromByteOffset`, over complete JSONL lines only.
+ */
+export async function readSidechainHumanInputs(
+  file: string,
+  fromByteOffset: number,
+): Promise<{ inputs: SidechainHumanInput[]; readOffset: number }> {
+  try {
+    const fileStat = await stat(file);
+    const start = Math.min(Math.max(0, fromByteOffset), fileStat.size);
+    const rawContent = await readFileRange(file, start, fileStat.size);
+    const inputs: SidechainHumanInput[] = [];
+    for (const line of rawContent.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const input = sidechainHumanInputFrom(JSON.parse(line) as unknown);
+        if (input) inputs.push(input);
+      } catch {
+        // Partial trailing line mid-append; the next read sees it complete.
+      }
+    }
+    return { inputs, readOffset: nextCompleteLineOffset(start, rawContent, fileStat.size) };
+  } catch {
+    return { inputs: [], readOffset: fromByteOffset };
+  }
+}
+
+/**
+ * Directory Claude Code writes a conversation's subagent transcripts and meta
+ * files under. Defined here (never imported from src/dashboard) so the sidechain
+ * probe has no dependency on the dashboard's own subagent discovery. The
+ * conversation read model's selector check reuses it (PAN-4268).
+ */
+export function subagentsDirFor(sessionFile: string): string {
+  return join(sessionFile.replace(/\.jsonl$/, ''), 'subagents');
+}
+
+const SUBAGENT_TRANSCRIPT_NAME = /^agent-(.+)\.jsonl$/;
+
+/**
+ * Snapshot each subagent transcript's current size, keyed by filename, so a
+ * later {@link probeSidechainsSince} call can scan only bytes appended since now.
+ * Subagents that appear after this call are absent from the map and are read
+ * from their start.
+ */
+export async function captureSidechainOffsets(sessionFile: string): Promise<Map<string, number>> {
+  const offsets = new Map<string, number>();
+  let entries: string[];
+  try {
+    entries = await readdir(subagentsDirFor(sessionFile));
+  } catch {
+    return offsets;
+  }
+
+  for (const entry of entries) {
+    if (!SUBAGENT_TRANSCRIPT_NAME.test(entry)) continue;
+    try {
+      const fileStat = await stat(join(subagentsDirFor(sessionFile), entry));
+      offsets.set(entry, fileStat.size);
+    } catch {
+      // Transcript disappeared between readdir and stat; skip it.
+    }
+  }
+  return offsets;
+}
+
+async function subagentDescription(subagentsDir: string, agentId: string): Promise<string> {
+  try {
+    const raw = await readFile(join(subagentsDir, `agent-${agentId}.meta.json`), 'utf8');
+    const parsed = JSON.parse(raw) as { description?: unknown };
+    if (typeof parsed.description === 'string' && parsed.description) return parsed.description;
+  } catch {
+    // Meta file missing or unparsable; fall back to the agent id.
+  }
+  return agentId;
+}
+
+/**
+ * Scan every subagent transcript for a human-origin sidechain record carrying
+ * `messageText`, reading only bytes appended since `offsets` was captured (a
+ * subagent absent from `offsets` is read from its start). Returns the first
+ * match's agent id and description, or `null` if none carry it.
+ */
+export async function probeSidechainsSince(
+  sessionFile: string,
+  offsets: ReadonlyMap<string, number>,
+  messageText: string,
+): Promise<{ agentId: string; description: string } | null> {
+  const needle = normalizeForContentMatch(messageText).slice(0, MATCH_PREFIX_CHARS);
+  if (!needle) return null;
+
+  const subagentsDir = subagentsDirFor(sessionFile);
+  let entries: string[];
+  try {
+    entries = await readdir(subagentsDir);
+  } catch {
+    return null;
+  }
+
+  for (const entry of entries.sort()) {
+    const match = SUBAGENT_TRANSCRIPT_NAME.exec(entry);
+    if (!match?.[1]) continue;
+
+    const { inputs } = await readSidechainHumanInputs(join(subagentsDir, entry), offsets.get(entry) ?? 0);
+    const hit = inputs.find((input) => normalizeForContentMatch(input.text).includes(needle));
+    if (hit) {
+      const agentId = match[1];
+      return { agentId, description: await subagentDescription(subagentsDir, agentId) };
+    }
+  }
+  return null;
 }

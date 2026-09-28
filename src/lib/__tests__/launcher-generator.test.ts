@@ -421,6 +421,21 @@ describe('generateLauncherScript', () => {
       exec "\\$_OVERDECK_REAL_GIT" "\\$@"
       EOF
       chmod 0755 '<OVERDECK_HOME>/agents/plan-abc/git-guard/git'
+      _OVERDECK_REAL_GH="$(command -v gh 2>/dev/null || true)"
+      if [ -n "$_OVERDECK_REAL_GH" ]; then
+      cat > '<OVERDECK_HOME>/agents/plan-abc/git-guard/gh' <<EOF
+      #!/bin/sh
+      _OVERDECK_REAL_GH="$_OVERDECK_REAL_GH"
+      _overdeck_gh_bucket=graphql
+      if [ "\\$1" = "run" ] || { [ "\\$1" = "api" ] && [ "\\$2" != "graphql" ]; }; then _overdeck_gh_bucket=rest; fi
+      if [ "\\$OVERDECK_GH_METERED" != "1" ]; then
+      mkdir -p '<OVERDECK_HOME>/github-quota' 2>/dev/null
+      printf '{"ts":"%s","pid":%s,"kind":"call","caller":"agent","agent":"%s","pool":"user","bucket":"%s","cost":1,"estimated":true,"outcome":"unknown"}\\n' "\\$(date -u +%Y-%m-%dT%H:%M:%SZ)" "\\$\\$" 'plan-abc' "\\$_overdeck_gh_bucket" >> '<OVERDECK_HOME>/github-quota'/ledger-"\\$(date -u +%Y%m%d%H)".jsonl 2>/dev/null || true
+      fi
+      exec "\\$_OVERDECK_REAL_GH" "\\$@"
+      EOF
+      chmod 0755 '<OVERDECK_HOME>/agents/plan-abc/git-guard/gh'
+      fi
       export PATH="<OVERDECK_HOME>/agents/plan-abc/git-guard:$PATH"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
@@ -606,6 +621,21 @@ describe('generateLauncherScript', () => {
       exec "\\$_OVERDECK_REAL_GIT" "\\$@"
       EOF
       chmod 0755 '<OVERDECK_HOME>/agents/spec-123/git-guard/git'
+      _OVERDECK_REAL_GH="$(command -v gh 2>/dev/null || true)"
+      if [ -n "$_OVERDECK_REAL_GH" ]; then
+      cat > '<OVERDECK_HOME>/agents/spec-123/git-guard/gh' <<EOF
+      #!/bin/sh
+      _OVERDECK_REAL_GH="$_OVERDECK_REAL_GH"
+      _overdeck_gh_bucket=graphql
+      if [ "\\$1" = "run" ] || { [ "\\$1" = "api" ] && [ "\\$2" != "graphql" ]; }; then _overdeck_gh_bucket=rest; fi
+      if [ "\\$OVERDECK_GH_METERED" != "1" ]; then
+      mkdir -p '<OVERDECK_HOME>/github-quota' 2>/dev/null
+      printf '{"ts":"%s","pid":%s,"kind":"call","caller":"agent","agent":"%s","pool":"user","bucket":"%s","cost":1,"estimated":true,"outcome":"unknown"}\\n' "\\$(date -u +%Y-%m-%dT%H:%M:%SZ)" "\\$\\$" 'spec-123' "\\$_overdeck_gh_bucket" >> '<OVERDECK_HOME>/github-quota'/ledger-"\\$(date -u +%Y%m%d%H)".jsonl 2>/dev/null || true
+      fi
+      exec "\\$_OVERDECK_REAL_GH" "\\$@"
+      EOF
+      chmod 0755 '<OVERDECK_HOME>/agents/spec-123/git-guard/gh'
+      fi
       export PATH="<OVERDECK_HOME>/agents/spec-123/git-guard:$PATH"
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY

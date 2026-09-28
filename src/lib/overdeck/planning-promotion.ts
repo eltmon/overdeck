@@ -15,6 +15,7 @@ import { getSharedIssueService } from '../../dashboard/server/services/issue-ser
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { getAgentState } from '../agents.js';
+import { planningHandoffStartedBy } from '../agents/provenance.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { recordHandoffDeferred } from '../cloister/deferred-handoff.js';
 import { isDeaconGloballyPaused } from './control-settings.js';
@@ -415,6 +416,7 @@ export async function completePlanningAutoSpawn(options: {
   autoSpawn?: boolean;
   fetchImpl?: typeof fetch;
   dashboardOrigin?: string;
+  readAgentState?: typeof getAgentState;
 }): Promise<CompletePlanningAutoSpawnResult | null> {
   if (options.autoSpawn !== true) {
     emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', 'autoSpawn not requested');
@@ -422,6 +424,9 @@ export async function completePlanningAutoSpawn(options: {
   }
 
   const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
+  const handoffStartedBy = planningHandoffStartedBy(
+    (options.readAgentState ?? getAgentState)(`planning-${options.issueId.toLowerCase()}`)?.startedBy,
+  );
   const internalToken = getInternalToken();
   const internalTokenHeaders: Record<string, string> = internalToken
     ? { [INTERNAL_TOKEN_HEADER]: internalToken }
@@ -444,7 +449,7 @@ export async function completePlanningAutoSpawn(options: {
       body: JSON.stringify({
         issueId: options.issueId,
         role: 'work',
-        startedBy: 'planning-auto-handoff',
+        startedBy: handoffStartedBy,
         autoSpawnConsentRequired: true,
         guardrailAcknowledgedWarnings: AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT,
       }),
@@ -480,7 +485,7 @@ export async function completePlanningAutoSpawn(options: {
           method: 'POST',
           headers: { 'content-type': 'application/json', origin: dashboardOrigin, ...internalTokenHeaders },
           body: JSON.stringify({
-            startedBy: 'planning-auto-handoff',
+            startedBy: handoffStartedBy,
             autoSpawnConsentRequired: true,
           }),
         },

@@ -1,4 +1,5 @@
 import { useComposerEchoes } from './useComposerEchoes';
+import { inputTargetNotice } from '../../lib/subagentRouting';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
@@ -119,6 +120,8 @@ interface ConversationPanelProps {
   hideComposer?: boolean;
   /** Called when a message POST fails. */
   onSendFailed?: () => void;
+  /** Passed through to SubagentRail — starts the rail at this collapsed state instead of localStorage (PAN-4222). */
+  subagentRailCollapsed?: boolean;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -160,6 +163,7 @@ export function ConversationPanel({
   embeddedResumeLabel,
   hideComposer = false,
   onSendFailed,
+  subagentRailCollapsed,
 }: ConversationPanelProps) {
   // Resume-click latch: bridges the gap between a successful resume POST and
   // the conversations poll reporting the session alive (up to one poll tick).
@@ -1105,7 +1109,12 @@ export function ConversationPanel({
             />
           </DiffWorkerPoolProvider>
         )}
-        <SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={selectedSubagentId} />
+        <SubagentRail
+          conversation={conversation}
+          subagents={subagents}
+          selectedAgentId={selectedSubagentId}
+          defaultCollapsed={subagentRailCollapsed}
+        />
       </div>
 
       {convMutations.forkTarget && (
@@ -1265,8 +1274,15 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     data?.contextUsage ?? conversation.contextUsage ?? null,
   );
 
-  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages);
+  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages, data?.subagents ?? [], data?.streaming ?? false);
   const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
+
+  // PAN-4268: only Claude Code's agent selector says where typed input goes.
+  // Agent-backed panels carry no inputTarget; their sends still switch.
+  const subagentNotice = useMemo(
+    () => (agentId ? null : inputTargetNotice(conversation.inputTarget)),
+    [agentId, conversation.inputTarget],
+  );
 
   const handleMessageSent = useCallback((text: string, clientMessageId?: string) => {
     addOptimistic(conversation.name, text, serverMessages.length, {
@@ -1276,7 +1292,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
 
   const handleMessageAcknowledged = useCallback((text: string, clientMessageId?: string) => {
     acknowledgeOptimistic(conversation.name, text, clientMessageId);
-  }, [acknowledgeOptimistic, conversation.name]);
+    // The send may have switched the selector back to main (PAN-4268).
+    void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+  }, [acknowledgeOptimistic, conversation.name, queryClient]);
 
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
@@ -1304,7 +1322,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // content parsed, the row is interrupted, not starting.
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking
     && isWithinSpawnWindow(conversation.createdAt) && !hasTimelineActivity;
-  const isFirstMessage = !isLoading && !isDiscovering && !awaitingFirstPayload && !hasTimelineActivity && conversation.sessionAlive;
+  const isFirstMessage = !isLoading && !isDiscovering && !awaitingFirstPayload && !hasTimelineActivity && failedMessages.length === 0 && conversation.sessionAlive;
   // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
   // successful empty response. Rendering it as "no saved history" (the old
   // behavior) falsely tells the user their history is gone, e.g. during a
@@ -1498,6 +1516,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           agentId={agentId}
           contextWindowUsage={contextWindowUsage}
           agentBusy={agentBusy}
+          subagentNotice={subagentNotice}
         />
       )}
     </div>

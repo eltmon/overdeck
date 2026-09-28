@@ -669,3 +669,56 @@ describe('chat ModelPicker Kimi harness-labeled rows (2026-08-02)', () => {
     unsubscribe();
   });
 });
+
+describe('chat ModelPicker dropdown portal (PAN-4266)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    installFetchMock();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('renders the dropdown as a child of document.body, not the render container', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    const dropdown = await screen.findByTestId('model-picker-dropdown');
+    expect(dropdown.parentElement).toBe(document.body);
+    expect(container).not.toContainElement(dropdown);
+  });
+
+  it('focuses the search input with preventScroll and no autofocus attribute', async () => {
+    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus');
+    const user = userEvent.setup();
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    const search = await screen.findByPlaceholderText('Search models…');
+    expect(search).not.toHaveAttribute('autofocus');
+
+    await waitFor(() => {
+      const callIndex = focusSpy.mock.calls.findIndex(
+        (args) => args.length === 1 && (args[0] as FocusOptions | undefined)?.preventScroll === true,
+      );
+      expect(callIndex).toBeGreaterThanOrEqual(0);
+      expect(focusSpy.mock.instances[callIndex]).toBe(search);
+    });
+  });
+
+  it('closes on an outside mousedown but stays open for a mousedown inside the dropdown', async () => {
+    const user = userEvent.setup();
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    const dropdown = await screen.findByTestId('model-picker-dropdown');
+    fireEvent.mouseDown(dropdown);
+    expect(screen.queryByTestId('model-picker-dropdown')).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+    await waitFor(() => expect(screen.queryByTestId('model-picker-dropdown')).not.toBeInTheDocument());
+  });
+});

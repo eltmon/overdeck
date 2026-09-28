@@ -8,6 +8,7 @@ import { loadCloisterConfigSync } from './config.js';
 import { getDockerStatsCollector } from '../../dashboard/server/routes/resources/shared.js';
 import { getResourceStacks, type ResourceStack, type StackContainerResource } from '../../dashboard/server/routes/resources/stacks.js';
 import { listRunningAgents } from '../agents/queries.js';
+import { isFlywheelStartedBy } from '../agents/provenance.js';
 import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { getAgentRuntimeStateSync } from '../agents/runtime-state.js';
 import { setAgentPaused, GOVERNOR_SLOT_PAUSE_REASON_PREFIX } from '../agents/agent-state.js';
@@ -58,6 +59,12 @@ export function classifyMemoryPressure(
 // a small state machine so it never oscillates. Memory pressure can hold or
 // shed. CPU saturation only holds admissions because running work self-heals
 // as it finishes; re-admission waits for lower load as well as memory runway.
+//
+// PAN-4267: macOS has no PSI and allocates swap on demand, so a low free-swap
+// share is not pressure there (swapGrowsOnDemand disables the swap/PSI hold
+// path entirely on darwin). Its stall signal is instead the kernel's own
+// memorystatus pressure level: 'critical' sheds immediately regardless of the
+// memory reserves, and 'normal' counts as calm for the holding re-admit window.
 
 export type GovernorMode = 'admitting' | 'holding' | 'shedding';
 
@@ -72,6 +79,8 @@ export interface GovernorRunway {
   swapFreeBytes: number;
   psiFullAvg10: number | null;
   loadPerCore: number | null;
+  macPressureLevel?: 'normal' | 'warn' | 'critical' | null;
+  swapGrowsOnDemand?: boolean;
 }
 
 export interface GovernorRunwayThresholds {
@@ -176,7 +185,7 @@ function nextGovernorModeWithRunway(
     : previousMode === 'admitting' && memoryMode === 'holding'
       ? { kind: 'soft-dip', readingBytes: availableBytes, thresholdBytes: reserves.softBytes }
       : null;
-  const swapEnabled = runway.swapTotalBytes > 0;
+  const swapEnabled = runway.swapTotalBytes > 0 && !runway.swapGrowsOnDemand;
   const swapSoftBytes = runway.swapTotalBytes * runwayThresholds.swapSoftFreePercent / 100;
   const swapRecoveryBytes = runway.swapTotalBytes * runwayThresholds.swapRecoveryFreePercent / 100;
   const activeSwapThresholdBytes = previousMode === 'admitting' ? swapSoftBytes : swapRecoveryBytes;
@@ -189,6 +198,12 @@ function nextGovernorModeWithRunway(
     : runway.loadPerCore >= runwayThresholds.cpuRecoveryLoadPerCore);
 
   if (memoryMode === 'shedding') return { mode: 'shedding', trigger: memoryTrigger };
+  if (runway.macPressureLevel === 'critical') {
+    return {
+      mode: 'shedding',
+      trigger: { kind: 'mac-pressure-critical', readingBytes: availableBytes, thresholdBytes: reserves.hardBytes },
+    };
+  }
   if (psiShed) {
     return {
       mode: 'shedding',
@@ -233,8 +248,8 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const snapshot = await readProcMemory();
   const loadPerCore = loadavg()[0] / Math.max(1, cpus().length);
   const now = Date.now();
-  const psiIsCalm = snapshot.psiFullAvg10 != null
-    && snapshot.psiFullAvg10 < psiCalmConfig.readmitAvg10;
+  const psiIsCalm = (snapshot.psiFullAvg10 != null && snapshot.psiFullAvg10 < psiCalmConfig.readmitAvg10)
+    || snapshot.macPressureLevel === 'normal';
   const previousMode = governorMode;
   const transition = nextGovernorModeWithRunway(
     snapshot.memAvailable,
@@ -244,6 +259,8 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
       swapFreeBytes: snapshot.swapFree,
       psiFullAvg10: snapshot.psiFullAvg10,
       loadPerCore,
+      macPressureLevel: snapshot.macPressureLevel,
+      swapGrowsOnDemand: snapshot.swapGrowsOnDemand,
     },
     runwayThresholds,
     governorMode,
@@ -291,6 +308,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     psiFullAvg10: snapshot.psiFullAvg10,
     loadPerCore,
     trigger: governorTrigger,
+    macPressureLevel: snapshot.macPressureLevel,
   };
   setCachedMemoryVerdict(verdict);
   return verdict;
@@ -324,7 +342,7 @@ export interface ShedResult {
 interface ShedCandidateAgent {
   id: string;
   issueId: string;
-  flywheelRunId?: string | null;
+  startedBy?: string | null;
 }
 
 export interface ShedAgentLike {
@@ -365,9 +383,10 @@ export function selectStackShedCandidates(
 
 /**
  * Pure core: the next idle work agent to pause, exempting operator-started
- * agents (PAN-1812, mirrors emergencyBrake's exemption in concurrency.ts —
- * duplicated rather than imported to avoid a memory-governor <-> concurrency
- * circular import) and any agent not in an 'idle' runtime state.
+ * agents (PAN-1812/PAN-3634: eligible iff startedBy is 'flywheel:'-provenanced;
+ * mirrors emergencyBrake's exemption in concurrency.ts — duplicated rather
+ * than imported to avoid a memory-governor <-> concurrency circular import)
+ * and any agent not in an 'idle' runtime state.
  */
 export function selectAgentToPause(
   candidates: readonly ShedCandidateAgent[],
@@ -375,7 +394,7 @@ export function selectAgentToPause(
   exemptOperatorStarted: boolean,
 ): ShedCandidateAgent | null {
   const eligible = exemptOperatorStarted
-    ? candidates.filter((a) => a.flywheelRunId !== undefined && a.flywheelRunId !== null && a.flywheelRunId !== '')
+    ? candidates.filter((a) => isFlywheelStartedBy(a.startedBy))
     : candidates;
   return eligible.find((a) => isIdle(a.id)) ?? null;
 }
@@ -465,7 +484,7 @@ export async function shed(): Promise<ShedResult> {
   const exemptOperatorStarted = loadCloisterConfigSync().concurrency?.exempt_operator_started;
   const workAgents: ShedCandidateAgent[] = runningAgents
     .filter((a) => a.role === 'work')
-    .map((a) => ({ id: a.id, issueId: a.issueId, flywheelRunId: a.flywheelRunId }));
+    .map((a) => ({ id: a.id, issueId: a.issueId, startedBy: a.startedBy }));
   const paused = new Set<string>();
 
   while (verdict.band === 'hard') {

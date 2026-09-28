@@ -37,8 +37,8 @@ export interface LiveFacts {
   pendingInputKinds?: readonly string[];
   /** `agentsById[entry.id]?.pendingQuestionPrompt`. */
   pendingQuestionPrompt?: string | null;
-  /** `agentRuntimeById[entry.id]`. */
-  runtime?: { activity?: string; currentTool?: string; lastActivity?: string };
+  /** `agentRuntimeById[entry.runtimeId ?? entry.id]`. */
+  runtime?: { activity?: string; currentTool?: string; currentToolDescription?: string; lastActivity?: string };
 }
 
 export interface LiveRow {
@@ -46,7 +46,7 @@ export interface LiveRow {
   reason: LiveReason;
   /** Needs you: when the wait began. Live, Waiting and Idle: the last activity. */
   since: string | null;
-  /** Subagents nested under this row (FR-8). */
+  /** Subagents nested under this row (FR-8), then its gauntlet lanes (PAN-4223 FR-19). */
   children: DirectoryEntry[];
 }
 
@@ -59,9 +59,6 @@ export interface LiveSections {
 
 /** A Live row quiet longer than this shows `· quiet <age>` (FR-5). */
 export const LIVE_QUIET_AFTER_MS = 5 * 60_000;
-
-const OUTPUT_LINE_MAX = 160;
-const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;
 
 /** Roles whose pane the issue's derived attention and pipeline state describe. */
 const ISSUE_AGENT_ROLES = new Set(['work', 'strike']);
@@ -84,22 +81,11 @@ function reason(kind: LiveReasonKind, section: LiveSection, tone: LiveTone, labe
   return { kind, section, tone, label, detail };
 }
 
-/** What a live agent is doing now: `running <tool>`, `thinking`, else `working`. */
+/** What a live agent is doing now: the bare tool name, `thinking`, else `working`. */
 export function activityLabel(runtime: LiveFacts['runtime']): string {
-  if (runtime?.currentTool) return `running ${runtime.currentTool}`;
+  if (runtime?.currentTool) return runtime.currentTool;
   if (runtime?.activity === 'thinking') return 'thinking';
   return 'working';
-}
-
-/** The last non-empty line of an agent's output, ANSI stripped, at most 160 characters. */
-export function lastOutputLine(lines: readonly string[] | undefined): string | null {
-  if (!lines) return null;
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index]!.replace(ANSI_RE, '').trim();
-    if (!line) continue;
-    return line.length > OUTPUT_LINE_MAX ? `${line.slice(0, OUTPUT_LINE_MAX - 1)}…` : line;
-  }
-  return null;
 }
 
 /** The one reason for a row, first match wins (PRD WI-4 precedence table). */
@@ -116,13 +102,18 @@ export function classifyEntry(entry: DirectoryEntry, facts: LiveFacts, now: Date
     return reason('question', 'needs-you', 'needs-you', 'question waiting', facts.pendingQuestionPrompt || null);
   }
   if (entry.pause?.by === 'operator') return reason('paused', 'needs-you', 'needs-you', 'paused by you', entry.pause.reason);
-  if (derived?.attention === 'api-error') return reason('api-error', 'needs-you', 'stuck', 'API error or usage limit');
+  if (derived?.attention === 'api-error' || entry.providerError) {
+    return reason('api-error', 'needs-you', 'stuck', 'API error or usage limit', entry.providerError?.message ?? null);
+  }
   if (derived?.attention === 'stuck' && entry.state === 'idle') {
     const age = idleAge(entry.lastActivityAt, now);
     return reason('stuck', 'needs-you', 'stuck', age === null ? 'stuck' : `stuck · idle ${age}`);
   }
   if (derived?.state === 'ready') return reason('ready-to-merge', 'needs-you', 'needs-you', 'ready to merge');
-  if (entry.state === 'working') return reason('working', 'live', 'live', activityLabel(facts.runtime));
+  if (entry.state === 'working') {
+    const detail = facts.runtime?.currentTool ? facts.runtime.currentToolDescription ?? null : null;
+    return reason('working', 'live', 'live', activityLabel(facts.runtime), detail);
+  }
   if (entry.state === 'unknown' && entry.location === 'remote') return reason('remote', 'live', 'live', 'running on Fly');
   if (entry.pause) return reason('held', 'waiting', 'waiting', 'held by Overdeck', entry.pause.reason);
   if (derived?.pr?.checks === 'red') return reason('ci-failed', 'waiting', 'stuck', 'CI failed');
@@ -134,6 +125,7 @@ export function classifyEntry(entry: DirectoryEntry, facts: LiveFacts, now: Date
 }
 
 function sinceOf(entry: DirectoryEntry, why: LiveReason, facts: LiveFacts): string | null {
+  if (why.kind === 'api-error' && entry.providerError) return entry.providerError.at;
   if (why.kind === 'paused' || why.kind === 'held') return entry.pause?.since ?? entry.lastActivityAt;
   if (why.section === 'live') return facts.runtime?.lastActivity ?? entry.lastActivityAt;
   return entry.lastActivityAt;
@@ -142,6 +134,20 @@ function sinceOf(entry: DirectoryEntry, why: LiveReason, facts: LiveFacts): stri
 function timeOf(iso: string | null): number | null {
   const ms = iso ? Date.parse(iso) : Number.NaN;
   return Number.isFinite(ms) ? ms : null;
+}
+
+/** The newest parseable timestamp among the candidates, or null if none parse. */
+function newestIso(candidates: ReadonlyArray<string | null>): string | null {
+  let best: string | null = null;
+  let bestTime = -Infinity;
+  for (const iso of candidates) {
+    const at = timeOf(iso);
+    if (at !== null && at > bestTime) {
+      bestTime = at;
+      best = iso;
+    }
+  }
+  return best;
 }
 
 /** Orders rows by one timestamp, missing last, ties by id. */
@@ -158,11 +164,72 @@ function compareRows(direction: 'asc' | 'desc', timeFor: (row: LiveRow) => strin
   };
 }
 
+/** PAN-4223: the lane role glyph a lane line shows before its key. */
+export const LANE_GLYPH: Readonly<Record<string, string>> = {
+  builder: 'B',
+  critic: 'C',
+  verifier: 'V',
+  play: 'P',
+  orchestrator: 'O',
+};
+
 /**
  * Rows grouped into the sections, sorted (FR-4, FR-7). A subagent nests
  * under its parent row and is not a row of its own; one whose parent is not on
  * the page is dropped (FR-8).
  */
+/**
+ * PAN-4223 FR-19, FR-29, D23: a lane whose parent has a row becomes a child
+ * line of that row and loses its own row, unless it needs you (then it has
+ * both). A lane under a lane that is itself a child line goes to that lane's
+ * host row, so the Live view keeps one level of child lines. A successor (a
+ * conversation with a parent but no lane) always keeps its own row.
+ */
+function attachLanes(entries: readonly DirectoryEntry[], rows: Map<string, LiveRow>): void {
+  const isChildLine = (row: LiveRow): boolean =>
+    row.entry.kind === 'conversation' && Boolean(row.entry.lane) && row.reason.section !== 'needs-you'
+    && row.entry.parentId !== null && rows.has(row.entry.parentId);
+  const hostOf = (entry: DirectoryEntry): LiveRow | undefined => {
+    const seen = new Set<string>([entry.id]);
+    let parentId = entry.parentId;
+    while (parentId && !seen.has(parentId)) {
+      seen.add(parentId);
+      const parent = rows.get(parentId);
+      if (!parent) return undefined;
+      if (!isChildLine(parent)) return parent;
+      parentId = parent.entry.parentId;
+    }
+    return undefined;
+  };
+  const moved: string[] = [];
+  for (const entry of entries) {
+    if (entry.kind !== 'conversation' || !entry.lane || !entry.parentId) continue;
+    const own = rows.get(entry.id);
+    const host = hostOf(entry);
+    if (!own || !host) continue;
+    host.children.push(entry);
+    if (own.reason.section !== 'needs-you') moved.push(entry.id);
+  }
+  for (const id of moved) rows.delete(id);
+  for (const row of rows.values()) row.children = criticsAfterBuilders(row.children);
+}
+
+/**
+ * PAN-4223 D27: a critic child line sits directly after the builder it judges
+ * (after that builder's earlier critics) when both are children of one row.
+ */
+function criticsAfterBuilders(children: DirectoryEntry[]): DirectoryEntry[] {
+  const ids = new Set(children.map((child) => child.id));
+  const isPlacedCritic = (child: DirectoryEntry) => child.lane?.criticOf !== undefined && child.parentId !== null && ids.has(child.parentId);
+  const ordered: DirectoryEntry[] = [];
+  const place = (entry: DirectoryEntry) => {
+    ordered.push(entry);
+    for (const critic of children) if (isPlacedCritic(critic) && critic.parentId === entry.id) place(critic);
+  };
+  for (const child of children) if (!isPlacedCritic(child)) place(child);
+  return ordered;
+}
+
 export function buildLiveSections(
   entries: readonly DirectoryEntry[],
   factsFor: (entry: DirectoryEntry) => LiveFacts,
@@ -178,6 +245,14 @@ export function buildLiveSections(
   for (const entry of entries) {
     if (entry.kind !== 'subagent' || !entry.parentId) continue;
     rows.get(entry.parentId)?.children.push(entry);
+  }
+  attachLanes(entries, rows);
+  // A Live row's quiet age reflects the whole row, subagents included: an
+  // orchestrator with a working subagent is not quiet just because it has
+  // not itself made a tool call (FR-5).
+  for (const row of rows.values()) {
+    if (row.reason.section !== 'live' || row.children.length === 0) continue;
+    row.since = newestIso([row.since, ...row.children.map((child) => child.lastActivityAt)]);
   }
 
   const sections: LiveSections = { needsYou: [], live: [], waiting: [], idle: [] };

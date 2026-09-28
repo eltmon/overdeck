@@ -59,11 +59,11 @@ describe('handleConversationMessage title behavior', () => {
     const response = await handleConversationMessage(
       'http-title-default',
       { message: 'Please help me refactor the auth middleware in src/auth.ts' },
-      { generateAiTitle },
+      { generateAiTitle, ensureMainInputTarget: async () => ({ ok: true, check: 'no-selector' }) },
     );
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ ok: true });
+    expect(response.body).toEqual({ ok: true, inputTarget: 'main' });
 
     const conv = getConversationByName('http-title-default');
     expect(conv?.title).toBe('refactor the auth middleware in src/auth.ts');
@@ -106,7 +106,7 @@ describe('handleConversationMessage title behavior', () => {
     const response = await handleConversationMessage(
       'http-title-manual',
       { message: 'Please help me refactor the auth middleware' },
-      { generateAiTitle },
+      { generateAiTitle, ensureMainInputTarget: async () => ({ ok: true, check: 'no-selector' }) },
     );
 
     expect(response.status).toBe(200);

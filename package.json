@@ -107,7 +107,7 @@
     "typecheck:acp": "tsc --noEmit -p packages/effect-acp/tsconfig.json",
     "typecheck:hooks": "tsc --noEmit -p tsconfig.hooks.json",
     "typecheck:evals": "tsc --noEmit -p tsconfig.evals.json",
-    "lint": "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:no-state-layer && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:liveness && npm run lint:harness-storage && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit && npm run lint:effect-facades && npm run lint:effect-diagnostics",
+    "lint": "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:no-state-layer && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:liveness && npm run lint:effort && npm run lint:harness-storage && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit && npm run lint:effect-facades && npm run lint:effect-diagnostics",
     "lint:effect-diagnostics": "bash scripts/lint-effect-diagnostics.sh",
     "lint:effect-facades": "bash scripts/lint-effect-facades.sh",
     "lint:pipeline-membership": "bash scripts/lint-pipeline-membership.sh",
@@ -132,7 +132,7 @@
     "lint:ratchet-audit": "bash scripts/lint-ratchet-audit.sh",
     "pretest": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli",
     "test": "vitest run --configLoader runner && npm run test:frontend-subset",
-    "test:frontend-subset": "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.menu-by-state.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx src/__tests__/fr7-conversation-pending-input.test.tsx src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+    "test:frontend-subset": "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.menu-by-state.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx src/__tests__/fr7-conversation-pending-input.test.tsx src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts src/components/CommandDeck/__tests__/conversation-tree.test.ts src/components/CommandDeck/__tests__/ConversationList.test.tsx src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/Agents/live/live-model.test.ts src/components/Agents/directory/directory-tree.test.ts src/components/chat/__tests__/resetClippedScroll.test.ts src/components/chat/__tests__/useFloatingPickerPosition.test.tsx src/components/chat/__tests__/ModelPicker.test.tsx src/components/chat/__tests__/EffortPicker.test.tsx src/components/__tests__/GitHubQuotaPill.test.tsx src/components/__tests__/GitHubRateLimitBanner.test.tsx src/components/Settings/sections/__tests__/TelemetrySection.test.tsx src/lib/__tests__/telemetry.test.ts src/components/Settings/sections/__tests__/CloseOutSection.test.tsx src/lib/simple/uiMode.test.ts src/components/home/__tests__/homeComposerIntents.test.ts src/components/home/__tests__/pendingTerminal.test.ts src/components/home/__tests__/HomeComposerProjectChip.test.tsx src/components/home/__tests__/HomeComposer.test.tsx src/components/home/__tests__/useTypeToFocus.test.tsx src/components/terminal/TerminalDrawer.pending.test.tsx src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts src/components/CommandDeck/__tests__/DeckEmptyState.test.tsx src/components/CommandDeck/__tests__/UnscopedConversationChip.test.tsx src/lib/__tests__/connectionState.test.ts src/components/__tests__/DegradedModeBanner.test.tsx src/App/BackendConnectionBoundary.test.tsx src/components/EventRouter.test.tsx src/components/chat/__tests__/composerHeldMessages.test.tsx",
     "test:unit": "vitest run --configLoader runner tests/unit",
     "test:integration": "vitest run --configLoader runner tests/integration",
     "test:e2e": "vitest run --configLoader runner tests/e2e",
@@ -148,7 +148,8 @@
     "typecheck:dashboard": "bash scripts/lint-dashboard-types.sh",
     "typecheck:frontend": "bash scripts/lint-frontend-types.sh",
     "lint:harness-storage": "bash scripts/lint-harness-storage.sh",
-    "lint:liveness": "bash scripts/lint-liveness.sh"
+    "lint:liveness": "bash scripts/lint-liveness.sh",
+    "lint:effort": "bash scripts/lint-effort.sh"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.118",

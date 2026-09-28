@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { isGitHubAppConfigured, listPullRequestsForHead } from './github-app.js';
+import { isGitHubAppConfigured, listPullRequestsForHead, type GitHubPullRequestForHead } from './github-app.js';
+import { selectPullRequestForHead } from './github-pr-selection.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -14,22 +15,33 @@ export interface BranchPullRequest {
   mergedAt: string | null;
 }
 
+/**
+ * The PR the merge gate judges for a branch (PAN-4263): open (most recently
+ * updated) above merged (most recent merge) above closed. Both the REST list
+ * and `gh pr list` sort by creation, so the first row can be a newer closed PR.
+ */
 export async function lookupPullRequestForBranch(
   owner: string,
   repo: string,
   branchName: string,
 ): Promise<BranchPullRequest | null> {
-  if (isGitHubAppConfigured()) {
-    const prs = await listPullRequestsForHead(owner, repo, branchName, 'all');
-    const pr = prs[0];
-    if (!pr) return null;
-    return {
-      number: pr.number,
-      state: pr.merged ? 'MERGED' : pr.state.toUpperCase(),
-      mergedAt: pr.mergedAt,
-    };
-  }
+  const prs = isGitHubAppConfigured()
+    ? await listPullRequestsForHead(owner, repo, branchName, 'all')
+    : await listPullRequestsWithGh(owner, repo, branchName);
+  const pr = selectPullRequestForHead(prs, { includeClosed: true });
+  if (!pr) return null;
+  return {
+    number: pr.number,
+    state: pr.merged ? 'MERGED' : pr.state.toUpperCase(),
+    mergedAt: pr.mergedAt,
+  };
+}
 
+async function listPullRequestsWithGh(
+  owner: string,
+  repo: string,
+  branchName: string,
+): Promise<GitHubPullRequestForHead[]> {
   const { stdout } = await execFileAsync(
     'gh',
     [
@@ -37,25 +49,33 @@ export async function lookupPullRequestForBranch(
       '--repo', `${owner}/${repo}`,
       '--head', branchName,
       '--state', 'all',
-      '--json', 'number,state,mergedAt',
-      '--limit', '1',
+      '--json', 'number,state,mergedAt,updatedAt',
+      '--limit', '20',
     ],
     { encoding: 'utf-8', timeout: 15000 },
   );
   const trimmed = stdout.trim();
-  if (!trimmed) return null;
+  if (!trimmed) return [];
 
-  const [pr] = JSON.parse(trimmed) as Array<{
+  const rows = JSON.parse(trimmed) as Array<{
     number?: number;
     state?: string;
     mergedAt?: string | null;
+    updatedAt?: string | null;
   }>;
-  if (!pr || !Number.isFinite(pr.number)) return null;
-  return {
-    number: pr.number as number,
-    state: typeof pr.state === 'string' ? pr.state.toUpperCase() : 'CLOSED',
-    mergedAt: typeof pr.mergedAt === 'string' ? pr.mergedAt : null,
-  };
+  return rows
+    .filter((row) => Number.isFinite(row.number))
+    .map((row) => {
+      const state = typeof row.state === 'string' ? row.state.toUpperCase() : 'CLOSED';
+      return {
+        number: row.number as number,
+        state: state === 'OPEN' ? 'open' : 'closed',
+        merged: state === 'MERGED',
+        mergedAt: typeof row.mergedAt === 'string' ? row.mergedAt : null,
+        mergeCommit: null,
+        updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : null,
+      };
+    });
 }
 
 export async function lookupPullRequestNumberForBranch(

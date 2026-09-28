@@ -55,6 +55,7 @@ export {
   autoSpawnOnFinalizeFlagPath,
   claimAutoSpawnConsentForWorkStart,
   completeAutoSpawnConsentClaim,
+  readAutoSpawnConsentWorkModel,
   readAutoSpawnOnFinalizeFlagAsync,
   releaseAutoSpawnConsentClaim,
   withAutoSpawnConsentClaim,
@@ -72,6 +73,8 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
  */
 export async function resolveAutoSpawnOnFinalize(requestedAutoSpawn: unknown, issueId: string): Promise<boolean> {
   if (requestedAutoSpawn === true || requestedAutoSpawn === false) {
+    // No options: writeAutoSpawnOnFinalizeFlag preserves the current generation's
+    // workModel (PAN-3022) — this rewrite is about the auto-spawn boolean only.
     await writeAutoSpawnOnFinalizeFlag(issueId, requestedAutoSpawn);
     return requestedAutoSpawn;
   }
@@ -136,6 +139,8 @@ export interface SpawnPlanningOptions {
   probe?: boolean;
   /** Automatically start the work agent after finalize; stamped by trusted callers only. */
   autoSpawnOnFinalize?: boolean;
+  /** Operator-chosen work-agent model (PAN-2997/PAN-3022), stored on the auto-start consent. */
+  workModel?: string;
   /** Origin token for the planning agent state. */
   startedBy: string;
   /** Optional callback for streaming progress events to the client. */
@@ -384,7 +389,7 @@ export function buildPlanningSessionEnv(startedBy: string): Record<string, strin
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, startedBy, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, workModel, startedBy, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
 
@@ -394,7 +399,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
   };
 
   try {
-    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true);
+    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, { workModel: workModel ?? null });
     console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
 
     // ── Step 1: Create workspace if needed ─────────────────────────────────

@@ -67,4 +67,37 @@ describe('SetupChecklistBanner', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('/api/diagnostics/setup');
     expect(toastSuccess).toHaveBeenCalledWith('Diagnostics copied');
   });
+
+  it('is hidden on the Home tab but shown on other tabs (PAN-4282 D11)', async () => {
+    const missingReport = {
+      platform: 'linux',
+      allRequiredFound: false,
+      checks: [{
+        id: 'tmux',
+        name: 'tmux',
+        required: true,
+        purpose: 'Plain terminals',
+        found: false,
+        version: null,
+        install: { linux: 'install tmux', mac: 'install tmux', win: 'install tmux' },
+      }],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => missingReport }));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <SetupChecklistBanner activeTab="home" />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(queryClient.getQueryData(['prerequisites'])).toBeDefined());
+    expect(screen.queryByText(/Finish setting up Overdeck/)).not.toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <SetupChecklistBanner activeTab="command-deck" />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(/Finish setting up Overdeck/)).toBeInTheDocument();
+  });
 });

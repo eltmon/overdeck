@@ -31,7 +31,8 @@ describe('project CI refill startup', () => {
     markReady();
     await expect(result).resolves.toBe(timer);
     expect(start).toHaveBeenCalledOnce();
-    expect(start).toHaveBeenCalledWith(15 * 60 * 1000);
+    // PAN-4264: the first fill waits 2 minutes, off the boot burst.
+    expect(start).toHaveBeenCalledWith(15 * 60 * 1000, { initialDelayMs: 120_000 });
   });
 
   // PAN-3931: a peer shares the primary's event log; the primary runs the refill.

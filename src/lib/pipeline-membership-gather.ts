@@ -14,13 +14,13 @@ import type { MembershipUnavailableReason } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
 import type { ForgeType } from './forge.js';
-import {
-  listIssuesWithAnyLabel,
-  listOpenIssuesWithLabels,
-} from './github-app.js';
+import { createAppFallbackIssueListers } from './pipeline-membership-app-fallback.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimit } from './concurrency.js';
 import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
 import { runGitHubGraphql } from './github-graphql-run.js';
+import { withGitHubCaller } from './github-quota/caller-context.js';
+import { GitHubQuotaPausedError, GitHubRateLimitedError } from './github-quota/pause-gate.js';
+import { runGh } from './github-quota/run-gh.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
@@ -34,6 +34,8 @@ import { issueIdFromTrackerIssue } from './tracker/issue-id.js';
 
 const execFileAsync = promisify(execFile);
 const GRAPHQL_ALIAS_CHUNK_SIZE = 50;
+/** PAN-4264: every batched query reports its real cost to the quota ledger. */
+const GRAPHQL_RATE_LIMIT_SELECTION = ' rateLimit { cost remaining resetAt limit }';
 
 function chunksOf<T>(values: T[]): T[][] {
   const chunks: T[][] = [];
@@ -70,10 +72,10 @@ const cachedOpenPullRequests = createSettledTtlPromiseCache<string, PullRequestR
 /** Share one short-lived repository PR snapshot across dashboard consumers. */
 export function listOpenPullRequestsSnapshot(owner: string, repo: string): Promise<PullRequestRow[]> {
   const key = `${owner}/${repo}`.toLowerCase();
-  return cachedOpenPullRequests(key, () => execFileAsync('gh', [
+  return cachedOpenPullRequests(key, () => runGh([
     'api', '--paginate', '--slurp', `repos/${owner}/${repo}/pulls?state=open&per_page=100`,
   ], {
-    encoding: 'utf-8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024,
+    caller: 'pipeline-membership', timeout: 30_000, maxBuffer: 16 * 1024 * 1024,
   }).then(({ stdout }) => (JSON.parse(stdout) as GitHubPullRequestRow[][]).flat().map((pr) => ({
     number: pr.number,
     title: pr.title,
@@ -106,7 +108,7 @@ export async function listMergedPullRequestHeadsBatched(
   for (const headChunk of chunksOf(heads)) {
     const fields = headChunk.map((head, index) =>
       `h${index}: pullRequests(states: MERGED, headRefName: ${JSON.stringify(head)}, first: 10) { nodes { headRepository { name owner { login } } } }`);
-    const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
+    const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} }${GRAPHQL_RATE_LIMIT_SELECTION} }`;
     const response = JSON.parse(await runGraphql(query)) as MergedHeadGraphqlResponse;
     const repository = response.data?.repository;
     if (response.errors?.length || !repository) throw new Error('Incomplete merged-PR GraphQL response');
@@ -137,7 +139,7 @@ export async function listIssueStatesBatched(
   const states: Array<{ number: number; state: 'open' | 'closed' }> = [];
   for (const numberChunk of chunksOf(numbers)) {
     const fields = numberChunk.map((number, index) => `i${index}: issue(number: ${number}) { state }`);
-    const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
+    const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} }${GRAPHQL_RATE_LIMIT_SELECTION} }`;
     const response = JSON.parse(await runGraphql(query)) as IssueStateGraphqlResponse;
     const repository = response.data?.repository;
     // Per-field errors (a number that resolves to a PR or deleted issue) leave
@@ -169,12 +171,24 @@ export interface ProjectTrackerIssueRow {
   labels: string[];
 }
 
-function resolveProjectTrackerType(project: ProjectConfig): TrackerType {
+/**
+ * PAN-4264: the project's tracker, or null when projects.yaml gives no way to
+ * resolve one (no `tracker`, `rally_project`, `github_repo`, `issue_prefix` or
+ * `gitlab_repo`). Membership refresh skips such projects instead of failing
+ * on every refresh.
+ */
+export function tryResolveProjectTrackerType(project: ProjectConfig): TrackerType | null {
   if (project.tracker) return project.tracker;
   if (project.rally_project) return 'rally';
   if (project.github_repo) return 'github';
   if (getIssuePrefix(project)) return 'linear';
   if (project.gitlab_repo) return 'gitlab';
+  return null;
+}
+
+function resolveProjectTrackerType(project: ProjectConfig): TrackerType {
+  const trackerType = tryResolveProjectTrackerType(project);
+  if (trackerType) return trackerType;
   throw new PipelineMembershipUnavailableError(
     'tracker_unconfigured',
     `Cannot resolve tracker for ${project.name}`,
@@ -270,6 +284,7 @@ const TRANSIENT_FORGE_FAILURE_PATTERNS: readonly RegExp[] = [
 
 /** PAN-3527: did this forge failure mean "ask again later" rather than "no"? */
 export function isTransientForgeFailure(error: unknown): boolean {
+  if (error instanceof GitHubRateLimitedError || error instanceof GitHubQuotaPausedError) return true;
   if (error instanceof Error && error.name === 'GitHubRequestTimeoutError') return true;
   const cause = error instanceof Error && error.cause instanceof Error ? ` ${error.cause.message}` : '';
   const text = `${error instanceof Error ? error.message : String(error)}${cause}`;
@@ -306,9 +321,13 @@ export interface PipelineMembershipGatherDeps {
   run(command: string, args: string[], cwd?: string): Promise<string>;
 }
 
+// PAN-4264: App-backed issue listings fall back to the gh user token on a
+// repo where the App is not installed (a 404), and skip the App there for 6 h.
+const appFallbackListers = createAppFallbackIssueListers();
+
 const defaultDeps: PipelineMembershipGatherDeps = {
-  listOpenIssues: listOpenIssuesWithLabels,
-  listPhaseLabeledIssues: (owner, repo) => listIssuesWithAnyLabel(owner, repo, STALE_PIPELINE_LABELS),
+  listOpenIssues: appFallbackListers.listOpenIssues,
+  listPhaseLabeledIssues: appFallbackListers.listPhaseLabeledIssues,
   listOpenPullRequests: listOpenPullRequestsSnapshot,
   listOpenMergeRequests: listOpenGitLabMergeRequests,
   listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
@@ -531,10 +550,21 @@ export async function gatherIssueBranchContainment(
   return result;
 }
 
-/** Gather all durable pipeline lenses for one project in batches. */
-export async function gatherProjectLensSignals(
+/**
+ * Gather all durable pipeline lenses for one project in batches. Every GitHub
+ * call inside is metered as caller `pipeline-membership` (non-essential, so it
+ * is skipped during a pause and the gather reports `forge_transient`).
+ */
+export function gatherProjectLensSignals(
   project: ProjectConfig,
   deps: PipelineMembershipGatherDeps = defaultDeps,
+): Promise<IssueLensSignals[]> {
+  return withGitHubCaller('pipeline-membership', () => gatherProjectLensSignalsMetered(project, deps));
+}
+
+async function gatherProjectLensSignalsMetered(
+  project: ProjectConfig,
+  deps: PipelineMembershipGatherDeps,
 ): Promise<IssueLensSignals[]> {
   const trackerType = resolveProjectTrackerType(project);
   const usesGitHubIssueTracker = trackerType === 'github';

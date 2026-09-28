@@ -21,8 +21,7 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { isBackendOutage } from '../../../lib/backendOutageState';
-import { ChevronDown, RotateCcw, XCircle, Search, X } from 'lucide-react';
+import { ChevronDown, Copy, RotateCcw, XCircle, Search, X } from 'lucide-react';
 import { ChatMarkdown, ChatMarkdownSettingsProvider } from '../ChatMarkdown';
 import {
   deriveTimelineEntries,
@@ -34,6 +33,7 @@ import styles from '../../CommandDeck/styles/command-deck.module.css';
 import type { MessagesTimelineProps, RoundMarker } from './types';
 import { RoundDivider } from './dividers';
 import { TimelineRowRenderer } from './TimelineRowRenderer';
+import { useConnectionPhase } from '../../../lib/connectionState';
 import {
   ALWAYS_UNVIRTUALIZED_TAIL_ROWS,
   AUTO_SCROLL_THRESHOLD_PX,
@@ -77,6 +77,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   targetMessageNonce,
   onTargetMessageHandled,
 }: MessagesTimelineProps) {
+  const connectionPhase = useConnectionPhase();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
@@ -413,7 +414,6 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isBackendOutage()) return; // page hidden by the outage boundary (PAN-3867)
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
         event.preventDefault();
         event.stopPropagation();
@@ -640,21 +640,34 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             </div>
             <div className={styles.failedMessageActions}>
               <span className={styles.failedMessageLabel}>
-                {fm.deliveryUnknown ? 'Delivery not confirmed' : fm.kind === 'command' ? 'Command request failed' : 'Failed to send'}
+                {fm.heldOffline ? 'Waiting to send — will send when the server reconnects'
+                  : fm.notFoundInTranscript ? 'Not found in transcript'
+                  : fm.deliveryUnknown ? 'Delivery not confirmed'
+                  : fm.kind === 'command' ? 'Command request failed' : 'Failed to send'}
               </span>
               {fm.error && (
                 <span className={styles.failedMessageReason} title={fm.error}>
                   {fm.error}
                 </span>
               )}
-              {fm.retryable !== false && (
+              {fm.retryable !== false && !(fm.heldOffline && connectionPhase !== 'live') && (
                 <button
                   className={styles.failedMessageBtn}
                   onClick={() => onRetryFailed?.(fm.id, fm.text)}
-                  title="Retry sending"
+                  title={fm.notFoundInTranscript ? 'Resend as a new message' : 'Retry sending'}
                 >
                   <RotateCcw size={12} />
-                  Retry
+                  {fm.notFoundInTranscript ? 'Resend' : 'Retry'}
+                </button>
+              )}
+              {fm.kind === 'prompt' && (
+                <button
+                  className={styles.failedMessageBtn}
+                  onClick={() => { void navigator.clipboard.writeText(fm.text); }}
+                  title="Copy message text"
+                >
+                  <Copy size={12} />
+                  Copy
                 </button>
               )}
               <button

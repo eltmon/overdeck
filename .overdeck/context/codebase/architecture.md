@@ -38,6 +38,10 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
+- `github-quota/` (PAN-4264) — GitHub API quota metering: the per-hour ledger,
+  `runGh` (metered `gh` exec), `withGitHubCaller`, App/PAT metering
+  (`rest-meter.ts`), the cross-process pause gate, the `/rate_limit` sampler
+  and the quota snapshot. Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
   legacy `model_selection.specialist_harnesses` (PAN-636).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
@@ -73,13 +77,22 @@ panes (Herdr default; legacy tmux on `tmux -L overdeck`), with state in
 2. Work agent — `agents/spawn.ts` `spawnAgent` (~:600; single-work tier staffing ~:629)
 3. Role runs — `agents/spawn.ts` `spawnRun` (~:120; slot tier staffing ~:137)
 4. Restart — `agents/resume.ts` / `agents/recovery.ts`
-5. Dashboard start route — `dashboard/server/routes/agents.ts` (~:3156, shells to `pan start`)
+5. Dashboard start route — `POST /api/agents`, `postAgentsRoute` in
+   `dashboard/server/routes/agents/spawn.ts` (~:263, shells to `pan start` via
+   `buildPanStartArgs` in `routes/agents/shared.ts`)
 
 Conversations pin harness at creation in `handleConversationCreate`
-(`src/lib/overdeck/conversation-runtime.ts` ~:918, called from `POST /api/conversations` in
-`routes/conversations.ts` ~:303) — not a spawn site. Conversation kickoff templates read at
+(`src/lib/overdeck/conversation-runtime.ts` ~:939, called from `POST /api/conversations` in
+`routes/conversations.ts` ~:304) — not a spawn site. Conversation kickoff templates read at
 request time live in `roles/` (`handoff.md`, `retrospective.md`); `src/lib/cloister/prompts/*.md`
 are build-copied to `dist/dashboard/prompts/` and cached by `renderPrompt`.
+
+Planning auto-start consent lives in
+`~/.overdeck/agents/planning-<issue>/auto-spawn-on-finalize.json`
+(`planning/auto-spawn-consent.ts`): one generation per planning cycle, claimed
+and spent by the first consent-bearing work spawn (`withAutoSpawnConsentClaim`
+in `agents/spawn.ts` `spawnAgent`/`spawnRun` and `remote/remote-agents.ts`).
+There is no per-issue pipeline record since the Cut (PAN-3917).
 
 ## Projects and workspaces domain (PAN-1990, PAN-3330)
 
@@ -130,4 +143,4 @@ injectable dep: the lib defaults serve the CLI; the route must inject the server
 facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
 imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
-<!-- last-verified: 2026-09-25 -->
+<!-- last-verified: 2026-09-26 -->

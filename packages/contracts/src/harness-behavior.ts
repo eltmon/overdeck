@@ -1,4 +1,5 @@
 import type { Harness } from "./types"
+import type { EffortLevel } from "./effort"
 
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
@@ -61,6 +62,8 @@ export interface HarnessBehavior {
   readonly injectsPromptTimeMemory: boolean
   readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui" | "muse-tui" | "prime-agent-host"
   readonly readyTimeoutSeconds: number
+  /** Effort levels this harness accepts, when narrower than the full {@link EFFORT_LEVELS} set. Undefined = no known restriction. */
+  readonly effortLevels?: readonly EffortLevel[]
 }
 
 export const CLAUDE_CODE_BEHAVIOR: HarnessBehavior = {
@@ -114,6 +117,7 @@ export const OHMYPI_BEHAVIOR: HarnessBehavior = {
   injectsPromptTimeMemory: true,
   workAgentMode: "ohmypi-rpc",
   readyTimeoutSeconds: 120,
+  effortLevels: ["low", "medium", "high", "xhigh"],
 }
 
 export const CODEX_BEHAVIOR: HarnessBehavior = {
@@ -216,6 +220,7 @@ export const MUSE_BEHAVIOR: HarnessBehavior = {
   injectsPromptTimeMemory: false,
   workAgentMode: "muse-tui",
   readyTimeoutSeconds: 60,
+  effortLevels: ["low", "medium", "high", "xhigh"],
 }
 
 export const PRIME_AGENT_BEHAVIOR: HarnessBehavior = {

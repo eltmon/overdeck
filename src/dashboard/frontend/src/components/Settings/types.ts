@@ -210,6 +210,9 @@ export interface SettingsConfig {
     enabled: boolean;
     effectiveEnabled?: boolean;
     installId?: string;
+    /** PAN-4264: send a pseudonymous operatorHash so one operator's installs group. */
+    operatorGrouping?: boolean;
+    operatorHash?: string;
   };
   memory?: MemorySettingsConfig;
   background_ai?: BackgroundAiConfig;

@@ -296,6 +296,48 @@ describe('role model configuration', () => {
     })).toThrow('config.yaml: roles.work.effort must be one of low, medium, high, xhigh, max');
   });
 
+  it('accepts a sub-role effort of max on a max-capable sub-role model', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        review: {
+          model: 'workhorse:expensive',
+          sub: {
+            security: { model: 'claude-opus-4-7', effort: 'max' },
+          },
+        },
+      },
+    });
+
+    expect(config.roles?.review?.sub?.security?.effort).toBe('max');
+  });
+
+  it('rejects a sub-role effort value outside the enum', () => {
+    expect(() => mergeConfigs({
+      roles: {
+        review: {
+          model: 'workhorse:expensive',
+          sub: {
+            security: { model: 'workhorse:cheap', effort: 'bogus' as never },
+          },
+        },
+      },
+    })).toThrow('config.yaml: roles.review.sub.security.effort must be one of low, medium, high, xhigh, max');
+  });
+
+  it('rejects a sub-role effort level the sub-role model does not support', () => {
+    expect(() => mergeConfigs({
+      roles: {
+        review: {
+          model: 'workhorse:expensive',
+          sub: {
+            // claude-sonnet-4-6 supports low/medium/high/max — xhigh requires newer models.
+            security: { model: 'claude-sonnet-4-6', effort: 'xhigh' },
+          },
+        },
+      },
+    })).toThrow("config.yaml: roles.review.sub.security.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high, max)");
+  });
+
   it('seeds missing workhorse slots while preserving user-defined slots', () => {
     // PAN-1067 added MODEL_DEPRECATIONS that transparently maps
     // 'gpt-5.5-mini' → 'gpt-5.4-mini' (a hallucinated tier that never

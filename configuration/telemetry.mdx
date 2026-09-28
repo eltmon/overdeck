@@ -52,6 +52,38 @@ winner, and restores mode `0600`.
 The ID is generated independently. Overdeck does not read Claude Code, Codex,
 GitHub, Git, or other credential files to identify an installation.
 
+## Group my installs (opt-in)
+
+If you run Overdeck on more than one machine with the same GitHub account,
+**Settings → Telemetry → Group my installs (pseudonymous)** adds an
+`operatorHash` to every event so those installs can be grouped. It is off by
+default. The equivalent configuration is:
+
+```yaml
+telemetry:
+  operator_grouping: true
+```
+
+The hash is a salted one-way HMAC of your GitHub numeric user ID, read once
+with `gh api user --jq .id`. Only the 16-character hash is stored (in
+`~/.overdeck/telemetry-operator-hash`) and sent; your GitHub login, email and
+raw user ID never are. The salt ships in the Overdeck source, so the hash is
+pseudonymous rather than secret.
+
+With grouping on, `pan doctor github-quota` can also list your other installs
+seen in the last 48 hours. That view needs a PostHog personal API key with
+query access and the project ID:
+
+```yaml
+telemetry:
+  operator_grouping: true
+  posthog_read_key: phx_...
+  posthog_project_id: "12345"
+```
+
+`OVERDECK_POSTHOG_READ_KEY` and `OVERDECK_POSTHOG_PROJECT_ID` override the
+file. The key is never shown in the Settings UI.
+
 ## What is sent
 
 - Dashboard tab and action categories
@@ -59,6 +91,11 @@ GitHub, Git, or other credential files to identify an installation.
 - Coarse project and active-agent count buckets
 - Pipeline stage, harness, and model-family enums
 - Platform, architecture, Overdeck version, and client type
+- Hourly, bucketed GitHub API points per Overdeck subsystem and the lowest
+  remaining GitHub budget (`github_quota_sample`), a throttled notice when
+  GitHub rate-limits a call (`github_rate_limited`), and a daily
+  `instance_heartbeat` with bucketed project and agent counts
+- With operator grouping on, the pseudonymous `operatorHash`
 - Sanitized categorical browser and server exceptions for error grouping
 
 Raw counts and durations are replaced by coarse buckets. The complete,
@@ -71,7 +108,7 @@ mechanically checked event and property list is in
 - Prompts, completions, or terminal output
 - Issue IDs, titles, or descriptions
 - Repository, branch, workspace, or file-path names
-- Email addresses, account IDs, or credentials
+- Email addresses, account IDs, GitHub logins, or credentials
 - Session replay recordings
 
 <Info>

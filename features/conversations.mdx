@@ -65,6 +65,33 @@ remembers what you last chose.
 See [Bare conversations](https://github.com/eltmon/overdeck/blob/main/docs/CONTEXT-LAYERS.md#bare-conversations-no-overdeck-context)
 for the full list of what is skipped and what keeps running.
 
+### Starting from Home
+
+Both Simple and Advanced Home carry a composer at the top of the page, so you
+can start a conversation or a terminal without opening the Command Deck or
+picking a project first:
+
+- **Enter** asks the composer's current agent, exactly as typed — no seed
+  prompt, no project required.
+- **Ctrl+Enter** (or choosing "Run in terminal:") opens the terminal drawer in
+  the relevant deck and runs the typed text as a command in a fresh shell.
+- **"Talk it through first:"** (Simple mode only) sends the same text through
+  a discuss-then-file prompt: the agent asks clarifying questions and files an
+  issue only once you say it's ready.
+
+The composer's project chip lists every registered project, a **no project**
+choice, and **Add a project…**. Choosing no project — or having none
+registered yet — starts the conversation or terminal in your home folder
+(`~/Projects` if it exists, otherwise your home directory) instead of blocking
+you. In the Command Deck, that same no-project state is the **No project**
+deck, always reachable from the sidebar's Projects section, and offered as
+"Start without a project" when nothing else is selected.
+
+If a conversation ends up outside any project — started from Home before a
+project existed, say — its pane shows a "Not in a project · Move to
+project…" chip so you can attach it to a project later without losing the
+conversation.
+
 ### Native OpenCode CLI in Terminal
 
 For an OpenCode conversation, **Terminal** attaches OpenCode's own interactive

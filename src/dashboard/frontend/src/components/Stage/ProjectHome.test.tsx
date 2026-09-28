@@ -3,6 +3,7 @@ import { render as rtlRender, screen, fireEvent, waitFor, act } from '@testing-l
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProjectHome } from './ProjectHome'
 import type { StageApi } from './types'
+import { takePendingTerminal } from '../home/pendingTerminal'
 
 // ProjectHome owns the project rename mutation (PAN-3156), so every render
 // needs a QueryClientProvider. Shadow render() so existing call sites work.
@@ -21,6 +22,7 @@ function api(overrides: Partial<StageApi> = {}): StageApi {
     openIssue: vi.fn(),
     openOrFocusAgentPane: vi.fn(),
     toggleTerminal: vi.fn(),
+    openTerminalDrawer: vi.fn(),
     ...overrides,
   }
 }
@@ -58,6 +60,26 @@ describe('ProjectHome', () => {
       expect(onCreateConversation).toHaveBeenCalledWith('claude-code', 'This is a test', 'terminal')
     })
     expect(openOrFocusAgentPane).toHaveBeenCalledWith('conv-123', 'Agent')
+  })
+
+  it('the terminal row writes the hand-off and opens the drawer', () => {
+    sessionStorage.clear()
+    const openTerminalDrawer = vi.fn()
+
+    render(
+      <ProjectHome
+        projectName="overdeck"
+        onCreateConversation={vi.fn()}
+        api={api({ deckKey: 'overdeck', openTerminalDrawer })}
+      />,
+    )
+
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'npm run dev' } })
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true })
+
+    expect(openTerminalDrawer).toHaveBeenCalledTimes(1)
+    expect(takePendingTerminal('overdeck')).toBe('npm run dev')
   })
 
   it('renders conversation creation errors inline without opening a pane', async () => {

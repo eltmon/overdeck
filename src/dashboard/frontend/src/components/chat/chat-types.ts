@@ -18,7 +18,10 @@ export interface ChatMessage {
   /** Local send identity and transcript reconciliation metadata. */
   clientMessageId?: string;
   echoBaselineIds?: string[];
-  deliveryState?: 'pending' | 'accepted' | 'unknown';
+  deliveryState?: 'pending' | 'accepted' | 'unknown' | 'subagent';
+  /** Set when deliveryState is 'subagent': the message routed into this running
+   * subagent instead of the main conversation (PAN-4247). */
+  deliveredToSubagent?: { agentId: string; description: string };
   /** Local-only structured result for a dashboard-intercepted `/pan` command. */
   commandResult?: ComposerCommandResult;
   /** Exact command text that produced commandResult, used for confirmations. */
@@ -39,6 +42,10 @@ export interface FailedMessage {
   echoBaselineIds?: string[];
   deliveryUnknown?: boolean;
   deliverAs?: 'steer' | 'follow_up';
+  /** True for an accepted bubble moved to the outbox after staying unmatched too long (PAN-4247). */
+  notFoundInTranscript?: boolean;
+  /** Submitted while the server was unreachable: never POSTed, sent on reconnect (PAN-4279). */
+  heldOffline?: boolean;
 }
 
 export interface WorkLogEntry {
@@ -57,6 +64,13 @@ export interface WorkLogEntry {
   sequence?: number;
 }
 
+/** A human-origin message read from a subagent's own sidechain transcript (PAN-4247). */
+export interface SubagentHumanInput {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface SubagentSummary {
   agentId: string;
   agentType: string;
@@ -64,6 +78,10 @@ export interface SubagentSummary {
   toolUseId: string;
   spawnDepth: number;
   status: 'running' | 'done';
+  /** True for a background subagent, launched with `requestShape: "background"` (PAN-4247). */
+  background?: boolean;
+  /** Recent human-origin sidechain inputs, most useful when a message routed into this subagent instead of the main conversation (PAN-4247). */
+  humanInputs?: SubagentHumanInput[];
 }
 
 export interface ProposedPlan {

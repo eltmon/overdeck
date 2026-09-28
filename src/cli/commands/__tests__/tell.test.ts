@@ -2,7 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
   messageAgent: vi.fn(
-    async (): Promise<{ delivered: boolean; queuedToMail: boolean; reason?: string }> =>
+    async (): Promise<{
+      delivered: boolean;
+      queuedToMail: boolean;
+      reason?: string;
+      confirmed?: boolean;
+      landedInSubagent?: { agentId: string; description: string };
+      inputTarget?: 'main';
+      switchedFromSubagent?: string;
+      inputTargetRefusal?: { reason: string; inputTarget: 'main' | { subagent: string } | 'unknown' };
+    }> =>
       ({ delivered: true, queuedToMail: false }),
   ),
 }));
@@ -116,6 +125,98 @@ describe('tellCommand outcome reporting (PAN-3736)', () => {
     await tellCommand('PAN-123', 'peer ping');
 
     expect(logSpy).toHaveBeenCalledTimes(2);
+    logSpy.mockRestore();
+  });
+});
+
+describe('tellCommand subagent-landing outcome (PAN-4247)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    remoteMocks.loadRemoteAgentState.mockReturnValue(null);
+  });
+
+  it('prints the subagent name and exits 1 instead of confirming delivery (AC2/AC3)', async () => {
+    agentMocks.messageAgent.mockResolvedValue({
+      delivered: false,
+      queuedToMail: true,
+      confirmed: false,
+      landedInSubagent: { agentId: 'agent-1', description: 'Investigate flaky test' },
+      reason: 'Claude Code routed the message into running subagent "Investigate flaky test" (agent-1), not the main conversation. Stop or finish that subagent, then resend.',
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { exitCli } = await import('../../exit.js');
+
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'please pause and check the logs');
+
+    const printed = errorSpy.mock.calls.map(call => String(call[0])).join('\n');
+    expect(printed).toContain('agent-pan-123');
+    expect(printed).toContain('Investigate flaky test');
+    expect(printed).toContain('agent-1');
+    expect(printed).not.toContain('turn confirmed');
+    expect(exitCli).toHaveBeenCalledWith(1);
+    errorSpy.mockRestore();
+  });
+});
+
+describe('tellCommand main-agent input target (PAN-4268)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    remoteMocks.loadRemoteAgentState.mockReturnValue(null);
+  });
+
+  it('prints the refusal and exits 1 when input could not be moved to the main agent', async () => {
+    const reason = "Could not move keyboard focus into Claude Code's agent selector.";
+    agentMocks.messageAgent.mockResolvedValue({
+      delivered: false,
+      queuedToMail: true,
+      confirmed: false,
+      reason,
+      inputTargetRefusal: { reason, inputTarget: { subagent: 'Counter run' } },
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { exitCli } = await import('../../exit.js');
+
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'please continue');
+
+    const printed = errorSpy.mock.calls.map(call => String(call[0])).join('\n');
+    expect(printed).toContain('could not be moved to the main agent');
+    expect(printed).toContain(reason);
+    expect(printed).not.toContain('turn confirmed');
+    expect(exitCli).toHaveBeenCalledWith(1);
+    errorSpy.mockRestore();
+  });
+
+  it("names the main agent on a confirmed delivery", async () => {
+    agentMocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: true, confirmed: true, inputTarget: 'main' });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { exitCli } = await import('../../exit.js');
+
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'please continue');
+
+    const printed = logSpy.mock.calls.map(call => String(call[0])).join('\n');
+    expect(printed).toContain("agent-pan-123's main agent (turn confirmed)");
+    expect(exitCli).toHaveBeenCalledWith(0);
+    logSpy.mockRestore();
+  });
+
+  it('names the subagent it switched away from', async () => {
+    agentMocks.messageAgent.mockResolvedValue({
+      delivered: true,
+      queuedToMail: true,
+      confirmed: true,
+      inputTarget: 'main',
+      switchedFromSubagent: 'Counter run',
+    });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-123', 'please continue');
+
+    const printed = logSpy.mock.calls.map(call => String(call[0])).join('\n');
+    expect(printed).toContain('Switched Claude Code\'s input from subagent "Counter run"');
     logSpy.mockRestore();
   });
 });

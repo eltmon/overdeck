@@ -1,0 +1,125 @@
+{
+  "version": "1",
+  "issueId": "PAN-3022",
+  "created": "2026-09-26T06:16:24.731Z",
+  "updated": "2026-09-26T08:22:28.334Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "consent-work-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3022",
+      "claimedAt": "2026-09-26T06:16:24.731Z",
+      "doneAt": "2026-09-26T06:59:31.891Z"
+    },
+    "start-planning-threads-work-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3022",
+      "claimedAt": "2026-09-26T06:59:55.383Z",
+      "doneAt": "2026-09-26T07:41:57.931Z"
+    },
+    "route-forwards-consent-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3022",
+      "claimedAt": "2026-09-26T07:42:02.037Z",
+      "doneAt": "2026-09-26T07:46:41.272Z"
+    },
+    "claim-applies-work-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3022",
+      "claimedAt": "2026-09-26T07:46:48.069Z",
+      "doneAt": "2026-09-26T08:00:21.201Z"
+    },
+    "delete-resolve-issue-work-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3022",
+      "claimedAt": "2026-09-26T08:00:25.575Z",
+      "doneAt": "2026-09-26T08:04:09.287Z"
+    },
+    "docs-handoff-work-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3022",
+      "claimedAt": "2026-09-26T08:04:16.152Z",
+      "doneAt": "2026-09-26T08:15:57.909Z"
+    },
+    "consent-work-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:18:31.627Z"
+    },
+    "consent-work-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:06.124Z"
+    },
+    "consent-work-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:17.420Z"
+    },
+    "consent-work-model.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:28.560Z"
+    },
+    "consent-work-model.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:40.074Z"
+    },
+    "start-planning-threads-work-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:19:52.888Z"
+    },
+    "start-planning-threads-work-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:04.794Z"
+    },
+    "start-planning-threads-work-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:18.492Z"
+    },
+    "route-forwards-consent-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:30.923Z"
+    },
+    "route-forwards-consent-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:41.839Z"
+    },
+    "route-forwards-consent-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:20:53.926Z"
+    },
+    "claim-applies-work-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:05.625Z"
+    },
+    "claim-applies-work-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:18.004Z"
+    },
+    "claim-applies-work-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:29.684Z"
+    },
+    "delete-resolve-issue-work-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:41.680Z"
+    },
+    "delete-resolve-issue-work-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:21:53.592Z"
+    },
+    "docs-handoff-work-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:06.030Z"
+    },
+    "docs-handoff-work-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:17.158Z"
+    },
+    "docs-handoff-work-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T08:22:28.334Z"
+    }
+  }
+}

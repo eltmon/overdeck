@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const posthogMock = vi.hoisted(() => ({
   init: vi.fn(),
   register: vi.fn(),
+  unregister: vi.fn(),
   capture: vi.fn(),
   captureException: vi.fn(),
 }));
@@ -40,6 +41,24 @@ describe('frontend telemetry wrapper', () => {
 
     expect(posthogMock.init).not.toHaveBeenCalled();
     expect(posthogMock.register).not.toHaveBeenCalled();
+  });
+
+  // PAN-4264: operator grouping is opt-in and must be revocable.
+  it('registers operatorHash while grouping is on and removes the persisted hash once it is off', async () => {
+    const settings = { telemetry: { enabled: true, installId: 'install-id', operatorHash: '0123456789abcdef' } as Record<string, unknown> };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => settings })));
+    const first = await import('../telemetry');
+    await first.initTelemetry();
+    expect(posthogMock.register).toHaveBeenCalledWith({ operatorHash: '0123456789abcdef' });
+    expect(posthogMock.unregister).not.toHaveBeenCalled();
+
+    vi.resetModules();
+    vi.clearAllMocks();
+    delete settings.telemetry.operatorHash;
+    const second = await import('../telemetry');
+    await second.initTelemetry();
+    expect(posthogMock.unregister).toHaveBeenCalledWith('operatorHash');
+    expect(posthogMock.register).not.toHaveBeenCalledWith(expect.objectContaining({ operatorHash: expect.anything() }));
   });
 
   it('hard-disables private automatic capture and enables sanitized unhandled exceptions', async () => {

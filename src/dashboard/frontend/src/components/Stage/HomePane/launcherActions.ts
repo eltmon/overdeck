@@ -11,6 +11,8 @@ export interface LauncherHandlers {
   openAgent: (intent: LauncherIntent, query: string) => void
   openTerminal: (query: string) => void
   openWeb: (query: string, url: string) => void
+  /** Simple-mode "Talk it through first:" row. */
+  openTalk?: (query: string) => void
   /** Record the agent the user just ran (feeds last-used ordering). */
   onAgentRun?: (agentId: string) => void
 }
@@ -28,6 +30,9 @@ export function dispatchLauncherIntent(
       return
     case 'web':
       handlers.openWeb(query, webSearchUrl(query))
+      return
+    case 'talk':
+      handlers.openTalk?.(query)
       return
     case 'agent':
       handlers.onAgentRun?.(intent.id)

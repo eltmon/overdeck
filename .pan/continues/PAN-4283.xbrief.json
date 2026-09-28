@@ -1,0 +1,283 @@
+{
+  "version": "1",
+  "issueId": "PAN-4283",
+  "created": "2026-09-28T00:30:23.576Z",
+  "updated": "2026-09-28T02:24:46.188Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "close-out-settings-lib": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T00:30:23.576Z",
+      "doneAt": "2026-09-28T00:40:54.975Z"
+    },
+    "default-remove-workspace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T00:41:21.573Z",
+      "doneAt": "2026-09-28T00:43:47.611Z"
+    },
+    "close-out-settings-lib.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:46:07.861Z"
+    },
+    "close-out-settings-lib.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:46:20.035Z"
+    },
+    "close-out-settings-lib.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:46:32.394Z"
+    },
+    "close-out-settings-lib.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:46:44.321Z"
+    },
+    "default-remove-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:46:55.517Z"
+    },
+    "default-remove-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:47:06.394Z"
+    },
+    "default-remove-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:47:18.373Z"
+    },
+    "close-out-settings-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T00:47:33.946Z",
+      "doneAt": "2026-09-28T00:55:14.295Z"
+    },
+    "close-out-settings-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:55:44.159Z"
+    },
+    "close-out-settings-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:55:54.843Z"
+    },
+    "close-out-settings-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:56:05.679Z"
+    },
+    "close-out-settings-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:56:16.853Z"
+    },
+    "dod-teardown-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T00:56:38.268Z",
+      "doneAt": "2026-09-28T01:00:53.230Z"
+    },
+    "dod-teardown-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:01:20.080Z"
+    },
+    "dod-teardown-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:01:32.256Z"
+    },
+    "dod-teardown-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:01:44.461Z"
+    },
+    "dod-teardown-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:01:55.922Z"
+    },
+    "close-out-settings-integration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:02:11.432Z",
+      "doneAt": "2026-09-28T01:13:26.895Z"
+    },
+    "close-out-settings-integration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:13:45.113Z"
+    },
+    "close-out-settings-integration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:13:55.127Z"
+    },
+    "closed-workspace-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:14:07.756Z",
+      "doneAt": "2026-09-28T01:15:48.470Z"
+    },
+    "closed-workspace-report.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:08.576Z"
+    },
+    "closed-workspace-report.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:20.522Z"
+    },
+    "closed-workspace-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:49.062Z"
+    },
+    "closed-workspace-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:58.848Z"
+    },
+    "closed-workspace-report.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:19:08.819Z"
+    },
+    "closed-workspace-cleanup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:19:22.965Z",
+      "doneAt": "2026-09-28T01:23:00.867Z"
+    },
+    "closed-workspace-cleanup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:23:25.148Z"
+    },
+    "closed-workspace-cleanup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:23:35.236Z"
+    },
+    "closed-workspace-cleanup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:23:44.824Z"
+    },
+    "closed-workspace-cleanup.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:23:54.200Z"
+    },
+    "disk-report-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:24:08.668Z",
+      "doneAt": "2026-09-28T01:25:58.125Z"
+    },
+    "disk-report-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:26:13.942Z"
+    },
+    "disk-report-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:26:24.012Z"
+    },
+    "cleanup-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:26:39.030Z",
+      "doneAt": "2026-09-28T01:32:32.039Z"
+    },
+    "cleanup-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:32:49.302Z"
+    },
+    "cleanup-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:32:58.551Z"
+    },
+    "cleanup-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:33:07.758Z"
+    },
+    "close-out-section": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:33:22.166Z",
+      "doneAt": "2026-09-28T01:43:45.102Z"
+    },
+    "close-out-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:44:00.118Z"
+    },
+    "close-out-section.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:44:09.354Z"
+    },
+    "close-out-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:44:19.281Z"
+    },
+    "close-out-section.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:44:29.949Z"
+    },
+    "close-out-section.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:44:40.673Z"
+    },
+    "disk-cost-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:45:00.157Z",
+      "doneAt": "2026-09-28T01:49:24.818Z"
+    },
+    "disk-cost-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:50:54.504Z"
+    },
+    "disk-cost-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:51:06.441Z"
+    },
+    "disk-cost-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:51:30.456Z"
+    },
+    "disk-cost-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:51:40.016Z"
+    },
+    "disk-cost-ui.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:51:49.122Z"
+    },
+    "close-out-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:52:02.049Z",
+      "doneAt": "2026-09-28T01:54:34.652Z"
+    },
+    "close-out-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:19:06.666Z"
+    },
+    "close-out-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:19:27.683Z"
+    },
+    "close-out-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:19:36.919Z"
+    },
+    "close-out-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:19:46.195Z"
+    },
+    "close-out-screenshots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T02:19:57.831Z",
+      "doneAt": "2026-09-28T02:22:06.193Z"
+    },
+    "close-out-screenshots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:22:21.314Z"
+    },
+    "close-out-screenshots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:22:30.511Z"
+    },
+    "close-out-screenshots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:24:46.188Z"
+    }
+  }
+}

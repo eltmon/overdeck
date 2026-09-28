@@ -44,6 +44,12 @@ vi.mock('../../../../lib/agents/transcript-resolver.js', () => ({
   listAgentTranscriptCandidates: vi.fn(() => Promise.resolve([])),
 }));
 
+vi.mock('../../services/agent-subagents.js', () => ({
+  isSafeSubagentId: vi.fn((id: string) => /^[A-Za-z0-9_-]+$/.test(id)),
+  listAgentSubagents: vi.fn(() => Promise.resolve([])),
+  resolveAgentSubagentTranscript: vi.fn(() => Promise.resolve(null)),
+}));
+
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return { ...actual, access: vi.fn(() => Promise.resolve()) };
@@ -62,6 +68,7 @@ import { parseAcpConversationMessages } from '../../services/acp-conversation-pa
 import {
   listAgentTranscriptCandidates,
 } from '../../../../lib/agents/transcript-resolver.js';
+import { resolveAgentSubagentTranscript } from '../../services/agent-subagents.js';
 import { access } from 'node:fs/promises';
 
 const mockGetAgentWorkspace = vi.mocked(getAgentWorkspace);
@@ -71,6 +78,7 @@ const mockParseOhmypiConversationMessages = vi.mocked(parseOhmypiConversationMes
 const mockParseCodexConversationMessages = vi.mocked(parseCodexConversationMessages);
 const mockParseAcpConversationMessages = vi.mocked(parseAcpConversationMessages);
 const mockListAgentTranscriptCandidates = vi.mocked(listAgentTranscriptCandidates);
+const mockResolveAgentSubagentTranscript = vi.mocked(resolveAgentSubagentTranscript);
 const mockAccess = vi.mocked(access);
 
 const EMPTY = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
@@ -122,6 +130,34 @@ describe('buildConversationResponse', () => {
     expect(result.streaming).toBe(false);
     expect(result.totalCost).toBe(0.42);
     expect(result.byteOffset).toBe(1024);
+  });
+
+  it('strips latestCompactSummary (PAN-4245) from the HTTP response body', async () => {
+    const jsonlPath = '/some/path/session.jsonl';
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: jsonlPath }]);
+    mockAccess.mockResolvedValue(undefined);
+    mockParseEntireConversation.mockResolvedValue({
+      messages: [{ role: 'user', content: 'hello' } as never],
+      latestCompactSummary: { text: 'Summary: earlier work', sequence: 3 } as never,
+      ...PARSE_RESULT_BASE,
+    });
+
+    const result = await buildAgentConversationResult('agent-PAN-473');
+
+    expect(result.body).not.toHaveProperty('latestCompactSummary');
+  });
+
+  it('strips latestCompactSummary (PAN-4245) from a subagent HTTP response body', async () => {
+    mockResolveAgentSubagentTranscript.mockResolvedValue({ kind: 'claude', path: '/some/path/subagent.jsonl' });
+    mockParseEntireConversation.mockResolvedValue({
+      messages: [{ role: 'user', content: 'hello' } as never],
+      latestCompactSummary: { text: 'Summary: earlier work', sequence: 3 } as never,
+      ...PARSE_RESULT_BASE,
+    });
+
+    const result = await buildAgentConversationResult('agent-PAN-473', { subagentId: 'agent-1' });
+
+    expect(result.body).not.toHaveProperty('latestCompactSummary');
   });
 
   it('returns empty result and logs error when parseEntireConversation throws', async () => {

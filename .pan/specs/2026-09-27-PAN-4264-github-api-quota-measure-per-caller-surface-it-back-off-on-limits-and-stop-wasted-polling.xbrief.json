@@ -1,0 +1,2138 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T15:23:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4264: GitHub API quota: measure per caller, surface it, back off on limits, and stop wasted polling",
+    "updated": "2026-09-27T15:30:02.942Z"
+  },
+  "plan": {
+    "id": "pan-4264",
+    "title": "GitHub API quota: measure per caller, surface it, back off on limits, and stop wasted polling",
+    "status": "running",
+    "uid": "df685094-3878-4760-a2d8-621d2a5353b0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-27T15:23:45Z",
+    "updated": "2026-09-27T15:30:02.942Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4264",
+        "label": "PAN-4264",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4264.md",
+        "label": "PRD draft (.pan/drafts/pan-4264.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4263",
+        "label": "PAN-4263 (in flight, owns forge.ts)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "github",
+      "rate-limit",
+      "quota",
+      "telemetry",
+      "dashboard",
+      "doctor"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator explicitly appended the telemetry scope (operator grouping, quota telemetry, heartbeat, doctor remote view) to this issue on 2026-09-27 and asked for it to be folded into this plan. Every slice reads the same ledger (quota-ledger) and pause gate (pause-gate), so the items share one foundation; they are decomposed as vertical slices with only file-sharing and output-to-input edges so the foreman can fan out. Items 20 and 23-27 may be split into a sibling issue if the surface proves unmanageable.",
+      "canonicalFilename": "2026-09-27-PAN-4264-github-api-quota-measure-per-caller-surface-it-back-off-on-limits-and-stop-wasted-polling.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "GitHub refuses Overdeck's GraphQL and REST calls several times a day ('API rate limit already exceeded for user ID 678719'), stalling verdicts, close-outs, merges and pipeline membership. Overdeck has no chokepoint or per-caller metering (about 45 files exec gh directly), no shared back-off (only IssueDataService suspends), wastes calls on misconfigured projects and on a repo without the App installed, mints an App token per call, bursts every project at boot and every 5 minutes, and its telemetry cannot group one operator's installs or show GitHub usage.",
+      "Proposal": "Add a cross-process JSONL ledger and pause gate under ~/.overdeck/github-quota/, a metered runGh helper plus AsyncLocalStorage caller context, and meter the named callers (pipeline membership, PR cache, PR sync, CI repair, close-out reaper, PAT client, issue poller, App REST door, agents via a count-only gh shim). Sample the free /rate_limit endpoint every 5 minutes. Pause only non-essential callers per pool and bucket, with typed errors that never read as no data. Publish a read-model snapshot to a status-bar pill and a banner whose text says whether this machine caused the limit, and add pan doctor github-quota. Skip projects with no resolvable tracker, fall back to the gh token when the App is not installed, cache App tokens, and stagger boot and convergence refreshes. Add bucketed github_quota_sample, throttled github_rate_limited and daily instance_heartbeat telemetry, the opt-in operatorHash, and a doctor view of sibling installs via PostHog HogQL. Document the policy in docs/PIPELINE-GATES.md and docs/TELEMETRY.md.",
+      "NonGoals": "- Migrating the other ~35 gh exec files (close-issue, workflows, merge-agent, discussions, command-deck, forge, and others) to runGh; their usage shows as unattributed\n- Changing src/lib/forge.ts artifact discovery or verdict-recording retries (PAN-4263 owns them)\n- Pausing essential callers: merge, verdict recording, tracker writes, agents, pan close / closeOut()\n- Blocking or rate-limiting agents' own gh calls; the shim only counts\n- Per-repo GitHub App installation discovery or multi-installation support\n- Sending any raw count, login, email, hostname, path, repo name or raw user id to PostHog\n- A Settings UI for the PostHog read key\n- Replacing cache.db rate_limits or IssueDataService's existing back-off\n- Webhook-driven quota updates\n- Persisting the quota snapshot in overdeck.db or the durable event log"
+    },
+    "autoDecisions": [
+      {
+        "summary": "One plan with sizeJustification instead of sibling issues",
+        "rationale": "The operator appended the telemetry scope to this issue and asked for it to be folded into this plan; every slice reads one ledger and pause gate. The foreman may split items 20 and 23-27 into a sibling if needed."
+      },
+      {
+        "summary": "Cross-process JSONL ledger and pause.json under ~/.overdeck/github-quota/, not cache.db",
+        "rationale": "Callers run in the dashboard, deacon child, CLI and agent shells; cache.db lives in server code src/lib must not import, and the /bin/sh agent shim cannot write SQLite."
+      },
+      {
+        "summary": "Meter only the callers the issue names; the other ~35 gh exec files show as unattributed",
+        "rationale": "Migrating 45 files is out of proportion; the free /rate_limit sample exposes the unmetered remainder, and a follow-up can migrate the rest."
+      },
+      {
+        "summary": "Pause per pool and bucket; essential callers (merge, verdicts, tracker writes, agents, pan close) are never paused",
+        "rationale": "The hidden per-user limit hits GraphQL while REST keeps working; blocking essential paths would convert a quota blip into a pipeline stall. PAN-4263 owns verdict retries."
+      },
+      {
+        "summary": "Record GITHUB_TOKEN usage as a separate 'pat' pool",
+        "rationale": "It is unknown whether the PAT belongs to the gh account; separate series cannot contradict each other in the user-pool samples the banner reads."
+      },
+      {
+        "summary": "Add a count-only gh shim beside the existing agent git guard",
+        "rationale": "The issue names 'agents via the gh shim' but none exists; the git-guard PATH dir already carries per-agent shims and filters inherited guard dirs."
+      },
+      {
+        "summary": "Keep the closed-union telemetry contract by bucketing points and remaining",
+        "rationale": "docs/TELEMETRY.md promises raw counts are never sent and the drift test enforces the domain tables."
+      },
+      {
+        "summary": "operatorHash = HMAC-SHA256(gh numeric user id, 'overdeck-operator-grouping-v1'), 16 hex, from gh api user via direct execFile",
+        "rationale": "Matches the operator's spec; the App token has no user; direct execFile avoids an import cycle with runGh. Docs state the salt is a pepper, not a secret."
+      },
+      {
+        "summary": "PostHog read key and project id live under telemetry: in config.yaml with OVERDECK_POSTHOG_READ_KEY / OVERDECK_POSTHOG_PROJECT_ID overrides; no Settings UI",
+        "rationale": "HogQL needs both; keeping the key out of the UI avoids exposing a personal API key."
+      },
+      {
+        "summary": "pan doctor github-quota is a Commander subcommand of doctor",
+        "rationale": "Plain pan doctor keeps its action; a nested command gives its own --json and help."
+      },
+      {
+        "summary": "CLI heartbeat reports dashboard_running false",
+        "rationale": "A running dashboard sends its own heartbeat at most every 24 hours, so a CLI that finds none in 24 hours knows no dashboard did."
+      },
+      {
+        "summary": "PAN-4263 files (forge.ts, github-pr-lookup.ts, github-pr-selection.ts, forge-transient.ts) are off limits",
+        "rationale": "PAN-4263 is in flight on feature/pan-4263 and owns forge artifact discovery and verdict retry."
+      }
+    ],
+    "items": [
+      {
+        "id": "quota-ledger",
+        "title": "Add the GitHub quota ledger, caller context and refusal classifier",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/github-quota.ts",
+            "packages/contracts/src/index.ts",
+            "src/lib/github-quota/ledger.ts",
+            "src/lib/github-quota/caller-context.ts",
+            "src/lib/github-quota/classify.ts",
+            "tests/unit/lib/github-quota/ledger.test.ts",
+            "tests/unit/lib/github-quota/classify.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/ledger.test.ts tests/unit/lib/github-quota/classify.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/github-quota/ledger.test.ts passes",
+            "tests/unit/lib/github-quota/classify.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "prdWorkItem": 1,
+          "foundationFor": [
+            "pause-gate",
+            "run-gh",
+            "agent-gh-shim",
+            "quota-snapshot",
+            "doctor-github-quota",
+            "quota-telemetry",
+            "skip-misconfigured",
+            "app-404-fallback"
+          ]
+        },
+        "narrative": {
+          "Action": "Create packages/contracts/src/github-quota.ts (GITHUB_QUOTA_CALLERS, GitHubQuotaCaller, NON_ESSENTIAL_GITHUB_CALLERS, GitHubQuotaSnapshot schema) and export it from packages/contracts/src/index.ts. Create src/lib/github-quota/ledger.ts (appendLedgerEntry async, readLedgerWindow sync bounded, aggregateLedger (counts every kind 'call' entry at its recorded cost, including agent-shim outcome 'unknown'), pruneLedger, computeOwnUsageLow with OWN_USAGE_LOW_POINTS=500, OWN_USAGE_REMAINING_FRACTION=0.1, SAMPLE_FRESH_MS=600000), caller-context.ts (withGitHubCaller/currentGitHubCaller on AsyncLocalStorage) and classify.ts (classifyGitHubRefusal). Ledger line format is FR-1 exactly; the agent shell shim (agent-gh-shim) writes the same format. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 1."
+        },
+        "items": [
+          {
+            "id": "quota-ledger.ac1",
+            "title": "Given a tmp OVERDECK_HOME, when appendLedgerEntry writes a call entry, then readLedgerWindow returns that entry and aggregateLedger reports its points under its caller and bucket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-ledger.ac2",
+            "title": "Given ledger files older than 3 hours, when pruneLedger runs at an hour rollover, then it deletes them and preserves the current and previous hour files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-ledger.ac3",
+            "title": "classifyGitHubRefusal returns { kind: 'primary' } for 'GraphQL: API rate limit already exceeded for user ID 678719', returns { kind: 'secondary', retryAfterSec: 30 } for a secondary-limit message with retry-after: 30, and returns null for a 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-ledger.ac4",
+            "title": "computeOwnUsageLow returns the expected boolean for each of the 4 rows of its truth table (low/high own usage x fresh sample with high/zero remaining)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pause-gate",
+        "title": "Add the cross-process GitHub pause gate with refusal listeners",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/pause-gate.ts",
+            "tests/unit/lib/github-quota/pause-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/pause-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/github-quota/pause-gate.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-4",
+            "NFR-8"
+          ],
+          "prdWorkItem": 2,
+          "foundationFor": [
+            "run-gh",
+            "app-rest-meter",
+            "pat-client-meter",
+            "issue-poller-gate",
+            "pr-sync-meter",
+            "quota-snapshot",
+            "quota-telemetry"
+          ],
+          "parallelSafeReason": "Touches only the new src/lib/github-quota/pause-gate.ts and its test; no other item edits that file."
+        },
+        "narrative": {
+          "Action": "Create src/lib/github-quota/pause-gate.ts: recordGitHubRefusal applying the FR-5 duration rules (visible primary -> sample resetAt; hidden primary -> 10 min capped at resetAt, floor 60 s; secondary -> retry-after else 60 s doubling to 900 s; x-ratelimit-reset wins only for primary), atomic pause.json write, readActivePause (mtime-cached), assertGitHubCallAllowed(caller, pool, bucket, nowMs) (throws only for a non-essential caller during an active pause on that exact pool and bucket), onGitHubRefusal(listener), GitHubRateLimitedError and GitHubQuotaPausedError. Never import src/lib/telemetry (NFR-8). Full detail: PRD .pan/drafts/pan-4264.md, Work Item 2."
+        },
+        "items": [
+          {
+            "id": "pause-gate.ac1",
+            "title": "Given fake timers, when a primary refusal is recorded while the latest sample shows remaining 0, then pause.json holds until equal to that sample's resetAt; with remaining > 0 it holds now + 10 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-gate.ac2",
+            "title": "Given three consecutive secondary refusals without retry-after within 30 minutes, then the pauses last 60, 120 and 240 seconds, and a secondary refusal carrying x-ratelimit-reset one hour out still pauses 60 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-gate.ac3",
+            "title": "During a user GraphQL pause, assertGitHubCallAllowed('pipeline-membership','user','graphql') throws GitHubQuotaPausedError, while ('agent','user','graphql') and ('pipeline-membership','user','rest') return",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-gate.ac4",
+            "title": "A listener registered with onGitHubRefusal receives one event per recorded refusal, and a listener that throws does not make recordGitHubRefusal reject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pause-gate.ac5",
+            "title": "Given an active pat REST pause, when assertGitHubCallAllowed('pipeline-membership','app','rest') and ('pipeline-membership','user','rest') run, then both return rather than throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-gh",
+        "title": "Route gh exec through a metered runGh and the GraphQL runner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/run-gh.ts",
+            "src/lib/github-graphql-run.ts",
+            "tests/unit/lib/github-quota/run-gh.test.ts",
+            "tests/unit/lib/github-graphql-run.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/run-gh.test.ts tests/unit/lib/github-graphql-run.test.ts",
+            "npm run lint:effect-facades",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/github-quota/run-gh.test.ts passes",
+            "tests/unit/lib/github-graphql-run.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "FR-7",
+            "NFR-5"
+          ],
+          "prdWorkItem": 3
+        },
+        "narrative": {
+          "Action": "Create src/lib/github-quota/run-gh.ts: runGh(args, { caller?, cwd?, timeout?, maxBuffer?, exec?, onSuccess? }) resolves the caller, classifies the bucket from args, calls assertGitHubCallAllowed(caller, 'user', bucket), execs gh asynchronously, appends one ledger line (enriched by onSuccess), and on failure records refusals via recordGitHubRefusal and throws GitHubRateLimitedError, otherwise rethrows unchanged. Change src/lib/github-graphql-run.ts defaultExec to runGh with readGraphqlRateLimit as onSuccess. Promise-only, no Effect twin (NFR-5). Full detail: PRD .pan/drafts/pan-4264.md, Work Item 3."
+        },
+        "items": [
+          {
+            "id": "run-gh.ac1",
+            "title": "Given an injected exec that succeeds, when runGh runs, then exactly one ledger line with outcome 'ok' and the resolved caller is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-gh.ac2",
+            "title": "Given an injected exec failing with rate-limit stderr, when runGh runs, then it throws GitHubRateLimitedError and pause.json exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-gh.ac3",
+            "title": "Given an active GraphQL pause, when runGh(['pr','list'], { caller: 'pr-cache' }) runs, then it rejects with GitHubQuotaPausedError and the exec spy is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-gh.ac4",
+            "title": "Given a GraphQL envelope with data.rateLimit { cost: 3 }, when runGitHubGraphql succeeds, then the appended ledger line records cost 3 with estimated false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-rest-meter",
+        "title": "Meter and gate the GitHub App REST door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-app.ts",
+            "tests/unit/lib/github-app.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-app.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/github-app.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "FR-8",
+            "NFR-6"
+          ],
+          "prdWorkItem": 4
+        },
+        "narrative": {
+          "Action": "In src/lib/github-app.ts githubApiWithToken (line 388): call assertGitHubCallAllowed(currentGitHubCaller() ?? 'app-rest', 'app', 'rest') before fetch, append a pool 'app' ledger line with x-ratelimit headers after the response, and on !ok classify the refusal (record + throw GitHubRateLimitedError) else keep the existing error text. Do not touch listPullRequestsForHead (PAN-4263). Full detail: PRD .pan/drafts/pan-4264.md, Work Item 4."
+        },
+        "items": [
+          {
+            "id": "app-rest-meter.ac1",
+            "title": "Given a mocked 403 response with x-ratelimit-remaining 0, when an App REST call runs, then it throws GitHubRateLimitedError and pause.json records pool 'app'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-rest-meter.ac2",
+            "title": "Given a mocked 200 response with x-ratelimit-remaining 4990, when an App REST call runs, then a ledger line with pool 'app', bucket 'rest' and remaining 4990 is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-rest-meter.ac3",
+            "title": "Given a mocked 404 response, when an App REST call runs, then it throws the existing 'GitHub API GET <path> failed: 404' error and records no pause",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-token-cache",
+        "title": "Reuse GitHub App installation tokens until near expiry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-app.ts",
+            "tests/unit/lib/github-app.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-app.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/github-app.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ],
+          "prdWorkItem": 5
+        },
+        "narrative": {
+          "Action": "In src/lib/github-app.ts getInstallationAccessToken (line 379) add a module-level { token, expiresAtMs } memo reused while Date.now() < expiresAtMs - 5 min, plus resetInstallationTokenCacheForTests(). Full detail: PRD .pan/drafts/pan-4264.md, Work Item 5."
+        },
+        "items": [
+          {
+            "id": "app-token-cache.ac1",
+            "title": "Given a minted token expiring in 60 minutes, when two App REST calls run within the hour, then the fetch spy sees exactly one access_tokens POST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-token-cache.ac2",
+            "title": "Given fake timers advanced 56 minutes past minting, when an App REST call runs, then a new token is minted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pat-client-meter",
+        "title": "Meter the PAT GitHub client as pool pat",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/github-client.ts",
+            "src/dashboard/server/services/__tests__/github-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/github-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/services/__tests__/github-client.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-8"
+          ],
+          "prdWorkItem": 6
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/github-client.ts ghFetch (line 151): run with caller tracker-client (essential), append a pool 'pat' bucket 'rest' ledger line with header values, and on 403/429 call recordGitHubRefusal with pool 'pat' while keeping the existing RateLimited typed error. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 6."
+        },
+        "items": [
+          {
+            "id": "pat-client-meter.ac1",
+            "title": "Given a mocked 429 with Retry-After: 30, when ghFetch runs, then it throws RateLimited and pause.json holds a 30-second secondary pause for pool 'pat'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pat-client-meter.ac2",
+            "title": "Given a mocked 200, when ghFetch runs, then a ledger line with caller 'tracker-client' and pool 'pat' is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-poller-gate",
+        "title": "Make the GitHub issue poller honor the pause gate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/__tests__/issue-data-service-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/issue-data-service-quota.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/services/__tests__/issue-data-service-quota.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-4",
+            "NFR-6"
+          ],
+          "prdWorkItem": 7
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/issue-data-service.ts pollGitHub: skip the poll and reschedule at the pause end when a pat-pool REST pause is active; wrap in withGitHubCaller('issue-poller'); append each Octokit page's x-ratelimit headers as pool 'pat' ledger lines at the existing cache.updateRateLimit site. Keep the cache.db suspension logic. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 7."
+        },
+        "items": [
+          {
+            "id": "issue-poller-gate.ac1",
+            "title": "Given fake timers and an active pat REST pause, when pollGitHub runs, then zero Octokit calls are made and the next poll is scheduled at the pause end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-poller-gate.ac2",
+            "title": "Given no pause and a mocked Octokit page with x-ratelimit headers, when pollGitHub runs, then a ledger line with caller 'issue-poller' and pool 'pat' is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "membership-meter",
+        "title": "Meter pipeline membership and treat quota errors as transient",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/pipeline-membership-gather.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-7",
+            "FR-8"
+          ],
+          "prdWorkItem": 8
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership-gather.ts: listOpenPullRequestsSnapshot (line 71) execs via runGh with caller pipeline-membership; gatherProjectLensSignals (line 535) runs inside withGitHubCaller('pipeline-membership'); append ' rateLimit { cost remaining resetAt limit }' to both batched GraphQL queries (lines 98, 130); isTransientForgeFailure (line 273) returns true for GitHubRateLimitedError and GitHubQuotaPausedError. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 8."
+        },
+        "items": [
+          {
+            "id": "membership-meter.ac1",
+            "title": "Given a listOpenIssues dep that throws GitHubQuotaPausedError, when gatherProjectLensSignals runs, then the result has unavailableReason 'forge_transient', not 'forge_unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-meter.ac2",
+            "title": "When listMergedPullRequestHeadsBatched and listIssueStatesBatched build their queries, then each query string contains 'rateLimit { cost remaining resetAt limit }'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-meter.ac3",
+            "title": "Given an injected successful open-PR exec, when listOpenPullRequestsSnapshot runs, then a ledger line with caller 'pipeline-membership' and bucket 'rest' is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-cache-meter",
+        "title": "Meter the repo PR cache read",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state-quota.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/overdeck/derived-issue-state-quota.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ],
+          "prdWorkItem": 9
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/derived-issue-state.ts readRepoPullRequests (line 321): exec via runGh(['pr','list',...], { caller: 'pr-cache', cwd: projectPath, timeout: 20000 }); the failure path still returns null. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 9."
+        },
+        "items": [
+          {
+            "id": "pr-cache-meter.ac1",
+            "title": "Given an active GraphQL pause, when readRepoPullRequests runs, then it returns null and no gh process is executed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-cache-meter.ac2",
+            "title": "Given a successful injected exec, when readRepoPullRequests runs, then a ledger line with caller 'pr-cache', bucket 'graphql' and estimated true is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-sync-meter",
+        "title": "Meter PR sync and skip its sweep during a pause",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pull-request-sync-service.ts",
+            "src/dashboard/server/services/__tests__/pull-request-sync-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/pull-request-sync-quota.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/services/__tests__/pull-request-sync-quota.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ],
+          "prdWorkItem": 10
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/pull-request-sync-service.ts: readGithubPullRequest (line 347) uses runGh with caller pr-sync; the sweep entry returns early without touching per-repo or per-key failure counters when a user-pool GraphQL pause is active. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 10."
+        },
+        "items": [
+          {
+            "id": "pr-sync-meter.ac1",
+            "title": "Given an active user GraphQL pause, when a PR sync sweep runs, then no gh process is executed and the per-repo and per-key failure counters are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-sync-meter.ac2",
+            "title": "Given no pause, when readGithubPullRequest succeeds, then a ledger line with caller 'pr-sync' is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-repair-meter",
+        "title": "Meter the CI repair gh api helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/ci/project-ci-github.ts",
+            "src/lib/overdeck/project-pipelines.ts",
+            "tests/unit/lib/ci/project-ci-github-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/ci/project-ci-github-quota.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/ci/project-ci-github-quota.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "prdWorkItem": 11
+        },
+        "narrative": {
+          "Action": "Change projectCiGhApi (src/lib/ci/project-ci-github.ts line 8) and defaultGhApi (src/lib/overdeck/project-pipelines.ts line 99) to runGh(['api', path, '-H', 'Accept: application/vnd.github+json'], { caller: 'ci-repair', timeout: 15000, maxBuffer: 8 MB }). Full detail: PRD .pan/drafts/pan-4264.md, Work Item 11."
+        },
+        "items": [
+          {
+            "id": "ci-repair-meter.ac1",
+            "title": "Given an active user REST pause, when projectCiGhApi runs, then it rejects with GitHubQuotaPausedError and executes no gh process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-repair-meter.ac2",
+            "title": "Given no pause, when the project-pipelines gh api default runs, then a ledger line with caller 'ci-repair' and bucket 'rest' is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-meter",
+        "title": "Meter tracker state reads and tag only the reaper as close-out",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/issue-closed.ts",
+            "src/lib/cloister/closed-issue-reaper.ts",
+            "tests/unit/lib/cloister/issue-closed-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/issue-closed-quota.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/cloister/issue-closed-quota.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ],
+          "prdWorkItem": 12
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/issue-closed.ts the gh issue view execs use runGh with no explicit caller (context decides). In src/lib/cloister/closed-issue-reaper.ts wrap reconcileClosedIssueAgents in withGitHubCaller('close-out'). closeOut() and pan close stay essential. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 12."
+        },
+        "items": [
+          {
+            "id": "close-out-meter.ac1",
+            "title": "Given an active GraphQL pause, when readLiveTrackerIssueState runs inside withGitHubCaller('close-out'), then it throws GitHubQuotaPausedError and never returns 'open'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-meter.ac2",
+            "title": "Given an active GraphQL pause, when readLiveTrackerIssueState runs with no caller context, then it still executes gh (the essential path is not paused)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-gh-shim",
+        "title": "Add a count-only gh shim beside the agent git guard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-git-guard.ts",
+            "src/lib/__tests__/launcher-git-guard-gh-shim.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-git-guard-gh-shim.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/launcher-git-guard-gh-shim.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "prdWorkItem": 13
+        },
+        "narrative": {
+          "Action": "In src/lib/launcher-git-guard.ts buildGitGuardLines (line 191): resolve _OVERDECK_REAL_GH at launch; when present write <guardDir>/gh (#!/bin/sh) that mkdir -p's the launch-time ledger dir (baked literal from getOverdeckHome(), never $OVERDECK_HOME at call time), appends one FR-1 ledger line (caller agent, agent id, pool user, bucket rest for 'api <path>'/'run' else graphql, cost 1, estimated true, outcome unknown) ignoring append failures, then execs the real gh. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 13."
+        },
+        "items": [
+          {
+            "id": "agent-gh-shim.ac1",
+            "title": "buildGitGuardLines returns lines that contain a heredoc writing <guardDir>/gh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gh-shim.ac2",
+            "title": "Given the rendered shim and a fake real gh on PATH, when 'gh api repos/o/r' runs through the shim, then one ledger line with caller 'agent' and bucket 'rest' is appended and the fake gh's stdout and exit code pass through unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gh-shim.ac3",
+            "title": "Given OVERDECK_HOME set to a different directory at call time, when the shim runs, then the ledger line lands in the launch-time ledger directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quota-sampler",
+        "title": "Sample GitHub /rate_limit every 5 minutes and resolve the login",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/sampler.ts",
+            "src/lib/github-quota/identity.ts",
+            "src/dashboard/server/main.ts",
+            "tests/unit/lib/github-quota/sampler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/sampler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/github-quota/sampler.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ],
+          "prdWorkItem": 14
+        },
+        "narrative": {
+          "Action": "Create src/lib/github-quota/sampler.ts (sampleGitHubRateLimits via runGh(['api','rate_limit'], { caller: 'quota-sampler' }) writing kind 'sample' lines for graphql and core; also the app pool via the App door when configured; startGitHubQuotaSampler(5 min, first run +2 min, unref)) and src/lib/github-quota/identity.ts (getGitHubLogin memoized via gh api user --jq .login). Start and stop the sampler in src/dashboard/server/main.ts. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 14."
+        },
+        "items": [
+          {
+            "id": "quota-sampler.ac1",
+            "title": "Given fake timers and an injected exec returning a /rate_limit fixture, when the sampler's first tick fires at +2 minutes, then one sample line each for graphql and rest is appended with remaining, limit and resetAt from the fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-sampler.ac2",
+            "title": "Given an active GraphQL pause, when the sampler ticks, then it still executes (quota-sampler is essential)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-sampler.ac3",
+            "title": "getGitHubLogin returns the fixture login and executes gh only once across two calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quota-snapshot",
+        "title": "Publish the GitHub quota snapshot through the read model and REST",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/github-quota.ts",
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/events.ts",
+            "packages/contracts/src/event-reducers.ts",
+            "src/dashboard/server/read-model.ts",
+            "src/dashboard/server/services/github-quota.ts",
+            "src/dashboard/server/routes/github-quota.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/services/__tests__/github-quota.test.ts",
+            "packages/contracts/src/__tests__/github-quota-reducer.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/github-quota.test.ts packages/contracts/src/__tests__/github-quota-reducer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/services/__tests__/github-quota.test.ts passes",
+            "packages/contracts/src/__tests__/github-quota-reducer.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-7"
+          ],
+          "prdWorkItem": 15,
+          "parallelSafeReason": "Its contract and server files are edited by no other item except main.ts, which is serialized by blocks edges (quota-sampler -> quota-snapshot -> stagger-refresh)."
+        },
+        "narrative": {
+          "Action": "Add githubQuota to DashboardSnapshot (packages/contracts/src/types.ts near line 585), a github_quota.changed event (events.ts, like restart_gate.changed at line 123), reducer state/merge/replace case (event-reducers.ts, mirroring restartGate at 126/175/351/769), read-model.ts snapshot line (near 392). Create src/dashboard/server/services/github-quota.ts (startGitHubQuotaPublisher every 30 s: aggregate ledger + active pause + login + unattributed + computeOwnUsageLow; emitOnly only on change) and src/dashboard/server/routes/github-quota.ts (GET /api/github-quota), registered in server.ts makeRoutesLayer and started in main.ts. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 15."
+        },
+        "items": [
+          {
+            "id": "quota-snapshot.ac1",
+            "title": "Given a ledger with an active pause, when two publisher ticks run with unchanged data, then getEventStore().emitOnly is called exactly once with github_quota.changed and appendDomainEventAsync is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-snapshot.ac2",
+            "title": "GET /api/github-quota returns JSON equal to the githubQuota field of the read-model snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-snapshot.ac3",
+            "title": "When a github_quota.changed event is applied to reducer state, then githubQuota equals the event payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-snapshot.ac4",
+            "title": "Given a user GraphQL sample showing 1000 used and 200 metered points, then the snapshot reports unattributed 800, and it floors at 0 when metered exceeds used",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rate-limit-banner",
+        "title": "Show a GitHub rate-limit banner while calls are paused",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/components/GitHubRateLimitBanner.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/components/__tests__/GitHubRateLimitBanner.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/__tests__/GitHubRateLimitBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/frontend/src/components/__tests__/GitHubRateLimitBanner.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ],
+          "prdWorkItem": 16
+        },
+        "narrative": {
+          "Action": "Add selectGitHubQuota to src/dashboard/frontend/src/lib/store.ts (next to selectRestartGate, line 652); create components/GitHubRateLimitBanner.tsx rendering the 4-row decision table from PRD Work Item 16 (local HH:MM of pause.until, login fallback 'your account'); render it in App/AppChrome.tsx system-notices-row after RestartApprovalBanner. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 16."
+        },
+        "items": [
+          {
+            "id": "rate-limit-banner.ac1",
+            "title": "Given a store snapshot with a primary pause and ownUsageLow true, the banner renders 'calls paused until HH:MM; not caused by this machine' with the login and this machine's points",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-banner.ac2",
+            "title": "Given a secondary pause, the banner renders the secondary-limit text; given a primary pause with ownUsageLow false, it renders the top caller and its points",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-banner.ac3",
+            "title": "Given no active pause, the banner renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quota-pill",
+        "title": "Show a GitHub quota pill with top callers in the app bar",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GitHubQuotaPill.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/components/__tests__/GitHubQuotaPill.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/__tests__/GitHubQuotaPill.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/frontend/src/components/__tests__/GitHubQuotaPill.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ],
+          "prdWorkItem": 17
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/GitHubQuotaPill.tsx (text 'GH <remaining>/<limit>' from the user GraphQL sample, 'GH —' without one; popover lists the top 5 callers by points plus unattributed; paused state uses the warning token, never green per pan-style-guide) and render it in App/AppChrome.tsx before SystemHealthPill. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 17."
+        },
+        "items": [
+          {
+            "id": "quota-pill.ac1",
+            "title": "Given a snapshot with a user GraphQL sample of 4200 remaining of 5000, the pill renders 'GH 4200/5000'; without a sample it renders 'GH —'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-pill.ac2",
+            "title": "When the pill popover opens, it lists callers in descending order of points, at most 5, followed by the unattributed row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-github-quota",
+        "title": "Add pan doctor github-quota local view",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/doctor-github-quota.ts",
+            "sync-sources/skills/pan-doctor/SKILL.md",
+            "tests/unit/cli/doctor-github-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/doctor-github-quota.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/cli/doctor-github-quota.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ],
+          "prdWorkItem": 18
+        },
+        "narrative": {
+          "Action": "Register doctor subcommand github-quota (--json) in src/cli/index.ts (line 1179) per the PRD before/after snippet; create src/cli/commands/doctor-github-quota.ts printing callers (last hour), latest samples, active pause, skipped projects (skipped-projects.json) and App-missing repos (repo-notes.json); exit 0. Add the usage line to sync-sources/skills/pan-doctor/SKILL.md. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 18."
+        },
+        "items": [
+          {
+            "id": "doctor-github-quota.ac1",
+            "title": "Given a seeded ledger, when 'pan doctor github-quota --json' runs, then it prints JSON whose callers totals match the seeded points and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-github-quota.ac2",
+            "title": "'pan doctor --help' prints the github-quota subcommand, and plain 'pan doctor' still prints its existing checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-github-quota.ac3",
+            "title": "Given a skipped-projects.json and a repo-notes.json marking eltmon/krux appInstalled false, the text output names the skipped project and eltmon/krux",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stagger-refresh",
+        "title": "Stagger boot and convergence project refreshes and delay the first CI refill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/project-resource-refresh-queue.ts",
+            "src/dashboard/server/main.ts",
+            "src/lib/overdeck/project-ci-fill.ts",
+            "src/dashboard/server/services/project-ci-refill-startup.ts",
+            "tests/unit/dashboard/project-resource-refresh-queue-stagger.test.ts",
+            "tests/unit/lib/overdeck/project-ci-fill-initial-delay.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/project-resource-refresh-queue-stagger.test.ts tests/unit/lib/overdeck/project-ci-fill-initial-delay.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/project-resource-refresh-queue-stagger.test.ts passes",
+            "tests/unit/lib/overdeck/project-ci-fill-initial-delay.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17",
+            "NFR-4",
+            "NFR-6"
+          ],
+          "prdWorkItem": 19
+        },
+        "narrative": {
+          "Action": "Add enqueueProjectsResourceRefreshStaggered(projects, reason, windowMs) -> { done, cancel } to project-resource-refresh-queue.ts with spacing max(debounce + 1000, floor(window/N)); convergence uses 4 min and cancels the previous tick's handle; main.ts boot-warm uses 60 s and awaits done. Add initialDelayMs to startProjectCiRefill (project-ci-fill.ts line 147) and pass 120000 from project-ci-refill-startup.ts. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 19."
+        },
+        "items": [
+          {
+            "id": "stagger-refresh.ac1",
+            "title": "Given fake timers and 10 projects in a 60-second window, when the staggered enqueue runs, then 10 separate refresh batches run spaced 6 seconds apart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stagger-refresh.ac2",
+            "title": "When a second convergence tick starts, then the first tick's pending enqueues are cancelled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stagger-refresh.ac3",
+            "title": "Given startProjectCiRefill with initialDelayMs 120000, then the first fill runs at +120 seconds and not at boot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-contract",
+        "title": "Add the quota and heartbeat telemetry events to the typed contract and docs table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md",
+            "tests/unit/telemetry-docs.test.ts",
+            "tests/unit/lib/telemetry/quota-buckets.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/telemetry-docs.test.ts tests/unit/lib/telemetry/quota-buckets.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/telemetry-docs.test.ts passes",
+            "tests/unit/lib/telemetry/quota-buckets.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18"
+          ],
+          "prdWorkItem": 20
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/telemetry.ts add domains github_caller, quota_points_bucket, quota_remaining_bucket, rate_limit_kind and events github_quota_sample, github_rate_limited, instance_heartbeat exactly as PRD Work Item 20 lists; export bucketQuotaPoints/bucketQuotaRemaining. Update docs/TELEMETRY.md event and domain tables and the 'Raw counts and timings are never sent' sentence in the same commit. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 20."
+        },
+        "items": [
+          {
+            "id": "telemetry-contract.ac1",
+            "title": "tests/unit/telemetry-docs.test.ts passes with the three new events and four new domains present in both the contract and docs/TELEMETRY.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-contract.ac2",
+            "title": "bucketQuotaPoints returns '0' for 0, '1-49' for 49, '50-199' for 50 and '2500+' for 2500; bucketQuotaRemaining returns 'unknown' for undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-contract.ac3",
+            "title": "docs/TELEMETRY.md contains the sentence stating that GitHub quota points and remaining values are sent only as buckets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skip-misconfigured",
+        "title": "Skip membership refresh for projects with no resolvable tracker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/lib/github-quota/skipped-projects.ts",
+            "src/cli/commands/doctor-project-config.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/dashboard/server/services/resource-discovery-skip.test.ts",
+            "tests/unit/cli/doctor-project-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/resource-discovery-skip.test.ts tests/unit/cli/doctor-project-config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/server/services/resource-discovery-skip.test.ts passes",
+            "tests/unit/cli/doctor-project-config.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-6"
+          ],
+          "prdWorkItem": 21
+        },
+        "narrative": {
+          "Action": "Export tryResolveProjectTrackerType from src/lib/pipeline-membership-gather.ts (next to line 172). In resource-discovery.ts refreshResourceAllocatedProjects (line 845) skip membership for unresolvable projects without pushing a failure. Create src/lib/github-quota/skipped-projects.ts (log once per projects.yaml mtime, write skipped-projects.json) and src/cli/commands/doctor-project-config.ts (checkProjectTrackerConfig warn row); add one checks.push line in doctor.ts next to checkTrackerRateLimits (line 872). Full detail: PRD .pan/drafts/pan-4264.md, Work Item 21."
+        },
+        "items": [
+          {
+            "id": "skip-misconfigured.ac1",
+            "title": "Given one project with no tracker, github_repo or issue_prefix, when two refresh cycles run, then no AggregateError is thrown and exactly one skip log line is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-misconfigured.ac2",
+            "title": "Given projects.yaml mtime changes, when the next refresh runs, then the skip is logged again once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-misconfigured.ac3",
+            "title": "checkProjectTrackerConfig returns a warn row naming the unresolvable project with a fix telling the operator to set tracker: or issue_prefix:",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "app-404-fallback",
+        "title": "Fall back to the gh user token when the GitHub App is not installed on a repo",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/repo-notes.ts",
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-app-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-app-fallback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/pipeline-membership-app-fallback.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ],
+          "prdWorkItem": 22
+        },
+        "narrative": {
+          "Action": "Create src/lib/github-quota/repo-notes.ts (markAppNotInstalled with 6-hour TTL in repo-notes.json, log once per TTL, isAppNotInstalled). In pipeline-membership-gather.ts wrap the App-backed listOpenIssues/listPhaseLabeledIssues defaults: on '/ failed: 404 /' mark and retry via runGh(['api','--paginate','--slurp','repos/<o>/<r>/issues?state=open&per_page=100'(+labels)], { caller: 'pipeline-membership' }); skip the App path while marked. Do not edit github-app.ts. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 22."
+        },
+        "items": [
+          {
+            "id": "app-404-fallback.ac1",
+            "title": "Given an App dep throwing 'failed: 404', when a gather runs, then the gh fallback is called once and repo-notes.json marks the repo appInstalled false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-404-fallback.ac2",
+            "title": "Given fake timers, when a second gather runs within 6 hours, then zero App calls are made; after 6 hours the App path is tried again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-404-fallback.ac3",
+            "title": "Given repeated App 404s for one repo within 6 hours, then the App-not-installed warning logs exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quota-telemetry",
+        "title": "Send hourly github_quota_sample and throttled github_rate_limited events",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/github-quota-telemetry.ts",
+            "src/dashboard/server/main.ts",
+            "src/cli/telemetry.ts",
+            "tests/unit/lib/telemetry/github-quota-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/github-quota-telemetry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/telemetry/github-quota-telemetry.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-19",
+            "NFR-4",
+            "NFR-8"
+          ],
+          "prdWorkItem": 23
+        },
+        "narrative": {
+          "Action": "Create src/lib/telemetry/github-quota-telemetry.ts: captureGitHubQuotaSample (bucketed aggregate), startGitHubQuotaTelemetry (hourly, unref), captureGitHubRateLimited (10-minute cross-process throttle on last-rate-limited-event mtime), registerGitHubRateLimitedTelemetry (onGitHubRefusal listener). Start both in src/dashboard/server/main.ts; register the listener in src/cli/telemetry.ts. Do not edit pause-gate.ts or ledger.ts. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 23."
+        },
+        "items": [
+          {
+            "id": "quota-telemetry.ac1",
+            "title": "Given fake timers and a seeded ledger, when the hourly tick fires, then one github_quota_sample is captured whose values are all bucket strings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-telemetry.ac2",
+            "title": "Given two refusals 5 minutes apart, then one github_rate_limited is captured; a third refusal at +11 minutes captures a second",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quota-telemetry.ac3",
+            "title": "When a refusal event is received, then the captured github_rate_limited records its caller, kind and own_usage_low",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "instance-heartbeat",
+        "title": "Send a daily instance_heartbeat from the dashboard and CLI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/instance-heartbeat.ts",
+            "src/dashboard/server/telemetry.ts",
+            "src/cli/telemetry.ts",
+            "tests/unit/lib/telemetry/instance-heartbeat.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/instance-heartbeat.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/telemetry/instance-heartbeat.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "NFR-4"
+          ],
+          "prdWorkItem": 24
+        },
+        "narrative": {
+          "Action": "Create src/lib/telemetry/instance-heartbeat.ts (maybeSendInstanceHeartbeat reading/writing ~/.overdeck/telemetry-heartbeat.json, sending at most once per 24 h). Call it from src/dashboard/server/telemetry.ts at boot and hourly with dashboardRunning true (reusing listBootTelemetryAgents/bucketServerCount), and from src/cli/telemetry.ts next to the cli_command_run capture (line 55) with dashboardRunning false and zero agents. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 24."
+        },
+        "items": [
+          {
+            "id": "instance-heartbeat.ac1",
+            "title": "Given fake timers and no heartbeat file, when maybeSendInstanceHeartbeat runs, then instance_heartbeat is captured and lastSentAt is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "instance-heartbeat.ac2",
+            "title": "Given a heartbeat sent 23 hours ago, when it runs again, then nothing is captured; at +24 hours it captures again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "instance-heartbeat.ac3",
+            "title": "When the CLI path runs, then it sends instance_heartbeat with dashboard_running false and active_agent_count '0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "operator-grouping",
+        "title": "Add the opt-in operator grouping setting and operatorHash on every event",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/settings-api-telemetry.ts",
+            "src/lib/telemetry/operator-hash.ts",
+            "src/lib/telemetry/service.ts",
+            "src/dashboard/server/telemetry.ts",
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/TelemetrySection.tsx",
+            "src/dashboard/frontend/src/lib/telemetry.ts",
+            "tests/unit/lib/telemetry/operator-hash.test.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TelemetrySection.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/operator-hash.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/TelemetrySection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/telemetry/operator-hash.test.ts passes",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TelemetrySection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21",
+            "NFR-3",
+            "NFR-8"
+          ],
+          "prdWorkItem": 25,
+          "parallelSafeReason": "Its settings, config-yaml and telemetry files are edited by no other item except src/dashboard/server/telemetry.ts, which is serialized after instance-heartbeat by a blocks edge."
+        },
+        "narrative": {
+          "Action": "Add telemetry.operator_grouping (default false), posthog_read_key, posthog_project_id to config-yaml schema/defaults/merge; expose operatorGrouping and operatorHash in settings-api.ts and validate in settings-api-telemetry.ts; add the 'Group my installs (pseudonymous)' switch (data-testid telemetry-operator-grouping-toggle, disabled when telemetry is off) to TelemetrySection.tsx and Settings types.ts. Create src/lib/telemetry/operator-hash.ts (computeOperatorHash HMAC-SHA256 with OPERATOR_HASH_SALT, 16 hex; getOperatorHashIfEnabled; ensureOperatorHash via direct async execFile gh api user --jq .id, persisting only the hash, mode 0600), call ensureOperatorHash from src/dashboard/server/telemetry.ts at boot, stamp operatorHash in service.ts capture and captureException, and register it in frontend lib/telemetry.ts. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 25."
+        },
+        "items": [
+          {
+            "id": "operator-grouping.ac1",
+            "title": "computeOperatorHash(678719) returns a 16-character lowercase hex string that is stable across calls and differs from the raw id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-grouping.ac2",
+            "title": "Given operator_grouping unset, when AnalyticsService.capture runs, then the captured properties omit operatorHash; with grouping on and a hash file present, they include it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-grouping.ac3",
+            "title": "Given ensureOperatorHash runs against a fake gh returning id 678719, then the hash file contains only the 16-hex hash with mode 0600 and never the raw id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-grouping.ac4",
+            "title": "The TelemetrySection grouping toggle renders off by default and clicking it sends operatorGrouping true in the settings change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-remote-installs",
+        "title": "List sibling installs for the same operator in pan doctor github-quota",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/posthog-read.ts",
+            "src/cli/commands/doctor-github-quota.ts",
+            "tests/unit/lib/telemetry/posthog-read.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/posthog-read.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/telemetry/posthog-read.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-22"
+          ],
+          "prdWorkItem": 26
+        },
+        "narrative": {
+          "Action": "Create src/lib/telemetry/posthog-read.ts (listInstallsForOperator POSTing the PRD HogQL to ${host}/api/projects/${projectId}/query/ with Bearer read key, operatorHash as a placeholder value, 10 s timeout, excluding this install, [] on error; config from telemetry.posthog_read_key/posthog_project_id with OVERDECK_POSTHOG_READ_KEY/OVERDECK_POSTHOG_PROJECT_ID overrides). Add the 'Other installs for this operator' section to src/cli/commands/doctor-github-quota.ts, printing a missing-setting line instead of failing. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 26."
+        },
+        "items": [
+          {
+            "id": "doctor-remote-installs.ac1",
+            "title": "Given an injected fetch, when listInstallsForOperator runs, then the request body's HogQL string does not contain the raw hash and values.operatorHash equals it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-remote-installs.ac2",
+            "title": "Given a response including this install's distinct id, then the returned list excludes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-remote-installs.ac3",
+            "title": "Given a network error, then listInstallsForOperator returns [] and the doctor section prints one line instead of failing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "privacy-test",
+        "title": "Prove no login, email, hostname, path or raw id reaches PostHog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/telemetry/github-telemetry-privacy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/github-telemetry-privacy.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/telemetry/github-telemetry-privacy.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ],
+          "prdWorkItem": 27
+        },
+        "narrative": {
+          "Action": "Create tests/unit/lib/telemetry/github-telemetry-privacy.test.ts using the service.test.ts recipe (mock posthog-node, config, install-id; delete VITEST and NODE_ENV): capture github_quota_sample, github_rate_limited, instance_heartbeat and one existing event with grouping on, then assert every JSON payload excludes os.hostname(), os.userInfo().username, os.homedir(), 'octo-login', 'octo@example.com', '678719' and /\\/(home|Users)\\//, and includes a 16-hex operatorHash. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 27."
+        },
+        "items": [
+          {
+            "id": "privacy-test.ac1",
+            "title": "Given operator grouping on, when the three new events and one existing event are captured, then no serialized payload contains the hostname, username, home directory, fixture login, fixture email or raw user id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "privacy-test.ac2",
+            "title": "Every captured payload contains an operatorHash matching /^[0-9a-f]{16}$/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-quota-policy",
+        "title": "Document the GitHub quota policy, operator grouping and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T15:23:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4264",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/TELEMETRY.md",
+            "configuration/telemetry.mdx",
+            ".overdeck/context/codebase/concerns.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'GitHub quota policy (PAN-4264)' docs/PIPELINE-GATES.md",
+            "grep -n 'Operator grouping (opt-in)' docs/TELEMETRY.md",
+            "npx vitest run tests/unit/telemetry-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "grep prints the heading line",
+            "grep prints the section heading",
+            "tests/unit/telemetry-docs.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14",
+            "FR-21"
+          ],
+          "prdWorkItem": 28
+        },
+        "narrative": {
+          "Action": "Add '## GitHub quota policy (PAN-4264)' to docs/PIPELINE-GATES.md between 'Agent Auto-Resume Gates' and 'The pipeline journal' (ledger, FR-5 pause rules verbatim, essential vs non-essential callers by name, never-no-data, skip/fallback/stagger, pill/banner/doctor). In docs/TELEMETRY.md add '## Operator grouping (opt-in)', amend the identity sentence and Implementation boundaries (posthog-read.ts). Mirror in configuration/telemetry.mdx. Add the hazard bullet to .overdeck/context/codebase/concerns.md and the src/lib/github-quota/ line to architecture.md. Full detail: PRD .pan/drafts/pan-4264.md, Work Item 28."
+        },
+        "items": [
+          {
+            "id": "docs-quota-policy.ac1",
+            "title": "docs/PIPELINE-GATES.md contains the heading '## GitHub quota policy (PAN-4264)' and states the 10-minute hidden-limit pause and the 60-to-900-second secondary back-off",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quota-policy.ac2",
+            "title": "docs/TELEMETRY.md contains '## Operator grouping (opt-in)' describing HMAC-SHA256 truncated to 16 hex characters and names src/lib/telemetry/posthog-read.ts as the PostHog read door",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quota-policy.ac3",
+            "title": "configuration/telemetry.mdx contains github_quota_sample, github_rate_limited, instance_heartbeat and the operator grouping toggle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quota-policy.ac4",
+            "title": ".overdeck/context/codebase/concerns.md contains a hazard telling new GitHub callers to use runGh or withGitHubCaller",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "quota-ledger",
+        "to": "pause-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-ledger",
+        "to": "agent-gh-shim",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-ledger",
+        "to": "quota-snapshot",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-ledger",
+        "to": "skip-misconfigured",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-ledger",
+        "to": "app-404-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-ledger",
+        "to": "doctor-github-quota",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-gate",
+        "to": "run-gh",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-gate",
+        "to": "app-rest-meter",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-gate",
+        "to": "pat-client-meter",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-gate",
+        "to": "issue-poller-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-gate",
+        "to": "pr-sync-meter",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-gate",
+        "to": "quota-snapshot",
+        "type": "blocks"
+      },
+      {
+        "from": "pause-gate",
+        "to": "quota-telemetry",
+        "type": "blocks"
+      },
+      {
+        "from": "run-gh",
+        "to": "membership-meter",
+        "type": "blocks"
+      },
+      {
+        "from": "run-gh",
+        "to": "pr-cache-meter",
+        "type": "blocks"
+      },
+      {
+        "from": "run-gh",
+        "to": "pr-sync-meter",
+        "type": "blocks"
+      },
+      {
+        "from": "run-gh",
+        "to": "ci-repair-meter",
+        "type": "blocks"
+      },
+      {
+        "from": "run-gh",
+        "to": "close-out-meter",
+        "type": "blocks"
+      },
+      {
+        "from": "run-gh",
+        "to": "quota-sampler",
+        "type": "blocks"
+      },
+      {
+        "from": "run-gh",
+        "to": "app-404-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "app-rest-meter",
+        "to": "app-token-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "membership-meter",
+        "to": "skip-misconfigured",
+        "type": "blocks"
+      },
+      {
+        "from": "skip-misconfigured",
+        "to": "app-404-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "skip-misconfigured",
+        "to": "doctor-github-quota",
+        "type": "blocks"
+      },
+      {
+        "from": "app-404-fallback",
+        "to": "doctor-github-quota",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-github-quota",
+        "to": "doctor-remote-installs",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-sampler",
+        "to": "quota-snapshot",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-snapshot",
+        "to": "stagger-refresh",
+        "type": "blocks"
+      },
+      {
+        "from": "stagger-refresh",
+        "to": "quota-telemetry",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-telemetry",
+        "to": "instance-heartbeat",
+        "type": "blocks"
+      },
+      {
+        "from": "instance-heartbeat",
+        "to": "operator-grouping",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-snapshot",
+        "to": "rate-limit-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-snapshot",
+        "to": "quota-pill",
+        "type": "blocks"
+      },
+      {
+        "from": "rate-limit-banner",
+        "to": "quota-pill",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-contract",
+        "to": "quota-telemetry",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-contract",
+        "to": "instance-heartbeat",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-contract",
+        "to": "docs-quota-policy",
+        "type": "blocks"
+      },
+      {
+        "from": "operator-grouping",
+        "to": "doctor-remote-installs",
+        "type": "blocks"
+      },
+      {
+        "from": "quota-telemetry",
+        "to": "privacy-test",
+        "type": "blocks"
+      },
+      {
+        "from": "instance-heartbeat",
+        "to": "privacy-test",
+        "type": "blocks"
+      },
+      {
+        "from": "operator-grouping",
+        "to": "privacy-test",
+        "type": "blocks"
+      },
+      {
+        "from": "operator-grouping",
+        "to": "docs-quota-policy",
+        "type": "informs"
+      },
+      {
+        "from": "pause-gate",
+        "to": "docs-quota-policy",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

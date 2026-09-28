@@ -244,6 +244,29 @@ describe('tiered execution tier table', () => {
     }))).toThrow("tiered_execution.by_kind.design references unknown tier 'missing'");
   });
 
+  it('preserves a valid per-tier effort override', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        standard: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex'], effort: 'low' },
+        frontier: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['expert'] },
+      },
+    }));
+
+    expect(result.tiers.standard!.effort).toBe('low');
+    expect(result.tiers.cheap!.effort).toBeUndefined();
+  });
+
+  it('rejects a tier effort value outside the enum', () => {
+    expect(() => validateTieredExecutionConfig(validConfig({
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        standard: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex'], effort: 'bogus' as never },
+        frontier: { model: 'claude-opus-4-8', harness: 'claude-code', difficulties: ['expert'] },
+      },
+    }))).toThrow('tiered_execution.tiers.standard.effort must be one of low, medium, high, xhigh, max');
+  });
+
   it('validates fully populated feed and escalation blocks', () => {
     const result = validateTieredExecutionConfig(validConfig({
       feed: {
@@ -357,6 +380,19 @@ describe('validateTieredExecutionConfig distribution tiers (PAN-2391)', () => {
     const config = structuredClone(base) as never as { tiers: { standard: { distribution: Array<{ harness: string }> } } };
     config.tiers.standard.distribution[0]!.harness = 'not-a-harness';
     expect(() => validateTieredExecutionConfig(config as never)).toThrow(/harness/);
+  });
+
+  it('rejects a tier effort a distribution entry model does not support', () => {
+    const config = structuredClone(base) as never as typeof base & { tiers: { standard: { effort: string } } };
+    // claude-sonnet-4-6 supports low/medium/high/max — xhigh requires newer models.
+    config.tiers.standard.distribution = [
+      { model: 'claude-sonnet-4-6', harness: 'claude-code', weight: 40 },
+      { model: 'kimi-k2.7-code', harness: 'claude-code', weight: 60 },
+    ];
+    config.tiers.standard.effort = 'xhigh';
+    expect(() => validateTieredExecutionConfig(config as never)).toThrow(
+      "tiered_execution.tiers.standard.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high, max)",
+    );
   });
 });
 

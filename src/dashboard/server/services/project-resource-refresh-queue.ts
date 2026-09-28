@@ -24,9 +24,24 @@ export interface ProjectResourceRefreshQueueDeps {
   now?: () => number;
 }
 
+/** A staggered enqueue in flight (PAN-4264). */
+export interface ProjectResourceRefreshStagger {
+  /** Resolves once every project was enqueued, or the stagger was cancelled. */
+  done: Promise<void>;
+  /** Drop the projects not yet enqueued. */
+  cancel(): void;
+}
+
 export interface ProjectResourceRefreshQueue {
   enqueueProject(project: ProjectConfig, reason: string): void;
   enqueueProjects(projects: ProjectConfig[], reason: string): void;
+  /**
+   * PAN-4264: enqueue project `i` at `i * spacing`, spacing =
+   * max(debounce + 1 s, floor(windowMs / projects.length)). The spacing stays
+   * above the debounce, so staggered projects refresh as separate batches
+   * instead of one burst of GitHub calls.
+   */
+  enqueueProjectsStaggered(projects: ProjectConfig[], reason: string, windowMs: number): ProjectResourceRefreshStagger;
   whenIdle(): Promise<void>;
   getState(): ProjectResourceRefreshQueueState;
   stop(): void;
@@ -103,11 +118,53 @@ export function createProjectResourceRefreshQueue(
     schedule();
   };
 
+  const staggers = new Set<ProjectResourceRefreshStagger>();
+
+  const enqueueProjectsStaggered = (
+    projects: ProjectConfig[],
+    reason: string,
+    windowMs: number,
+  ): ProjectResourceRefreshStagger => {
+    const spacing = Math.max(debounceMs + 1_000, Math.floor(windowMs / Math.max(projects.length, 1)));
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    let resolveDone: () => void = () => undefined;
+    const done = new Promise<void>((resolve) => {
+      resolveDone = resolve;
+    });
+    let remaining = projects.length;
+    const stagger: ProjectResourceRefreshStagger = {
+      done,
+      cancel() {
+        for (const timer of timers) clearTimeout(timer);
+        timers.clear();
+        staggers.delete(stagger);
+        resolveDone();
+      },
+    };
+    if (stopped || remaining === 0) {
+      resolveDone();
+      return stagger;
+    }
+    staggers.add(stagger);
+    projects.forEach((project, index) => {
+      const timer = setTimeout(() => {
+        timers.delete(timer);
+        enqueueProject(project, reason);
+        remaining -= 1;
+        if (remaining === 0) stagger.cancel();
+      }, index * spacing);
+      timer.unref?.();
+      timers.add(timer);
+    });
+    return stagger;
+  };
+
   return {
     enqueueProject,
     enqueueProjects(projects, reason) {
       for (const project of projects) enqueueProject(project, reason);
     },
+    enqueueProjectsStaggered,
     whenIdle() {
       if (isIdle()) return Promise.resolve();
       return new Promise<void>((resolve) => idleWaiters.add(resolve));
@@ -124,6 +181,7 @@ export function createProjectResourceRefreshQueue(
     },
     stop() {
       stopped = true;
+      for (const stagger of [...staggers]) stagger.cancel();
       if (timer) clearTimeout(timer);
       timer = null;
       pending.clear();
@@ -163,6 +221,15 @@ export function enqueueProjectsResourceRefresh(projects: ProjectConfig[], reason
   projectResourceRefreshQueue.enqueueProjects(projects, reason);
 }
 
+/** PAN-4264: see `ProjectResourceRefreshQueue.enqueueProjectsStaggered`. */
+export function enqueueProjectsResourceRefreshStaggered(
+  projects: ProjectConfig[],
+  reason: string,
+  windowMs: number,
+): ProjectResourceRefreshStagger {
+  return projectResourceRefreshQueue.enqueueProjectsStaggered(projects, reason, windowMs);
+}
+
 export function whenProjectResourceRefreshIdle(): Promise<void> {
   return projectResourceRefreshQueue.whenIdle();
 }
@@ -175,13 +242,33 @@ export function stopProjectResourceRefreshQueue(): void {
   projectResourceRefreshQueue.stop();
 }
 
-export function startProjectResourceConvergence(): () => void {
+/** PAN-4264: boot-warm refreshes spread over this window. */
+export const PROJECT_RESOURCE_BOOT_STAGGER_WINDOW_MS = 60_000;
+/** PAN-4264: each convergence tick spreads its projects over this window. */
+export const PROJECT_RESOURCE_CONVERGENCE_STAGGER_WINDOW_MS = 4 * 60_000;
+
+/**
+ * Every 5 minutes, enqueue every project for a periodic convergence refresh,
+ * staggered over 4 minutes (PAN-4264). A new tick cancels the previous tick's
+ * pending enqueues: with the spacing floor, a large project list can
+ * outlast the interval.
+ */
+export function startProjectResourceConvergence(
+  queue: Pick<ProjectResourceRefreshQueue, 'enqueueProjectsStaggered'> = projectResourceRefreshQueue,
+  listProjects: () => ProjectConfig[] = () => listProjectsSync().map((entry) => entry.config),
+): () => void {
+  let stagger: ProjectResourceRefreshStagger | null = null;
   const timer = setInterval(() => {
-    enqueueProjectsResourceRefresh(
-      listProjectsSync().map((entry) => entry.config),
+    stagger?.cancel();
+    stagger = queue.enqueueProjectsStaggered(
+      listProjects(),
       'periodic-convergence',
+      PROJECT_RESOURCE_CONVERGENCE_STAGGER_WINDOW_MS,
     );
   }, PROJECT_RESOURCE_CONVERGENCE_INTERVAL_MS);
   timer.unref?.();
-  return () => clearInterval(timer);
+  return () => {
+    clearInterval(timer);
+    stagger?.cancel();
+  };
 }

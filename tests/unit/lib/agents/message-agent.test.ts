@@ -19,6 +19,13 @@ const mocks = vi.hoisted(() => ({
   getConversationByName: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
+  captureSidechainOffsets: vi.fn(),
+  probeSidechainsSince: vi.fn(),
+  ensureMainInputTarget: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/agents/input-target.js', () => ({
+  ensureMainInputTarget: mocks.ensureMainInputTarget,
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
@@ -65,6 +72,8 @@ vi.mock('../../../../src/lib/agents/delivery.js', async (importOriginal) => {
 vi.mock('../../../../src/lib/transcript-landing.js', () => ({
   captureTranscriptUserRecordSnapshot: mocks.captureTranscriptUserRecordSnapshot,
   probeTranscriptSince: mocks.probeTranscriptSince,
+  captureSidechainOffsets: mocks.captureSidechainOffsets,
+  probeSidechainsSince: mocks.probeSidechainsSince,
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
@@ -169,9 +178,12 @@ describe('messageAgent', () => {
       readOffset: 0,
     });
     mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: false, realAssistantTurnCount: 0 });
+    mocks.captureSidechainOffsets.mockResolvedValue(new Map());
+    mocks.probeSidechainsSince.mockResolvedValue(null);
     mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
     mocks.hasAgentRuntimeInSubtree.mockResolvedValue(true);
     mocks.getConversationByName.mockReturnValue(null);
+    mocks.ensureMainInputTarget.mockResolvedValue({ ok: true, check: 'no-selector' });
   });
 
   afterEach(() => {
@@ -199,6 +211,7 @@ describe('messageAgent', () => {
     await expect(messageAgent('agent-pan-2262', 'review feedback', 'pan-tell')).resolves.toEqual({
       delivered: true,
       queuedToMail: true,
+      inputTarget: 'main',
       confirmed: true,
     });
 
@@ -260,7 +273,7 @@ describe('messageAgent', () => {
 
     const outcome = await messageAgent('conv-20260716-1234', 'operator message', 'pan-tell');
 
-    expect(outcome).toEqual({ delivered: true, queuedToMail: true, confirmed: false });
+    expect(outcome).toEqual({ delivered: true, queuedToMail: true, confirmed: false, inputTarget: 'main' });
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
       'conv-20260716-1234',
       'operator message',
@@ -289,6 +302,7 @@ describe('messageAgent', () => {
       delivered: true,
       queuedToMail: false,
       confirmed: false,
+      inputTarget: 'main',
     });
 
     // Keyed deliveries never enter the confirming primitive: the dedup door
@@ -554,6 +568,7 @@ describe('messageAgent', () => {
         delivered: true,
         queuedToMail: true,
         confirmed: true,
+        inputTarget: 'main',
       });
       expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
         'agent-pan-2262',
@@ -585,6 +600,87 @@ describe('messageAgent', () => {
         'agent-pan-2262',
         expect.stringContaining('messageAgent NOT confirmed'),
       );
+    });
+
+    it('returns delivered false, confirmed false, and landedInSubagent when the message routed into a subagent (PAN-4247 AC1)', async () => {
+      mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: false, realAssistantTurnCount: 0 });
+      mocks.probeSidechainsSince.mockResolvedValue({ agentId: 'agent-1', description: 'Investigate flaky test' });
+
+      const promise = messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+      await vi.advanceTimersByTimeAsync(10);
+      const outcome = await promise;
+
+      expect(outcome).toEqual({
+        delivered: false,
+        queuedToMail: true,
+        confirmed: false,
+        landedInSubagent: { agentId: 'agent-1', description: 'Investigate flaky test' },
+        reason: 'Claude Code routed the message into running subagent "Investigate flaky test" (agent-1), not the main conversation. Stop or finish that subagent, then resend.',
+      });
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+      expect(mocks.logAgentLifecycle).toHaveBeenCalledWith(
+        'agent-pan-2262',
+        expect.stringContaining('messageAgent landed in subagent agent-1'),
+      );
+    });
+  });
+  describe('Claude Code input target (PAN-4268)', () => {
+    const claudeAgent = {
+      id: 'agent-pan-2262',
+      issueId: 'PAN-2262',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'claude-code',
+      sessionId: 'session-2262',
+    };
+
+    it('refuses, queues plain mail, and pastes nothing when input cannot reach main', async () => {
+      mocks.getAgentState.mockReturnValue(claudeAgent);
+      const reason = "Could not move keyboard focus into Claude Code's agent selector.";
+      mocks.ensureMainInputTarget.mockResolvedValue({ ok: false, reason, inputTarget: { subagent: 'Counter run' } });
+
+      const outcome = await messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+
+      expect(outcome).toEqual({
+        delivered: false,
+        queuedToMail: true,
+        confirmed: false,
+        reason,
+        inputTargetRefusal: { reason, inputTarget: { subagent: 'Counter run' } },
+      });
+      expect(mocks.ensureMainInputTarget).toHaveBeenCalledWith('agent-pan-2262');
+      expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+      const files = readdirSync('/tmp/agent-pan-2262/mail');
+      expect(files).toHaveLength(1);
+      expect(files[0]).toMatch(/\.md$/);
+      expect(files[0]).not.toMatch(/\.(pending|delivered)\.md$/);
+    });
+
+    it('reports the subagent it switched away from on a confirmed delivery', async () => {
+      mocks.getAgentState.mockReturnValue(claudeAgent);
+      mocks.ensureMainInputTarget.mockResolvedValue({ ok: true, check: 'switched', switchedFromSubagent: 'Counter run' });
+      mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
+
+      const outcome = await messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
+
+      expect(outcome).toMatchObject({ delivered: true, confirmed: true, inputTarget: 'main', switchedFromSubagent: 'Counter run' });
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('never runs the check for a codex target', async () => {
+      mocks.getAgentState.mockReturnValue({
+        id: 'agent-pan-2701',
+        issueId: 'PAN-2701',
+        status: 'running',
+        workspace: '/repo',
+        harness: 'codex',
+      });
+
+      const outcome = await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
+
+      expect(mocks.ensureMainInputTarget).not.toHaveBeenCalled();
+      expect(mocks.deliverAgentMessage).toHaveBeenCalledTimes(1);
+      expect(outcome).not.toHaveProperty('inputTarget');
     });
   });
 });

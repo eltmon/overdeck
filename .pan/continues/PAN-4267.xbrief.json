@@ -1,0 +1,159 @@
+{
+  "version": "1",
+  "issueId": "PAN-4267",
+  "created": "2026-09-27T15:34:04.785Z",
+  "updated": "2026-09-27T16:23:38.404Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "governor-reserve-defaults": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4267",
+      "claimedAt": "2026-09-27T15:34:04.785Z",
+      "doneAt": "2026-09-27T15:41:13.594Z"
+    },
+    "spawn-threshold-defaults": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4267",
+      "claimedAt": "2026-09-27T15:41:20.101Z",
+      "doneAt": "2026-09-27T15:44:06.016Z"
+    },
+    "reserve-normalization": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4267",
+      "claimedAt": "2026-09-27T15:44:09.732Z",
+      "doneAt": "2026-09-27T15:49:23.365Z"
+    },
+    "darwin-available-memory": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4267",
+      "claimedAt": "2026-09-27T15:49:27.344Z",
+      "doneAt": "2026-09-27T15:56:02.090Z"
+    },
+    "darwin-stall-signal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4267",
+      "claimedAt": "2026-09-27T15:56:06.516Z",
+      "doneAt": "2026-09-27T16:05:15.948Z"
+    },
+    "truthful-patrol-messages": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4267",
+      "claimedAt": "2026-09-27T16:05:19.572Z",
+      "doneAt": "2026-09-27T16:09:58.399Z"
+    },
+    "governor-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4267",
+      "claimedAt": "2026-09-27T16:10:01.995Z",
+      "doneAt": "2026-09-27T16:11:45.861Z"
+    },
+    "governor-reserve-defaults.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:19:06.292Z"
+    },
+    "governor-reserve-defaults.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:19:17.095Z"
+    },
+    "governor-reserve-defaults.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:19:28.640Z"
+    },
+    "spawn-threshold-defaults.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:19:39.908Z"
+    },
+    "spawn-threshold-defaults.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:19:50.572Z"
+    },
+    "spawn-threshold-defaults.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:01.087Z"
+    },
+    "reserve-normalization.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:11.616Z"
+    },
+    "reserve-normalization.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:22.162Z"
+    },
+    "reserve-normalization.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:32.331Z"
+    },
+    "reserve-normalization.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:43.348Z"
+    },
+    "darwin-available-memory.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:20:54.219Z"
+    },
+    "darwin-available-memory.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:21:05.180Z"
+    },
+    "darwin-available-memory.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:21:16.266Z"
+    },
+    "darwin-available-memory.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:21:27.859Z"
+    },
+    "darwin-stall-signal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:21:38.700Z"
+    },
+    "darwin-stall-signal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:21:50.153Z"
+    },
+    "darwin-stall-signal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:22:00.727Z"
+    },
+    "darwin-stall-signal.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:22:11.480Z"
+    },
+    "truthful-patrol-messages.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:22:23.191Z"
+    },
+    "truthful-patrol-messages.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:22:34.190Z"
+    },
+    "truthful-patrol-messages.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:22:44.204Z"
+    },
+    "truthful-patrol-messages.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:22:54.864Z"
+    },
+    "governor-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:23:05.862Z"
+    },
+    "governor-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:23:17.057Z"
+    },
+    "governor-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:23:27.722Z"
+    },
+    "governor-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-27T16:23:38.403Z"
+    }
+  }
+}

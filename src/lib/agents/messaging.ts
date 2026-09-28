@@ -16,6 +16,7 @@ import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
 import { closeAgentPane, launchAgentPane } from '../terminal-backends/launch.js';
 import { toPaneRole } from '../terminal-backends/prompt-guard.js';
+import { ensureMainInputTarget, type InputTarget } from './input-target.js';
 import { isAlive, isConfirmedDead } from './liveness.js';
 import {
   clearReadySignal,
@@ -68,6 +69,16 @@ export interface MessageDeliveryOutcome {
   deduplicated?: boolean;
   /** true when a transcript probe saw the message land as a new turn (Claude Code only). */
   confirmed?: boolean;
+  /** Set when Claude Code routed the message into a running subagent instead of
+   * the main conversation (PAN-4247); the caller's intent was to reach the main
+   * agent, so this is never treated as delivered. */
+  landedInSubagent?: { agentId: string; description: string };
+  /** PAN-4268: typed input was confirmed to go to Claude Code's main agent before delivery. */
+  inputTarget?: 'main';
+  /** PAN-4268: the subagent the selector was switched away from before delivery. */
+  switchedFromSubagent?: string;
+  /** PAN-4268: delivery was refused because input could not be moved to the main agent. */
+  inputTargetRefusal?: { reason: string; inputTarget: InputTarget };
 }
 
 export type MessageAgentOutcome = 'delivered' | 'queued';
@@ -245,7 +256,8 @@ export async function messageAgent(
   if (isConversationTarget && !agentState) {
     try {
       const { getConversationByName } = await import('../overdeck/conversations.js');
-      conversationHarness = getConversationByName(normalizedId)?.harness ?? undefined;
+      // Rows are keyed by the bare name; the target carries the conv- prefix (PAN-4223 FR-17).
+      conversationHarness = getConversationByName(normalizedId.slice('conv-'.length))?.harness ?? undefined;
     } catch {
       // The conversations store may be unavailable in minimal installs or
       // tests — fall through to the agent-state default below.
@@ -678,6 +690,25 @@ export async function messageAgent(
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
 
+  // PAN-4268: Claude Code sends typed input to whichever agent its selector
+  // marks with ●. Move it back to main before pasting, or refuse.
+  let mainTarget: Pick<MessageDeliveryOutcome, 'inputTarget' | 'switchedFromSubagent'> = {};
+  if (expectedHarness === 'claude-code') {
+    const target = await ensureMainInputTarget(normalizedId);
+    if (!target.ok) {
+      queueAgentMail(normalizedId, message, 'queued', opts.dedupKey, caller);
+      logAgentLifecycle(normalizedId, `messageAgent refused: ${target.reason}`);
+      return {
+        delivered: false,
+        queuedToMail: true,
+        confirmed: false,
+        reason: target.reason,
+        inputTargetRefusal: { reason: target.reason, inputTarget: target.inputTarget },
+      };
+    }
+    mainTarget = { inputTarget: 'main', ...(target.switchedFromSubagent ? { switchedFromSubagent: target.switchedFromSubagent } : {}) };
+  }
+
   const deliveryMethod = resolveAgentDeliveryMethod(agentState);
   const deliveryCaller = `messageAgent:${caller}`;
   const transcriptSessionId = getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl'
@@ -699,15 +730,30 @@ export async function messageAgent(
         ? 'supervisor'
         : deliveryMethod,
     });
-    queueAgentMail(normalizedId, message, 'delivered');
     await appendTellInterventionForUserSource(normalizedId, caller);
+    if (confirmedDelivery.landing.kind === 'subagent') {
+      const { agentId: subagentId, description } = confirmedDelivery.landing;
+      // The caller wanted the main agent; a retry would route into the same
+      // subagent again, so this is queued for manual delivery, not redelivered.
+      queueAgentMail(normalizedId, message, 'queued');
+      logAgentLifecycle(normalizedId, `messageAgent landed in subagent ${subagentId}`);
+      const reason = `Claude Code routed the message into running subagent "${description}" (${subagentId}), not the main conversation. Stop or finish that subagent, then resend.`;
+      return {
+        delivered: false,
+        queuedToMail: true,
+        confirmed: false,
+        landedInSubagent: { agentId: subagentId, description },
+        reason,
+      };
+    }
+    queueAgentMail(normalizedId, message, 'delivered');
     if (!confirmedDelivery.delivered) {
       const reason = `message was injected but no turn appeared in transcript ${transcriptSessionId} within the confirmation window (${confirmedDelivery.attempts} attempts)`;
       logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);
-      return { delivered: false, queuedToMail: true, confirmed: false, reason };
+      return { delivered: false, queuedToMail: true, confirmed: false, reason, ...mainTarget };
     }
     logAgentLifecycle(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
-    return { delivered: true, queuedToMail: true, confirmed: true };
+    return { delivered: true, queuedToMail: true, confirmed: true, ...mainTarget };
   }
 
   // Claude Code agent without an identifiable transcript: the confirmed-turn
@@ -720,7 +766,7 @@ export async function messageAgent(
     logAgentLifecycle(normalizedId, `messageAgent NOT confirmed: ${reason}`);
     queueAgentMail(normalizedId, message, 'queued', undefined, caller);
     await appendTellInterventionForUserSource(normalizedId, caller);
-    return { delivered: false, queuedToMail: true, confirmed: false, reason };
+    return { delivered: false, queuedToMail: true, confirmed: false, reason, ...mainTarget };
   }
 
   // Keyed deliveries and non-Claude harnesses keep the composer-level contract.
@@ -749,6 +795,7 @@ export async function messageAgent(
     confirmed: false,
     ...(delivery.failure ? { reason: delivery.failure } : {}),
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
+    ...mainTarget,
   };
 }
 

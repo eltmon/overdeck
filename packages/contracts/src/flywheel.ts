@@ -1,4 +1,6 @@
 import { Effect, Schema } from "effect"
+import type { EffortLevel } from "./effort"
+import { EffortLevelSchema } from "./effort"
 
 export const FlywheelRunId = Schema.String.check(Schema.isPattern(/^RUN-\d+$/))
 export type FlywheelRunId = typeof FlywheelRunId.Type
@@ -10,11 +12,11 @@ export const FlywheelHarness = Schema.Literals(["claude-code", "pi", "ohmypi", "
 export interface FlywheelOrchestrator {
   harness: typeof FlywheelHarness.Type
   model: string
-  effort: "low" | "medium" | "high" | "xhigh" | "max"
+  effort: EffortLevel
   ctxPercent: number
 }
 
-export const FlywheelEffort = Schema.Literals(["low", "medium", "high", "xhigh", "max"])
+export const FlywheelEffort = EffortLevelSchema
 export const FlywheelOrchestrator = Schema.Struct({
   harness: FlywheelHarness,
   model: Schema.String,

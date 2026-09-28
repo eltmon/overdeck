@@ -94,9 +94,10 @@ export interface ConcurrencyConfig {
    */
   reserved_swarm_slots: number;
   /**
-   * When true, operator-started work agents (no flywheelRunId) are exempt from
-   * the emergency brake/governor reaping so the operator's deliberate spawns are
-   * not trimmed to satisfy the cap. Defaults to true (PAN-1812).
+   * When true, operator-started work agents (startedBy not 'flywheel:'-
+   * provenanced) are exempt from the emergency brake/governor reaping so the
+   * operator's deliberate spawns are not trimmed to satisfy the cap. Defaults
+   * to true (PAN-1812/PAN-3634).
    */
   exempt_operator_started?: boolean;
   /**
@@ -318,9 +319,12 @@ export interface RetentionConfig {
 }
 
 export interface CloseOutConfig {
+  /** Remove the issue's workspace directory at close-out. Default true (PAN-4283). */
   remove_workspace: boolean;
   delete_feature_branch: boolean;
+  /** @deprecated inert since PAN-3917 — nothing reads it */
   auto: boolean;
+  /** @deprecated inert since PAN-3917 — nothing reads it */
   auto_delay_minutes: number;
 }
 
@@ -530,13 +534,10 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     health_staleness_hours: 24,
   },
   close_out: {
-    remove_workspace: false,
+    remove_workspace: true,
     delete_feature_branch: false,
-    // Auto close-out is ON by default: without it merged issues sit in
-    // "awaiting close-out (verify on main)" forever and their Docker stacks,
-    // branches, and agent state leak. Correct operation must not depend on an
-    // operator discovering an opt-in flag; `auto = false` remains an explicit
-    // opt-out escape hatch for debugging.
+    // auto / auto_delay_minutes are inert: automatic close-out was removed in
+    // PAN-3917 (deacon-lite). Kept so existing files parse.
     auto: true,
     auto_delay_minutes: 60,
   },

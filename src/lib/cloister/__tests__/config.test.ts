@@ -29,12 +29,11 @@ describe('loadCloisterConfig', () => {
     mockedWriteFileSync.mockReset();
   });
 
-  it('defines close-out defaults with auto close-out ON (destructive options off)', () => {
+  it('defines close-out defaults removing the workspace, keeping the branch, with inert auto keys', () => {
     expect(DEFAULT_CLOISTER_CONFIG.close_out).toEqual({
-      remove_workspace: false,
+      remove_workspace: true,
       delete_feature_branch: false,
-      // Auto close-out must default ON — merged issues otherwise sit in
-      // "awaiting close-out" forever leaking Docker stacks and branches.
+      // auto / auto_delay_minutes are inert since PAN-3917; kept only so existing files parse.
       auto: true,
       auto_delay_minutes: 60,
     });

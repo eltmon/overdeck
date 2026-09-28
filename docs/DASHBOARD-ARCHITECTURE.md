@@ -66,6 +66,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   `stopped` this way also has `hasLivePane` (and its deprecated alias
   `hasLiveTmuxSession`) served `false`; a row served `unknown` keeps its stored flags.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
+- Outage handling never blocks the UI: see [Degraded mode (PAN-4279)](#degraded-mode-pan-4279).
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 - The Command Deck project list (`command-deck-projects`), project registry
   (`registered-projects`) and conversation list (`conversations`) still load over
@@ -89,14 +90,25 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   another HTTP error is a settled answer and shows the alert with its Retry
   button. The membership query also joins the reconnect refetch above.
 
-**Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
-starts a discuss-first conversation through `POST /api/conversations` and opens
-`/conv/:name`. The description uses a full row, with the project selector, model
-picker, and action wrapping below it. The model picker follows the configured
-provider harness unless explicit harness permutations are enabled. Click and
-Enter share a pending-launch guard. Launch errors appear below the controls;
-the draft stays available for retry. Browser coverage lives in
-`src/dashboard/frontend/tests/talk-it-through.spec.ts`.
+**Home composer** (PAN-4280): `components/home/HomeComposer.tsx`, mounted on
+both Simple and Advanced Home. It wraps the existing Launcher with the Home
+intent order from `buildHomeIntents` (agent, terminal, optional codex,
+Simple-only "Talk it through first:"), a project chip, and type-to-focus.
+Enter posts the raw typed text to `POST /api/conversations` (no `projectKey`
+when no project is chosen) and opens `/conv/:name`; the Simple discuss-first
+flow sends `seedDiscussPrompt(text)` instead. Ctrl+Enter (or the terminal row)
+writes a terminal hand-off through `components/home/pendingTerminal.ts` — a
+sessionStorage record plus a same-tab `CustomEvent` — then navigates to the
+deck; `Stage` peeks it (non-consuming) to open the drawer, and
+`TerminalDrawer` consumes it to run the command in a fresh shell, so it runs
+exactly once.
+Launch errors appear below the input; the draft stays available for retry.
+Browser coverage lives in `src/dashboard/frontend/tests/home-type-and-go.spec.ts`
+and `tests/talk-it-through.spec.ts`.
+
+`POST /api/terminals` also accepts an optional `command` (a single line, at
+most 2000 characters): once the tmux session exists, it is typed in with
+`send-keys -l` then Enter, and the response reports `commandSent`.
 
 **Pipeline retrospective button:** the Command Deck header's
 `RetrospectiveButton` (`components/CommandDeck/RetrospectiveButton.tsx`) POSTs
@@ -290,6 +302,23 @@ door that does not exist; a real record read door would be a separate change.
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
   120 seconds, and reconciles late echoes using message identity or text/time matching.
+  A pending user bubble's `deliveryState` renders one of: `pending` ("Sending…"),
+  `unknown` ("Delivery not confirmed"), `accepted` ("Sent · waiting for transcript"), or
+  `subagent` ("Delivered to subagent · `<description>`" — Claude Code routed the message
+  into a running subagent instead of this conversation; PAN-4247). Before pasting, the
+  composer route checks Claude Code's agent selector and switches input back to the main
+  agent (PAN-4268); if that cannot be confirmed the route answers 409
+  `input-target-not-main`, the toast shows the reason, and the draft stays in the editor.
+  Conversation rows carry `inputTarget` (`'main' | { subagent } | 'unknown'`), which
+  drives the composer's "Typed messages are going to subagent" notice. An `accepted` bubble
+  that stays unmatched for `TURN_STALL_MS` (4 minutes) **while the conversation is not
+  streaming** moves to the outbox as "Not found in transcript", with **Resend** (a fresh
+  send identity — new `clientMessageId`, no inherited `createdAt`, no `retry` flag, since
+  the original send may still land) and **Copy** (writes the text to the clipboard); while
+  streaming, the same delay proves nothing, since a message queued behind a long tool
+  call is legitimately unrendered until consumed. Two or more quick sends that Claude
+  Code joins into one queued message are reconciled together: the single transcript
+  record clears every contributing bubble at once, not just the first.
 - The PTY supervisor reports what it observes about its harness to
   `POST /api/agents/:id/lifecycle`, authenticated by the session's pty-token. It emits
   `session-started`, `turn-started` (on a confirmed injection) and `exited`. The route
@@ -353,6 +382,87 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
 
+## Degraded mode (PAN-4279)
+
+When a tab loses touch with its server, the dashboard never blocks the UI. The
+last-known pages stay mounted, visible and navigable, and one banner reports
+the outage. `lib/connectionState.ts` is the single source of truth: a Zustand
+store that holds the inputs and derives one **connection phase** from them.
+
+| Phase | Meaning | Banner (`components/DegradedModeBanner.tsx`) |
+| --- | --- | --- |
+| `restarting` | A planned restart is in progress (`dashboardLifecycle.active`). | "Overdeck server is restarting — showing data from HH:MM", plus the lifecycle issue and reason. |
+| `unreachable` | The server does not answer HTTP. | "Can't reach the Overdeck server — showing data from HH:MM", with **Retry** and **Force Restart**. |
+| `delayed` | HTTP answers, but the `/ws/rpc` domain stream is reconnecting or has not bootstrapped. | "Live updates are delayed — reconnecting · showing data from HH:MM", with **Retry**. |
+| `live` | HTTP answers and the stream has bootstrapped. | Nothing. After any degraded phase, "Reconnected" shows for 2.5 s. |
+
+Precedence is `restarting` > `unreachable` > `delayed` > `live`.
+
+- **Reachability rule.** A response is *reachable* when its body is JSON with a
+  string `status` field, at any HTTP status. `/api/health` answers 503 with
+  JSON in its "incoherent" states, and the server is still up then. A network
+  error, a 3 s timeout, or a non-JSON body (a proxy's 502/503/504 HTML page) is
+  *unreachable*. Two sources write reachability: the App's 5 s `/api/version`
+  poll (2 failed polls mean unreachable, one success means reachable) and
+  EventRouter's `probeServerHealth()` (`GET /api/health`). EventRouter probes on
+  every stream retry, staleness strike and bootstrap failure, so a stream
+  outage reads `delayed`, never `unreachable`, while HTTP still works.
+- **Freshness stamp.** `HH:MM` is `lastLiveAt`: the time of the last successful
+  bootstrap or applied domain-event batch. Before any bootstrap it is the
+  cached snapshot's timestamp (`loadSnapshotCacheEntry()` in
+  `lib/snapshotCache.ts`). The clause is omitted when no time is known.
+- **First-load screen.** `App/BackendConnectionBoundary.tsx` renders the
+  first-load screen ("Can't reach the Overdeck server" or "Overdeck server is
+  restarting", "The dashboard will load as soon as the server answers.",
+  Retry) only when the tab has no snapshot at all (no cache, no bootstrap) and
+  the phase is `unreachable` or `restarting`. It is the only full-page outage
+  state. With a snapshot, the boundary always renders its children. It keeps
+  one duty: when the phase leaves `unreachable`/`restarting`, it invalidates
+  every React Query so queries that failed during the outage refetch.
+- **Bootstrap.** EventRouter races `getSnapshot` against a 20 s timeout
+  (`BOOTSTRAP_TIMEOUT_MS`). A timed-out or failed attempt sets the stream
+  down, probes health, and schedules a reconnect on a fresh transport with the
+  existing backoff (2 s doubling, 30 s cap, ±20 % jitter). Retries continue
+  forever; there is no give-up window. A generation counter makes a superseded
+  attempt a no-op, so a late answer never overwrites newer state. The 2 s
+  fallback poller runs until the first bootstrap succeeds, and it stands down
+  while a backoff reconnect is scheduled.
+- **Retry.** The banner's and first-load screen's Retry calls
+  `requestReconnect()`. EventRouter registers that on mount: it abandons any
+  in-flight attempt (even one that will never settle), resets the backoff, and
+  reconnects on a fresh transport. The banner's Retry also refetches the
+  `backend-health` poll.
+- **Write actions.** While the phase is `unreachable` or `restarting`, every
+  issue action with a server endpoint (`ISSUE_ACTIONS` entries with
+  `endpoint !== null`) is disabled but stays visible, with the reason "Can't
+  reach the Overdeck server — available again when it reconnects."
+  (`blockedOffline` in `useIssueActions.ts`). `delayed` blocks nothing, because
+  HTTP works. Mutations outside the issue-action registry keep failing with
+  their own error toasts.
+- **Held composer messages.** A prompt submitted while `unreachable` or
+  `restarting` is not POSTed. `holdSend` keeps it in the composer outbox as
+  "Waiting to send — will send when the server reconnects", and it is sent
+  once, oldest first, when the phase returns to `live`, keeping its
+  `clientMessageId`. A `/pan` command is not held: it shows "Can't reach the
+  Overdeck server — commands need a live connection" and keeps the draft. Held
+  messages live in the in-memory composer store, so a full page reload drops
+  them; drafts already persist in localStorage.
+- **Asset recovery.** `recovery.tsx`'s "Reconnecting to the dashboard…" modal
+  shows only for the `root_error_boundary` trigger, when React itself is down.
+  Chunk and asset load failures poll `/` silently, then reload.
+
+Outage surfaces that PAN-4279 removed or folded into the banner: the
+`display: none` route wrapper and "Waiting for backend data" page, the
+"Connection lost — reconnecting…" pill, both EventRouter "Server unreachable —
+Retry" overlays (the 3-minute fallback window and the 6-retry escalation), and
+the AppChrome restart, "Backend is unreachable" and "Backend is back up"
+banners. Kept on purpose: the `RootErrorBoundary` crash fallback and the reload
+circuit-breaker overlay (crashes, not connectivity), `XTerminal.tsx`'s inline
+reconnecting status, and region-scoped boundaries (`LoadingBoundary`,
+`ProjectMembershipBoundary`, the Flywheel unreachable chip). Browser coverage
+is `src/dashboard/frontend/tests/pan-4279-degraded-mode.spec.ts`, which runs on
+an isolated dashboard.
+
 ## Agents page: Live and History (PAN-3920, PAN-4197)
 
 `/agents` opens the **Live view** (`components/Agents/live/`): what is running and progressing,
@@ -395,6 +505,29 @@ than `live` answers 400, and `windowHours` is ignored with `scope=live`. The win
 `scheduler` for `yieldedByScheduler`, else `machine`; `reason` is `pausedReason`; `since` is
 `pausedAt`, else `yieldedAt`.
 
+**Lanes and successors (PAN-4223).** A conversation entry's `parentId` is `conv:<parent name>`
+whenever its row has a parent link (`parent_conversation_id`), so gauntlet lanes nest under the
+conversation that launched them and handoff/fork successors under their predecessor. A lane entry
+carries `lane: { run, key, role, iteration, reportStatus }`; a successor carries `continuesFrom`
+(the predecessor's legacy conversation id, linked as `/conv/<id>`). `keepWithAncestors` never
+climbs a **succession edge** (a conversation entry with a `parentId` and no `lane`): a live
+successor keeps its own row and does not pull its ended predecessor into the live scope, while a
+live lane still pulls in its ended launcher. In the Live view a lane with its parent on the page is
+a child line of the parent row (a needs-you lane also keeps its own row), and a successor always
+keeps its own row with its `continues ←` link. History nests both by `parentId`, capped at two
+levels; a deeper row renders at the second level with `flattenedFrom` naming its real parent.
+
+**Command Deck conversation groups (PAN-4223).** `conversation-tree.ts` nests every conversation
+whose parent link names a row in the rendered list, lanes and successors alike, in pre-order at
+display depth `min(natural depth, 2)`; a deeper row keeps its pre-order place and shows a marker
+naming its real parent (`↳ continued from #<id>` or `lane of #<id> · <run>`), and a row whose
+parent is not in the list renders at top level with the same kind of marker. A top-level group
+ranks where its best member would sit in the flat active-then-inactive order, so an ended
+predecessor with a live successor ranks with the successor. Only top-level rows carry a collapse
+toggle, which lists the group's non-zero counts. A group defaults to expanded while any descendant
+is active and collapsed otherwise; the viewer's collapsed groups persist in localStorage under
+`commandDeck.groups.collapsed` (a JSON array of top-level conversation names).
+
 **Reasons.** `live-model.ts` classifies each row on the client from the entry plus real-time store
 facts: the issue's derived state, the agent snapshot's pending inputs, and the runtime snapshot.
 The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `work` or `strike`.
@@ -403,10 +536,10 @@ The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `w
 | --- | --- | --- | --- | --- |
 | 1 | `blocked` | question waiting / permission prompt / plan approval | Needs you | needs-you |
 | 2 | operator pause | paused by you | Needs you | needs-you |
-| 3 | issue agent, attention `api-error` | API error or usage limit | Needs you | stuck |
+| 3 | issue agent, attention `api-error`, or any entry with `providerError` | API error or usage limit | Needs you | stuck |
 | 4 | issue agent, attention `stuck`, `idle` | stuck · idle `<age>` | Needs you | stuck |
 | 5 | issue agent, issue `ready` | ready to merge | Needs you | needs-you |
-| 6 | `working` | running `<tool>` / thinking / working | Live | live |
+| 6 | `working` | `<tool>` / thinking / working | Live | live |
 | 7 | remote and `unknown` | running on Fly | Live | live |
 | 8 | scheduler or machine pause | held by Overdeck | Waiting | waiting |
 | 9 | issue agent, PR checks red | CI failed | Waiting | stuck |
@@ -421,10 +554,31 @@ pointer as agents write output; Waiting and Idle sort most recent activity first
 nests under its parent row (at most three lines, then `+N more`, each with its state glyph). A
 row's first line is the issue id and title (the role only when it is not `work`); its second
 line is the reason, then what it is doing or waiting on, then the age. For a live agent that is
-its last output line, streamed through `useAgentOutputSubscription` while the row is mounted,
-and `quiet <age>` in the stuck tone past five minutes. Tones are the `--state-*` tokens in `index.css` (live blue and
+its runtime snapshot's tool name (`currentTool`, bare, no longer `running <tool>`) and, when the
+hook reported one, the tool's own description (`currentToolDescription`, e.g. `Bash · Commit
+WI-7`) — never the agent's raw pane output; there is no output subscription on this row anymore.
+A row's `since` (and its quiet age) is the newest activity across the row and every one of its
+subagents, not just its own: an orchestrator with a working subagent is never quiet just because
+it made no tool call itself. `quiet <age>` replaces the age in the stuck tone past five silent
+minutes — the two never render together. Tones are the `--state-*` tokens in `index.css` (live blue and
 never green, needs-you amber, stuck red, waiting warm neutral, done emerald); see the style
 guide's "State Tokens". The same tokens tone the History row badge.
+
+A conversation entry is keyed in the directory by `conv:<name>`, but its runtime facts
+(`agentRuntimeById`) are keyed by its tmux session — `DirectoryEntry.runtimeId` carries that
+session id when it differs from `id`, and the Live view looks runtime facts up by
+`runtimeId ?? id`. `DirectoryEntry.providerError` (`{ message, at }`) is set on a conversation
+whose transcript's last turn ended in a provider error (billing, a usage limit) while the
+session otherwise looks idle (`readConversationProviderError`, `src/lib/overdeck/`) — reason 3
+above fires on it exactly like an issue agent's `api-error` attention, with the error's own
+message and timestamp.
+
+When there are no visible rows, the Live view renders one column, never the two-panel layout: the
+loading/error status or the empty message (`Nothing is running or waiting. Finished work is in
+History.`), followed by the Idle footer when there are idle sessions — no preview pane, so there
+is never a second, contradictory "Select an agent…" message alongside it. The preview's own
+Agents rail (a conversation's subagent list, `SubagentRail`) starts collapsed there regardless of
+what the user left it at on the conversation's own page — see `docs/CONVERSATION-SUBAGENTS.md`.
 
 ### History: the Agents Directory
 

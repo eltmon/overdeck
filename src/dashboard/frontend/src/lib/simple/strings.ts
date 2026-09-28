@@ -3,8 +3,8 @@
  *
  * Simple-mode UI copy must live in this catalog (or in userFacingState.ts) and
  * must not contain internal jargon. The lint test
- * (src/lib/__tests__/simple-copy-lint.test.ts) scans both this catalog and the
- * simple components' source. Internal terms belong to Advanced mode only.
+ * (src/lib/__tests__/simple-foundations.test.ts) scans both this catalog and
+ * the simple components' source. Internal terms belong to Advanced mode only.
  */
 
 /** Internal jargon that must never appear in simple-mode user-facing strings. */
@@ -46,8 +46,10 @@ export const SIMPLE_STRINGS = {
     workingSub: "Nothing for you to do on these — you'll be told when they're ready.",
     readyTitle: 'Ready to merge',
     doneTitle: 'Finished',
-    composerPlaceholder: 'Describe what you want built or fixed, in plain words…',
-    composerButton: 'Talk it through',
+    composerPlaceholder: 'Ask for anything, or describe what you want built, in plain words…',
+    chipIn: 'In: ',
+    chipNoProject: 'Not in a project',
+    chipAddProject: 'Add a project…',
     nothingNeedsYou: 'Nothing needs you right now. Nice.',
     quietEmpty: 'Nothing here yet.',
   },
@@ -89,5 +91,25 @@ export const SIMPLE_STRINGS = {
   mode: {
     simple: 'Simple',
     advanced: 'Advanced',
+  },
+  setup: {
+    title: 'Get set up',
+    subtitle: 'A few things make Overdeck work best. Nothing here stops you from starting.',
+    hide: 'Hide',
+    setUp: 'Set up',
+    recheck: 'Re-check',
+    claudeDone: 'Claude is signed in',
+    claudeTodo: 'Sign in to Claude',
+    githubDone: 'GitHub is connected',
+    githubTodo: 'Connect GitHub',
+    agentsDone: 'Agents can start',
+    agentsTodo: 'Finish setup so agents can start',
+    terminalsDone: 'Plain terminals are ready',
+    terminalsTodo: 'Install the terminal helper',
+    dockerDone: 'Docker is running (optional)',
+    dockerTodo: 'Docker (optional)',
+    memoryPrefix: 'Free memory: ',
+    memoryLow: 'New agents may wait for memory to free up.',
+    runThis: 'Run this in a terminal, then re-check:',
   },
 } as const;

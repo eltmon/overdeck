@@ -186,6 +186,7 @@ const deepWipe = (...args: Parameters<typeof deepWipeProgram>) => Effect.runProm
 const close = (...args: Parameters<typeof closeProgram>) => Effect.runPromise(closeProgram(...args));
 const resetToTodo = (...args: Parameters<typeof resetToTodoProgram>) => Effect.runPromise(resetToTodoProgram(...args));
 import { AGENTS_DIR, OVERDECK_HOME, getOverdeckHome } from '../../../../src/lib/paths.js';
+import { writeCloseOutSetting } from '../../../../src/lib/cloister/close-out-settings.js';
 import { findSpecByIssue as findSpecByIssueProgram, writeSpecForIssue as writeSpecForIssueProgram } from '../../../../src/lib/pan-dir/specs.js';
 
 // PAN-1249: pan-dir/specs functions return Effect; bridge to sync via runPromise for tests.
@@ -1158,15 +1159,21 @@ describe('workflows', () => {
       expect(result.steps.some(s => s.step === 'close-out:abort')).toBe(false);
     });
 
-    it('should preserve workspace and branches by default', async () => {
+    it('should remove the workspace and keep branches by default', async () => {
       const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
       mkdirSync(wsPath, { recursive: true });
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git worktree remove')) {
+          rmSync(wsPath, { recursive: true, force: true });
+        }
+        return { stdout: '', stderr: '' };
+      });
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
 
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeUndefined();
-      expect(existsSync(wsPath)).toBe(true);
+      expect(existsSync(wsPath)).toBe(false);
     });
 
     it('should honor close_out branch deletion config', async () => {
@@ -1216,6 +1223,42 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--add-label "closed-out"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
+    });
+
+    describe('close-out honors settings written through writeCloseOutSetting', () => {
+      it('keeps the workspace when remove_workspace is saved off', async () => {
+        const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
+        const configFile = join(OVERDECK_HOME, 'cloister.toml');
+
+        await writeCloseOutSetting('remove_workspace', false, configFile);
+        mkdirSync(wsPath, { recursive: true });
+
+        const result = await closeOut({ issueId: 'PAN-100', projectPath: testDir }, { tracker: successfulTracker() });
+        const teardownRow = result.dodGate?.rows.find(row => row.id === 'teardown');
+
+        expect(existsSync(wsPath)).toBe(true);
+        expect(teardownRow?.observed.startsWith('workspace kept (close_out.remove_workspace is off)')).toBe(true);
+      });
+
+      it('removes the workspace when remove_workspace is saved on', async () => {
+        const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
+        const configFile = join(OVERDECK_HOME, 'cloister.toml');
+
+        await writeCloseOutSetting('remove_workspace', true, configFile);
+        mkdirSync(wsPath, { recursive: true });
+        mockExecAsync.mockImplementation(async (command: string) => {
+          if (command.startsWith('git worktree remove')) {
+            rmSync(wsPath, { recursive: true, force: true });
+          }
+          return { stdout: '', stderr: '' };
+        });
+
+        const result = await closeOut({ issueId: 'PAN-100', projectPath: testDir }, { tracker: successfulTracker() });
+        const teardownRow = result.dodGate?.rows.find(row => row.id === 'teardown');
+
+        expect(existsSync(wsPath)).toBe(false);
+        expect(teardownRow?.observed.startsWith('workspace removed')).toBe(true);
+      });
     });
 
     it('should complete xBRIEF status and prune checkpoint refs during close-out', async () => {

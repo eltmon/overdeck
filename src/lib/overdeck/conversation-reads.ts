@@ -73,6 +73,7 @@ import { parseKimiConversationMessages } from '../../dashboard/server/services/k
 import { resolveEffectivePullRequest } from '@overdeck/contracts';
 import { listConversationPullRequests } from './conversation-pull-requests.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
+import { readConversationInputTarget } from './conversation-input-target.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
 import { findClaudeSessionFileById } from './claude-session-file-search.js';
 import { ACP_TRANSCRIPT_FILE } from '../runtimes/storage/acp.js';
@@ -317,6 +318,7 @@ export async function getCachedMessages(
         permissionMode: incremental.permissionMode ?? cachedResult.permissionMode,
         fileEditsByAssistantId: mergedFileEdits,
         countedUsageIds: incremental.countedUsageIds,
+        latestCompactSummary: incremental.latestCompactSummary ?? cachedResult.latestCompactSummary,
       };
     }
   } else {
@@ -338,6 +340,7 @@ export async function getCachedMessages(
       contextBoundaryOffset: parsed.contextBoundaryOffset,
       permissionMode: parsed.permissionMode,
       countedUsageIds: parsed.countedUsageIds,
+      latestCompactSummary: parsed.latestCompactSummary,
     },
   });
   if (messagesCache.size > MESSAGES_CACHE_MAX) {
@@ -494,9 +497,11 @@ export async function getConversationRead(
       }
     }
     const pullRequests = listConversationPullRequests(conv.name); // PAN-3822
+    const inputTarget = await readConversationInputTarget(conv, sessionAlive, convSf); // PAN-4268
     return result({
       ...conv,
       sessionAlive,
+      ...(inputTarget ? { inputTarget } : {}),
       contextUsage,
       branch: gitInfo.branch,
       isWorktree: gitInfo.isWorktree,
@@ -789,8 +794,8 @@ export async function retitleConversation(
     if (!sessionFile || !existsSync(sessionFile)) {
       return result({ error: 'Conversation has no transcript yet' }, 400);
     }
-    const { messages } = await getCachedMessages(sessionFile, false);
-    const transcript = serializeConversationTranscript(messages);
+    const { messages, latestCompactSummary } = await getCachedMessages(sessionFile, false);
+    const transcript = serializeConversationTranscript(messages, { compactSummary: latestCompactSummary, purpose: 'title' });
     if (!transcript.trim()) {
       return result({ error: 'Conversation has no messages to summarize yet' }, 400);
     }
@@ -841,7 +846,7 @@ export async function getConversationAbout(
       return result({ ...cached.data, cached: true });
     }
 
-    const { messages } = await getCachedMessages(sessionFile, false);
+    const { messages, latestCompactSummary } = await getCachedMessages(sessionFile, false);
     const conversational = messages.filter(
       (m) => m.role !== 'system' && typeof m.text === 'string' && m.text.trim().length > 0,
     );
@@ -849,7 +854,7 @@ export async function getConversationAbout(
       return result({ summary: null, messageCount: 0, generatedAt: null });
     }
 
-    const transcript = serializeConversationTranscript(messages);
+    const transcript = serializeConversationTranscript(messages, { compactSummary: latestCompactSummary, purpose: 'about' });
     const aboutModel = configuredTitleModel();
     console.log(`[claude-invoke] purpose=conversation-about | model=${aboutModel} | conversation=${name} | transcriptChars=${transcript.length}`);
     const summary = await summarizeTranscriptAbout(transcript, aboutModel);

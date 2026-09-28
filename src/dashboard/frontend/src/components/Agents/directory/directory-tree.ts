@@ -27,8 +27,11 @@ export interface DirectoryNode {
 
 export interface DirectoryRow {
   entry: DirectoryEntry;
+  /** Display depth, capped at 2 (PAN-4223 D22). */
   depth: number;
   spawnedByLabel: string | null;
+  /** The real parent's label when the natural depth is deeper than 2 (D22). */
+  flattenedFrom: string | null;
 }
 
 export const UNASSIGNED_PROJECT = 'unassigned';
@@ -226,8 +229,9 @@ export function entriesForNode(entries: readonly DirectoryEntry[], nodeId: strin
     const parent = depth === 0 && entry.parentId ? byId.get(entry.parentId) : undefined;
     rows.push({
       entry,
-      depth,
+      depth: Math.min(depth, 2),
       spawnedByLabel: depth === 0 && entry.parentId ? parentLabel(entry.parentId, parent) : null,
+      flattenedFrom: depth > 2 && entry.parentId ? parentLabel(entry.parentId, byId.get(entry.parentId)) : null,
     });
     for (const child of [...(childrenOf.get(entry.id) ?? [])].sort(compareEntries)) visit(child, depth + 1);
   };

@@ -30,6 +30,7 @@ This skill guides you through checking the health of your Overdeck installation,
 
 ```bash
 pan doctor
+pan doctor github-quota [--json]   # GitHub API quota use per caller, active pauses, skipped projects (PAN-4264)
 ```
 
 ## Health Check Workflow

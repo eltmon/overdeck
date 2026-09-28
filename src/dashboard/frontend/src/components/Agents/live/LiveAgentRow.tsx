@@ -6,22 +6,22 @@
  *
  * Line 1 names the work: the issue id and its title (the role only when it is
  * not `work`), or the conversation's label. Line 2 says why the row is here:
- * the reason, then what a live agent is doing now (its last output line,
- * streamed while the row is mounted) or what a waiting row waits on, then the
- * age, and `quiet <age>` in the stuck tone once a live agent has been silent
- * five minutes. Clicking selects (the preview pane shows it); Open, Enter or a
- * double-click goes to the agent's live pane or the conversation.
+ * the reason, then its tool description (when a tool call names one) or what
+ * a waiting row waits on, then the age, and `quiet <age>` in the stuck tone
+ * once a live agent has been silent five minutes. Clicking selects (the
+ * preview pane shows it); Open, Enter or a double-click goes to the agent's
+ * live pane or the conversation.
  */
+import { useState } from 'react';
+
 import type { DirectoryEntry } from '@overdeck/contracts';
 
-import { useAgentOutputSubscription } from '../../../hooks/useAgentOutputSubscription';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import { navigateToDecisionSubject } from '../../../lib/navigateToDecision';
 import { usePanesStore } from '../../../lib/panesStore';
-import { useDashboardStore } from '../../../lib/store';
 import { cn } from '../../../lib/utils';
 import { rowTitle } from '../directory/DirectoryList';
-import { LIVE_QUIET_AFTER_MS, lastOutputLine, type LiveRow, type LiveTone } from './live-model';
+import { LANE_GLYPH, LIVE_QUIET_AFTER_MS, type LiveRow, type LiveTone } from './live-model';
 
 const RAIL: Record<LiveTone, string> = {
   live: 'bg-state-live',
@@ -48,10 +48,16 @@ export const LIVE_GLYPH: Record<LiveTone, string> = {
 /** Geist has no ◐; a symbol-capable stack keeps every glyph full size. */
 export const GLYPH_FONT = 'ui-sans-serif, "DejaVu Sans", "Segoe UI Symbol", "Apple Symbols", sans-serif';
 
-/** Subagent lines shown under a row before `+N more`. */
+/** PAN-4223: a lane's report badge, by the badge formula in the state tones. */
+const LANE_REPORT_TONE: Record<'done' | 'blocked' | 'failed', string> = {
+  done: 'badge-bg-state-done badge-border-state-done text-state-done',
+  blocked: 'badge-bg-state-needs-you badge-border-state-needs-you text-state-needs-you',
+  failed: 'badge-bg-state-stuck badge-border-state-stuck text-state-stuck',
+};
+
+/** Subagent lines shown under a row before `+N more`. Lane lines are never capped. */
 export const LIVE_SUBAGENT_LINES = 3;
 
-const EMPTY_LINES: readonly string[] = [];
 const UNASSIGNED_PROJECT = 'unassigned';
 
 export function liveRowDomId(entryId: string): string {
@@ -123,7 +129,56 @@ function RowName({ entry }: { entry: DirectoryEntry }) {
   return (
     <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground" title={entry.label}>
       {entry.label}
+      {entry.continuesFrom !== undefined && (
+        <a
+          href={`/conv/${entry.continuesFrom}`}
+          data-component="agents-live-continues"
+          onClick={(event) => event.stopPropagation()}
+          className="ml-2 text-[11px] font-normal text-muted-foreground hover:text-foreground hover:underline"
+        >
+          continues ← #{entry.continuesFrom}
+        </a>
+      )}
     </span>
+  );
+}
+
+/** D28: WOWED and PASS use the done token; every other verdict is neutral. */
+function verdictTone(value: string): string {
+  return value === 'WOWED' || value === 'PASS'
+    ? 'badge-bg-state-done badge-border-state-done text-state-done'
+    : 'bg-transparent border-muted-foreground/40 text-muted-foreground';
+}
+
+/**
+ * One lane child line: `↳ <glyph> <key> i<n> · <state> [REPORT]` (PAN-4223
+ * FR-19). A critic line sits one indent deeper, under its builder, with its
+ * verdict badge (`PENDING` without one; D27, D28).
+ */
+function LaneLine({ lane: child }: { lane: DirectoryEntry }) {
+  const lane = child.lane!;
+  const critic = lane.criticOf !== undefined;
+  const verdict = lane.verdict && lane.verdict !== 'pending' ? lane.verdict : 'PENDING';
+  return (
+    <div
+      data-component="agents-live-lane"
+      data-entry-id={child.id}
+      className={cn('mt-0.5 flex min-w-0 items-baseline gap-1.5 font-mono-ui text-[11px] text-muted-foreground', critic && 'pl-4')}
+      title={child.label}
+    >
+      <span aria-hidden="true">↳</span>
+      <span className="min-w-0 truncate">{`${LANE_GLYPH[lane.role] ?? '?'} ${lane.key} i${lane.iteration} · ${child.state}`}</span>
+      {critic && (
+        <span data-component="agents-live-verdict" className={cn('shrink-0 border px-1 text-[9px] leading-[14px] tracking-wide', verdictTone(verdict))}>
+          {verdict}
+        </span>
+      )}
+      {!critic && lane.reportStatus && (
+        <span className={cn('shrink-0 border px-1 text-[9px] leading-[14px] tracking-wide', LANE_REPORT_TONE[lane.reportStatus])}>
+          {lane.reportStatus.toUpperCase()}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -137,13 +192,13 @@ interface LiveAgentRowProps {
 
 export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgentRowProps) {
   const { entry, reason, children } = row;
-  const live = reason.section === 'live';
-  useAgentOutputSubscription(entry.id, live && entry.kind === 'agent' && entry.location === 'local');
-  const lines = useDashboardStore((state) => state.agentOutputById[entry.id] ?? EMPTY_LINES);
-  const activity = live ? lastOutputLine(lines) : reason.detail;
+  const activity = reason.detail;
   const age = row.since ? ageOf(row.since, now) : '';
   const quiet = isQuiet(row, now);
-  const hiddenChildren = Math.max(0, children.length - LIVE_SUBAGENT_LINES);
+  const subagents = children.filter((child) => !child.lane);
+  const lanes = children.filter((child) => child.lane);
+  const [lanesOpen, setLanesOpen] = useState(true);
+  const hiddenChildren = Math.max(0, subagents.length - LIVE_SUBAGENT_LINES);
 
   return (
     <div
@@ -200,11 +255,12 @@ export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgent
             </span>
           )}
           <span className="ml-auto flex shrink-0 items-baseline gap-1.5 pl-2 font-mono-ui tabular-nums" title={row.since ?? undefined}>
-            {age && <span data-component="agents-live-age">{age}</span>}
-            {quiet && <span data-component="agents-live-quiet" className="text-state-stuck">quiet {age}</span>}
+            {quiet
+              ? <span data-component="agents-live-quiet" className="text-state-stuck">quiet {age}</span>
+              : age && <span data-component="agents-live-age">{age}</span>}
           </span>
         </div>
-        {children.slice(0, LIVE_SUBAGENT_LINES).map((child) => {
+        {subagents.slice(0, LIVE_SUBAGENT_LINES).map((child) => {
           const working = child.state === 'working';
           return (
             <div
@@ -227,6 +283,21 @@ export function LiveAgentRow({ row, selected, now, onSelect, onOpen }: LiveAgent
             ↳ +{hiddenChildren} more
           </div>
         )}
+        {lanes.length > 0 && (
+          <button
+            type="button"
+            data-component="agents-live-lanes-toggle"
+            aria-expanded={lanesOpen}
+            onClick={(event) => {
+              event.stopPropagation();
+              setLanesOpen((open) => !open);
+            }}
+            className="mt-0.5 block font-mono-ui text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            {`${lanesOpen ? '▾' : '▸'} ${lanes.length} ${lanes.length === 1 ? 'lane' : 'lanes'}`}
+          </button>
+        )}
+        {lanesOpen && lanes.map((child) => <LaneLine key={child.id} lane={child} />)}
       </div>
     </div>
   );

@@ -105,3 +105,23 @@ describe('listBootTelemetryAgents (#4109)', () => {
     expect(await listBootTelemetryAgents()).toEqual([{ hasLivePane: true }, { hasLivePane: false }]);
   });
 });
+
+// PAN-4264 Work Item 24: the dashboard checks the daily heartbeat at boot and hourly.
+describe('startInstanceHeartbeat (PAN-4264)', () => {
+  it('checks at boot and then every hour', async () => {
+    vi.useFakeTimers();
+    try {
+      const { INSTANCE_HEARTBEAT_CHECK_MS, startInstanceHeartbeat } = await import('../../../src/dashboard/server/telemetry.js');
+      const send = vi.fn(async () => false);
+      const stop = startInstanceHeartbeat(send);
+      expect(send).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(INSTANCE_HEARTBEAT_CHECK_MS);
+      expect(send).toHaveBeenCalledTimes(2);
+      stop();
+      await vi.advanceTimersByTimeAsync(INSTANCE_HEARTBEAT_CHECK_MS * 2);
+      expect(send).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
