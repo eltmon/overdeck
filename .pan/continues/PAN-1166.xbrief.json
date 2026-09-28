@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:56:28.770Z",
+  "updated": "2026-09-28T13:56:41.460Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "ws-rpc-gate.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T13:56:28.770Z"
+    },
+    "ws-rpc-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:41.460Z"
     }
   }
 }
