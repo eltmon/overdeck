@@ -298,6 +298,15 @@ door that does not exist; a real record read door would be a separate change.
   lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
   names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
   subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
+- Delivery modes (PAN-4292). `HarnessBehavior.steerKind` (`packages/contracts/src/harness-behavior.ts`)
+  says how a harness can be steered: `send-now-keys` (Claude Code), `control-channel` (Pi), or
+  `null`. The composer shows its delivery selector only for a steer-capable harness (Pi only on
+  conversations), and Ctrl/Cmd+Enter sends with `deliverAs: 'steer'`; elsewhere Ctrl+Enter is
+  Enter. Both `POST /api/conversations/:name/message` and `POST /api/agents/:id/message` accept
+  the `deliverAs` body field. A Claude Code steer reaches the delivery door as
+  `submit: 'steer'`. A harness without steer, or `follow_up` on Claude Code, answers **422**
+  `steer-unsupported` and delivers nothing. When an old PTY supervisor pressed Enter instead, the
+  response carries `steerDegraded` with the reason.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
