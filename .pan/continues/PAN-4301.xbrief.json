@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T13:56:30.438Z",
+  "updated": "2026-09-28T13:56:43.316Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "conversation-entries-lifecycle.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T13:56:30.438Z"
+    },
+    "gauntlet-run-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:43.316Z"
     }
   }
 }
