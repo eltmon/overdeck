@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:58:32.803Z",
+  "updated": "2026-09-28T15:58:44.713Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "lane-cpu-class.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T15:58:32.802Z"
+    },
+    "lane-cpu-class.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:58:44.713Z"
     }
   }
 }
