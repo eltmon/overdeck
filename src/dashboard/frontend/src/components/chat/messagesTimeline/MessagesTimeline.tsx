@@ -21,7 +21,6 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { isBackendOutage } from '../../../lib/backendOutageState';
 import { ChevronDown, Copy, RotateCcw, XCircle, Search, X } from 'lucide-react';
 import { ChatMarkdown, ChatMarkdownSettingsProvider } from '../ChatMarkdown';
 import {
@@ -413,7 +412,6 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isBackendOutage()) return; // page hidden by the outage boundary (PAN-3867)
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
         event.preventDefault();
         event.stopPropagation();
