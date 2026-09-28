@@ -111,7 +111,7 @@ describe('runGh (PAN-4264)', () => {
     expect(exec).toHaveBeenCalledTimes(2);
   });
 
-  it('rethrows other failures unchanged and records an error line', async () => {
+  it('rethrows other failures unchanged and records an error line at cost 1 when GitHub answered (PAN-4291 AC3)', async () => {
     const failure = Object.assign(new Error('Command failed: gh issue view 9'), {
       code: 1,
       stdout: '{"data":{"x":1},"errors":[]}',
@@ -121,8 +121,28 @@ describe('runGh (PAN-4264)', () => {
 
     await expect(runGh(['issue', 'view', '9'], { caller: 'close-out', exec })).rejects.toBe(failure);
     await flushLedgerWrites();
-    expect(readLedgerWindow(Date.now()).map((e) => e.outcome)).toEqual(['error']);
+    expect(readLedgerWindow(Date.now())).toEqual([expect.objectContaining({ outcome: 'error', cost: 1, estimated: true })]);
     expect(readActivePause()).toEqual([]);
+  });
+
+  it('records a local gh failure at cost 0 when GitHub never saw the call (PAN-4291 AC1, AC2)', async () => {
+    const noRemote = Object.assign(new Error('Command failed: gh pr list'), {
+      code: 1,
+      stdout: '',
+      stderr: 'no git remotes found',
+    });
+    const execNoRemote = vi.fn().mockRejectedValue(noRemote);
+    await expect(runGh(['pr', 'list'], { caller: 'pr-cache', exec: execNoRemote })).rejects.toBe(noRemote);
+
+    const enoent = Object.assign(new Error('spawn gh ENOENT'), { code: 'ENOENT' });
+    const execEnoent = vi.fn().mockRejectedValue(enoent);
+    await expect(runGh(['pr', 'list'], { caller: 'pr-cache', exec: execEnoent })).rejects.toBe(enoent);
+
+    await flushLedgerWrites();
+    expect(readLedgerWindow(Date.now())).toEqual([
+      expect.objectContaining({ outcome: 'error', cost: 0, estimated: false }),
+      expect.objectContaining({ outcome: 'error', cost: 0, estimated: false }),
+    ]);
   });
 
   it('classifies gh invocations into buckets', () => {

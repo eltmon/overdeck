@@ -14,7 +14,9 @@
  *      other call costs a flat 1 unless `opts.onSuccess` overrides it — or on
  *      a rate-limit refusal records the pause and throws
  *      `GitHubRateLimitedError`. Any other failure is rethrown unchanged
- *      (callers read `stdout`/`stderr` off it).
+ *      (callers read `stdout`/`stderr` off it) and costs 1 only when stderr
+ *      shows GitHub actually answered (an HTTP status or a `GraphQL:` error);
+ *      a local failure (bad args, no git remote, ENOENT) costs 0.
  *
  * Promise-only by design: no Effect wrapper and no sync twin (NFR-5).
  */
@@ -135,7 +137,10 @@ export async function runGh(args: string[], opts: RunGhOptions = {}): Promise<{ 
       const pause = await recordGitHubRefusal({ pool: 'user', bucket, caller, refusal });
       throw new GitHubRateLimitedError(pause, { cause: error });
     }
-    queueLedgerEntry({ ...base, outcome: 'error' });
+    // A failure GitHub never saw (bad args, no git remote, ENOENT, …) spent
+    // nothing: only charge when stderr shows GitHub actually answered.
+    const reachedGitHub = typeof stderr === 'string' && (/\bHTTP \d{3}\b/.test(stderr) || /GraphQL:/.test(stderr));
+    queueLedgerEntry({ ...base, outcome: 'error', ...(reachedGitHub ? {} : { cost: 0, estimated: false }) });
     throw error;
   }
 
