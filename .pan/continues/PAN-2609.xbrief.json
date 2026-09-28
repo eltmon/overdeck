@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-28T13:38:44.663Z",
+  "updated": "2026-09-28T13:39:14.757Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-2609",
       "claimedAt": "2026-09-28T13:38:44.663Z"
+    },
+    "cli-telemetry-bypass": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:39:14.757Z"
     }
   }
 }
