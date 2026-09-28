@@ -4,10 +4,11 @@
  *
  * One chokepoint (FR-1) so all four surfaces reject the same way: origin
  * check first, then a configured internal token, then a credential (session
- * cookie or internal token header/Bearer). Peer-based trust (`isLoopbackPeer`)
- * is deliberately NOT consulted here (FR-3) — it lives only in the session
- * mint, so PAN-2351's `require_token_mint` switch can close peer trust
- * everywhere at once by changing the mint alone. See docs/DASHBOARD-AUTH.md.
+ * cookie or internal token header/Bearer). Peer-based trust (the loopback and
+ * Docker-bridge check the session mint uses) is deliberately NOT consulted
+ * here (FR-3) — it lives only in the mint, so PAN-2351's `require_token_mint`
+ * switch can close peer trust everywhere at once by changing the mint alone.
+ * See docs/DASHBOARD-AUTH.md.
  */
 import type { Socket } from 'node:net';
 
