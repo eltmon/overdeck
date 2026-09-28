@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T00:34:50.107Z",
+  "updated": "2026-09-28T00:41:24.836Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,9 +64,10 @@
       "doneAt": "2026-09-28T00:34:11.924Z"
     },
     "dialog-nested-step": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4281",
-      "claimedAt": "2026-09-28T00:34:50.107Z"
+      "claimedAt": "2026-09-28T00:34:50.107Z",
+      "doneAt": "2026-09-28T00:41:24.836Z"
     }
   }
 }
