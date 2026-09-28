@@ -82,8 +82,12 @@ export interface RecordSegment {
 
 export interface Settlement {
   at: string;
+  /** Last chunk id written by this settlement. */
   chunk: string;
+  /** Human turns in the whole transcript after this settlement (FR-18). */
   turn: number;
+  /** Cumulative LOG line count after this settlement; versions map onto it (P-7). */
+  lines: number;
   cwdState: CwdState | null;
 }
 
@@ -106,7 +110,9 @@ export interface SessionRecord {
   /** Set on version forks (P-7). */
   parent: { vaultId: string; version: number } | null;
   segments: RecordSegment[];
+  /** The last 500 settlements; older ones are folded into `settlementsArchive` chunks. */
   settlements: Settlement[];
+  settlementsArchive?: string[];
   lineage: Array<{ environmentId: string; adoptedAt: string }>;
   tombstone: false;
   createdAt: string;
