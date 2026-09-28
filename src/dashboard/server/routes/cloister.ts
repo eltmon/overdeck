@@ -11,6 +11,8 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/cloister/spawn-status
  *   GET  /api/cloister/config
  *   PUT  /api/cloister/config
+ *   GET  /api/cloister/close-out
+ *   PUT  /api/cloister/close-out
  *   GET  /api/cloister/agents/health
  */
 
@@ -19,6 +21,11 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfigSync, saveCloisterConfigSync } from '../../../lib/cloister/config.js';
+import {
+  CloseOutSettingsError,
+  readCloseOutSettings,
+  writeCloseOutSetting,
+} from '../../../lib/cloister/close-out-settings.js';
 import { emergencyBrake } from '../../../lib/cloister/concurrency.js';
 import { saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { getAgentState } from '../../../lib/agents.js';
@@ -205,6 +212,43 @@ const putCloisterConfigRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/cloister/close-out ──────────────────────────────────────
+
+const getCloisterCloseOutRoute = HttpRouter.add(
+  'GET',
+  '/api/cloister/close-out',
+  httpHandler(Effect.tryPromise({
+    try: async () => jsonResponse(await readCloseOutSettings()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
+// ─── Route: PUT /api/cloister/close-out ──────────────────────────────────────
+
+const putCloisterCloseOutRoute = HttpRouter.add(
+  'PUT',
+  '/api/cloister/close-out',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { key, value } = (body ?? {}) as { key?: unknown; value?: unknown };
+    return yield* Effect.tryPromise({
+      try: async () => {
+        try {
+          const settings = await writeCloseOutSetting(key, value);
+          const reload = reloadDurableCloisterConfig();
+          return jsonResponse({ settings, reloaded: reload.accepted });
+        } catch (err) {
+          if (err instanceof CloseOutSettingsError) {
+            return jsonResponse({ error: err.message }, { status: err.status });
+          }
+          throw err;
+        }
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+  })),
+);
+
 // ─── Route: GET /api/cloister/agents/health ──────────────────────────────────
 
 const getCloisterAgentsHealthRoute = HttpRouter.add(
@@ -231,6 +275,8 @@ export const cloisterRouteLayer = Layer.mergeAll(
   getCloisterSpawnStatusRoute,
   getCloisterConfigRoute,
   putCloisterConfigRoute,
+  getCloisterCloseOutRoute,
+  putCloisterCloseOutRoute,
   getCloisterAgentsHealthRoute,
 );
 
