@@ -75,9 +75,9 @@ async function runCloseOutCleanup(): Promise<CloseOutCleanupResult> {
 }
 
 function formatDiskBytes(bytes: number): string {
-  const gb = bytes / 1_000_000_000;
-  if (gb >= 1) return `${gb.toFixed(1)} GB`;
-  return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  const gib = bytes / (1024 * 1024 * 1024);
+  if (gib >= 1) return `${gib.toFixed(1)} GB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function CloseOutDiskLine() {

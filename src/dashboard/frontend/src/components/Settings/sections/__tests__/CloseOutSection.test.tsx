@@ -110,7 +110,7 @@ describe('CloseOutSection', () => {
     mockFetch(SETTINGS_VIEW, {
       diskReport: {
         closedCount: 3,
-        totalBytes: 12_400_000_000,
+        totalBytes: 13_314_398_618,
         unknownSizeCount: 0,
         trackerReadsPaused: false,
         computedAt: '2026-09-28T00:00:00.000Z',
@@ -125,9 +125,18 @@ describe('CloseOutSection', () => {
     await waitFor(() => expect(screen.getByText(/3 closed issue\(s\) still have workspaces/)).toBeTruthy());
     expect(screen.getByText(/12\.4 GB/)).toBeTruthy();
 
+    const diskCallsBeforeCleanup = vi.mocked(global.fetch).mock.calls.filter(
+      ([input]) => input.toString() === '/api/cloister/close-out/disk',
+    ).length;
+
     fireEvent.click(screen.getByTestId('close-out-cleanup'));
 
     await waitFor(() => expect(screen.getByText('Skipped PAN-2 — uncommitted changes in feature-pan-2')).toBeTruthy());
+
+    const diskCallsAfterCleanup = vi.mocked(global.fetch).mock.calls.filter(
+      ([input]) => input.toString() === '/api/cloister/close-out/disk',
+    ).length;
+    expect(diskCallsAfterCleanup).toBeGreaterThan(diskCallsBeforeCleanup);
   });
 
   it('renders the paused sentence when tracker reads are paused', async () => {
