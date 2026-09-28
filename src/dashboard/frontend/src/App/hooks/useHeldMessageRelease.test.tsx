@@ -106,6 +106,13 @@ describe('held composer messages', () => {
     expect(optimistic().map((m) => m.deliveryState)).toEqual(['accepted', 'accepted']);
   });
 
+  it('releases on a row that no longer carries pendingPermission', async () => {
+    holdMessage('BTW How can I launch Orca?', 'orig-1');
+    renderRelease();
+    await feed([{ name: CONV, pendingAskUserQuestion: { toolUseId: 't', askedAt: T0.toISOString(), questions: [] } }], T0.getTime() + 4000);
+    expect(messagePosts().map((body) => body.message)).toEqual(['BTW How can I launch Orca?']);
+  });
+
   it('the resend uses a new clientMessageId', async () => {
     holdMessage('BTW How can I launch Orca?', 'orig-1');
     renderRelease();
