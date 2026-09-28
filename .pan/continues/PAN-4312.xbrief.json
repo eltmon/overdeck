@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4312",
   "created": "2026-09-28T14:11:29.588Z",
-  "updated": "2026-09-28T15:50:19.392Z",
+  "updated": "2026-09-28T15:50:31.891Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "diffs-batch-per-repo.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T15:50:19.392Z"
+    },
+    "diffs-result-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:50:31.891Z"
     }
   }
 }
