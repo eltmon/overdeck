@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:41:12.022Z",
+  "updated": "2026-09-28T15:42:47.510Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,9 +100,10 @@
       "doneAt": "2026-09-28T15:41:08.320Z"
     },
     "runaway-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4311",
-      "claimedAt": "2026-09-28T15:41:12.022Z"
+      "claimedAt": "2026-09-28T15:41:12.022Z",
+      "doneAt": "2026-09-28T15:42:47.510Z"
     }
   }
 }
