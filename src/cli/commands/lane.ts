@@ -146,6 +146,8 @@ export interface LaneStartOptions {
   at?: string;
   reuse?: boolean;
   replace?: boolean;
+  /** PAN-4311: launch even while the host is CPU-saturated. */
+  force?: boolean;
   wait?: boolean;
   json?: boolean;
 }
@@ -199,6 +201,7 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
     ...(options.at ? { at: options.at } : {}),
     ...(options.reuse ? { reuse: true } : {}),
     ...(options.replace ? { replace: true } : {}),
+    ...(options.force ? { force: true } : {}),
   };
   let answer: ApiAnswer;
   try {
@@ -579,6 +582,7 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
     .option('--at <ref>', 'Commit a critic or verifier judges (default with --for: the builder\'s newest done head)')
     .option('--reuse', 'Continue in the directory of the latest earlier lane with the same run, key and role')
     .option('--replace', 'Stop the live lane with the same run, key and role first')
+    .option('--force', 'Launch even while the host is CPU-saturated')
     .option('--no-wait', 'Return without waiting for the lane to start')
     .option('--json', 'Print the launch result as JSON')
     .action(async (options: LaneStartOptions) => exitCli(await laneStartCommand(options, deps())));

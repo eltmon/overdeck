@@ -52,6 +52,7 @@ function harness() {
     stop: vi.fn(async () => undefined),
     start: vi.fn(async () => undefined),
     emitCreated: vi.fn(),
+    cpuPressure: vi.fn(async () => ({ saturated: false, signal: 'psi-some-avg60' as const, reading: 10, threshold: 50, psiSomeAvg10: 8 })),
     sleep: vi.fn(async () => undefined),
     homeDir: () => TEST_HOME,
     tmpRoot: join(TEST_HOME, 'tmp'),
