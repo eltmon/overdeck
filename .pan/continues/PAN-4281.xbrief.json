@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T08:31:06.519Z",
+  "updated": "2026-09-28T08:31:19.424Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -284,6 +284,10 @@
     "workspace-project-missing.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T08:31:06.519Z"
+    },
+    "workspace-branch-candidates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:31:19.424Z"
     }
   }
 }
