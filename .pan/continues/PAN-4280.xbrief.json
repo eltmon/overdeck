@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:12:22.082Z",
+  "updated": "2026-09-28T01:12:34.574Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "home-intents.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T01:12:22.081Z"
+    },
+    "home-intents.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:12:34.573Z"
     }
   }
 }
