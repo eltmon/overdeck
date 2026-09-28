@@ -58,9 +58,9 @@ describe('GitHub pause gate (PAN-4264)', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('pauses a visible primary limit until the exhausted sample resets', async () => {
-    const resetAt = NOW + 25 * MINUTE;
-    await writeUserGraphqlSample(0, resetAt);
+  it('pauses a visible primary limit until the exhausted sample resets, even from a sample taken 15 minutes ago (PAN-4291 AC1)', async () => {
+    const resetAt = NOW + 40 * MINUTE;
+    await writeUserGraphqlSample(0, resetAt, 15 * MINUTE);
 
     const pause = await recordGitHubRefusal({
       pool: 'user', bucket: 'graphql', caller: 'pipeline-membership', refusal: { kind: 'primary' },
@@ -87,18 +87,28 @@ describe('GitHub pause gate (PAN-4264)', () => {
     expect(untilMs(capped)).toBe(soonReset);
   });
 
-  it('pauses a hidden primary limit for 10 minutes when no fresh sample exists, never under 60 seconds', async () => {
+  it('pauses a hidden primary limit for 10 minutes when no sample exists', async () => {
     const noSample = await recordGitHubRefusal({
       pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
     });
     expect(untilMs(noSample)).toBe(NOW + 10 * MINUTE);
+  });
 
-    await vi.advanceTimersByTimeAsync(11 * MINUTE);
-    await writeUserGraphqlSample(4900, Date.now() + 10_000);
-    const floored = await recordGitHubRefusal({
+  it('pauses a hidden primary limit for 10 minutes when the only sample has an already-passed resetAt (PAN-4291 AC3)', async () => {
+    await writeUserGraphqlSample(4900, Date.now() - 5 * MINUTE);
+    const pause = await recordGitHubRefusal({
       pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
     });
-    expect(untilMs(floored)).toBe(Date.now() + MINUTE);
+    expect(untilMs(pause)).toBe(NOW + 10 * MINUTE);
+  });
+
+  it('pauses until a sample reset only 10 seconds away, with no 60-second floor (PAN-4291 AC2)', async () => {
+    const resetAt = Date.now() + 10_000;
+    await writeUserGraphqlSample(4900, resetAt);
+    const pause = await recordGitHubRefusal({
+      pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
+    });
+    expect(untilMs(pause)).toBe(resetAt);
   });
 
   it('lets an x-ratelimit-reset header win for a primary refusal', async () => {

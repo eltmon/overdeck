@@ -36,14 +36,13 @@ import {
   computeOwnUsageLow,
   getGitHubQuotaDir,
   readLedgerWindow,
-  SAMPLE_FRESH_MS,
   type LedgerEntryInput,
 } from './ledger.js';
 
 /** A pause as stored in `pause.json` and published in the quota snapshot. */
 export type PauseRecord = GitHubQuotaPause;
 
-/** Shortest pause for a primary limit. */
+/** Shortest pause for a primary limit paused from an `x-ratelimit-reset` header. */
 export const PRIMARY_PAUSE_FLOOR_MS = 60_000;
 /** Pause for a primary limit whose cause this token cannot see. */
 export const HIDDEN_PRIMARY_PAUSE_MS = 10 * 60_000;
@@ -254,17 +253,13 @@ function primaryPauseUntil(input: RecordGitHubRefusalInput, nowMs: number): numb
   }
 
   const sample = aggregateLedger(readLedgerWindow(nowMs)).samples[input.pool]?.[input.bucket];
-  const sampleMs = sample ? Date.parse(sample.ts) : Number.NaN;
-  const fresh = sample !== undefined && Number.isFinite(sampleMs) && nowMs - sampleMs <= SAMPLE_FRESH_MS;
-  const sampleResetMs = fresh && sample.resetAt ? Date.parse(sample.resetAt) : Number.NaN;
+  const resetMs = sample?.resetAt ? Date.parse(sample.resetAt) : Number.NaN;
 
-  if (fresh && sample.remaining === 0 && Number.isFinite(sampleResetMs)) {
-    return Math.max(sampleResetMs, floor);
+  if (Number.isFinite(resetMs) && resetMs > nowMs) {
+    return sample!.remaining === 0 ? resetMs : Math.min(nowMs + HIDDEN_PRIMARY_PAUSE_MS, resetMs);
   }
 
-  let until = nowMs + HIDDEN_PRIMARY_PAUSE_MS;
-  if (Number.isFinite(sampleResetMs) && sampleResetMs < until) until = sampleResetMs;
-  return Math.max(until, floor);
+  return nowMs + HIDDEN_PRIMARY_PAUSE_MS;
 }
 
 function secondaryPauseUntil(
