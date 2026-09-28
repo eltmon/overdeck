@@ -742,7 +742,7 @@ export async function loadIssueStateFacts(
     apiError,
     now,
     ...(branch ? { branch } : {}),
-    ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable } } : {}),
+    ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable, ...(pr.merged ? { merged: true } : {}) } } : {}),
     ...(pr && !pr.merged ? { prApprovedAtHead: (deps.approvalAtHead ?? cachedApprovalAtHead)(issueId, pr.headSha) === true } : {}),
     ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
   };
@@ -868,7 +868,7 @@ export async function loadIssueStatesForProject(
       apiError: false,
       now,
       ...(branch ? { branch } : {}),
-      ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable } } : {}),
+      ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable, ...(pr.merged ? { merged: true } : {}) } } : {}),
       ...(pr && !pr.merged ? { prApprovedAtHead: approvalAtHead(issueId, pr.headSha) === true } : {}),
       ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
     };

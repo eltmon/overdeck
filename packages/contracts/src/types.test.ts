@@ -57,6 +57,17 @@ describe("DerivedIssueState", () => {
     }
     expect(decodeDerived(input)).toEqual(input)
   })
+
+  it("round-trips pr.merged true", () => {
+    const input = {
+      issueId: "PAN-4290",
+      state: "closed",
+      pr: { url: "u", number: 3, reviewState: "approved", checks: "green", mergeable: true, merged: true },
+    }
+    const decoded = decodeDerived(input)
+    expect(decoded).toEqual(input)
+    expect(encodeDerived(decoded)).toEqual(input)
+  })
 })
 
 describe("BackendPane", () => {

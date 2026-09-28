@@ -1,0 +1,165 @@
+{
+  "version": "1",
+  "issueId": "PAN-4290",
+  "created": "2026-09-28T12:19:35.919Z",
+  "updated": "2026-09-28T14:03:41.853Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pr-merged-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T12:19:35.919Z",
+      "doneAt": "2026-09-28T12:29:54.599Z"
+    },
+    "outcome-derivation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T12:30:22.130Z",
+      "doneAt": "2026-09-28T13:01:50.587Z"
+    },
+    "outcome-hooks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T13:01:54.103Z",
+      "doneAt": "2026-09-28T13:12:59.754Z"
+    },
+    "agent-step-row-outcome": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T13:13:03.349Z",
+      "doneAt": "2026-09-28T13:26:37.455Z"
+    },
+    "session-panel-outcome": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T13:26:41.459Z",
+      "doneAt": "2026-09-28T13:34:41.568Z"
+    },
+    "drawer-outcome": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T13:34:45.079Z",
+      "doneAt": "2026-09-28T13:42:25.174Z"
+    },
+    "fallback-surfaces": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T13:42:29.432Z",
+      "doneAt": "2026-09-28T13:50:28.130Z"
+    },
+    "docs-outcome-labels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4290",
+      "claimedAt": "2026-09-28T13:50:31.276Z",
+      "doneAt": "2026-09-28T13:56:56.168Z"
+    },
+    "pr-merged-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:57.095Z"
+    },
+    "pr-merged-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:23.854Z"
+    },
+    "pr-merged-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:36.236Z"
+    },
+    "outcome-derivation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:52.386Z"
+    },
+    "outcome-derivation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:05.035Z"
+    },
+    "outcome-derivation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:17.212Z"
+    },
+    "outcome-derivation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:29.707Z"
+    },
+    "outcome-derivation.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:41.187Z"
+    },
+    "outcome-derivation.ac6": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:52.726Z"
+    },
+    "outcome-hooks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:06.176Z"
+    },
+    "outcome-hooks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:20.252Z"
+    },
+    "outcome-hooks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:33.551Z"
+    },
+    "agent-step-row-outcome.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:49.305Z"
+    },
+    "agent-step-row-outcome.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:01.488Z"
+    },
+    "agent-step-row-outcome.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:16.249Z"
+    },
+    "agent-step-row-outcome.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:29.006Z"
+    },
+    "session-panel-outcome.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:42.429Z"
+    },
+    "session-panel-outcome.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:55.366Z"
+    },
+    "drawer-outcome.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:07.563Z"
+    },
+    "drawer-outcome.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:20.291Z"
+    },
+    "fallback-surfaces.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:37.091Z"
+    },
+    "fallback-surfaces.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:50.156Z"
+    },
+    "fallback-surfaces.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:03.654Z"
+    },
+    "docs-outcome-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:17.043Z"
+    },
+    "docs-outcome-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:29.439Z"
+    },
+    "docs-outcome-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:41.853Z"
+    }
+  }
+}

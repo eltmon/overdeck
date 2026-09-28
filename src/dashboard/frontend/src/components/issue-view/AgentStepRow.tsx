@@ -31,6 +31,8 @@ import { useLiveFlash } from '../../lib/useLiveFlash';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { useDashboardStore } from '../../lib/store';
+import { useSessionNodeOutcome } from '../../lib/useSessionOutcome';
+import type { SessionOutcome } from '../../lib/sessionOutcome';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { useResolvedModels, resolveWorkTypeKey } from '../../lib/useResolvedModels';
 import { useAvailableModels, type Harness, type ModelGroup } from '../shared/ModelPicker';
@@ -374,13 +376,19 @@ function getSessionStatusTitle({
   presence,
   displayStatus,
   lastHeardLabel,
+  outcome,
 }: {
   runtime: AgentRuntimeSnapshot | undefined;
   presence: SessionNodeType['presence'];
   displayStatus: string;
   lastHeardLabel?: string;
+  outcome?: SessionOutcome | null;
 }): string {
   const details: string[] = [];
+  const ended = presence === 'ended' && Boolean(outcome);
+  if (ended && outcome) {
+    details.push(`${outcome.label}: ${outcome.detail}`);
+  }
   switch (displayStatus) {
     case 'working': details.push('Actively using tools or just finished a tool run.'); break;
     case 'thinking': details.push('Waiting on model output with no tool currently in flight.'); break;
@@ -392,38 +400,22 @@ function getSessionStatusTitle({
       }
       break;
     case 'starting':
-      details.push(
-        presence === 'ended'
-          ? 'Session was starting, but it appears to have ended before reporting live activity.'
-          : 'Session is starting and has not reported live activity yet.',
-      );
+      if (!ended) details.push('Session is starting and has not reported live activity yet.');
       break;
     case 'running':
-      details.push(
-        presence === 'ended'
-          ? 'Session still reports a running state, but its tmux session has ended.'
-          : 'Session is running but has not reported a more specific live activity yet.',
-      );
+      if (!ended) details.push('Session is running but has not reported a more specific live activity yet.');
       break;
     case 'error':
-      details.push(
-        presence === 'ended'
-          ? 'Session hit an error and has ended.'
-          : 'Session hit an error and needs attention before work can continue.',
-      );
+      if (!ended) details.push('Session hit an error and needs attention before work can continue.');
       break;
     case 'stopped':
-      details.push(
-        presence === 'ended'
-          ? 'Session ended cleanly and is no longer live.'
-          : 'Agent work is stopped, but the tmux session is still live.',
-      );
+      if (!ended) details.push('Agent work is stopped, but the tmux session is still live.');
       break;
     case 'stopping': details.push('Stop has been requested and the session is shutting down.'); break;
     default: details.push(`Session status: ${displayStatus}.`); break;
   }
 
-  const includePresenceDetail = !(
+  const includePresenceDetail = !ended && !(
     presence === 'ended'
     && (displayStatus === 'starting' || displayStatus === 'running' || displayStatus === 'error' || displayStatus === 'stopped')
   );
@@ -583,8 +575,17 @@ export function AgentStepRow({
   const dotStatus = session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
   const activity = effectiveActivity(runtime, session.presence);
   const isLive = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
-  const displayStatus = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  // PAN-4290: the outcome label (Merged, Review approved, …) replaces the
+  // bare status word for an ended session; null while the session is live.
+  const outcome = useSessionNodeOutcome(session, issueId);
   const statusCssKey = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  const displayStatus = (isStopping && isLive)
+    ? 'stopping'
+    : session.awaitingInput
+      ? 'waiting'
+      : outcome
+        ? outcome.label
+        : (activity ?? session.status);
 
   const isLiveActivity = isLive && (
     statusCssKey === 'running' || statusCssKey === 'working' || statusCssKey === 'thinking' || statusCssKey === 'starting'
@@ -626,7 +627,7 @@ export function AgentStepRow({
   const sessionLabelTitle = getSessionLabelTitle(session, defaultModel, lastHeardLabel);
   const statusTitle = session.awaitingInput
     ? `Awaiting user input${session.awaitingInputPrompt ? `: ${session.awaitingInputPrompt}` : '.'}`
-    : getSessionStatusTitle({ runtime, presence: session.presence, displayStatus, lastHeardLabel });
+    : getSessionStatusTitle({ runtime, presence: session.presence, displayStatus: statusCssKey, lastHeardLabel, outcome });
 
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
@@ -639,15 +640,19 @@ export function AgentStepRow({
 
   const { latestReviewResult } = session.roundMetadata ?? {};
   const verdictTile = latestReviewResult === 'APPROVED' ? 'ok' : latestReviewResult === 'CHANGES_REQUESTED' ? 'bad' : undefined;
+  // D8: for an ended row, the outcome's tone — not the lossy status — picks
+  // the color, so an ended Review row with changes requested is no longer red.
   const cockpitDotStatus: StatusDotStatus = session.awaitingInput
     ? 'waiting'
-    : statusCssKey === 'error'
-      ? 'error'
-      : isLiveActivity
-        ? session.type === 'review' || session.type === 'reviewer' ? 'reviewing' : 'active'
-        : session.presence === 'ended' || session.status === 'stopped'
-          ? 'done'
-          : 'idle';
+    : outcome
+      ? (outcome.tone === 'attention' ? 'error' : 'done')
+      : statusCssKey === 'error'
+        ? 'error'
+        : isLiveActivity
+          ? session.type === 'review' || session.type === 'reviewer' ? 'reviewing' : 'active'
+          : session.presence === 'ended' || session.status === 'stopped'
+            ? 'done'
+            : 'idle';
 
   const renderCockpitDot = () => (
     <span className={cockpitStyles.dotSlot} data-section={SECTIONS.icon}>
@@ -661,8 +666,9 @@ export function AgentStepRow({
     </span>
   );
 
-  const statusClassForCockpit =
-    statusCssKey === 'running' || statusCssKey === 'working' || statusCssKey === 'thinking' || statusCssKey === 'starting'
+  const statusClassForCockpit = outcome
+    ? (outcome.tone === 'attention' ? 'bad' : 'muted')
+    : statusCssKey === 'running' || statusCssKey === 'working' || statusCssKey === 'thinking' || statusCssKey === 'starting'
       ? 'info'
       : statusCssKey === 'error'
         ? 'bad'
@@ -822,9 +828,9 @@ export function AgentStepRow({
               onClick={() => requestAskUserQuestionReopen(session.sessionId)}
             />
           )}
-          {!['stopped', 'unknown', 'idle', 'completed', 'running', 'working', 'thinking', 'paused'].includes(String(statusCssKey)) && (
+          {(Boolean(outcome) || !['stopped', 'unknown', 'idle', 'completed', 'running', 'working', 'thinking', 'paused'].includes(String(statusCssKey))) && (
             <span
-              className={`${railStyles.sessionStatus} ${railStyles[`sessionStatus_${statusCssKey}`] ?? ''}`}
+              className={`${railStyles.sessionStatus} ${outcome ? (outcome.tone === 'attention' ? railStyles.sessionStatus_error : '') : (railStyles[`sessionStatus_${statusCssKey}`] ?? '')}`}
               data-section={SECTIONS.status}
               title={statusTitle}
             >
