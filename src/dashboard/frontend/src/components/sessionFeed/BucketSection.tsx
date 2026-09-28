@@ -1,5 +1,6 @@
 import { ActivityFeedCard } from './ActivityFeedCard';
 import { ConversationFeedCard } from './ConversationFeedCard';
+import { GauntletRunFeedCard } from './GauntletRunFeedCard';
 import { GitFeedCard } from './GitFeedCard';
 import type { SessionFeedEntry } from './types';
 
@@ -32,7 +33,7 @@ function renderEntry(entry: SessionFeedEntry, onSelect: (entry: SessionFeedEntry
     case 'git':
       return <GitFeedCard key={entry.id} entry={entry} onSelect={handleSelect} now={now} />;
     case 'gauntlet_run':
-      return null;
+      return <GauntletRunFeedCard key={entry.id} entry={entry} onSelect={handleSelect} now={now} />;
     case 'file_change':
     case 'comment':
     case 'placeholder':

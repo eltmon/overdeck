@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { BucketSection } from '../BucketSection';
 import type { SessionFeedEntry } from '../types';
@@ -16,6 +17,29 @@ const conversation: SessionFeedEntry = {
   agent: 'claude_code',
   lastMessageDate: '2026-05-23T01:00:00.000Z',
   lastMessageSnippet: 'Conversation card snippet',
+  recencyAt: '2026-05-23T01:00:00.000Z',
+  timestampLabel: 'started',
+  sessionAlive: false,
+  agentState: 'idle',
+  projectKey: null,
+};
+
+const gauntletRun: SessionFeedEntry = {
+  kind: 'gauntlet_run',
+  id: 'gauntlet-run:lexerra:india',
+  timestamp: '2026-05-23T01:03:00.000Z',
+  workspaceId: null,
+  issueId: null,
+  run: 'india',
+  projectKey: 'lexerra',
+  orchestratorName: 'conv-2884',
+  orchestratorTitle: null,
+  countsLine: '6 builders · 6 working',
+  state: 'working',
+  latest: { text: 'alpha builder launched', at: '2026-05-23T01:03:00.000Z' },
+  lanes: [],
+  laneConversationIds: [],
+  anyAlive: true,
 };
 
 const activity: SessionFeedEntry = {
@@ -71,5 +95,21 @@ describe('BucketSection', () => {
     fireEvent.click(buttons[1]);
 
     expect(onSelect).toHaveBeenCalledWith(activity);
+  });
+
+  it('renders a gauntlet_run entry as a run card and selects it from the main area — PAN-4301', () => {
+    const onSelect = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <BucketSection label="Just Now" items={[gauntletRun]} onSelect={onSelect} now={now} />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByText('INDIA · lexerra'));
+
+    expect(screen.getByText('6 builders · 6 working')).toBeTruthy();
+    expect(onSelect).toHaveBeenCalledWith(gauntletRun);
+    client.clear();
   });
 });
