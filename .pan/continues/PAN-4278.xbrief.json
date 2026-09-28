@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4278",
   "created": "2026-09-27T23:29:11.482Z",
-  "updated": "2026-09-28T00:29:52.960Z",
+  "updated": "2026-09-28T00:30:04.949Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -268,6 +268,10 @@
     "root-cause-probe.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:29:52.960Z"
+    },
+    "root-cause-probe.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:30:04.949Z"
     }
   }
 }
