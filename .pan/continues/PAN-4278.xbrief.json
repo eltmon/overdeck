@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4278",
   "created": "2026-09-27T23:29:11.482Z",
-  "updated": "2026-09-28T00:23:22.387Z",
+  "updated": "2026-09-28T00:23:33.602Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "hold-client.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:23:22.387Z"
+    },
+    "hold-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:23:33.602Z"
     }
   }
 }
