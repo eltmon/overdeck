@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:47:39.922Z",
+  "updated": "2026-09-28T13:47:55.518Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "delivery-door-steer.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T13:47:39.922Z"
+    },
+    "delivery-door-steer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:55.518Z"
     }
   }
 }
