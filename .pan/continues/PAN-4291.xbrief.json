@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:19:28.123Z",
+  "updated": "2026-09-28T14:19:38.722Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "pause-reconcile-on-sample.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T14:19:28.123Z"
+    },
+    "pause-reconcile-on-sample.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:19:38.722Z"
     }
   }
 }
