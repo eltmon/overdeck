@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4312",
   "created": "2026-09-28T14:11:29.588Z",
-  "updated": "2026-09-28T15:49:40.715Z",
+  "updated": "2026-09-28T15:49:52.887Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
     "claude-initial-snapshot.ac5": {
       "status": "completed",
       "doneAt": "2026-09-28T15:49:40.714Z"
+    },
+    "diffs-batch-per-repo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:49:52.887Z"
     }
   }
 }
