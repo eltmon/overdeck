@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:24:01.944790Z · model: claude-opus-5-5 · open: 770_
+_Last sequenced: 2026-09-28T12:26:24.193720Z · model: claude-opus-5-5 · open: 771_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4290 | M | medium | ok |  |  | In-pipeline (live workspace): ended sessions show derived outcome (Merged, Approved, Stopped) instead of bare 'Session ended' |
+| 2 | PAN-4291 | L | high | ok |  |  | In-pipeline (live workspace): own polling drains GitHub GraphQL budget hourly, pausing calls; sampler reads wrong counter |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -782,6 +783,10 @@ _Last sequenced: 2026-09-28T12:24:01.944790Z · model: claude-opus-5-5 · open: 
 
 New issue already in the pipeline with a live workspace, so it is pinned at the free rank 1 slot rather than ranked against the backlog. It is a frontend read-time derivation over existing facts (pipeline journal, PR, role, supervisor stopped event) with clear ACs and no new stored status, so condition is ok at medium importance.
 
+### PAN-4291 (rank 2)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the free rank 2 slot rather than ranked against the backlog. The hourly GraphQL exhaustion pauses every GitHub call Overdeck makes (PR state, merges, close-out), so it degrades the pipeline itself; causes are verified, the fix list is ranked, and ACs are mechanical, so condition is ok at high importance.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1074,10 +1079,6 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 
 Codex weekly-quota exhaustion has no graceful handling — needs resource alert + downshift/dismiss policy.
 
-### PAN-4184 (rank 118)
-
-New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1085,11 +1086,37 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:24:01.944790Z",
+  "generatedAt": "2026-09-28T12:26:24.193720Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 770,
+  "openCount": 771,
   "nodes": [
+    {
+      "issue": "PAN-4290",
+      "rank": 1,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): ended sessions show derived outcome (Merged, Approved, Stopped) instead of bare 'Session ended'",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the free rank 1 slot rather than ranked against the backlog. It is a frontend read-time derivation over existing facts (pipeline journal, PR, role, supervisor stopped event) with clear ACs and no new stored status, so condition is ok at medium importance.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4291",
+      "rank": 2,
+      "size": "L",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): own polling drains GitHub GraphQL budget hourly, pausing calls; sampler reads wrong counter",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the free rank 2 slot rather than ranked against the backlog. The hourly GraphQL exhaustion pauses every GitHub call Overdeck makes (PR state, merges, close-out), so it degrades the pipeline itself; causes are verified, the fix list is ranked, and ACs are mechanical, so condition is ok at high importance.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-4217",
       "rank": 23,
@@ -8738,6 +8765,19 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "planning": "auto"
     },
     {
+      "issue": "PAN-4248",
+      "rank": 711,
+      "size": "L",
+      "importance": "medium",
+      "score": 24,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged.",
+      "rationale": "Its only blocker, the PAN-1641 Ollama sidecar, closed as completed, so it moves into the freed rank 711 slot ahead of other local-model work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1117",
       "rank": 712,
       "size": "M",
@@ -9004,19 +9044,6 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "dependsOn": [],
       "why": "state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity",
       "rationale": "Triage: references the pre-rename hook pipeline; verify against liveness.ts, which now owns state.json exclusively. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4248",
-      "rank": 711,
-      "size": "L",
-      "importance": "medium",
-      "score": 24,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged.",
-      "rationale": "Its only blocker, the PAN-1641 Ollama sidecar, closed as completed, so it moves into the freed rank 711 slot ahead of other local-model work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10600,19 +10627,6 @@ New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart
       "dependsOn": [],
       "why": "Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content.",
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4290",
-      "rank": 1,
-      "size": "M",
-      "importance": "medium",
-      "score": 62,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline (live workspace): ended sessions show derived outcome (Merged, Approved, Stopped) instead of bare 'Session ended'",
-      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the free rank 1 slot rather than ranked against the backlog. It is a frontend read-time derivation over existing facts (pipeline journal, PR, role, supervisor stopped event) with clear ACs and no new stored status, so condition is ok at medium importance.",
       "gate": "auto",
       "planning": "auto"
     }
