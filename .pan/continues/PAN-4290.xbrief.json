@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4290",
   "created": "2026-09-28T12:19:35.919Z",
-  "updated": "2026-09-28T13:59:17.212Z",
+  "updated": "2026-09-28T13:59:29.708Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "outcome-derivation.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T13:59:17.212Z"
+    },
+    "outcome-derivation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:29.707Z"
     }
   }
 }
