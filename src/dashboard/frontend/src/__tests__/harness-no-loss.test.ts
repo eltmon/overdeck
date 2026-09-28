@@ -27,7 +27,7 @@ const FRONTEND_LITERAL_FILES = [
   'components/CommandDeck/ConversationRow.tsx',
   'components/CommandDeck/ForkModal.tsx',
   'components/CommandDeck/useConversationMutations.ts',
-  'components/sessionFeed/useConversationFeed.ts',
+  'components/sessionFeed/types.ts',
   'components/sessionFeed/ConversationFeedCard.tsx',
   'components/context/ContextPage.tsx',
   'hooks/useSwitchModel.ts',

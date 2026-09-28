@@ -720,3 +720,60 @@ open with `O_NONBLOCK` and re-check the descriptor with `fstat`, so a FIFO never
 thread. A registration is written to a temp file, fsynced and `link()`ed to `registration.json`,
 so the name only appears with complete content; a file that does not parse counts as absent and
 is replaced. The transcript link is appended with the async `appendSessionIdToHistoryAsync`.
+
+## Awareness feed (PAN-4301)
+
+The Command Deck's right-hand rail is `SessionFeedSidebar`
+(`src/dashboard/frontend/src/components/sessionFeed/`) with three scopes, Needs
+you, Project and Global. Needs you is the `DecisionsPanel`. Project and Global
+show one merged feed with three tabs: All, Chats and Activity. The Git, Files and
+Comments tabs are gone because no source ever wrote rows for them; a stored
+hidden tab falls back to All.
+
+Sources, merged in `useMergedFeed.ts`:
+
+- `GET /api/conversations`, polled every 30 s (`useConversationFeed.ts`).
+- `recentActivity`, the `activity.entry` events in the dashboard store, capped
+  at 50 (`useActivityEntryFeed.ts`).
+- Memory observations (`useObservationFeed.ts`).
+
+**All shows transitions.** A conversation card is dated by a lifecycle fact:
+`endedAt` when the conversation ended, otherwise `createdAt`, labelled `ended` or
+`started`. It is never dated by transcript activity (`lastActivityAt`, the
+transcript file mtime), which moves on every write and used to pull every busy
+conversation back to "Just Now" on each poll. All keeps a conversation only when
+that lifecycle timestamp is inside a 24 h window (`FEED_WINDOW_MS`).
+
+**Chats is a recency index.** It keeps root conversations that are alive or were
+active in the last 24 h, re-dated to the recency timestamp
+(`lastActivityAt ?? lastAttachedAt ?? createdAt`, labelled `active`), newest
+first.
+
+**Gauntlet runs are one card.** Lane conversations never render as their own
+cards. `groupGauntletRuns` (`gauntletRunEntries.ts`) folds them into one run card
+per `(projectKey, gauntletRun)` with a counts line (`6 builders · 6 working`), a
+state dot and the latest event. The card's time is the newest lane report,
+failed start, end or launch, never transcript activity. A run card shows in All
+and Chats while any lane is alive or its latest event is inside the window. The
+card opens the launching conversation; its expand control lists the lanes and
+fetches `GET /api/lanes?run=<run>` only on expand, once, with no polling, for git
+facts and archived lanes.
+
+**Other rules.**
+
+- Activity entries that name an issue collapse to one card per issue: the newest
+  entry's headline, plus `N steps` for the entries folded into it.
+- Singleton runners (`flywheel-orchestrator`, `sequencer-runner`,
+  `SINGLETON_AGENT_IDS` in `@overdeck/contracts`) never render.
+- The conversation card's status dot is derived from the row: waiting when the
+  session is alive with pending input, active when it is alive and working,
+  idle otherwise.
+- **Project scope** keeps an entry when it is system-wide activity, its issue is
+  one of the project's issues, it is a conversation in the Command Deck's
+  resolved project conversation set (`projectConvIdSet`, built with
+  `resolveEffectiveProjectKey`), or it is a run card with a lane in that set.
+
+Everything above is a selector over existing rows and events; nothing is stored.
+`activity.entry` is meant for news (something shipped, failed, finished or needs
+the operator); progress telemetry belongs in `activity.detailed`. Moving the
+remaining telemetry emit sites is tracked in PAN-4306.

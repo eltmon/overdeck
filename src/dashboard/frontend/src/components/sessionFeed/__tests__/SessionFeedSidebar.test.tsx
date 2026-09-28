@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../lib/store';
 import { useAskUserQuestionUiStore } from '../../../lib/askUserQuestionUiStore';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
-import { SESSION_FEED_TAB_STORAGE_KEY, SessionFeedSidebar } from '../SessionFeedSidebar';
-import type { ConversationSessionFeedEntry, GitSessionFeedEntry } from '../types';
+import { SESSION_FEED_TAB_STORAGE_KEY, SessionFeedSidebar, navigateToFeedEntry } from '../SessionFeedSidebar';
+import type { ConversationSessionFeedEntry, GauntletRunSessionFeedEntry, GitSessionFeedEntry } from '../types';
 
 // The sidebar's pending-input count now spans two domains: agents from the read
 // model and conversations from the REST door, which it reads via react-query.
@@ -22,18 +22,12 @@ function render(ui: ReactElement) {
 }
 
 const hookSources = vi.hoisted(() => ({
-  conversations: { entries: [] as ConversationSessionFeedEntry[], isLoading: false, error: null as Error | null },
-  git: { entries: [] as GitSessionFeedEntry[], isLoading: false, error: null as Error | null },
+  conversations: { entries: [] as Array<ConversationSessionFeedEntry | GauntletRunSessionFeedEntry>, isLoading: false, error: null as Error | null },
   useConversationFeed: vi.fn(),
-  useGitFeed: vi.fn(),
 }));
 
 vi.mock('../useConversationFeed', () => ({
   useConversationFeed: hookSources.useConversationFeed,
-}));
-
-vi.mock('../useGitFeed', () => ({
-  useGitFeed: hookSources.useGitFeed,
 }));
 
 const now = new Date('2026-05-23T01:05:00.000Z');
@@ -89,6 +83,11 @@ function conversationEntry(overrides: Partial<ConversationSessionFeedEntry> = {}
     agent: 'claude_code',
     lastMessageDate: '2026-05-23T01:04:00.000Z',
     lastMessageSnippet: 'Conversation destination',
+    recencyAt: '2026-05-23T01:04:00.000Z',
+    timestampLabel: 'started',
+    sessionAlive: false,
+    agentState: 'idle',
+    projectKey: null,
     ...overrides,
   };
 }
@@ -105,11 +104,8 @@ describe('SessionFeedSidebar', () => {
     window.history.pushState(null, '', '/');
     window.localStorage.clear();
     hookSources.conversations = { entries: [], isLoading: false, error: null };
-    hookSources.git = { entries: [], isLoading: false, error: null };
     hookSources.useConversationFeed.mockImplementation(() => hookSources.conversations);
-    hookSources.useGitFeed.mockImplementation(() => hookSources.git);
     hookSources.useConversationFeed.mockClear();
-    hookSources.useGitFeed.mockClear();
     useDashboardStore.setState({
       agentsById: {},
       channelPermissionRequestsById: {},
@@ -127,16 +123,13 @@ describe('SessionFeedSidebar', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the six tabs in reference order and calls onClose', () => {
+  it('renders the All, Chats and Activity tabs only and calls onClose — PAN-4301 FR-16', () => {
     const onClose = vi.fn();
     render(<SessionFeedSidebar onClose={onClose} now={now} />);
 
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'All',
       'Chats',
-      'Files',
-      'Git',
-      'Comments',
       'Activity',
     ]);
 
@@ -145,7 +138,7 @@ describe('SessionFeedSidebar', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('renders per-tab empty states and only shows the all-tab empty state when every wired source is empty', () => {
+  it('renders per-tab empty states when every source is empty', () => {
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
     expect(screen.getByTestId('session-feed-empty-all')).toHaveTextContent('No session activity yet.');
@@ -153,38 +146,48 @@ describe('SessionFeedSidebar', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Chats' }));
     expect(screen.getByTestId('session-feed-empty-chats')).toHaveTextContent('No chats yet.');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Git' }));
-    expect(screen.getByTestId('session-feed-empty-git')).toHaveTextContent('No git activity yet.');
-
     fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
     expect(screen.getByTestId('session-feed-empty-activity')).toHaveTextContent('No activity updates yet.');
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
-    expect(screen.getByTestId('session-feed-empty-files')).toHaveTextContent('Files feed coming soon.');
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Comments' }));
-    expect(screen.getByTestId('session-feed-empty-comments')).toHaveTextContent('Comments feed coming soon.');
   });
 
-  it('renders stub tabs without invoking wired feed hooks', () => {
-    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, 'files');
+  it.each(['git', 'files', 'comments'])('falls back to All for a stored hidden tab %s', (stored) => {
+    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, stored);
 
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
-    expect(screen.getByTestId('session-feed-empty-files')).toHaveTextContent('Files feed coming soon.');
-    expect(screen.getByText('Aggregate file changes are not wired into the session feed yet.')).toBeTruthy();
-    expect(screen.queryByText('Loading activity…')).toBeNull();
-    expect(hookSources.useConversationFeed).not.toHaveBeenCalled();
-    expect(hookSources.useGitFeed).not.toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.localStorage.getItem(SESSION_FEED_TAB_STORAGE_KEY)).toBe('all');
+  });
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Comments' }));
+  it('shows the All empty state when every entry is outside the All window', () => {
+    hookSources.conversations = {
+      entries: [conversationEntry({ timestamp: '2026-05-21T01:00:00.000Z', recencyAt: '2026-05-23T01:04:00.000Z', sessionAlive: true })],
+      isLoading: false,
+      error: null,
+    };
 
-    expect(screen.getByTestId('session-feed-empty-comments')).toHaveTextContent('Comments feed coming soon.');
-    expect(screen.getByText('Issue comments are not cached for the session feed yet.')).toBeTruthy();
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    expect(screen.getByTestId('session-feed-empty-all')).toHaveTextContent('No session activity yet.');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Chats' }));
+    expect(screen.queryByTestId('session-feed-empty-chats')).toBeNull();
   });
 
   it('does not render the all-tab empty state when another wired source has entries', () => {
-    hookSources.git = { entries: [gitEntry()], isLoading: false, error: null };
+    useDashboardStore.setState({
+      recentActivity: [
+        {
+          id: 'activity-entry-all',
+          timestamp: '2026-05-23T01:04:00.000Z',
+          source: 'work',
+          level: 'info',
+          message: 'Committed sidebar work',
+          details: null,
+          issueId: 'PAN-1389',
+        },
+      ],
+    });
 
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
@@ -261,11 +264,11 @@ describe('SessionFeedSidebar', () => {
   });
 
   it('persists the active tab in localStorage and restores it on mount', () => {
-    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, 'git');
+    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, 'chats');
 
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
-    expect(screen.getByRole('tab', { name: 'Git' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Chats' })).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
 
@@ -304,11 +307,11 @@ describe('SessionFeedSidebar', () => {
   });
 
   it('leaves git entry clicks as a no-op destination', () => {
+    // PAN-4301 D11: the merged feed no longer carries git entries, so drive the
+    // navigation seam directly.
     const debug = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
-    hookSources.git = { entries: [gitEntry()], isLoading: false, error: null };
 
-    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
-    fireEvent.click(screen.getByText('Committed sidebar work').closest('button') as HTMLButtonElement);
+    navigateToFeedEntry(gitEntry());
 
     expect(window.location.pathname).toBe('/');
     expect(window.location.search).toBe('');
@@ -349,6 +352,65 @@ describe('SessionFeedSidebar', () => {
     // The restart (system-wide) survives the scope filter; the work entry does not.
     expect(screen.getByText(/Dashboard restarted via pan reload/)).toBeTruthy();
     expect(screen.queryByText('Work agent committed task-3')).toBeNull();
+  });
+
+  it('keeps the project conversations and runs in Project scope — PAN-4301 FR-15', () => {
+    const run = (runKey: string, laneIds: number[]): GauntletRunSessionFeedEntry => ({
+      kind: 'gauntlet_run',
+      id: `gauntlet-run:lexerra:${runKey}`,
+      timestamp: '2026-05-23T01:03:00.000Z',
+      workspaceId: null,
+      issueId: null,
+      run: runKey,
+      projectKey: 'lexerra',
+      orchestratorName: null,
+      orchestratorTitle: null,
+      countsLine: `${laneIds.length} builder · ${laneIds.length} working`,
+      state: 'working',
+      latest: { text: 'alpha builder launched', at: '2026-05-23T01:03:00.000Z' },
+      lanes: [],
+      laneConversationIds: laneIds,
+      anyAlive: true,
+    });
+    hookSources.conversations = {
+      entries: [
+        conversationEntry({ id: 'conversation:ten', conversationId: 10, conversationName: 'ten', issueId: null, lastMessageSnippet: 'Project root ten' }),
+        conversationEntry({ id: 'conversation:thirty', conversationId: 30, conversationName: 'thirty', issueId: null, lastMessageSnippet: 'Other root thirty' }),
+        run('india', [20, 21]),
+        run('kilo', [40]),
+      ],
+      isLoading: false,
+      error: null,
+    };
+    useDashboardStore.setState({
+      observationsByIssueId: {},
+      recentActivity: [
+        {
+          id: 'restart-entry-scope',
+          timestamp: '2026-05-23T01:04:00.000Z',
+          source: 'dashboard',
+          level: 'info',
+          message: 'Dashboard restarted via pan reload',
+          details: null,
+          issueId: null,
+        },
+      ],
+    });
+
+    render(
+      <SessionFeedSidebar
+        now={now}
+        scopeSwitcher
+        projectIssueIds={['PAN-1']}
+        projectConversationIds={new Set([10, 20])}
+      />,
+    );
+
+    expect(screen.getByText('Project root ten')).toBeTruthy();
+    expect(screen.queryByText('Other root thirty')).toBeNull();
+    expect(screen.getByText('INDIA · lexerra')).toBeTruthy();
+    expect(screen.queryByText('KILO · lexerra')).toBeNull();
+    expect(screen.getByText('Dashboard restarted via pan reload')).toBeTruthy();
   });
 
   it('navigates restart entries to their initiator conversation via the link field', () => {
@@ -527,5 +589,58 @@ describe('SessionFeedSidebar', () => {
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
     expect(screen.getByText('agent-unbound')).toBeTruthy();
+  });
+});
+
+describe('navigateToFeedEntry', () => {
+  function gauntletRunEntry(overrides: Partial<GauntletRunSessionFeedEntry> = {}): GauntletRunSessionFeedEntry {
+    return {
+      kind: 'gauntlet_run',
+      id: 'gauntlet-run:lexerra:india',
+      timestamp: '2026-09-28T10:00:00.000Z',
+      workspaceId: null,
+      issueId: null,
+      run: 'india',
+      projectKey: 'lexerra',
+      orchestratorName: 'conv-2884',
+      orchestratorTitle: 'Lexerra gauntlet',
+      countsLine: '1 builder · 1 working',
+      state: 'working',
+      latest: { text: 'alpha builder launched', at: '2026-09-28T10:00:00.000Z' },
+      lanes: [{
+        id: 7,
+        name: 'conv-lane-alpha',
+        key: 'alpha',
+        role: 'builder',
+        iteration: 1,
+        activity: 'working',
+        report: null,
+        criticOfConversationId: null,
+        createdAt: '2026-09-28T10:00:00.000Z',
+      }],
+      laneConversationIds: [7],
+      anyAlive: true,
+      ...overrides,
+    };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('routes a gauntlet run card to its orchestrator conversation', () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+
+    navigateToFeedEntry(gauntletRunEntry());
+
+    expect(pushState).toHaveBeenCalledWith(null, '', '/conv/conv-2884');
+  });
+
+  it('routes a gauntlet run card without an orchestrator to its first lane', () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+
+    navigateToFeedEntry(gauntletRunEntry({ orchestratorName: null }));
+
+    expect(pushState).toHaveBeenCalledWith(null, '', '/conv/conv-lane-alpha');
   });
 });
