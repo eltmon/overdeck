@@ -3,6 +3,7 @@
  *
  * Lexical-based text input for the conversation composer.
  * - Enter submits (calls onCommandKeyDown with 'Enter')
+ * - Ctrl+Enter / Cmd+Enter steers (calls onCommandKeyDown with 'SteerEnter', PAN-4292)
  * - Shift+Enter inserts a newline
  * - Auto-expands up to max-h-[200px], scrollable beyond that
  * - Draft persisted to localStorage (300ms debounce)
@@ -61,7 +62,7 @@ function saveDraft(conversationName: string, text: string): void {
 
 interface InnerPluginProps {
   conversationName: string;
-  onCommandKeyDown: (key: 'Enter') => void;
+  onCommandKeyDown: (key: 'Enter' | 'SteerEnter') => void;
   onTextChange: (text: string) => void;
   onSlashKey: (root: HTMLElement) => void;
 }
@@ -91,7 +92,7 @@ function ComposerPlugin({
 
         // Consume the event and delegate to the submit handler
         event?.preventDefault();
-        onCommandKeyDown('Enter');
+        onCommandKeyDown(event && (event.ctrlKey || event.metaKey) ? 'SteerEnter' : 'Enter');
         return true;
       },
       COMMAND_PRIORITY_HIGH,
@@ -189,7 +190,7 @@ export interface ComposerPromptEditorProps {
   slashCommandsEnabled?: boolean;
   disabled?: boolean;
   placeholder?: string;
-  onCommandKeyDown: (key: 'Enter') => void;
+  onCommandKeyDown: (key: 'Enter' | 'SteerEnter') => void;
   /** Exposed so parent can read current text on submit */
   editorRef?: React.RefObject<LexicalEditor | null>;
   /** Callback whenever text content changes */

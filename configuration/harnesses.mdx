@@ -37,6 +37,19 @@ Harness-native slash commands are a separate lane and are not uniform. The compo
 
 Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resume, Overdeck copies the Agent Skills standard directories synced by `pan sync` from `~/.agents/skills` into that home's `skills/` directory. Managed skills are refreshed additively, per-agent-only skill directories are preserved, and Codex still keeps its sessions and configuration inside the isolated home.
 
+## Steering a running turn
+
+Pressing **Enter** in the dashboard composer queues your message while the agent is busy: Claude Code feeds it to the model at the next tool boundary, or after the turn ends. To change course now, **steer**. Press **Ctrl+Enter** (**Cmd+Enter** on macOS), or choose **Steer** in the composer delivery selector, which then applies to Enter as well. From a shell, `pan tell --steer <id> "<message>"` does the same.
+
+| Harness | Delivery modes | What Steer does |
+| --- | --- | --- |
+| Claude Code | Auto, Steer | Interrupts the running turn and sends the message at once, like the TUI's Ctrl+Enter. Under the hood Overdeck types the message and presses Claude Code's send-now chord, Ctrl+X Ctrl+S. An idle agent just receives the message. |
+| Pi (`ohmypi`) | Auto, Steer, Follow-up | Steers over the Pi control channel. Conversations only. |
+| Codex | Auto | Not yet; see [PAN-4303](https://github.com/eltmon/overdeck/issues/4303). |
+| ACP, OpenCode, Kimi Code, Muse Code, Prime Agent | Auto | None. |
+
+A steer never falls back silently to a queued message. A harness without steer answers `steer-unsupported` and delivers nothing. A Claude Code agent launched before steer support has a PTY supervisor that presses Enter instead, and the delivery reports that it went out as a normal submit.
+
 ## Supported harnesses
 
 ### Claude Code (default)

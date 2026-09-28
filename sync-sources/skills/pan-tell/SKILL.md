@@ -48,6 +48,20 @@ pan tell ISSUE-123 "Your message here"
 4. **Validates session exists** - Fails fast if agent not running
 5. **Reaches the main agent** - for Claude Code targets it checks the agent selector and switches input back to the main agent before sending; it refuses (exit 1, message saved to mail) when it cannot confirm the switch.
 
+## Steer a running turn
+
+A plain `pan tell` queues behind a busy agent: Claude Code feeds the message in at the next tool boundary, or after the turn. To change course now, steer:
+
+```bash
+pan tell --steer ISSUE-123 "Stop the refactor. Fix the failing login test first."
+```
+
+`--steer` types the message and presses Claude Code's send-now chord (Ctrl+X Ctrl+S) instead of Enter. Claude Code interrupts the running turn and sends the message at once; an idle agent just receives it. The dashboard composer does the same with Ctrl+Enter (Cmd+Enter on macOS).
+
+- **Supported:** local Claude Code agents and conversations.
+- **Refused (exit 1, nothing sent or mailed):** other harnesses (Codex, Kimi, ACP, OpenCode, Muse, Prime Agent), remote (Fly) agents, and paused, suspended or stopped agents, which have no running turn to interrupt. Drop `--steer` to send a normal message. Steer Pi from the dashboard composer.
+- **Old PTY supervisor:** an agent launched before steer support presses Enter instead; `pan tell` prints that the message was delivered as a normal submit.
+
 ## Workflow
 
 ### 1. Find the Agent Session

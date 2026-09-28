@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T14:23:27.276639Z · model: claude-opus-5-5 · open: 790_
+_Last sequenced: 2026-09-28T16:04:32.209421Z · model: claude-opus-5-5 · open: 791_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -13,6 +13,7 @@ _Last sequenced: 2026-09-28T14:23:27.276639Z · model: claude-opus-5-5 · open: 
 | 6 | PAN-4310 | S | high | ok |  |  | In-pipeline (live workspace): Herdr stream decodes UTF-8 as Latin-1, so the Terminal tab shows mojibake; stream decoder fix. |
 | 7 | PAN-4311 | L | high | ok |  |  | In-pipeline (live workspace): CPU weights/nice for agents, observe-only runaway detector, PSI-based CPU dispatch hold |
 | 8 | PAN-4312 | L | high | ok |  |  | In-pipeline (live workspace): conversation open stalls up to 17s behind polling ops on the read lane; duplicate transcript loads |
+| 9 | PAN-4320 | M | high | ok |  |  | In-pipeline (live workspace): Herdr pane inventory never records agentId, so the dashboard serves every live agent as stopped |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -830,6 +831,10 @@ New issue already in the pipeline with a live workspace, so it is pinned at the 
 
 New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (8) rather than ranked against the backlog. Its PRD measures conversation-open stalls of up to 17.6 s caused by polling aggregates sharing the single-slot read worker lane, plus redundant transcript parses and git spawns per open; the fix list and acceptance criteria are concrete, so condition is ok at high importance.
 
+### PAN-4320 (rank 9)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (9) rather than ranked against the backlog. The body traces the defect to backend-inventory.ts dropping tokens.agentId on pane-created/metadata events while deriveServedAgentStatuses matches on it, which makes God View, Command Deck and agent counts wrong on the default Herdr backend; acceptance criteria are concrete, so condition is ok at high importance.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1094,10 +1099,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 
 Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boots.
 
-### PAN-1618 (rank 111)
-
-Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1105,10 +1106,10 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T14:23:27.276639Z",
+  "generatedAt": "2026-09-28T16:04:32.209421Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 790,
+  "openCount": 791,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -10933,6 +10934,19 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (8) rather than ranked against the backlog. Its PRD measures conversation-open stalls of up to 17.6 s caused by polling aggregates sharing the single-slot read worker lane, plus redundant transcript parses and git spawns per open; the fix list and acceptance criteria are concrete, so condition is ok at high importance.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4320",
+      "rank": 9,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): Herdr pane inventory never records agentId, so the dashboard serves every live agent as stopped",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (9) rather than ranked against the backlog. The body traces the defect to backend-inventory.ts dropping tokens.agentId on pane-created/metadata events while deriveServedAgentStatuses matches on it, which makes God View, Command Deck and agent counts wrong on the default Herdr backend; acceptance criteria are concrete, so condition is ok at high importance.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12195,6 +12209,20 @@ Work-spawn docker-health gate has no autonomous recovery — proposed work canno
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-3762",
+      "to": "PAN-2609",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4320",
+      "to": "PAN-4300",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

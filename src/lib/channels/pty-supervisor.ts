@@ -38,6 +38,7 @@ import {
   type PaneViewport,
 } from '../pane-composer.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
+import { STEER_PTY_BYTES, SUPERVISOR_STEER_ACK, type SubmitMode } from '../terminal-backends/steer-keys.js';
 import {
   INPUT_ECHO_CONFIRM_INTERVAL_MS,
   INPUT_ECHO_CONFIRM_ATTEMPTS,
@@ -73,6 +74,14 @@ export interface PtySupervisorPayload {
    * dedup instead of a second PTY write.
    */
   dedupKey?: string;
+  /**
+   * How to finish the message (PAN-4292). `enter` (default) writes `\r`.
+   * `steer` writes Claude Code's send-now chord (`\x18\x13`, Ctrl+X Ctrl+S),
+   * which interrupts the running turn and sends the message at once. A steer
+   * is answered with `{"ok":true,"submit":"steer"}` so the client can tell
+   * this supervisor from one that predates steer and pressed Enter.
+   */
+  submit?: SubmitMode;
 }
 
 /** Max accepted dedup key length; keys are free-form caller namespaces. */
@@ -145,6 +154,9 @@ function parsePayload(value: unknown): { payload: PtySupervisorPayload | null; e
   }
   if (payload.echo !== undefined && typeof payload.echo !== 'boolean') return { payload: null };
   if (payload.caller !== undefined && typeof payload.caller !== 'string') return { payload: null };
+  if (payload.submit !== undefined && payload.submit !== 'enter' && payload.submit !== 'steer') {
+    return { payload: null, error: 'submit must be "enter" or "steer"' };
+  }
   if (payload.dedupKey !== undefined
     && (typeof payload.dedupKey !== 'string' || payload.dedupKey.length === 0 || payload.dedupKey.length > DEDUP_KEY_MAX_CHARS)) return { payload: null };
   if (payload.meta !== undefined) {
@@ -243,6 +255,11 @@ async function appendEchoFailureLog(
   } catch {
     // non-critical
   }
+}
+
+/** Success body: bare 'ok' for Enter (unchanged), `{ok, submit}` for a steer (PAN-4292). */
+function deliveredBody(payload: PtySupervisorPayload): unknown {
+  return payload.submit === 'steer' ? SUPERVISOR_STEER_ACK : 'ok';
 }
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
@@ -537,8 +554,11 @@ export async function injectPtyMessage(
       );
     }
 
+    // PAN-4292: a steer presses the send-now chord instead of Enter.
+    const submitBytes = payload.submit === 'steer' ? STEER_PTY_BYTES : '\r';
+    const submitName = payload.submit === 'steer' ? 'steer chord' : 'Enter';
     await sleep(inputSettleMs(trimmed.length));
-    child.write('\r');
+    child.write(submitBytes);
 
     if (deps.readPayloadPresence) {
       for (let attempt = 1; attempt <= INPUT_SUBMIT_CONFIRM_ATTEMPTS; attempt++) {
@@ -548,9 +568,9 @@ export async function injectPtyMessage(
         if (attempt < INPUT_SUBMIT_CONFIRM_ATTEMPTS) {
           console.warn(
             `[pty-supervisor] Submitted text is still in ${agentId}'s active composer; ` +
-            `sending standalone Enter again (${attempt}/${INPUT_SUBMIT_CONFIRM_ATTEMPTS - 1}).`,
+            `sending standalone ${submitName} again (${attempt}/${INPUT_SUBMIT_CONFIRM_ATTEMPTS - 1}).`,
           );
-          child.write('\r');
+          child.write(submitBytes);
           continue;
         }
 
@@ -558,7 +578,7 @@ export async function injectPtyMessage(
         // every Enter attempt. Erase it before returning 502 so auto delivery may
         // safely fall back to tmux without stacking a duplicate copy.
         await purgePtyInput(child, trimmed.length);
-        throw new Error(`submit confirmation failed after ${INPUT_SUBMIT_CONFIRM_ATTEMPTS} Enter attempts`);
+        throw new Error(`submit confirmation failed after ${INPUT_SUBMIT_CONFIRM_ATTEMPTS} ${submitName} attempts`);
       }
     }
 
@@ -660,7 +680,7 @@ export function createPtySupervisorServer(
         deliveredDedupKeys.add(key);
         inFlightDedupKeys.delete(key);
         settle();
-        writeJson(res, 200, 'ok');
+        writeJson(res, 200, deliveredBody(payload));
       } catch (error) {
         // Release the reservation so a later retry can attempt the injection.
         inFlightDedupKeys.delete(key);
@@ -675,7 +695,7 @@ export function createPtySupervisorServer(
       await injectPtyMessage(child, agentId, payload, deps);
       // A confirmed injection starts a turn (PAN-3849 W33).
       emitLifecycleEvent(agentId, 'turn-started');
-      writeJson(res, 200, 'ok');
+      writeJson(res, 200, deliveredBody(payload));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       writeJson(res, 502, { error: message });

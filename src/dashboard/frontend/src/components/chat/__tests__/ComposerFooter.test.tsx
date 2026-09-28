@@ -5,7 +5,7 @@ import { resetComposerStore } from '../../../lib/composerStore';
 import { modelSupportsImages, findModelDef } from '../../Settings/modelCatalog';
 
 const { editorState, mockFocus, mockToastError, mockToastWarning, mockSaveStoredModel, storedEffort, voiceWidgetRenders } = vi.hoisted(() => ({
-  editorState: { text: '' },
+  editorState: { text: '', onCommandKeyDown: null as null | ((key: 'Enter' | 'SteerEnter') => void) },
   mockFocus: vi.fn(),
   mockToastError: vi.fn(),
   mockToastWarning: vi.fn(),
@@ -25,7 +25,8 @@ vi.mock('lexical', () => ({
 
 vi.mock('../ComposerPromptEditor', () => ({
   loadDraft: () => '',
-  ComposerPromptEditor: ({ editorRef, onChange, disabled, onPaste }: { editorRef: { current: unknown }; onChange: (value: string) => void; disabled: boolean; onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void }) => {
+  ComposerPromptEditor: ({ editorRef, onChange, disabled, onPaste, onCommandKeyDown }: { editorRef: { current: unknown }; onChange: (value: string) => void; disabled: boolean; onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void; onCommandKeyDown: (key: 'Enter' | 'SteerEnter') => void }) => {
+    editorState.onCommandKeyDown = onCommandKeyDown;
     editorRef.current = {
       read: (callback: () => void) => callback(),
       update: (callback: () => void) => callback(),
@@ -722,6 +723,152 @@ describe('ComposerFooter attachments', () => {
         body: JSON.stringify({ message: 'hello pi', clientMessageId: 'image-1' }),
       }),
     );
+  });
+
+  it('offers Auto and Steer for a Claude Code conversation (PAN-4292)', () => {
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} />);
+
+    const select = screen.getByLabelText('Delivery mode');
+    expect(Array.from(select.querySelectorAll('option')).map((option) => option.getAttribute('value'))).toEqual(['auto', 'steer']);
+  });
+
+  it('offers the delivery selector on a Claude Code agent session (PAN-4292)', () => {
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentId="agent-pan-4292" />);
+
+    expect(screen.getByLabelText('Delivery mode')).toBeInTheDocument();
+  });
+
+  it('keeps Auto, Steer and Follow-up for a Pi conversation (PAN-4292)', () => {
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'ohmypi' as const }} />);
+
+    const select = screen.getByLabelText('Pi delivery mode');
+    expect(Array.from(select.querySelectorAll('option')).map((option) => option.getAttribute('value'))).toEqual(['auto', 'steer', 'follow_up']);
+  });
+
+  it('renders no delivery selector for a Codex conversation (PAN-4292)', () => {
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'codex' as const }} />);
+
+    expect(screen.queryByLabelText('Delivery mode')).toBeNull();
+    expect(screen.queryByLabelText('Pi delivery mode')).toBeNull();
+  });
+
+  it('posts deliverAs steer when Steer is chosen on a Claude Code conversation (PAN-4292)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+
+    fireEvent.change(screen.getByLabelText('Delivery mode'), { target: { value: 'steer' } });
+    expect(screen.getByLabelText('Delivery mode')).toHaveAttribute('title', expect.stringContaining('interrupt the current turn'));
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('change course', 'image-1'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: 'change course', clientMessageId: 'image-1', deliverAs: 'steer' }),
+      }),
+    );
+  });
+
+  it('posts deliverAs steer to the agent route for a Claude Code agent (PAN-4292)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentId="agent-pan-4292" onSendAcknowledged={onSendAcknowledged} />);
+
+    fireEvent.change(screen.getByLabelText('Delivery mode'), { target: { value: 'steer' } });
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('change course', 'image-1'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/agents/agent-pan-4292/message',
+      expect.objectContaining({
+        body: JSON.stringify({ message: 'change course', clientMessageId: 'image-1', deliverAs: 'steer' }),
+      }),
+    );
+  });
+
+  it('Ctrl+Enter posts deliverAs steer on a Claude Code conversation with the selector on Auto (PAN-4292)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+
+    expect(screen.getByLabelText('Delivery mode')).toHaveValue('auto');
+    expect(screen.getByRole('option', { name: /Steer \((Ctrl|⌘)\+Enter\)/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
+    editorState.onCommandKeyDown?.('SteerEnter');
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('change course', 'image-1'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.objectContaining({
+        body: JSON.stringify({ message: 'change course', clientMessageId: 'image-1', deliverAs: 'steer' }),
+      }),
+    );
+  });
+
+  it('Ctrl+Enter on a Codex conversation sends like Enter, with no deliverAs (PAN-4292)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'codex' as const }} onSendAcknowledged={onSendAcknowledged} />);
+
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'keep going' } });
+    editorState.onCommandKeyDown?.('SteerEnter');
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('keep going', 'image-1'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/test-conv/message',
+      expect.objectContaining({
+        body: JSON.stringify({ message: 'keep going', clientMessageId: 'image-1' }),
+      }),
+    );
+  });
+
+  it('resets the delivery mode when a reused composer switches conversations (PAN-4292)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const onSendAcknowledged = vi.fn();
+
+    const view = render(<ComposerFooter conversation={{ ...conversation, harness: 'ohmypi' as const }} onSendAcknowledged={onSendAcknowledged} />);
+    fireEvent.change(screen.getByLabelText('Pi delivery mode'), { target: { value: 'follow_up' } });
+
+    view.rerender(<ComposerFooter conversation={{ ...secondConversation, harness: 'claude-code' as const }} onSendAcknowledged={onSendAcknowledged} />);
+
+    await waitFor(() => expect(screen.getByLabelText('Delivery mode')).toHaveValue('auto'));
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'plain message' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalledWith('plain message', 'image-1'));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/conversations/other-conv/message',
+      expect.objectContaining({ body: JSON.stringify({ message: 'plain message', clientMessageId: 'image-1' }) }),
+    );
+  });
+
+  it('warns when the server delivered a steer as a normal submit (PAN-4292)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response(
+      JSON.stringify({ ok: true, steerDegraded: 'supervisor predates steer; delivered as a normal submit' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    const onSendAcknowledged = vi.fn();
+
+    render(<ComposerFooter conversation={{ ...conversation, harness: 'claude-code' as const }} agentBusy onSendAcknowledged={onSendAcknowledged} />);
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'change course' } });
+    editorState.onCommandKeyDown?.('SteerEnter');
+
+    await waitFor(() => expect(onSendAcknowledged).toHaveBeenCalled());
+    expect(mockToastWarning).toHaveBeenCalledWith('Sent without interrupting: supervisor predates steer; delivered as a normal submit');
   });
 
   it('posts live thinking-level changes for Codex conversations', async () => {

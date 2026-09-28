@@ -1,0 +1,53 @@
+{
+  "version": "1",
+  "issueId": "PAN-4310",
+  "created": "2026-09-28T13:32:18.843Z",
+  "updated": "2026-09-28T13:57:34.719Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "utf8-frame-decode": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4310",
+      "claimedAt": "2026-09-28T13:32:18.842Z",
+      "doneAt": "2026-09-28T13:46:25.520Z"
+    },
+    "docs-utf8-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4310",
+      "claimedAt": "2026-09-28T13:46:31.919Z",
+      "doneAt": "2026-09-28T13:47:33.701Z"
+    },
+    "utf8-frame-decode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:16.168Z"
+    },
+    "utf8-frame-decode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:28.970Z"
+    },
+    "utf8-frame-decode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:41.567Z"
+    },
+    "utf8-frame-decode.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:54.766Z"
+    },
+    "utf8-frame-decode.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:08.790Z"
+    },
+    "docs-utf8-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:23.442Z"
+    },
+    "docs-utf8-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:34.718Z"
+    }
+  }
+}
