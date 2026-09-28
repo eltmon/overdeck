@@ -1017,3 +1017,47 @@ describe('ConversationPanel subagent message target (PAN-3982)', () => {
     expect(window.location.search).not.toContain('subagent=');
   });
 });
+
+describe('ConversationPanel /diffs polling (PAN-4312)', () => {
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    window.history.replaceState(null, '', '/');
+    localStorage.clear();
+  });
+
+  function diffsCallCount(): number {
+    return fetchControl.fetchMock.mock.calls.filter(([input]) => {
+      const url = input instanceof Request ? input.url : String(input);
+      return /\/api\/conversations\/test-conv\/diffs$/.test(url);
+    }).length;
+  }
+
+  it('polls /diffs exactly once for an ended conversation over 15s', async () => {
+    renderPanel({ ...mockConversation, sessionAlive: false });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(diffsCallCount()).toBe(1);
+
+    await act(() => vi.advanceTimersByTimeAsync(15_000));
+    expect(diffsCallCount()).toBe(1);
+  });
+
+  it('keeps polling /diffs for a live conversation', async () => {
+    renderPanel({ ...mockConversation, sessionAlive: true });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(diffsCallCount()).toBeGreaterThan(1);
+  });
+});

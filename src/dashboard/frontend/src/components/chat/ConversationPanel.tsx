@@ -332,7 +332,8 @@ export function ConversationPanel({
       return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
     },
     enabled: !isSyntheticConversation,
-    refetchInterval: 5000,
+    // Ended conversations cannot gain new edits, so stop polling once the session dies.
+    refetchInterval: conversation.sessionAlive ? 5000 : false,
   })
 
   const turnDiffSummaryByAssistantMessageId = useMemo(() => {
