@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4312",
   "created": "2026-09-28T14:11:29.588Z",
-  "updated": "2026-09-28T15:29:40.635Z",
+  "updated": "2026-09-28T15:37:55.914Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-09-28T15:29:37.070Z"
     },
     "diffs-batch-per-repo": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4312",
-      "claimedAt": "2026-09-28T15:29:40.635Z"
+      "claimedAt": "2026-09-28T15:29:40.635Z",
+      "doneAt": "2026-09-28T15:37:55.914Z"
     }
   }
 }
