@@ -339,7 +339,7 @@ type WiredSessionFeedTab = Exclude<SessionFeedTab, 'files' | 'comments'>;
 type StubSessionFeedTab = Extract<SessionFeedTab, 'files' | 'comments'>;
 
 function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: WiredSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date; issueIds?: readonly string[]; unscoped?: boolean }) {
-  const feed = useMergedFeed(tab);
+  const feed = useMergedFeed(tab, now.getTime());
   // PAN-1561 scoping: `unscoped` keeps only entries with no issue (the No-project
   // bucket); otherwise `issueIds` keeps entries for those issues (case-insensitive).
   const idSet = useMemo(

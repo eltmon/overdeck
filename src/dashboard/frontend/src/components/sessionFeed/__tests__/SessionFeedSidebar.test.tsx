@@ -189,7 +189,19 @@ describe('SessionFeedSidebar', () => {
   });
 
   it('does not render the all-tab empty state when another wired source has entries', () => {
-    hookSources.git = { entries: [gitEntry()], isLoading: false, error: null };
+    useDashboardStore.setState({
+      recentActivity: [
+        {
+          id: 'activity-entry-all',
+          timestamp: '2026-05-23T01:04:00.000Z',
+          source: 'work',
+          level: 'info',
+          message: 'Committed sidebar work',
+          details: null,
+          issueId: 'PAN-1389',
+        },
+      ],
+    });
 
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
@@ -309,11 +321,11 @@ describe('SessionFeedSidebar', () => {
   });
 
   it('leaves git entry clicks as a no-op destination', () => {
+    // PAN-4301 D11: the merged feed no longer carries git entries, so drive the
+    // navigation seam directly.
     const debug = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
-    hookSources.git = { entries: [gitEntry()], isLoading: false, error: null };
 
-    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
-    fireEvent.click(screen.getByText('Committed sidebar work').closest('button') as HTMLButtonElement);
+    navigateToFeedEntry(gitEntry());
 
     expect(window.location.pathname).toBe('/');
     expect(window.location.search).toBe('');
