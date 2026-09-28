@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:54:34.652Z",
+  "updated": "2026-09-28T02:19:06.667Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,10 @@
       "claimedBy": "agent-pan-4283",
       "claimedAt": "2026-09-28T01:52:02.049Z",
       "doneAt": "2026-09-28T01:54:34.652Z"
+    },
+    "close-out-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T02:19:06.666Z"
     }
   }
 }
