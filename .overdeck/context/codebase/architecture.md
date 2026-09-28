@@ -152,4 +152,6 @@ injectable dep: the lib defaults serve the CLI; the route must inject the server
 facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
 imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
+Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store.
+
 <!-- last-verified: 2026-09-28 -->

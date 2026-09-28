@@ -614,7 +614,7 @@ export function loadProjectsConfigSync(): ProjectsConfig {
   }
 }
 
-interface ProjectsConfigMutation<T> {
+export interface ProjectsConfigMutation<T> {
   config: ProjectsConfig;
   result: T;
   changed: boolean;
@@ -650,7 +650,7 @@ function updateProjectsConfigSync<T>(
   return result;
 }
 
-async function updateProjectsConfigAsync<T>(
+export async function updateProjectsConfigAsync<T>(
   transform: (config: ProjectsConfig) => ProjectsConfigMutation<T>,
 ): Promise<T> {
   const result = await updateProjectsConfigText(PROJECTS_CONFIG_FILE, 'projects: {}\n', content => {

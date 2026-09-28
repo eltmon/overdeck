@@ -184,14 +184,6 @@ export interface AgentResourceStats {
   totalUsd: number;
 }
 
-export interface Skill {
-  name: string;
-  path: string;
-  source: 'overdeck' | 'claude';
-  hasSkillMd: boolean;
-  description?: string;
-}
-
 // Overdeck's canonical states (richer than most trackers)
 export type CanonicalState =
   | 'backlog'
