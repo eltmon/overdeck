@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:36:52.557Z",
+  "updated": "2026-09-28T00:37:04.821Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "get-set-up-card.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T00:36:52.557Z"
+    },
+    "get-set-up-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:04.821Z"
     }
   }
 }
