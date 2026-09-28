@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:37:17.103Z",
+  "updated": "2026-09-28T00:37:29.631Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "connection-store.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T00:37:17.102Z"
+    },
+    "eventrouter-bootstrap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:29.631Z"
     }
   }
 }
