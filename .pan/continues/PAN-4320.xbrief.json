@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4320",
   "created": "2026-09-28T15:34:16.087Z",
-  "updated": "2026-09-28T16:29:26.342Z",
+  "updated": "2026-09-28T16:29:37.598Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -180,6 +180,10 @@
     "live-herdr-verification.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T16:29:26.341Z"
+    },
+    "live-herdr-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:29:37.598Z"
     }
   }
 }
