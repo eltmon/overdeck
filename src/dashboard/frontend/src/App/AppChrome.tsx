@@ -81,8 +81,9 @@ export function AppChrome({
         <GitHubRateLimitBanner />
 
         {/* Setup checklist — shown while a required host tool (tmux, git, node,
-            claude) is missing from the server's PATH (PAN-774) */}
-        <SetupChecklistBanner />
+            claude) is missing from the server's PATH (PAN-774). Hidden on the
+            Home tab, which shows the "Get set up" card instead (PAN-4282). */}
+        <SetupChecklistBanner activeTab={activeTab} />
 
         {/* Package/context inputs changed since the last pan sync. */}
         <SyncRequiredBanner />

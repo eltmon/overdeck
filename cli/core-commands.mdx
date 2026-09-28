@@ -28,6 +28,8 @@ This command:
 - Creates necessary configuration directories
 - Sets up git hooks for registered projects
 
+The prerequisite gate only fails on Node, git, and (under the tmux backend) tmux. Docker, ast-grep, and (under Herdr) tmux print a yellow warning instead of failing, and installation continues.
+
 ## pan sync
 
 Sync skills and configuration to all AI tools.
@@ -63,7 +65,8 @@ Checks:
 - Node.js version (22+ required)
 - Git installation
 - Docker installation and status
-- tmux installation
+- tmux installation (a warning, not an error, when Herdr is the terminal backend)
+- Claude Code and GitHub CLI login state (warnings)
 - Required CLI tools (gh, glab)
 - Configuration files
 - API key validity
