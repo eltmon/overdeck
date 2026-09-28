@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T13:52:28.208Z",
+  "updated": "2026-09-28T13:58:40.563Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,9 +68,10 @@
       "doneAt": "2026-09-28T13:52:10.083Z"
     },
     "pr-cache-idle-ttl": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4291",
-      "claimedAt": "2026-09-28T13:52:28.208Z"
+      "claimedAt": "2026-09-28T13:52:28.208Z",
+      "doneAt": "2026-09-28T13:58:40.563Z"
     }
   }
 }
