@@ -103,6 +103,11 @@ describe('checkSystemPrerequisites', () => {
     }
   });
 
+  it('the herdr catalog entry points every platform at `pan install` (PAN-4282 D3)', () => {
+    const herdr = PREREQUISITES.find((definition) => definition.id === 'herdr');
+    expect(herdr?.install).toEqual({ linux: 'pan install', mac: 'pan install', win: 'pan install' });
+  });
+
   it('lists the Kimi Code CLI prerequisite exactly once, covering both native and ACP harnesses (PAN-1837 wi10.ac1)', () => {
     const kimiEntries = PREREQUISITES.filter((definition) => definition.id === 'kimi');
     expect(kimiEntries).toHaveLength(1);
