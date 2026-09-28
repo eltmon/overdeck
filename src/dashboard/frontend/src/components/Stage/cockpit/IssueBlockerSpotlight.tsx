@@ -24,7 +24,7 @@ export function IssueBlockerSpotlight({ issueId }: { issueId: string }) {
   const blocked = spotlight.tone === 'blocked'
   const buttons = spotlight.actionKeys
     .map((key) => actions.all.find((v) => v.action.key === key))
-    .filter((v): v is IssueActionView => !!v && v.enabled)
+    .filter((v): v is IssueActionView => !!v && (v.enabled || v.blockedOffline))
     .slice(0, 3)
 
   const detail = spotlight.detail?.trim()
@@ -68,7 +68,8 @@ export function IssueBlockerSpotlight({ issueId }: { issueId: string }) {
               <button
                 key={view.action.key}
                 type="button"
-                disabled={view.isPending}
+                disabled={view.isPending || view.blockedOffline}
+                title={view.blockedOffline ? view.disabledReason : undefined}
                 onClick={view.invoke}
                 className={`inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-50 ${
                   i === 0 && blocked

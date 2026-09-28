@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import {
   sendConversationMessage,
@@ -7,6 +7,8 @@ import {
   useConversationFailed,
   type SendFailureDetails,
 } from '../../lib/composerStore';
+import { deriveConnectionPhase, useConnectionPhase, useConnectionState } from '../../lib/connectionState';
+import type { FailedMessage } from './chat-types';
 
 interface ComposerDeliveryStateOptions {
   conversation: Conversation;
@@ -28,6 +30,32 @@ function openCommandUi(
       focus,
     },
   }));
+}
+
+/** Conversations whose held messages are being sent; one flusher per conversation. */
+const flushingConversations = new Set<string>();
+
+/**
+ * Send a conversation's held messages (PAN-4279) one at a time, oldest first,
+ * while the phase stays `live`. Reads the store on every step, so entries held
+ * during the flush are sent too and every entry is attempted exactly once.
+ */
+async function flushHeldMessages(conversationName: string, send: (held: FailedMessage) => Promise<unknown>) {
+  if (flushingConversations.has(conversationName)) return;
+  flushingConversations.add(conversationName);
+  const attempted = new Set<string>();
+  try {
+    while (deriveConnectionPhase(useConnectionState.getState()) === 'live') {
+      const next = (useComposerStore.getState().byConversation[conversationName]?.failed ?? [])
+        .filter((failed) => failed.heldOffline && !attempted.has(failed.id))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+      if (!next) break;
+      attempted.add(next.id);
+      await send(next);
+    }
+  } finally {
+    flushingConversations.delete(conversationName);
+  }
 }
 
 export function useComposerDeliveryState({
@@ -89,6 +117,22 @@ export function useComposerDeliveryState({
     }
     replaceCommandResult(conversation.name, messageId, nextResult);
   }, [agentId, commandResults, conversation, removeCommandResult, replaceCommandResult]);
+
+  // Held messages go out once the server is back — including those held for
+  // this conversation while its panel was not mounted.
+  const connectionPhase = useConnectionPhase();
+  const hasHeld = failedMessages.some((failed) => failed.heldOffline);
+  useEffect(() => {
+    if (connectionPhase !== 'live' || !hasHeld) return;
+    void flushHeldMessages(conversation.name, (held) => retryFailed(
+      conversation.name,
+      held.id,
+      held.text,
+      serverBaseCount,
+      agentId,
+      serverMessageIds,
+    ));
+  }, [agentId, connectionPhase, conversation.name, hasHeld, retryFailed, serverBaseCount, serverMessageIds]);
 
   const handleDiscardFailed = useCallback((failedId: string) => {
     removeFailed(conversation.name, failedId);

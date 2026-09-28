@@ -1,0 +1,247 @@
+{
+  "version": "1",
+  "issueId": "PAN-4279",
+  "created": "2026-09-27T23:48:05.677Z",
+  "updated": "2026-09-28T00:44:39.798Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "connection-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-27T23:48:05.677Z",
+      "doneAt": "2026-09-27T23:50:02.319Z"
+    },
+    "eventrouter-bootstrap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-27T23:56:02.360Z",
+      "doneAt": "2026-09-27T23:56:13.579Z"
+    },
+    "degraded-banner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:00:14.572Z",
+      "doneAt": "2026-09-28T00:00:26.639Z"
+    },
+    "boundary-first-load": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:02:04.654Z",
+      "doneAt": "2026-09-28T00:02:16.242Z"
+    },
+    "remove-outage-guards": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:02:20.260Z",
+      "doneAt": "2026-09-28T00:04:34.670Z"
+    },
+    "issue-actions-offline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:04:39.556Z",
+      "doneAt": "2026-09-28T00:08:09.584Z"
+    },
+    "composer-held-messages": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:08:15.259Z",
+      "doneAt": "2026-09-28T00:12:18.362Z"
+    },
+    "asset-recovery-overlay": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:12:22.730Z",
+      "doneAt": "2026-09-28T00:13:39.025Z"
+    },
+    "ci-frontend-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:13:45.025Z",
+      "doneAt": "2026-09-28T00:14:16.581Z"
+    },
+    "browser-suite": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:22:56.117Z",
+      "doneAt": "2026-09-28T00:23:07.484Z"
+    },
+    "docs-degraded-mode": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4279",
+      "claimedAt": "2026-09-28T00:23:12.643Z",
+      "doneAt": "2026-09-28T00:24:10.357Z"
+    },
+    "connection-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:36:41.181Z"
+    },
+    "connection-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:36:52.711Z"
+    },
+    "connection-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:04.981Z"
+    },
+    "connection-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:17.102Z"
+    },
+    "eventrouter-bootstrap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:29.631Z"
+    },
+    "eventrouter-bootstrap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:41.754Z"
+    },
+    "eventrouter-bootstrap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:53.455Z"
+    },
+    "eventrouter-bootstrap.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:04.600Z"
+    },
+    "eventrouter-bootstrap.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:16.024Z"
+    },
+    "degraded-banner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:26.927Z"
+    },
+    "degraded-banner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:38.214Z"
+    },
+    "degraded-banner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:49.537Z"
+    },
+    "degraded-banner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:00.158Z"
+    },
+    "degraded-banner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:11.794Z"
+    },
+    "boundary-first-load.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:22.896Z"
+    },
+    "boundary-first-load.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:33.782Z"
+    },
+    "boundary-first-load.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:45.571Z"
+    },
+    "boundary-first-load.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:57.181Z"
+    },
+    "boundary-first-load.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:40:08.920Z"
+    },
+    "remove-outage-guards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:40:21.702Z"
+    },
+    "remove-outage-guards.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:40:34.328Z"
+    },
+    "remove-outage-guards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:40:45.680Z"
+    },
+    "issue-actions-offline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:40:57.042Z"
+    },
+    "issue-actions-offline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:41:08.497Z"
+    },
+    "issue-actions-offline.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:41:19.972Z"
+    },
+    "composer-held-messages.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:41:32.356Z"
+    },
+    "composer-held-messages.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:41:44.038Z"
+    },
+    "composer-held-messages.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:41:56.435Z"
+    },
+    "composer-held-messages.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:42:08.158Z"
+    },
+    "asset-recovery-overlay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:42:18.953Z"
+    },
+    "asset-recovery-overlay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:42:30.278Z"
+    },
+    "asset-recovery-overlay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:42:42.462Z"
+    },
+    "browser-suite.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:42:53.642Z"
+    },
+    "browser-suite.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:43:04.810Z"
+    },
+    "browser-suite.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:43:16.886Z"
+    },
+    "browser-suite.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:43:28.338Z"
+    },
+    "browser-suite.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:43:39.513Z"
+    },
+    "docs-degraded-mode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:43:51.174Z"
+    },
+    "docs-degraded-mode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:44:02.975Z"
+    },
+    "docs-degraded-mode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:44:14.744Z"
+    },
+    "ci-frontend-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:44:26.884Z"
+    },
+    "ci-frontend-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:44:39.798Z"
+    }
+  }
+}

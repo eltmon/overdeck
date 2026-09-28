@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
-import { isBackendOutage } from '../../lib/backendOutageState';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
@@ -373,7 +372,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
   // PAN-1234: j/k row navigation; Enter opens the selected row.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (keyboardShortcutsDisabled || isBackendOutage()) return;
+      if (keyboardShortcutsDisabled) return;
       const target = e.target as HTMLElement;
       const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       if (inInput || e.defaultPrevented) return;

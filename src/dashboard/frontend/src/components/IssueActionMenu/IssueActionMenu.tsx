@@ -436,14 +436,14 @@ export function IssueActionMenu({
   // PAN-4198 (D5): the agent-scope menu is its own allowlist and ignores
   // placement, so Pause and Recover still reach the fleet cards.
   const inScope = (view: IssueActionView) => (
-    agentScopeOnly ? AGENT_SCOPE_ACTION_KEYS.has(view.action.key) && view.enabled : true
+    agentScopeOnly ? AGENT_SCOPE_ACTION_KEYS.has(view.action.key) && (view.enabled || view.blockedOffline) : true
   );
   const scopedAll = actions.all.filter(inScope);
   const scopedPrimary = actions.primary.filter(inScope);
   const scopedSecondary = actions.secondary.filter(inScope);
   const scopedOverflow = actions.overflow.filter(inScope);
   const registryPins = pinRight
-    .map((key) => scopedAll.find((view) => view.action.key === key && view.enabled))
+    .map((key) => scopedAll.find((view) => view.action.key === key && (view.enabled || view.blockedOffline)))
     .filter((view): view is IssueActionView => !!view);
   const enabledRegistryPinSet = new Set(registryPins.map((view) => view.action.key));
   const excludedFromOverflow = (view: IssueActionView) =>

@@ -15,7 +15,7 @@ import App, {
   serializeConversationViewModes,
 } from './App';
 import { useDashboardStore } from './lib/store';
-import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from './lib/backendConnectionEvents';
+import { useConnectionState } from './lib/connectionState';
 
 const {
   mockDashboardState,
@@ -148,6 +148,7 @@ vi.mock('./lib/store', () => ({
   selectPendingInputSubjects: () => [],
   selectMemoryObservations: () => () => [],
   selectRestartGate: (state: { restartGate?: unknown }) => state.restartGate ?? null,
+  selectGitHubQuota: (state: { githubQuota?: unknown }) => state.githubQuota ?? null,
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
@@ -417,25 +418,23 @@ describe('App primary routing', () => {
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
   });
 
-  it('keeps route views mounted with a banner during a transient stream reconnect', async () => {
+  it('keeps route views mounted and visible while the server is unreachable', () => {
     window.history.replaceState(null, '', '/command-deck/panopticon-cli');
     renderApp();
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
 
     act(() => {
-      window.dispatchEvent(new CustomEvent(BACKEND_RECONNECTING_EVENT));
+      useConnectionState.setState({ hasSnapshot: true, serverReachable: false });
     });
 
-    // Transient reconnects must NOT tear down the UI (PAN-3373 regression):
-    // the route view stays mounted and a non-blocking banner announces it.
+    // Degraded mode never hides or unmounts the route view (PAN-4279).
+    expect(screen.getByTestId('selected-project')).toBeVisible();
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
-    expect(screen.getByRole('status')).toHaveTextContent('Connection lost — reconnecting…');
+    expect(document.querySelector('[data-component="first-load-screen"]')).toBeNull();
 
     act(() => {
-      window.dispatchEvent(new CustomEvent(BACKEND_RECONNECTED_EVENT));
+      useConnectionState.setState({ serverReachable: true });
     });
-
-    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
   });
 
