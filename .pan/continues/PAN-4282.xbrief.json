@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:35:41.274Z",
+  "updated": "2026-09-28T00:35:52.368Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
     "prereq-backend-required.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T00:35:41.274Z"
+    },
+    "prereq-report-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:35:52.367Z"
     }
   }
 }
