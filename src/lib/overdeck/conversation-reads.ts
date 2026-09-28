@@ -49,6 +49,7 @@ import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import {
   computeContextUsage,
+  contextUsageFromParseResult,
   parseConversationMessages,
   parseFromLastCompactBoundary,
   type ParseState,
@@ -582,14 +583,7 @@ export async function getConversationMessagesRead(
         updateConversationCost(name, parsed.totalCost, parsed.totalTokens);
       }
 
-      let contextUsage = null;
-      if (conv) {
-        try {
-          contextUsage = await computeContextUsage(sessionFile, conv.model);
-        } catch {
-          contextUsage = null;
-        }
-      }
+      const contextUsage = conv ? contextUsageFromParseResult(parsed, conv.model) : null;
       const subagents = agentId === undefined
         ? isCodexSessionFile(parentSessionFile)
           ? await listCodexSubagents(parentSessionFile, parsed.workLog)

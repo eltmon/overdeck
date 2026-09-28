@@ -180,11 +180,17 @@ so neither reaches `feedback`, `scopeDrift`, `sessionHistory`, or
 door that does not exist; a real record read door would be a separate change.
 
 **DB job worker lanes:**
-- The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
-  reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
-  The `parse` lane runs `parseTranscriptSnapshot`. Transcript parsing is CPU-bound and
-  can take seconds, so its own lane cannot block interactive reads or wait behind bulk
-  sweeps.
+- Five lanes. The `read` lane handles interactive point lookups only (e.g.
+  `getConversationByName`). The `poll` lane runs the four polling aggregates —
+  `getCostsByIssueSnapshot`, `getConversationSearchStats`, `getConversationLedgerCosts`,
+  and `getAgentCostStats` — so their multi-second refreshes never queue behind, or ahead
+  of, an interactive lookup. The `long` lane handles bulk scans and reconciliation, and
+  the `semantic` lane isolates embedding and semantic-search work. The `parse` lane runs
+  `parseTranscriptSnapshot`. Transcript parsing is CPU-bound and can take seconds, so its
+  own lane cannot block interactive reads or wait behind bulk sweeps. Rule: an aggregate
+  or scan never shares a lane with a lookup that sits on an interactive path (PAN-4312 —
+  before this, the polling aggregates shared `read` with `getConversationByName`, so a
+  live conversation subscribe could wait behind a 13-second search-stats refresh).
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.
@@ -218,21 +224,50 @@ door that does not exist; a real record read door would be a separate change.
   transfer memory without repeated parsing while preserving EventBus publication and
   durable skip-cache updates.
 - Cost polling, conversation-list ledger totals, and search counters use shared worker
-  snapshots. Concurrent refreshes coalesce. Cost snapshots refresh after 15 seconds;
-  search counters refresh after 60 seconds. Successful values remain usable for at most
-  five minutes during refresh failures, with a five-second retry backoff. Search
-  configuration, provider availability, and runtime health are still read per request.
+  snapshots on the `poll` lane. Concurrent refreshes coalesce. Cost snapshots refresh
+  after 15 seconds; search counters refresh after 60 seconds and read `lastIndexedAt`
+  from `max(file_cursors.updated_at)` rather than scanning every row of the `chunks`
+  table (PAN-4312 — that scan cost ~9s on a 3GB embeddings DB). Successful values remain
+  usable for at most five minutes during refresh failures, with a five-second retry
+  backoff. Search configuration, provider availability, and runtime health are still
+  read per request.
 - Agent resource costs use one grouped worker query and a 15-second shared snapshot,
   invalidated when agent membership changes. Hourly burn remains twice the sum in the
   last 30 minutes, with the inclusive cutoff and rounding to cents preserved. SQLite's
   more accurate summation can correct a cent at a half-cent floating-point boundary.
   Resource polling no longer materializes each agent's full ledger history.
-- `subscribeConversationMessages` resolves transcript paths on the main thread and
-  shares worker parse results across subscribers. Codex consumes appended records;
-  other full-parser harnesses still parse changed files in the worker. Clients receive
-  complete initial history, then changed message/tool rows and metadata. Explicit resets
-  replace history after truncation/replacement, and metadata snapshots clear removed
-  plans or compact boundaries. Full tool results remain accessible.
+- `subscribeConversationMessages` resolves the conversation row with a `read`-lane point
+  lookup (`getConversationByName`), then resolves transcript paths on the main thread and
+  shares worker parse results across subscribers. The Claude initial transcript snapshot
+  goes through `sharedTranscriptParser('claude-initial')`: reused while the file's stat
+  signature is unchanged, with each subscriber getting its own copy of the mutable
+  parse-state containers (`parseStateFromSnapshot`), since the incremental parser mutates
+  those containers in place and a shared copy would corrupt other subscribers. A missing
+  session file (a freshly spawned conversation subscribing before its transcript exists)
+  still dispatches an uncached parse rather than throwing; `watchConversation` then polls
+  until the file appears. Codex consumes appended records; other full-parser harnesses
+  still parse changed files in the worker. Clients receive complete initial history, then
+  changed message/tool rows and metadata. Explicit resets replace history after
+  truncation/replacement, and metadata snapshots clear removed plans or compact
+  boundaries. Full tool results remain accessible.
+  - The client shows the loading skeleton until the first WS payload arrives, and falls
+    back to HTTP `GET .../messages` only after `MESSAGES_HTTP_FALLBACK_MS` (1500 ms) pass
+    without one (`useMessagesHttpFallback`, PAN-4312). Resume, switch-model, and fork
+    completion re-read over HTTP with `queryClient.fetchQuery({ ..., staleTime: 0 })`
+    rather than `invalidateQueries`, since `invalidateQueries` does not refetch a
+    disabled query, and `fetchQuery` without `staleTime: 0` would return cached data
+    without a request whenever a recent stream event left the query fresh under the
+    app's default 30 s `staleTime`.
+  - Context usage comes from the parse result (`contextUsageFromParseResult`) on both the
+    WS path and HTTP `/messages`, instead of a second file parse. `GET
+    /api/conversations/:id` uses a memoized `computeContextUsage`, keyed by session file
+    and model and validated against file size and mtime, so a repeat read with an
+    unchanged transcript never reopens the file.
+  - `/diffs` polls only while the conversation's session is alive (an ended conversation
+    cannot gain new edits), runs one `git diff` pair per repo across every edited turn
+    instead of one pair per turn, and caches its result for 30 seconds keyed by the
+    transcript's size and mtime (repo `HEAD` is not part of the key, since `git diff
+    <base> -- <paths>` compares against the working tree either way).
 - Global issue updates use `issues.delta`: complete changed rows at their original
   array positions plus the resulting length. Initial/reconnect snapshots retain all
   rows and descriptions. Shared reducers preserve order, removal, and arbitrary tracker
