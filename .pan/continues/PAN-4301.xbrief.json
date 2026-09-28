@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T14:00:48.767Z",
+  "updated": "2026-09-28T14:01:01.987Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -252,6 +252,10 @@
     "ci-subset-feed-tests.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T14:00:48.766Z"
+    },
+    "ci-subset-feed-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:01.987Z"
     }
   }
 }
