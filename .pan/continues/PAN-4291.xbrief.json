@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:23:30.489Z",
+  "updated": "2026-09-28T14:23:41.729Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,10 @@
     "settled-cache-ttl-for.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T14:23:30.489Z"
+    },
+    "settled-cache-ttl-for.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:23:41.729Z"
     }
   }
 }
