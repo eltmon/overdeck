@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T13:08:21.281Z",
+  "updated": "2026-09-28T13:09:27.464Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-28T13:08:16.507Z"
     },
     "lanes-views-shared-activity": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4301",
-      "claimedAt": "2026-09-28T13:08:21.281Z"
+      "claimedAt": "2026-09-28T13:08:21.281Z",
+      "doneAt": "2026-09-28T13:09:27.464Z"
     }
   }
 }
