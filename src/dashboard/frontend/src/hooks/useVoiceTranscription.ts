@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ensureDashboardSession } from '../lib/wsTransport';
 
 type VoiceMessage =
   | { type: 'transcript:partial'; text: string }
@@ -68,6 +69,9 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
     if (isListening) return;
     setError(null);
     try {
+      // Mint before prompting for the microphone, so a refused session never
+      // triggers a getUserMedia permission prompt the socket can't use anyway.
+      await ensureDashboardSession();
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: deviceId ? { deviceId: { exact: deviceId } } : true,
       });
