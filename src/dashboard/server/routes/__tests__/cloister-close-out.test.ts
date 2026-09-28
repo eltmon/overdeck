@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   readCloseOutSettings: vi.fn(),
   writeCloseOutSetting: vi.fn(),
   reloadDurableCloisterConfig: vi.fn(() => ({ accepted: true as const })),
+  collectClosedIssueWorkspaces: vi.fn(),
 }));
 
 class MockCloseOutSettingsError extends Error {
@@ -26,6 +27,10 @@ vi.mock('../../../../lib/cloister/close-out-settings.js', () => ({
 vi.mock('../../services/cloister-control-surface.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../services/cloister-control-surface.js')>()),
   reloadDurableCloisterConfig: mocks.reloadDurableCloisterConfig,
+}));
+
+vi.mock('../../../../lib/workspaces/closed-issue-workspaces.js', () => ({
+  collectClosedIssueWorkspaces: mocks.collectClosedIssueWorkspaces,
 }));
 
 interface RouteResult {
@@ -97,5 +102,21 @@ describe('cloister close-out routes', () => {
       body: { error: 'auto is inert since PAN-3917 and cannot be set' },
     });
     expect(mocks.reloadDurableCloisterConfig).not.toHaveBeenCalled();
+  });
+
+  it('GET /api/cloister/close-out/disk returns the collected report', async () => {
+    const report = {
+      closedCount: 2,
+      totalBytes: 12_400_000_000,
+      unknownSizeCount: 0,
+      trackerReadsPaused: false,
+      rows: [],
+      computedAt: '2026-09-28T00:00:00.000Z',
+    };
+    mocks.collectClosedIssueWorkspaces.mockResolvedValue(report);
+
+    const result = await requestCloisterRoute('/api/cloister/close-out/disk');
+
+    expect(result).toEqual({ status: 200, body: report });
   });
 });
