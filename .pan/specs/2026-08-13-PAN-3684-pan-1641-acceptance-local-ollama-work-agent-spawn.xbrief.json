@@ -2,7 +2,7 @@
   "xBRIEFInfo": {
     "version": "0.8",
     "created": "2026-08-13T16:05:50.422Z",
-    "updated": "2026-09-27T14:53:46.714Z",
+    "updated": "2026-09-28T12:08:21.370Z",
     "author": "overdeck/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-3684: PAN-1641 acceptance: local Ollama work-agent spawn",
     "inspectionPolicy": "never"
@@ -13,9 +13,9 @@
     "status": "running",
     "uid": "2761d3ec-18eb-46e2-ab34-20c5be55c8ab",
     "author": "overdeck/auto-start",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-13T16:05:50.422Z",
-    "updated": "2026-09-27T14:53:46.714Z",
+    "updated": "2026-09-28T12:08:21.370Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3684",
