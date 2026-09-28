@@ -4,17 +4,17 @@
     "created": "2026-09-28T13:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2609: Session Vault: versioned, encrypted, off-machine storage and cross-machine resume for agent conversations",
-    "updated": "2026-09-28T13:03:44.236Z"
+    "updated": "2026-09-28T13:05:17.708Z"
   },
   "plan": {
     "id": "pan-2609",
     "title": "Session Vault: versioned, encrypted, off-machine storage and cross-machine resume for agent conversations",
-    "status": "proposed",
+    "status": "running",
     "uid": "b503abba-dea6-4d64-a05b-15fccc442de7",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-28T13:30:00Z",
-    "updated": "2026-09-28T13:03:44.236Z",
+    "updated": "2026-09-28T13:05:17.708Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2609",
