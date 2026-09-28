@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-3684",
+  "created": "2026-09-28T12:12:20.568Z",
+  "updated": "2026-09-28T12:12:20.568Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "auto-start": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3684",
+      "claimedAt": "2026-09-28T12:12:20.568Z"
+    }
+  }
+}
