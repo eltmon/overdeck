@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T12:49:37.810Z",
+  "updated": "2026-09-28T13:08:44.713Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "sampler-graphql-source": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4291",
-      "claimedAt": "2026-09-28T12:49:37.809Z"
+      "claimedAt": "2026-09-28T12:49:37.809Z",
+      "doneAt": "2026-09-28T13:08:44.712Z"
     }
   }
 }
