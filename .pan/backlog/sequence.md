@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T13:10:50.344189Z · model: claude-opus-5-5 · open: 787_
+_Last sequenced: 2026-09-28T13:11:32.683753Z · model: claude-opus-5-5 · open: 787_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -261,13 +261,13 @@ _Last sequenced: 2026-09-28T13:10:50.344189Z · model: claude-opus-5-5 · open: 
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 316 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
 | 316 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
 | 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28: PAN-3762 per-machine server is default; adds Vault/Fly/paid tracks. Children carry the order. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 320 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
 | 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 322 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
 | 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
 | 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
 | 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
@@ -1102,7 +1102,7 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T13:10:50.344189Z",
+  "generatedAt": "2026-09-28T13:11:32.683753Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 787,
@@ -4285,7 +4285,7 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
     },
     {
       "issue": "PAN-2351",
-      "rank": 316,
+      "rank": 322,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -4294,7 +4294,7 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
         "PAN-1166"
       ],
       "why": "Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites)",
-      "rationale": "Body updated since the last pass; it remains the security prerequisite that blocks every other Overdeck Anywhere phase, so the rank holds.",
+      "rationale": "Moved from 316 to the free rank 322 because in-pipeline PAN-1166 is pinned at 316 and PAN-2351 depends on it, so it must follow.",
       "gate": "auto",
       "planning": "skip"
     },
