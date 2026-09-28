@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:10:08.098Z",
+  "updated": "2026-09-28T13:14:11.016Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-09-28T13:09:16.838Z"
     },
     "ws-voice-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1166",
-      "claimedAt": "2026-09-28T13:09:21.314Z"
+      "claimedAt": "2026-09-28T13:09:21.314Z",
+      "doneAt": "2026-09-28T13:14:11.016Z"
     },
     "ws-autopreso-gate": {
       "status": "in_progress",
