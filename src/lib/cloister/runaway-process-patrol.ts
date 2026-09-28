@@ -36,7 +36,11 @@ import type {
   AgentSessionProcess,
   HostProcessRecord,
 } from '../../dashboard/server/routes/resources/host-processes.js';
-import type { ResourceProcessGroup } from '../../dashboard/server/routes/resources/spike-sampler.js';
+import {
+  createResourceSpikeSampler,
+  type ResourceProcessGroup,
+  type ResourceSpikeSampler,
+} from '../../dashboard/server/routes/resources/spike-sampler.js';
 
 export const RUNAWAY_PATROL_INTERVAL_MS = 30_000;
 export const RUNAWAY_WINDOW_MS = 10 * 60_000;
@@ -80,6 +84,8 @@ export interface RunawayPatrolDeps {
   isAgentIdle(agentId: string): boolean | Promise<boolean>;
   readHostCpu(): { cpuPercent: number; load1: number; cores: number };
   emit(entry: RunawayFeedEntry): void;
+  /** PAN-4311 FR-12: fed once per tick with host CPU, load and the attributed process groups. */
+  spikeSampler: ResourceSpikeSampler;
   now(): number;
   platform: NodeJS.Platform;
   dashboardPid: number;
@@ -255,6 +261,7 @@ function defaultDeps(): RunawayPatrolDeps {
     isAgentIdle: async (agentId) => (await import('../agents/liveness.js')).isIdle(agentId),
     readHostCpu,
     emit: (entry) => emitActivityEntry(entry as unknown as EmitActivityOptions),
+    spikeSampler: createResourceSpikeSampler(),
     now: Date.now,
     platform: process.platform,
     dashboardPid: process.pid,
@@ -474,6 +481,12 @@ export function createRunawayPatrol(overrides: Partial<RunawayPatrolDeps> = {}):
         load1: host.load1,
         cores: host.cores,
       };
+      deps.spikeSampler.sample({
+        cpuPercent: latest.cpuPercent,
+        load1: latest.load1,
+        cores: latest.cores,
+        processGroups: latest.processGroups,
+      });
     },
     snapshot: () => latest,
     reset() {

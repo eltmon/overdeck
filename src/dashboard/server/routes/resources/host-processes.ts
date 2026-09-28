@@ -171,8 +171,24 @@ export function buildHostProcesses(
   return selectTopRows([...activeRows, ...retainedRows], limit);
 }
 
-export function getHostProcessesSnapshot(): HostProcessRow[] {
-  return buildHostProcesses([]);
+/** The runaway patrol's latest sample, as `getHostProcessesSnapshot` needs it (PAN-4311). */
+export interface HostProcessesSample {
+  records: HostProcessRecord[];
+  agentSessions: AgentSessionProcess[];
+  coreServicePids: number[];
+}
+
+/**
+ * PAN-4311 FR-12: host process rows from the runaway patrol's latest sample.
+ * Descendants of a harness pid are attributed to its agent. Empty before the
+ * patrol's first tick and off Linux.
+ */
+export function getHostProcessesSnapshot(sample: HostProcessesSample | null = null): HostProcessRow[] {
+  if (!sample) return buildHostProcesses([]);
+  return buildHostProcesses(sample.records, {
+    agentSessions: sample.agentSessions,
+    coreServicePids: sample.coreServicePids,
+  });
 }
 
 function isDockerProcess(process: HostProcessRecord): boolean {

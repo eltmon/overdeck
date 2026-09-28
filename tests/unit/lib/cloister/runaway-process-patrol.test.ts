@@ -19,6 +19,7 @@ vi.mock('../../../../src/lib/agents/delivery.js', async (importOriginal) => ({
   deliverAgentMessage: sideEffects.deliverAgentMessage,
 }));
 
+import { createResourceSpikeSampler } from '../../../../src/dashboard/server/routes/resources/spike-sampler.js';
 import {
   createRunawayPatrol,
   parseProcStat,
@@ -91,6 +92,7 @@ function host(t0: number) {
     isAgentIdle: () => false,
     readHostCpu: () => ({ cpuPercent: 20, load1: 4, cores: 24 }),
     emit: (entry) => { emitted.push(entry); },
+    spikeSampler: { sample: vi.fn(), reset: vi.fn() },
   };
   return { procs, deps, emitted, readCmdline };
 }
@@ -224,6 +226,29 @@ describe('createRunawayPatrol (PAN-4311 AC-4, AC-5)', () => {
     expect(snapshot.records.map((record) => record.pid).sort((a, b) => a - b)).toEqual([100, 200, 300, 500]);
     expect(snapshot).toMatchObject({ load1: 4, cores: 24, cpuPercent: 20, runaways: [] });
     expect(snapshot.processGroups).toEqual([expect.objectContaining({ label: 'yes', agentId: 'agent-pan-9', count: 1 })]);
+  });
+
+  it('feeds the spike sampler, which names the top group on a load spike (PAN-4311 AC-6)', async () => {
+    const { procs, deps } = host(Date.now());
+    procs.delete(500);
+    for (let i = 0; i < 42; i += 1) {
+      procs.set(700 + i, {
+        pid: 700 + i, ppid: 1917, pgid: 700, comm: 'yes', cmdline: 'yes', startedAtMs: Date.now() - MIN, cores: 1,
+        env: { OVERDECK_CONVERSATION: 'conv-lane-b1' },
+      });
+    }
+    const spikes: Array<{ message: string }> = [];
+    const patrol = createRunawayPatrol({
+      ...deps,
+      readHostCpu: () => ({ cpuPercent: 95, load1: 40, cores: 24 }),
+      spikeSampler: createResourceSpikeSampler({ emit: (entry) => { spikes.push(entry); } }),
+    });
+
+    await patrol.tick();
+    await step(patrol);
+
+    expect(spikes).toHaveLength(1);
+    expect(spikes[0]!.message).toContain('yes x42 (conv-lane-b1)');
   });
 
   it('does nothing off Linux', async () => {

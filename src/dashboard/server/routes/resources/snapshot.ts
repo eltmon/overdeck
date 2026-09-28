@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
+import { getRunawaySnapshot } from '../../../../lib/cloister/runaway-process-patrol.js';
 import { readCpuPsi } from '../../../../lib/system-health/cpu-psi.js';
 import { getBackendPanes } from '../../services/backend-inventory.js';
 import { jsonResponse, jsonStringResponse } from '../../http-helpers.js';
@@ -88,7 +89,7 @@ export function buildResourcesPayloadEffect() {
       containers,
       forecast: buildCapacityForecast(stacks, { hostVitals }),
       hostVitals,
-      hostProcesses: getHostProcessesSnapshot(),
+      hostProcesses: getHostProcessesSnapshot(getRunawaySnapshot()),
       stoppedContainers,
       networks: [],
       reclaimCandidates: reclaim.reclaimCandidates,

@@ -51,6 +51,7 @@ import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { startCliproxyWatchdogForDashboard } from './routes/cliproxy.js';
 import { startResourcesSnapshotService } from './routes/resources/snapshot.js';
+import { startRunawayPatrol, stopRunawayPatrol } from '../../lib/cloister/runaway-process-patrol.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
@@ -622,10 +623,13 @@ void (async () => {
     const stopTriggers = startResourceRefreshTriggers();
     const stopConvergence = startProjectResourceConvergence();
     const stopResourcesSnapshot = startResourcesSnapshotService();
+    // PAN-4311 D1: the runaway patrol lives here, beside the snapshot it feeds.
+    startRunawayPatrol();
     stopResourceRefreshServices = () => {
       stopTriggers();
       stopConvergence();
       stopResourcesSnapshot();
+      stopRunawayPatrol();
       stopProjectResourceRefreshQueue();
     };
     console.log('[overdeck] Project resource refresh queue and resources snapshot service started');
