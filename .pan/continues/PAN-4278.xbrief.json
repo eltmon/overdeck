@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4278",
   "created": "2026-09-27T23:29:11.482Z",
-  "updated": "2026-09-28T00:27:54.565Z",
+  "updated": "2026-09-28T00:28:05.342Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -224,6 +224,10 @@
     "permission-needs-you.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T00:27:54.564Z"
+    },
+    "permission-needs-you.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:28:05.342Z"
     }
   }
 }
