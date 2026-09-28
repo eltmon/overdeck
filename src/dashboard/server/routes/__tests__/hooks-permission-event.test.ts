@@ -121,6 +121,15 @@ describe('handlePermissionEventBody', () => {
     expect(listPermissionRequests(CONV).map((e) => e.agentKey)).toEqual(['main']);
   });
 
+  it('a PermissionDenied with the same agent_id removes the only entry and reports waiting=false', async () => {
+    await hook('PermissionRequest', { agent_id: 'sub-1', tool_name: 'Bash', tool_input: { command: 'rm -f x' } });
+    const result = await hook('PermissionDenied', { agent_id: 'sub-1', tool_name: 'Bash' });
+
+    expect(result).toEqual({ ok: true, conversationName: CONV, waiting: false });
+    expect(listPermissionRequests(CONV)).toEqual([]);
+    expect(emittedEvents.at(-1)?.payload.waiting).toBe(false);
+  });
+
   it('waiting=false once every entry clears', async () => {
     await hook('PermissionRequest', { tool_name: 'Bash', tool_input: { command: 'ls' } });
     await hook('PermissionRequest', { agent_id: 'sub-1', tool_name: 'Bash', tool_input: { command: 'rm -f x' } });
