@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T13:57:21.718Z",
+  "updated": "2026-09-28T13:57:33.074Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "gauntlet-run-card.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T13:57:21.718Z"
+    },
+    "feed-tab-rules.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:33.073Z"
     }
   }
 }
