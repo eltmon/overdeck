@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T14:00:23.220Z",
+  "updated": "2026-09-28T14:00:36.121Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,10 @@
     "session-mint-loud-401.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T14:00:23.220Z"
+    },
+    "xterminal-mint-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:36.121Z"
     }
   }
 }
