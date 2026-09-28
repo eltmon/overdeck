@@ -140,6 +140,25 @@ function warnRetiredModelOverrides(): void {
   );
 }
 
+function isIntegerInRange(value: unknown, min: number, max: number): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+}
+
+// Inverted CPU PSI thresholds fall back to the defaults instead of throwing
+// (PAN-4311), warned once per distinct pair so repeated config loads stay quiet.
+const warnedInvertedCpuPsiThresholds = new Set<string>();
+function warnInvertedCpuPsiThresholds(hold: number, recovery: number): void {
+  const key = `${hold}:${recovery}`;
+  if (warnedInvertedCpuPsiThresholds.has(key)) return;
+  warnedInvertedCpuPsiThresholds.add(key);
+  console.warn(
+    'config.yaml: resources.governor_cpu_psi_recovery_avg60 must be lower than '
+    + 'resources.governor_cpu_psi_hold_avg60 — lower CPU pressure is healthier. '
+    + `Using the defaults (hold ${DEFAULT_CONFIG.resources.governorCpuPsiHoldAvg60}, `
+    + `recovery ${DEFAULT_CONFIG.resources.governorCpuPsiRecoveryAvg60}).`,
+  );
+}
+
 // An unrecognized `terminal.backend` is ignored, once per distinct bad value,
 // so a typo falls back to auto-selection instead of stranding every spawn.
 const warnedInvalidTerminalBackends = new Set<string>();
@@ -249,6 +268,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorPsiCalmWindowMs: DEFAULT_CONFIG.resources.governorPsiCalmWindowMs,
       governorCpuSoftLoadPerCore: DEFAULT_CONFIG.resources.governorCpuSoftLoadPerCore,
       governorCpuRecoveryLoadPerCore: DEFAULT_CONFIG.resources.governorCpuRecoveryLoadPerCore,
+      dashboardCpuWeight: DEFAULT_CONFIG.resources.dashboardCpuWeight,
+      verificationCpuWeight: DEFAULT_CONFIG.resources.verificationCpuWeight,
+      agentNice: DEFAULT_CONFIG.resources.agentNice,
+      laneNice: DEFAULT_CONFIG.resources.laneNice,
+      governorCpuPsiHoldAvg60: DEFAULT_CONFIG.resources.governorCpuPsiHoldAvg60,
+      governorCpuPsiRecoveryAvg60: DEFAULT_CONFIG.resources.governorCpuPsiRecoveryAvg60,
+      governorCpuHoldDispatch: DEFAULT_CONFIG.resources.governorCpuHoldDispatch,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -825,6 +851,39 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ) {
         result.resources.governorCpuRecoveryLoadPerCore = config.resources.governor_cpu_recovery_load_per_core;
       }
+      // PAN-4311: CPU weights, nice levels and CPU PSI thresholds. An out-of-range
+      // value is ignored (the default stays) rather than clamped.
+      if (isIntegerInRange(config.resources.dashboard_cpu_weight, 1, 10_000)) {
+        result.resources.dashboardCpuWeight = config.resources.dashboard_cpu_weight;
+      }
+      if (isIntegerInRange(config.resources.verification_cpu_weight, 1, 10_000)) {
+        result.resources.verificationCpuWeight = config.resources.verification_cpu_weight;
+      }
+      if (isIntegerInRange(config.resources.agent_nice, 0, 19)) {
+        result.resources.agentNice = config.resources.agent_nice;
+      }
+      if (isIntegerInRange(config.resources.lane_nice, 0, 19)) {
+        result.resources.laneNice = config.resources.lane_nice;
+      }
+      if (
+        typeof config.resources.governor_cpu_psi_hold_avg60 === 'number'
+        && Number.isFinite(config.resources.governor_cpu_psi_hold_avg60)
+        && config.resources.governor_cpu_psi_hold_avg60 > 0
+        && config.resources.governor_cpu_psi_hold_avg60 <= 100
+      ) {
+        result.resources.governorCpuPsiHoldAvg60 = config.resources.governor_cpu_psi_hold_avg60;
+      }
+      if (
+        typeof config.resources.governor_cpu_psi_recovery_avg60 === 'number'
+        && Number.isFinite(config.resources.governor_cpu_psi_recovery_avg60)
+        && config.resources.governor_cpu_psi_recovery_avg60 >= 0
+        && config.resources.governor_cpu_psi_recovery_avg60 <= 100
+      ) {
+        result.resources.governorCpuPsiRecoveryAvg60 = config.resources.governor_cpu_psi_recovery_avg60;
+      }
+      if (typeof config.resources.governor_cpu_hold_dispatch === 'boolean') {
+        result.resources.governorCpuHoldDispatch = config.resources.governor_cpu_hold_dispatch;
+      }
       // PAN-4267: normalize hard/soft/watch/recovery ordering and cap all four
       // against this host's RAM in one place — see governor-reserves.ts.
       const normalizedGovernorReserves = normalizeGovernorReserves(
@@ -851,6 +910,14 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
           'config.yaml: resources.governor_cpu_recovery_load_per_core must be lower than '
           + 'resources.governor_cpu_soft_load_per_core — lower CPU load is healthier',
         );
+      }
+      if (result.resources.governorCpuPsiRecoveryAvg60 >= result.resources.governorCpuPsiHoldAvg60) {
+        warnInvertedCpuPsiThresholds(
+          result.resources.governorCpuPsiHoldAvg60,
+          result.resources.governorCpuPsiRecoveryAvg60,
+        );
+        result.resources.governorCpuPsiHoldAvg60 = DEFAULT_CONFIG.resources.governorCpuPsiHoldAvg60;
+        result.resources.governorCpuPsiRecoveryAvg60 = DEFAULT_CONFIG.resources.governorCpuPsiRecoveryAvg60;
       }
     }
 

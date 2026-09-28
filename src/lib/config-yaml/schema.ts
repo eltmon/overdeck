@@ -450,6 +450,20 @@ export interface ResourcesConfig {
   governor_cpu_soft_load_per_core?: number;
   /** PAN-3344: re-admit only below this load per core; must be lower than soft */
   governor_cpu_recovery_load_per_core?: number;
+  /** PAN-4311: systemd CPUWeight (1-10000) for the dashboard and supervisor units */
+  dashboard_cpu_weight?: number;
+  /** PAN-4311: systemd CPUWeight (1-10000) for verification-worker scopes */
+  verification_cpu_weight?: number;
+  /** PAN-4311: nice level (0-19) for batch agents (work, review, test, plan, worker, strike, uat) */
+  agent_nice?: number;
+  /** PAN-4311: nice level (0-19) for gauntlet lane conversations */
+  lane_nice?: number;
+  /** PAN-4311: hold at or above this CPU PSI `some avg60` percentage */
+  governor_cpu_psi_hold_avg60?: number;
+  /** PAN-4311: stay held while CPU PSI `some avg60` is at or above this; must be lower than hold */
+  governor_cpu_psi_recovery_avg60?: number;
+  /** PAN-4311: hold Flywheel-started agent spawns while CPU pressure is saturated (default off) */
+  governor_cpu_hold_dispatch?: boolean;
 }
 
 export interface IssuesConfig {
@@ -992,6 +1006,14 @@ export interface NormalizedConfig {
     /** PAN-3344: CPU runway thresholds. Lower load is healthier. */
     governorCpuSoftLoadPerCore: number;
     governorCpuRecoveryLoadPerCore: number;
+    /** PAN-4311: CPU weights for systemd units/scopes, nice levels by CPU class, CPU PSI thresholds. */
+    dashboardCpuWeight: number;
+    verificationCpuWeight: number;
+    agentNice: number;
+    laneNice: number;
+    governorCpuPsiHoldAvg60: number;
+    governorCpuPsiRecoveryAvg60: number;
+    governorCpuHoldDispatch: boolean;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */
