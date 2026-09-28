@@ -15,6 +15,9 @@ export interface ResourceHistorySample {
   timestamp?: string;
   cpuPercent: number;
   memoryPercent: number;
+  /** PAN-4311: CPU PSI `some` averages, percent; null off Linux. */
+  psiCpuSomeAvg10?: number | null;
+  psiCpuSomeAvg60?: number | null;
 }
 
 export interface ResourceHistoryPoint {
@@ -33,6 +36,8 @@ export interface ResourceHistoryResponse {
   startedAt: string;
   cpu: ResourceHistoryPoint[];
   mem: ResourceHistoryPoint[];
+  /** PAN-4311: CPU PSI `some avg60` per bucket; empty when PSI was never available. */
+  cpuPsi: ResourceHistoryPoint[];
   annotations: ResourceHistoryAnnotation[];
 }
 
@@ -40,6 +45,8 @@ interface StoredSample {
   ts: number;
   cpuPercent: number;
   memoryPercent: number;
+  psiCpuSomeAvg10: number | null;
+  psiCpuSomeAvg60: number | null;
 }
 
 const samples: StoredSample[] = [];
@@ -67,6 +74,8 @@ export function recordResourceHistorySample(sample: ResourceHistorySample): void
     ts,
     cpuPercent: sample.cpuPercent,
     memoryPercent: sample.memoryPercent,
+    psiCpuSomeAvg10: sample.psiCpuSomeAvg10 ?? null,
+    psiCpuSomeAvg60: sample.psiCpuSomeAvg60 ?? null,
   });
   samples.sort((a, b) => a.ts - b.ts);
   pruneSamples(ts);
@@ -76,14 +85,16 @@ function average(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function downsample(metric: 'cpuPercent' | 'memoryPercent'): ResourceHistoryPoint[] {
+function downsample(metric: 'cpuPercent' | 'memoryPercent' | 'psiCpuSomeAvg60'): ResourceHistoryPoint[] {
   pruneSamples();
   const buckets = new Map<number, number[]>();
 
   for (const sample of samples) {
+    const value = sample[metric];
+    if (value == null) continue;
     const bucket = Math.floor(sample.ts / BUCKET_MS) * BUCKET_MS;
     const values = buckets.get(bucket) ?? [];
-    values.push(sample[metric]);
+    values.push(value);
     buckets.set(bucket, values);
   }
 
@@ -143,6 +154,7 @@ export function buildResourceHistoryResponse(
     startedAt: new Date(startedAt).toISOString(),
     cpu: downsample('cpuPercent'),
     mem: downsample('memoryPercent'),
+    cpuPsi: downsample('psiCpuSomeAvg60'),
     annotations: activityEvents
       .map((event) => resourceAnnotationFromEvent(event, now))
       .filter((annotation): annotation is ResourceHistoryAnnotation => Boolean(annotation)),

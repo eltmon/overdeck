@@ -124,3 +124,44 @@ describe('PAN-2464 resources history', () => {
     expect(response.cpu.at(-1)?.ts).toBe('2026-07-08T18:00:00.000Z');
   });
 });
+
+describe('PAN-4311 CPU PSI history', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-28T12:00:00Z'));
+    resetResourceHistorySamples();
+  });
+
+  afterEach(() => {
+    resetResourceHistorySamples();
+    vi.useRealTimers();
+  });
+
+  it('carries CPU PSI some avg60 as the cpuPsi series', () => {
+    recordResourceHistorySample({ cpuPercent: 30, memoryPercent: 50, psiCpuSomeAvg10: 12, psiCpuSomeAvg60: 40 });
+
+    const response = buildResourceHistoryResponse([]);
+
+    expect(response.cpuPsi).toEqual([{ ts: '2026-09-28T12:00:00.000Z', value: 40 }]);
+    expect(response.cpu).toEqual([{ ts: '2026-09-28T12:00:00.000Z', value: 30 }]);
+    expect(response.mem).toEqual([{ ts: '2026-09-28T12:00:00.000Z', value: 50 }]);
+  });
+
+  it('returns an empty cpuPsi series when PSI was never available', () => {
+    recordResourceHistorySample({ cpuPercent: 30, memoryPercent: 50, psiCpuSomeAvg10: null, psiCpuSomeAvg60: null });
+    recordResourceHistorySample({ cpuPercent: 20, memoryPercent: 50 });
+
+    const response = buildResourceHistoryResponse([]);
+
+    expect(response.cpuPsi).toEqual([]);
+    expect(response.cpu).toEqual([{ ts: '2026-09-28T12:00:00.000Z', value: 25 }]);
+  });
+
+  it('averages only the samples that carry PSI within a bucket', () => {
+    recordResourceHistorySample({ cpuPercent: 10, memoryPercent: 50, psiCpuSomeAvg60: 20 });
+    recordResourceHistorySample({ cpuPercent: 10, memoryPercent: 50, psiCpuSomeAvg60: null });
+    recordResourceHistorySample({ cpuPercent: 10, memoryPercent: 50, psiCpuSomeAvg60: 60 });
+
+    expect(buildResourceHistoryResponse([]).cpuPsi).toEqual([{ ts: '2026-09-28T12:00:00.000Z', value: 40 }]);
+  });
+});
