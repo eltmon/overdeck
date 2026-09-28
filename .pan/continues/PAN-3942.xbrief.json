@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3942",
   "created": "2026-09-28T17:21:05.119Z",
-  "updated": "2026-09-28T18:29:24.350Z",
+  "updated": "2026-09-28T18:29:34.365Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "cli.ac5": {
       "status": "completed",
       "doneAt": "2026-09-28T18:29:24.350Z"
+    },
+    "launcher-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:29:34.365Z"
     }
   }
 }
