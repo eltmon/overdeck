@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:18:21.532Z",
+  "updated": "2026-09-28T01:18:32.314Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -282,6 +282,10 @@
     "mount-simple-home.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T01:18:21.532Z"
+    },
+    "mount-simple-home.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:32.314Z"
     }
   }
 }
