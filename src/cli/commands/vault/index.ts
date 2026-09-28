@@ -44,4 +44,16 @@ export function registerVaultCommands(program: Command): void {
     .command('sync')
     .description('Settle owned transcripts that grew, register this machine and refresh the list')
     .action(lazyAction(() => import('./sync.js'), 'syncCommand'));
+
+  vault
+    .command('list')
+    .description('List saved conversations from the local cache (never contacts the backend)')
+    .option('--json', 'Output in JSON format')
+    .action(lazyAction(() => import('./list.js'), 'listCommand'));
+
+  vault
+    .command('show <id>')
+    .description('Print a saved conversation read-only with its versions')
+    .option('--json', 'Output in JSON format')
+    .action(lazyAction(() => import('./show.js'), 'showCommand'));
 }

@@ -38,3 +38,13 @@ pan vault sync                               # settle owned transcripts that gre
 ```
 
 `save` prints one verdict per transcript: `appended N lines`, `noop`, `blocked at line N: <pattern>`, `diverged`, `excluded`, or `offline`. A blocked line names the pattern and never the value; allow it with `pan vault allow-secret <id-or-path> <line>` or exclude the session. `pan vault save --hook` is the Stop-hook mode: it reads the hook JSON from stdin, prints nothing and always exits 0.
+
+## Browse and resume
+
+```bash
+pan vault list                      # from the local cache; works offline
+pan vault list --json
+pan vault show <id>                 # human turns, assistant text and versions, read-only
+```
+
+`resume` compares the target directory's git state with the saved state. On a difference it asks on a TTY; `--on-drift continue|note|cancel` answers non-interactively and a non-TTY run without the flag cancels. Claude Code and Codex resume natively; other harnesses get a seed digest file in the target directory.
