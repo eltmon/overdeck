@@ -15,6 +15,12 @@ const BANNED_PATH_PREFIXES = ['src/dashboard/', 'src/lib/terminal-backends/', 's
 const BANNED_PACKAGES = [/^effect(\/|$)/, /^@effect\//, /node-pty/];
 
 const SPECIFIER_PATTERN = /(?:^|\n)\s*(?:import|export)\s[^;'"]*?from\s*['"]([^'"]+)['"]|(?:^|\n)\s*import\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
+const TYPE_ONLY_IMPORT = /^\s*(?:import|export)\s+type\s/;
+
+/** Drop block and line comments so a JSDoc example never counts as an import. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+}
 
 function listTsFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -61,10 +67,12 @@ export function walkImportGraph(entries: readonly string[], repoRoot = REPO_ROOT
     const { file, chain } = queue.shift()!;
     if (seen.has(file)) continue;
     seen.add(file);
-    const source = readFileSync(file, 'utf8');
+    const source = stripComments(readFileSync(file, 'utf8'));
     for (const match of source.matchAll(SPECIFIER_PATTERN)) {
       const specifier = match[1] ?? match[2] ?? match[3];
       if (!specifier) continue;
+      // Type-only imports are erased at compile time and load nothing.
+      if (TYPE_ONLY_IMPORT.test(match[0].replace(/^\n/, ''))) continue;
       if (specifier.startsWith('node:')) continue;
       if (specifier.startsWith('.')) {
         const target = resolveRelative(file, specifier);
