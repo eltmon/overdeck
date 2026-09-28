@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:19:22.965Z",
+  "updated": "2026-09-28T01:23:00.867Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,9 +134,10 @@
       "doneAt": "2026-09-28T01:19:08.819Z"
     },
     "closed-workspace-cleanup": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4283",
-      "claimedAt": "2026-09-28T01:19:22.965Z"
+      "claimedAt": "2026-09-28T01:19:22.965Z",
+      "doneAt": "2026-09-28T01:23:00.867Z"
     }
   }
 }
