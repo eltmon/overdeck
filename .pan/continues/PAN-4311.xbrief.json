@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:56:56.766Z",
+  "updated": "2026-09-28T15:57:07.753Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "dashboard-supervisor-weight.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T15:56:56.766Z"
+    },
+    "verification-weight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:57:07.753Z"
     }
   }
 }
