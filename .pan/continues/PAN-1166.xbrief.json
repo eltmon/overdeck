@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:25:30.432Z",
+  "updated": "2026-09-28T13:25:35.044Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-1166",
       "claimedAt": "2026-09-28T13:22:00.579Z",
       "doneAt": "2026-09-28T13:25:30.431Z"
+    },
+    "xterminal-mint-first": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:25:35.044Z"
     }
   }
 }
