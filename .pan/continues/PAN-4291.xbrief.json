@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:24:36.316Z",
+  "updated": "2026-09-28T14:24:47.449Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "banner-account-used.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T14:24:36.315Z"
+    },
+    "docs-quota-source.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:24:47.449Z"
     }
   }
 }
