@@ -16,7 +16,10 @@
  * successful user-pool sample also reconciles the active pause on its
  * bucket (`reconcileGitHubPauseWithSample`), so a pause lifts or is
  * corrected to the window's real reset as soon as a fresh sample lands,
- * rather than waiting out a hidden-limit guess.
+ * rather than waiting out a hidden-limit guess. The REST and GraphQL
+ * fetches run concurrently, but the two reconcile calls run REST-then-
+ * GraphQL, sequentially, since both read-modify-write the same
+ * `pause.json` and a concurrent pair could lose one bucket's update.
  */
 
 import type { GitHubQuotaBucket, GitHubQuotaPool } from '@overdeck/contracts';
@@ -123,7 +126,7 @@ async function writeGraphQLRateLimitSample(response: unknown, nowMs: number): Pr
 export async function sampleGitHubRateLimits(deps: GitHubQuotaSamplerDeps = {}): Promise<void> {
   const nowMs = Date.now();
 
-  const sampleUserRest = async (): Promise<void> => {
+  const sampleUserRest = async (): Promise<WrittenSample | undefined> => {
     try {
       const { stdout } = await runGh(['api', 'rate_limit'], {
         caller: 'quota-sampler',
@@ -132,14 +135,14 @@ export async function sampleGitHubRateLimits(deps: GitHubQuotaSamplerDeps = {}):
         onSuccess: () => ({ cost: 0, estimated: false }),
       });
       const resources = (JSON.parse(stdout) as RateLimitResponse | null)?.resources;
-      const written = await writeSample('user', 'rest', resources?.core, nowMs);
-      if (written) await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'rest', ...written }, nowMs);
+      return await writeSample('user', 'rest', resources?.core, nowMs);
     } catch {
       // gh missing, unauthenticated or offline: no user-pool rest sample this tick.
+      return undefined;
     }
   };
 
-  const sampleUserGraphQL = async (): Promise<void> => {
+  const sampleUserGraphQL = async (): Promise<WrittenSample | undefined> => {
     try {
       const { stdout } = await runGh(['api', 'graphql', '-f', `query=${GRAPHQL_RATE_LIMIT_QUERY}`], {
         caller: 'quota-sampler',
@@ -147,10 +150,10 @@ export async function sampleGitHubRateLimits(deps: GitHubQuotaSamplerDeps = {}):
         ...(deps.exec ? { exec: deps.exec } : {}),
         onSuccess: () => ({ cost: 0, estimated: false }),
       });
-      const written = await writeGraphQLRateLimitSample(JSON.parse(stdout), nowMs);
-      if (written) await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', ...written }, nowMs);
+      return await writeGraphQLRateLimitSample(JSON.parse(stdout), nowMs);
     } catch {
       // GraphQL rateLimit query failed: no user-pool graphql sample this tick.
+      return undefined;
     }
   };
 
@@ -164,9 +167,14 @@ export async function sampleGitHubRateLimits(deps: GitHubQuotaSamplerDeps = {}):
     }
   };
 
-  // Independent sources: sample them concurrently rather than serializing
-  // one bucket's ledger write behind the next bucket's network call.
-  await Promise.all([sampleUserRest(), sampleUserGraphQL(), sampleApp()]);
+  // Independent network fetches and ledger writes run concurrently, but the
+  // two user-pool pause reconciliations below run sequentially afterward
+  // (PRD D1: REST sample first, then GraphQL) — both read-modify-write the
+  // same pause.json, and running them concurrently could lose one bucket's
+  // reconciliation to a last-writer-wins race.
+  const [restWritten, graphqlWritten] = await Promise.all([sampleUserRest(), sampleUserGraphQL(), sampleApp()]);
+  if (restWritten) await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'rest', ...restWritten }, nowMs);
+  if (graphqlWritten) await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', ...graphqlWritten }, nowMs);
 }
 
 /**

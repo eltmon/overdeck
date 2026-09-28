@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const gh = vi.hoisted(() => ({ calls: [] as string[][], stdout: '[]' }));
-const git = vi.hoisted(() => ({ remoteStdout: 'origin\n' }));
+const git = vi.hoisted(() => ({ remoteStdout: 'origin\n', remoteShouldReject: false }));
 const trackerless = vi.hoisted(() => ({ path: '' }));
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -25,6 +25,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   (execFileStub as unknown as Record<PropertyKey, unknown>)[promisify.custom] =
     (cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> => {
       if (cmd === 'git' && args[0] === 'remote') {
+        if (git.remoteShouldReject) return Promise.reject(new Error('git: connection reset'));
         return Promise.resolve({ stdout: git.remoteStdout, stderr: '' });
       }
       if (cmd !== 'gh') return Promise.reject(new Error(`unexpected execFile: ${cmd}`));
@@ -45,7 +46,7 @@ vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
   };
 });
 
-import { readRepoPullRequests } from '../../../../src/lib/overdeck/derived-issue-state.js';
+import { PR_CACHE_TTL_MS, readRepoPullRequests } from '../../../../src/lib/overdeck/derived-issue-state.js';
 import { flushLedgerWrites, readLedgerWindow } from '../../../../src/lib/github-quota/ledger.js';
 import { recordGitHubRefusal } from '../../../../src/lib/github-quota/pause-gate.js';
 
@@ -62,6 +63,7 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
     process.env.OVERDECK_HOME = home;
     gh.calls.length = 0;
     git.remoteStdout = 'origin\n';
+    git.remoteShouldReject = false;
     trackerless.path = '';
   });
 
@@ -125,6 +127,26 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
     const rows = await readRepoPullRequests(path);
     expect(rows).toEqual([]);
     expect(gh.calls).toEqual([]);
+  });
+
+  it('reads a transient "git remote" failure as failed (null), never as a cached "no remote" (review NB-1)', async () => {
+    git.remoteShouldReject = true;
+    const path = `/repos/quota-${++repoSeq}`;
+
+    await expect(readRepoPullRequests(path)).resolves.toBeNull();
+    expect(gh.calls).toEqual([]);
+
+    // A failed read is cached for the normal active TTL like any other
+    // failure (a pause, a rate limit) — the `git remote` failure itself is
+    // never cached as a confirmed "no remote", which would otherwise hide a
+    // real listing for PR_CACHE_REMOTE_CHECK_TTL_MS (10 minutes) plus the
+    // idle TTL (5 minutes) instead of just the normal 30 seconds.
+    await vi.advanceTimersByTimeAsync(PR_CACHE_TTL_MS + 1_000);
+    git.remoteShouldReject = false;
+    gh.stdout = JSON.stringify([{ number: 1, state: 'OPEN', headRefName: 'feature/pan-1' }]);
+    const rows = await readRepoPullRequests(path);
+    expect(rows).toHaveLength(1);
+    expect(gh.calls).toHaveLength(1);
   });
 
   it('caches a listing with no open PR for 5 minutes instead of the flat 30 s (PAN-4291 idle-ttl AC1)', async () => {

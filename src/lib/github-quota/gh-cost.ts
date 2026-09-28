@@ -1,8 +1,10 @@
 /**
- * PAN-4291: price a `gh pr list` / `gh issue list` call by the REST pages
- * GitHub actually walks to answer it, not a flat 1 point.
+ * PAN-4291: price a `gh pr list` / `gh issue list` call by the GraphQL pages
+ * GitHub actually walks to answer it, not a flat 1 point. `classifyGhInvocation`
+ * already bills `gh pr`/`gh issue` commands to the `graphql` bucket; this
+ * gives that estimate the same page-and-field-aware shape as the real cost.
  *
- * `gh` fetches one page of up to 100 rows per REST call; each extra `--json`
+ * `gh` fetches one page of up to 100 rows per call; each extra `--json`
  * field GitHub joins in (a review, a status-check rollup, …) makes that page
  * more expensive. `priceGhListCall` prices every page `--limit` implies,
  * then — when the actual response is shorter than that — keeps only the
@@ -12,7 +14,7 @@
 const PAGE_ROWS = 100;
 const DEFAULT_LIMIT = 30;
 
-/** `--json` fields GitHub bills as extra REST sub-requests per row. */
+/** `--json` fields GitHub bills as extra per-row cost in the GraphQL page. */
 const FIELD_WEIGHTS: Record<string, number> = {
   statusCheckRollup: 2,
   reviewRequests: 1,
@@ -90,7 +92,7 @@ function pageCost(pageSize: number, weight: number): number {
 }
 
 /**
- * The REST point cost of a `gh pr list` / `gh issue list` call, or `null`
+ * The GraphQL point cost of a `gh pr list` / `gh issue list` call, or `null`
  * when `args` is not one of those two commands.
  */
 export function priceGhListCall(args: readonly string[], stdout?: string): number | null {

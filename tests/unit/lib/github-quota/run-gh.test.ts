@@ -59,7 +59,7 @@ describe('runGh (PAN-4264)', () => {
     ]);
   });
 
-  it('prices a gh pr list call by the REST pages it walked (PAN-4291 AC4)', async () => {
+  it('prices a gh pr list call by the GraphQL pages it walked (PAN-4291 AC4)', async () => {
     const rows = Array.from({ length: 200 }, (_, i) => ({ number: i }));
     const exec = vi.fn().mockResolvedValue({ stdout: JSON.stringify(rows) });
     const fields = 'number,url,title,state,mergedAt,mergeable,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';

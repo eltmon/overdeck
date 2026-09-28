@@ -741,7 +741,7 @@ failures, and the closed-issue reaper treats the issue as not closed.
 - The close-out merged-PR lookup (`isSquashMergedViaPr`) runs through `runGh` instead of a raw unmetered exec, and a "not merged" answer for a `(project, branch, tip SHA)` is cached for one hour so the deacon's 60-second closed-issue reaper does not re-ask GitHub every tick for a still-unmerged branch (PAN-4291).
 - `readRepoPullRequests` skips the `gh pr list` call entirely — no exec, no ledger line — for a repo with no git remote or a project with no resolvable tracker.
 - The PR-cache listing is capped at 100 rows, not 200, and a listing with no OPEN PR is cached for `PR_CACHE_IDLE_TTL_MS` (5 minutes) instead of the flat 30 seconds, since nothing in it can change without a new PR opening.
-- `gh pr list`/`gh issue list` calls are priced by the REST pages they actually walk (`priceGhListCall`), weighted by which `--json` fields GitHub joins in, instead of a flat 1 point.
+- `gh pr list`/`gh issue list` calls are priced by the GraphQL pages they actually walk (`priceGhListCall`), weighted by which `--json` fields GitHub joins in, instead of a flat 1 point.
 - A `gh` failure GitHub never saw (bad args, no git remote, `gh` missing) costs 0, not 1; only a failure whose stderr shows GitHub actually answered (an HTTP status or a `GraphQL:` error) still costs 1.
 
 **Where to look.** The app-bar pill shows `GH <remaining>/<limit>` for the

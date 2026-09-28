@@ -10,7 +10,7 @@
  *      user-pool bucket is paused (throws `GitHubQuotaPausedError`);
  *   3. execs `gh` asynchronously;
  *   4. appends one ledger line — a `gh pr list`/`gh issue list` call is priced
- *      per REST page it actually walked (`priceGhListCall`, PAN-4291), every
+ *      per GraphQL page it actually walked (`priceGhListCall`, PAN-4291), every
  *      other call costs a flat 1 unless `opts.onSuccess` overrides it — or on
  *      a rate-limit refusal records the pause and throws
  *      `GitHubRateLimitedError`. Any other failure is rethrown unchanged

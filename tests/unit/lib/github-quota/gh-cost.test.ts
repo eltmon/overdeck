@@ -1,6 +1,6 @@
 /**
  * PAN-4291 Work Item 4: priceGhListCall prices a `gh pr/issue list` call by
- * the REST pages it actually walks, instead of a flat 1 point.
+ * the GraphQL pages it actually walks, instead of a flat 1 point.
  */
 
 import { describe, expect, it } from 'vitest';

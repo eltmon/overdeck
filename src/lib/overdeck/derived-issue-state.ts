@@ -330,9 +330,12 @@ export async function listRepoPullRequests(projectPath: string): Promise<readonl
  */
 export async function readRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[] | null> {
   return cachedRepoPullRequests(projectPath, async () => {
-    // PAN-4291: no tracker or no git remote means gh could never answer.
-    if (!(await shouldListPullRequests(projectPath))) return [];
     try {
+      // PAN-4291: no tracker means gh could never answer; a `git remote`
+      // failure reads as failed too (never cached as a false "no remote"),
+      // landing in the catch below like a pause or refusal — "failed" (null),
+      // never "no PRs".
+      if (!(await shouldListPullRequests(projectPath))) return [];
       // PAN-4264: metered as caller pr-cache; a pause or refusal lands in the
       // catch below and reads as "failed" (null), never as "no PRs".
       const { stdout } = await runGh([
