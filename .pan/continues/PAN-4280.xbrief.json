@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T00:33:47.898Z",
+  "updated": "2026-09-28T00:41:05.591Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,9 +106,10 @@
       "doneAt": "2026-09-28T00:33:44.343Z"
     },
     "unscoped-move-chip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4280",
-      "claimedAt": "2026-09-28T00:33:47.898Z"
+      "claimedAt": "2026-09-28T00:33:47.898Z",
+      "doneAt": "2026-09-28T00:41:05.591Z"
     }
   }
 }
