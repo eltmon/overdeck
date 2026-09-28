@@ -37,6 +37,16 @@ const INCREMENTAL_FRAME = {
   seq: 2,
 };
 
+/** A terminal.frame record built from explicit raw bytes, for UTF-8 decode fixtures. */
+const frame = (bytes: number[], full = false) => ({
+  type: 'terminal.frame',
+  bytes: Buffer.from(bytes).toString('base64'),
+  encoding: 'ansi',
+  full,
+  width: 100,
+  height: 30,
+});
+
 /** A child process stand-in whose stdout the test drives line by line. */
 class FakeChild extends EventEmitter {
   readonly stdout = new EventEmitter() as EventEmitter & { setEncoding(enc: string): void };
@@ -102,6 +112,33 @@ describe('decodeTerminalRecord', () => {
       { kind: 'exit', code: null },
     ]);
   });
+
+  it('decodes a 3-byte character split across two incremental frames', () => {
+    const state: TerminalDecodeState = { cols: 100, rows: 30 };
+    expect(decodeTerminalRecord(frame([0xe2]), state)).toEqual([]);
+    expect(decodeTerminalRecord(frame([0x97, 0x8f]), state)).toEqual([
+      { kind: 'output', data: '●' },
+    ]);
+  });
+
+  it('starts a fresh decoder on a snapshot frame', () => {
+    const state: TerminalDecodeState = { cols: 100, rows: 30 };
+    expect(decodeTerminalRecord(frame([0xe2]), state)).toEqual([]);
+    expect(decodeTerminalRecord(frame([...Buffer.from('hello')], true), state)).toEqual([
+      { kind: 'snapshot', cols: 100, rows: 30, data: 'hello' },
+    ]);
+    expect(decodeTerminalRecord(frame([0xe2, 0x97, 0x8f]), state)).toEqual([
+      { kind: 'output', data: '●' },
+    ]);
+  });
+
+  it('decodes multi-byte characters and emoji in one frame', () => {
+    const state: TerminalDecodeState = { cols: 100, rows: 30 };
+    const text = '● · ─ ⎿ 🚀';
+    expect(decodeTerminalRecord(frame([...Buffer.from(text, 'utf-8')]), state)).toEqual([
+      { kind: 'output', data: text },
+    ]);
+  });
 });
 
 describe('observeTerminal', () => {
@@ -144,6 +181,29 @@ describe('observeTerminal', () => {
     children[0].stdout.emit('data', '{not json}\n');
     children[0].emitRecord(FULL_FRAME);
     expect((await pending)[0]).toMatchObject({ kind: 'snapshot' });
+  });
+
+  it('keeps one decoder per stream', async () => {
+    const { spawn, children } = fakeSpawn();
+    const first = observeTerminal('term_f', { spawn });
+    const second = observeTerminal('term_f', { spawn });
+    expect(children).toHaveLength(2);
+
+    children[0].emitRecord(FULL_FRAME);
+    children[1].emitRecord(FULL_FRAME);
+    children[0].emitRecord(frame([0xe2]));
+    children[1].emitRecord(frame([0x97, 0x8f]));
+    children[0].emitRecord(frame([0x97, 0x8f]));
+
+    const [firstFrames, secondFrames] = await Promise.all([
+      collect(first.frames, 2),
+      collect(second.frames, 2),
+    ]);
+    expect(firstFrames[1]).toEqual({ kind: 'output', data: '●' });
+    expect(secondFrames[1]).toEqual({ kind: 'output', data: '��' });
+
+    first.close();
+    second.close();
   });
 });
 
