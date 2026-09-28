@@ -9,8 +9,6 @@
  * This module is the one place that spells the chord for each backend.
  */
 
-import type { HerdrApiClient } from './herdr-api.js';
-
 /** How a delivery finishes: Enter (queue while busy) or the send-now chord (steer). */
 export type SubmitMode = 'enter' | 'steer';
 
@@ -38,7 +36,8 @@ export function tmuxSubmitKeys(mode: SubmitMode = 'enter'): readonly string[] {
  * multi-line message must not submit at its first newline.
  */
 export async function steerHerdrPane(
-  api: Pick<HerdrApiClient, 'call'>,
+  // Structural, not HerdrApiClient: importing herdr-api here would close an import cycle through types.ts.
+  api: { call(method: string, params: Record<string, unknown>): Promise<unknown> },
   paneId: string,
   text: string,
 ): Promise<void> {
