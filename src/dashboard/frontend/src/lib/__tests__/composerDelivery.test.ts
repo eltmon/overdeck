@@ -117,6 +117,31 @@ describe('not-found outbox (PAN-4247)', () => {
   });
 });
 
+describe('not-delivered failures (PAN-4278)', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); resetComposerStore(); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it('Resend of a not-delivered entry uses a fresh clientMessageId without retry', async () => {
+    send('send-1', 'hello');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: 'Not delivered: refused: agent_blocked', code: 'not-delivered', deliveryUnknown: false, retryable: true,
+    }), { status: 502 })));
+    const err = await sendConversationMessage(CONV, 'hello', undefined, undefined, undefined, { clientMessageId: 'send-1' })
+      .catch((e: unknown) => e);
+    store().failSend(CONV, 'hello', 'prompt', { ...sendFailureDetails(err), clientMessageId: 'send-1' });
+    const failed = slice().failed[0]!;
+    expect(failed).toMatchObject({ code: 'not-delivered', deliveryUnknown: false, retryable: true });
+
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"ok":true}'));
+    vi.stubGlobal('fetch', fetchMock);
+    await store().retryFailed(CONV, failed.id, 'hello', 2);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.clientMessageId).not.toBe('send-1');
+    expect(body).not.toHaveProperty('retry');
+  });
+});
+
 describe('delivery response classification', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });

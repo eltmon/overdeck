@@ -225,4 +225,23 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   are paused. Agent `gh` calls are counted by a shim that lives beside the
   git guard (`launcher-git-guard.ts`), not by `runGh`.
 
+- **Two terminal-permission detectors coexist** (PAN-4278) — agents are
+  detected by `src/lib/agent-input-detection.ts` (the `1. Yes / 2. Yes, and … /
+  3. No` shape); Claude Code conversations use `src/lib/agents/permission-prompt.ts`
+  (2- or 3-option prompts, the ` · from the <type> agent` subagent title, the
+  `│` reason line). They were deliberately not unified; a Claude Code UI change
+  must update both, and the 2.1.280 fixtures pin the second.
+- **Check for a permission prompt before ensure-main** (PAN-4278) —
+  `ensureMainInputTarget` sends `Down`/`Up`/`Enter`/`Escape`; with a permission
+  menu up, `Down` moves the menu cursor and `Enter` answers it. Anything that
+  keys a Claude Code pane before pasting must consult
+  `conversationPendingPermission` (pane-confirmed `answerable`) first, as the
+  composer route does. Never hold or block on a hook-registry entry alone: the
+  hook is a best-effort `curl --max-time 1`, so entries can go stale.
+- **Composer receipts cache every response for 24 h** (PAN-4278) —
+  `withConversationMessageReceipt` replays any response, including a 409 or a
+  502, for the same `(name, clientMessageId)`. A resend after a
+  `permission-pending` hold or a `not-delivered` failure must mint a fresh
+  `clientMessageId` and send no `retry` flag, like the not-found Resend.
+
 <!-- last-verified: 2026-09-28 -->

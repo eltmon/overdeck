@@ -91,7 +91,7 @@ function cleanLine(line: string): string {
  * PAN-3068 shape — key/action pairs separated by "·". Every segment must open
  * with a key name, so real post-answer output never qualifies.
  */
-function looksLikeHarnessFooterHint(line: string): boolean {
+export function looksLikeHarnessFooterHint(line: string): boolean {
   const segments = line.split('·').map((s) => s.trim()).filter(Boolean)
   if (segments.length === 0) return false
   return segments.every(

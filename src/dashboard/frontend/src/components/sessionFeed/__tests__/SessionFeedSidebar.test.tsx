@@ -461,6 +461,31 @@ describe('SessionFeedSidebar', () => {
     expect(window.location.pathname).toBe('/conv/conv-20260728-5277');
   });
 
+  it('Needs you shows waiting <elapsed> and puts the oldest permission first', async () => {
+    const permission = (agentLabel: string, since: string) => ({
+      signature: `sig-${since}`, answerable: true, agentLabel, agentKey: null, toolName: 'Bash', header: 'Bash command',
+      detailLines: [], reason: null, options: [], since,
+    });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/conversations/pending-input') {
+        return Response.json([
+          { name: 'conv-newer', title: 'Newer', pendingPermission: permission('Main agent', '2026-05-23T01:00:00.000Z') },
+          { name: 'conv-older', title: 'Older', pendingPermission: permission('Subagent: Orca study', '2026-05-22T18:05:00.000Z') },
+        ]);
+      }
+      return undefined;
+    });
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    const older = await screen.findByTestId('needs-you-row-conv-older');
+    expect(within(older).getByText('Subagent: Orca study · Bash')).toBeInTheDocument();
+    expect(within(older).getByText('waiting 7h ago')).toBeInTheDocument();
+    expect(within(screen.getByTestId('needs-you-row-conv-newer')).getByText('waiting 5m ago')).toBeInTheDocument();
+    const rows = screen.getAllByTestId(/^needs-you-row-/).map((el) => el.getAttribute('data-testid'));
+    expect(rows).toEqual(['needs-you-row-conv-older', 'needs-you-row-conv-newer']);
+  });
+
   it('still requests the dialog reopen so a payload-carrying question keeps answering in place', async () => {
     const askedAt = '2026-05-23T01:04:00.000Z';
     useDashboardStore.setState({

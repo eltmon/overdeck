@@ -26,6 +26,7 @@ import {
 import { fetchWithTimeout } from './apiFetch';
 import { formatIssueRef } from './issueLabel';
 import type { PendingPaneChoice } from './paneChoice';
+import type { TerminalPendingPermission } from '../components/TerminalPermissionDialog';
 
 /** A conversation with an open blocking surface, as served by the REST door. */
 export interface ConversationPendingInputRow {
@@ -37,6 +38,30 @@ export interface ConversationPendingInputRow {
   pendingProposedPlan?: PendingInputSubject['pendingProposedPlan'];
   /** PAN-3113 — a blocking numbered-choice menu parsed from the pane. */
   pendingPaneChoice?: PendingPaneChoice;
+  /** PAN-4278 — a Claude Code terminal permission prompt blocking the conversation. */
+  pendingPermission?: TerminalPendingPermission;
+}
+
+/** Kinds a conversation row reports, derived when the REST door does not spell them out. */
+function conversationKinds(c: ConversationPendingInputRow): string[] {
+  if (c.pendingInputKinds?.length) return [...c.pendingInputKinds];
+  return [
+    ...(c.pendingAskUserQuestion ? ['askUserQuestion'] : []),
+    ...(c.pendingProposedPlan ? ['exitPlanMode'] : []),
+    ...(c.pendingPaneChoice ? ['paneChoice'] : []),
+    ...(c.pendingPermission ? ['permissionRequest'] : []),
+  ];
+}
+
+/** PAN-4278 — "who asked · for what", shown as the row detail. */
+function permissionSummary(c: ConversationPendingInputRow): string | undefined {
+  const p = c.pendingPermission;
+  if (!p) return undefined;
+  return p.toolName ? `${p.agentLabel} · ${p.toolName}` : p.agentLabel;
+}
+
+function conversationSince(c: ConversationPendingInputRow): string {
+  return c.pendingPermission?.since ?? c.pendingAskUserQuestion?.askedAt ?? c.pendingProposedPlan?.askedAt ?? '';
 }
 
 /** One definition, shared with `PendingInputSubject` so the two never drift. */
@@ -55,6 +80,8 @@ export interface Decision {
   pendingProposedPlan?: PendingInputSubject['pendingProposedPlan'];
   /** PAN-3113 — parsed pane choice menu, present on the paneChoice kind. */
   pendingPaneChoice?: PendingPaneChoice;
+  /** PAN-4278 — "<agent> · <tool>" for a pending terminal permission prompt. */
+  permissionSummary?: string;
   /** Oldest blocking timestamp — drives ordering and the age column. */
   since: string;
   /**
@@ -126,13 +153,7 @@ export function usePendingInputSubjects(): PendingInputSubject[] {
     // shape change upstream). Iterating that throws inside a useMemo and takes
     // down every surface built on this hook, so coerce before the loop.
     for (const c of Array.isArray(convRows) ? convRows : []) {
-      const kinds = c.pendingInputKinds?.length
-        ? [...c.pendingInputKinds]
-        : [
-            ...(c.pendingAskUserQuestion ? ['askUserQuestion'] : []),
-            ...(c.pendingProposedPlan ? ['exitPlanMode'] : []),
-            ...(c.pendingPaneChoice ? ['paneChoice'] : []),
-          ];
+      const kinds = conversationKinds(c);
       if (kinds.length === 0) continue;
       out.push({
         agentId: c.name,
@@ -142,7 +163,8 @@ export function usePendingInputSubjects(): PendingInputSubject[] {
         pendingAskUserQuestion: c.pendingAskUserQuestion,
         pendingProposedPlan: c.pendingProposedPlan,
         permissionRequestIds: [],
-        since: c.pendingAskUserQuestion?.askedAt ?? c.pendingProposedPlan?.askedAt ?? '',
+        permissionSummary: permissionSummary(c),
+        since: conversationSince(c),
       });
     }
     return out;
@@ -192,13 +214,7 @@ export function useDecisions(): Decision[] {
     for (const c of convRows) {
       // The REST door may report a payload without spelling out its kind; derive
       // the kind so a conversation is never dropped for lacking one.
-      const kinds = c.pendingInputKinds?.length
-        ? c.pendingInputKinds
-        : [
-            ...(c.pendingAskUserQuestion ? ['askUserQuestion'] : []),
-            ...(c.pendingProposedPlan ? ['exitPlanMode'] : []),
-            ...(c.pendingPaneChoice ? ['paneChoice'] : []),
-          ];
+      const kinds = conversationKinds(c);
       if (kinds.length === 0) continue;
       const issueTitle = c.issueId ? titleByIssueId.get(c.issueId) : undefined;
       out.push({
@@ -211,7 +227,8 @@ export function useDecisions(): Decision[] {
         pendingAskUserQuestion: c.pendingAskUserQuestion,
         pendingProposedPlan: c.pendingProposedPlan,
         pendingPaneChoice: c.pendingPaneChoice,
-        since: c.pendingAskUserQuestion?.askedAt ?? c.pendingProposedPlan?.askedAt ?? '',
+        permissionSummary: permissionSummary(c),
+        since: conversationSince(c),
         blocking: isBlockingDecision(kinds),
       });
     }

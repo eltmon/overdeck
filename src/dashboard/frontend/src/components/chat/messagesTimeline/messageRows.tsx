@@ -6,6 +6,7 @@ import { ChangedFilesTree } from '../ChangedFilesTree';
 import { DiffStatLabel } from '../DiffStatLabel';
 import { summarizeTurnDiffStats } from '../../../lib/turnDiffTree';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
+import { useComposerStore } from '../../../lib/composerStore';
 import { formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
 
@@ -48,6 +49,30 @@ export function UserMessageRow({ message, cwd, issueId }: { message: ChatMessage
         >
           <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
           <span className={styles.messageTimestamp}>{`Delivered to subagent · ${description}`}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.deliveryState === 'held') {
+    return (
+      <div className={styles.userMessageRow}>
+        <div
+          className={styles.userMessageBubble}
+          style={{ opacity: 0.6 }}
+          title="Not sent yet: the agent is waiting on a permission prompt. This message sends itself once the prompt is answered."
+        >
+          <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+          <span className={styles.messageTimestamp}>
+            Waiting: the agent needs a permission answer first ·{' '}
+            <button
+              type="button"
+              onClick={() => useComposerStore.getState().discardHeld(message.id)}
+              style={{ border: 'none', background: 'transparent', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Discard
+            </button>
+          </span>
         </div>
       </div>
     );

@@ -188,6 +188,26 @@ describe('ComposerFooter attachments', () => {
     window.removeEventListener('overdeck:open-fork-modal', openModal);
   });
 
+  it('holds the message as a waiting bubble on 409 permission-pending (PAN-4278)', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      error: 'Waiting: the agent needs a permission answer first', code: 'permission-pending', deliveryUnknown: false, retryable: true,
+    }), { status: 409 }));
+    const { useComposerStore } = await import('../../../lib/composerStore');
+    const onSend = vi.fn((text: string, clientMessageId?: string) => {
+      useComposerStore.getState().addOptimistic(conversation.name, text, 0, { clientMessageId });
+    });
+    const onSendFailed = vi.fn();
+
+    render(<ComposerFooter conversation={conversation} onSend={onSend} onSendFailed={onSendFailed} />);
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'BTW How can I launch Orca?' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    await waitFor(() => expect(useComposerStore.getState().byConversation[conversation.name]?.optimistic[0]?.deliveryState).toBe('held'));
+    expect(onSendFailed).not.toHaveBeenCalled();
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(editorState.text).toBe('');
+  });
+
   it('opens the server-requested fork dialog without rendering a chat message', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {

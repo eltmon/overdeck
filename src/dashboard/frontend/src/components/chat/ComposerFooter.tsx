@@ -37,6 +37,7 @@ import {
   sendConversationMessage,
   sendFailureDetails,
   getAttachmentAccept,
+  MessageSendError,
   type SendFailureDetails,
 } from '../../lib/composerStore';
 import { classifyAttachmentKind, isDotfileAttachment, isExtensionlessAttachment } from '../../lib/attachmentTypes';
@@ -573,6 +574,17 @@ export function ComposerFooter({
         setText('');
       }
     } catch (err) {
+      // PAN-4278: a permission prompt is up, so the server pasted nothing. The
+      // bubble waits as 'held' and resends itself once the prompt clears.
+      if (!isPortableCommand && err instanceof MessageSendError && err.code === 'permission-pending') {
+        useComposerStore.getState().hold(submitConversationName, clientMessageId);
+        consumeAttachmentsForConversation(submitConversationName);
+        if (submitConversationName === currentConversationNameRef.current) {
+          editor.update(() => { $getRoot().clear(); });
+          setText('');
+        }
+        return;
+      }
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
       onSendFailed?.(submissionMessage, isPortableCommand ? 'command' : 'prompt', {
