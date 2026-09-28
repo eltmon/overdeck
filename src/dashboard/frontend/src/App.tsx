@@ -18,6 +18,8 @@ import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import type { CreatedProject } from './components/project/new/useProjectCreateIntent';
+import { takeAddProjectReturnTo, useAddProjectDialog } from './components/project/new/addProjectDialogStore';
+import { requestLauncherFocusAfterCreate } from './components/Stage/launcherFocusStore';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -225,16 +227,13 @@ export default function App() {
   const queryClient = useQueryClient();
   const recentActivity = useDashboardStore((state) => (state.recentActivity ?? []) as Array<Record<string, unknown>>);
 
-  const handleNewProject = useCallback(() => {
-    setActiveTabState('project-new');
-    window.history.pushState({ tab: 'project-new' }, '', '/projects/new');
-  }, []);
+  const handleNewProject = useCallback(() => useAddProjectDialog.getState().show(), []);
 
   const handleProjectCreated = useCallback((project: CreatedProject) => {
     void queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] });
     void queryClient.invalidateQueries({ queryKey: ['registered-projects'] });
     setSelectedProjectKey(project.key);
-    const target = getProjectCreatedNavigation(project.key); // PAN-3836: honors returnTo=/workspaces/new from the chips
+    const target = getProjectCreatedNavigation(project.key, takeAddProjectReturnTo()); // honors returnTo=/workspaces/new from the chips
     setActiveTabState(target.tab);
     if (target.tab === 'command-deck') commandDeckPathRef.current = target.path;
     if (window.location.pathname !== target.path) window.history.pushState(target.state, '', target.path);
@@ -244,6 +243,7 @@ export default function App() {
     // deck path, which would clobber the /workspaces/new?project= return path.
     setConversationRoute(null, 'conversation', target.tab === 'command-deck');
     usePanesStore.getState().ensureHome(project.key);
+    requestLauncherFocusAfterCreate(target.tab, project.key);
   }, [queryClient, setConversationRoute]);
   const seenWorkspaceActivityIds = useRef(new Set<string>());
 
@@ -862,6 +862,7 @@ export default function App() {
           onRestartCliproxy={() => restartCliproxyMutation.mutate()}
           onToggleSessionFeedSidebar={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
           onNavigateNeedsYou={() => setActiveTab('flywheel')}
+          onProjectCreated={handleProjectCreated}
         />
 
         <div className="min-h-0 flex flex-1 overflow-hidden">

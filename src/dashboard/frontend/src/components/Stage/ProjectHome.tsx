@@ -116,6 +116,7 @@ export function ProjectHome({
       busy={launchBusy}
       errorText={launchError ?? undefined}
       lastUsedAgentId={readLastUsedAgent(api.deckKey)}
+      focusKey={api.deckKey}
       onSelect={(intent, query) =>
         dispatchLauncherIntent(intent, query, {
           openAgent: (i, query) => onAgentSelected(i.id, query),

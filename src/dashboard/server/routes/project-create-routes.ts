@@ -30,11 +30,14 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getProjectSync } from '../../../lib/projects.js';
+import { getProjectSync, listProjectsAsync } from '../../../lib/projects.js';
+import { getDefaultCwd } from '../../../lib/default-cwd.js';
+import { listSuggestedRepositories } from '../../../lib/projects/create-scan.js';
 import { resolveProjectCreateRecovery } from '../../../lib/projects/create-recovery.js';
 import { finishProjectSetup, performProjectCreate } from '../../../lib/projects/create-perform.js';
 import {
@@ -51,6 +54,7 @@ import {
 } from './project-create-jobs.js';
 import { DuplicateProjectError } from '../../../lib/project-registration.js';
 import {
+  canonicalizePath,
   resolveProjectCreateIntent,
   type ProjectCreateInput,
 } from '../../../lib/projects/create.js';
@@ -61,6 +65,30 @@ import {
   rejectUnsafeDashboardMutationRequest,
 } from './dashboard-auth.js';
 import { readProjectJsonBody } from './project-body.js';
+
+// ─── Route: GET /api/projects/suggestions ───────────────────────────────────
+// PAN-4281 (D10): repositories already sitting in the default projects folder
+// that are not registered yet, for the Add-project dialog. Read-only; `root` is
+// also where the dialog's folder picker starts, and `homeDir` lets the browser
+// show paths under home as `~` (it cannot infer a server's home).
+
+const getProjectSuggestionsRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/suggestions',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
+    const root = getDefaultCwd();
+    const projects = yield* Effect.promise(() => listProjectsAsync());
+    const registered = new Set(
+      yield* Effect.promise(() => Promise.all(projects.map((project) => canonicalizePath(project.config.path)))),
+    );
+    const repositories = yield* Effect.promise(() => listSuggestedRepositories(root, registered));
+    return jsonResponse({ root, homeDir: homedir(), repositories });
+  })),
+);
 
 // ─── Route: GET /api/projects/create-jobs/:jobId ────────────────────────────
 // PAN-3836: poll background job status during clone operations.
@@ -251,6 +279,7 @@ const postProjectsRoute = HttpRouter.add(
       parentDir?: unknown;
       name?: unknown;
       issuePrefix?: unknown;
+      repos?: unknown;
       operationId?: unknown;
     };
 
@@ -273,6 +302,10 @@ const postProjectsRoute = HttpRouter.add(
       parentDir: typeof body.parentDir === 'string' ? body.parentDir : undefined,
       name: typeof body.name === 'string' ? body.name : undefined,
       issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
+      repos:
+        Array.isArray(body.repos) && body.repos.every((repo) => typeof repo === 'string')
+          ? (body.repos as string[])
+          : undefined,
       homeBoundary: true,
       refreshRemote: true,
     };
@@ -363,6 +396,7 @@ const postProjectsRoute = HttpRouter.add(
 
 
 export const projectCreateJobRoutesLayer = Layer.mergeAll(
+  getProjectSuggestionsRoute,
   getProjectCreateJobRoute,
   postProjectCreateJobCancelRoute,
   postProjectCreateReconcileRoute,

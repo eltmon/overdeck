@@ -1,14 +1,15 @@
 /**
  * PAN-4280 (WI-8, D4/D4a) — the Home composer's project chip. Shows which
  * project a conversation or terminal will start in and lets the user change
- * it, including "Add a project…", which — in this slice — just navigates to
- * /projects/new (D4a; #4281 replaces this with a modal dialog).
+ * it, including "Add a project…", which opens the Add-project dialog over Home
+ * (PAN-4281; it navigated to /projects/new before the dialog existed).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RegisteredProject } from '../CommandDeck/UnknownProjectState';
 import type { UiMode } from '../../lib/simple/uiMode';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
+import { useAddProjectDialog } from '../project/new/addProjectDialogStore';
 
 export interface HomeComposerProjectChipProps {
   mode: UiMode;
@@ -16,11 +17,6 @@ export interface HomeComposerProjectChipProps {
   value: string | undefined;
   onChange: (key: string | undefined) => void;
   disabled?: boolean;
-}
-
-function navigateToNewProject(): void {
-  window.history.pushState({ tab: 'project-new' }, '', '/projects/new');
-  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 export function HomeComposerProjectChip({ mode, projects, value, onChange, disabled }: HomeComposerProjectChipProps) {
@@ -105,7 +101,7 @@ export function HomeComposerProjectChip({ mode, projects, value, onChange, disab
             role="menuitem"
             onClick={() => {
               close();
-              navigateToNewProject();
+              useAddProjectDialog.getState().show();
             }}
             className="flex w-full cursor-pointer select-none items-center rounded px-3 py-1.5 text-left text-xs text-muted-foreground outline-none hover:bg-accent"
           >

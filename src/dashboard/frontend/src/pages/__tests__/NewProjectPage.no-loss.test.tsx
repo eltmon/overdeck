@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('../../lib/wsTransport.js', () => ({
   dashboardMutationJsonHeaders: vi.fn().mockResolvedValue({ 'content-type': 'application/json' }),
@@ -76,8 +77,12 @@ function routeFetch(
 }
 
 function renderPage(props: Partial<React.ComponentProps<typeof NewProjectPage>> = {}) {
+  // The start step reads registered projects through React Query (PAN-4281).
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <NewProjectPage onCancel={props.onCancel ?? (() => {})} onCreated={props.onCreated ?? (() => {})} />,
+    <QueryClientProvider client={queryClient}>
+      <NewProjectPage onCancel={props.onCancel ?? (() => {})} onCreated={props.onCreated ?? (() => {})} />
+    </QueryClientProvider>,
   );
 }
 
@@ -103,10 +108,10 @@ describe('WI-5 no-loss inventory', () => {
     routeFetch();
     renderPage();
 
-    expect(screen.getByRole('button', { name: /Open existing folder/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open a folder/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Create new project/i })).toBeInTheDocument();
 
-    await enterMode(user, 'Open existing folder');
+    await enterMode(user, 'Open a folder');
     expect(screen.getByLabelText('Folder')).toBeInTheDocument();
   });
 
@@ -123,9 +128,10 @@ describe('WI-5 no-loss inventory', () => {
     const user = userEvent.setup();
     routeFetch(() => json({}), intentFixture({ mode: 'existing' }));
     renderPage();
-    await enterMode(user, 'Open existing folder');
+    await enterMode(user, 'Open a folder');
 
-    await user.click(screen.getByRole('button', { name: /Browse server folders/i }));
+    // The folder step opens on the picker itself (PAN-4281 WI-9), so there is
+    // no Browse button to press first.
     const select = await screen.findByTestId('folder-picker-select');
     await user.click(select);
 
@@ -285,7 +291,7 @@ describe('WI-5 no-loss inventory', () => {
       '/workspaces/new',
     );
 
-    for (const label of ['Open existing folder', 'Clone repository', 'Create new project']) {
+    for (const label of ['Open a folder', 'Clone from URL', 'Create new project']) {
       await enterMode(user, label);
       expect(guide()).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Change' }));
@@ -298,12 +304,14 @@ describe('WI-5 no-loss inventory', () => {
     renderPage();
 
     for (const [label, cta] of [
-      ['Open existing folder', 'Add project'],
-      ['Clone repository', 'Clone repository'],
+      ['Open a folder', 'Add project'],
+      ['Clone from URL', 'Clone repository'],
       ['Create new project', 'Create project'],
     ] as const) {
       await enterMode(user, label);
-      const actions = screen.getByRole('button', { name: cta });
+      // The folder step shows its form once a folder is chosen (PAN-4281 WI-9).
+      if (label === 'Open a folder') await user.click(await screen.findByTestId('folder-picker-select'));
+      const actions = await screen.findByRole('button', { name: cta });
       expect(actions).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Change' }));
     }

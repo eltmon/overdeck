@@ -93,10 +93,13 @@ Registration detects:
 - `issue_prefix` — proposed from the project key, up to ten characters
 - The main workspace row
 
-Adding a **subdirectory** of a repository is refused with the real repository
-root offered instead, so you cannot end up with two projects fighting over one
-checkout. A linked worktree is recognized as a repository. A plain folder that
-is not a repository at all is fine — it registers as a project without one.
+Adding a **subdirectory** of a repository adds the repository root instead,
+and says so: `ℹ Using the repository root /home/you/code/app.` This keeps two
+projects from fighting over one checkout. A name you pass with `--name` is kept;
+otherwise the name comes from the root folder. A home directory that is itself a
+repository (a dotfiles-managed `~`) is the one exception: folders under it stay
+plain folders. A linked worktree is recognized as a repository. A plain folder
+that is not a repository at all is fine — it registers as a project without one.
 
 `workspaces/` is excluded through `<project>/.git/info/exclude`, which is local
 and untracked. Overdeck never edits your tracked `.gitignore`, so a freshly
@@ -123,13 +126,41 @@ the wrong project.
 
 ### Dashboard
 
-Register projects through the dashboard at `/projects/new`, reachable from the
-sidebar `+`, the workspace-page chips, and the HomePage button:
+The sidebar `+`, the command palette, the workspace-page chips, and the
+HomePage button open the **Add a project** dialog over the page you are on.
+`/projects/new` still works and shows the same dialog as a full page;
+`?mode=clone`, `?mode=existing` or `?mode=new` skips the first step.
 
-- **Open existing folder** — use a folder already on the server. Browse with the
-  folder picker or type an absolute path.
-- **Clone repository** — download a git repository.
-- **Create new project** — start an empty git repository.
+The first step focuses **Open a folder**; the arrow keys move between the
+choices and Enter picks one.
+
+- **Open a folder** — type a path or browse the server's folders, starting in
+  `~/Projects`. What happens next depends on what the folder is:
+  - **A Git repository** — review it and add it. A folder *inside* a repository
+    adds the repository root, with the note "Using the repository root
+    ~/code/app."
+  - **A folder with repositories in it** — the dialog lists the repositories it
+    found, all checked. **Add N projects** adds each checked one as its own
+    project; a failure on one row does not stop the rest. **Add this folder as
+    one project** adds a single multi-repo project spanning the checked
+    repositories: it registers `workspace.type: polyrepo` with one
+    `workspace.repos` entry per repository and keeps `.pan/` in the first one
+    (`pan_records.repo`). No tracker is set, since several remotes do not name
+    one; add it yourself. See [Polyrepo Configuration](/configuration/polyrepo).
+  - **A plain folder** — the dialog explains that agents and terminals work
+    there but branches, isolated copies and pull requests won't, and offers
+    **Add as folder** or **Back**.
+- **Clone from URL** — download a Git repository. Press Enter to clone once the
+  URL checks out.
+- **Create new project** — start an empty Git repository. Press Enter to create
+  once the name checks out.
+
+Below the choices, **Repositories in ~/Projects** lists repositories already in
+that folder that are not projects yet; **Add** registers one in a single click.
+
+After a project is added, Overdeck opens it and puts the cursor in its
+Launcher. If you started from the New Workspace page, you go back there with the
+new project selected.
 
 Defaults are real server-resolved values, not placeholders: the parent folder
 comes from the server's home directory, and the exact destination is shown

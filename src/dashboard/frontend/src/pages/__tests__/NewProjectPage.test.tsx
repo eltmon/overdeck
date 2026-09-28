@@ -64,7 +64,13 @@ function routeFetch(
 }
 
 function renderPage(onCreated = vi.fn(), onCancel = vi.fn()) {
-  render(<NewProjectPage onCancel={onCancel} onCreated={onCreated} />);
+  // The start step reads registered projects through React Query (PAN-4281).
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <NewProjectPage onCancel={onCancel} onCreated={onCreated} />
+    </QueryClientProvider>,
+  );
   return { onCreated, onCancel };
 }
 
@@ -91,7 +97,7 @@ describe('entry and focus', () => {
     renderPage();
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Open existing folder/i })).toHaveFocus(),
+      expect(screen.getByRole('button', { name: /Open a folder/i })).toHaveFocus(),
     );
   });
 

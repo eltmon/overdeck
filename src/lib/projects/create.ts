@@ -47,6 +47,7 @@ import { homedir } from 'os';
 import { promisify } from 'util';
 
 import { parseRepoUrl } from './repo-url.js';
+import { findNestedRepositories, type NestedRepository } from './create-scan.js';
 import {
   redactTransportUrl,
   ProjectCreateFailureError,
@@ -83,14 +84,23 @@ export type ProjectIntentCode =
   | 'path-not-absolute'
   /** The path exists but this server cannot stat or read it. */
   | 'path-unreadable'
-  /** The chosen folder sits inside a repository rooted somewhere else (D-15). */
-  | 'repository-root-elsewhere'
   /** This exact folder is already registered under this key — open or repair it. */
-  | 'project-exists-here';
+  | 'project-exists-here'
+  /** A `repos` entry is not a repository directly inside a non-git folder. */
+  | 'repos-invalid';
 
 export interface ProjectIntentFinding {
   field: ProjectIntentField;
   code: ProjectIntentCode;
+  message: string;
+  detail?: string;
+}
+
+export type ProjectNoticeCode = 'using-repository-root';
+
+/** A non-blocking resolve result: the create proceeds, but the operator should know. */
+export interface ProjectIntentNotice {
+  code: ProjectNoticeCode;
   message: string;
   detail?: string;
 }
@@ -105,6 +115,21 @@ export interface ProjectCreateInput {
   homeBoundary: boolean;
   refreshRemote?: boolean;
   homeDir?: string;
+  /**
+   * Child folder names of a non-git `existing` path to register together as one
+   * multi-repo (`workspace.type: polyrepo`) project. Ignored in other modes.
+   */
+  repos?: string[];
+}
+
+/** One repository of a multi-repo project, as registration writes it. */
+export interface ProjectWorkspaceRepo {
+  /** The repo's name in `workspace.repos[]`: the folder name, slugged. */
+  name: string;
+  /** Folder relative to the project root. */
+  path: string;
+  defaultBranch: string | null;
+  forge: 'github' | 'gitlab' | null;
 }
 
 export interface ResolvedProjectIntent {
@@ -135,6 +160,11 @@ export interface ResolvedProjectIntent {
   /** Set when this exact path is already registered under this key (repair target). */
   registeredKeyAtPath: string | null;
   findings: ProjectIntentFinding[];
+  notices: ProjectIntentNotice[];
+  /** Repositories directly inside a non-git `existing` folder (≤ 50, by name). */
+  nestedRepositories: NestedRepository[];
+  /** Set when `repos` selected a multi-repo project; registered as `workspace.repos`. */
+  workspaceRepos: ProjectWorkspaceRepo[];
 }
 
 export interface ProjectCreateProgress {
@@ -428,6 +458,56 @@ async function detectDefaultBranch(dir: string): Promise<string | null> {
 }
 
 /**
+ * Validate a multi-repo selection: every entry must be a single folder name
+ * directly inside `root` that holds a repository, and no two may slug to the
+ * same repo name. Invalid entries become `repos-invalid` findings; the valid
+ * ones get their default branch and forge detected, never guessed.
+ */
+async function resolveWorkspaceRepos(
+  root: string,
+  entries: string[],
+  findings: ProjectIntentFinding[],
+): Promise<ProjectWorkspaceRepo[]> {
+  const valid: Array<{ entry: string; name: string }> = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    const name = entry.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const reject = (message: string): void => {
+      findings.push({ field: 'path', code: 'repos-invalid', message, detail: entry });
+    };
+    if (!entry.trim() || /[/\\]/.test(entry) || entry === '.' || entry === '..' || !name.replace(/-/g, '')) {
+      reject('Choose folders directly inside this folder.');
+      continue;
+    }
+    try {
+      await stat(join(root, entry, '.git'));
+    } catch {
+      reject(`${entry} is not a Git repository inside this folder.`);
+      continue;
+    }
+    if (seen.has(name)) {
+      reject(`Two folders map to the repository name '${name}'.`);
+      continue;
+    }
+    seen.add(name);
+    valid.push({ entry, name });
+  }
+
+  return Promise.all(
+    valid.map(async ({ entry, name }) => {
+      const dir = join(root, entry);
+      const [defaultBranch, originUrl] = await Promise.all([detectDefaultBranch(dir), detectOriginUrl(dir)]);
+      return {
+        name,
+        path: entry,
+        defaultBranch,
+        forge: originUrl ? (parseRepoUrl(originUrl)?.provider ?? null) : null,
+      };
+    }),
+  );
+}
+
+/**
  * Resolve a project creation intent to a computed preview with findings.
  * Writes nothing; safe to call on every keystroke.
  */
@@ -435,6 +515,7 @@ export async function resolveProjectCreateIntent(
   input: ProjectCreateInput,
 ): Promise<ResolvedProjectIntent> {
   const findings: ProjectIntentFinding[] = [];
+  const notices: ProjectIntentNotice[] = [];
   const home = await canonicalizePath(input.homeDir ?? homedir());
 
   // Defaults are computed before any early return. An empty form still has to
@@ -482,6 +563,9 @@ export async function resolveProjectCreateIntent(
     willCreateMainWorkspace: false,
     registeredKeyAtPath: null,
     findings,
+    notices,
+    nestedRepositories: [],
+    workspaceRepos: [],
   };
 
   // 1. Mode-specific source validation
@@ -542,7 +626,7 @@ export async function resolveProjectCreateIntent(
   }
 
   // 2. Key
-  const key = intent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  let key = intent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   if (!key.replace(/-/g, '')) {
     findings.push({
       field: 'name',
@@ -570,6 +654,35 @@ export async function resolveProjectCreateIntent(
         detail: intent.path,
       });
       return intent;
+    }
+
+    // Git-root detection runs before the already-registered checks so they
+    // compare the folder that would actually be registered.
+    const root = await detectGitRoot(intent.path);
+    if (root) {
+      const canonicalRoot = await canonicalizePath(root);
+      intent.gitRoot = canonicalRoot;
+      // A dotfiles-managed home is a repository too. Snapping ~/Projects to ~
+      // would offer to register the whole home directory, so a home root counts
+      // as no repository and the folder stays a plain folder.
+      if (canonicalRoot !== home) {
+        intent.isGitRepository = true;
+        if (canonicalRoot !== intent.path) {
+          // Snap to the repository root (Orca parity): registering the subfolder
+          // would root a second project inside an existing checkout.
+          intent.path = canonicalRoot;
+          notices.push({
+            code: 'using-repository-root',
+            message: `Using the repository root ${canonicalRoot}.`,
+            detail: canonicalRoot,
+          });
+          if (!input.name?.trim()) {
+            intent.name = basename(canonicalRoot);
+            key = intent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            intent.key = key;
+          }
+        }
+      }
     }
   }
 
@@ -665,22 +778,7 @@ export async function resolveProjectCreateIntent(
       }
     }
   } else if (input.mode === 'existing' && intent.path) {
-    const root = await detectGitRoot(intent.path);
-    if (root) {
-      const canonicalRoot = await canonicalizePath(root);
-      intent.isGitRepository = true;
-      intent.gitRoot = canonicalRoot;
-      if (canonicalRoot !== intent.path) {
-        // Registering here would root a second project inside an existing repo,
-        // which is how you end up with two projects fighting over one checkout.
-        findings.push({
-          field: 'path',
-          code: 'repository-root-elsewhere',
-          message: `That folder is inside a Git repository rooted at ${canonicalRoot}. Add that folder instead.`,
-          detail: canonicalRoot,
-        });
-      }
-
+    if (intent.isGitRepository) {
       const originUrl = await detectOriginUrl(intent.path);
       if (originUrl) {
         const parsedOrigin = parseRepoUrl(originUrl);
@@ -690,10 +788,22 @@ export async function resolveProjectCreateIntent(
         }
       }
       intent.defaultBranch = await detectDefaultBranch(intent.path);
+      if (input.repos?.length) {
+        findings.push({
+          field: 'path',
+          code: 'repos-invalid',
+          message: 'This folder is already a Git repository; add it as a single project.',
+          detail: intent.path,
+        });
+      }
     } else {
       // A plain folder is a perfectly good project; `new` mode's init is what
       // would turn it into a repository, and existing mode must not do that.
       intent.isGitRepository = false;
+      intent.nestedRepositories = await findNestedRepositories(intent.path);
+      if (input.repos?.length) {
+        intent.workspaceRepos = await resolveWorkspaceRepos(intent.path, input.repos, findings);
+      }
     }
   }
 

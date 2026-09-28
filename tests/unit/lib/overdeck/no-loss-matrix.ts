@@ -404,6 +404,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/version',                          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Build version probe; outside 8 remodel domains' },
   { surface: 'GET /api/registered-projects',              kind: 'http', disposition: 'READ',        door: 'ConfigResolver.listProjects' },
   { surface: 'POST /api/projects/resolve',                kind: 'http', disposition: 'READ',        door: 'resolveProjectCreateIntent (dry-run validation, PAN-3836)' },
+  { surface: 'GET /api/projects/suggestions',             kind: 'http', disposition: 'READ',        door: 'listSuggestedRepositories (read-only onboarding suggestions, PAN-4281)' },
   { surface: 'GET /api/projects/create-jobs/:jobId',      kind: 'http', disposition: 'READ',        door: 'getProjectCreateJob (background clone job status polling, PAN-3836)' },
   { surface: 'POST /api/projects',                        kind: 'http', disposition: 'WRITE',       door: 'reserveProjectCreateOperation gates the destination, then performProjectCreate (existing/new) or startProjectCreateJob (clone, PAN-3836)' },
   { surface: 'POST /api/projects/create-jobs/:jobId/cancel', kind: 'http', disposition: 'WRITE',      door: 'requestProjectCreateJobCancel — aborts the clone child; answers cancelling, never cancelled (PAN-3836)' },
