@@ -52,6 +52,8 @@ export type WorkspaceIntentCode =
   | 'mode-conflict'
   | 'project-not-found'
   | 'project-ambiguous'
+  /** No project is registered at all, so there is nothing to choose from. */
+  | 'project-missing'
   | 'target-not-a-directory'
   | 'path-exists';
 
@@ -159,6 +161,9 @@ async function resolveProjectRef(projectKey?: string, cwd?: string): Promise<Pro
       };
     }
     return { ref: found };
+  }
+  if (all.length === 0) {
+    return { finding: { field: 'project', code: 'project-missing', message: 'Add a project first.' } };
   }
   if (all.length === 1) return { ref: all[0] };
   if (cwd) {

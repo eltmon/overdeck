@@ -259,6 +259,18 @@ describe('resolveWorkspaceCreateIntent — no ambient working directory (AC-4)',
     ]);
   });
 
+  it('zero projects returns project-missing', async () => {
+    unregisterProject(SECOND_PROJECT_KEY);
+    unregisterProject(PROJECT_KEY);
+
+    const intent = await resolveWorkspaceCreateIntent({ name: 'nothing-yet' });
+
+    expect(intent.projectId).toBeNull();
+    expect(intent.findings).toEqual([
+      { field: 'project', code: 'project-missing', message: 'Add a project first.' },
+    ]);
+  });
+
   it('anchors a relative target path to the caller cwd, not the ambient one', async () => {
     const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/definitely/not/here');
 
