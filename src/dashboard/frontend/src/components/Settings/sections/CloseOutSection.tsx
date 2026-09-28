@@ -41,6 +41,102 @@ function sourceLabel(source: 'default' | 'cloister.toml'): string {
   return source === 'cloister.toml' ? 'cloister.toml' : 'default';
 }
 
+interface ClosedIssueWorkspaceReport {
+  closedCount: number;
+  totalBytes: number;
+  unknownSizeCount: number;
+  trackerReadsPaused: boolean;
+  computedAt: string;
+}
+
+interface CloseOutCleanupResult {
+  removed: Array<{ issueId: string; freedBytes: number | null }>;
+  skipped: Array<{ issueId: string; reason: string }>;
+}
+
+async function fetchCloseOutDiskReport(): Promise<ClosedIssueWorkspaceReport> {
+  const res = await fetch('/api/cloister/close-out/disk');
+  if (!res.ok) throw new Error(`Failed to fetch closed-issue workspace disk report (${res.status})`);
+  return res.json();
+}
+
+async function runCloseOutCleanup(): Promise<CloseOutCleanupResult> {
+  await ensureDashboardSession();
+  const res = await fetch('/api/cloister/close-out/cleanup', {
+    method: 'POST',
+    credentials: 'include',
+    headers: await dashboardMutationJsonHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error ?? `Failed to clean up closed-issue workspaces (${res.status})`);
+  }
+  return res.json();
+}
+
+function formatDiskBytes(bytes: number): string {
+  const gb = bytes / 1_000_000_000;
+  if (gb >= 1) return `${gb.toFixed(1)} GB`;
+  return `${(bytes / 1_000_000).toFixed(1)} MB`;
+}
+
+function CloseOutDiskLine() {
+  const queryClient = useQueryClient();
+  const { data: report, isLoading } = useQuery({
+    queryKey: ['close-out-disk'],
+    queryFn: fetchCloseOutDiskReport,
+  });
+
+  const cleanup = useMutation({
+    mutationFn: runCloseOutCleanup,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['close-out-disk'] });
+    },
+    onError: (err) => {
+      toast.error(`Clean up failed: ${err instanceof Error ? err.message : String(err)}`);
+    },
+  });
+
+  let text: string;
+  if (isLoading || !report) {
+    text = 'Measuring closed-issue workspaces…';
+  } else if (report.closedCount === 0) {
+    text = 'No closed issues have workspaces on disk.';
+  } else {
+    text = `${report.closedCount} closed issue(s) still have workspaces (${formatDiskBytes(report.totalBytes)})`;
+    if (report.unknownSizeCount > 0) text += ` — size unknown for ${report.unknownSizeCount}`;
+    if (report.trackerReadsPaused) text += ' GitHub reads are paused; this count may be incomplete.';
+  }
+
+  return (
+    <div className="px-4 pb-2">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-xs text-muted-foreground">{text}</p>
+        <button
+          type="button"
+          data-testid="close-out-cleanup"
+          disabled={!report || report.closedCount === 0 || cleanup.isPending}
+          onClick={() => cleanup.mutate()}
+          title="Runs `pan workspace destroy` (also deletes the local branch) for closed, merged issues whose workspaces have no uncommitted changes."
+          className="text-xs px-2 py-1 rounded-md border border-border bg-background hover:bg-muted/50 disabled:opacity-50 shrink-0"
+        >
+          {cleanup.isPending ? 'Cleaning up…' : 'Clean up now'}
+        </button>
+      </div>
+      {cleanup.data && (
+        <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+          {cleanup.data.removed.map((r) => (
+            <p key={`removed-${r.issueId}`}>Removed {r.issueId}</p>
+          ))}
+          {cleanup.data.skipped.map((s) => (
+            <p key={`skipped-${s.issueId}`}>{`Skipped ${s.issueId} — ${s.reason}`}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToggleSwitch({
   checked,
   disabled,
@@ -144,6 +240,7 @@ export function CloseOutSection({ markSaveError, markSaved, setSaveStatus }: Clo
               onClick={() => view && toggle('remove_workspace', view.remove_workspace.value)}
             />
           </SettingsRow>
+          <CloseOutDiskLine />
 
           <SettingsRow
             label="Delete the feature branch at close-out"
