@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:52:36.766Z",
+  "updated": "2026-09-28T13:52:48.693Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "composer-steer-selector.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T13:52:36.766Z"
+    },
+    "composer-ctrl-enter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:52:48.693Z"
     }
   }
 }
