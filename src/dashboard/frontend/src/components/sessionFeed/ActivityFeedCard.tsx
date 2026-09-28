@@ -40,7 +40,9 @@ function hasDestination(entry: ActivitySessionFeedEntry): boolean {
 
 export function ActivityFeedCard({ entry, onSelect, now = new Date() }: ActivityFeedCardProps) {
   const metaParts = [entry.workspaceId, entry.issueId].filter(Boolean);
-  const meta = metaParts.length > 0 ? metaParts.join(' · ') : entry.summary;
+  const baseMeta = metaParts.length > 0 ? metaParts.join(' · ') : entry.summary;
+  // PAN-4301 FR-14: a collapsed per-issue card says how many steps it stands for.
+  const meta = entry.stepCount && entry.stepCount > 1 ? `${baseMeta} · ${entry.stepCount} steps` : baseMeta;
   const navigable = hasDestination(entry);
 
   const copy = () => {
