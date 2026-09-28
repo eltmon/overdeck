@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import type { ParseResult } from './conversation/types.js';
 import { runDashboardDbJob } from './dashboard-db-task.js';
 
-type Parser = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'muse' | 'kimi';
+type Parser = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'muse' | 'kimi' | 'prime-agent';
 interface CachedParse {
   signature: string;
   bytes: number;

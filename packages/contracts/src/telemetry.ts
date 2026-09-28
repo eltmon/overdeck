@@ -85,7 +85,7 @@ export const TELEMETRY_CLI_VERBS = [
   "other",
 ] as const
 
-const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse"] as const satisfies readonly Harness[]
+const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent"] as const satisfies readonly Harness[]
 
 /**
  * PAN-4264: GitHub quota callers as telemetry values (`-` → `_`). Mirrors

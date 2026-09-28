@@ -36,6 +36,7 @@ import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkProjectTrackerConfig } from './doctor-project-config.js';
 import { checkHerdr } from './doctor-herdr.js';
+import { checkPrimeAgent } from './doctor-prime-agent.js';
 import { checkCoreCommands, checkFirstRunLogins } from './doctor-first-run.js';
 import { checkClaudeLogin, checkGhLogin } from '../../lib/first-run-checks.js';
 import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
@@ -770,6 +771,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+  for (const c of await checkPrimeAgent()) checks.push(c); // PAN-3668: version pin + orphaned daemons
 
   // Ollama (PAN-1641): silent unless a local model is configured or installed.
   for (const c of await checkOllama({ config: loadYamlConfig().config })) checks.push(c);

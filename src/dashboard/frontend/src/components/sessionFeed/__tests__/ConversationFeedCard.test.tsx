@@ -83,6 +83,20 @@ describe('ConversationFeedCard', () => {
     expect(screen.queryByLabelText('Claude Code logo')).not.toBeInTheDocument();
   });
 
+  it('renders prime_agent conversations with the Prime Agent label and logo (PAN-3668)', () => {
+    render(
+      <ConversationFeedCard
+        entry={entry({ agent: 'prime_agent' })}
+        onSelect={vi.fn()}
+        now={new Date('2026-05-23T01:05:00.000Z')}
+      />,
+    );
+
+    expect(screen.getByLabelText('Prime Agent logo')).toBeInTheDocument();
+    expect(screen.getByText('Prime Agent')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Claude Code logo')).not.toBeInTheDocument();
+  });
+
   it('renders codex conversations with the Codex label and logo', () => {
     render(
       <ConversationFeedCard

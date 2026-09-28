@@ -1,4 +1,5 @@
 import { parseMuseConversationMessages } from './muse-conversation-parser.js';
+import { parsePrimeAgentConversationMessages } from './prime-agent-conversation-parser.js';
 import { randomUUID } from 'node:crypto';
 import type { Worker } from 'node:worker_threads';
 import { spawnModuleWorker } from '../../../lib/module-worker.js';
@@ -62,7 +63,7 @@ export type DashboardDbOperation =
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
 export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse';
 
-type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'claude-initial';
+type TranscriptParserName = 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi' | 'muse' | 'prime-agent' | 'claude-initial';
 type TranscriptParser = (sessionFile: string) => Promise<ParseResult>;
 
 const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
@@ -72,6 +73,7 @@ const transcriptParsers: Record<TranscriptParserName, TranscriptParser> = {
   acp: parseAcpConversationMessages,
   kimi: parseKimiConversationMessages,
   muse: parseMuseConversationMessages,
+  'prime-agent': parsePrimeAgentConversationMessages,
   'claude-initial': sessionFile => parseEntireConversation(sessionFile, { flushPendingToolUse: false }),
 };
 

@@ -123,6 +123,9 @@ describe('dashboard context routes helpers', () => {
     expect(response.previews.ohmypi).toContain('Ohmypi guidance.');
     expect(response.previews.ohmypi).not.toContain('Claude guidance.');
     expect(response.previews.fullPrompt).toContain('Private harness base prompt: Unavailable');
+    expect(response.previews['prime-agent']).toContain('Shared guidance.');
+    expect(response.previews['prime-agent']).not.toContain('Claude guidance.');
+    expect(response.previews.fullPrompt).toContain('## Prime Agent');
     expect(syncRunner).not.toHaveBeenCalled();
     await expect(exists(globalFile)).resolves.toBe(false);
   });

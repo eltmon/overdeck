@@ -336,6 +336,10 @@ describe('parseAgentHarness (PAN-1837 review fix)', () => {
     expect(() => parseAgentHarness('not-a-harness')).toThrow('Invalid --agent-harness: not-a-harness');
   });
 
+  it('accepts --agent-harness prime-agent (PAN-3668)', () => {
+    expect(parseAgentHarness('prime-agent')).toBe('prime-agent');
+  });
+
   it('no-loss: accepts every canonical harness', () => {
     for (const harness of KNOWN_HARNESSES) {
       expect(parseAgentHarness(harness)).toBe(harness);
