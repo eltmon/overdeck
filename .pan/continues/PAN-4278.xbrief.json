@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4278",
   "created": "2026-09-27T23:29:11.482Z",
-  "updated": "2026-09-28T00:21:47.482Z",
+  "updated": "2026-09-28T00:22:05.227Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "permission-prompt-parser.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:21:47.482Z"
+    },
+    "codebase-map.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:22:05.227Z"
     }
   }
 }
