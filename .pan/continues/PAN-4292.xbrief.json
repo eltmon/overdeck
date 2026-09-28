@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:53:24.062Z",
+  "updated": "2026-09-28T13:53:35.860Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -258,6 +258,10 @@
     "docs-steering.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T13:53:24.062Z"
+    },
+    "docs-steering.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:35.860Z"
     }
   }
 }
