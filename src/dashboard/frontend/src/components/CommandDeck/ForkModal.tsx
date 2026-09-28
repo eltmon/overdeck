@@ -160,9 +160,9 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
 
   // Intent is the user-facing choice (up to 3 options). The 4th legacy mode
   // ("fast-summary") is an advanced toggle under the summary intent.
-  // ACP transcripts are portable only through summary/handoff adapters; the
-  // server rejects an exact-copy fork from an ACP source.
-  const sourceSupportsPlainFork = conversation.harness !== 'acp' && conversation.harness !== 'opencode';
+  // ACP and Prime Agent transcripts are portable only through summary/handoff
+  // adapters; the server rejects an exact-copy fork from those sources.
+  const sourceSupportsPlainFork = conversation.harness !== 'acp' && conversation.harness !== 'opencode' && conversation.harness !== 'prime-agent';
   const initialIntent: ForkIntent =
     initialMode === 'plain' && sourceSupportsPlainFork
       ? 'plain'

@@ -12,7 +12,7 @@ import {
   type CrewEntry,
 } from './tiered-crews';
 
-const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse'];
+const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent'];
 
 /** PAN-4191: a `workhorse:<slot>` ref follows the workhorse settings; the option shows what it resolves to. */
 export function WorkhorseOptions({ workhorses }: { workhorses: WorkhorsesConfig | undefined }) {

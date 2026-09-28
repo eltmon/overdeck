@@ -261,6 +261,18 @@ export const stopAgent = (
       }
     });
 
+    // PAN-3668 D3: a pane close can kill the Prime Agent host before it reaps its
+    // private daemon, so the stop door reaps it too. Idempotent.
+    yield* Effect.promise(async () => {
+      try {
+        if (getAgentState(normalizedId)?.harness !== 'prime-agent') return;
+        const { reapPrimeAgentDaemon } = await import('../prime-agent/daemon.js');
+        await reapPrimeAgentDaemon(normalizedId);
+      } catch (err) {
+        console.warn(`[agents] Prime Agent daemon reap failed for ${normalizedId} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+      }
+    });
+
     // PAN-1527: same orphan-launcher kill as stopAgentSync. Runs after the
     // backend close so the terminal gets the first chance to take everything
     // down cleanly; falls through and kills any survivor by command-line match.

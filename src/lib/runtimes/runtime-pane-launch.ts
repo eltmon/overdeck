@@ -29,7 +29,7 @@ export function runtimeUsesSupervisor(harness: string, backend: TerminalBackend)
 export interface RuntimePaneLaunch {
   readonly agentId: string;
   readonly workspace: string;
-  readonly harness: 'muse' | 'kimi-code';
+  readonly harness: 'muse' | 'kimi-code' | 'prime-agent';
   readonly model: string;
   readonly launcherScript: string;
   readonly env?: Readonly<Record<string, string>>;

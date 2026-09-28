@@ -6,7 +6,7 @@ type RunningAgent = AgentState & { tmuxActive: boolean };
 
 async function reconcileSourceForRunningAgents(
   runningAgents: readonly RunningAgent[],
-  source: 'ohmypi' | 'codex',
+  source: 'ohmypi' | 'codex' | 'prime-agent',
 ): Promise<void> {
   if (!runningAgents.some((agent) => getAgentState(agent.id)?.harness === source)) return;
 
@@ -24,4 +24,5 @@ async function reconcileSourceForRunningAgents(
 export async function reconcilePiCostEventsForRunningAgents(runningAgents: readonly RunningAgent[]): Promise<void> {
   await reconcileSourceForRunningAgents(runningAgents, 'ohmypi');
   await reconcileSourceForRunningAgents(runningAgents, 'codex');
+  await reconcileSourceForRunningAgents(runningAgents, 'prime-agent');
 }

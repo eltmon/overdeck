@@ -11,6 +11,7 @@ import { claudeSessionTranscriptExists, sessionFilePath } from '../runtimes/stor
 import { logAgentLifecycle } from '../persistent-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { hostDisplayName, hostTransportFor } from '../runtimes/host-transport.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { closeAgentPane, launchAgentPane } from '../terminal-backends/launch.js';
@@ -500,6 +501,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     // Caller-supplied message wins.
 
     let messageDelivered = false;
+    const hostTransport = hostTransportFor(effectiveHarness);
     if (effectiveHarness === 'ohmypi') {
       // ohmypi does not fire the Claude SessionStart hook; wait for ready.json and
       // deliver the auto-continue prompt through the FIFO JSONL protocol.
@@ -511,11 +513,11 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[resumeAgent] ohmypi prompt delivery failed: ${msg}`);
       }
-    } else if (effectiveHarness === 'acp' || effectiveHarness === 'opencode') {
+    } else if (hostTransport) {
       const delivery = await deliverInitialPromptWithRetry(
         normalizedId,
         effectiveMessage,
-        'resumeAgent:acp-continue',
+        `resumeAgent:${hostTransport}-continue`,
       );
       messageDelivered = delivery.ok;
       if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
@@ -523,7 +525,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
         await closeAgentPane(normalizedId);
         return {
           success: false,
-          error: `ACP continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
+          error: `${hostDisplayName(hostTransport)} continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
         };
       }
     } else if (effectiveHarness === 'codex') {

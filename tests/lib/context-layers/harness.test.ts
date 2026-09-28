@@ -55,6 +55,14 @@ describe('renderForHarness', () => {
     expect(renderForHarness(c, 'acp')).not.toContain('kimi-only');
   });
 
+  it('keeps {{#harness:prime-agent}} spans for prime-agent and drops them for claude-code (PAN-3668)', () => {
+    const c = 'A\n{{#harness:prime-agent}}\nprime-only\n{{/harness:prime-agent}}\nB';
+    expect(renderForHarness(c, 'prime-agent')).toContain('prime-only');
+    expect(renderForHarness(c, 'claude-code')).not.toContain('prime-only');
+    expect(renderForHarness(c, 'acp')).not.toContain('prime-only');
+    expect(validateTemplate(c)).toEqual({ ok: true, issues: [] });
+  });
+
   it('renders a union of harnesses when given an array — a kimi-only span survives AGENTS.md rendered for [ohmypi, kimi-code] (PAN-1837 review fix)', () => {
     const c = 'shared\n{{#harness:kimi-code}}\nkimi-only\n{{/harness:kimi-code}}\n{{#harness:ohmypi}}\nohmypi-only\n{{/harness:ohmypi}}\n{{#harness:codex}}\ncodex-only\n{{/harness:codex}}';
     const rendered = renderForHarness(c, ['ohmypi', 'kimi-code']);
