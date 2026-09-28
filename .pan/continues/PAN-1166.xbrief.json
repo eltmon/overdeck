@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T14:01:16.982Z",
+  "updated": "2026-09-28T14:01:29.558Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "autopreso-hook-mint-first.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T14:01:16.982Z"
+    },
+    "autopreso-hook-mint-first.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:29.558Z"
     }
   }
 }
