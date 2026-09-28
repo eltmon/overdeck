@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:26:24.012Z",
+  "updated": "2026-09-28T01:26:39.030Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,11 @@
     "disk-report-route.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T01:26:24.012Z"
+    },
+    "cleanup-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:26:39.030Z"
     }
   }
 }
