@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:51:00.524275Z · model: claude-opus-5-5 · open: 784_
+_Last sequenced: 2026-09-28T12:54:44.350190Z · model: claude-opus-5-5 · open: 785_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -303,6 +303,7 @@ _Last sequenced: 2026-09-28T12:51:00.524275Z · model: claude-opus-5-5 · open: 
 | 356 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
 | 357 | PAN-4236 | S | medium | ok |  |  | GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test |
 | 358 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
+| 359 | PAN-4306 | M | medium | ok |  | PAN-4300 | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
 | 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
 | 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
 | 362 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
@@ -1099,10 +1100,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:51:00.524275Z",
+  "generatedAt": "2026-09-28T12:54:44.350190Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 784,
+  "openCount": 785,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -10842,6 +10843,21 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "rationale": "New issue: false-negative landing check on queued prompts in transcript-landing.ts; clear AC and fixtures, ranked beside PAN-3121 (same double-send risk).",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4306",
+      "rank": 359,
+      "size": "M",
+      "importance": "medium",
+      "score": 61,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4300"
+      ],
+      "why": "Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300",
+      "rationale": "New issue split out of in-pipeline PAN-4301 with verified emit sites and ACs; ranked in the medium band because it waits on PAN-4300 (in pipeline) and is feed hygiene, not substrate.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12048,6 +12064,20 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4300",
+      "to": "PAN-4306",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4301",
+      "to": "PAN-4306",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.8
     }
   ]
 }
