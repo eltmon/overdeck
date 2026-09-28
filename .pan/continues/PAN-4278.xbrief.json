@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4278",
   "created": "2026-09-27T23:29:11.482Z",
-  "updated": "2026-09-28T00:28:16.340Z",
+  "updated": "2026-09-28T00:28:27.206Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,10 @@
     "permission-notify.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:28:16.340Z"
+    },
+    "permission-notify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:28:27.206Z"
     }
   }
 }
