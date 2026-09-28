@@ -12,6 +12,7 @@ import {
   nextReconnectDelay,
   type ReconnectPolicyState,
 } from '../lib/terminalReconnectPolicy';
+import { DashboardSessionUnauthorizedError, ensureDashboardSession } from '../lib/wsTransport';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
 // Must match TERMINAL_BG in src/lib/ui-theme.ts — new tmux sessions stamp
@@ -570,8 +571,39 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       wsUrl += `&token=${encodeURIComponent(token)}`;
     }
 
-    profMark(sessionName, tProf, 'new WebSocket()');
-    const ws = new WebSocket(wsUrl);
+    // The upgrade requires the session cookie (PAN-1166 ws-auth.ts gate), so the
+    // mint must complete before the socket is opened. `connect()` stays a plain
+    // (non-async) useCallback for its React identity, with this async tail as a
+    // fire-and-forget continuation guarded by mountedRef so a stale mint that
+    // resolves after unmount (or after a newer connect() superseded it) never
+    // opens a socket or touches disposed state.
+    void (async () => {
+      try {
+        await ensureDashboardSession();
+      } catch (err) {
+        if (!mountedRef.current) return;
+        if (err instanceof DashboardSessionUnauthorizedError) {
+          setConnectionStatus('failed');
+          return;
+        }
+        // Any other mint error falls through to the existing reconnect policy.
+        const now = Date.now();
+        const policy = reconnectPolicy.current ?? { attempt: 0, windowStartedAt: now };
+        reconnectPolicy.current = policy;
+        const delay = nextReconnectDelay(policy, now, reconnectJitterMs);
+        if (delay !== null) {
+          policy.attempt += 1;
+          setConnectionStatus('reconnecting');
+          reconnectTimer.current = setTimeout(() => connect(), delay);
+        } else {
+          setConnectionStatus('failed');
+        }
+        return;
+      }
+      if (!mountedRef.current) return;
+
+      profMark(sessionName, tProf, 'new WebSocket()');
+      const ws = new WebSocket(wsUrl);
     // IMPORTANT: Use arraybuffer for synchronous binary processing
     // Default 'blob' requires async handling which can cause out-of-order writes
     ws.binaryType = 'arraybuffer';
@@ -792,6 +824,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       }
     };
     connectionCleanupRef.current = cleanupConnection;
+    })();
   }, [sessionName, token, autoCopyOnSelect, reconnectJitterMs, handleKeyEvent, handleContextMenu, handleTerminalWheel, handleForcedSelectionMouseDown, handleSelectionContextMouseDown, getMeasuredSize, sendResizeIfNeeded]);
   connectRef.current = connect;
 
