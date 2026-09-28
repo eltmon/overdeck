@@ -623,7 +623,7 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
   }, 30_000);
 });
 
-describe.skipIf(isBun)('steer submit (PAN-4292)', () => {
+describe('steer submit (PAN-4292)', () => {
   async function listen(agentId: string, fake: ReturnType<typeof createFakePty>) {
     const token = await writePtyToken(agentId);
     const server = createPtySupervisorServer(agentId, fake.child);
