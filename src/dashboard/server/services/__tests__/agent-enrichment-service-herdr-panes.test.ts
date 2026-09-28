@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   computeAgentEnrichment: vi.fn(),
   getAgentJsonlMtime: vi.fn(),
   getBackendPanes: vi.fn(),
+  isBackendInventoryDegraded: vi.fn(),
   getRuntimeCensus: vi.fn(),
   saveAgentStateAndEmitEvent: vi.fn(),
   emitActivityEntry: vi.fn(),
@@ -29,7 +30,11 @@ vi.mock('../../../../lib/agent-enrichment.js', () => ({
   computeAgentEnrichment: mocks.computeAgentEnrichment,
   getAgentJsonlMtime: mocks.getAgentJsonlMtime,
 }))
-vi.mock('../backend-inventory.js', () => ({ getBackendPanes: mocks.getBackendPanes }))
+vi.mock('../backend-inventory.js', () => ({
+  getBackendPanes: mocks.getBackendPanes,
+  isBackendInventoryDegraded: mocks.isBackendInventoryDegraded,
+}))
+vi.mock('../../../../lib/terminal-backends/select.js', () => ({ hostTerminalBackendName: async () => 'herdr' }))
 vi.mock('../../../../lib/runtime-census.js', () => ({ getRuntimeCensus: mocks.getRuntimeCensus }))
 vi.mock('../../event-store.js', () => ({ getEventStore: () => mocks.store }))
 vi.mock('../agent-projection.js', () => ({ saveAgentStateAndEmitEvent: mocks.saveAgentStateAndEmitEvent }))
@@ -98,7 +103,10 @@ describe('agent enrichment service — Herdr pane join by agent key (PAN-4320)',
     vi.clearAllMocks()
     vi.useFakeTimers()
     vi.stubEnv('OVERDECK_DISABLE_DEACON', '')
-    mocks.getRuntimeCensus.mockResolvedValue({ tmuxAvailable: true })
+    // On Herdr the gate follows isBackendInventoryDegraded, not the tmux
+    // census — a Herdr host may run no tmux server at all (PAN-4320).
+    mocks.getRuntimeCensus.mockResolvedValue({ tmuxAvailable: false })
+    mocks.isBackendInventoryDegraded.mockReturnValue(false)
     mocks.getAgentJsonlMtime.mockResolvedValue(null)
     mocks.computeAgentEnrichment.mockResolvedValue(NEUTRAL_ENRICHMENT)
   })
@@ -114,6 +122,20 @@ describe('agent enrichment service — Herdr pane join by agent key (PAN-4320)',
     await runOneTick()
 
     expect(createdAgentIds()).toEqual(['agent-pan-herdr-live'])
+  })
+
+  // PAN-4320 (FR-7): on Herdr, no tmux server ever runs, so tmuxAvailable is
+  // always false. The gate must not skip on that account — only a degraded
+  // Herdr inventory does.
+  it('does not skip the enrichment cycle on Herdr even with no tmux census evidence', async () => {
+    mocks.getRuntimeCensus.mockResolvedValue({ tmuxAvailable: false })
+    mocks.isBackendInventoryDegraded.mockReturnValue(false)
+    mocks.listRunningAgents.mockImplementation(() => Effect.succeed([makeAgent('agent-pan-herdr-no-tmux', 'running')]))
+    mocks.getBackendPanes.mockResolvedValue([herdrPane('agent-pan-herdr-no-tmux', 4, 'working')])
+
+    await runOneTick()
+
+    expect(createdAgentIds()).toEqual(['agent-pan-herdr-no-tmux'])
   })
 
   it('emits no agent.created for a Herdr-shaped exited pane, even with stored status running', async () => {
