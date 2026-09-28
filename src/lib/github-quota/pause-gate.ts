@@ -355,3 +355,38 @@ export async function recordGitHubRefusal(input: RecordGitHubRefusalInput): Prom
 
   return pause;
 }
+
+/**
+ * Reconcile the active primary pause on `(sample.pool, sample.bucket)` against
+ * a fresh sample: a sample showing headroom (`remaining > 0`) lifts the pause,
+ * and a still-exhausted sample (`remaining === 0`) with a future `resetAt`
+ * moves the pause to match the current window's actual reset. Secondary
+ * pauses and every other key are untouched. Never throws (NFR-2).
+ */
+export async function reconcileGitHubPauseWithSample(
+  sample: { pool: GitHubQuotaPool; bucket: GitHubQuotaBucket; remaining: number; resetAt?: string },
+  nowMs: number = Date.now(),
+): Promise<void> {
+  try {
+    const file = readPauseFile();
+    const key = pauseKey(sample.pool, sample.bucket);
+    const existing = file.pauses[key];
+    if (!existing || existing.kind !== 'primary' || Date.parse(existing.until) <= nowMs) return;
+
+    if (sample.remaining > 0) {
+      const next: PauseFile = { pauses: { ...file.pauses }, secondaryBackoff: file.secondaryBackoff };
+      delete next.pauses[key];
+      await writePauseFile(next);
+      return;
+    }
+
+    const resetMs = sample.resetAt ? Date.parse(sample.resetAt) : Number.NaN;
+    if (!Number.isFinite(resetMs) || resetMs <= nowMs) return;
+
+    const next: PauseFile = { pauses: { ...file.pauses }, secondaryBackoff: file.secondaryBackoff };
+    next.pauses[key] = { ...existing, until: new Date(resetMs).toISOString() };
+    await writePauseFile(next);
+  } catch {
+    // NFR-2: reconciliation never fails the sampler.
+  }
+}

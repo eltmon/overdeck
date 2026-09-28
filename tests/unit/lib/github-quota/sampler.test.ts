@@ -9,7 +9,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { flushLedgerWrites, readLedgerWindow } from '../../../../src/lib/github-quota/ledger.js';
-import { recordGitHubRefusal } from '../../../../src/lib/github-quota/pause-gate.js';
+import { activeGitHubPause, recordGitHubRefusal } from '../../../../src/lib/github-quota/pause-gate.js';
 import { LOGIN_RETRY_MS, getGitHubLogin, resetGitHubLoginForTests } from '../../../../src/lib/github-quota/identity.js';
 import {
   QUOTA_SAMPLER_INITIAL_DELAY_MS,
@@ -92,6 +92,18 @@ describe('GitHub quota sampler (PAN-4264)', () => {
     expect(samples).toEqual([
       expect.objectContaining({ pool: 'user', bucket: 'rest', remaining: 4990, limit: 5000 }),
     ]);
+  });
+
+  it('lifts an active primary user/graphql pause once a healthy GraphQL rateLimit sample lands (PAN-4291 AC4)', async () => {
+    await recordGitHubRefusal({
+      pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
+    });
+    expect(activeGitHubPause('user', 'graphql')).toBeDefined();
+
+    const exec = dualExec();
+    await sampleGitHubRateLimits({ exec, isAppConfigured: () => false });
+
+    expect(activeGitHubPause('user', 'graphql')).toBeUndefined();
   });
 
   it('also samples the app pool when the App is configured', async () => {

@@ -12,12 +12,17 @@
  * one, and the snapshot reports the latest sample per pool and bucket.
  *
  * `quota-sampler` is an essential caller: the sampler keeps running during a
- * pause, which is exactly when the operator needs the numbers.
+ * pause, which is exactly when the operator needs the numbers. Every
+ * successful user-pool sample also reconciles the active pause on its
+ * bucket (`reconcileGitHubPauseWithSample`), so a pause lifts or is
+ * corrected to the window's real reset as soon as a fresh sample lands,
+ * rather than waiting out a hidden-limit guess.
  */
 
 import type { GitHubQuotaBucket, GitHubQuotaPool } from '@overdeck/contracts';
 import { getAppRateLimit, isGitHubAppConfigured } from '../github-app.js';
 import { appendLedgerEntry } from './ledger.js';
+import { reconcileGitHubPauseWithSample } from './pause-gate.js';
 import { runGh, type GhExecFn } from './run-gh.js';
 
 /** First sample this long after start, so boot traffic settles first. */
@@ -47,13 +52,19 @@ export interface GitHubQuotaSamplerDeps {
   readAppRateLimit?: () => Promise<unknown>;
 }
 
+interface WrittenSample {
+  remaining: number;
+  resetAt?: string;
+}
+
 async function writeSample(
   pool: GitHubQuotaPool,
   bucket: GitHubQuotaBucket,
   resource: RateLimitResource | undefined,
   nowMs: number,
-): Promise<void> {
-  if (typeof resource?.limit !== 'number' || typeof resource.remaining !== 'number') return;
+): Promise<WrittenSample | undefined> {
+  if (typeof resource?.limit !== 'number' || typeof resource.remaining !== 'number') return undefined;
+  const resetAt = typeof resource.reset === 'number' ? new Date(resource.reset * 1000).toISOString() : undefined;
   await appendLedgerEntry({
     ts: new Date(nowMs).toISOString(),
     kind: 'sample',
@@ -65,8 +76,9 @@ async function writeSample(
     outcome: 'ok',
     remaining: resource.remaining,
     limit: resource.limit,
-    ...(typeof resource.reset === 'number' ? { resetAt: new Date(resource.reset * 1000).toISOString() } : {}),
+    ...(resetAt ? { resetAt } : {}),
   });
+  return { remaining: resource.remaining, ...(resetAt ? { resetAt } : {}) };
 }
 
 /** Write REST-sourced samples for the given buckets (both, by default). */
@@ -87,9 +99,10 @@ async function writeRestSamples(
 }
 
 /** Write the user pool's `graphql` sample from GraphQL's own `rateLimit`. */
-async function writeGraphQLRateLimitSample(response: unknown, nowMs: number): Promise<void> {
+async function writeGraphQLRateLimitSample(response: unknown, nowMs: number): Promise<WrittenSample | undefined> {
   const rateLimit = (response as GraphQLRateLimitResponse | null)?.data?.rateLimit;
-  if (typeof rateLimit?.limit !== 'number' || typeof rateLimit.remaining !== 'number') return;
+  if (typeof rateLimit?.limit !== 'number' || typeof rateLimit.remaining !== 'number') return undefined;
+  const resetAt = typeof rateLimit.resetAt === 'string' ? rateLimit.resetAt : undefined;
   await appendLedgerEntry({
     ts: new Date(nowMs).toISOString(),
     kind: 'sample',
@@ -101,8 +114,9 @@ async function writeGraphQLRateLimitSample(response: unknown, nowMs: number): Pr
     outcome: 'ok',
     remaining: rateLimit.remaining,
     limit: rateLimit.limit,
-    ...(typeof rateLimit.resetAt === 'string' ? { resetAt: rateLimit.resetAt } : {}),
+    ...(resetAt ? { resetAt } : {}),
   });
+  return { remaining: rateLimit.remaining, ...(resetAt ? { resetAt } : {}) };
 }
 
 /** Take one sample of every configured pool. Never throws (NFR-2). */
@@ -117,7 +131,9 @@ export async function sampleGitHubRateLimits(deps: GitHubQuotaSamplerDeps = {}):
         ...(deps.exec ? { exec: deps.exec } : {}),
         onSuccess: () => ({ cost: 0, estimated: false }),
       });
-      await writeRestSamples('user', JSON.parse(stdout), nowMs, ['rest']);
+      const resources = (JSON.parse(stdout) as RateLimitResponse | null)?.resources;
+      const written = await writeSample('user', 'rest', resources?.core, nowMs);
+      if (written) await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'rest', ...written }, nowMs);
     } catch {
       // gh missing, unauthenticated or offline: no user-pool rest sample this tick.
     }
@@ -131,7 +147,8 @@ export async function sampleGitHubRateLimits(deps: GitHubQuotaSamplerDeps = {}):
         ...(deps.exec ? { exec: deps.exec } : {}),
         onSuccess: () => ({ cost: 0, estimated: false }),
       });
-      await writeGraphQLRateLimitSample(JSON.parse(stdout), nowMs);
+      const written = await writeGraphQLRateLimitSample(JSON.parse(stdout), nowMs);
+      if (written) await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', ...written }, nowMs);
     } catch {
       // GraphQL rateLimit query failed: no user-pool graphql sample this tick.
     }

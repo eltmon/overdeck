@@ -10,10 +10,12 @@ import { join } from 'path';
 
 import { appendLedgerEntry, getGitHubQuotaDir, readLedgerWindow } from '../../../../src/lib/github-quota/ledger.js';
 import {
+  activeGitHubPause,
   assertGitHubCallAllowed,
   GitHubQuotaPausedError,
   onGitHubRefusal,
   readActivePause,
+  reconcileGitHubPauseWithSample,
   recordGitHubRefusal,
 } from '../../../../src/lib/github-quota/pause-gate.js';
 
@@ -227,5 +229,50 @@ describe('GitHub pause gate (PAN-4264)', () => {
     writeFileSync(join(getGitHubQuotaDir(), 'pause.json'), '{"pauses":');
     expect(readActivePause()).toEqual([]);
     expect(() => assertGitHubCallAllowed('pr-sync', 'user', 'graphql')).not.toThrow();
+  });
+
+  describe('reconcileGitHubPauseWithSample (PAN-4291)', () => {
+    it('lifts an active primary pause when the sample shows headroom (AC1)', async () => {
+      await recordGitHubRefusal({
+        pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
+      });
+      expect(activeGitHubPause('user', 'graphql')).toBeDefined();
+
+      await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 2576 });
+
+      expect(activeGitHubPause('user', 'graphql')).toBeUndefined();
+    });
+
+    it('moves an active primary pause to the sample\'s own future resetAt when still exhausted (AC2)', async () => {
+      await recordGitHubRefusal({
+        pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'primary' },
+      });
+      const resetAt = Date.now() + 40 * MINUTE;
+
+      await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 0, resetAt: new Date(resetAt).toISOString() });
+
+      expect(untilMs(activeGitHubPause('user', 'graphql')!)).toBe(resetAt);
+    });
+
+    it('leaves an active secondary pause unchanged for any sample (AC3)', async () => {
+      const before = await recordGitHubRefusal({
+        pool: 'user', bucket: 'graphql', caller: 'pr-sync', refusal: { kind: 'secondary' },
+      });
+
+      await reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 4956, resetAt: new Date(Date.now() + 40 * MINUTE).toISOString() });
+
+      expect(activeGitHubPause('user', 'graphql')).toEqual(before);
+    });
+
+    it('does nothing when there is no active pause on that bucket', async () => {
+      await expect(reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 4956 })).resolves.toBeUndefined();
+      expect(activeGitHubPause('user', 'graphql')).toBeUndefined();
+    });
+
+    it('never throws, even with a corrupt pause.json', async () => {
+      mkdirSync(getGitHubQuotaDir(), { recursive: true });
+      writeFileSync(join(getGitHubQuotaDir(), 'pause.json'), '{"pauses":');
+      await expect(reconcileGitHubPauseWithSample({ pool: 'user', bucket: 'graphql', remaining: 2576 })).resolves.toBeUndefined();
+    });
   });
 });
