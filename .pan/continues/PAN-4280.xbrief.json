@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:16:20.789Z",
+  "updated": "2026-09-28T01:16:33.277Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -242,6 +242,10 @@
     "composer-project-chip.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T01:16:20.789Z"
+    },
+    "type-to-focus.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:16:33.277Z"
     }
   }
 }
