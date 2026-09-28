@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4310",
   "created": "2026-09-28T13:32:18.843Z",
-  "updated": "2026-09-28T13:56:41.568Z",
+  "updated": "2026-09-28T13:56:54.766Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
     "utf8-frame-decode.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T13:56:41.567Z"
+    },
+    "utf8-frame-decode.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:54.766Z"
     }
   }
 }
