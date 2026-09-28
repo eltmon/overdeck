@@ -27,3 +27,37 @@ export function launcherSkillOverrideLines(opts: {
 export function claudeSkillSettingsArg(emitted: boolean): string {
   return emitted ? ' ${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}' : '';
 }
+
+/** The LauncherConfig fields that decide whether and how a launch applies skill overrides. */
+export interface SkillOverrideLaunchConfig {
+  harness?: string;
+  spawnMode?: string;
+  workingDir: string;
+  codexHome?: string;
+  overdeckEnv?: { issueId?: string };
+}
+
+/** Local launches of the harness apply overrides; remote (Fly) launches do not. */
+function appliesTo(config: SkillOverrideLaunchConfig, harness: 'claude-code' | 'codex'): boolean {
+  return config.spawnMode !== 'remote' && (config.harness ?? 'claude-code') === harness;
+}
+
+/**
+ * Claude Code: the resolve step, and a base command that passes the resolved
+ * settings. Both Claude command shapes start from `baseCommand`.
+ */
+export function claudeSkillOverrideLaunch<T extends SkillOverrideLaunchConfig & { baseCommand?: string }>(
+  config: T,
+): { config: T; lines: string[] } {
+  if (!appliesTo(config, 'claude-code')) return { config, lines: [] };
+  return {
+    config: config.baseCommand ? { ...config, baseCommand: config.baseCommand + claudeSkillSettingsArg(true) } : config,
+    lines: launcherSkillOverrideLines({ harness: 'claude-code', workingDir: config.workingDir, issueId: config.overdeckEnv?.issueId }),
+  };
+}
+
+/** Codex: the step that writes the per-agent config block; it needs CODEX_HOME exported first. */
+export function codexSkillOverrideLines(config: SkillOverrideLaunchConfig): string[] {
+  if (!appliesTo(config, 'codex') || !config.codexHome) return [];
+  return launcherSkillOverrideLines({ harness: 'codex', workingDir: config.workingDir, issueId: config.overdeckEnv?.issueId });
+}
