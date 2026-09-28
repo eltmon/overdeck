@@ -47,6 +47,7 @@ import { homedir } from 'os';
 import { promisify } from 'util';
 
 import { parseRepoUrl } from './repo-url.js';
+import { findNestedRepositories, type NestedRepository } from './create-scan.js';
 import {
   redactTransportUrl,
   ProjectCreateFailureError,
@@ -143,6 +144,8 @@ export interface ResolvedProjectIntent {
   registeredKeyAtPath: string | null;
   findings: ProjectIntentFinding[];
   notices: ProjectIntentNotice[];
+  /** Repositories directly inside a non-git `existing` folder (≤ 50, by name). */
+  nestedRepositories: NestedRepository[];
 }
 
 export interface ProjectCreateProgress {
@@ -492,6 +495,7 @@ export async function resolveProjectCreateIntent(
     registeredKeyAtPath: null,
     findings,
     notices,
+    nestedRepositories: [],
   };
 
   // 1. Mode-specific source validation
@@ -718,6 +722,7 @@ export async function resolveProjectCreateIntent(
       // A plain folder is a perfectly good project; `new` mode's init is what
       // would turn it into a repository, and existing mode must not do that.
       intent.isGitRepository = false;
+      intent.nestedRepositories = await findNestedRepositories(intent.path);
     }
   }
 

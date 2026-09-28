@@ -319,6 +319,53 @@ describe('resolveProjectCreateIntent', () => {
     expect(intent.gitRoot).toBe(realPathOf(TEST_HOME));
   });
 
+  function mockNoGit() {
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      cb(new Error('not a git repository'));
+    });
+  }
+
+  it('non-git folder lists nested repositories', async () => {
+    const dir = makeProjectDir('folder-of-repos');
+    mkdirSync(join(dir, 'a', '.git'), { recursive: true });
+    mkdirSync(join(dir, 'b'), { recursive: true });
+    writeFileSync(join(dir, 'b', '.git'), 'gitdir: /somewhere/.git/worktrees/b\n');
+    mkdirSync(join(dir, 'c'), { recursive: true });
+    mkdirSync(join(dir, '.hidden', '.git'), { recursive: true });
+    mockNoGit();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.isGitRepository).toBe(false);
+    expect(intent.nestedRepositories).toEqual([
+      { name: 'a', path: join(realPathOf(dir), 'a') },
+      { name: 'b', path: join(realPathOf(dir), 'b') },
+    ]);
+  });
+
+  it('nested scan is capped at 50', async () => {
+    const dir = makeProjectDir('many-repos');
+    for (let i = 0; i < 55; i++) {
+      mkdirSync(join(dir, `repo-${String(i).padStart(2, '0')}`, '.git'), { recursive: true });
+    }
+    mockNoGit();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.nestedRepositories).toHaveLength(50);
+    expect(intent.nestedRepositories[0]!.name).toBe('repo-00');
+  });
+
   it('detects a linked worktree, whose .git is a file not a directory (D-15)', async () => {
     const dir = makeProjectDir('worktree');
     writeFileSync(join(dir, '.git'), 'gitdir: /somewhere/.git/worktrees/wt\n');

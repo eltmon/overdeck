@@ -24,6 +24,11 @@ export interface ProjectIntentNotice {
   detail?: string;
 }
 
+export interface NestedRepository {
+  path: string;
+  name: string;
+}
+
 /** The safe projection of a resolved intent. `cloneUrl` arrives redacted. */
 export interface ResolvedProjectIntent {
   mode: ProjectCreateMode;
@@ -49,6 +54,8 @@ export interface ResolvedProjectIntent {
   findings: ProjectIntentFinding[];
   /** The server always sends this; read it as `intent.notices ?? []`. */
   notices?: ProjectIntentNotice[];
+  /** Repositories directly inside a non-git folder; read as `?? []`. */
+  nestedRepositories?: NestedRepository[];
 }
 
 export type ProjectCreateFailureCode =
