@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../lib/apiFetch';
 import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ConfirmationRequest } from '../components/ConfirmationDialog';
 import type { ConversationPaletteOpenRequest } from '../components/CommandPalette';
@@ -119,7 +120,8 @@ export async function respondToTerminalPermission(
   signature: string,
   choice: 'allow-once' | 'allow-always' | 'deny',
 ): Promise<TerminalPermissionAnswerResult> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(conversationName)}/permission`, {
+  // Bounded: a hung request must not leave the dialog's buttons disabled.
+  const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(conversationName)}/permission`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ signature, choice }),

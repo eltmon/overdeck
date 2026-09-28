@@ -19,6 +19,7 @@ const { createConversation } = await import('../conversations.js');
 const { closeOverdeckDatabase } = await import('../infra.js');
 const { handleConversationPermissionAnswer } = await import('../conversation-permission.js');
 const { parsePermissionPrompt } = await import('../../agents/permission-prompt.js');
+const { listPermissionRequests, recordPermissionRequest } = await import('../conversation-permission-registry.js');
 
 function fixture(name: string): string {
   return readFileSync(new URL(`../../agents/__fixtures__/claude-code-2.1.280/${name}`, import.meta.url), 'utf8');
@@ -59,6 +60,17 @@ describe('handleConversationPermissionAnswer', () => {
     const result = await handleConversationPermissionAnswer('perm-answer', { choice: 'allow-once', signature: signature(BASH) }, { io, sleep });
     expect(result).toEqual({ body: { ok: true, answered: 'allow-once' } });
     expect(sent).toEqual(['Enter']);
+  });
+
+  it('clears the answered prompt\'s hook entry after a confirmed answer', async () => {
+    recordPermissionRequest('perm-answer', {
+      agentKey: 'main', agentId: null, agentType: null, agentDescription: null,
+      toolName: 'Bash', toolInputPreview: 'touch /tmp/pan4278-probe-marker.txt', requestedAt: '2026-09-27T15:00:00.000Z',
+    });
+    const { io } = fakeIo(BASH, ANSWERED);
+    const result = await handleConversationPermissionAnswer('perm-answer', { choice: 'deny', signature: signature(BASH) }, { io, sleep });
+    expect(result.body).toEqual({ ok: true, answered: 'deny' });
+    expect(listPermissionRequests('perm-answer')).toEqual([]);
   });
 
   it('deny arrows to No and presses Enter', async () => {

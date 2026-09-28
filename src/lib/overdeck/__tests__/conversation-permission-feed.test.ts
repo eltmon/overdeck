@@ -26,7 +26,7 @@ vi.mock('../conversation-input-target.js', () => ({ readConversationInputTarget:
 const { createConversation, getConversationByName } = await import('../conversations.js');
 const { closeOverdeckDatabase } = await import('../infra.js');
 const { conversationPendingPermission } = await import('../conversation-permission.js');
-const { recordPermissionRequest, resetPermissionRegistryForTests } = await import('../conversation-permission-registry.js');
+const { listPermissionRequests, recordPermissionRequest, resetPermissionRegistryForTests } = await import('../conversation-permission-registry.js');
 const { getConversationRead, getConversationsPendingInputFeed } = await import('../conversation-reads.js');
 
 function fixture(name: string): string {
@@ -140,6 +140,32 @@ describe('conversationPendingPermission', () => {
     recordPermissionRequest('perm-feed', entry('main', { agentKey: 'x', agentId: null, agentType: null }));
     const pending = await conversationPendingPermission(conv, deps(''));
     expect(pending).toMatchObject({ answerable: false, agentLabel: 'Unknown agent' });
+  });
+
+  it('drops an entry once the pane showed its prompt and no longer does (main-thread Deny)', async () => {
+    recordPermissionRequest('perm-feed', entry('main', { toolInputPreview: 'touch /tmp/pan4278-probe-marker.txt' }));
+    expect(await conversationPendingPermission(conv, deps(fixture('permission-bash.txt')))).toMatchObject({ answerable: true });
+    expect(await conversationPendingPermission(conv, deps(fixture('permission-answered.txt')))).toBeNull();
+    expect(listPermissionRequests('perm-feed')).toEqual([]);
+  });
+
+  it('keeps a seen entry when the pane cannot be read', async () => {
+    recordPermissionRequest('perm-feed', entry('main'));
+    await conversationPendingPermission(conv, deps(fixture('permission-bash.txt')));
+    const pending = await conversationPendingPermission(conv, { read: async () => { throw new Error('gone'); } });
+    expect(pending).toMatchObject({ answerable: false, agentKey: 'main' });
+  });
+
+  it('drops a seen entry when a different prompt replaced it, and a new request resets it', async () => {
+    recordPermissionRequest('perm-feed', entry('main', { toolInputPreview: 'touch' }));
+    await conversationPendingPermission(conv, deps(fixture('permission-bash.txt')));
+    recordPermissionRequest('perm-feed', entry('a9ef', { agentDescription: 'Orca' }));
+    const pending = await conversationPendingPermission(conv, deps(fixture('permission-subagent.txt')));
+    expect(pending).toMatchObject({ agentLabel: 'Subagent: Orca' });
+    expect(listPermissionRequests('perm-feed').map((e) => e.agentKey)).toEqual(['a9ef']);
+
+    recordPermissionRequest('perm-feed', entry('a9ef', { agentDescription: 'Orca', requestedAt: '2026-09-27T16:30:00.000Z' }));
+    expect(await conversationPendingPermission(conv, deps(fixture('permission-answered.txt')))).toMatchObject({ answerable: false });
   });
 
   it('null for a codex conversation', async () => {

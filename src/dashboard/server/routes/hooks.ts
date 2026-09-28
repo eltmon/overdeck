@@ -545,6 +545,8 @@ function permissionToolInputPreview(toolName: string, toolInput: unknown): strin
 
 async function subagentDescription(transcriptPath: unknown, agentId: string): Promise<string | null> {
   if (typeof transcriptPath !== 'string' || !transcriptPath) return null;
+  // agent_id becomes a filename; accept only Claude Code's id alphabet.
+  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) return null;
   try {
     const meta = JSON.parse(await readFile(join(subagentsDirFor(transcriptPath), `agent-${agentId}.meta.json`), 'utf8')) as { description?: unknown };
     return typeof meta.description === 'string' && meta.description ? meta.description : null;

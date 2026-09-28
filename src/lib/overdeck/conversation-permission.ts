@@ -30,8 +30,11 @@ import {
 import { resolveAgentPaneIo, type AgentPaneIo } from '../terminal-backends/agent-pane-io.js';
 import { PANE_CAPTURE_LINES } from '../session-pane-choice.js';
 import {
+  clearPermissionRequest,
   firstSeenAt,
   listPermissionRequests,
+  markPermissionSeenOnPane,
+  pruneAnsweredPermissions,
   type ConversationPermissionEntry,
 } from './conversation-permission-registry.js';
 
@@ -113,10 +116,14 @@ export function pendingPermissionFromPane(
   paneText: string | null,
   now: string,
 ): PendingPermission | null {
-  const entries = listPermissionRequests(conv.name);
   const prompt = paneText ? parsePermissionPrompt(paneText) : null;
+  // A pane we could read is evidence: an entry whose prompt it showed before
+  // and does not show now was answered. An unread pane proves nothing.
+  if (paneText !== null) pruneAnsweredPermissions(conv.name, prompt?.signature ?? null);
+  const entries = listPermissionRequests(conv.name);
   if (prompt) {
     const entry = entryForPrompt(prompt, entries);
+    if (entry) markPermissionSeenOnPane(conv.name, entry.agentKey, prompt.signature);
     return {
       signature: prompt.signature,
       answerable: true,
@@ -242,6 +249,9 @@ export async function handleConversationPermissionAnswer(
     if (after && after.signature === signature) {
       return { body: { error: 'The keys were sent but the prompt is still up — answer it in the terminal', code: 'delivery-unconfirmed' }, status: 409 };
     }
+    // The answered prompt's hook entry is resolved; no hook reliably says so.
+    const answeredEntry = entryForPrompt(prompt, listPermissionRequests(conv.name));
+    if (answeredEntry) clearPermissionRequest(conv.name, answeredEntry.agentKey);
     console.log(`[conversations] ${conv.name}: permission answered ${choice}`);
     return { body: { ok: true, answered: choice } };
   } catch (error: unknown) {

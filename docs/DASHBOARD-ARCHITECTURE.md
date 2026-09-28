@@ -388,7 +388,9 @@ a plain-text screen (fixtures in `src/lib/agents/__fixtures__/claude-code-2.1.28
 agent key (`agent_id ?? 'main'`), the tool, an input preview, the subagent's description
 (`subagents/agent-<id>.meta.json`) and the request time in an in-memory registry
 (`src/lib/overdeck/conversation-permission-registry.ts`); a clearing hook removes only its own
-agent's entry. `conversationPendingPermission` (`src/lib/overdeck/conversation-permission.ts`)
+agent's entry. Hooks alone cannot keep it current — a user Deny fires neither `PostToolUse` nor
+`Stop` — so the pane is the evidence: an entry whose prompt the pane showed and no longer shows
+is dropped on the next read, and a confirmed dashboard answer clears its entry. `conversationPendingPermission` (`src/lib/overdeck/conversation-permission.ts`)
 reads the pane through `resolveAgentPaneIo` (Herdr or tmux) and joins the two:
 `pendingPermission.answerable` is true only when the prompt is on screen. A registry entry
 without a prompt on screen is `answerable: false`. The registry is lost on a dashboard restart;
@@ -417,7 +419,8 @@ With a prompt up it pastes nothing and answers 409 `permission-pending`. A regis
 never holds a message: the hook is best-effort, so a lost clearing post must not block every
 send. The composer keeps the message as a `held` bubble ("Waiting: the agent needs a permission
 answer first", with Discard) and resends it once a feed read newer than the hold shows no
-`pendingPermission` for that conversation, with a fresh `clientMessageId` and no `retry` flag —
+on-screen (`answerable`) `pendingPermission` for that conversation, with a fresh `clientMessageId`
+and no `retry` flag —
 the receipts cache holds the 409 under the old id. A second `permission-pending` holds it again.
 Held bubbles live in memory only: a page reload drops them.
 
