@@ -1,0 +1,397 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T12:49:43Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4300: Dead agents re-emit heartbeat_dead + status_changed → running every minute (~50k events/day)",
+    "updated": "2026-09-28T12:52:43.055Z"
+  },
+  "plan": {
+    "id": "pan-4300",
+    "title": "Dead agents re-emit heartbeat_dead + status_changed → running every minute (~50k events/day)",
+    "status": "proposed",
+    "uid": "33b7725a-f5cf-40e7-ba0b-4df493f5a690",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-28T12:49:43Z",
+    "updated": "2026-09-28T12:52:43.055Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4300",
+        "label": "PAN-4300",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4300.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "deacon-lite",
+      "events",
+      "liveness",
+      "activity-feed"
+    ],
+    "narratives": {
+      "Problem": "deacon-lite's reconcileAgentLiveness (src/lib/cloister/deacon-lite.ts ~line 129) reports every agent whose state.json says running but that the backend confirms dead, on every 60s tick, with no memory between ticks. Nothing moves such an agent's state.json off running (the supervisor's exited event appends agent.stopped only, by PAN-3917/PAN-3962 design). The notifier in src/dashboard/server/deacon-main.ts (~line 71; copy in main.ts ~line 459) emits agent.heartbeat_dead plus agent.status_changed with status: running and no previousStatus, which flips the read model back to running every minute. Result: ~50k events/day, 99% of the Activity Detailed stream, plus ~25k needless reconcileAgentMemory / syncTranscriptPollerRegistry runs a day triggered by heartbeat_dead in main.ts ~line 651.",
+      "Proposal": "Emit on the transition only (PRD D1). WI-1: add an in-memory reported-dead guard in deacon-lite keyed by agent id and launch generation (startedAt|lastResumeAt), dropped when the agent is seen alive or leaves the running list, set only after the notifier succeeds. WI-2: a shared builder module src/lib/cloister/agent-status-events.ts whose buildConfirmedDeadAgentEvents emits heartbeat_dead then status_changed with status: stopped, previousStatus = recorded status, hasLivePane: false. WI-3/WI-4: deacon-main.ts and main.ts use the shared builders and drop their local copies. WI-5: document the emission rule in docs/DASHBOARD-ARCHITECTURE.md's Deacon child process list. See .pan/drafts/pan-4300.md for exact before/after code.",
+      "NonGoals": "- Writing stopped (or any field) to state.json from deacon-lite or from either notifier\n- Making the supervisor's exited lifecycle handler write stopped to state.json\n- Persisting the reported-dead guard across deacon child restarts (one re-emission per still-dead agent per restart is accepted)\n- Deleting the unreachable setAgentStoppedNotifier registration in main.ts or the unused agentStatusChangedNotifier path in deacon-lite\n- Changing read-model reducers, deriveServedAgentStatuses, Activity page rendering, or the Awareness feed (PAN-4301)\n- Changing detectCrashedAgents or pan recover\n- Cleaning up historical heartbeat_dead / status_changed rows already in the event store"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Emit only on a real transition (in-memory guard in deacon-lite) instead of writing stopped to state.json.",
+        "rationale": "The issue allows either. deacon-lite's contract is write-free ('correct the cache side only'); the read model already derives served status from the backend inventory (#4098); and detectCrashedAgents / pan recover list crashed agents as 'state.json running, oracle dead', which a patrol-written stopped would silently empty. The pan admin agents exited precedent writes stopped from a launcher's direct report, not from inference."
+      },
+      {
+        "summary": "Guard key is agent id + launch generation (startedAt|lastResumeAt); entry cleared when the agent is seen alive or leaves the running list; indeterminate verdicts leave it untouched.",
+        "rationale": "Keying on id alone would never re-report a resumed agent that dies again; spawn.ts writes startedAt and resume.ts writes lastResumeAt, so the pair identifies a launch. Pruning keeps the map bounded."
+      },
+      {
+        "summary": "Accept one re-emission per still-dead agent per deacon child restart.",
+        "rationale": "Bounded by the number of dead running state.json rows (tens) versus ~25k pairs/day today; persisting the guard would add stored derived state, which Overdeck avoids."
+      },
+      {
+        "summary": "The dead-agent status_changed event carries status: stopped with previousStatus = the recorded status.",
+        "rationale": "Satisfies issue AC2 (never previousStatus null when a status is recorded) and stops the event from flipping the read model back to running after agent.stopped."
+      },
+      {
+        "summary": "Docs rule goes in the 'Deacon child process' list of docs/DASHBOARD-ARCHITECTURE.md.",
+        "rationale": "The issue names an 'events section', but the file has none (headings at lines 1, 387, 449, 530, 647); the deacon child list (lines 18-23) already documents deacon-lite behaviour."
+      }
+    ],
+    "items": [
+      {
+        "id": "dead-agent-guard",
+        "title": "Report a confirmed-dead agent once per launch generation in reconcileAgentLiveness",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:49:43Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4300",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-lite.ts",
+            "tests/unit/lib/cloister/deacon-lite.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-lite.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-lite.test.ts passes including the new once-per-death tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. In src/lib/cloister/deacon-lite.ts add module-level `const reportedDeadAgents = new Map<string, string>()`, `launchGeneration(agent) => `${agent.startedAt}|${agent.lastResumeAt ?? ''}``, and exported `__resetReportedDeadAgentsForTests()`. In reconcileAgentLiveness: first delete guard entries whose id is not in the running list; for an agent in liveIds or with verdict.alive, delete its entry and continue; for an indeterminate verdict, continue without touching the entry; for a confirmed-dead agent whose entry equals its generation, continue; otherwise call the notifier and set the entry only after the notifier returns without throwing (no notifier ⇒ set nothing). Add one sentence to the section comment. In tests/unit/lib/cloister/deacon-lite.test.ts call __resetReportedDeadAgentsForTests() in the top-level beforeEach (required — existing tests share agent-pan-1) and add the six tests listed in PRD WI-1 step 5, using fake timers (already enabled in beforeEach). Implementation checkpoint: if startDeaconLite ticks need mocks the file lacks, use the direct-call fallback described in the PRD.",
+          "Why": "Nothing writes a dead agent's state.json off running, so without memory between ticks the same death is reported every 60s."
+        },
+        "items": [
+          {
+            "id": "dead-agent-guard.ac1",
+            "title": "Given a running agent absent from the inventory and confirmed dead, when five deacon-lite ticks run under fake timers, then the stopped notifier is called exactly once with that agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dead-agent-guard.ac2",
+            "title": "Given an agent already reported dead, when a tick observes it alive (in the inventory) and a later tick confirms it dead again, then the notifier is called a second time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dead-agent-guard.ac3",
+            "title": "Given an agent already reported dead, when its lastResumeAt changes or it leaves and re-enters the running list while still dead, then the notifier is called again; when a tick returns runtime-indeterminate between two dead ticks, then no extra call is made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dead-agent-guard.ac4",
+            "title": "Given the notifier throws on its first call, when the next tick runs, then the notifier is called again (the guard entry is set only after a successful call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-event-builder",
+        "title": "Create shared agent-status-events module whose dead-agent builder emits status stopped with the recorded previousStatus",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:49:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4300",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "deacon-main-uses-builder",
+            "main-uses-builder"
+          ],
+          "files_scope": [
+            "src/lib/cloister/agent-status-events.ts",
+            "tests/unit/lib/cloister/agent-status-events.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/agent-status-events.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-status-events.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Create src/lib/cloister/agent-status-events.ts importing only types (AgentState from ../agents/agent-state-read.js, DomainEvent from @overdeck/contracts). Export toAgentStatusPayload (accepts undefined, returns 'starting'|'running'|'stopped'|'error'|'unknown'), buildAgentStatusChangedPayload (moved verbatim from src/dashboard/server/deacon-main.ts ~line 26-50), and buildConfirmedDeadAgentEvents(agentId, state, now?) returning [heartbeat_dead {agentId, issueId, sessionId}, status_changed built from {...state, status:'stopped'} with previousStatus=state.status and hasLiveTmuxSession=false] when state exists, or [heartbeat_dead {agentId}] when state is null. Must not mutate the input state. Add tests/unit/lib/cloister/agent-status-events.test.ts with the four pure tests in PRD WI-2.",
+          "Why": "The two notifier copies emit status: running with no previousStatus; one shared builder fixes the payload and stops the copies drifting."
+        },
+        "items": [
+          {
+            "id": "status-event-builder.ac1",
+            "title": "Given a state with status running, when buildConfirmedDeadAgentEvents is called, then it returns agent.heartbeat_dead followed by agent.status_changed whose payload has status 'stopped', previousStatus 'running', hasLivePane false and hasLiveTmuxSession false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-event-builder.ac2",
+            "title": "Given state null, when buildConfirmedDeadAgentEvents is called, then it returns exactly one agent.heartbeat_dead event with payload { agentId }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-event-builder.ac3",
+            "title": "Given a state with status starting, when the builder runs, then status_changed.payload.previousStatus equals 'starting' (never undefined) and the input state's status is still 'starting' afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-main-uses-builder",
+        "title": "Switch the deacon child's stopped notifier to buildConfirmedDeadAgentEvents",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T12:49:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4300",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/deacon-main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/dashboard/server/deacon-main.ts delete the local toAgentStatusPayload and buildAgentStatusChangedPayload; import buildAgentStatusChangedPayload and buildConfirmedDeadAgentEvents from ../../lib/cloister/agent-status-events.js. Replace the setAgentStoppedNotifier body with a try/catch that appends every event from buildConfirmedDeadAgentEvents(agentId, getAgentState(agentId)) via append(). setAgentStatusChangedNotifier keeps its call, now to the imported builder. Remove the AgentState import if unused.",
+          "Why": "deacon-main.ts is the live registration: deacon-lite runs only in the deacon child."
+        },
+        "items": [
+          {
+            "id": "deacon-main-uses-builder.ac1",
+            "title": "Given the change, when running grep -n 'function buildAgentStatusChangedPayload\\|function toAgentStatusPayload' src/dashboard/server/deacon-main.ts, then it prints nothing and the stopped notifier body calls buildConfirmedDeadAgentEvents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-main-uses-builder.ac2",
+            "title": "Given the change, when npm run typecheck and npm run lint run, then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-uses-builder",
+        "title": "Switch the dashboard process's stopped notifier in main.ts to buildConfirmedDeadAgentEvents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:49:43Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4300",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "git diff --stat origin/main -- src/dashboard/server/main.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "main.ts shows net deletions versus origin/main"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In src/dashboard/server/main.ts delete the local toAgentStatusPayload (~line 426) and buildAgentStatusChangedPayload (~line 432); import both builders from ../../lib/cloister/agent-status-events.js. Replace the setAgentStoppedNotifier body (~line 459) so it iterates buildConfirmedDeadAgentEvents(agentId, getAgentState(agentId)): append agent.heartbeat_dead with es.append(event) and agent.status_changed with saveAgentStateAndEmitEvent(state, event). Add a one-line comment that this registration is unreachable today (deacon-lite runs only in the deacon child, PAN-3922) and is kept identical to deacon-main.ts. Do not delete the registration.",
+          "Why": "Keeps the two registrations identical so they cannot drift again."
+        },
+        "items": [
+          {
+            "id": "main-uses-builder.ac1",
+            "title": "Given the change, when running grep -n 'function buildAgentStatusChangedPayload\\|function toAgentStatusPayload' src/dashboard/server/main.ts, then it prints nothing and the stopped notifier body calls buildConfirmedDeadAgentEvents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-uses-builder.ac2",
+            "title": "Given the change, when npm run typecheck and npm run lint run, then both exit 0 and wc -l src/dashboard/server/main.ts returns fewer lines than origin/main's copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-emission-rule",
+        "title": "Document the once-per-death dead-agent emission rule in DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:49:43Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4300",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-4300' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new bullet inside the Deacon child process list near line 18-24"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5: add the given bullet to the '**Deacon child process** (PAN-3922)' list in docs/DASHBOARD-ARCHITECTURE.md (lines 18-23), after the IPC bullet. The file has no events section; this list is the chosen home (PRD D7).",
+          "Why": "Issue AC4 requires the emission rule to be documented."
+        },
+        "items": [
+          {
+            "id": "docs-emission-rule.ac1",
+            "title": "Given the change, when a reader opens the Deacon child process list in docs/DASHBOARD-ARCHITECTURE.md, then it shows a PAN-4300 bullet stating that the child emits agent.heartbeat_dead then agent.status_changed with status: stopped and previousStatus set to the recorded status, once per death",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-emission-rule.ac2",
+            "title": "Given the change, when a reader opens that bullet, then it states that state.json is not changed and that a deacon child restart emits the pair once more for each still-dead agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "status-event-builder",
+        "to": "deacon-main-uses-builder",
+        "type": "blocks"
+      },
+      {
+        "from": "status-event-builder",
+        "to": "main-uses-builder",
+        "type": "blocks"
+      },
+      {
+        "from": "dead-agent-guard",
+        "to": "docs-emission-rule",
+        "type": "informs"
+      },
+      {
+        "from": "status-event-builder",
+        "to": "docs-emission-rule",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-28-PAN-4300-dead-agents-re-emit-heartbeat-dead-status-changed-running-every-minute-50k-events-day.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
