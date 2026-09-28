@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:55:48.831Z",
+  "updated": "2026-09-28T13:56:02.352Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "ws-terminal-gate.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T13:55:48.831Z"
+    },
+    "ws-terminal-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:02.352Z"
     }
   }
 }
