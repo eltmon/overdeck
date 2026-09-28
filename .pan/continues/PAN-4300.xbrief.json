@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4300",
   "created": "2026-09-28T12:54:38.633Z",
-  "updated": "2026-09-28T13:49:33.134Z",
+  "updated": "2026-09-28T13:49:45.635Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "main-uses-builder.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T13:49:33.134Z"
+    },
+    "docs-emission-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:49:45.635Z"
     }
   }
 }
