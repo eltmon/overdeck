@@ -13,6 +13,11 @@ export interface UseDefaultDeckSelectionOptions {
   registeredProjects: readonly RegisteredProject[];
   loaded: boolean;
   onSelectProject?: (projectName: string | null, opts?: { updateUrl?: boolean }) => void;
+  /** A pending conversation deep-link (`/conv/<name>`) must win over
+   * auto-select: onSelectProject's default path clears the conversation
+   * route, which would drop the deep-link before its own effect applies it
+   * (mirrors the guard on the single-project auto-select effect). */
+  convId?: string | null;
 }
 
 export function useDefaultDeckSelection({
@@ -20,13 +25,14 @@ export function useDefaultDeckSelection({
   registeredProjects,
   loaded,
   onSelectProject,
+  convId,
 }: UseDefaultDeckSelectionOptions): void {
   const firedRef = useRef(false);
 
   useEffect(() => {
     if (firedRef.current) return;
-    if (!loaded || selectedProject || registeredProjects.length > 0) return;
+    if (!loaded || selectedProject || registeredProjects.length > 0 || convId) return;
     firedRef.current = true;
     onSelectProject?.(NO_PROJECT_KEY);
-  }, [loaded, selectedProject, registeredProjects, onSelectProject]);
+  }, [loaded, selectedProject, registeredProjects, onSelectProject, convId]);
 }

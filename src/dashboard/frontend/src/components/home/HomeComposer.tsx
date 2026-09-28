@@ -172,6 +172,7 @@ export function HomeComposer({ mode }: HomeComposerProps) {
       <div className="min-w-0 max-w-full">
         <ModelPicker value={model} onChange={setModel} harness={harness} onHarnessChange={setHarness} followProviderDefault disabled={spawn.isPending} />
       </div>
+      {!model && <p className="w-full text-xs text-muted-foreground">Choose a model to start the conversation.</p>}
     </div>
   );
 }

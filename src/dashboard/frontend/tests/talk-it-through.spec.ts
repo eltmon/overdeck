@@ -26,6 +26,7 @@ for (const width of [1280, 785, 390, 320]) {
     await page.route('**/api/conversations', async (route) => {
       if (route.request().method() !== 'POST') return route.fallback();
       const body = route.request().postDataJSON();
+      expect(body).toMatchObject({ model: 'gpt-6-astra' });
       // Before picker settings load, an omitted harness lets the server resolve
       // provider routing. It must never send the old hardcoded claude-code value.
       expect([undefined, 'codex']).toContain(body.harness);

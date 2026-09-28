@@ -99,8 +99,9 @@ when no project is chosen) and opens `/conv/:name`; the Simple discuss-first
 flow sends `seedDiscussPrompt(text)` instead. Ctrl+Enter (or the terminal row)
 writes a terminal hand-off through `components/home/pendingTerminal.ts` — a
 sessionStorage record plus a same-tab `CustomEvent` — then navigates to the
-deck; `Stage` and `TerminalDrawer` each consume that hand-off (opening the
-drawer and running the command in a fresh shell) so it runs exactly once.
+deck; `Stage` peeks it (non-consuming) to open the drawer, and
+`TerminalDrawer` consumes it to run the command in a fresh shell, so it runs
+exactly once.
 Launch errors appear below the input; the draft stays available for retry.
 Browser coverage lives in `src/dashboard/frontend/tests/home-type-and-go.spec.ts`
 and `tests/talk-it-through.spec.ts`.

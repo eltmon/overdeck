@@ -300,7 +300,7 @@ export function CommandDeck({
     queryFn: fetchRegisteredProjects,
     staleTime: 60000,
   });
-  useDefaultDeckSelection({ selectedProject, registeredProjects, loaded: registeredProjectsFetched, onSelectProject });
+  useDefaultDeckSelection({ selectedProject, registeredProjects, onSelectProject, convId, loaded: registeredProjectsFetched && !registeredProjectsError });
 
   const { data: versionData } = useQuery({
     queryKey: ['version'],

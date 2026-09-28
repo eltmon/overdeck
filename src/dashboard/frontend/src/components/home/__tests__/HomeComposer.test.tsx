@@ -53,6 +53,17 @@ describe('HomeComposer', () => {
     expect(body.projectKey).toBeUndefined();
   });
 
+  it('shows a hint instead of silently no-opping when no model resolves', () => {
+    applyDefaultConversationModel('');
+    renderWithProviders(<HomeComposer mode="advanced" />);
+    const input = screen.getByTestId('home-composer-input');
+    fireEvent.change(input, { target: { value: 'hello there' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(screen.getByText('Choose a model to start the conversation.')).toBeVisible();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url) === '/api/conversations')).toBe(false);
+  });
+
   it('the talk row posts the seeded prompt', async () => {
     renderWithProviders(<HomeComposer mode="simple" />);
     const input = screen.getByTestId('home-composer-input');

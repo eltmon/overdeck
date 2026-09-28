@@ -43,4 +43,19 @@ describe('useDefaultDeckSelection', () => {
     );
     expect(alreadySelected).not.toHaveBeenCalled();
   });
+
+  it('does nothing while a conversation deep link is pending', () => {
+    const onSelectProject = vi.fn();
+    const { rerender } = renderHook(
+      (props: { convId: string | null }) =>
+        useDefaultDeckSelection({ selectedProject: null, registeredProjects: [], loaded: true, onSelectProject, ...props }),
+      { initialProps: { convId: 'conv-1' } },
+    );
+    expect(onSelectProject).not.toHaveBeenCalled();
+
+    // Once the deep-link effect resolves it sets selectedProject itself
+    // (even to NO_PROJECT_KEY), so this hook still must not double-fire.
+    rerender({ convId: 'conv-1' });
+    expect(onSelectProject).not.toHaveBeenCalled();
+  });
 });
