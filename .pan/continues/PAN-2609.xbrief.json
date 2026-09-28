@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-28T13:24:15.128Z",
+  "updated": "2026-09-28T13:24:16.455Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-2609",
       "claimedAt": "2026-09-28T13:20:10.669Z",
       "doneAt": "2026-09-28T13:24:15.127Z"
+    },
+    "vault-continuity": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T13:24:16.455Z"
     }
   }
 }
