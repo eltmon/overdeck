@@ -16,6 +16,7 @@
  * (a leaf module); nothing under `src/lib/overdeck/*` is imported (P-14).
  */
 import { mkdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { claudeProjectDir } from '../runtimes/storage/claude-code.js';
 import { decodeChunk, type RecordSegment, type SegmentPrefix, type SessionRecord } from './format.js';
@@ -229,4 +230,74 @@ export async function restoreNative(options: RestoreNativeOptions): Promise<{ pa
   const lines = await segmentLines(record, segment, store, keys);
   await writeNewFile(nativePath, nativeFileContent(lines));
   return { path: nativePath, lines: lines.length };
+}
+
+// ---------------------------------------------------------------------------
+// Codex (P-16, checkpoint outcome 2026-09-28: opened)
+// ---------------------------------------------------------------------------
+
+/** `$CODEX_HOME` or `~/.codex`. */
+export function codexHomeDir(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CODEX_HOME && env.CODEX_HOME.length > 0 ? env.CODEX_HOME : join(homedir(), '.codex');
+}
+
+/** `<codexHome>/sessions/YYYY/MM/DD/rollout-<YYYY-MM-DDTHH-MM-SS>-<id>.jsonl`, Codex's own layout. */
+export function codexRolloutPath(codexHome: string, sessionId: string, now = new Date()): string {
+  const iso = now.toISOString();
+  const [date, time] = iso.split('T') as [string, string];
+  const [yyyy, mm, dd] = date.split('-') as [string, string, string];
+  const stamp = `${date}T${time.slice(0, 8).replace(/:/g, '-')}`;
+  return join(codexHome, 'sessions', yyyy, mm, dd, `rollout-${stamp}-${sessionId}.jsonl`);
+}
+
+export interface MaterializeCodexOptions {
+  record: SessionRecord;
+  store: VaultStore;
+  keys: VaultSubkeys;
+  targetCwd: string;
+  newSessionId: string;
+  /** Defaults to `$CODEX_HOME` or `~/.codex`. */
+  codexHome?: string;
+  now?: Date;
+}
+
+/**
+ * Plan a Codex rollout for the VIEW. Codex indexes rollouts found under its
+ * sessions directory into its own state database, so the SQLite file is never
+ * written here; the thread id is rewritten wherever the old id appears as a
+ * quoted string (session_meta `id`/`session_id`) and `cwd` follows the target.
+ */
+export async function planCodexMaterialization(options: MaterializeCodexOptions): Promise<MaterializationPlan> {
+  const { record, store, keys, targetCwd, newSessionId } = options;
+  const view = await readViewLines(record, store, keys);
+  const ids = knownIdentifiers(record);
+  const cwdChanged = targetCwd !== record.cwd;
+  const lines = view.lines.map((line) => {
+    let out = line;
+    for (const from of ids.sessionIds) {
+      if (from && from !== newSessionId) out = out.split(JSON.stringify(from)).join(JSON.stringify(newSessionId));
+    }
+    return rewriteLine(out, { sessionIdsFrom: [], sessionIdTo: newSessionId, cwdsFrom: ids.cwds, cwdTo: cwdChanged ? targetCwd : null });
+  });
+  return {
+    lines,
+    path: codexRolloutPath(options.codexHome ?? codexHomeDir(), newSessionId, options.now),
+    prefix: {
+      viewFromChunk: view.fromChunk,
+      viewFromLine: view.fromLine,
+      logEnd: view.logEnd,
+      sessionIdFrom: record.nativeSessionId,
+      sessionIdTo: newSessionId,
+      cwdFrom: record.cwd,
+      cwdTo: targetCwd,
+      lineCount: lines.length,
+    },
+  };
+}
+
+/** Write the VIEW as a fresh Codex rollout under the sessions directory. */
+export async function materializeCodex(options: MaterializeCodexOptions): Promise<MaterializeResult> {
+  const plan = await planCodexMaterialization(options);
+  await writeMaterialization(plan);
+  return { path: plan.path, lines: plan.lines.length, prefix: plan.prefix };
 }

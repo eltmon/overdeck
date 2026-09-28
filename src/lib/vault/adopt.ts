@@ -18,7 +18,7 @@ import { tailOf } from './continuity.js';
 import { encryptRef, isTombstone, readSessionRecord, refName, type SessionRecord } from './format.js';
 import type { VaultSubkeys } from './identity.js';
 import { setOwnedTail } from './local-index.js';
-import { nativeFileContent, planMaterialization, writeMaterialization } from './materialize.js';
+import { nativeFileContent, planCodexMaterialization, planMaterialization, writeMaterialization } from './materialize.js';
 import { logThroughVersion } from './settle.js';
 import type { VaultStore } from './store/types.js';
 
@@ -30,6 +30,8 @@ export interface AdoptOptions {
   newSessionId?: string;
   /** Defaults to `~/.claude/projects`. */
   projectsRoot?: string;
+  /** Codex records: defaults to `$CODEX_HOME` or `~/.codex`. */
+  codexHome?: string;
   /** Defaults to `ensureEnvironmentIdentity()`. */
   identity?: EnvironmentIdentity;
   now?: () => Date;
@@ -61,7 +63,9 @@ async function claimAndMaterialize(
   const { store, keys, targetCwd, identity } = options;
   const now = options.now ?? (() => new Date());
   const newSessionId = options.newSessionId ?? randomUUID();
-  const plan = await planMaterialization({ record: current.record, store, keys, targetCwd, newSessionId, projectsRoot: options.projectsRoot });
+  const plan = current.record.harness === 'codex'
+    ? await planCodexMaterialization({ record: current.record, store, keys, targetCwd, newSessionId, codexHome: options.codexHome })
+    : await planMaterialization({ record: current.record, store, keys, targetCwd, newSessionId, projectsRoot: options.projectsRoot });
   const tail = tailOf(plan.lines, Buffer.byteLength(nativeFileContent(plan.lines), 'utf8'));
   const at = now().toISOString();
   const next: SessionRecord = {
