@@ -78,6 +78,9 @@ function makeResolvedIntent(mode: 'clone' | 'existing' | 'new', overrides: Parti
     wouldGitInit: mode === 'new',
     willCreateMainWorkspace: true,
     findings: [],
+    notices: [],
+    nestedRepositories: [],
+    workspaceRepos: [],
     ...overrides,
   };
 }
@@ -199,6 +202,32 @@ describe('project-create routes', () => {
       // This route runs once per settled keystroke; forcing a refresh here would
       // spawn a `git ls-remote` per character typed.
       expect(input.refreshRemote).toBeFalsy();
+    });
+  });
+
+  describe('POST /api/projects/resolve — multi-repo selection', () => {
+    it('resolve passes a repos array to the core', async () => {
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(makeResolvedIntent('existing'));
+
+      await requestProjectsRoute('/api/projects/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'existing', path: '/home/user/suite', repos: ['frontend', 'backend'] }),
+      });
+
+      const input = routeMocks.resolveProjectCreateIntent.mock.calls[0][0];
+      expect(input.repos).toEqual(['frontend', 'backend']);
+    });
+
+    it('drops a repos value that is not an array of strings', async () => {
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(makeResolvedIntent('existing'));
+
+      await requestProjectsRoute('/api/projects/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'existing', path: '/home/user/suite', repos: ['frontend', 3] }),
+      });
+
+      const input = routeMocks.resolveProjectCreateIntent.mock.calls[0][0];
+      expect(input.repos).toBeUndefined();
     });
   });
 

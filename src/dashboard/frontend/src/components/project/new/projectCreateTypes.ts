@@ -29,6 +29,13 @@ export interface NestedRepository {
   name: string;
 }
 
+export interface ProjectWorkspaceRepo {
+  name: string;
+  path: string;
+  defaultBranch: string | null;
+  forge: 'github' | 'gitlab' | null;
+}
+
 /** The safe projection of a resolved intent. `cloneUrl` arrives redacted. */
 export interface ResolvedProjectIntent {
   mode: ProjectCreateMode;
@@ -56,6 +63,8 @@ export interface ResolvedProjectIntent {
   notices?: ProjectIntentNotice[];
   /** Repositories directly inside a non-git folder; read as `?? []`. */
   nestedRepositories?: NestedRepository[];
+  /** Set when a `repos` selection resolved to a multi-repo project; read as `?? []`. */
+  workspaceRepos?: ProjectWorkspaceRepo[];
 }
 
 export type ProjectCreateFailureCode =

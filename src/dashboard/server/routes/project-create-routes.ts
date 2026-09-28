@@ -251,6 +251,7 @@ const postProjectsRoute = HttpRouter.add(
       parentDir?: unknown;
       name?: unknown;
       issuePrefix?: unknown;
+      repos?: unknown;
       operationId?: unknown;
     };
 
@@ -273,6 +274,10 @@ const postProjectsRoute = HttpRouter.add(
       parentDir: typeof body.parentDir === 'string' ? body.parentDir : undefined,
       name: typeof body.name === 'string' ? body.name : undefined,
       issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
+      repos:
+        Array.isArray(body.repos) && body.repos.every((repo) => typeof repo === 'string')
+          ? (body.repos as string[])
+          : undefined,
       homeBoundary: true,
       refreshRemote: true,
     };

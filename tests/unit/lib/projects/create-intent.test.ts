@@ -366,6 +366,70 @@ describe('resolveProjectCreateIntent', () => {
     expect(intent.nestedRepositories[0]!.name).toBe('repo-00');
   });
 
+  it('repos selection resolves workspaceRepos for a non-git folder', async () => {
+    const dir = makeProjectDir('suite');
+    mkdirSync(join(dir, 'frontend', '.git'), { recursive: true });
+    mkdirSync(join(dir, 'Back_End', '.git'), { recursive: true });
+    const frontend = join(realPathOf(dir), 'frontend');
+    execFileMock.mockImplementation((cmd, args, opts: { cwd?: string }, cb) => {
+      if (opts?.cwd === frontend && args[0] === 'symbolic-ref') {
+        cb(null, { stdout: 'origin/main\n', stderr: '' });
+      } else if (opts?.cwd === frontend && args[0] === 'remote') {
+        cb(null, { stdout: 'git@github.com:acme/frontend.git\n', stderr: '' });
+      } else {
+        cb(new Error('not a git repository'));
+      }
+    });
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      repos: ['frontend', 'Back_End'],
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toHaveLength(0);
+    expect(intent.workspaceRepos).toEqual([
+      { name: 'frontend', path: 'frontend', defaultBranch: 'main', forge: 'github' },
+      { name: 'back-end', path: 'Back_End', defaultBranch: null, forge: null },
+    ]);
+  });
+
+  it('repos entry that is not a child repository is repos-invalid', async () => {
+    const dir = makeProjectDir('suite-bad');
+    mkdirSync(join(dir, 'plain'), { recursive: true });
+    mockNoGit();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      repos: ['../x', 'missing', 'plain'],
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    const invalid = intent.findings.filter((f) => f.code === 'repos-invalid');
+    expect(invalid.map((f) => f.detail)).toEqual(['../x', 'missing', 'plain']);
+    expect(intent.workspaceRepos).toEqual([]);
+  });
+
+  it('repos on a folder that is itself a repository is repos-invalid', async () => {
+    const dir = makeProjectDir('single-repo');
+    mockGitRoot(dir);
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      repos: ['anything'],
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(expect.objectContaining({ code: 'repos-invalid' }));
+    expect(intent.workspaceRepos).toEqual([]);
+  });
+
   it('detects a linked worktree, whose .git is a file not a directory (D-15)', async () => {
     const dir = makeProjectDir('worktree');
     writeFileSync(join(dir, '.git'), 'gitdir: /somewhere/.git/worktrees/wt\n');
