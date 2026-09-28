@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:17:10.046Z",
+  "updated": "2026-09-28T01:17:22.018Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -258,6 +258,10 @@
     "type-to-focus.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T01:17:10.046Z"
+    },
+    "home-composer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:17:22.018Z"
     }
   }
 }
