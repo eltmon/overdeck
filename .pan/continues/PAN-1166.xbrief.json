@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:58:07.735Z",
+  "updated": "2026-09-28T13:58:19.678Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "ws-autopreso-gate.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T13:58:07.735Z"
+    },
+    "ws-autopreso-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:19.677Z"
     }
   }
 }
