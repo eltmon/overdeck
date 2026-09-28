@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:22:20.766Z",
+  "updated": "2026-09-28T01:22:33.140Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -366,6 +366,10 @@
     "docs-slice-a.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T01:22:20.766Z"
+    },
+    "ci-frontend-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:22:33.140Z"
     }
   }
 }
