@@ -391,8 +391,8 @@ The dashboard runs in its own transient systemd unit started with
 unit uses the same value). That weight enables the `cpu` controller in
 `app.slice`, so under contention the dashboard's cgroup gets its weighted
 share instead of competing thread by thread with every agent in the Herdr
-unit. It fixes scheduler starvation of the event loop. It does not fix
-event-loop latency the dashboard causes itself with its own blocking work.
+unit. It fixes scheduler starvation of the event loop. It does not fix the
+event-loop p99 the dashboard causes itself with its own blocking work.
 
 The runaway-process patrol (`src/lib/cloister/runaway-process-patrol.ts`)
 runs in the dashboard **main** process, not the deacon child, because
