@@ -39,6 +39,7 @@ export function withConcurrencyLimit<T>(
 interface SettledTtlEntry<T> {
   promise: Promise<T>;
   settledAt: number | null;
+  value?: T;
 }
 
 export interface SettledTtlPromiseCache<K, V> {
@@ -47,17 +48,30 @@ export interface SettledTtlPromiseCache<K, V> {
   invalidate(key?: K): void;
 }
 
-/** Cache settled values for a TTL while preserving single-flight for pending work regardless of age. */
-export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => number = () => Date.now()): SettledTtlPromiseCache<K, V> {
+/**
+ * Cache settled values for a TTL while preserving single-flight for pending
+ * work regardless of age. `ttlFor`, when given, overrides `ttlMs` per settled
+ * value — e.g. a longer TTL for an "idle" answer than a "busy" one — and is
+ * ignored for rejected loads, which keep today's behavior (entry dropped).
+ */
+export function createSettledTtlPromiseCache<K, V>(
+  ttlMs: number,
+  now: () => number = () => Date.now(),
+  ttlFor?: (value: V) => number,
+): SettledTtlPromiseCache<K, V> {
   const entries = new Map<K, SettledTtlEntry<V>>();
   const get = (key: K, load: () => Promise<V>): Promise<V> => {
     const cached = entries.get(key);
-    if (cached && (cached.settledAt === null || now() - cached.settledAt < ttlMs)) return cached.promise;
+    if (cached) {
+      if (cached.settledAt === null) return cached.promise;
+      const ttl = ttlFor ? ttlFor(cached.value as V) : ttlMs;
+      if (now() - cached.settledAt < ttl) return cached.promise;
+    }
 
     const entry: SettledTtlEntry<V> = { promise: load(), settledAt: null };
     entries.set(key, entry);
     entry.promise.then(
-      () => { entry.settledAt = now(); },
+      (value) => { entry.settledAt = now(); entry.value = value; },
       () => { if (entries.get(key) === entry) entries.delete(key); },
     );
     return entry.promise;
