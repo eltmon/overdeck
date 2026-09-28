@@ -120,7 +120,11 @@ vi.mock('../sessionFeed/SessionFeedSidebar', () => ({
   // PAN-1591: the merged Awareness rail passes the project's issues via
   // `projectIssueIds` (scopeSwitcher mode); keep `issueIds` as a fallback.
   SessionFeedSidebar: (props: any) => (
-    <div data-testid="activity-feed" data-issues={(props.projectIssueIds ?? props.issueIds ?? []).join(',')} />
+    <div
+      data-testid="activity-feed"
+      data-issues={(props.projectIssueIds ?? props.issueIds ?? []).join(',')}
+      data-conversations={props.projectConversationIds ? [...props.projectConversationIds].join(',') : 'none'}
+    />
   ),
 }));
 
@@ -473,6 +477,8 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     const stage = screen.getByTestId('stage');
     expect(stage).toHaveAttribute('data-deck', 'test-project');
     expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
+    // PAN-4301 FR-15: the rail scopes by the project's resolved conversation set.
+    await waitFor(() => expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-conversations', '1'));
   });
 
   it('keeps the issue rail rendered while selected-project membership is unavailable', async () => {

@@ -1,0 +1,1115 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T13:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4301: Awareness feed: show transitions instead of a live conversation index; consolidate gauntlet lanes into one card per run",
+    "updated": "2026-09-28T13:03:23.870Z"
+  },
+  "plan": {
+    "id": "pan-4301",
+    "title": "Awareness feed: show transitions instead of a live conversation index; consolidate gauntlet lanes into one card per run",
+    "status": "running",
+    "uid": "9950c35a-2442-4f13-816f-c73081ee5d6a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-28T13:30:00.000Z",
+    "updated": "2026-09-28T13:03:23.870Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4301",
+        "label": "PAN-4301",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-4301/.pan/drafts/pan-4301.md",
+        "label": "PRD draft (.pan/drafts/pan-4301.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4306",
+        "label": "PAN-4306 (sibling: telemetry emit sites)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "awareness-feed",
+      "lanes",
+      "frontend",
+      "contracts"
+    ],
+    "narratives": {
+      "Problem": "The Command Deck Awareness rail is flooded: the Chats source maps every non-archived conversation to a card dated by transcript mtime (lastActivityAt), polled every 30 s, so every working conversation and each gauntlet lane jumps to 'Just Now' and nothing ages out; the sequencer-runner singleton shows as a blank 'No messages yet' card; Project scope filters by issue id only, hiding issue-less lane conversations; the Git, Files and Comments tabs never show anything.",
+      "Proposal": "Derive, don't store. Conversation entries are dated by lifecycle facts (createdAt/endedAt) in All and by recency in a 24 h-windowed Chats index; singleton agents are excluded; the status dot is derived from isWorking/pendingInputCount/sessionAlive. Lane rows collapse into one gauntlet_run entry per (projectKey, gauntletRun), built by a pure selector using the D10 lane-activity rule moved to @overdeck/contracts (laneActivityOf, also used by src/lib/lanes/views.ts); the card shows counts, the latest report/failure/end/launch and its time, opens the orchestrator, and fetches GET /api/lanes?run= only on expand. Per-issue activity collapses to one card with a step count. Project scope keeps conversations and runs in the Command Deck's resolved project set. Git/Files/Comments tabs are hidden. Docs updated in DASHBOARD-ARCHITECTURE.md, reference/lanes.mdx and concepts.mdx.",
+      "NonGoals": "- Moving telemetry out of activity.entry at emit sites, the prdGate superseded-failure rule, and the one-merge-card rule (PAN-4306, blocked by PAN-4300)\n- Fixing the dead-agent heartbeat_dead / status_changed loop (PAN-4300)\n- Changing seedRecentActivity's 50-entry truncation or God View 'merges today'\n- Any new table, column, stored status field, or server route\n- Changing usePendingInputSubjects, DecisionsPanel or the Needs-you rows\n- Grouping pre-pan-lane 'SB lane' conversations that lack gauntletRun\n- Depending on the pan-gauntlet-loop skill's gauntlet/status.json\n- Deleting useGitFeed.ts, GitFeedCard.tsx or their tests\n- Changing pan lane list / GET /api/lanes output"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split Wanted item 4 (telemetry leaves activity.entry at emit sites) and its three ACs into sibling issue PAN-4306, blocked by PAN-4300.",
+        "rationale": "The issue names PAN-4300 as a prerequisite for item 4, and the emit sites span six more subsystems (cloister, agents, overdeck lib, server routes/main, CLI); the planning contract prefers independently shippable siblings over a mega-plan. Recorded as a comment on PAN-4301."
+      },
+      {
+        "summary": "Conversation entries carry two clocks: timestamp = lifecycle fact (endedAt when ended, else createdAt) and recencyAt; the Chats tab re-dates to recencyAt.",
+        "rationale": "The issue requires All to be dated by recorded facts while the review's Chats design is a recency index; one entry with both fields keeps a single mapper."
+      },
+      {
+        "summary": "The All tab applies a 24 h window to every conversation entry, alive or not.",
+        "rationale": "All shows transitions; an alive conversation created days ago has no transition in the window and stays reachable in Chats and the Command Deck list."
+      },
+      {
+        "summary": "Pending-input 'since' does not date conversation or run entries.",
+        "rationale": "The conversation row has pendingInputCount but no since; a waiting lane already has its own dated Needs-you row, and the run card shows it in counts and state."
+      },
+      {
+        "summary": "Run cards group by the lane row's explicit projectKey; Project scope uses the Command Deck's existing projectConvIdSet.",
+        "rationale": "Lane launch always stores projectKey (launch.ts:333-334, :483); PAN-1577 requires one project resolver, which projectConvIdSet already applies."
+      },
+      {
+        "summary": "Counts line is one aggregate 'roles · activities' line (e.g. '6 builders · 6 working').",
+        "rationale": "Matches the issue AC text and fits the 320 px rail; the review's per-role breakdown was illustrative."
+      },
+      {
+        "summary": "Per-issue activity collapse uses the newest entry's headline with a step count.",
+        "rationale": "The newest entry is the issue's current state; the merge-card rule needs emit-site issueIds and belongs to PAN-4306."
+      },
+      {
+        "summary": "laneActivityOf and SINGLETON_AGENT_IDS share one new contracts module, packages/contracts/src/conversation-rows.ts, tested in packages/contracts/src/__tests__.",
+        "rationale": "Both classify conversation rows for server and frontend; pure-function tests belong beside the function, and views.test.ts runs unchanged as regression proof."
+      },
+      {
+        "summary": "Hide the Git tab and stop merging useGitFeed; keep the hook and card files.",
+        "rationale": "git_operations has 0 rows ever; the 15 s poll feeds nothing; restoring it is a two-line change once a writer exists."
+      },
+      {
+        "summary": "Add the sessionFeed tests to root package.json test:frontend-subset.",
+        "rationale": "CI runs only listed frontend tests (conventions.md); none of the sessionFeed tests are listed today, so the new behavior would otherwise never run in CI."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The projection exceeds 25 files / 6 subsystems only through tests (11 files), three separately located doc files (each counted as its own subsystem), and root package.json for the CI subset. All source changes sit in components/sessionFeed plus one contracts module and two one-line consumers; the separable telemetry work was already split to PAN-4306. Further splitting would create siblings that all edit sessionFeed/types.ts and useMergedFeed.ts and serialize anyway.",
+      "canonicalFilename": "2026-09-28-PAN-4301-awareness-feed-show-transitions-instead-of-a-live-conversation-index-consolidate-gauntlet-lanes-into-one-card-per-run.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "contracts-conversation-rows",
+        "title": "Add shared conversation-row classifiers (singletons, lane activity) to @overdeck/contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4301",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/conversation-rows.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/conversation-rows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/conversation-rows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-rows.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-13",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "lanes-views-shared-activity",
+            "identity-singletons-from-contracts",
+            "gauntlet-run-selector",
+            "feed-entry-types",
+            "conversation-entries-lifecycle"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create packages/contracts/src/conversation-rows.ts exporting SINGLETON_AGENT_IDS (ReadonlySet: 'flywheel-orchestrator','sequencer-runner'), isSingletonConversation({name, issueId}) (case-insensitive match on name or issueId), type LaneActivity, LANE_STARTING_GRACE_MS = 3*60_000, interface LaneActivityInput and laneActivityOf(row, now) implementing D10 first-match-wins exactly as src/lib/lanes/views.ts:117 activityOf does today (archivedAt != null -> stopped; spawnError -> failed-to-start; sessionAlive -> needs-you if pendingInputCount>0, working if isWorking, else idle; status==='active' and created < grace ago -> starting; else stopped). Code is in the PRD. Add `export * from \"./conversation-rows\"` to packages/contracts/src/index.ts. Write the branch-by-branch test file."
+        },
+        "items": [
+          {
+            "id": "contracts-conversation-rows.ac1",
+            "title": "Given each D10 branch input, when laneActivityOf runs with an injected now, then it returns failed-to-start, needs-you, working, idle, starting or stopped in first-match order (archived beats spawnError, spawnError beats alive).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-conversation-rows.ac2",
+            "title": "Given an active row created 2 minutes before now, laneActivityOf returns starting; given 4 minutes before now, it returns stopped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-conversation-rows.ac3",
+            "title": "Given a row named sequencer-runner, or a row with issueId SEQUENCER-RUNNER, isSingletonConversation returns true; given conv-foo it returns false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-conversation-rows.ac4",
+            "title": "Given the contracts index, when the frontend imports laneActivityOf from @overdeck/contracts, then npm run typecheck passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lanes-views-shared-activity",
+        "title": "Make src/lib/lanes/views.ts use laneActivityOf from contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/views.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/views.test.ts src/lib/lanes/__tests__/views-pairing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "views.test.ts and views-pairing.test.ts pass unmodified",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Delete the local STARTING_GRACE_MS, LaneActivity type and private activityOf from src/lib/lanes/views.ts; import laneActivityOf and type LaneActivity from '@overdeck/contracts' and re-export the type (`export type { LaneActivity }`). Replace the two call sites (grep `activity: activityOf(`) with laneActivityOf({ ...row, ...liveness }, now) as shown in the PRD; EnrichedLiveness cannot overwrite archivedAt/spawnError/status/createdAt. Do not edit the tests."
+        },
+        "items": [
+          {
+            "id": "lanes-views-shared-activity.ac1",
+            "title": "Given the unmodified src/lib/lanes/__tests__/views.test.ts and views-pairing.test.ts, when they run, then both pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lanes-views-shared-activity.ac2",
+            "title": "Given src/lib/lanes/views.ts after the change, grep for `function activityOf` and `STARTING_GRACE_MS` returns no match and the file imports laneActivityOf from @overdeck/contracts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "identity-singletons-from-contracts",
+        "title": "Make src/lib/agents/identity.ts read SINGLETON_AGENT_IDS from contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "refactor",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/identity.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents-normalize-id.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agents-normalize-id.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Replace `const SINGLETON_AGENT_IDS = new Set(['flywheel-orchestrator', 'sequencer-runner']);` (identity.ts:49) with an import from '@overdeck/contracts'; keep the PAN-1866 explanatory comment beside the import. normalizeAgentId and isQualifiedAgentId are otherwise unchanged."
+        },
+        "items": [
+          {
+            "id": "identity-singletons-from-contracts.ac1",
+            "title": "Given src/lib/agents/identity.ts, it imports SINGLETON_AGENT_IDS from @overdeck/contracts and grep for `new Set(['flywheel-orchestrator'` returns no match in src/lib/agents.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identity-singletons-from-contracts.ac2",
+            "title": "Given normalizeAgentId('sequencer-runner'), when called, then it returns 'sequencer-runner' and tests/unit/lib/agents-normalize-id.test.ts passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-entry-types",
+        "title": "Add the gauntlet_run entry kind and new conversation/activity entry fields to sessionFeed types",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/types.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/BucketSection.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/useConversationFeed.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-14"
+          ],
+          "foundationFor": [
+            "conversation-entries-lifecycle",
+            "gauntlet-run-selector",
+            "gauntlet-run-card",
+            "feed-tab-rules",
+            "activity-per-issue-collapse",
+            "conversation-card-status-dot",
+            "sidebar-hidden-tabs",
+            "project-scope-by-conversation"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In types.ts add 'gauntlet_run' to SessionFeedEntryKind; add recencyAt, timestampLabel ('started'|'ended'|'active'), sessionAlive, agentState ('active'|'waiting'|'idle'), projectKey to ConversationSessionFeedEntry; add optional stepCount to ActivitySessionFeedEntry; add GauntletRunLane and GauntletRunSessionFeedEntry (fields exactly as in the PRD, LaneActivity imported from @overdeck/contracts) and add it to the SessionFeedEntry union. Keep the tree compiling: BucketSection renderEntry gets `case 'gauntlet_run': return null;`; SessionFeedSidebar navigateToFeedEntry gets the gauntlet_run case that pushes /conv/<orchestratorName ?? lanes[0].name>; mapConversationToFeedEntry fills the new required fields with the FR-1/FR-5 rules (WI-5 adds tests and row fields)."
+        },
+        "items": [
+          {
+            "id": "feed-entry-types.ac1",
+            "title": "Given the SessionFeedEntry union includes GauntletRunSessionFeedEntry, when npm run typecheck runs, then it passes with BucketSection renderEntry and navigateToFeedEntry both handling 'gauntlet_run'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-entry-types.ac2",
+            "title": "Given a gauntlet_run entry with orchestratorName 'conv-2884', when navigateToFeedEntry receives it, then it routes to /conv/conv-2884; with orchestratorName null it routes to the first lane's /conv/<name>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gauntlet-run-selector",
+        "title": "Add the pure groupGauntletRuns selector that builds one run entry per (projectKey, gauntletRun)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/gauntletRunEntries.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/gauntletRunEntries.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/gauntletRunEntries.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "gauntletRunEntries.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Touches only the new gauntletRunEntries.ts and its new test; no file overlaps any other item."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New gauntletRunEntries.ts exporting groupGauntletRuns(lanes, allRows, now): group lane rows by (projectKey ?? null, gauntletRun); per lane activity = laneActivityOf(row, now); counts line per FR-9 (role order builder, critic, verifier, play, orchestrator pluralised with s; then activity counts needs you, failed to start, working, idle, starting, stopped; joined ' · '); state per PRD step 3; latest event per FR-8 with the exact text formats in the PRD (report > failed start > end > launch on ties); orchestrator per D8; lane order per FR-12; anyAlive; laneConversationIds; id `gauntlet-run:<projectKey ?? '-'>:<run>`; timestamp = latest.at; issueId/workspaceId null. Return newest latest.at first. Never read lastActivityAt. Tests inject now."
+        },
+        "items": [
+          {
+            "id": "gauntlet-run-selector.ac1",
+            "title": "Given 6 working builder lanes in run india of project lexerra, when groupGauntletRuns runs, then it returns exactly one entry whose countsLine is '6 builders · 6 working'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-run-selector.ac2",
+            "title": "Given those six lanes with lastActivityAt advanced by 5 minutes and nothing else changed, when groupGauntletRuns runs again, then the entry timestamp is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-run-selector.ac3",
+            "title": "Given one lane with laneReport {status:'done', at:T}, when groupGauntletRuns runs, then latest.text contains that lane key and 'reported done' and timestamp equals T.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-run-selector.ac4",
+            "title": "Given one lane with pendingInputCount 1, when groupGauntletRuns runs, then countsLine contains '1 needs you' and state is 'needs-you'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-run-selector.ac5",
+            "title": "Given run india in lexerra and run india in overdeck, when groupGauntletRuns runs, then it returns two entries with different ids, and a critic with criticOfConversationId is ordered right after its builder.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-entries-lifecycle",
+        "title": "Date conversation entries by lifecycle facts, drop singletons, and route lane rows into run entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/useConversationFeed.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/useConversationFeed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/useConversationFeed.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useConversationFeed.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Extend ConversationFeedRow with the optional enriched-list fields listed in the PRD (status, endedAt, sessionAlive, isWorking, pendingInputCount, spawnError, projectKey, parent*, gauntletRun, laneKey, laneRole, laneIteration, laneReport, criticOfConversationId). mapConversationToFeedEntry: timestamp = endedAt when status==='ended' and endedAt set, else createdAt; timestampLabel ended/started; recencyAt = lastActivityAt ?? lastAttachedAt ?? createdAt (also lastMessageDate); sessionAlive; agentState per FR-5; projectKey. mapConversationsToFeedEntries(rows, now = Date.now()) drops archived and isSingletonConversation rows, maps root rows, and passes lane rows (gauntletRun && laneKey) to groupGauntletRuns. Replace the PAN-1556 lastActivityAt-timestamp tests with the lifecycle expectations in the PRD."
+        },
+        "items": [
+          {
+            "id": "conversation-entries-lifecycle.ac1",
+            "title": "Given a live row whose lastActivityAt is newer than createdAt, when mapped, then entry.timestamp equals createdAt and timestampLabel is 'started'; given an ended row, timestamp equals endedAt and timestampLabel is 'ended'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-entries-lifecycle.ac2",
+            "title": "Given a sequencer-runner row that is alive with a null title, when mapConversationsToFeedEntries runs, then no entry is produced for it (no 'No messages yet' card).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-entries-lifecycle.ac3",
+            "title": "Given six lane rows of run india, when mapConversationsToFeedEntries runs, then it produces zero conversation entries for them and exactly one gauntlet_run entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-entries-lifecycle.ac4",
+            "title": "Given sessionAlive with pendingInputCount 1, the entry agentState is 'waiting'; sessionAlive with isWorking, 'active'; not alive, 'idle'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gauntlet-run-card",
+        "title": "Render run entries with GauntletRunFeedCard, with on-expand lane details",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/GauntletRunFeedCard.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/GauntletRunFeedCard.test.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/BucketSection.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/GauntletRunFeedCard.test.tsx src/components/sessionFeed/__tests__/BucketSection.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "GauntletRunFeedCard.test.tsx and BucketSection.test.tsx pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-11",
+            "FR-12",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Touches the new GauntletRunFeedCard.tsx and its test plus BucketSection.tsx, which only feed-entry-types (a blocker) also edits."
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New GauntletRunFeedCard.tsx: collapsed rows (state dot with ConversationFeedCard tokens plus bg-destructive for failed; lucide Layers icon; title `${run.toUpperCase()} · ${projectKey ?? 'no project'}`; relative time of entry.timestamp; countsLine; `latest: ${latest.text}`; `launched from ${orchestratorTitle ?? orchestratorName}` when known). Main area button calls onSelect(entry.id); a separate expand button (data-testid gauntlet-run-expand, aria-expanded, aria-label Show lanes/Hide lanes) toggles the lane list. Lane rows (data-testid gauntlet-run-lane-<name>) navigate to /conv/<name> via history.pushState + popstate. useQuery(['lanes', projectKey, run]) fetches /api/lanes?run=<run> with enabled: expanded, staleTime 60_000, no refetchInterval; keep lanes with projectKey equal to the card's; show git facts and a muted archived list; on error show 'Lane details unavailable'. BucketSection renders the card for kind 'gauntlet_run'. No pill badges."
+        },
+        "items": [
+          {
+            "id": "gauntlet-run-card.ac1",
+            "title": "Given a collapsed run card for india/lexerra, when it renders, then it shows 'INDIA · lexerra', the counts line and the latest line, and contains no gauntlet-run-lane-* element.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-run-card.ac2",
+            "title": "Given the expand button is clicked, when the card re-renders, then it shows one gauntlet-run-lane-* row per lane and fetch is called exactly once with /api/lanes?run=india; collapsing and expanding again does not fetch a second time.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-run-card.ac3",
+            "title": "Given the /api/lanes response contains a lane from project overdeck, when the lexerra card is expanded, then that lane is not shown; given the fetch rejects, then the text 'Lane details unavailable' renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gauntlet-run-card.ac4",
+            "title": "Given BucketSection receives a gauntlet_run entry, when it renders, then GauntletRunFeedCard is rendered and clicking its main area calls onSelect.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-tab-rules",
+        "title": "Apply transition windows to All, a recency index to Chats, and drop the Git source from the merged feed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/useMergedFeed.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/useMergedFeed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/useMergedFeed.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useMergedFeed.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-10",
+            "FR-16",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Export FEED_WINDOW_MS = 24h. filterSessionFeedEntriesForTab(entries, tab, now = Date.now()) implements the switch in the PRD: all = activity + conversations with lifecycle timestamp in window + run entries with anyAlive or latest.at in window; chats = conversations with sessionAlive or recencyAt in window re-dated to recencyAt with timestampLabel 'active', plus visible run entries, sorted newest first; activity = activity only; git/files/comments = []. useMergedFeed stops importing/calling useGitFeed; isLoading/error come from conversations only. Update the hook test to stop mocking useGitFeed."
+        },
+        "items": [
+          {
+            "id": "feed-tab-rules.ac1",
+            "title": "Given now, when filterSessionFeedEntriesForTab('all') runs, then it drops a conversation whose lifecycle timestamp is 25 h old and keeps one 23 h old.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-tab-rules.ac2",
+            "title": "Given a run with anyAlive and a 3-day-old latest event, 'all' keeps it; given a stopped run of the same age, 'all' drops it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-tab-rules.ac3",
+            "title": "Given an alive conversation last active 3 days ago and an ended one last active 25 h ago, when 'chats' runs, then it keeps only the alive one, re-dated to recencyAt with timestampLabel 'active', sorted newest first.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-tab-rules.ac4",
+            "title": "Given useMergedFeed, when it renders, then it no longer calls useGitFeed and the hook test passes without a useGitFeed mock.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-per-issue-collapse",
+        "title": "Collapse per-issue activity entries into one card with a visible step count",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/useActivityEntryFeed.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/ActivityFeedCard.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/useActivityEntryFeed.test.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/ActivityFeedCard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/useActivityEntryFeed.test.ts src/components/sessionFeed/__tests__/ActivityFeedCard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useActivityEntryFeed.test.ts and ActivityFeedCard.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In createActivityEntryFeedSelector replace the review-kickoff-only filter (grep seenReviewKickoff) with the general per-issue collapse from the PRD: over the newest-first list, the first entry per lower-cased issueId is kept with stepCount 1 and each later entry for that issue increments it; entries without an issue pass through; then slice to MAX_ACTIVITY_ENTRY_FEED_ENTRIES. Keep the memo on the recentActivity reference. ActivityFeedCard appends ` · ${stepCount} steps` to the meta text when stepCount > 1. Update the PAN-1556 comment."
+        },
+        "items": [
+          {
+            "id": "activity-per-issue-collapse.ac1",
+            "title": "Given three entries for PAN-1 and one for PAN-2, when the selector runs, then it returns two issue entries and the PAN-1 entry carries the newest headline and stepCount 3.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-per-issue-collapse.ac2",
+            "title": "Given entries for 'pan-1' and 'PAN-1', the selector collapses them into one; given entries without an issueId, it keeps every one of them.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-per-issue-collapse.ac3",
+            "title": "Given the same recentActivity array reference twice, the selector returns the same result instance.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-per-issue-collapse.ac4",
+            "title": "Given stepCount 4, ActivityFeedCard renders '4 steps'; given stepCount 1, it renders no 'steps' text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-card-status-dot",
+        "title": "Render the conversation card dot from agentState and label its time",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/ConversationFeedCard.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/ConversationFeedCard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/ConversationFeedCard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationFeedCard.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Delete readAgentState and read entry.agentState. Render `${entry.timestampLabel} ${formatRelativeTime(entry.timestamp, now)}` inside <time dateTime={entry.timestamp}>. Add data-testid conversation-feed-status-dot and data-state={entry.agentState} to the dot span."
+        },
+        "items": [
+          {
+            "id": "conversation-card-status-dot.ac1",
+            "title": "Given agentState 'active', the dot renders with bg-info and data-state 'active'; 'waiting' renders bg-warning; 'idle' renders bg-muted-foreground/60.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-card-status-dot.ac2",
+            "title": "Given timestampLabel 'ended', the card's time text starts with 'ended'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sidebar-hidden-tabs",
+        "title": "Hide the Git, Files and Comments tabs in the Awareness rail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "SessionFeedSidebar.test.tsx passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. TABS becomes All, Chats, Activity. isSessionFeedTab accepts only all|chats|activity so readStoredTab falls back to 'all' for stored git/files/comments. Remove the isStubTab render branch, StubTabEmptyState, isStubTab and StubSessionFeedTab (orphaned); narrow FeedTabContent's tab prop to 'all'|'chats'|'activity'. Update tests that referenced the removed tabs. Also change FeedTabContent's isEmpty (grep `const isEmpty = tab === 'all'`) to scopedEntries.length === 0 for every tab, because after feed-tab-rules the All tab filters by the 24 h window."
+        },
+        "items": [
+          {
+            "id": "sidebar-hidden-tabs.ac1",
+            "title": "Given the Awareness rail renders, when the tab bar is inspected, then it contains exactly the tabs All, Chats and Activity and no Git, Files or Comments tab.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-hidden-tabs.ac2",
+            "title": "Given localStorage overdeck.ui.sessionFeedSidebarTab is 'git', when SessionFeedSidebar mounts, then the All tab is selected.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-hidden-tabs.ac3",
+            "title": "Given the All tab's scoped, filtered entries are empty while unfiltered entries exist, when the feed renders, then the session-feed-empty-all empty state renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-scope-by-conversation",
+        "title": "Keep the selected project's conversations and run cards in Project scope",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx src/components/CommandDeck/CommandDeck.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SessionFeedSidebar.test.tsx and CommandDeck.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Add prop projectConversationIds?: ReadonlySet<number> to SessionFeedSidebar, effective only when scopeSwitcher && scope==='project', passed to FeedTabContent as conversationIds. Replace the keep predicate with the PRD's After block (systemWide; unscoped; no filter; issue in project; conversation id in set; run with any lane id in set) and filter when unscoped || idSet || conversationIds. In CommandDeck/index.tsx pass projectConversationIds={isNoProject ? undefined : projectConvIdSet} (the memoized set computed with resolveEffectiveProjectKey). Do not add a second project resolver."
+        },
+        "items": [
+          {
+            "id": "project-scope-by-conversation.ac1",
+            "title": "Given Project scope with projectIssueIds ['PAN-1'] and projectConversationIds {10, 20}, when the feed renders, then an issue-less conversation with id 10 created within the 24 h window renders and one with id 30 does not.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-scope-by-conversation.ac2",
+            "title": "Given the same scope, a run card whose laneConversationIds include 20 renders, a run card with lanes [40] does not, and system-wide activity still renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-scope-by-conversation.ac3",
+            "title": "Given the Command Deck with a selected project, when it mounts SessionFeedSidebar, then it passes projectConversationIds equal to projectConvIdSet (undefined for the No-project bucket).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-subset-feed-tests",
+        "title": "Add the sessionFeed tests to the CI frontend test subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e 'const s=require(\"./package.json\").scripts[\"test:frontend-subset\"]; for (const f of [\"useConversationFeed.test.ts\",\"gauntletRunEntries.test.ts\",\"GauntletRunFeedCard.test.tsx\",\"useMergedFeed.test.ts\",\"useActivityEntryFeed.test.ts\",\"ActivityFeedCard.test.tsx\",\"ConversationFeedCard.test.tsx\",\"SessionFeedSidebar.test.tsx\"]) if (!s.includes(\"sessionFeed/__tests__/\"+f)) { console.error(\"missing \"+f); process.exit(1) }'",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the node check exits 0 with no 'missing' output",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Append src/components/sessionFeed/__tests__/{useConversationFeed.test.ts, gauntletRunEntries.test.ts, GauntletRunFeedCard.test.tsx, useMergedFeed.test.ts, useActivityEntryFeed.test.ts, ActivityFeedCard.test.tsx, ConversationFeedCard.test.tsx, SessionFeedSidebar.test.tsx} to the path list in root package.json scripts.test:frontend-subset (paths relative to src/dashboard/frontend)."
+        },
+        "items": [
+          {
+            "id": "ci-subset-feed-tests.ac1",
+            "title": "Given root package.json, when the node check in verify_commands runs, then it exits 0 because test:frontend-subset contains all eight sessionFeed test paths.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset-feed-tests.ac2",
+            "title": "Given the updated script, when npm --prefix ./src/dashboard/frontend run test runs those eight paths, then every file exists and passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-awareness-feed",
+        "title": "Document the Awareness feed rules, run cards and tabs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4301",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "reference/lanes.mdx",
+            "concepts.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-6",
+            "FR-12",
+            "FR-13",
+            "FR-15",
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. docs/DASHBOARD-ARCHITECTURE.md: add '## Awareness feed' with the content listed in the PRD (scopes and tabs, sources, All = transitions in a 24 h window, Chats = recency index, run cards per (projectKey, gauntletRun) with /api/lanes?run= on expand, per-issue collapse with step count, singleton exclusion, Project-scope rule, activity.entry = news vs activity.detailed = telemetry with PAN-4306). reference/lanes.mdx: under '## Derived state' add '### In the Awareness rail' (grouping, counts line, latest-event time rule, click/expand, nothing stored, laneActivityOf in @overdeck/contracts is the single D10 rule). concepts.mdx line 19: extend the Awareness rail bullet with the All/Chats/Activity tabs, All listing what changed, and one card per gauntlet run."
+        },
+        "items": [
+          {
+            "id": "docs-awareness-feed.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, it contains a '## Awareness feed' section that states All is dated by createdAt/endedAt and lane reports rather than transcript activity, and names GET /api/lanes?run= as fetched only on expand.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-awareness-feed.ac2",
+            "title": "Given reference/lanes.mdx, it contains '### In the Awareness rail' describing one card per project and run key whose time is the latest report, end or launch, and names laneActivityOf in @overdeck/contracts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-awareness-feed.ac3",
+            "title": "Given concepts.mdx, the Awareness rail bullet names the All, Chats and Activity tabs and says a gauntlet run shows as one card.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-conversation-rows",
+        "to": "lanes-views-shared-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-conversation-rows",
+        "to": "identity-singletons-from-contracts",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-conversation-rows",
+        "to": "feed-entry-types",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-conversation-rows",
+        "to": "gauntlet-run-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-entry-types",
+        "to": "gauntlet-run-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-entry-types",
+        "to": "conversation-entries-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "gauntlet-run-selector",
+        "to": "conversation-entries-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-entry-types",
+        "to": "gauntlet-run-card",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-entry-types",
+        "to": "feed-tab-rules",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-entry-types",
+        "to": "activity-per-issue-collapse",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-entry-types",
+        "to": "conversation-card-status-dot",
+        "type": "blocks"
+      },
+      {
+        "from": "feed-entry-types",
+        "to": "sidebar-hidden-tabs",
+        "type": "blocks"
+      },
+      {
+        "from": "sidebar-hidden-tabs",
+        "to": "project-scope-by-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "gauntlet-run-selector",
+        "to": "ci-subset-feed-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "gauntlet-run-card",
+        "to": "ci-subset-feed-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-per-issue-collapse",
+        "to": "ci-subset-feed-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "gauntlet-run-card",
+        "to": "docs-awareness-feed",
+        "type": "informs"
+      },
+      {
+        "from": "feed-tab-rules",
+        "to": "docs-awareness-feed",
+        "type": "informs"
+      },
+      {
+        "from": "project-scope-by-conversation",
+        "to": "docs-awareness-feed",
+        "type": "informs"
+      },
+      {
+        "from": "feed-entry-types",
+        "to": "project-scope-by-conversation",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

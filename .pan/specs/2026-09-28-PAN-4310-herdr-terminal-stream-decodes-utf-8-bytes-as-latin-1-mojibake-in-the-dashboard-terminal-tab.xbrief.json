@@ -1,0 +1,209 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T13:30:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4310: Herdr terminal stream decodes UTF-8 bytes as Latin-1: mojibake in the dashboard Terminal tab",
+    "updated": "2026-09-28T13:31:22.596Z"
+  },
+  "plan": {
+    "id": "pan-4310",
+    "title": "Herdr terminal stream decodes UTF-8 bytes as Latin-1: mojibake in the dashboard Terminal tab",
+    "status": "proposed",
+    "uid": "57858433-c663-4256-95dc-489fa08e2987",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-28T13:30:26Z",
+    "updated": "2026-09-28T13:31:22.596Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4310",
+        "label": "PAN-4310",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4310.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "terminal",
+      "utf-8",
+      "bug",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "decodeTerminalRecord() in src/lib/terminal-backends/herdr-stream.ts (lines 65-67) decodes each Herdr terminal.frame's base64 bytes with Buffer#toString('binary') (Latin-1). The string flows unchanged through HerdrTerminalProcess.pump() in src/dashboard/server/services/terminal-service.ts to the /ws/terminal client, so every non-ASCII character (e.g. U+25CF, UTF-8 E2 97 8F) renders as mojibake in the dashboard Terminal tab on the Herdr backend. Introduced in 48c0c6ce2d9 (PAN-3917 W8). The tmux path already decodes UTF-8.",
+      "Proposal": "Decode frame bytes as UTF-8 with a streaming TextDecoder held as an optional decoder field on the per-stream TerminalDecodeState (created lazily). A full (snapshot) frame assigns a fresh decoder before decoding. Incremental frames that decode to the empty string emit no output frame. The record.text branch is unchanged. Add unit tests for split characters, snapshot reset, multi-byte/emoji, and per-stream decoder isolation, and document the UTF-8 decoding contract in the Herdr wire facts section of docs/TERMINAL-BACKENDS.md.",
+      "NonGoals": "- No change to the tmux / node-pty / Bun PTY terminal path\n- No change to the TerminalFrame type, terminal-service.ts, the /ws/terminal protocol, or the frontend\n- No flush of a dangling partial UTF-8 sequence at stream end\n- No change to the record.text branch or its interaction with pending decoder bytes\n- No change to the control direction (terminal.input keeps sending text)\n- No branching on the record's encoding field ('ansi' names escape sequences, not a charset)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Hold the decoder as an optional `decoder?: TextDecoder` field on TerminalDecodeState, created lazily with ??=.",
+        "rationale": "Keeps existing `{ cols, rows }` test literals and startStream's state initializer valid, so pre-existing tests pass unchanged; the state object is already per stream."
+      },
+      {
+        "summary": "Use the global TextDecoder rather than string_decoder.StringDecoder.",
+        "rationale": "TextDecoder is already used under src/lib (deacon-event-client.ts, conversation-message.ts) and by BunPtyProcess in terminal-service.ts; StringDecoder is the stated fallback if typecheck rejects it."
+      },
+      {
+        "summary": "Suppress output frames whose decoded data is empty; always emit snapshots.",
+        "rationale": "In-repo precedent BunPtyProcess.emitData drops empty text; an empty snapshot is a real blank-screen render."
+      },
+      {
+        "summary": "Do not flush the decoder at stream end.",
+        "rationale": "A dangling partial would flush only to one U+FFFD, and the EOF path never passes through decodeTerminalRecord; plumbing it adds complexity for no visible value."
+      },
+      {
+        "summary": "Invalid UTF-8 becomes U+FFFD (non-fatal decoder) and never throws.",
+        "rationale": "Matches the existing rule in startStream that a corrupt line must not tear down a live terminal."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-28-PAN-4310-herdr-terminal-stream-decodes-utf-8-bytes-as-latin-1-mojibake-in-the-dashboard-terminal-tab.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "utf8-frame-decode",
+        "title": "Decode Herdr terminal frame bytes as streaming UTF-8",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T13:30:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/terminal-backends/herdr-stream.ts",
+            "tests/unit/lib/terminal-backends/herdr-stream.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/terminal-backends/herdr-stream.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "herdr-stream.test.ts passes, including the new split-character, snapshot-reset, multi-byte/emoji, and per-stream-decoder tests",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/terminal-backends/herdr-stream.ts: add optional `decoder?: TextDecoder` to TerminalDecodeState; add a `decodeFrameData(record, state)` helper that returns record.text ?? '' when bytes is undefined, else `(state.decoder ??= new TextDecoder('utf-8')).decode(Buffer.from(record.bytes, 'base64'), { stream: true })`; in decodeTerminalRecord, for a full frame assign `state.decoder = new TextDecoder('utf-8')` BEFORE decoding and always return the snapshot; for incremental frames keep the size-frame logic and push an output frame only when decoded data is non-empty. Remove the Buffer#toString('binary') call. Update the decodeTerminalRecord doc comment and add one line to the module header saying bytes is base64 UTF-8 and encoding 'ansi' is not a charset. Add the four tests listed in PRD WI-1 step 4 using explicit byte-array fixtures. Do not modify terminal-service.ts, types.ts, or the frontend. Do not change assertions of existing tests."
+        },
+        "items": [
+          {
+            "id": "utf8-frame-decode.ac1",
+            "title": "Given one decode state, when decodeTerminalRecord receives an incremental frame with bytes [E2] and then one with bytes [97 8F], then it returns [] for the first and [{kind:'output', data:'●'}] for the second",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "utf8-frame-decode.ac2",
+            "title": "Given a decode state holding the partial byte E2, when a full frame with bytes 'hello' arrives, then it returns a snapshot whose data is exactly 'hello' (no leading U+FFFD), and a following frame [E2 97 8F] returns output '●'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "utf8-frame-decode.ac3",
+            "title": "Given two observeTerminal streams from the fake spawn, when stream 0 receives [E2] then [97 8F] and stream 1 receives only [97 8F], then stream 0 emits output '●' and stream 1 emits '\\uFFFD\\uFFFD', proving each stream has its own decoder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "utf8-frame-decode.ac4",
+            "title": "Given the Herdr backend and an agent pane showing Claude Code's UI, when the Terminal tab is opened in an isolated Playwright browser, then the xterm buffer renders '●', '─' and '⎿' and contains no 'â' or 'Â·' mojibake",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "utf8-frame-decode.ac5",
+            "title": "When npx vitest run tests/unit/lib/terminal-backends/herdr-stream.test.ts, npm run typecheck and npm run lint run, each exits 0 and the pre-existing herdr-stream tests pass with their assertions unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-utf8-contract",
+        "title": "Document the Herdr terminal stream UTF-8 decoding contract in docs/TERMINAL-BACKENDS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T13:30:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4310",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"TextDecoder\" docs/TERMINAL-BACKENDS.md",
+            "grep -n \"PAN-4310\" docs/TERMINAL-BACKENDS.md"
+          ],
+          "expected_outputs": [
+            "grep finds the TextDecoder sentence inside the '## Herdr wire facts (v0.9.1, protocol 22)' section",
+            "grep finds the PAN-4310 reference in the same bullet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In docs/TERMINAL-BACKENDS.md, section '## Herdr wire facts (v0.9.1, protocol 22)', extend the bullet beginning '- Terminal streams are NDJSON `terminal.frame` records' (or add a sibling bullet directly after it) with the PRD's text: bytes is base64 of UTF-8 terminal output; encoding 'ansi' names escape sequences, not a charset; herdr-stream.ts decodes with one streaming TextDecoder per stream so a split character decodes whole; a full frame starts a fresh decoder; an incremental frame that decodes to nothing emits no output frame; invalid bytes become U+FFFD; decoding as Latin-1 ('binary') was the PAN-4310 mojibake bug. Touch no other file."
+        },
+        "items": [
+          {
+            "id": "docs-utf8-contract.ac1",
+            "title": "When a reader opens the Herdr wire facts section of docs/TERMINAL-BACKENDS.md, it shows that terminal.frame bytes are base64 UTF-8 and that encoding 'ansi' is not a charset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-utf8-contract.ac2",
+            "title": "When a reader opens the same section, it shows that herdr-stream.ts decodes with one streaming TextDecoder per stream, that a full frame starts a fresh decoder, and that invalid bytes become U+FFFD, citing PAN-4310",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
