@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T14:03:25.969Z",
+  "updated": "2026-09-28T14:03:38.294Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "e2e-ws-auth-spec.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T14:03:25.969Z"
+    },
+    "e2e-ws-auth-spec.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:38.294Z"
     }
   }
 }
