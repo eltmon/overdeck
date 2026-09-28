@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:33:07.759Z",
+  "updated": "2026-09-28T01:33:22.166Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,11 @@
     "cleanup-route.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T01:33:07.758Z"
+    },
+    "close-out-section": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:33:22.166Z"
     }
   }
 }
