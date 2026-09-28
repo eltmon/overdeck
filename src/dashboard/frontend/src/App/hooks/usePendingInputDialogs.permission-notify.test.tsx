@@ -35,20 +35,33 @@ function render(rows: PermissionNotificationRow[], onOpen = vi.fn()) {
   });
 }
 
+/** Desktop notifications created, as their titles. */
+const notifications: Array<{ title: string; options?: NotificationOptions }> = [];
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(START);
   toastInfo.mockReset();
+  notifications.length = 0;
+  class FakeNotification {
+    static permission = 'granted';
+    onclick: (() => void) | null = null;
+    constructor(title: string, options?: NotificationOptions) { notifications.push({ title, options }); }
+    close(): void {}
+  }
+  vi.stubGlobal('Notification', FakeNotification);
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('usePendingInputDialogs permission notifications', () => {
   it('notifies once on first sight', () => {
     const { rerender } = render(pending);
     rerender({ feed: [...pending] });
+    expect(notifications.map((n) => n.title)).toEqual(['Permission needed']);
     expect(toastInfo).toHaveBeenCalledTimes(1);
     expect(toastInfo).toHaveBeenCalledWith('Permission needed', expect.objectContaining({
       description: 'Orca study · Subagent: Research Orca onboarding flow · Bash',
@@ -68,6 +81,7 @@ describe('usePendingInputDialogs permission notifications', () => {
     expect(toastInfo).toHaveBeenCalledTimes(3);
     await vi.advanceTimersByTimeAsync(60 * 60_000);
     expect(toastInfo).toHaveBeenCalledTimes(3);
+    expect(notifications.map((n) => n.title)).toEqual(['Permission needed', 'Permission needed', 'Permission needed']);
   });
 
   it('times reminders from since, skipping ones already past', async () => {
@@ -83,6 +97,7 @@ describe('usePendingInputDialogs permission notifications', () => {
     rerender({ feed: [{ name: '20260927-3978', title: 'Orca study' }] });
     await vi.advanceTimersByTimeAsync(60 * 60_000);
     expect(toastInfo).toHaveBeenCalledTimes(1);
+    expect(notifications).toHaveLength(1);
   });
 
   it('the Answer action opens the conversation', () => {
