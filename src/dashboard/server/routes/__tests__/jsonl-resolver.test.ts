@@ -804,3 +804,52 @@ describe('resolveJsonlPath / resolvePiSessionPath — pi agents (PAN-1908)', () 
     expect(path).toBe(join(agentDir, TRANSCRIPT_OLD));
   });
 });
+
+describe('Prime Agent transcripts (PAN-3668 WI-18)', () => {
+  async function primeAgent(): Promise<{ agentDir: string; sessionFile: string }> {
+    const agentDir = join(agentsDir, AGENT_ID);
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({ id: AGENT_ID, harness: 'prime-agent', workspace: WORKSPACE_PATH, model: 'gpt-5.5' }));
+    const sessionFile = join(agentDir, 'prime-sessions', '01a0.jsonl');
+    await mkdir(join(agentDir, 'prime-sessions'), { recursive: true });
+    await writeFile(sessionFile, '{"type":"session","version":3}\n');
+    return { agentDir, sessionFile };
+  }
+
+  it('watches the agent prime-sessions directory', async () => {
+    await primeAgent();
+    await expect(listAgentTranscriptWatchRoots(AGENT_ID, WORKSPACE_PATH, { agentsDirOverride: agentsDir }))
+      .resolves.toEqual([join(agentsDir, AGENT_ID, 'prime-sessions')]);
+  });
+
+  it('falls back to the prime-agent-session-file pointer when sessions.json has no path', async () => {
+    const { agentDir, sessionFile } = await primeAgent();
+    await writeFile(join(agentDir, 'prime-agent-session-file'), `${sessionFile}\n`);
+
+    const candidates = await listAgentTranscriptCandidates(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    });
+
+    expect(candidates).toEqual([{ kind: 'prime-agent', path: sessionFile, model: 'gpt-5.5' }]);
+  });
+
+  it('prefers the path the host recorded in sessions.json', async () => {
+    const { agentDir, sessionFile } = await primeAgent();
+    await writeFile(join(agentDir, 'sessions.json'), `${JSON.stringify({
+      sessionId: 'prime-session-1',
+      at: new Date().toISOString(),
+      source: 'prime-agent-host',
+      harness: 'prime-agent',
+      path: sessionFile,
+    })}\n`);
+
+    const candidates = await listAgentTranscriptCandidates(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    });
+
+    expect(candidates[0]).toMatchObject({ kind: 'prime-agent', path: sessionFile });
+  });
+});

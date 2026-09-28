@@ -354,7 +354,445 @@
     "verification-gauntlet.ac3": {
       "status": "completed",
       "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T02:08:38.708Z",
+      "doneAt": "2026-09-26T02:34:54.028Z"
+    },
+    "runtime-name-policy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T02:35:07.059Z",
+      "doneAt": "2026-09-26T02:48:16.285Z"
+    },
+    "lib-harness-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T02:48:22.979Z",
+      "doneAt": "2026-09-26T03:02:37.913Z"
+    },
+    "cli-harness-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:02:40.067Z",
+      "doneAt": "2026-09-26T03:10:20.240Z"
+    },
+    "frontend-harness-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:10:30.461Z",
+      "doneAt": "2026-09-26T03:15:49.752Z"
+    },
+    "prime-storage": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:18:35.390Z",
+      "doneAt": "2026-09-26T03:20:52.281Z"
+    },
+    "prime-provider-map": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:20:54.616Z",
+      "doneAt": "2026-09-26T03:27:05.433Z"
+    },
+    "rpc-transport": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:27:07.710Z",
+      "doneAt": "2026-09-26T03:29:45.105Z"
+    },
+    "host-transport": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:29:55.298Z",
+      "doneAt": "2026-09-26T03:40:15.344Z"
+    },
+    "daemon-reaper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:40:23.077Z",
+      "doneAt": "2026-09-26T03:43:08.848Z"
+    },
+    "prime-host": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:43:16.175Z",
+      "doneAt": "2026-09-26T03:52:56.513Z"
+    },
+    "work-launch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T03:53:02.485Z",
+      "doneAt": "2026-09-26T04:10:40.743Z"
+    },
+    "planning-launch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:10:46.973Z",
+      "doneAt": "2026-09-26T04:12:37.678Z"
+    },
+    "prime-conversations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:12:38.830Z",
+      "doneAt": "2026-09-26T04:17:37.454Z"
+    },
+    "prime-runtime-adapter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:17:38.393Z",
+      "doneAt": "2026-09-26T04:20:58.120Z"
+    },
+    "recovery-stop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:21:04.143Z",
+      "doneAt": "2026-09-26T04:27:46.802Z"
+    },
+    "context-preview": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:27:47.623Z",
+      "doneAt": "2026-09-26T04:31:13.666Z"
+    },
+    "transcript-feed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:31:14.868Z",
+      "doneAt": "2026-09-26T04:45:57.647Z"
+    },
+    "cost-ingest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:45:58.691Z",
+      "doneAt": "2026-09-26T04:50:59.071Z"
+    },
+    "doctor-prereq": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:51:00.078Z",
+      "doneAt": "2026-09-26T04:54:35.932Z"
+    },
+    "harness-no-loss-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:54:50.646Z",
+      "doneAt": "2026-09-26T04:57:51.475Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T04:57:52.559Z",
+      "doneAt": "2026-09-26T05:00:04.853Z"
+    },
+    "live-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3668",
+      "claimedAt": "2026-09-26T05:00:06.309Z",
+      "doneAt": "2026-09-26T05:55:48.519Z"
+    },
+    "contracts-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:36:37.221Z"
+    },
+    "contracts-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:37:37.129Z"
+    },
+    "contracts-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:37:49.012Z"
+    },
+    "runtime-name-policy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:38:00.397Z"
+    },
+    "runtime-name-policy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:38:12.342Z"
+    },
+    "runtime-name-policy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:38:24.174Z"
+    },
+    "lib-harness-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:38:37.215Z"
+    },
+    "lib-harness-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:38:49.141Z"
+    },
+    "lib-harness-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:39:00.539Z"
+    },
+    "cli-harness-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:39:13.828Z"
+    },
+    "cli-harness-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:53:39.117Z"
+    },
+    "cli-harness-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:39:43.164Z"
+    },
+    "frontend-harness-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:39:57.865Z"
+    },
+    "frontend-harness-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:40:12.134Z"
+    },
+    "frontend-harness-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:40:27.180Z"
+    },
+    "host-transport.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:40:42.351Z"
+    },
+    "host-transport.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:40:56.079Z"
+    },
+    "host-transport.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:41:10.354Z"
+    },
+    "host-transport.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:41:23.849Z"
+    },
+    "prime-storage.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:41:37.237Z"
+    },
+    "prime-storage.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:41:51.001Z"
+    },
+    "prime-storage.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:42:02.902Z"
+    },
+    "prime-provider-map.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:42:16.856Z"
+    },
+    "prime-provider-map.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:42:30.766Z"
+    },
+    "prime-provider-map.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:42:43.736Z"
+    },
+    "prime-provider-map.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:42:56.828Z"
+    },
+    "rpc-transport.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:43:09.882Z"
+    },
+    "rpc-transport.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:43:22.575Z"
+    },
+    "rpc-transport.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:43:35.389Z"
+    },
+    "rpc-transport.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:43:47.919Z"
+    },
+    "daemon-reaper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:44:00.280Z"
+    },
+    "daemon-reaper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:44:11.314Z"
+    },
+    "daemon-reaper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:44:22.613Z"
+    },
+    "prime-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:44:33.434Z"
+    },
+    "prime-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:44:44.204Z"
+    },
+    "prime-host.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:44:55.109Z"
+    },
+    "prime-host.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:45:07.231Z"
+    },
+    "prime-host.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:45:19.695Z"
+    },
+    "work-launch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:45:30.048Z"
+    },
+    "work-launch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:45:41.675Z"
+    },
+    "work-launch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:45:54.206Z"
+    },
+    "work-launch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:46:08.506Z"
+    },
+    "planning-launch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:46:20.953Z"
+    },
+    "planning-launch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:46:33.569Z"
+    },
+    "prime-conversations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:46:46.645Z"
+    },
+    "prime-conversations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:46:59.064Z"
+    },
+    "prime-conversations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:47:11.574Z"
+    },
+    "prime-conversations.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:47:23.815Z"
+    },
+    "prime-runtime-adapter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:47:35.730Z"
+    },
+    "prime-runtime-adapter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:47:47.529Z"
+    },
+    "prime-runtime-adapter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:47:59.476Z"
+    },
+    "prime-runtime-adapter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:48:10.968Z"
+    },
+    "recovery-stop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:48:24.821Z"
+    },
+    "recovery-stop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:48:40.103Z"
+    },
+    "context-preview.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:48:53.554Z"
+    },
+    "context-preview.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:49:06.356Z"
+    },
+    "context-preview.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:49:19.112Z"
+    },
+    "transcript-feed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:49:31.629Z"
+    },
+    "transcript-feed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:49:44.298Z"
+    },
+    "transcript-feed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:49:57.509Z"
+    },
+    "transcript-feed.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:50:11.261Z"
+    },
+    "cost-ingest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:50:26.721Z"
+    },
+    "cost-ingest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:50:40.407Z"
+    },
+    "cost-ingest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:50:53.826Z"
+    },
+    "doctor-prereq.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:51:07.034Z"
+    },
+    "doctor-prereq.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:51:19.134Z"
+    },
+    "doctor-prereq.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:51:31.711Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:51:44.601Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:51:57.393Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:52:09.974Z"
+    },
+    "harness-no-loss-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:52:22.840Z"
+    },
+    "harness-no-loss-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:52:36.553Z"
+    },
+    "live-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:52:50.471Z"
+    },
+    "live-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:53:04.310Z"
+    },
+    "live-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-26T05:53:17.556Z"
     }
   },
-  "updated": "2026-09-19T00:29:15.869084Z"
+  "updated": "2026-09-26T05:55:48.520Z"
 }

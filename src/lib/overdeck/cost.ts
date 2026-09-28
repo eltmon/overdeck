@@ -19,6 +19,7 @@ import { getOverdeckHome } from '../paths.js';
 import { deriveTieredAgentCostRole } from '../agents/tier-metrics.js';
 import { recordSkipVerdict } from '../costs/skip-cache.js';
 import { collectCodexCostEvents } from '../costs/codex-collector.js';
+import { collectPrimeAgentCostEvents } from '../costs/prime-agent-collector.js';
 export { collectCodexCostEvents, type SkipVerdictEntry } from '../costs/codex-collector.js';
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
@@ -510,7 +511,7 @@ export class CostWriter extends Context.Service<
     readonly record: (event: CostEvent, opts?: { dryRun?: boolean }) => Effect.Effect<boolean, CostIngestError>;
     // Catch-up sweep (PAN-1935: pi/codex sweep lands here)
     readonly reconcile: (opts?: {
-      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'wal';
+      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'prime-agent' | 'wal';
       dryRun?: boolean;
       extraRoots?: string[];
       extraRootSpecs?: CostReconcileExtraRoot[];
@@ -605,7 +606,7 @@ export const CostWriterLive = Layer.effect(
     // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
     const reconcile = (opts?: {
-      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'wal';
+      source?: 'claude' | 'ohmypi' | 'codex' | 'acp' | 'prime-agent' | 'wal';
       dryRun?: boolean;
       extraRoots?: string[];
       extraRootSpecs?: CostReconcileExtraRoot[];
@@ -624,7 +625,25 @@ export const CostWriterLive = Layer.effect(
           latestEventTs: null,
           warnings: [],
         };
-        if (source !== 'ohmypi' && source !== 'codex') return empty;
+        if (source !== 'ohmypi' && source !== 'codex' && source !== 'prime-agent') return empty;
+        if (source === 'prime-agent') {
+          // PAN-3668 D16: Prime session JSONL under agents/*/prime-sessions/.
+          const collected = yield* Effect.promise(() => collectPrimeAgentCostEvents());
+          let imported = 0;
+          let duplicatesSkipped = 0;
+          let earliestEventTs: string | null = null;
+          let latestEventTs: string | null = null;
+          for (const event of collected.events) {
+            if (yield* record(event, { dryRun: opts?.dryRun })) {
+              imported++;
+              const iso = event.ts.toISOString();
+              if (earliestEventTs == null || iso < earliestEventTs) earliestEventTs = iso;
+              if (latestEventTs == null || iso > latestEventTs) latestEventTs = iso;
+            } else duplicatesSkipped++;
+          }
+          return { imported, cacheSkipped: 0, skipped: collected.skipped, sessionsScanned: collected.scanned,
+            eventsImported: imported, duplicatesSkipped, errors: collected.errors, earliestEventTs, latestEventTs, warnings: [] };
+        }
         if (source === 'codex') {
           const collected = yield* Effect.promise(() => collectCodexCostEvents(opts));
           let imported = 0;

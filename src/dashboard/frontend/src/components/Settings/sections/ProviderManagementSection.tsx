@@ -55,6 +55,7 @@ const HARNESS_LABELS: Record<Harness, string> = {
   opencode: 'OpenCode',
   'kimi-code': 'Kimi Code',
   muse: 'Muse Code',
+  'prime-agent': 'Prime Agent',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
@@ -77,15 +78,23 @@ function harnessLabel(harness: Harness): string {
 }
 
 /**
+ * Providers Prime Agent can reach with credentials Overdeck resolves (the
+ * provider map in src/lib/prime-agent/provider-map.ts, PAN-3668).
+ */
+const PRIME_AGENT_PROVIDERS: ReadonlySet<Provider | 'openrouter'> = new Set(['anthropic', 'openai', 'google', 'kimi', 'minimax', 'openrouter', 'zai', 'mimo']);
+
+/**
  * Harness choices offered for a provider. `acp` and `kimi-code` are Kimi-only
  * at the policy gate (src/lib/harness-policy.ts), so offering them on another
- * provider would write a config that fails at every spawn.
+ * provider would write a config that fails at every spawn. `prime-agent` is
+ * offered only for providers Prime Agent has a credential mapping for.
  */
 function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
   if (provider === 'opencode' || provider === 'opencode-go') return ['opencode'];
   if (provider === 'meta') return ['muse'];
   const shared: Harness[] = ['claude-code', 'ohmypi', 'codex'];
-  return provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
+  const options: Harness[] = provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
+  return PRIME_AGENT_PROVIDERS.has(provider) ? [...options, 'prime-agent'] : options;
 }
 
 /**

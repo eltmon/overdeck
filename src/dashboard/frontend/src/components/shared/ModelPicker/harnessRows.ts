@@ -24,11 +24,12 @@ import type { Harness } from './ModelPicker';
 
 export const KIMI_NATIVE_EFFORT_LEVELS = ['low', 'high', 'max'] as const;
 
-const HARNESS_ROW_LABELS = {
+export const HARNESS_ROW_LABELS = {
   'claude-code': 'Claude Code',
   'kimi-code': 'Kimi Code CLI',
   muse: 'Muse Code',
   acp: 'ACP (Kimi Code)',
+  'prime-agent': 'Prime Agent',
 } as const;
 
 type RowBase = {

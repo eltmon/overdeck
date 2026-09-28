@@ -22,6 +22,7 @@ import {
 import {
   OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON,
   POLICY_RUNTIME_NAMES,
+  PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON,
 } from '../../../../../src/lib/harness-policy.js';
 import type { AuthMode } from '../../../../../src/lib/subscription-types.js';
 
@@ -84,6 +85,19 @@ describe('buildHarnessPolicyDecisions', () => {
     for (const model of [ANTHROPIC_MODEL, OPENAI_MODEL]) {
       expect(Object.keys(decisions[model] ?? {}).sort()).toEqual([...POLICY_RUNTIME_NAMES].sort());
     }
+  });
+
+  it('AC-2(PAN-3668): serves a prime-agent decision that carries the Anthropic subscription ToS block', async () => {
+    expect(POLICY_RUNTIME_NAMES).toContain('prime-agent');
+
+    const subscription = await buildHarnessPolicyDecisions([ANTHROPIC_MODEL], authModeResolver('subscription'));
+    expect(subscription[ANTHROPIC_MODEL]?.['prime-agent']).toEqual({
+      allowed: false,
+      reason: PRIME_AGENT_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON,
+    });
+
+    const apiKey = await buildHarnessPolicyDecisions([ANTHROPIC_MODEL], authModeResolver('api-key'));
+    expect(apiKey[ANTHROPIC_MODEL]?.['prime-agent']).toEqual({ allowed: true });
   });
 
   it('ac3a: allows ohmypi for Anthropic + api-key (no ToS bar engaged)', async () => {
