@@ -1,0 +1,640 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T12:11:55Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4290: Ended agent sessions should show their outcome (Merged, Review approved, Stopped by close-out) instead of a bare \"Session ended\"",
+    "updated": "2026-09-28T12:18:48.707Z"
+  },
+  "plan": {
+    "id": "pan-4290",
+    "title": "Ended agent sessions should show their outcome (Merged, Review approved, Stopped by close-out) instead of a bare \"Session ended\"",
+    "status": "proposed",
+    "uid": "9c716bd9-7aca-4ee3-9015-e8f1fc63868a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-28T12:11:55Z",
+    "updated": "2026-09-28T12:18:48.707Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4290",
+        "label": "PAN-4290",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4290.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "agent-sessions",
+      "derived-state"
+    ],
+    "narratives": {
+      "Problem": "Every agent session whose terminal is gone shows 'Session ended', whether it finished normally (reviewer verdict, merged PR, close-out) or crashed, so the operator cannot tell a normal finish from a failure. In addition, normalizeAgentStatus maps a review row's changes-requested and a test row's failure to 'error', so ended specialist rows render red as if they crashed.",
+      "Proposal": "One pure render-time derivation (src/dashboard/frontend/src/lib/sessionOutcome.ts) maps facts already in the dashboard store — derived issue state (PR review decision, checks, merged, issue state), the agent snapshot (status, stoppedByUser), and SessionNode fields (planningComplete, reviewer round verdict) — to an outcome label and a quiet/attention tone via a first-match precedence table where PR-derived outcomes rank first. Store-reading hooks feed AgentStepRow, SessionPanel and DrawerAgentSession; the two unmounted surfaces route through the shared fallback. A small contract extension (optional DerivedPrState.merged, emitOnly) keeps 'Merged' derivable after close-out. docs/ISSUE-VIEW.md documents the labels.",
+      "NonGoals": "- Do not read the pipeline journal in the outcome derivation\n- Do not consult the test agent's uat.verdict; the test outcome comes from pr.checks\n- Do not add a persisted status field or a server-side outcome field on SessionNode; do not change routes/projects.ts or routes/command-deck.ts node builders\n- Do not change normalizeAgentStatus or live-row status rendering\n- Do not change describeAgentStop in AgentPillPopoverRow.tsx or StoppedAgentsBanner\n- Do not delete or re-mount ConversationTerminal, TerminalPanel, or TerminalSessionWrapper\n- Do not add new colors, tokens, or badges; normal outcomes (including Merged) stay muted, never --success\n- No new endpoint, polling loop, query, or store slice"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Derive the outcome in the frontend from store facts, not as a server-side SessionNode field",
+        "rationale": "The store already holds derived issue state and agent snapshots, and the drawer works from SessionAgent, so a server field would touch four builders and still need a frontend path for the drawer."
+      },
+      {
+        "summary": "Do not read the pipeline journal",
+        "rationale": "Its review verdicts are already on the PR (self-review marker comments are read back into reviewState), merge is covered by the new pr.merged flag, the journal dies with the workspace at close-out, and the PR wins on disagreement."
+      },
+      {
+        "summary": "Add optional DerivedPrState.merged (set only when true)",
+        "rationale": "deriveState ranks closed above merged and the pr object omits the merged flag, so after close-out 'Merged' would be underivable; the field is derived and emitOnly, not a persisted status, and omitting it when false keeps existing fixtures unchanged."
+      },
+      {
+        "summary": "'Ended unexpectedly' requires positive evidence: recorded error status, ended while still recorded running/starting, or a primary plan/work/strike agent that ended with no outcome on a known-open, unmerged issue",
+        "rationale": "The operator's complaint is false alarms; synthesized Review/Test rows exist whenever a PR exists and carry PR-derived statuses, so treating 'no match' as unexpected for them would re-create the problem. Missing facts produce the plain 'Session ended' fallback, matching AC-1."
+      },
+      {
+        "summary": "Test outcome reads pr.checks (green/red)",
+        "rationale": "It is the same fact the Test row's own status already comes from and is available on every surface, including the drawer."
+      },
+      {
+        "summary": "Keep the two unmounted surfaces and route them through the shared fallback helper",
+        "rationale": "The issue lists them explicitly; the surgical-change rule forbids deleting unrelated dead code; conversations carry no pipeline facts, so the fallback is the correct label there."
+      },
+      {
+        "summary": "All normal outcomes and the fallback render with --muted-foreground; only 'Ended unexpectedly' uses the existing error treatment",
+        "rationale": "The issue requires the style guide's quiet treatment for normal outcomes, and the style guide allows at most one colored signal per row."
+      },
+      {
+        "summary": "Workers and paused agents never reach the primary-agent 'Ended unexpectedly' rule",
+        "rationale": "Worker sessions are pushed as type 'work' nodes and a machine pause leaves status 'stopped' without stoppedByUser; both are normal states (PausedBanner already surfaces pauses), so labelling them unexpected would be a false alarm."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-28-PAN-4290-ended-agent-sessions-should-show-their-outcome-merged-review-approved-stopped-by-close-out-instead-of-a-bare-session-ended.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pr-merged-flag",
+        "title": "Carry DerivedPrState.merged so Merged survives issue close",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:11:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "backend",
+          "files_scope": [
+            "packages/contracts/src/derived-issue-state.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "packages/contracts/src/types.test.ts",
+            "tests/unit/lib/overdeck/derived-issue-state.test.ts"
+          ],
+          "verify_commands": [
+            "npm --prefix ./packages/contracts run test -- src/types.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass including the new merged cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add `merged: Schema.optional(Schema.Boolean)` to DerivedPrState in packages/contracts/src/derived-issue-state.ts (after `mergeable`, doc comment 'Present only when true; survives state: closed (PAN-4290)'). At both fact-assembly sites in src/lib/overdeck/derived-issue-state.ts (grep `pr: { url: pr.url, number: pr.number` — lines ~731 and ~857) append `...(pr.merged ? { merged: true } : {})` inside the pr object so open-PR payloads are byte-identical to today. Add a round-trip case with pr.merged:true to packages/contracts/src/types.test.ts and, in tests/unit/lib/overdeck/derived-issue-state.test.ts, a closed-issue + merged-PR case (state 'closed', pr.merged true) and an open-PR case whose pr has no merged key. This is a derived emitOnly wire field, not a persisted status."
+        },
+        "items": [
+          {
+            "id": "pr-merged-flag.ac1",
+            "title": "Given a tracker-closed issue whose PR row has mergedAt set, when loadIssueStateFacts/deriveIssueState run, then the result returns state 'closed' and pr.merged === true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-merged-flag.ac2",
+            "title": "Given an open PR, when the derived state is built, then the pr object contains no merged key (existing toEqual fixtures stay unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-merged-flag.ac3",
+            "title": "Given a DerivedIssueState row with pr.merged true, when decoded and re-encoded with the contracts schema, then it round-trips unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outcome-derivation",
+        "title": "Add the pure deriveSessionOutcome function and its fact adapters",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:11:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4290",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "foundationFor": [
+            "outcome-hooks",
+            "agent-step-row-outcome",
+            "session-panel-outcome",
+            "drawer-outcome",
+            "fallback-surfaces"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/sessionOutcome.ts",
+            "src/dashboard/frontend/src/lib/sessionOutcome.test.ts",
+            "package.json"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/sessionOutcome.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "sessionOutcome.test.ts passes with a case for each of the 12 precedence rows",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "acJustification": "Six criteria: the worker/paused false-alarm guard is a distinct rule from the synthesized-row guard and needs its own observable check."
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/frontend/src/lib/sessionOutcome.ts exporting exactly the types and functions listed in PRD WI-2 (SessionOutcomeKind, SessionOutcomeTone, SessionOutcome, SessionOutcomeRole, SessionOutcomeFacts, SESSION_ENDED_FALLBACK, deriveSessionOutcome, outcomeFactsFromSessionNode, outcomeFactsFromAgent). Implement the 12-row precedence table verbatim (first match wins; labels, details, tones as written; only 'ended-unexpectedly' has tone 'attention'). Implement the adapter rules verbatim, including: a node whose agent snapshot has role 'worker' maps to role 'worker' before the node.type mapping (worker sessions arrive as type 'work' nodes); `paused` comes from the agent snapshot and row 11 requires paused !== true; synthesized = node.type review|test; legacy node maps to role plan with synthesized true; recordedStatus from AgentSnapshot first, else node.status only for non-synthesized agent-backed node types; drawer review agents with id /-review-[a-z]+$/i map to 'reviewer'; drawer planning finalized per decision D6. Pure module: no store, no React. Write src/dashboard/frontend/src/lib/sessionOutcome.test.ts with one case per precedence row plus the named edge cases in PRD WI-2, and append 'src/lib/sessionOutcome.test.ts' to the root package.json test:frontend-subset script."
+        },
+        "items": [
+          {
+            "id": "outcome-derivation.ac1",
+            "title": "Given role work with issueState 'closed' and prMerged true, when deriveSessionOutcome runs, then it returns kind 'merged' with label 'Merged' and tone 'quiet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-derivation.ac2",
+            "title": "Given a reviewer with verdict APPROVED and stoppedByUser true, when deriveSessionOutcome runs, then it returns 'Review approved' (PR-derived outcome outranks the stop cause)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-derivation.ac3",
+            "title": "Given a synthesized review node with no verdict and PR-derived status 'error', when the node adapter and derivation run, then the outcome falls back to 'Session ended' with tone 'quiet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-derivation.ac4",
+            "title": "Given a non-synthesized work agent with recordedStatus 'error' and an open issue, when deriveSessionOutcome runs, then it returns 'Ended unexpectedly' with tone 'attention', and no other kind ever returns tone 'attention'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-derivation.ac5",
+            "title": "Given a stopped work agent with issueState undefined, when deriveSessionOutcome runs, then it returns the fallback label 'Session ended'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-derivation.ac6",
+            "title": "Given a work-typed SessionNode whose agent snapshot has role 'worker' (or paused true) on an open issue with a clean stop, when the node adapter and derivation run, then the outcome falls back to 'Session ended' rather than 'Ended unexpectedly'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "outcome-hooks",
+        "title": "Add store-reading hooks useSessionNodeOutcome and useAgentSessionOutcome",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:11:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/useSessionOutcome.ts",
+            "src/dashboard/frontend/src/lib/useSessionOutcome.test.ts"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/useSessionOutcome.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useSessionOutcome.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/dashboard/frontend/src/lib/useSessionOutcome.ts with useSessionNodeOutcome(node, issueId) and useAgentSessionOutcome(agent). Each reads useDerivedIssueState(issue id upper-cased) and useDashboardStore((s) => s.agentsById[id]), calls the matching adapter from sessionOutcome.ts, then deriveSessionOutcome. Return null while the session is not ended (node.presence !== 'ended'; !isEndedAgent(agent); agent null). No new query, endpoint, polling, or store slice. Tests in src/dashboard/frontend/src/lib/useSessionOutcome.test.ts seed the real store with useDashboardStore.setState (pattern: RunningAgentsPill.test.tsx) and use renderHook."
+        },
+        "items": [
+          {
+            "id": "outcome-hooks.ac1",
+            "title": "Given the store holds a derived state with pr.merged true and an ended work SessionNode, when useSessionNodeOutcome renders, then it returns label 'Merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-hooks.ac2",
+            "title": "Given a SessionNode with presence 'active', when useSessionNodeOutcome renders, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "outcome-hooks.ac3",
+            "title": "Given agentsById holds a stopped work agent with stoppedByUser true and the issue is open, when useAgentSessionOutcome renders, then it returns label 'Stopped by operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-step-row-outcome",
+        "title": "Render the outcome label and tone in AgentStepRow (cockpit, rail, tooltip)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:11:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-4290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+            "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/AgentStepRow.test.tsx",
+            "npm run typecheck",
+            "npm run lint",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "AgentStepRow.test.tsx passes including the new outcome cases",
+            "typecheck and lint complete without errors",
+            "file-size guard passes"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and decision D8. In src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx: call useSessionNodeOutcome(session, issueId); when non-null and the row is not awaiting input, displayStatus shows outcome.label; getSessionStatusTitle takes an outcome argument and, for ended rows with an outcome, leads with `${label}: ${detail}` and skips the per-status ended sentences — delete the string 'Session ended cleanly and is no longer live.'. For ended rows with an outcome: statusClassForCockpit is 'bad' for attention and 'muted' for quiet; cockpitDotStatus is 'error' for attention and 'done' for quiet; the rail status span renders despite the exclusion list at ~line 825, with railStyles.sessionStatus_error only for attention. Live-row rendering is unchanged. In AgentStepRow.test.tsx the store is mocked (line 23) — mock ../../lib/useSessionOutcome to return the outcome each case needs rather than widening the store mock. Keep the file under the 1000-line ceiling."
+        },
+        "items": [
+          {
+            "id": "agent-step-row-outcome.ac1",
+            "title": "Given an ended cockpit row whose outcome is 'Merged', when it renders, then the status text reads 'Merged' with the muted status class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-step-row-outcome.ac2",
+            "title": "Given an ended review row whose outcome is 'Changes requested', when it renders, then the status text reads 'Changes requested' and the row does not carry the bad status class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-step-row-outcome.ac3",
+            "title": "Given an ended row whose outcome is 'Ended unexpectedly', when it renders in cockpit density, then the status carries the bad class and the dot renders the error status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-step-row-outcome.ac4",
+            "title": "Given an ended rail-density row, when it renders, then the outcome label appears as visible status text and the tooltip begins with the outcome label instead of 'Session ended cleanly'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-panel-outcome",
+        "title": "Render the outcome in SessionPanel's ended terminal tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:11:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SessionPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx replace `{isEnded ? 'Session ended' : 'No terminal session available.'}` (~line 518) with `(outcome ?? SESSION_ENDED_FALLBACK).label` for ended sessions, where outcome = useSessionNodeOutcome(session, issueId); add `text-destructive` only when outcome.tone is 'attention' and set data-outcome-tone. Keep the existing fallback assertion in SessionPanel.test.tsx (~line 190) valid for the fixture with no derived state, and add a case with a merged derived state that expects 'Merged'. If the test file mocks lib/store, mock lib/useSessionOutcome instead."
+        },
+        "items": [
+          {
+            "id": "session-panel-outcome.ac1",
+            "title": "Given an ended session on an issue whose PR merged, when the terminal tab renders, then it shows 'Merged' instead of 'Session ended'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-panel-outcome.ac2",
+            "title": "Given an ended session with no derived issue state in the store, when the terminal tab renders, then it falls back to 'Session ended' without the destructive class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-outcome",
+        "title": "Render the outcome in DrawerAgentSession's terminal toggle and body",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:11:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/DrawerAgentSession.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DrawerAgentSession.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx call useAgentSessionOutcome(agent); the terminalDisabledReason for ended agents (~line 113) becomes `${(outcome ?? SESSION_ENDED_FALLBACK).label} — no live terminal to attach`, and the ended body (~line 244) becomes `${label} — no live terminal to attach.` with text-destructive instead of text-muted-foreground only for attention tone. Keep DrawerAgentSession.test.tsx lines ~158-161 passing for the no-derived-state fixture (fallback) and add a case with a closed issue in the store expecting 'Stopped by close-out — no live terminal to attach'. ViewToggle.test.tsx is not changed."
+        },
+        "items": [
+          {
+            "id": "drawer-outcome.ac1",
+            "title": "Given an ended drawer agent on a closed issue with no operator stop, when the drawer renders, then the terminal toggle's disabled reason reads 'Stopped by close-out — no live terminal to attach'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-outcome.ac2",
+            "title": "Given an ended drawer agent with no derived issue state, when the drawer renders, then the body text falls back to 'Session ended — no live terminal to attach.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fallback-surfaces",
+        "title": "Route ConversationTerminal and TerminalSessionWrapper through the shared fallback with quiet tone",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:11:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-4290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationTerminal.tsx",
+            "src/dashboard/frontend/src/components/TerminalSessionWrapper.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationTerminal.test.tsx",
+            "src/dashboard/frontend/src/components/__tests__/TerminalSessionWrapper.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ConversationTerminal.test.tsx src/components/__tests__/TerminalSessionWrapper.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and decision D7. ConversationTerminal.tsx line ~96 renders SESSION_ENDED_FALLBACK.label. TerminalSessionWrapper.tsx gains an optional `outcome?: SessionOutcome | null` prop; the ended card heading is (outcome ?? SESSION_ENDED_FALLBACK).label and the icon ring/icon use accentOrange only when outcome?.tone === 'attention', otherwise textSecondary. Do not wire TerminalPanel and do not delete either component (both are unmounted in production; conversations have no pipeline facts). Update components/CommandDeck/__tests__/ConversationTerminal.test.tsx and add components/__tests__/TerminalSessionWrapper.test.tsx (mock XTerminal to call onDisconnect)."
+        },
+        "items": [
+          {
+            "id": "fallback-surfaces.ac1",
+            "title": "Given an ended conversation, when ConversationTerminal renders, then it shows 'Session ended' taken from SESSION_ENDED_FALLBACK",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fallback-surfaces.ac2",
+            "title": "Given TerminalSessionWrapper after its terminal disconnects with no outcome prop, when it renders, then it shows 'Session ended' without the orange #fb923c accent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fallback-surfaces.ac3",
+            "title": "Given TerminalSessionWrapper with an outcome of tone 'attention', when it renders the ended card, then it shows 'Ended unexpectedly' with the orange accent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-outcome-labels",
+        "title": "Document ended-session outcomes in docs/ISSUE-VIEW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T12:11:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-4290",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "kind": "docs",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md"
+          ],
+          "verify_commands": [
+            "grep -n 'Ended session outcomes' docs/ISSUE-VIEW.md",
+            "grep -c 'Stopped by close-out\\|Ended unexpectedly\\|Plan finalized' docs/ISSUE-VIEW.md"
+          ],
+          "expected_outputs": [
+            "the heading line prints",
+            "the count is at least 3"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add `### Ended session outcomes (PAN-4290)` under `## Density model`, after `### Cockpit layout`, in docs/ISSUE-VIEW.md: a table of all ten labels (Merged, Review approved, Changes requested, Tests passed, Tests failed, Plan finalized, Stopped by operator, Stopped by close-out, Ended unexpectedly, Session ended) with kind and tone; the first-match precedence with PR-derived outcomes first; the evidence rule for 'Ended unexpectedly' (decision D5); that derivation happens at render time in src/dashboard/frontend/src/lib/sessionOutcome.ts and nothing is persisted; and that DerivedPrState.merged keeps 'Merged' visible after close-out. No Mintlify page describes session end states today, so none changes."
+        },
+        "items": [
+          {
+            "id": "docs-outcome-labels.ac1",
+            "title": "Given docs/ISSUE-VIEW.md, when grepped for 'Ended session outcomes', then the new subsection heading is found under Density model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-outcome-labels.ac2",
+            "title": "Given the new subsection, when read, then it lists all ten outcome labels with their tone and states that only 'Ended unexpectedly' uses the attention color",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-outcome-labels.ac3",
+            "title": "Given the new subsection, when read, then it names src/dashboard/frontend/src/lib/sessionOutcome.ts as the single render-time derivation and states that no outcome is persisted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pr-merged-flag",
+        "to": "outcome-derivation",
+        "type": "blocks"
+      },
+      {
+        "from": "outcome-derivation",
+        "to": "outcome-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "outcome-derivation",
+        "to": "fallback-surfaces",
+        "type": "blocks"
+      },
+      {
+        "from": "outcome-hooks",
+        "to": "agent-step-row-outcome",
+        "type": "blocks"
+      },
+      {
+        "from": "outcome-hooks",
+        "to": "session-panel-outcome",
+        "type": "blocks"
+      },
+      {
+        "from": "outcome-hooks",
+        "to": "drawer-outcome",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
