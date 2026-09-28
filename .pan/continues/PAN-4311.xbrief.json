@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4311",
+  "created": "2026-09-28T13:59:42.470Z",
+  "updated": "2026-09-28T13:59:42.470Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "cfg-keys": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4311",
+      "claimedAt": "2026-09-28T13:59:42.469Z"
+    }
+  }
+}
