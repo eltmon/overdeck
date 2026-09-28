@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T13:27:46.822Z",
+  "updated": "2026-09-28T13:28:05.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "gh-list-pricing": {
       "status": "completed",
       "doneAt": "2026-09-28T13:27:46.821Z"
+    },
+    "gh-local-failure-cost": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4291",
+      "claimedAt": "2026-09-28T13:28:05.384Z"
     }
   }
 }
