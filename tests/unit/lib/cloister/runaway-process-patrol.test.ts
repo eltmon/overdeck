@@ -284,15 +284,19 @@ describe('createRunawayPatrol (PAN-4311 AC-4, AC-5)', () => {
 });
 
 describe('startRunawayPatrol / stopRunawayPatrol (PAN-4311 runaway-wiring)', () => {
-  it.skipIf(process.platform !== 'linux')('publishes a snapshot after the first tick and clears it on stop', async () => {
+  it('publishes a snapshot after the first tick on Linux, is a no-op elsewhere, and clears it on stop', async () => {
     const { getRunawaySnapshot, startRunawayPatrol, stopRunawayPatrol } = await import(
       '../../../../src/lib/cloister/runaway-process-patrol.js'
     );
     try {
       startRunawayPatrol();
       startRunawayPatrol(); // idempotent: one patrol, one timer
-      await vi.waitFor(() => expect(getRunawaySnapshot()).not.toBeNull(), { timeout: 10_000 });
-      expect(getRunawaySnapshot()!.coreServicePids).toContain(process.pid);
+      if (process.platform === 'linux') {
+        await vi.waitFor(() => expect(getRunawaySnapshot()).not.toBeNull(), { timeout: 10_000 });
+        expect(getRunawaySnapshot()!.coreServicePids).toContain(process.pid);
+      } else {
+        expect(getRunawaySnapshot()).toBeNull();
+      }
     } finally {
       stopRunawayPatrol();
     }
