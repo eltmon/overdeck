@@ -21,6 +21,7 @@ function api(overrides: Partial<StageApi> = {}): StageApi {
     openIssue: vi.fn(),
     openOrFocusAgentPane: vi.fn(),
     toggleTerminal: vi.fn(),
+    openTerminalDrawer: vi.fn(),
     ...overrides,
   }
 }
