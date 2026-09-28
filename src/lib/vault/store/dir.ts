@@ -176,6 +176,10 @@ export class DirVaultStore implements VaultStore {
     throw new Error(`Could not acquire vault ref lock ${lockPath}`);
   }
 
+  async refresh(): Promise<void> {
+    // The directory is the source of truth; nothing to pull.
+  }
+
   async listRefs(prefix: string): Promise<Array<{ name: string; version: string }>> {
     const refsRoot = join(this.root, 'refs');
     const out: Array<{ name: string; version: string }> = [];

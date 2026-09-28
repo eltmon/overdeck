@@ -33,6 +33,12 @@ export interface VaultStore {
    */
   casRef(name: string, expectedVersion: string | null, value: Uint8Array): Promise<CasResult>;
   listRefs(prefix: string): Promise<Array<{ name: string; version: string }>>;
+  /**
+   * Bring the local view up to date with the remote before a read-heavy pass
+   * (sync). Throws VaultOfflineError when the remote cannot be reached. A
+   * backend with no remote view (the directory store) resolves immediately.
+   */
+  refresh(): Promise<void>;
 }
 
 /** The backend cannot be reached right now; the caller should back off and retry later. */
