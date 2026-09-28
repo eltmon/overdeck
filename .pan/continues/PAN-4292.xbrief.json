@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:46:59.466Z",
+  "updated": "2026-09-28T13:47:12.681Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "herdr-steer-submit.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T13:46:59.466Z"
+    },
+    "herdr-steer-submit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:47:12.681Z"
     }
   }
 }
