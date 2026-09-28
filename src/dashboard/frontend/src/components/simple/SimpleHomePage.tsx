@@ -17,6 +17,7 @@ import { useSimpleActions } from '../../lib/simple/useSimpleActions';
 import { useUiMode, syncSimpleIssueUrl } from '../../lib/simple/uiMode';
 import { ModeToggle, PrimaryButton, ProgressBar, QuietButton } from './parts';
 import { TalkItThrough } from './TalkItThrough';
+import { GetSetUpCard } from '../home/GetSetUpCard';
 
 const S = SIMPLE_STRINGS.home;
 
@@ -257,6 +258,8 @@ export function SimpleHomePage() {
         </div>
 
         <TalkItThrough />
+
+        <div className="mt-6"><GetSetUpCard /></div>
 
         <section className="mt-8">
           <h2 className="text-[15px] font-medium">{S.needsYouTitle} <span className="text-xs text-muted-foreground">{needsCount}</span></h2>

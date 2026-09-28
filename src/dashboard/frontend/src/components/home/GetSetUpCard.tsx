@@ -189,13 +189,17 @@ export function GetSetUpCard() {
     retry: 1,
   });
 
+  const hasValidReport = !!report && Array.isArray(report.checks);
   const rows = useMemo(
-    () => (report ? buildRows(report, strings, report.platform) : []),
-    [report, strings],
+    () => (hasValidReport ? buildRows(report, strings, report.platform) : []),
+    [hasValidReport, report, strings],
   );
-  const requiredFailing = useMemo(() => (report ? hasRequiredFailing(report) : false), [report]);
+  const requiredFailing = useMemo(
+    () => (hasValidReport ? hasRequiredFailing(report) : false),
+    [hasValidReport, report],
+  );
 
-  if (!report) return null;
+  if (!hasValidReport) return null;
   if (dismissed && !requiredFailing) return null;
 
   const toggleRow = (id: string) => {
