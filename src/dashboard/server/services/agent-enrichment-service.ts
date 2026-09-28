@@ -26,7 +26,7 @@ import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-censu
 import { getEventStore, type EventStore } from '../event-store.js'
 import { saveAgentStateAndEmitEvent } from './agent-projection.js'
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js'
-import type { AgentEnrichmentChangedEvent, AgentCreatedEvent } from '@overdeck/contracts'
+import { indexPanesByAgentKey, type AgentEnrichmentChangedEvent, type AgentCreatedEvent } from '@overdeck/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 import { isPeerDashboardProcess } from '../../../lib/boot-gates.js'
 
@@ -193,7 +193,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   // role, model, branch) the enrichment event payload carries.
   const panes = await getBackendPanes()
   const livePaneIds = new Set(
-    panes.filter((pane) => pane.state !== 'exited').map((pane) => pane.terminalId ?? pane.id),
+    [...indexPanesByAgentKey(panes)].filter(([, pane]) => pane.state !== 'exited').map(([key]) => key),
   )
   const specialistIssues = new Set(
     panes
@@ -204,7 +204,13 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
   // Only enrich agents the backend reports as live. A pane that exited has no
   // changing state — its enrichment is static.
-  const activeAgents = runningAgents.filter(a => livePaneIds.has(a.id))
+  //
+  // PAN-4320: on Herdr a stopped agent's pane (and idle harness) can outlive the
+  // stop, so a live pane alone is not a claim of life. A stored `stopped`/`error`
+  // is operator or supervisor intent the poller never overrides — the same
+  // claimed-live set `deriveServedAgentStatuses` checks.
+  const activeAgents = runningAgents.filter(a =>
+    livePaneIds.has(a.id) && (a.status === 'running' || a.status === 'starting'))
 
   await withConcurrencyLimit(
     activeAgents.map((agent) => async () => {
