@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:41:38.744Z",
+  "updated": "2026-09-28T13:41:43.788Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-1166",
       "claimedAt": "2026-09-28T13:39:52.550Z",
       "doneAt": "2026-09-28T13:41:38.743Z"
+    },
+    "e2e-ws-auth-spec": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:41:43.788Z"
     }
   }
 }
