@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:08:05.858Z",
+  "updated": "2026-09-28T16:08:17.333Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -364,6 +364,10 @@
     "docs-weights.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T16:08:05.858Z"
+    },
+    "docs-weights.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:08:17.333Z"
     }
   }
 }
