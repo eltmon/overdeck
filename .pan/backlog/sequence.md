@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:46:14.136186Z · model: claude-opus-5-5 · open: 782_
+_Last sequenced: 2026-09-28T12:47:47.347998Z · model: claude-opus-5-5 · open: 783_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -317,6 +317,7 @@ _Last sequenced: 2026-09-28T12:46:14.136186Z · model: claude-opus-5-5 · open: 
 | 371 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
 | 372 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
 | 373 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
+| 374 | PAN-4303 | S | medium | needs-refinement |  | PAN-4292 | Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind. |
 | 375 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
 | 376 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
 | 377 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
@@ -1097,10 +1098,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:46:14.136186Z",
+  "generatedAt": "2026-09-28T12:47:47.347998Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 782,
+  "openCount": 783,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -10812,6 +10813,21 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "rationale": "New follow-up split out of PAN-4291 (in pipeline at rank 2): it migrates the remaining direct gh callers to runGh so the quota ledger attributes spend and non-essential callers respect quota pauses. The file list and grep-based ACs are concrete, so condition is ok; it ranks just after PAN-2259 (GraphQL quota burn) because it completes the same quota-hardening line and needs PAN-4291 to land first.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4303",
+      "rank": 374,
+      "size": "S",
+      "importance": "medium",
+      "score": 58,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-4292"
+      ],
+      "why": "Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind.",
+      "rationale": "New issue split from in-pipeline PAN-4292; it cannot start until PAN-4292 adds HarnessBehavior.steerKind, and its first step is an open verification question, so it sits in the free rank 374 slot among comparable medium conversation-delivery fixes.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11997,6 +12013,20 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-4292",
+      "to": "PAN-4303",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2580",
+      "to": "PAN-4303",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
