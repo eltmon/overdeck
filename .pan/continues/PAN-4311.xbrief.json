@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:15:07.533Z",
+  "updated": "2026-09-28T15:17:39.314Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-09-28T15:15:03.224Z"
     },
     "lane-door-hold": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4311",
-      "claimedAt": "2026-09-28T15:15:07.533Z"
+      "claimedAt": "2026-09-28T15:15:07.533Z",
+      "doneAt": "2026-09-28T15:17:39.314Z"
     }
   }
 }
