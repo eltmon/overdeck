@@ -1,10 +1,20 @@
 import { useState, type ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { BackendConnectionBoundary } from './BackendConnectionBoundary';
-import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents';
-import { useMenuOpen } from '../lib/menuOpenState';
+import { useConnectionState, type ConnectionInputs } from '../lib/connectionState';
+
+// PAN-4279 WI-4: degraded mode never hides mounted content; only a tab with no
+// snapshot shows the full-page first-load screen.
+
+const LIVE: ConnectionInputs = {
+  serverReachable: true,
+  streamLive: true,
+  restarting: false,
+  hasSnapshot: true,
+  lastLiveAt: 1,
+};
 
 function render(ui: ReactNode, queryClient = new QueryClient()) {
   return rtlRender(ui, {
@@ -12,27 +22,87 @@ function render(ui: ReactNode, queryClient = new QueryClient()) {
   });
 }
 
+function setInputs(inputs: Partial<ConnectionInputs>) {
+  act(() => {
+    useConnectionState.setState(inputs);
+  });
+}
+
+function hiddenAncestor(el: HTMLElement): HTMLElement | null {
+  for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+    if (node.style.display === 'none') return node;
+  }
+  return null;
+}
+
+function firstLoadScreen() {
+  return document.querySelector('[data-component="first-load-screen"]');
+}
+
 describe('BackendConnectionBoundary', () => {
-  it('hides the UI, without unmounting it, while the backend is down', () => {
-    render(
-      <BackendConnectionBoundary backendDown restarting={false}>
-        <div data-testid="app-content">app</div>
-      </BackendConnectionBoundary>,
-    );
-    // Hidden, not unmounted: route state such as typed input survives (PAN-3867).
-    expect(screen.getByTestId('app-content')).not.toBeVisible();
-    expect(screen.getByRole('status')).toHaveTextContent('Waiting for backend data');
+  beforeEach(() => {
+    useConnectionState.setState({ ...LIVE, reconnect: null });
   });
 
-  it('hides the UI, without unmounting it, while the dashboard is restarting', () => {
+  it('keeps cached content visible while the server is unreachable', () => {
+    useConnectionState.setState({ serverReachable: false });
     render(
-      <BackendConnectionBoundary backendDown={false} restarting>
+      <BackendConnectionBoundary>
         <div data-testid="app-content">app</div>
       </BackendConnectionBoundary>,
     );
-    // Hidden, not unmounted: route state such as typed input survives (PAN-3867).
-    expect(screen.getByTestId('app-content')).not.toBeVisible();
-    expect(screen.getByRole('status')).toHaveTextContent('Dashboard is restarting');
+    const content = screen.getByTestId('app-content');
+    expect(hiddenAncestor(content)).toBeNull();
+    expect(content).toBeVisible();
+    expect(firstLoadScreen()).toBeNull();
+  });
+
+  it('keeps cached content visible while the server restarts', () => {
+    useConnectionState.setState({ restarting: true });
+    render(
+      <BackendConnectionBoundary>
+        <div data-testid="app-content">app</div>
+      </BackendConnectionBoundary>,
+    );
+    expect(screen.getByTestId('app-content')).toBeVisible();
+    expect(firstLoadScreen()).toBeNull();
+  });
+
+  it('shows the first-load screen without a snapshot while unreachable', () => {
+    useConnectionState.setState({ hasSnapshot: false, streamLive: false, lastLiveAt: null, serverReachable: false });
+    render(
+      <BackendConnectionBoundary>
+        <div data-testid="app-content">app</div>
+      </BackendConnectionBoundary>,
+    );
+    expect(firstLoadScreen()).not.toBeNull();
+    expect(firstLoadScreen()?.textContent).toContain("Can't reach the Overdeck server");
+    expect(firstLoadScreen()?.textContent).toContain('The dashboard will load as soon as the server answers.');
+    expect(screen.queryByTestId('app-content')).toBeNull();
+  });
+
+  it('names a restart on the first-load screen and retries through the connection store', () => {
+    const reconnect = vi.fn();
+    useConnectionState.setState({ hasSnapshot: false, streamLive: false, lastLiveAt: null, restarting: true, reconnect });
+    render(
+      <BackendConnectionBoundary>
+        <div data-testid="app-content">app</div>
+      </BackendConnectionBoundary>,
+    );
+    expect(firstLoadScreen()?.textContent).toContain('Overdeck server is restarting');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(reconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders children without a snapshot while only live updates are delayed', () => {
+    useConnectionState.setState({ hasSnapshot: false, streamLive: false, lastLiveAt: null });
+    render(
+      <BackendConnectionBoundary>
+        <div data-testid="app-content">app</div>
+      </BackendConnectionBoundary>,
+    );
+    expect(screen.getByTestId('app-content')).toBeVisible();
+    expect(firstLoadScreen()).toBeNull();
   });
 
   it('keeps child state across an outage and recovery', () => {
@@ -44,66 +114,37 @@ describe('BackendConnectionBoundary', () => {
         </button>
       );
     }
-    const { rerender } = render(
-      <BackendConnectionBoundary backendDown={false} restarting={false}><Counter /></BackendConnectionBoundary>,
-    );
+    render(<BackendConnectionBoundary><Counter /></BackendConnectionBoundary>);
     fireEvent.click(screen.getByTestId('app-content'));
-    rerender(<BackendConnectionBoundary backendDown restarting={false}><Counter /></BackendConnectionBoundary>);
-    rerender(<BackendConnectionBoundary backendDown={false} restarting><Counter /></BackendConnectionBoundary>);
-    rerender(<BackendConnectionBoundary backendDown={false} restarting={false}><Counter /></BackendConnectionBoundary>);
+    setInputs({ serverReachable: false });
+    setInputs({ restarting: true });
+    setInputs({ serverReachable: true, restarting: false });
 
     expect(screen.getByTestId('app-content')).toBeVisible();
     expect(screen.getByTestId('app-content')).toHaveTextContent('1');
-    expect(screen.queryByRole('status')).toBeNull();
   });
 
-  it('keeps children mounted with a banner during a transient reconnect', () => {
-    render(
-      <BackendConnectionBoundary backendDown={false} restarting={false}>
-        <div data-testid="app-content">app</div>
-      </BackendConnectionBoundary>,
-    );
-    expect(screen.getByTestId('app-content')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).toBeNull();
-
-    act(() => {
-      window.dispatchEvent(new CustomEvent(BACKEND_RECONNECTING_EVENT));
-    });
-    expect(screen.getByTestId('app-content')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Connection lost — reconnecting…');
-
-    act(() => {
-      window.dispatchEvent(new CustomEvent(BACKEND_RECONNECTED_EVENT));
-    });
-    expect(screen.getByTestId('app-content')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).toBeNull();
-  });
-
-  it('refetches every query when the page is shown again after an outage', () => {
+  it('refetches every query once the server answers again after an outage', () => {
     const queryClient = new QueryClient();
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
-    const { rerender } = render(
-      <BackendConnectionBoundary backendDown={false} restarting={false}><div /></BackendConnectionBoundary>,
-      queryClient,
-    );
+    render(<BackendConnectionBoundary><div /></BackendConnectionBoundary>, queryClient);
     expect(invalidate).not.toHaveBeenCalled();
 
-    rerender(<BackendConnectionBoundary backendDown restarting={false}><div /></BackendConnectionBoundary>);
+    setInputs({ serverReachable: false });
     expect(invalidate).not.toHaveBeenCalled();
 
-    rerender(<BackendConnectionBoundary backendDown={false} restarting={false}><div /></BackendConnectionBoundary>);
+    setInputs({ serverReachable: true });
     expect(invalidate).toHaveBeenCalledTimes(1);
     expect(invalidate).toHaveBeenCalledWith();
   });
 
-  it('closes the open portaled menu when the page is hidden', () => {
-    const { rerender } = render(
-      <BackendConnectionBoundary backendDown={false} restarting={false}><div /></BackendConnectionBoundary>,
-    );
-    act(() => useMenuOpen.getState().setOpenMenu('issue-actions:PAN-1'));
-    expect(useMenuOpen.getState().openMenuKey).toBe('issue-actions:PAN-1');
+  it('does not refetch on a delayed-only blip', () => {
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    render(<BackendConnectionBoundary><div /></BackendConnectionBoundary>, queryClient);
 
-    rerender(<BackendConnectionBoundary backendDown restarting={false}><div /></BackendConnectionBoundary>);
-    expect(useMenuOpen.getState().openMenuKey).toBeNull();
+    setInputs({ streamLive: false });
+    setInputs({ streamLive: true });
+    expect(invalidate).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,8 @@ import { fetchProjects, filterSpecOnlyPlanned, type ProjectData } from '../compo
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore, selectLatestMemoryFailure } from '../lib/store';
 import { ModeToggle } from '../components/simple/parts';
+import { HomeComposer } from '../components/home/HomeComposer';
+import { GetSetUpCard } from '../components/home/GetSetUpCard';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
 import type { DerivedIssueState, Issue } from '../types';
@@ -148,10 +150,12 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 A live landing page for current workspace context, cross-workspace ownership, and memory-first guidance.
               </p>
+              <div className="mt-4"><HomeComposer mode="advanced" /></div>
             </div>
             <ModeToggle />
           </div>
         </header>
+        <GetSetUpCard />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Home summary">
           {summaryCards.map((card) => (

@@ -8,6 +8,13 @@
  *
  * Event coalescing: rapid bursts of events are queued via queueMicrotask
  * and flushed to the store in one batch, preventing redundant React renders.
+ *
+ * Degraded mode (PAN-4279): EventRouter never shows a blocking overlay. It
+ * feeds the connection store (`streamLive`, `serverReachable` via
+ * `/api/health` probes, `lastLiveAt`) and the one `DegradedModeBanner` reports
+ * the outage. Bootstrap is bounded by `BOOTSTRAP_TIMEOUT_MS` and retries with
+ * backoff forever; the banner's Retry (`requestReconnect`) always starts a
+ * fresh attempt, abandoning any attempt still in flight.
  */
 
 import { useEffect, useRef } from 'react'
@@ -17,14 +24,13 @@ import { getTransport, resetTransport, type PanRpcProtocolClient } from '../lib/
 import type { DomainEvent, DashboardSnapshot } from '@overdeck/contracts'
 import { WS_METHODS } from '@overdeck/contracts'
 import { Stream } from 'effect'
-import { loadSnapshotFromCache } from '../lib/snapshotCache'
-import { hideOverlay, showOverlay } from '../recovery'
+import { loadSnapshotCacheEntry } from '../lib/snapshotCache'
 import { dispatchBackendReconnected, dispatchBackendReconnecting } from '../lib/backendConnectionEvents'
+import { probeServerHealth, useConnectionState } from '../lib/connectionState'
 
 const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
-const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
 const STREAM_STALENESS_TIMEOUT_MS = 35_000
-const UNREACHABLE_OVERLAY_RETRY_ATTEMPTS = 6
+export const BOOTSTRAP_TIMEOUT_MS = 20_000
 export const EVENT_ROUTER_RECONNECT_BASE_DELAY_MS = 2_000
 export const EVENT_ROUTER_RECONNECT_MAX_DELAY_MS = 30_000
 export const EVENT_ROUTER_RECONNECT_JITTER_RATIO = 0.2
@@ -58,12 +64,19 @@ export function EventRouter() {
   useEffect(() => {
     const coordinator = createRecoveryCoordinator()
     recovery.current = coordinator
+    const connection = useConnectionState.getState()
     let bootstrapInFlight = false
-    let bootstrapPromise: Promise<boolean> | null = null
+    // Resolves true on success, false on failure, null when superseded.
+    let bootstrapPromise: Promise<boolean | null> | null = null
+    // Bumped by every bootstrap attempt, forced reconnect and unmount; an
+    // attempt whose generation is no longer current never touches state.
+    let generation = 0
+    let disposed = false
+    // Only the most recent health probe may write reachability.
+    let probeSeq = 0
     let bootstrapComplete = false
     let reconnecting = false
     let fallbackInterval: ReturnType<typeof setInterval> | null = null
-    let fallbackTimeout: ReturnType<typeof setTimeout> | null = null
     let stalenessTimeout: ReturnType<typeof setTimeout> | null = null
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
     let reconnectAttempt = 0
@@ -76,11 +89,10 @@ export function EventRouter() {
 
     function stopFallbackPoller() {
       if (fallbackInterval) clearInterval(fallbackInterval)
-      if (fallbackTimeout) clearTimeout(fallbackTimeout)
       fallbackInterval = null
-      fallbackTimeout = null
     }
 
+    // Polls until the first bootstrap succeeds — no give-up window (PAN-4279).
     function startFallbackPoller() {
       stopFallbackPoller()
       fallbackInterval = setInterval(() => {
@@ -88,14 +100,11 @@ export function EventRouter() {
           stopFallbackPoller()
           return
         }
+        // A scheduled reconnect owns recovery: it resets the transport, which
+        // a poll over a wedged transport would never do.
+        if (reconnectTimeout) return
         bootstrap().catch(console.error)
       }, SNAPSHOT_FALLBACK_INTERVAL_MS)
-      fallbackTimeout = setTimeout(() => {
-        if (!bootstrapComplete) {
-          showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: () => reconnectDomainStream() })
-        }
-        stopFallbackPoller()
-      }, SNAPSHOT_FALLBACK_WINDOW_MS)
     }
 
     function stopStalenessWatchdog() {
@@ -108,15 +117,36 @@ export function EventRouter() {
       reconnectTimeout = null
     }
 
+    // The stream is down: data is stale until the next bootstrap. Probe HTTP
+    // so the phase reads `delayed` (server answers) rather than `unreachable`.
+    function markStreamDown() {
+      connection.setStreamLive(false)
+      const seq = ++probeSeq
+      void probeServerHealth().then((reachable) => {
+        if (!disposed && seq === probeSeq) connection.setServerReachable(reachable)
+      })
+    }
+
     function markBackendReconnecting() {
       reconnecting = true
       dispatchBackendReconnecting()
+      markStreamDown()
     }
 
     function bootstrapWithReconnectRetry() {
       void bootstrap().then((succeeded) => {
-        if (!succeeded) scheduleReconnectDomainStream()
+        if (succeeded === false) scheduleReconnectDomainStream()
       })
+    }
+
+    // Banner Retry: abandon any in-flight attempt (it may never settle — a hung
+    // session fetch or getSnapshot) and start over on a fresh transport.
+    function forceReconnect() {
+      generation += 1
+      bootstrapInFlight = false
+      bootstrapPromise = null
+      reconnectAttempt = 0
+      reconnectDomainStream({ fullReset: true })
     }
 
     function reconnectDomainStream(options?: { fullReset?: boolean }) {
@@ -162,9 +192,10 @@ export function EventRouter() {
     }
 
     // ── Instant render: load from localStorage cache ─────────────────────────
-    const cached = loadSnapshotFromCache()
+    const cached = loadSnapshotCacheEntry()
     if (cached) {
-      syncSnapshot(cached)
+      syncSnapshot(cached.data)
+      connection.markSnapshotCached(Date.parse(cached.timestamp))
     }
 
     // ── Activity backfill: HTTP fetch of persisted activity entries ──────────
@@ -180,22 +211,38 @@ export function EventRouter() {
     }
 
     // ── Bootstrap: fetch initial snapshot ───────────────────────────────────
-    function bootstrap(): Promise<boolean> {
+    function bootstrap(): Promise<boolean | null> {
       if (bootstrapPromise) return bootstrapPromise
 
+      const gen = ++generation
       bootstrapInFlight = true
       bootstrapPromise = (async () => {
         coordinator.beginSnapshotRecovery('bootstrap')
+        // getSnapshot has no timeout of its own, and the transport awaits an
+        // untimed session fetch first; a hung attempt must not pin
+        // bootstrapInFlight forever (PAN-4279).
+        let timeout: ReturnType<typeof setTimeout> | undefined
         try {
-          const snapshot = await getTransport().request((client) =>
-            (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
-          ) as DashboardSnapshot
+          const snapshot = await Promise.race([
+            getTransport().request((client) =>
+              (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
+            ) as Promise<DashboardSnapshot>,
+            new Promise<never>((_, reject) => {
+              timeout = setTimeout(
+                () => reject(new Error(`getSnapshot timed out after ${BOOTSTRAP_TIMEOUT_MS}ms`)),
+                BOOTSTRAP_TIMEOUT_MS,
+              )
+            }),
+          ])
+          if (gen !== generation) return null
           syncSnapshot(snapshot)
           // Snapshot carries recent activity now; keep the HTTP backfill as a
           // non-fatal compatibility path for older cached/server payloads.
           void seedRecentActivityFromApi()
           bootstrapComplete = true
           stopFallbackPoller()
+          connection.setServerReachable(true)
+          connection.setStreamLive(true)
           const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
           if (needsReplay) {
             await replay(snapshot.sequence)
@@ -204,17 +251,21 @@ export function EventRouter() {
             reconnecting = false
             reconnectAttempt = 0
             stopScheduledReconnect()
-            hideOverlay()
             dispatchBackendReconnected()
           }
           return true
         } catch (err) {
+          if (gen !== generation) return null
           console.error('[EventRouter] bootstrap failed:', err)
           coordinator.failRecovery()
+          markStreamDown()
           return false
         } finally {
-          bootstrapInFlight = false
-          bootstrapPromise = null
+          clearTimeout(timeout)
+          if (gen === generation) {
+            bootstrapInFlight = false
+            bootstrapPromise = null
+          }
         }
       })()
       return bootstrapPromise
@@ -261,7 +312,11 @@ export function EventRouter() {
           break
         }
       }
-      if (applyBatch.length > 0) applyEvents(applyBatch)
+      if (applyBatch.length > 0) {
+        applyEvents(applyBatch)
+        // Freshness stamp: live data just landed.
+        if (useConnectionState.getState().streamLive) connection.setStreamLive(true)
+      }
     }
 
     // ── Event coalescing ──────────────────────────────────────────────────────
@@ -293,7 +348,6 @@ export function EventRouter() {
       } else {
         reconnectAttempt = 0
         stopScheduledReconnect()
-        hideOverlay()
       }
       if (!isSequencedDomainEvent(event)) return
 
@@ -330,25 +384,25 @@ export function EventRouter() {
             console.log('[EventRouter] transport reconnected — re-bootstrapping snapshot')
             bootstrapWithReconnectRetry()
           },
-          onRetry: (attempt) => {
-            // Early retries are transient: the reconnecting event drives a
-            // non-blocking banner. Escalate to the blocking overlay only once
-            // the server looks genuinely unreachable.
+          // Retries never block the UI: the degraded-mode banner reports them,
+          // and the health probe decides between `delayed` and `unreachable`.
+          onRetry: () => {
             markBackendReconnecting()
-            if (attempt >= UNREACHABLE_OVERLAY_RETRY_ATTEMPTS) {
-              showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: () => reconnectDomainStream() })
-            }
           },
         },
       )
       resetStalenessWatchdog()
     }
 
+    connection.registerReconnect(forceReconnect)
     subscribeToDomainEvents()
-    bootstrap()
+    bootstrapWithReconnectRetry()
     startFallbackPoller()
 
     return () => {
+      disposed = true
+      generation += 1
+      connection.registerReconnect(null)
       stopFallbackPoller()
       stopStalenessWatchdog()
       stopScheduledReconnect()
