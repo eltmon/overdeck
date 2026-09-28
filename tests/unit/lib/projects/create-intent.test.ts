@@ -222,11 +222,7 @@ describe('resolveProjectCreateIntent', () => {
     expect(intent.findings).toHaveLength(0);
   });
 
-  it('flags a subdirectory of a repository and offers its root (D-15)', async () => {
-    const root = makeProjectDir('repo-root');
-    const nested = join(root, 'packages', 'inner');
-    mkdirSync(nested, { recursive: true });
-
+  function mockGitRoot(root: string) {
     execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'rev-parse' && args[1] === '--show-toplevel') {
         cb(null, { stdout: `${root}\n`, stderr: '' });
@@ -234,6 +230,13 @@ describe('resolveProjectCreateIntent', () => {
         cb(new Error('Unknown command'));
       }
     });
+  }
+
+  it('existing subfolder snaps to repo root with notice', async () => {
+    const root = makeProjectDir('repo-root');
+    const nested = join(root, 'packages', 'inner');
+    mkdirSync(nested, { recursive: true });
+    mockGitRoot(root);
 
     const intent = await resolveProjectCreateIntent({
       mode: 'existing',
@@ -242,14 +245,78 @@ describe('resolveProjectCreateIntent', () => {
       homeDir: TEST_HOME,
     });
 
-    // Registering here would root a second project inside an existing checkout.
-    expect(intent.findings).toContainEqual(
-      expect.objectContaining({
-        field: 'path',
-        code: 'repository-root-elsewhere',
+    // Registering the subfolder would root a second project inside an existing
+    // checkout, so resolve registers the checkout itself (Orca parity).
+    expect(intent.path).toBe(realPathOf(root));
+    expect(intent.notices).toEqual([
+      {
+        code: 'using-repository-root',
+        message: `Using the repository root ${realPathOf(root)}.`,
         detail: realPathOf(root),
-      }),
-    );
+      },
+    ]);
+    expect(intent.findings).toHaveLength(0);
+    const rootName = realPathOf(root).split('/').pop()!;
+    expect(intent.name).toBe(rootName);
+    expect(intent.key).toBe(rootName.toLowerCase());
+  });
+
+  it('snapped root that is already registered reports already-registered', async () => {
+    const root = makeProjectDir('registered-root');
+    const nested = join(root, 'src');
+    mkdirSync(nested, { recursive: true });
+    mockGitRoot(root);
+    const key = realPathOf(root).split('/').pop()!.toLowerCase();
+    writeFileSync(PROJECTS_CONFIG_FILE, `projects:\n  ${key}:\n    name: ${key}\n    path: ${root}\n`);
+    invalidateProjectsConfigCache();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: nested,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(expect.objectContaining({ code: 'project-exists-here' }));
+    expect(intent.registeredKeyAtPath).toBe(key);
+  });
+
+  it('a typed name survives the snap', async () => {
+    const root = makeProjectDir('named-root');
+    const nested = join(root, 'lib');
+    mkdirSync(nested, { recursive: true });
+    mockGitRoot(root);
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: nested,
+      name: 'custom',
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.path).toBe(realPathOf(root));
+    expect(intent.name).toBe('custom');
+    expect(intent.key).toBe('custom');
+  });
+
+  it('a folder under a git-managed home does not snap', async () => {
+    // A dotfiles-managed home: the home directory itself is the repository root.
+    const projects = join(TEST_HOME, 'Projects');
+    mkdirSync(projects, { recursive: true });
+    mockGitRoot(TEST_HOME);
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: projects,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.notices).toHaveLength(0);
+    expect(intent.isGitRepository).toBe(false);
+    expect(intent.path).toBe(realPathOf(projects));
+    expect(intent.gitRoot).toBe(realPathOf(TEST_HOME));
   });
 
   it('detects a linked worktree, whose .git is a file not a directory (D-15)', async () => {

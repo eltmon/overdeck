@@ -104,6 +104,7 @@ describe('pan project add (PAN-3836: resolve-before-create)', () => {
       key: 'test-proj',
       name: 'Test Project',
       path: projectDir,
+      notices: [],
       findings: [],
       isGitRepository: true,
       wouldClone: false,
@@ -136,6 +137,7 @@ describe('pan project add (PAN-3836: resolve-before-create)', () => {
       key: null,
       name: '',
       path: projectDir,
+      notices: [],
       findings: [
         {
           field: 'path',
@@ -174,6 +176,7 @@ describe('pan project add (PAN-3836: resolve-before-create)', () => {
       key: 'test-proj',
       name: 'Test Project',
       path: projectDir,
+      notices: [],
       findings: [],
       isGitRepository: true,
       wouldClone: false,
@@ -234,6 +237,7 @@ describe('pan project clone (PAN-3836: clone support)', () => {
       key: 'orca',
       name: 'Orca',
       path: null,
+      notices: [],
       findings: [],
       isGitRepository: true,
       wouldClone: true,
@@ -269,6 +273,7 @@ describe('pan project clone (PAN-3836: clone support)', () => {
       key: null,
       name: '',
       path: null,
+      notices: [],
       findings: [
         {
           field: 'url',
@@ -304,6 +309,7 @@ describe('pan project clone (PAN-3836: clone support)', () => {
       key: 'orca',
       name: 'Orca',
       path: '/home/test/Projects/orca',
+      notices: [],
       findings: [],
       isGitRepository: true,
       wouldClone: true,
@@ -463,6 +469,7 @@ describe('pan project clone — transport and failure reporting (PAN-3836 WI-3)'
       key: 'private',
       name: 'private',
       path: '/home/user/Projects/private',
+      notices: [],
       findings: [],
       isGitRepository: true,
       wouldClone: true,

@@ -17,6 +17,13 @@ export interface ProjectIntentFinding {
   detail?: string;
 }
 
+/** A non-blocking resolve result: the create proceeds, but the operator should know. */
+export interface ProjectIntentNotice {
+  code: string;
+  message: string;
+  detail?: string;
+}
+
 /** The safe projection of a resolved intent. `cloneUrl` arrives redacted. */
 export interface ResolvedProjectIntent {
   mode: ProjectCreateMode;
@@ -40,6 +47,8 @@ export interface ResolvedProjectIntent {
   willCreateMainWorkspace: boolean;
   registeredKeyAtPath: string | null;
   findings: ProjectIntentFinding[];
+  /** The server always sends this; read it as `intent.notices ?? []`. */
+  notices?: ProjectIntentNotice[];
 }
 
 export type ProjectCreateFailureCode =

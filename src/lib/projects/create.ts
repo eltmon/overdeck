@@ -83,14 +83,21 @@ export type ProjectIntentCode =
   | 'path-not-absolute'
   /** The path exists but this server cannot stat or read it. */
   | 'path-unreadable'
-  /** The chosen folder sits inside a repository rooted somewhere else (D-15). */
-  | 'repository-root-elsewhere'
   /** This exact folder is already registered under this key — open or repair it. */
   | 'project-exists-here';
 
 export interface ProjectIntentFinding {
   field: ProjectIntentField;
   code: ProjectIntentCode;
+  message: string;
+  detail?: string;
+}
+
+export type ProjectNoticeCode = 'using-repository-root';
+
+/** A non-blocking resolve result: the create proceeds, but the operator should know. */
+export interface ProjectIntentNotice {
+  code: ProjectNoticeCode;
   message: string;
   detail?: string;
 }
@@ -135,6 +142,7 @@ export interface ResolvedProjectIntent {
   /** Set when this exact path is already registered under this key (repair target). */
   registeredKeyAtPath: string | null;
   findings: ProjectIntentFinding[];
+  notices: ProjectIntentNotice[];
 }
 
 export interface ProjectCreateProgress {
@@ -435,6 +443,7 @@ export async function resolveProjectCreateIntent(
   input: ProjectCreateInput,
 ): Promise<ResolvedProjectIntent> {
   const findings: ProjectIntentFinding[] = [];
+  const notices: ProjectIntentNotice[] = [];
   const home = await canonicalizePath(input.homeDir ?? homedir());
 
   // Defaults are computed before any early return. An empty form still has to
@@ -482,6 +491,7 @@ export async function resolveProjectCreateIntent(
     willCreateMainWorkspace: false,
     registeredKeyAtPath: null,
     findings,
+    notices,
   };
 
   // 1. Mode-specific source validation
@@ -542,7 +552,7 @@ export async function resolveProjectCreateIntent(
   }
 
   // 2. Key
-  const key = intent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  let key = intent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   if (!key.replace(/-/g, '')) {
     findings.push({
       field: 'name',
@@ -570,6 +580,35 @@ export async function resolveProjectCreateIntent(
         detail: intent.path,
       });
       return intent;
+    }
+
+    // Git-root detection runs before the already-registered checks so they
+    // compare the folder that would actually be registered.
+    const root = await detectGitRoot(intent.path);
+    if (root) {
+      const canonicalRoot = await canonicalizePath(root);
+      intent.gitRoot = canonicalRoot;
+      // A dotfiles-managed home is a repository too. Snapping ~/Projects to ~
+      // would offer to register the whole home directory, so a home root counts
+      // as no repository and the folder stays a plain folder.
+      if (canonicalRoot !== home) {
+        intent.isGitRepository = true;
+        if (canonicalRoot !== intent.path) {
+          // Snap to the repository root (Orca parity): registering the subfolder
+          // would root a second project inside an existing checkout.
+          intent.path = canonicalRoot;
+          notices.push({
+            code: 'using-repository-root',
+            message: `Using the repository root ${canonicalRoot}.`,
+            detail: canonicalRoot,
+          });
+          if (!input.name?.trim()) {
+            intent.name = basename(canonicalRoot);
+            key = intent.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            intent.key = key;
+          }
+        }
+      }
     }
   }
 
@@ -665,22 +704,7 @@ export async function resolveProjectCreateIntent(
       }
     }
   } else if (input.mode === 'existing' && intent.path) {
-    const root = await detectGitRoot(intent.path);
-    if (root) {
-      const canonicalRoot = await canonicalizePath(root);
-      intent.isGitRepository = true;
-      intent.gitRoot = canonicalRoot;
-      if (canonicalRoot !== intent.path) {
-        // Registering here would root a second project inside an existing repo,
-        // which is how you end up with two projects fighting over one checkout.
-        findings.push({
-          field: 'path',
-          code: 'repository-root-elsewhere',
-          message: `That folder is inside a Git repository rooted at ${canonicalRoot}. Add that folder instead.`,
-          detail: canonicalRoot,
-        });
-      }
-
+    if (intent.isGitRepository) {
       const originUrl = await detectOriginUrl(intent.path);
       if (originUrl) {
         const parsedOrigin = parseRepoUrl(originUrl);
