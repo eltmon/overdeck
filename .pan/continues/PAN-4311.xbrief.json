@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:00:23.732Z",
+  "updated": "2026-09-28T16:00:36.809Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "governor-cpu-trigger.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T16:00:23.732Z"
+    },
+    "governor-cpu-trigger.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:00:36.809Z"
     }
   }
 }
