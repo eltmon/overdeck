@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3684",
   "created": "2026-09-28T12:12:20.568Z",
-  "updated": "2026-09-28T12:45:21.194Z",
+  "updated": "2026-09-28T13:08:55.457Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,7 +16,7 @@
       "doneAt": "2026-09-28T12:43:51.352Z"
     },
     "auto-start.ac1": {
-      "status": "completed",
+      "status": "cancelled",
       "doneAt": "2026-09-28T12:45:21.194Z"
     }
   }
