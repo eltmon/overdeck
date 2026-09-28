@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:45:03.762Z",
+  "updated": "2026-09-28T00:45:16.532Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "home-mount-card.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T00:45:03.762Z"
+    },
+    "home-mount-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:45:16.531Z"
     }
   }
 }
