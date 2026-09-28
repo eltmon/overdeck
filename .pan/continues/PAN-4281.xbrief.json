@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T08:30:14.517Z",
+  "updated": "2026-09-28T08:30:24.817Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,10 @@
     "dialog-route-audit.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T08:30:14.517Z"
+    },
+    "launcher-focus-after-create.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:30:24.816Z"
     }
   }
 }
