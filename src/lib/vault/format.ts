@@ -18,13 +18,21 @@
  */
 import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto';
 import { promisify } from 'node:util';
-import { zstdCompress, zstdDecompress } from 'node:zlib';
+import * as zlib from 'node:zlib';
 import { lineHash, type Tail } from './continuity.js';
 import type { CwdState } from './cwd-state.js';
 import type { VaultSubkeys } from './identity.js';
 
-const zstdCompressAsync = promisify(zstdCompress);
-const zstdDecompressAsync = promisify(zstdDecompress);
+// zstd landed in Node 22.15 (package.json requires >= 22.16); the installed
+// @types/node predates it, so the two functions are typed here.
+type ZstdCallback = (error: Error | null, result: Buffer) => void;
+type ZstdFn = (input: Uint8Array, callback: ZstdCallback) => void;
+const zlibWithZstd = zlib as unknown as { zstdCompress?: ZstdFn; zstdDecompress?: ZstdFn };
+if (typeof zlibWithZstd.zstdCompress !== 'function' || typeof zlibWithZstd.zstdDecompress !== 'function') {
+  throw new Error(`Session Vault needs zstd support in node:zlib (Node >= 22.15); running ${process.version}`);
+}
+const zstdCompressAsync = promisify(zlibWithZstd.zstdCompress);
+const zstdDecompressAsync = promisify(zlibWithZstd.zstdDecompress);
 
 export const FORMAT_VERSION = 1;
 export const CHUNK_CODEC = 'zstd';
