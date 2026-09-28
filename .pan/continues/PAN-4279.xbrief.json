@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:40:08.920Z",
+  "updated": "2026-09-28T00:40:21.702Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "boundary-first-load.ac5": {
       "status": "completed",
       "doneAt": "2026-09-28T00:40:08.920Z"
+    },
+    "remove-outage-guards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:40:21.702Z"
     }
   }
 }
