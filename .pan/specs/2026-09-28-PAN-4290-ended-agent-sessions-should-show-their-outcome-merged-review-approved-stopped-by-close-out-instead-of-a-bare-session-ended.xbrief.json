@@ -4,17 +4,17 @@
     "created": "2026-09-28T12:11:55Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4290: Ended agent sessions should show their outcome (Merged, Review approved, Stopped by close-out) instead of a bare \"Session ended\"",
-    "updated": "2026-09-28T12:18:48.707Z"
+    "updated": "2026-09-28T12:19:26.855Z"
   },
   "plan": {
     "id": "pan-4290",
     "title": "Ended agent sessions should show their outcome (Merged, Review approved, Stopped by close-out) instead of a bare \"Session ended\"",
-    "status": "proposed",
+    "status": "running",
     "uid": "9c716bd9-7aca-4ee3-9015-e8f1fc63868a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-28T12:11:55Z",
-    "updated": "2026-09-28T12:18:48.707Z",
+    "updated": "2026-09-28T12:19:26.855Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4290",
