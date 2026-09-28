@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T01:10:13.009Z",
+  "updated": "2026-09-28T01:11:39.227Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,9 +112,10 @@
       "doneAt": "2026-09-28T01:10:07.973Z"
     },
     "docs-onboarding": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4281",
-      "claimedAt": "2026-09-28T01:10:13.009Z"
+      "claimedAt": "2026-09-28T01:10:13.009Z",
+      "doneAt": "2026-09-28T01:11:39.227Z"
     }
   }
 }
