@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T00:41:21.573Z",
+  "updated": "2026-09-28T00:43:47.611Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-28T00:40:54.975Z"
     },
     "default-remove-workspace": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4283",
-      "claimedAt": "2026-09-28T00:41:21.573Z"
+      "claimedAt": "2026-09-28T00:41:21.573Z",
+      "doneAt": "2026-09-28T00:43:47.611Z"
     }
   }
 }
