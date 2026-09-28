@@ -4,17 +4,17 @@
     "created": "2026-09-28T00:21:28Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4283: Close-out settings in the dashboard (remove workspace, delete branch, auto close-out) with disk cost and cleanup, and an honest teardown row",
-    "updated": "2026-09-28T00:29:16.274Z"
+    "updated": "2026-09-28T00:29:51.447Z"
   },
   "plan": {
     "id": "pan-4283",
     "title": "Close-out settings in the dashboard (remove workspace, delete branch, auto close-out) with disk cost and cleanup, and an honest teardown row",
-    "status": "proposed",
+    "status": "running",
     "uid": "c311f314-81fe-4a0f-92df-de7a2919201b",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-28T00:21:28Z",
-    "updated": "2026-09-28T00:29:16.274Z",
+    "updated": "2026-09-28T00:29:51.447Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4283",
