@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:58:55.966Z",
+  "updated": "2026-09-28T13:59:08.037Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -170,6 +170,10 @@
     "unauthorized-phase.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T13:58:55.966Z"
+    },
+    "unauthorized-phase.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:08.037Z"
     }
   }
 }
