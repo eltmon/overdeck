@@ -4,17 +4,17 @@
     "created": "2026-09-27T23:44:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4281: Orca-style onboarding: Add Project dialog with repo-root snap, folder-of-repos import (separate or one multi-repo project), and a Smart field on New Workspace",
-    "updated": "2026-09-27T23:53:46.955Z"
+    "updated": "2026-09-27T23:54:23.299Z"
   },
   "plan": {
     "id": "pan-4281",
     "title": "Orca-style onboarding: Add Project dialog with repo-root snap, folder-of-repos import (separate or one multi-repo project), and a Smart field on New Workspace",
-    "status": "proposed",
+    "status": "running",
     "uid": "2b6ff99c-a8e5-4027-b32a-b82e9a129998",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T23:44:35Z",
-    "updated": "2026-09-27T23:53:46.955Z",
+    "updated": "2026-09-27T23:54:23.299Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4281",
