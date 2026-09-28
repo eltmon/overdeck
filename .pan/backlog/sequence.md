@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T13:28:11.801764Z · model: claude-opus-5-5 · open: 788_
+_Last sequenced: 2026-09-28T13:29:20.614244Z · model: claude-opus-5-5 · open: 788_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1103,7 +1103,7 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T13:28:11.801764Z",
+  "generatedAt": "2026-09-28T13:29:20.614244Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 788,
