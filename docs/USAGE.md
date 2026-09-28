@@ -376,11 +376,12 @@ The singular `pan project` form is a compatibility alias.
 # Sync layered context and bundled skills to Claude Code
 pan sync
 
-# List available skills
+# List skills with their effective on/off state and its source
 pan skills
+pan skills list --project <key> --issue <id>
 
-# Validate skill format
-pan skills validate /path/to/skill
+# Turn a skill on, off, or back to inherit (global unless --project/--issue)
+pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
 ```
 
 ### Release Commands
