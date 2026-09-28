@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:06:12.718Z",
+  "updated": "2026-09-28T16:06:25.203Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -328,6 +328,10 @@
     "runaway-wiring.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T16:06:12.717Z"
+    },
+    "runaway-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:06:25.203Z"
     }
   }
 }
