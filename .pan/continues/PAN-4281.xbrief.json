@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T08:29:21.224Z",
+  "updated": "2026-09-28T08:29:31.904Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,10 @@
     "dialog-nested-step.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T08:29:21.223Z"
+    },
+    "dialog-nested-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:29:31.904Z"
     }
   }
 }
