@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 778_
+_Last sequenced: 2026-09-28T12:46:14.136186Z · model: claude-opus-5-5 · open: 782_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,6 +8,8 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 1 | PAN-4290 | M | medium | ok |  |  | In-pipeline (live workspace): ended sessions show derived outcome (Merged, Approved, Stopped) instead of bare 'Session ended' |
 | 2 | PAN-4291 | L | high | ok |  |  | In-pipeline (live workspace): own polling drains GitHub GraphQL budget hourly, pausing calls; sampler reads wrong counter |
 | 3 | PAN-4292 | M | medium | ok |  |  | In-pipeline (live workspace): steer running Claude Code/Codex turns from composer (Ctrl+Enter) and pan tell --steer, not only Pi. |
+| 4 | PAN-4300 | S | high | ok |  |  | In-pipeline (live workspace): dead agents re-emit heartbeat_dead + status→running each minute, ~50k events/day flooding Activity |
+| 5 | PAN-4301 | L | medium | ok |  | PAN-4300 | In-pipeline (live workspace): Awareness feed shows transitions not a live chat index; one card per gauntlet run; telemetry out of feed |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -111,6 +113,7 @@ _Last sequenced: 2026-09-28T12:43:01.812749Z · model: claude-opus-5-5 · open: 
 | 142 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
 | 143 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
 | 144 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 145 | PAN-4302 | M | high | ok |  | PAN-4291 | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
 | 146 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
 | 147 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
 | 148 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
@@ -799,6 +802,14 @@ New issue already in the pipeline with a live workspace, so it is pinned at the 
 
 New issue already in the pipeline with a live workspace, so it is pinned in the in-pipeline tier at a free top slot rather than ranked against the queue; it extends the existing Pi-only steer delivery to Claude Code and Codex and carries an explicit implementation checkpoint on keystroke mechanics.
 
+### PAN-4300 (rank 4)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the free rank 4 slot rather than ranked against the backlog. It is a well-scoped event-emission bug in the stopped notifier with concrete ACs (one emission per real transition, fake-timer tests, docs), and it is the stated prerequisite for the PAN-4301 Awareness feed redesign, so importance is high and condition ok.
+
+### PAN-4301 (rank 5)
+
+New issue already in the pipeline with a live workspace and a committed PRD (.pan/drafts/pan-4301.md), so it is pinned at the free rank 5 slot. It is a derive-not-store frontend/read-model redesign built on existing lane and conversation facts; it depends on PAN-4300 removing the dead-agent event flood before telemetry moves into the Detailed stream.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1079,14 +1090,6 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 
 New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
 
-### PAN-2639 (rank 115)
-
-codex-resume replays a rotated-out revoked refresh token, wedging every codex review convoy with 401.
-
-### PAN-2331 (rank 116)
-
-Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no auto-dismiss.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1094,10 +1097,10 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T12:43:01.812749Z",
+  "generatedAt": "2026-09-28T12:46:14.136186Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 778,
+  "openCount": 782,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -10766,6 +10769,49 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "rationale": "New since the prior run: the last step of the Fly track with four unbuilt prerequisites and open isolation and credential questions, so it ranks below its dependencies.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4300",
+      "rank": 4,
+      "size": "S",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): dead agents re-emit heartbeat_dead + status→running each minute, ~50k events/day flooding Activity",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the free rank 4 slot rather than ranked against the backlog. It is a well-scoped event-emission bug in the stopped notifier with concrete ACs (one emission per real transition, fake-timer tests, docs), and it is the stated prerequisite for the PAN-4301 Awareness feed redesign, so importance is high and condition ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4301",
+      "rank": 5,
+      "size": "L",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4300"
+      ],
+      "why": "In-pipeline (live workspace): Awareness feed shows transitions not a live chat index; one card per gauntlet run; telemetry out of feed",
+      "rationale": "New issue already in the pipeline with a live workspace and a committed PRD (.pan/drafts/pan-4301.md), so it is pinned at the free rank 5 slot. It is a derive-not-store frontend/read-model redesign built on existing lane and conversation facts; it depends on PAN-4300 removing the dead-agent event flood before telemetry moves into the Detailed stream.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4302",
+      "rank": 145,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4291"
+      ],
+      "why": "~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291",
+      "rationale": "New follow-up split out of PAN-4291 (in pipeline at rank 2): it migrates the remaining direct gh callers to runGh so the quota ledger attributes spend and non-essential callers respect quota pauses. The file list and grep-based ACs are concrete, so condition is ok; it ranks just after PAN-2259 (GraphQL quota burn) because it completes the same quota-hardening line and needs PAN-4291 to land first.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -11930,6 +11976,27 @@ Codex rate-limit Switch to gpt-5.4-mini modal stalls autonomous agents with no a
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.9
+    },
+    {
+      "from": "PAN-4291",
+      "to": "PAN-4302",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4300",
+      "to": "PAN-4301",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-2259",
+      "to": "PAN-4302",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
