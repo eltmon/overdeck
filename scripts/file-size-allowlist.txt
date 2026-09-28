@@ -145,3 +145,4 @@
 1035 src/cli/commands/doctor.ts # PAN-3668
 1038 src/cli/commands/doctor.ts # PAN-1641
 1040 src/cli/commands/doctor.ts # PAN-1641
+1221 src/dashboard/server/ws-rpc.ts # PAN-1166
