@@ -14,6 +14,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
+import { isServerWriteBlocked } from '../../lib/connectionState';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
@@ -159,6 +160,7 @@ export function ComposerFooter({
   const removeAttachmentForConversation = useComposerStore((s) => s.removeAttachment);
   const consumeAttachmentsForConversation = useComposerStore((s) => s.consumeAttachments);
   const addCommandResult = useComposerStore((s) => s.addCommandResult);
+  const holdSend = useComposerStore((s) => s.holdSend);
 
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
@@ -507,6 +509,26 @@ export function ComposerFooter({
         return;
       }
 
+      // Degraded mode (PAN-4279): while the server is unreachable a prompt is
+      // held and sent on reconnect; a command needs a live round trip, so it
+      // keeps its draft instead.
+      if (isServerWriteBlocked()) {
+        if (isPortableCommand) {
+          toast.error("Can't reach the Overdeck server — commands need a live connection");
+          return;
+        }
+        holdSend(submitConversationName, composedMessage, {
+          clientMessageId,
+          deliverAs: piConversation && deliverAs !== 'auto' ? deliverAs : undefined,
+        });
+        consumeAttachmentsForConversation(submitConversationName);
+        editor.update(() => {
+          $getRoot().clear();
+        });
+        setText('');
+        return;
+      }
+
       // The `/pan` namespace is intercepted by the dashboard control plane and
       // returns a structured result. It must never appear as an optimistic user
       // prompt or reach the harness transcript.
@@ -564,7 +586,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, piConversation, sending, setSendingFor]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;

@@ -33,6 +33,7 @@ import styles from '../../CommandDeck/styles/command-deck.module.css';
 import type { MessagesTimelineProps, RoundMarker } from './types';
 import { RoundDivider } from './dividers';
 import { TimelineRowRenderer } from './TimelineRowRenderer';
+import { useConnectionPhase } from '../../../lib/connectionState';
 import {
   ALWAYS_UNVIRTUALIZED_TAIL_ROWS,
   AUTO_SCROLL_THRESHOLD_PX,
@@ -76,6 +77,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   targetMessageNonce,
   onTargetMessageHandled,
 }: MessagesTimelineProps) {
+  const connectionPhase = useConnectionPhase();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
@@ -638,7 +640,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             </div>
             <div className={styles.failedMessageActions}>
               <span className={styles.failedMessageLabel}>
-                {fm.notFoundInTranscript ? 'Not found in transcript'
+                {fm.heldOffline ? 'Waiting to send — will send when the server reconnects'
+                  : fm.notFoundInTranscript ? 'Not found in transcript'
                   : fm.deliveryUnknown ? 'Delivery not confirmed'
                   : fm.kind === 'command' ? 'Command request failed' : 'Failed to send'}
               </span>
@@ -647,7 +650,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                   {fm.error}
                 </span>
               )}
-              {fm.retryable !== false && (
+              {fm.retryable !== false && !(fm.heldOffline && connectionPhase !== 'live') && (
                 <button
                   className={styles.failedMessageBtn}
                   onClick={() => onRetryFailed?.(fm.id, fm.text)}

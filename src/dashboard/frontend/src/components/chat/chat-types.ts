@@ -44,6 +44,8 @@ export interface FailedMessage {
   deliverAs?: 'steer' | 'follow_up';
   /** True for an accepted bubble moved to the outbox after staying unmatched too long (PAN-4247). */
   notFoundInTranscript?: boolean;
+  /** Submitted while the server was unreachable: never POSTed, sent on reconnect (PAN-4279). */
+  heldOffline?: boolean;
 }
 
 export interface WorkLogEntry {
