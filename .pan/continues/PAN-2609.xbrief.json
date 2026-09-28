@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-28T14:47:50.731Z",
+  "updated": "2026-09-28T14:48:40.316Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -143,6 +143,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-2609",
       "claimedAt": "2026-09-28T14:47:50.731Z"
+    },
+    "cli-evict-restore": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2609",
+      "claimedAt": "2026-09-28T14:48:40.316Z"
     }
   }
 }
