@@ -4,17 +4,17 @@
     "created": "2026-09-28T10:08:48Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3942: Per-skill on/off at global, project, and issue level",
-    "updated": "2026-09-28T10:14:34.846Z"
+    "updated": "2026-09-28T17:20:51.765Z"
   },
   "plan": {
     "id": "pan-3942",
     "title": "Per-skill on/off at global, project, and issue level (rescoped from skill bundles)",
-    "status": "proposed",
+    "status": "running",
     "uid": "e4192152-b331-4532-9c6e-4ae05a3e03d0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-28T10:08:48Z",
-    "updated": "2026-09-28T10:14:34.846Z",
+    "updated": "2026-09-28T17:20:51.765Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3942",
