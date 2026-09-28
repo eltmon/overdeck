@@ -20,6 +20,7 @@ import { decodeChunk, isTombstone, readSessionRecord, refName, type SessionRecor
 import type { VaultSubkeys } from './identity.js';
 import { listOwned, type OwnedEntry } from './local-index.js';
 import type { VaultStore } from './store/types.js';
+import { removeTranscriptFile } from '../cloister/transcript-deletion-door.js';
 
 export const EVICTION_BATCH_FILENAME = 'eviction-batch.json';
 
@@ -250,4 +251,69 @@ export async function reofferEntry(vaultId: string): Promise<EvictionBatch> {
   batch.declined = batch.declined.filter((declined) => declined.vaultId !== vaultId);
   await writeEvictionBatch(batch);
   return batch;
+}
+
+export interface ConfirmOptions {
+  store: VaultStore;
+  keys: VaultSubkeys;
+  config?: VaultConfig;
+  now?: () => Date;
+}
+
+export type ConfirmResult =
+  | { refused: true; fingerprint: string }
+  | {
+      refused: false;
+      deleted: string[];
+      skipped: Array<{ nativePath: string; reason: string }>;
+      bytesFreed: number;
+      /** Fingerprint of the batch that remains after this confirmation. */
+      fingerprint: string;
+    };
+
+/**
+ * FR-21: delete the reviewed batch. `fingerprint` must equal the current
+ * batch fingerprint, otherwise nothing is deleted and the current fingerprint
+ * is returned for a fresh review. Each entry re-runs the FR-16 checks (size
+ * unchanged since review, quiet, covering chunk reads back and matches)
+ * immediately before `removeTranscriptFile`; failing entries stay in the batch
+ * with their new status and reason. This is the only deletion call site in
+ * src/lib/vault (P-9).
+ */
+export async function confirmEviction(fingerprint: string, options: ConfirmOptions): Promise<ConfirmResult> {
+  const { store, keys } = options;
+  const now = options.now ?? (() => new Date());
+  const config = options.config ?? (await readVaultConfig());
+  const batch = await readEvictionBatch();
+  const current = batchFingerprint(batch);
+  if (current !== fingerprint) return { refused: true, fingerprint: current };
+
+  const me = await ensureEnvironmentIdentity();
+  const owned = await listOwned();
+  const deleted: string[] = [];
+  const skipped: Array<{ nativePath: string; reason: string }> = [];
+  let bytesFreed = 0;
+  const remaining: EvictionEntry[] = [];
+  for (const entry of batch.entries) {
+    const at = now().toISOString();
+    const ownedEntry = owned[entry.nativePath];
+    const record = ownedEntry ? await readOwnedRecord(store, keys, ownedEntry.vaultId) : null;
+    const check = ownedEntry
+      ? await checkEligibility(entry.nativePath, ownedEntry, record, store, keys, config, now, me.environmentId)
+      : { ok: false, reason: 'transcript is no longer in the local index', sizeBytes: 0, settlementChunk: null };
+    let reason = check.ok ? undefined : check.reason;
+    if (check.ok && check.sizeBytes !== entry.sizeBytes) reason = `file size changed since review (${entry.sizeBytes} -> ${check.sizeBytes} bytes)`;
+    if (check.ok && check.settlementChunk !== entry.settlementChunk) reason = 'a new settlement happened since review';
+    if (reason !== undefined) {
+      skipped.push({ nativePath: entry.nativePath, reason });
+      remaining.push({ ...entry, verification: 'failed', reason, checkedAt: at });
+      continue;
+    }
+    await removeTranscriptFile(entry.nativePath);
+    deleted.push(entry.nativePath);
+    bytesFreed += entry.sizeBytes;
+  }
+  batch.entries = remaining;
+  await writeEvictionBatch(batch);
+  return { refused: false, deleted, skipped, bytesFreed, fingerprint: batchFingerprint(batch) };
 }
