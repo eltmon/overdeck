@@ -60,6 +60,57 @@ function collectPrivateKeyRanges(text: string, ranges: RedactionRange[]): void {
   }
 }
 
+/**
+ * Patterns whose presence blocks a Session Vault settlement (PAN-2609 P-8).
+ * `ENV_ASSIGNMENT_PATTERN` and `LABELLED_SECRET_PATTERN` stay redaction-only:
+ * `FOO=bar` and `token: x` appear in ordinary shell output in almost every
+ * coding session, so blocking on them would refuse most sessions.
+ */
+export type SecretPatternName =
+  | 'api-key'
+  | 'token'
+  | 'aws-access-key'
+  | 'jwt'
+  | 'database-url'
+  | 'basic-auth-url'
+  | 'private-key';
+
+export interface SecretMatch {
+  pattern: SecretPatternName;
+  start: number;
+  end: number;
+}
+
+const BLOCKING_REGEX_PATTERNS: ReadonlyArray<[SecretPatternName, RegExp]> = [
+  ['api-key', API_KEY_PATTERN],
+  ['token', TOKEN_PATTERN],
+  ['aws-access-key', AWS_ACCESS_KEY_PATTERN],
+  ['jwt', JWT_PATTERN],
+  ['database-url', DATABASE_URL_PATTERN],
+  ['basic-auth-url', BASIC_AUTH_URL_PATTERN],
+];
+
+/**
+ * Locate every blocking-pattern match in `text`, sorted by offset. Returns
+ * positions and pattern names only; callers must never echo the matched value.
+ * Built from the same constants and collectors `redactSensitiveText` uses, so
+ * the two never disagree about what a secret looks like.
+ */
+export function findSecretMatches(text: string): SecretMatch[] {
+  const matches: SecretMatch[] = [];
+  const privateKeyRanges: RedactionRange[] = [];
+  collectPrivateKeyRanges(text, privateKeyRanges);
+  for (const range of privateKeyRanges) {
+    matches.push({ pattern: 'private-key', start: range.start, end: range.end });
+  }
+  for (const [pattern, regex] of BLOCKING_REGEX_PATTERNS) {
+    const ranges: RedactionRange[] = [];
+    collectRegexRanges(text, regex, ranges, '');
+    for (const range of ranges) matches.push({ pattern, start: range.start, end: range.end });
+  }
+  return matches.sort((a, b) => a.start - b.start || b.end - a.end);
+}
+
 function collectRedactionRanges(text: string): RedactionRange[] {
   const ranges: RedactionRange[] = [];
   collectPrivateKeyRanges(text, ranges);
