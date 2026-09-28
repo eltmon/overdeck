@@ -23,17 +23,11 @@ function render(ui: ReactElement) {
 
 const hookSources = vi.hoisted(() => ({
   conversations: { entries: [] as ConversationSessionFeedEntry[], isLoading: false, error: null as Error | null },
-  git: { entries: [] as GitSessionFeedEntry[], isLoading: false, error: null as Error | null },
   useConversationFeed: vi.fn(),
-  useGitFeed: vi.fn(),
 }));
 
 vi.mock('../useConversationFeed', () => ({
   useConversationFeed: hookSources.useConversationFeed,
-}));
-
-vi.mock('../useGitFeed', () => ({
-  useGitFeed: hookSources.useGitFeed,
 }));
 
 const now = new Date('2026-05-23T01:05:00.000Z');
@@ -110,11 +104,8 @@ describe('SessionFeedSidebar', () => {
     window.history.pushState(null, '', '/');
     window.localStorage.clear();
     hookSources.conversations = { entries: [], isLoading: false, error: null };
-    hookSources.git = { entries: [], isLoading: false, error: null };
     hookSources.useConversationFeed.mockImplementation(() => hookSources.conversations);
-    hookSources.useGitFeed.mockImplementation(() => hookSources.git);
     hookSources.useConversationFeed.mockClear();
-    hookSources.useGitFeed.mockClear();
     useDashboardStore.setState({
       agentsById: {},
       channelPermissionRequestsById: {},
@@ -132,16 +123,13 @@ describe('SessionFeedSidebar', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the six tabs in reference order and calls onClose', () => {
+  it('renders the All, Chats and Activity tabs only and calls onClose — PAN-4301 FR-16', () => {
     const onClose = vi.fn();
     render(<SessionFeedSidebar onClose={onClose} now={now} />);
 
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'All',
       'Chats',
-      'Files',
-      'Git',
-      'Comments',
       'Activity',
     ]);
 
@@ -150,7 +138,7 @@ describe('SessionFeedSidebar', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('renders per-tab empty states and only shows the all-tab empty state when every wired source is empty', () => {
+  it('renders per-tab empty states when every source is empty', () => {
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
     expect(screen.getByTestId('session-feed-empty-all')).toHaveTextContent('No session activity yet.');
@@ -158,34 +146,32 @@ describe('SessionFeedSidebar', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Chats' }));
     expect(screen.getByTestId('session-feed-empty-chats')).toHaveTextContent('No chats yet.');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Git' }));
-    expect(screen.getByTestId('session-feed-empty-git')).toHaveTextContent('No git activity yet.');
-
     fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
     expect(screen.getByTestId('session-feed-empty-activity')).toHaveTextContent('No activity updates yet.');
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
-    expect(screen.getByTestId('session-feed-empty-files')).toHaveTextContent('Files feed coming soon.');
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Comments' }));
-    expect(screen.getByTestId('session-feed-empty-comments')).toHaveTextContent('Comments feed coming soon.');
   });
 
-  it('renders stub tabs without invoking wired feed hooks', () => {
-    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, 'files');
+  it.each(['git', 'files', 'comments'])('falls back to All for a stored hidden tab %s', (stored) => {
+    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, stored);
 
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
-    expect(screen.getByTestId('session-feed-empty-files')).toHaveTextContent('Files feed coming soon.');
-    expect(screen.getByText('Aggregate file changes are not wired into the session feed yet.')).toBeTruthy();
-    expect(screen.queryByText('Loading activity…')).toBeNull();
-    expect(hookSources.useConversationFeed).not.toHaveBeenCalled();
-    expect(hookSources.useGitFeed).not.toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.localStorage.getItem(SESSION_FEED_TAB_STORAGE_KEY)).toBe('all');
+  });
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Comments' }));
+  it('shows the All empty state when every entry is outside the All window', () => {
+    hookSources.conversations = {
+      entries: [conversationEntry({ timestamp: '2026-05-21T01:00:00.000Z', recencyAt: '2026-05-23T01:04:00.000Z', sessionAlive: true })],
+      isLoading: false,
+      error: null,
+    };
 
-    expect(screen.getByTestId('session-feed-empty-comments')).toHaveTextContent('Comments feed coming soon.');
-    expect(screen.getByText('Issue comments are not cached for the session feed yet.')).toBeTruthy();
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    expect(screen.getByTestId('session-feed-empty-all')).toHaveTextContent('No session activity yet.');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Chats' }));
+    expect(screen.queryByTestId('session-feed-empty-chats')).toBeNull();
   });
 
   it('does not render the all-tab empty state when another wired source has entries', () => {
@@ -278,11 +264,11 @@ describe('SessionFeedSidebar', () => {
   });
 
   it('persists the active tab in localStorage and restores it on mount', () => {
-    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, 'git');
+    window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, 'chats');
 
     render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
 
-    expect(screen.getByRole('tab', { name: 'Git' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Chats' })).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
 
