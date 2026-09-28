@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T10:36:03.816935Z · model: claude-opus-5-5 · open: 771_
+_Last sequenced: 2026-09-28T11:54:08.902217Z · model: claude-opus-5-5 · open: 770_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-4290 | M | medium | ok |  |  | In-pipeline (live workspace): ended sessions show derived outcome (Merged, Approved, Stopped) instead of bare 'Session ended' |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -203,7 +204,6 @@ _Last sequenced: 2026-09-28T10:36:03.816935Z · model: claude-opus-5-5 · open: 
 | 250 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
 | 251 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
 | 252 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 253 | PAN-4243 | S | medium | ok |  |  | Fix deployed (build 063c780641d), search re-enabled in config pending restart; left: confirm search, drop dead EINTR path + dep |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
 | 258 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
@@ -516,7 +516,7 @@ _Last sequenced: 2026-09-28T10:36:03.816935Z · model: claude-opus-5-5 · open: 
 | 592 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
 | 593 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
 | 594 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 595 | PAN-3684 | XS | medium | ok |  | PAN-1641 | Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence |
+| 595 | PAN-3684 | XS | medium | ok |  |  | Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence |
 | 596 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
 | 597 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
 | 598 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
@@ -580,7 +580,7 @@ _Last sequenced: 2026-09-28T10:36:03.816935Z · model: claude-opus-5-5 · open: 
 | 662 | PAN-2352 | M | low | needs-refinement |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
 | 663 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 664 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 665 | PAN-3011 | M | low | ok |  | PAN-1641, PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 665 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 666 | PAN-3957 | L | low | ok |  |  | Parked: Overdeck-owned project memory in the repo replacing per-harness auto-memory; needs a PRD deciding the store location |
 | 667 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
 | 668 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
@@ -623,7 +623,7 @@ _Last sequenced: 2026-09-28T10:36:03.816935Z · model: claude-opus-5-5 · open: 
 | 708 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
 | 709 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
 | 710 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
+| 711 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
 | 712 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
 | 713 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
 | 714 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
@@ -646,9 +646,8 @@ _Last sequenced: 2026-09-28T10:36:03.816935Z · model: claude-opus-5-5 · open: 
 | 731 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
 | 732 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
 | 733 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 734 | PAN-4248 | L | medium | ok |  | PAN-1641 | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; starts after PAN-1641 merges. |
 | 735 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 736 | PAN-4275 | S | low | ok |  | PAN-1641 | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge |
+| 736 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
 | 737 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
 | 738 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
 | 739 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
@@ -778,6 +777,10 @@ _Last sequenced: 2026-09-28T10:36:03.816935Z · model: claude-opus-5-5 · open: 
 | 872 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
 
 ## Rationale detail
+
+### PAN-4290 (rank 1)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the free rank 1 slot rather than ranked against the backlog. It is a frontend read-time derivation over existing facts (pipeline journal, PR, role, supervisor stopped event) with clear ACs and no new stored status, so condition is ok at medium importance.
 
 ### PAN-4217 (rank 23)
 
@@ -1075,10 +1078,6 @@ Codex weekly-quota exhaustion has no graceful handling — needs resource alert 
 
 New issue, placed at free rank 118 beside PAN-3899 (rank 99) on the same restart/boot-gate surface: needs-refinement because the premise is unverified ("very likely"), the fix is an undecided two-option choice (support a Deacon-off primary vs refuse --no-deacon up front and correct the skill), and the body bundles a second defect (pan restart --now dropping a running reload's gate flags).
 
-### PAN-2511 (rank 119)
-
-Work agents burn 20+ min on false test failures — sandbox denies spawnSync git (EPERM); a per-issue cycle-time sink.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1086,10 +1085,10 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T10:36:03.816935Z",
+  "generatedAt": "2026-09-28T11:54:08.902217Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 771,
+  "openCount": 770,
   "nodes": [
     {
       "issue": "PAN-4217",
@@ -3618,19 +3617,6 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "planning": "auto"
     },
     {
-      "issue": "PAN-4243",
-      "rank": 253,
-      "size": "S",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Fix deployed (build 063c780641d), search re-enabled in config pending restart; left: confirm search, drop dead EINTR path + dep",
-      "rationale": "Rank held; score lowered because the 2026-09-28 comment confirms the polling-watcher fix is live in the running build and the search stopgap is reverted, so only confirmation after the next restart and dead-code removal remain.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3013",
       "rank": 255,
       "size": "XS",
@@ -3651,6 +3637,7 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "condition": "ok",
       "dependsOn": [],
       "why": "Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries.",
+      "rationale": "PAN-4243 (the dashboard wedge that forced search off) closed as completed; rank unchanged, the search pipeline gaps in this issue still stand.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7451,9 +7438,7 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "importance": "medium",
       "score": 40,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-1641"
-      ],
+      "dependsOn": [],
       "why": "Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence",
       "gate": "auto",
       "planning": "auto"
@@ -8235,11 +8220,10 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "score": 26,
       "condition": "ok",
       "dependsOn": [
-        "PAN-1641",
         "PAN-465"
       ],
       "why": "Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU.",
-      "rationale": "Re-derived github-ref dependencies this pass: the body gates its Ollama path on #1641 and its hosted path on #465. Rank unchanged - both cross-references predate the prior pass.",
+      "rationale": "PAN-1641 (the Ollama path) closed as completed, so only the hosted-path dependency on PAN-465 remains; rank unchanged because the hardware limit still applies.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8754,18 +8738,6 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "planning": "auto"
     },
     {
-      "issue": "PAN-1641",
-      "rank": 711,
-      "size": "M",
-      "importance": "low",
-      "score": 22,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Run agents on local GPU models via a managed Ollama sidecar",
-      "gate": "auto",
-      "planning": "skip"
-    },
-    {
       "issue": "PAN-1117",
       "rank": 712,
       "size": "M",
@@ -9037,16 +9009,14 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
     },
     {
       "issue": "PAN-4248",
-      "rank": 734,
+      "rank": 711,
       "size": "L",
       "importance": "medium",
       "score": 24,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-1641"
-      ],
-      "why": "List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; starts after PAN-1641 merges.",
-      "rationale": "New issue (2026-09-27) with clear ACs, but its body says to start only after the PAN-1641 Ollama sidecar merges, so it ranks just behind that parent.",
+      "dependsOn": [],
+      "why": "List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged.",
+      "rationale": "Its only blocker, the PAN-1641 Ollama sidecar, closed as completed, so it moves into the freed rank 711 slot ahead of other local-model work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9069,11 +9039,9 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "importance": "low",
       "score": 20,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-1641"
-      ],
-      "why": "Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge",
-      "rationale": "New follow-up carved from PAN-1641's cancelled e2e item; ranked just below its in-pipeline parent as low-importance local-model work.",
+      "dependsOn": [],
+      "why": "Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged.",
+      "rationale": "PAN-1641 closed as completed, which removes the merge blocker; rank unchanged because the open question is model capability, not the sidecar.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10634,6 +10602,19 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4290",
+      "rank": 1,
+      "size": "M",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): ended sessions show derived outcome (Merged, Approved, Stopped) instead of bare 'Session ended'",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the free rank 1 slot rather than ranked against the backlog. It is a frontend read-time derivation over existing facts (pipeline journal, PR, role, supervisor stopped event) with clear ACs and no new stored status, so condition is ok at medium importance.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -10741,13 +10722,6 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-1641",
-      "to": "PAN-3684",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.95
     },
     {
       "from": "PAN-3566",
@@ -11112,13 +11086,6 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 0.95
-    },
-    {
-      "from": "PAN-1641",
-      "to": "PAN-3011",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.8
     },
     {
       "from": "PAN-465",
@@ -11569,41 +11536,6 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "confidence": 0.6
     },
     {
-      "from": "PAN-4243",
-      "to": "PAN-1711",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4243",
-      "to": "PAN-2905",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4243",
-      "to": "PAN-3522",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4243",
-      "to": "PAN-3771",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
-      "from": "PAN-1641",
-      "to": "PAN-4248",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4253",
       "to": "PAN-4255",
       "type": "unblocks",
@@ -11616,13 +11548,6 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-1641",
-      "to": "PAN-4275",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-4275",
