@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:18:23.503Z",
+  "updated": "2026-09-28T14:18:34.466Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "sampler-graphql-source.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T14:18:23.503Z"
+    },
+    "pause-until-window-reset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:18:34.466Z"
     }
   }
 }
