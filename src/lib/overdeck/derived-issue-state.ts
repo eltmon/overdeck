@@ -73,6 +73,7 @@ import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { inferProjectForge } from '../project-repos.js';
 import { cachedApprovalAtHead } from '../cloister/approval-at-head.js';
 import { runGh } from '../github-quota/run-gh.js';
+import { shouldListPullRequests } from './pr-cache-policy.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -321,6 +322,8 @@ export async function listRepoPullRequests(projectPath: string): Promise<readonl
  */
 export async function readRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[] | null> {
   return cachedRepoPullRequests(projectPath, async () => {
+    // PAN-4291: no tracker or no git remote means gh could never answer.
+    if (!(await shouldListPullRequests(projectPath))) return [];
     try {
       // PAN-4264: metered as caller pr-cache; a pause or refusal lands in the
       // catch below and reads as "failed" (null), never as "no PRs".
