@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T10:34:38.673616Z · model: claude-opus-5-5 · open: 771_
+_Last sequenced: 2026-09-28T10:36:03.816935Z · model: claude-opus-5-5 · open: 771_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -203,7 +203,7 @@ _Last sequenced: 2026-09-28T10:34:38.673616Z · model: claude-opus-5-5 · open: 
 | 250 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
 | 251 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
 | 252 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 253 | PAN-4243 | S | medium | ok |  |  | Parcel-watcher futex wedge fixed on main (polling watcher); left: pan reload, re-enable search, drop dead EINTR path + @parcel/watcher |
+| 253 | PAN-4243 | S | medium | ok |  |  | Fix deployed (build 063c780641d), search re-enabled in config pending restart; left: confirm search, drop dead EINTR path + dep |
 | 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
 | 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
 | 258 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
@@ -1086,7 +1086,7 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T10:34:38.673616Z",
+  "generatedAt": "2026-09-28T10:36:03.816935Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 771,
@@ -3622,11 +3622,11 @@ Work agents burn 20+ min on false test failures — sandbox denies spawnSync git
       "rank": 253,
       "size": "S",
       "importance": "medium",
-      "score": 60,
+      "score": 50,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Parcel-watcher futex wedge fixed on main (polling watcher); left: pan reload, re-enable search, drop dead EINTR path + @parcel/watcher",
-      "rationale": "New issue filed with its fix already on main (93468d610c1): the conversation watcher now polls instead of using @parcel/watcher, whose dead-backend destructor hung the main thread after EINTR. What remains is small: ship the fix with pan reload, set conversationSearch.enabled back to true, and delete the now-dead EINTR resubscribe path and the @parcel/watcher dependency. It sits beside PAN-3771 (conversation search) because re-enabling search depends on this fix deploying, and it separates the 0% CPU wedge from the CPU-burning stalls in PAN-1711 and PAN-2905.",
+      "why": "Fix deployed (build 063c780641d), search re-enabled in config pending restart; left: confirm search, drop dead EINTR path + dep",
+      "rationale": "Rank held; score lowered because the 2026-09-28 comment confirms the polling-watcher fix is live in the running build and the search stopgap is reverted, so only confirmation after the next restart and dead-code removal remain.",
       "gate": "auto",
       "planning": "auto"
     },
