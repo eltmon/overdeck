@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:03:00.923Z",
+  "updated": "2026-09-28T16:03:12.550Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,10 @@
     "guardrail-cpu-warning.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T16:03:00.923Z"
+    },
+    "guardrail-cpu-warning.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:03:12.550Z"
     }
   }
 }
