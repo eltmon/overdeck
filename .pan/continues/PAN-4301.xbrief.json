@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T13:59:44.270Z",
+  "updated": "2026-09-28T13:59:56.236Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,10 @@
     "sidebar-hidden-tabs.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T13:59:44.270Z"
+    },
+    "sidebar-hidden-tabs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:56.236Z"
     }
   }
 }
