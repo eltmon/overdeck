@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:38:49.156Z",
+  "updated": "2026-09-28T00:39:00.022Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "doctor-first-run.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:38:49.156Z"
+    },
+    "doctor-first-run.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:00.022Z"
     }
   }
 }
