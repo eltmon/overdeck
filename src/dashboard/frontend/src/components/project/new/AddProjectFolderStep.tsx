@@ -6,8 +6,12 @@
  *     projects folder.
  *   - waiting: resolve is checking the chosen folder.
  *   - review: a Git repository shows the form (with a notice when resolve
- *     snapped a subfolder to its repository root); a plain folder is explained
- *     first, with **Add as folder** and **Back**.
+ *     snapped a subfolder to its repository root); a folder that holds
+ *     repositories shows the nested step; a plain folder is explained first,
+ *     with **Add as folder** and **Back**.
+ *
+ * The nested step renders from here rather than as a dialog step so its Back
+ * returns to this picker where the operator left it.
  *
  * Step copy stays clear of the simple-mode banned words; the "create a
  * workspace" guidance shows on the full page only.
@@ -24,6 +28,7 @@ import {
   ProjectWorkspaceGuide,
 } from './ProjectCreateForm.js';
 import { tildePath, useProjectSuggestions } from './useProjectSuggestions.js';
+import { AddProjectNestedStep } from './AddProjectNestedStep.js';
 import type { CreatedProject } from './projectCreateTypes.js';
 
 interface AddProjectFolderStepProps {
@@ -106,6 +111,21 @@ export function AddProjectFolderStep({ titleId, showGuide, onCreated, onChange, 
         <span className="font-mono">{tildePath(snap.detail ?? intent.path ?? '', intent.homeDir)}</span>.
       </p>
     ) : null;
+
+    const nested = intent.nestedRepositories ?? [];
+    if (!intent.isGitRepository && nested.length > 0 && intent.path) {
+      return (
+        <AddProjectNestedStep
+          titleId={titleId}
+          folder={intent.path}
+          homeDir={intent.homeDir}
+          repositories={nested}
+          onCreated={onCreated}
+          onBack={backToPicker}
+          onCancel={onCancel}
+        />
+      );
+    }
 
     // A plain folder is explained before it is added. Once a submit has
     // started, the form owns progress, failure and setup recovery.
