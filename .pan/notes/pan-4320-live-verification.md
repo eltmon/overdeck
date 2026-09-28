@@ -41,12 +41,11 @@ ids as above (verified by diffing the id sets; the full raw JSON is reproducible
 list` and is omitted here for length). Confirms the dashboard's `agentsById`/`hasLivePane` answer
 matches the Herdr backend's own live-agent inventory 1:1.
 
-## Deviation: God View shelf/Doldrums screenshot check skipped
+## 4. God View shelf/Doldrums placement — checked by eye on the peer dashboard
 
-The PRD's optional "Also check" (God View shelf/Doldrums placement via an isolated Playwright
-browser profile against the peer dashboard) was not run in this session — no isolated
-Chrome/Playwright profile was readily available, and the peer dashboard had already been stopped
-by the time this was considered. The FR-2/FR-3 regression checks above (the actual acceptance
-criteria) are covered by the WI-2/WI-3 unit tests and the two live checks above. If PAN-4301-style
-God View misplacement is later observed on Herdr, file a follow-up issue rather than folding it
-into this one, per the PRD's own non-goal note.
+Screenshot of `http://localhost:3497/god-view` in an isolated browser tab: the SHELF row
+("parked / yielded by governor") and the DOLDRUMS row ("nothing autonomous will advance · 2
+parked · showing 8") both render with content in their expected positions; no PAN-4301-style
+misplacement observed. Agents count in the sidebar reads 14, consistent with the 13
+`agent-`/`-review` rows above plus `sequencer-runner`. Tab closed and peer dashboard stopped
+immediately after.

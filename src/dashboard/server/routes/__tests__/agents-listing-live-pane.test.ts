@@ -107,6 +107,6 @@ describe('GET /api/agents joins Herdr panes by agentId (PAN-4320)', () => {
     const live = rows.get('agent-pan-4311');
     expect(live).toMatchObject({ hasLivePane: true });
     expect(['healthy', 'warning']).toContain(live?.status);
-    expect(rows.get('agent-pan-4312')).toMatchObject({ status: 'stopped' });
+    expect(rows.get('agent-pan-4312')).toMatchObject({ status: 'stopped', hasLivePane: false });
   });
 });
