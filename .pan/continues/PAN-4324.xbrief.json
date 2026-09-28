@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4324",
   "created": "2026-09-28T17:28:58.075Z",
-  "updated": "2026-09-28T17:38:06.082Z",
+  "updated": "2026-09-28T17:40:28.725Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,10 @@
       "claimedBy": "agent-pan-4324",
       "claimedAt": "2026-09-28T17:37:36.325Z",
       "doneAt": "2026-09-28T17:38:06.081Z"
+    },
+    "row5-liveness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T17:40:28.724Z"
     }
   }
 }
