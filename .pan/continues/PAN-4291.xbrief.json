@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4291",
   "created": "2026-09-28T12:49:37.810Z",
-  "updated": "2026-09-28T14:18:34.466Z",
+  "updated": "2026-09-28T14:18:45.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "pause-until-window-reset.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T14:18:34.466Z"
+    },
+    "pause-until-window-reset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:18:45.047Z"
     }
   }
 }
