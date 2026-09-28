@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   reloadDurableCloisterConfig: vi.fn(() => ({ accepted: true as const })),
 }));
 
-vi.mock('../../../../lib/cloister/config.js', () => ({
+vi.mock('../../../../lib/cloister/config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/cloister/config.js')>()),
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
   saveCloisterConfigSync: mocks.saveCloisterConfigSync,
 }));

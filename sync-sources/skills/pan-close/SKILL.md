@@ -87,20 +87,21 @@ cleanup policy instead of force-deleting everything.
 
 ## Close-Out Configuration
 
-The `close_out` section in Cloister config controls what close-out is allowed to do:
+The `[close_out]` table in `~/.overdeck/cloister.toml` controls what close-out is allowed to do:
 
-```yaml
-close_out:
-  remove_workspace: false
-  delete_feature_branch: false
-  auto: false
-  auto_delay_minutes: 60
+```toml
+[close_out]
+remove_workspace = true
+delete_feature_branch = false
+auto = true
+auto_delay_minutes = 60
 ```
 
-- `remove_workspace` — delete the worktree/workspace during close-out when true.
-- `delete_feature_branch` — delete local/remote feature branches during close-out when true.
-- `auto` — let deacon-lite's closed-issue reaper run close-out automatically for eligible merged issues when true.
-- `auto_delay_minutes` — minimum age after merge before automatic close-out is eligible.
+- `remove_workspace` — delete the worktree/workspace during close-out when true. Default `true` since PAN-4283.
+- `delete_feature_branch` — delete local/remote feature branches during close-out when true. Default `false`.
+- `auto` / `auto_delay_minutes` — inert since PAN-3917 — nothing reads them. Automatic close-out was removed with the old `deacon.ts`; the keys stay in the config type only so existing files still parse.
+
+Edit these from the dashboard at Settings → Close-out, which also shows how much disk space closed issues' workspaces are using and can run cleanup for you.
 
 ## See Also
 

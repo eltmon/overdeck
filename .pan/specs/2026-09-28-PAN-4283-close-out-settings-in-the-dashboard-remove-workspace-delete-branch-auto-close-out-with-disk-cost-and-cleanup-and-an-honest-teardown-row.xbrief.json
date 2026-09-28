@@ -1,0 +1,1038 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T00:21:28Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4283: Close-out settings in the dashboard (remove workspace, delete branch, auto close-out) with disk cost and cleanup, and an honest teardown row",
+    "updated": "2026-09-28T00:29:51.447Z"
+  },
+  "plan": {
+    "id": "pan-4283",
+    "title": "Close-out settings in the dashboard (remove workspace, delete branch, auto close-out) with disk cost and cleanup, and an honest teardown row",
+    "status": "running",
+    "uid": "c311f314-81fe-4a0f-92df-de7a2919201b",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-28T00:21:28Z",
+    "updated": "2026-09-28T00:29:51.447Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4283",
+        "label": "PAN-4283",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4283.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "settings",
+      "dashboard",
+      "cloister",
+      "workspaces",
+      "disk"
+    ],
+    "narratives": {
+      "Problem": "The [close_out] keys in ~/.overdeck/cloister.toml are not in the dashboard. With remove_workspace defaulting to false, 21 closed issues kept ~47 GB of worktrees. DoD row 9 claims the workspace was removed even when it was kept on purpose. Planning also found that auto and auto_delay_minutes are inert since PAN-3917 and that the existing PUT /api/cloister/config clobbers the whole file.",
+      "Proposal": "Add a Settings Close-out section backed by narrow GET/PUT /api/cloister/close-out endpoints that report each key's effective value and source and write only the changed key. Flip remove_workspace's default to true. Show closed-issue workspace disk cost and a Clean up now action that runs pan workspace destroy for closed, merged, clean workspaces with skip reasons. Make DoD row 9's observed text say when the workspace or branch was kept. Render the inert auto keys disabled and document them honestly.",
+      "NonGoals": "- Re-implementing automatic close-out or making close_out.auto / auto_delay_minutes do anything\n- Changing the closed-issue reaper (reap-issue-residue.ts) or making it honor [close_out]; investigating why 21 workspaces escaped it\n- Preserving TOML comments on write, or changing PUT /api/cloister/config / saveCloisterConfigSync\n- Cleanup for polyrepo workspaces; destroy with --force or --purge-memory; deleting remote branches from the cleanup action\n- Changing pan workspace list --stale's merge heuristic\n- Background job infrastructure or polling for cleanup\n- Migrating existing cloister.toml files"
+    },
+    "autoDecisions": [
+      {
+        "summary": "auto and auto_delay_minutes render as disabled, read-only controls marked inert; automatic close-out is not re-implemented",
+        "rationale": "Their only consumer was deleted in PAN-3917 W4 (commit 94255f055fe); the Cut deliberately reduced deacon-lite to four fixed routines. A live toggle that nothing reads would repeat the dishonest-report problem this issue fixes. Rendering them disabled still shows all four controls."
+      },
+      {
+        "summary": "Close-out settings use new narrow GET/PUT /api/cloister/close-out endpoints instead of PUT /api/cloister/config",
+        "rationale": "The existing PUT stringifies the whole merged config, which materializes every default (making every source read 'cloister.toml') and drops the operator's comments. A key-scoped write keeps source attribution truthful."
+      },
+      {
+        "summary": "remove_workspace defaults to true; delete_feature_branch stays false",
+        "rationale": "The issue recommends true: a kept workspace has no known use after merge and close. The default applies wherever the file omits the key (deepMerge), which docs state."
+      },
+      {
+        "summary": "Cleanup requires tracker-closed AND isBranchMerged === 'merged' AND empty git status --porcelain (untracked counts as dirty); polyrepo workspaces are skipped",
+        "rationale": "Matches the issue's 'closed, merged, no uncommitted changes' rule with the squash-aware merge check; isBranchMerged runs in the project root, which is wrong for polyrepo wrappers."
+      },
+      {
+        "summary": "Cleanup runs synchronously with concurrency 2, shelling pan workspace destroy without --force",
+        "rationale": "Mirrors bulkCloseOut's synchronous bounded-concurrency pattern; the issue names pan workspace destroy as the mechanism."
+      },
+      {
+        "summary": "A new 'Close-out' settings section follows the Cloister section",
+        "rationale": "No Pipeline section exists; the issue allows 'or a Close-out section'."
+      },
+      {
+        "summary": "Screenshots are committed as Mintlify docs images and linked from the PR body",
+        "rationale": "The repo's docs already use images/dashboard/*-light|dark.png with ThemedImage; committing them satisfies 'attached to the PR' durably."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The projected-surface lint counts each top-level doc file, the docs images dir, scripts/file-size-allowlist.txt and package.json as separate subsystems. Code spans src/lib, src/dashboard and tests/unit; the rest are three doc files, two docs images and the frontend test-subset line in package.json. The disk-cost line sits inside the same settings row as the remove-workspace toggle the issue asks for, so splitting it into a sibling issue would ship a half section. The file count is 25, at the limit; the planned move of dirSizeBytes out of the CLI was dropped to stay there.",
+      "canonicalFilename": "2026-09-28-PAN-4283-close-out-settings-in-the-dashboard-remove-workspace-delete-branch-auto-close-out-with-disk-cost-and-cleanup-and-an-honest-teardown-row.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "close-out-settings-lib",
+        "title": "Add close-out settings lib with per-key source and narrow write",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4283",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/close-out-settings.ts",
+            "src/lib/cloister/__tests__/close-out-settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/close-out-settings.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "close-out-settings.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "close-out-settings-routes",
+            "close-out-settings-integration",
+            "close-out-section"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-1. Create src/lib/cloister/close-out-settings.ts exporting CloseOutSettingsView, WRITABLE_CLOSE_OUT_KEYS, CloseOutSettingsError(status 400|409), readCloseOutSettings(configFile?) and writeCloseOutSetting(key,value,configFile?) exactly as the PRD specifies. Define CLOISTER_CONFIG_FILE locally as join(OVERDECK_HOME,'cloister.toml'); do not edit config.ts. Use fs/promises only. Source is 'cloister.toml' when the raw parsed [close_out] table has the key, else 'default'. The write parses the raw file, sets only close_out.<key>, and writes stringify(raw) back without merging defaults; an unparseable existing file throws 409 and writes nothing; auto/auto_delay_minutes/unknown keys/non-boolean values throw 400."
+        },
+        "items": [
+          {
+            "id": "close-out-settings-lib.ac1",
+            "title": "Given no cloister.toml, readCloseOutSettings returns all four keys with source 'default' and values equal to DEFAULT_CLOISTER_CONFIG.close_out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-settings-lib.ac2",
+            "title": "Given a file containing only [close_out] remove_workspace = false, readCloseOutSettings returns remove_workspace {value:false, source:'cloister.toml'} and source 'default' for the other three keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-settings-lib.ac3",
+            "title": "Given a file with [concurrency] max_work_agents = 14, writeCloseOutSetting('delete_feature_branch', true) persists close_out.delete_feature_branch = true, preserves max_work_agents = 14, and creates no close_out.remove_workspace key and no [startup] table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-settings-lib.ac4",
+            "title": "writeCloseOutSetting rejects 'auto', 'auto_delay_minutes' and a non-boolean value with status 400, and rejects an unparseable file with status 409 while leaving the file bytes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "default-remove-workspace",
+        "title": "Default close_out.remove_workspace to true and mark auto keys inert",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/config.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "src/lib/cloister/__tests__/config.test.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/config.test.ts tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config.test.ts and workflows.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-2. In config.ts set DEFAULT_CLOISTER_CONFIG.close_out.remove_workspace to true, replace the comment above auto: true with the PRD's inert-key comment, and add @deprecated doc comments to CloseOutConfig.auto and auto_delay_minutes. In workflows.ts:336 change the fallback to ?? true. Update config.test.ts:34 to expect true, and rename the workflows.test.ts case 'should preserve workspace and branches by default' to 'should remove the workspace and keep branches by default', asserting the workspace dir is removed (mock git worktree remove to rmSync) and teardown:branches is absent."
+        },
+        "items": [
+          {
+            "id": "default-remove-workspace.ac1",
+            "title": "DEFAULT_CLOISTER_CONFIG.close_out.remove_workspace defaults to true and delete_feature_branch defaults to false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-remove-workspace.ac2",
+            "title": "Given no [close_out] keys in cloister.toml, closeOut() removes workspaces/feature-pan-100 and emits no teardown:branches step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-remove-workspace.ac3",
+            "title": "src/lib/cloister/config.ts contains @deprecated comments on CloseOutConfig.auto and auto_delay_minutes stating they are inert since PAN-3917",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-settings-routes",
+        "title": "Add GET/PUT /api/cloister/close-out routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/cloister.ts",
+            "src/dashboard/server/routes/__tests__/cloister-close-out.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/cloister-close-out.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cloister-close-out.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-3. Add getCloisterCloseOutRoute and putCloisterCloseOutRoute to cloister.ts, register them in the route layer list, and update the header route list. PUT reads {key,value} via readJsonBody, calls writeCloseOutSetting, then reloadDurableCloisterConfig(), and returns {settings, reloaded}. Map CloseOutSettingsError to jsonResponse({error},{status}). Add the two no-loss-matrix rows from the PRD after the PUT /api/cloister/config row. Write route tests using the requestCloisterRoute harness copied from cloister-config.test.ts."
+        },
+        "items": [
+          {
+            "id": "close-out-settings-routes.ac1",
+            "title": "GET /api/cloister/close-out returns status 200 with the readCloseOutSettings view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-settings-routes.ac2",
+            "title": "PUT /api/cloister/close-out with {key:'remove_workspace', value:false} calls writeCloseOutSetting('remove_workspace', false) and reloadDurableCloisterConfig, and returns status 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-settings-routes.ac3",
+            "title": "PUT /api/cloister/close-out returns status 400 with {error} when writeCloseOutSetting throws a 400 CloseOutSettingsError, and does not call reloadDurableCloisterConfig",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-settings-routes.ac4",
+            "title": "no-loss-matrix.ts contains rows for GET /api/cloister/close-out and PUT /api/cloister/close-out and no-loss-matrix.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-teardown-row",
+        "title": "Make DoD row 9 report a kept workspace honestly",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/dod.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod.test.ts tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "dod.test.ts and workflows.test.ts pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-4. In dod.ts change the teardown row's expected text to the PRD's neutral wording and add describeTeardownObserved(steps: ReadonlyArray<StepResult>, {removeWorkspace, deleteBranches}). In workflows.ts compute removeWorkspace (?? true) and deleteBranches (?? false) once, pass them to teardownWorkspace, and set the teardown row observed to describeTeardownObserved(...). Status stays 'pass'. If workflows.ts exceeds 1158 lines, update its scripts/file-size-allowlist.txt row to the new count with # PAN-4283."
+        },
+        "items": [
+          {
+            "id": "dod-teardown-row.ac1",
+            "title": "Given removeWorkspace false, describeTeardownObserved returns text starting with 'workspace kept (close_out.remove_workspace is off)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-teardown-row.ac2",
+            "title": "Given removeWorkspace true and a successful non-skipped teardown:worktree step, describeTeardownObserved returns text starting with 'workspace removed' that does not contain 'kept (close_out.remove_workspace'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-teardown-row.ac3",
+            "title": "Given deleteBranches false, describeTeardownObserved includes 'feature branch kept (close_out.delete_feature_branch is off)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-teardown-row.ac4",
+            "title": "The teardown DOD_ROWS entry contains expected text stating the workspace is removed or kept per close_out.remove_workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-settings-integration",
+        "title": "Integration test: a saved setting governs the next close-out",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "expected_outputs": [
+            "workflows.test.ts passes including the new describe block"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-5. Add describe('close-out honors settings written through writeCloseOutSetting') to workflows.test.ts: write remove_workspace=false via writeCloseOutSetting into join(OVERDECK_HOME,'cloister.toml'), run closeOut on PAN-100 with a workspace dir, assert the dir remains and the teardown row observed starts with 'workspace kept (close_out.remove_workspace is off)'; then write true, recreate the dir, run again with git worktree remove mocked to rmSync, and assert the dir is gone and observed starts with 'workspace removed'."
+        },
+        "items": [
+          {
+            "id": "close-out-settings-integration.ac1",
+            "title": "Given writeCloseOutSetting('remove_workspace', false), the next closeOut() preserves workspaces/feature-pan-100 and its teardown row observed starts with 'workspace kept (close_out.remove_workspace is off)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-settings-integration.ac2",
+            "title": "Given writeCloseOutSetting('remove_workspace', true), the next closeOut() removes workspaces/feature-pan-100 and its teardown row observed starts with 'workspace removed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closed-workspace-report",
+        "title": "Collect closed-issue workspaces with total disk size",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4283",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/closed-issue-workspaces.ts",
+            "tests/unit/lib/workspaces/closed-issue-workspaces.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/closed-issue-workspaces.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "closed-issue-workspaces.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "closed-workspace-cleanup",
+            "disk-report-route",
+            "disk-cost-ui"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-7. Create src/lib/workspaces/closed-issue-workspaces.ts with ClosedIssueWorkspaceRow, ClosedIssueWorkspaceReport, ClosedIssueWorkspaceDeps, collectClosedIssueWorkspaces(deps?) and clearClosedIssueWorkspaceCache() per the PRD. Enumerate registered projects' feature-<issue>[-strike|-slot-N] dirs, group by issue via resolveIssueWorkspaceDirs, keep closed issues (default isClosed = withGitHubCaller('close-out', () => isTrackerIssueClosed(id))), default dirSize = a private async dirSizeBytes in this module (execFile du -sb, null on failure; do not touch src/cli), sum dirSize per issue with concurrency 4, and cache the default-deps report for 60 s. Add trackerReadsPaused: boolean to the report, set from an injectable isTrackerPaused dep (default: readActivePause().length > 0 from src/lib/github-quota/pause-gate.ts), because during a quota pause isTrackerIssueClosed answers false for every issue. Any cache-expiry test uses fake timers."
+        },
+        "items": [
+          {
+            "id": "closed-workspace-report.ac1",
+            "title": "Given PAN-1 (base + strike dirs) closed and PAN-2 open with dirSize 100 per path, collectClosedIssueWorkspaces returns closedCount 1, totalBytes 200 and one row with two paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-workspace-report.ac2",
+            "title": "Given a closed issue whose dirSize returns null, the report counts it in unknownSizeCount and excludes it from totalBytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-workspace-report.ac3",
+            "title": "Given a polyrepo project, the report row carries polyrepo: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-workspace-report.ac4",
+            "title": "Given isTrackerPaused returns true, the report returns trackerReadsPaused: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-workspace-report.ac5",
+            "title": "Given the default deps, a second call within 60 s returns the cached report and clearClosedIssueWorkspaceCache forces recomputation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closed-workspace-cleanup",
+        "title": "Clean up closed, merged, clean workspaces with skip reasons",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/closed-issue-workspaces.ts",
+            "tests/unit/lib/workspaces/closed-issue-workspaces.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/closed-issue-workspaces.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "closed-issue-workspaces.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-8. Add cleanupClosedIssueWorkspaces(deps?) returning {removed, skipped}. Per row, first failing check wins: polyrepo -> 'polyrepo workspace — run pan workspace destroy by hand'; git status --porcelain non-empty in any path -> 'uncommitted changes in <basename>' (command failure -> 'cannot read git status in <basename>'); isBranchMerged status unmerged -> 'branch not merged', no-branch -> 'merge state unknown (no local or remote branch)'; then destroy via async execFile('pan',['workspace','destroy',issueId,'--project',projectPath],{timeout:180000}), rejection -> 'destroy failed: <first line>'. Concurrency 2. Never pass --force or --purge-memory. Clear the report cache at the end. Tests use a real temp git repo with two git worktrees, one with an untracked file."
+        },
+        "items": [
+          {
+            "id": "closed-workspace-cleanup.ac1",
+            "title": "Given closed+merged fixture worktrees feature-pan-1 (clean) and feature-pan-2 (untracked file), cleanupClosedIssueWorkspaces calls destroy once with PAN-1 and returns skipped [{issueId:'PAN-2', reason:'uncommitted changes in feature-pan-2'}]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-workspace-cleanup.ac2",
+            "title": "Given isMerged returns 'unmerged', the issue is skipped with reason 'branch not merged' and destroy is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-workspace-cleanup.ac3",
+            "title": "Given a polyrepo project row, the issue is skipped with reason 'polyrepo workspace — run pan workspace destroy by hand' without running git status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-workspace-cleanup.ac4",
+            "title": "Given destroy rejects, the issue is reported in skipped with a reason starting 'destroy failed:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disk-report-route",
+        "title": "Add GET /api/cloister/close-out/disk route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/cloister.ts",
+            "src/dashboard/server/routes/__tests__/cloister-close-out.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/cloister-close-out.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route and no-loss tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-9. Add getCloisterCloseOutDiskRoute (GET /api/cloister/close-out/disk -> collectClosedIssueWorkspaces()) to cloister.ts and its route layer list, the PRD's AGGREGATE no-loss row, and a route test with the lib mocked."
+        },
+        "items": [
+          {
+            "id": "disk-report-route.ac1",
+            "title": "GET /api/cloister/close-out/disk returns status 200 with the report produced by collectClosedIssueWorkspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-report-route.ac2",
+            "title": "no-loss-matrix.ts contains a row for GET /api/cloister/close-out/disk and no-loss-matrix.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup-route",
+        "title": "Add POST /api/cloister/close-out/cleanup route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/cloister.ts",
+            "src/dashboard/server/routes/__tests__/cloister-close-out.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/cloister-close-out.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route and no-loss tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-10. Add postCloisterCloseOutCleanupRoute (POST /api/cloister/close-out/cleanup -> cleanupClosedIssueWorkspaces()) to cloister.ts and its route layer list, the PRD's WRITE no-loss row, and route tests with the lib mocked."
+        },
+        "items": [
+          {
+            "id": "cleanup-route.ac1",
+            "title": "POST /api/cloister/close-out/cleanup returns status 200 with the {removed, skipped} result from cleanupClosedIssueWorkspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cleanup-route.ac2",
+            "title": "POST /api/cloister/close-out/cleanup returns status 500 with {error} when cleanupClosedIssueWorkspaces throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cleanup-route.ac3",
+            "title": "no-loss-matrix.ts contains a row for POST /api/cloister/close-out/cleanup and no-loss-matrix.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-section",
+        "title": "Add the Settings Close-out section with four controls",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/CloseOutSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/CloseOutSection.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.types.ts",
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/CloseOutSection.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "CloseOutSection.test.tsx passes",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-11. Build CloseOutSection per PRD WI-11: section id close-out, query ['close-out-settings'] on GET /api/cloister/close-out, mutation PUT /api/cloister/close-out with ensureDashboardSession + dashboardMutationJsonHeaders, four SettingsRow rows with SettingsRowStatus variant neutral source labels and the exact labels, descriptions and data-testids from the PRD; auto and delay rows disabled with the PAN-3917 inert text. Add the nav item {id:'close-out', label:'Close-out', icon: Trash2} after cloister, render the section after CloisterSection, add the CloseOutSettingsView mirror type, and add the test file to test:frontend-subset in root package.json."
+        },
+        "items": [
+          {
+            "id": "close-out-section.ac1",
+            "title": "The Close-out section renders four controls: close-out-remove-workspace, close-out-delete-branch, close-out-auto and close-out-auto-delay",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-section.ac2",
+            "title": "Each row renders a source label reading 'cloister.toml' or 'default' matching the GET /api/cloister/close-out response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-section.ac3",
+            "title": "Clicking close-out-remove-workspace sends PUT /api/cloister/close-out with body {\"key\":\"remove_workspace\",\"value\":false} when the current value is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-section.ac4",
+            "title": "The section renders close-out-auto and close-out-auto-delay as disabled controls with text stating automatic close-out was removed in PAN-3917",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-section.ac5",
+            "title": "root package.json test:frontend-subset contains src/components/Settings/sections/__tests__/CloseOutSection.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disk-cost-ui",
+        "title": "Show closed-workspace disk cost and a Clean up now action",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/CloseOutSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/CloseOutSection.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/CloseOutSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CloseOutSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-12. Under the remove-workspace row, query ['close-out-disk'] on GET /api/cloister/close-out/disk and render the disk line with the PRD's exact texts and GB/MB formatting; add the 'Clean up now' button (data-testid close-out-cleanup) posting to /api/cloister/close-out/cleanup, disabled when closedCount is 0 or while pending, with the destroy hint text; after success render 'Removed <ISSUE>' and 'Skipped <ISSUE> — <reason>' lines and invalidate ['close-out-disk']. When the report has trackerReadsPaused true, append 'GitHub reads are paused; this count may be incomplete.' to the disk line. No polling."
+        },
+        "items": [
+          {
+            "id": "disk-cost-ui.ac1",
+            "title": "Given a disk report of 3 closed issues totalling 12.4 GiB, the section renders '3 closed issue(s) still have workspaces (12.4 GB)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-cost-ui.ac2",
+            "title": "Given closedCount 0, the section renders 'No closed issues have workspaces on disk.' and close-out-cleanup is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-cost-ui.ac3",
+            "title": "Clicking close-out-cleanup sends POST /api/cloister/close-out/cleanup and renders 'Skipped PAN-2 — uncommitted changes in feature-pan-2' from the response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-cost-ui.ac4",
+            "title": "After a successful cleanup the section sends a second GET /api/cloister/close-out/disk request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-cost-ui.ac5",
+            "title": "Given a report with trackerReadsPaused true, the section renders 'GitHub reads are paused; this count may be incomplete.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-docs",
+        "title": "Document close-out settings, default, inert keys and cleanup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "sync-sources/skills/pan-close/SKILL.md",
+            "configuration/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'inert since PAN-3917' docs/MERGE-WORKFLOW.md sync-sources/skills/pan-close/SKILL.md",
+            "grep -n 'remove_workspace = true' sync-sources/skills/pan-close/SKILL.md",
+            "grep -n 'Close-out' configuration/workspaces.mdx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-13. Add '### Close-out settings' under '## Post-merge handoff and Docker cleanup' in docs/MERGE-WORKFLOW.md covering the four keys, the true default (applies wherever the file omits the key), the inert keys, the Settings -> Close-out section, cleanup rules, DoD row 9 wording and the closed-issue reaper overlap, framing the disk line and Clean up now as the backstop for when the reaper is frozen (deacon.globally_paused, PAN-4210) or GitHub reads are paused. Rewrite '## Close-Out Configuration' in sync-sources/skills/pan-close/SKILL.md as a TOML [close_out] block (remove_workspace = true, delete_feature_branch = false) with inert-key bullets. Add '## Cleaning up after close-out' to configuration/workspaces.mdx with the ThemedImage pointing at /images/dashboard/close-out-settings-{light,dark}.png."
+        },
+        "items": [
+          {
+            "id": "close-out-docs.ac1",
+            "title": "docs/MERGE-WORKFLOW.md contains text stating that remove_workspace defaults to true, that auto and auto_delay_minutes are inert since PAN-3917, and that the closed-issue reaper removes merged closed-issue workspaces and branches independent of [close_out]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-docs.ac2",
+            "title": "sync-sources/skills/pan-close/SKILL.md contains a TOML [close_out] block with remove_workspace = true and marks auto and auto_delay_minutes as inert since PAN-3917",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-docs.ac3",
+            "title": "configuration/workspaces.mdx contains a Cleaning up after close-out section and a ThemedImage for close-out-settings-light.png and close-out-settings-dark.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-docs.ac4",
+            "title": "npm run lint exits 0, including scripts/lint-skills.sh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-screenshots",
+        "title": "Capture light and dark screenshots of the Close-out section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T00:21:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4283",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "images/dashboard/close-out-settings-light.png",
+            "images/dashboard/close-out-settings-dark.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -s images/dashboard/close-out-settings-light.png && test -s images/dashboard/close-out-settings-dark.png"
+          ],
+          "expected_outputs": [
+            "both PNG files exist and are non-empty"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4283.md WI-14. With the built dashboard running (or node dist/dashboard/server.js under Node 22 on a free port with a temp OVERDECK_HOME), use an isolated Playwright browser context to open /settings#close-out, capture the section in light and dark theme, save both PNGs under images/dashboard/, inspect them yourself, and link them in the PR body. Never screenshot a unit-test render; if no server can start, report the blocker via pan tell instead of fabricating images."
+        },
+        "items": [
+          {
+            "id": "close-out-screenshots.ac1",
+            "title": "images/dashboard/close-out-settings-light.png renders the Close-out section with four controls, the disk line and the Clean up now button in light theme",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-screenshots.ac2",
+            "title": "images/dashboard/close-out-settings-dark.png renders the same section in dark theme",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-screenshots.ac3",
+            "title": "The PR body contains links to both screenshot files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "close-out-settings-lib",
+        "to": "close-out-settings-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "close-out-settings-lib",
+        "to": "close-out-settings-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "default-remove-workspace",
+        "to": "dod-teardown-row",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-teardown-row",
+        "to": "close-out-settings-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "closed-workspace-report",
+        "to": "closed-workspace-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "close-out-settings-routes",
+        "to": "disk-report-route",
+        "type": "blocks"
+      },
+      {
+        "from": "closed-workspace-report",
+        "to": "disk-report-route",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-report-route",
+        "to": "cleanup-route",
+        "type": "blocks"
+      },
+      {
+        "from": "closed-workspace-cleanup",
+        "to": "cleanup-route",
+        "type": "blocks"
+      },
+      {
+        "from": "close-out-settings-routes",
+        "to": "close-out-section",
+        "type": "blocks"
+      },
+      {
+        "from": "close-out-section",
+        "to": "disk-cost-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-report-route",
+        "to": "disk-cost-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "cleanup-route",
+        "to": "disk-cost-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "disk-cost-ui",
+        "to": "close-out-screenshots",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
