@@ -38,6 +38,11 @@ interface SessionFeedSidebarProps {
    */
   scopeSwitcher?: boolean;
   projectIssueIds?: readonly string[];
+  /**
+   * PAN-4301: conversations the Command Deck resolved to the selected project via
+   * resolveEffectiveProjectKey; scopes conversation and run entries in Project scope.
+   */
+  projectConversationIds?: ReadonlySet<number>;
 }
 
 type FeedScope = 'needs' | 'project' | 'global';
@@ -64,7 +69,7 @@ const EMPTY_STATES: Record<VisibleSessionFeedTab, string> = {
 
 let loggedGitNavigationNoop = false;
 
-export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false, scopeSwitcher = false, projectIssueIds }: SessionFeedSidebarProps) {
+export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false, scopeSwitcher = false, projectIssueIds, projectConversationIds }: SessionFeedSidebarProps) {
   const [activeTab, setActiveTab] = useState<VisibleSessionFeedTab>(readStoredTab);
   const [scope, setScope] = useState<FeedScope>(readStoredScope);
 
@@ -87,6 +92,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
   // honor the legacy issueIds/unscoped props verbatim (backward compatible).
   const effIssueIds = scopeSwitcher ? (scope === 'project' ? projectIssueIds : undefined) : issueIds;
   const effUnscoped = scopeSwitcher ? false : unscoped;
+  const effConversationIds = scopeSwitcher && scope === 'project' ? projectConversationIds : undefined;
   const showFeed = !scopeSwitcher || scope !== 'needs';
 
   return (
@@ -163,7 +169,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} issueIds={effIssueIds} unscoped={effUnscoped} />
+            <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} issueIds={effIssueIds} unscoped={effUnscoped} conversationIds={effConversationIds} />
           </div>
         </>
       )}
@@ -331,10 +337,12 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false, now = new Date
   );
 }
 
-function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: VisibleSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date; issueIds?: readonly string[]; unscoped?: boolean }) {
+function FeedTabContent({ tab, onSelect, now, issueIds, unscoped, conversationIds }: { tab: VisibleSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date; issueIds?: readonly string[]; unscoped?: boolean; conversationIds?: ReadonlySet<number> }) {
   const feed = useMergedFeed(tab, now.getTime());
   // PAN-1561 scoping: `unscoped` keeps only entries with no issue (the No-project
   // bucket); otherwise `issueIds` keeps entries for those issues (case-insensitive).
+  // PAN-4301 FR-15: `conversationIds` also keeps the project's own conversations
+  // and any run card with a lane among them, so issue-less lanes show in Project.
   const idSet = useMemo(
     () => (issueIds ? new Set(issueIds.map((id) => id.toLowerCase())) : null),
     [issueIds],
@@ -344,10 +352,15 @@ function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: Visib
       // System news (dashboard restarts, supervisor actions) is relevant in
       // every scope — never drop it through the issue filter.
       if (e.kind === 'activity' && e.systemWide) return true;
-      return unscoped ? e.issueId == null : !idSet || (!!e.issueId && idSet.has(e.issueId.toLowerCase()));
+      if (unscoped) return e.issueId == null;
+      if (!idSet && !conversationIds) return true;
+      if (e.issueId && idSet?.has(e.issueId.toLowerCase())) return true;
+      if (e.kind === 'conversation') return conversationIds?.has(e.conversationId) ?? false;
+      if (e.kind === 'gauntlet_run') return e.laneConversationIds.some((id) => conversationIds?.has(id));
+      return false;
     };
-    return unscoped || idSet ? feed.entries.filter(keep) : feed.entries;
-  }, [feed.entries, idSet, unscoped]);
+    return unscoped || idSet || conversationIds ? feed.entries.filter(keep) : feed.entries;
+  }, [feed.entries, idSet, unscoped, conversationIds]);
   const groups = useMemo(
     () => groupByContiguousLabel(scopedEntries, (entry) => formatBucketLabel(entry.timestamp, now)),
     [scopedEntries, now],

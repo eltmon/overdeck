@@ -22,7 +22,7 @@ function render(ui: ReactElement) {
 }
 
 const hookSources = vi.hoisted(() => ({
-  conversations: { entries: [] as ConversationSessionFeedEntry[], isLoading: false, error: null as Error | null },
+  conversations: { entries: [] as Array<ConversationSessionFeedEntry | GauntletRunSessionFeedEntry>, isLoading: false, error: null as Error | null },
   useConversationFeed: vi.fn(),
 }));
 
@@ -352,6 +352,65 @@ describe('SessionFeedSidebar', () => {
     // The restart (system-wide) survives the scope filter; the work entry does not.
     expect(screen.getByText(/Dashboard restarted via pan reload/)).toBeTruthy();
     expect(screen.queryByText('Work agent committed task-3')).toBeNull();
+  });
+
+  it('keeps the project conversations and runs in Project scope — PAN-4301 FR-15', () => {
+    const run = (runKey: string, laneIds: number[]): GauntletRunSessionFeedEntry => ({
+      kind: 'gauntlet_run',
+      id: `gauntlet-run:lexerra:${runKey}`,
+      timestamp: '2026-05-23T01:03:00.000Z',
+      workspaceId: null,
+      issueId: null,
+      run: runKey,
+      projectKey: 'lexerra',
+      orchestratorName: null,
+      orchestratorTitle: null,
+      countsLine: `${laneIds.length} builder · ${laneIds.length} working`,
+      state: 'working',
+      latest: { text: 'alpha builder launched', at: '2026-05-23T01:03:00.000Z' },
+      lanes: [],
+      laneConversationIds: laneIds,
+      anyAlive: true,
+    });
+    hookSources.conversations = {
+      entries: [
+        conversationEntry({ id: 'conversation:ten', conversationId: 10, conversationName: 'ten', issueId: null, lastMessageSnippet: 'Project root ten' }),
+        conversationEntry({ id: 'conversation:thirty', conversationId: 30, conversationName: 'thirty', issueId: null, lastMessageSnippet: 'Other root thirty' }),
+        run('india', [20, 21]),
+        run('kilo', [40]),
+      ],
+      isLoading: false,
+      error: null,
+    };
+    useDashboardStore.setState({
+      observationsByIssueId: {},
+      recentActivity: [
+        {
+          id: 'restart-entry-scope',
+          timestamp: '2026-05-23T01:04:00.000Z',
+          source: 'dashboard',
+          level: 'info',
+          message: 'Dashboard restarted via pan reload',
+          details: null,
+          issueId: null,
+        },
+      ],
+    });
+
+    render(
+      <SessionFeedSidebar
+        now={now}
+        scopeSwitcher
+        projectIssueIds={['PAN-1']}
+        projectConversationIds={new Set([10, 20])}
+      />,
+    );
+
+    expect(screen.getByText('Project root ten')).toBeTruthy();
+    expect(screen.queryByText('Other root thirty')).toBeNull();
+    expect(screen.getByText('INDIA · lexerra')).toBeTruthy();
+    expect(screen.queryByText('KILO · lexerra')).toBeNull();
+    expect(screen.getByText('Dashboard restarted via pan reload')).toBeTruthy();
   });
 
   it('navigates restart entries to their initiator conversation via the link field', () => {
