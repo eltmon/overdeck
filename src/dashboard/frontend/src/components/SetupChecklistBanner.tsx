@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Check, Copy, RefreshCw, X } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Tab } from './Header';
 
 /**
  * SetupChecklistBanner (PAN-774) — first-run host-tool checklist.
@@ -13,6 +14,9 @@ import { toast } from 'sonner';
  * optional integrations (gh, tasks, Docker, Codex) with copyable install
  * commands. Overdeck never runs the installs itself — system packages need
  * sudo/user consent.
+ *
+ * Hidden on the Home tab (PAN-4282 D11) — Home shows the "Get set up" card
+ * (GetSetUpCard) instead.
  */
 
 export interface PrerequisiteCheck {
@@ -87,7 +91,7 @@ function ChecklistRow({ check, platform }: { check: PrerequisiteCheck; platform:
   );
 }
 
-export function SetupChecklistBanner() {
+export function SetupChecklistBanner({ activeTab }: { activeTab?: Tab } = {}) {
   const [expanded, setExpanded] = useState(false);
   const [dismissedSet, setDismissedSet] = useState<string>(() => localStorage.getItem(DISMISS_KEY) ?? '');
 
@@ -110,6 +114,7 @@ export function SetupChecklistBanner() {
 
   if (!report || missingRequired.length === 0) return null;
   if (!expanded && dismissedSet === missingKey) return null;
+  if (activeTab === 'home') return null;
 
   const dismiss = () => {
     localStorage.setItem(DISMISS_KEY, missingKey);
