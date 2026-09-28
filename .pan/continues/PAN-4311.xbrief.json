@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:55:47.392Z",
+  "updated": "2026-09-28T15:55:58.056Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "cfg-keys.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T15:55:47.391Z"
+    },
+    "cfg-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:55:58.055Z"
     }
   }
 }
