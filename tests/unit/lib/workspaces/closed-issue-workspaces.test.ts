@@ -1,7 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+
+const mockListProjectsSync = vi.hoisted(() => vi.fn(() => [] as Array<{ key: string; config: { path: string } }>));
+
+vi.mock('../../../../src/lib/projects.js', () => ({
+  listProjectsSync: mockListProjectsSync,
+}));
+
 import {
   clearClosedIssueWorkspaceCache,
   collectClosedIssueWorkspaces,
@@ -67,5 +74,31 @@ describe('collectClosedIssueWorkspaces', () => {
 
     expect(report.trackerReadsPaused).toBe(true);
     expect(report.closedCount).toBe(0);
+  });
+
+  it('marks polyrepo project rows', async () => {
+    const report = await collectClosedIssueWorkspaces({
+      listProjects: () => [{ key: 'proj', config: { path: projectPath, workspace: { type: 'polyrepo' } } }],
+      isClosed: async (issueId) => issueId === 'PAN-1',
+      dirSize: async () => 100,
+      isTrackerPaused: () => false,
+      now: () => new Date(),
+    });
+
+    expect(report.rows[0]?.polyrepo).toBe(true);
+  });
+
+  it('caches the default-deps report for 60s and clearClosedIssueWorkspaceCache forces recomputation', async () => {
+    mockListProjectsSync.mockClear();
+
+    const first = await collectClosedIssueWorkspaces();
+    const second = await collectClosedIssueWorkspaces();
+    expect(second).toBe(first);
+    expect(mockListProjectsSync).toHaveBeenCalledTimes(1);
+
+    clearClosedIssueWorkspaceCache();
+    const third = await collectClosedIssueWorkspaces();
+    expect(third).not.toBe(first);
+    expect(mockListProjectsSync).toHaveBeenCalledTimes(2);
   });
 });
