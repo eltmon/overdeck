@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:18:49.063Z",
+  "updated": "2026-09-28T01:18:58.848Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "closed-workspace-report.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T01:18:49.062Z"
+    },
+    "closed-workspace-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:18:58.848Z"
     }
   }
 }
