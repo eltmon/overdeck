@@ -604,14 +604,14 @@ Auto-resume is intentionally suppressible:
   into a permanent stall.
 - **Memory gate (PAN-2500, scaled defaults PAN-4267):** the hysteresis
   resource governor (`assessMemoryPressure` in `cloister/memory-governor.ts`)
-  gates exactly one caller: the preemptive scheduler's
-  `preemption.ts:resumeYieldedAgents`. It also feeds the memory-pressure
-  patrol (`memory-pressure-patrol.ts`), which only reports the band to the
-  activity feed — `shed()` (stack-stop / idle-agent-pause reclaim) has no
-  caller anywhere in the codebase. The governor never gates conversations,
-  `pan start`, or dashboard Start. Below the SOFT reserve the governor
-  defers `resumeYieldedAgents`; below HARD it reports `shedding`; neither
-  re-admits until memory clears RECOVERY. Reserve defaults are a share of
+  runs in the deacon child and its verdict only feeds the memory-pressure
+  patrol (`memory-pressure-patrol.ts`), which reports the band to the
+  activity feed. Nothing else acts on it: `preemption.ts:resumeYieldedAgents`
+  (which would defer on a held verdict) and `shed()` (stack-stop /
+  idle-agent-pause reclaim) have no production caller. The governor never
+  gates conversations, `pan start`, or dashboard Start. Below the SOFT
+  reserve the governor reports `holding`; below HARD it reports `shedding`;
+  neither re-admits until memory clears RECOVERY. Reserve defaults are a share of
   RAM with an absolute floor and a cap (hard &le; 10%, soft &le; 20%,
   watch &le; 25%, recovery &le; 35% of total RAM; see
   `src/lib/config-yaml/governor-reserves.ts`), so a small host (an 8-16 GB
@@ -625,6 +625,54 @@ Auto-resume is intentionally suppressible:
   hysteresis; these defaults are also scaled, `min(4, RAM/8)` GB warn and
   `min(2, RAM/16)` GB block. This is separate from `--no-resume`, which
   suppresses resume outright regardless of memory.
+- **CPU pressure (PAN-4311):** the signal is CPU PSI `some avg60` from
+  `/proc/pressure/cpu` (`system-health/cpu-psi.ts`), the share of the last
+  minute during which a runnable task waited for a CPU. Unlike load average
+  it does not count IO wait. Load per core is the fallback only where PSI is
+  unavailable (macOS, old kernels). The governor holds at
+  `resources.governor_cpu_psi_hold_avg60` (default 50) and stays held until
+  PSI falls below `governor_cpu_psi_recovery_avg60` (default 25); a CPU-caused
+  hold records trigger kind `cpu`, and the feed names the CPU reading and the
+  recovery threshold. The governor's own verdict still gates nothing. The
+  dispatch doors read CPU directly through the stateless
+  `assessCpuPressure()` (`cloister/cpu-pressure.ts`: PSI against the hold
+  threshold, no stored state), because the governor's verdict lives in the
+  deacon child and the doors run in the dashboard main process or a `pan`
+  CLI process. Three doors read it: (1) the lane door (`launchLane`, `POST
+  /api/lanes`, `pan lane start`) refuses with HTTP 429 `cpu-saturated`
+  unless `--force` / `force: true`; (2) `POST /api/agents` adds an
+  acknowledgeable `cpu_saturated` guardrail warning (code `cpu_pressure`),
+  which the operator's confirm covers but the planning auto-handoff does
+  not, so a deferred handoff waits and retries; (3) `spawnAgent` holds
+  Flywheel-started (`flywheel:*`) work agents with a `CpuPressureHoldError`
+  only when `resources.governor_cpu_hold_dispatch` is true (default false,
+  until calibration data exists). Conversations, operator `pan start`, and
+  dashboard Start are never gated on CPU. The memory-pressure patrol logs a
+  `cpu-pressure sample` calibration line (PSI some avg10/avg60, load per core)
+  to `~/.overdeck/logs/deacon.log` every 5 minutes. Quality-gate admission
+  (`quality-gate-admission.ts`) treats the host as contended at PSI `some
+  avg10 >= 25`, with load per core `>= 1` as the fallback.
+- **Runaway processes (PAN-4311):** the runaway patrol
+  (`cloister/runaway-process-patrol.ts`, classifier `runaway-classify.ts`)
+  runs every 30 s in the dashboard main process and is observe-only: it
+  never kills, pauses, or messages anything. It reads `/proc` for every
+  process in the Overdeck cgroups (the Herdr unit, the tmux server and
+  `tmux-spawn-*` scopes) and flags a process group whose CPU sustained over
+  the last 10 minutes is at least half a core and which is `orphaned` (age
+  >= 10 min, no live harness ancestor, parent chain reaches pid 1 or the
+  user manager), `detached-from-tool-shell` (a non-shell direct child of a
+  harness process, age >= 10 min), `outlived-tool-call` (age > 15 min and
+  its agent idle or its harness gone), or `long-burn` (age >= 30 min).
+  Never flagged: harness processes and their pane shells, Herdr, tmux, the
+  dashboard, Docker/containerd cgroups, gate-shaped groups (leader at nice
+  19, younger than the 20.5-minute gate watchdog), and the quality-gate
+  admission owner with its descendants. Ownership resolves from the
+  process's environ (`OVERDECK_CONVERSATION`, `OVERDECK_AGENT_ID`), then an
+  ancestor's environ, then the cgroup unit, then a `workspaces/feature-*`
+  cwd. The feed gets one `warn` per group (naming `kill -TERM -<pgid>`),
+  one escalation at 60 minutes, and one `info` entry when the group exits.
+  The same sample feeds `/api/resources` `hostProcesses` and the load-spike
+  sampler.
 - **macOS measurement (PAN-4267):** the header collector
   (`system-health/darwin.ts`) and the governor's reader
   (`readProcMemoryDarwin` in `dashboard/server/services/proc-memory.ts`)
