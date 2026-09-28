@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:16:57.899Z",
+  "updated": "2026-09-28T01:17:10.046Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "type-to-focus.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T01:16:57.899Z"
+    },
+    "type-to-focus.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:17:10.046Z"
     }
   }
 }
