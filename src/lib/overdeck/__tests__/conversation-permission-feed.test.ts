@@ -117,11 +117,16 @@ describe('conversationPendingPermission', () => {
     expect(pending!.reason).toMatch(/^Dangerous rm operation/);
   });
 
-  it('falls back to the prompt title when two subagent entries match nothing', async () => {
+  it('Unknown agent when two entries and no preview match', async () => {
     recordPermissionRequest('perm-feed', entry('s1', { agentDescription: 'One', toolInputPreview: 'ls' }));
     recordPermissionRequest('perm-feed', entry('s2', { agentDescription: 'Two', toolInputPreview: 'whoami' }));
     const pending = await conversationPendingPermission(conv, deps(fixture('permission-subagent.txt')));
-    expect(pending).toMatchObject({ agentLabel: 'Subagent: general-purpose', agentKey: null, toolName: 'Bash command', since: NOW });
+    expect(pending).toMatchObject({ agentLabel: 'Unknown agent', agentKey: null, toolName: 'Bash command', since: NOW });
+  });
+
+  it('labels from the prompt title when the registry is empty (after a restart)', async () => {
+    const pending = await conversationPendingPermission(conv, deps(fixture('permission-subagent.txt')));
+    expect(pending).toMatchObject({ agentLabel: 'Subagent: general-purpose', agentKey: null, answerable: true });
   });
 
   it('picks the subagent whose preview appears in the prompt', async () => {
@@ -159,6 +164,16 @@ describe('pending-input feed and conversation read', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ name: 'perm-feed', pendingPermission: { answerable: true, header: 'Bash command' } });
     expect(paneChoice).not.toHaveBeenCalled();
+  });
+
+  it('feed row carries a non-answerable pendingPermission for a registry-only entry', async () => {
+    recordPermissionRequest('perm-feed', entry('main', { toolInputPreview: 'npm install' }));
+    paneRead.mockResolvedValue(fixture('permission-answered.txt'));
+    const rows = (await getConversationsPendingInputFeed(feedDeps)).body as Array<Record<string, unknown>>;
+    expect(rows).toEqual([expect.objectContaining({
+      name: 'perm-feed',
+      pendingPermission: expect.objectContaining({ answerable: false, signature: null, agentLabel: 'Main agent' }),
+    })]);
   });
 
   it('feed shares the tmux pane read with the pane-choice check', async () => {

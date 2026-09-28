@@ -81,8 +81,12 @@ function entryLabel(entry: ConversationPermissionEntry): string {
  * candidates to that thread; one candidate wins outright, several are told
  * apart by their input preview appearing in the prompt's detail lines.
  */
+function threadCandidates(prompt: PermissionPrompt, entries: ConversationPermissionEntry[]): ConversationPermissionEntry[] {
+  return entries.filter((entry) => (prompt.fromAgent === null) === (entry.agentKey === 'main'));
+}
+
 function entryForPrompt(prompt: PermissionPrompt, entries: ConversationPermissionEntry[]): ConversationPermissionEntry | null {
-  const candidates = entries.filter((entry) => (prompt.fromAgent === null) === (entry.agentKey === 'main'));
+  const candidates = threadCandidates(prompt, entries);
   if (candidates.length === 1) return candidates[0]!;
   const detail = prompt.detailLines.join('\n');
   const matches = candidates.filter((entry) => {
@@ -92,8 +96,14 @@ function entryForPrompt(prompt: PermissionPrompt, entries: ConversationPermissio
   return matches.length === 1 ? matches[0]! : null;
 }
 
-/** Label from the screen alone: the title's " · from the <type> agent" suffix, or the main thread. */
-function promptLabel(prompt: PermissionPrompt): string {
+/**
+ * Label when no registry entry was picked. Several candidates that cannot be
+ * told apart are 'Unknown agent' (Decision 8). With none at all — the registry
+ * is empty after a dashboard restart — the prompt's own title still says which
+ * thread asked: " · from the <type> agent", or the main thread.
+ */
+function unmatchedLabel(prompt: PermissionPrompt, candidates: number): string {
+  if (candidates > 1) return 'Unknown agent';
   return prompt.fromAgent !== null ? `Subagent: ${prompt.fromAgent}` : 'Main agent';
 }
 
@@ -110,7 +120,7 @@ export function pendingPermissionFromPane(
     return {
       signature: prompt.signature,
       answerable: true,
-      agentLabel: entry ? entryLabel(entry) : promptLabel(prompt),
+      agentLabel: entry ? entryLabel(entry) : unmatchedLabel(prompt, threadCandidates(prompt, entries).length),
       agentKey: entry?.agentKey ?? (prompt.fromAgent === null ? 'main' : null),
       toolName: entry?.toolName || prompt.header,
       header: prompt.header,
