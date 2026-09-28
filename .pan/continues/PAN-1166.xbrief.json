@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T12:54:00.907Z",
+  "updated": "2026-09-28T13:03:04.085Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-28T12:53:51.879Z"
     },
     "ws-terminal-gate": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1166",
-      "claimedAt": "2026-09-28T12:54:00.907Z"
+      "claimedAt": "2026-09-28T12:54:00.907Z",
+      "doneAt": "2026-09-28T13:03:04.085Z"
     }
   }
 }
