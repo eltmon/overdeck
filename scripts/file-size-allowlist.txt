@@ -147,3 +147,4 @@
 1040 src/cli/commands/doctor.ts # PAN-1641
 1045 src/lib/config-yaml/merge.ts # PAN-4311
 1114 src/lib/config-yaml/schema.ts # PAN-4311
+1252 src/lib/overdeck/conversation-runtime.ts # PAN-4311
