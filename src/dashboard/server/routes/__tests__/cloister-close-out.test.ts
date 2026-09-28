@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   writeCloseOutSetting: vi.fn(),
   reloadDurableCloisterConfig: vi.fn(() => ({ accepted: true as const })),
   collectClosedIssueWorkspaces: vi.fn(),
+  cleanupClosedIssueWorkspaces: vi.fn(),
 }));
 
 class MockCloseOutSettingsError extends Error {
@@ -31,6 +32,7 @@ vi.mock('../../services/cloister-control-surface.js', async (importOriginal) => 
 
 vi.mock('../../../../lib/workspaces/closed-issue-workspaces.js', () => ({
   collectClosedIssueWorkspaces: mocks.collectClosedIssueWorkspaces,
+  cleanupClosedIssueWorkspaces: mocks.cleanupClosedIssueWorkspaces,
 }));
 
 interface RouteResult {
@@ -118,5 +120,25 @@ describe('cloister close-out routes', () => {
     const result = await requestCloisterRoute('/api/cloister/close-out/disk');
 
     expect(result).toEqual({ status: 200, body: report });
+  });
+
+  it('POST /api/cloister/close-out/cleanup returns the cleanup result', async () => {
+    const cleanupResult = {
+      removed: [{ issueId: 'PAN-1', freedBytes: 100 }],
+      skipped: [{ issueId: 'PAN-2', reason: 'uncommitted changes in feature-pan-2' }],
+    };
+    mocks.cleanupClosedIssueWorkspaces.mockResolvedValue(cleanupResult);
+
+    const result = await requestCloisterRoute('/api/cloister/close-out/cleanup', { method: 'POST' });
+
+    expect(result).toEqual({ status: 200, body: cleanupResult });
+  });
+
+  it('POST /api/cloister/close-out/cleanup returns 500 with an error body on failure', async () => {
+    mocks.cleanupClosedIssueWorkspaces.mockRejectedValue(new Error('destroy binary not found'));
+
+    const result = await requestCloisterRoute('/api/cloister/close-out/cleanup', { method: 'POST' });
+
+    expect(result).toEqual({ status: 500, body: { error: 'destroy binary not found' } });
   });
 });

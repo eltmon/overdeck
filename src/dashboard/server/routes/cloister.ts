@@ -14,6 +14,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/cloister/close-out
  *   PUT  /api/cloister/close-out
  *   GET  /api/cloister/close-out/disk
+ *   POST /api/cloister/close-out/cleanup
  *   GET  /api/cloister/agents/health
  */
 
@@ -27,7 +28,7 @@ import {
   readCloseOutSettings,
   writeCloseOutSetting,
 } from '../../../lib/cloister/close-out-settings.js';
-import { collectClosedIssueWorkspaces } from '../../../lib/workspaces/closed-issue-workspaces.js';
+import { cleanupClosedIssueWorkspaces, collectClosedIssueWorkspaces } from '../../../lib/workspaces/closed-issue-workspaces.js';
 import { emergencyBrake } from '../../../lib/cloister/concurrency.js';
 import { saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { getAgentState } from '../../../lib/agents.js';
@@ -262,6 +263,17 @@ const getCloisterCloseOutDiskRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/cloister/close-out/cleanup ─────────────────────────────
+
+const postCloisterCloseOutCleanupRoute = HttpRouter.add(
+  'POST',
+  '/api/cloister/close-out/cleanup',
+  httpHandler(Effect.tryPromise({
+    try: async () => jsonResponse(await cleanupClosedIssueWorkspaces()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
 // ─── Route: GET /api/cloister/agents/health ──────────────────────────────────
 
 const getCloisterAgentsHealthRoute = HttpRouter.add(
@@ -291,6 +303,7 @@ export const cloisterRouteLayer = Layer.mergeAll(
   getCloisterCloseOutRoute,
   putCloisterCloseOutRoute,
   getCloisterCloseOutDiskRoute,
+  postCloisterCloseOutCleanupRoute,
   getCloisterAgentsHealthRoute,
 );
 
