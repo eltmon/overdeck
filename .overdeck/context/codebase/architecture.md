@@ -42,6 +42,10 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `runGh` (metered `gh` exec), `withGitHubCaller`, App/PAT metering
   (`rest-meter.ts`), the cross-process pause gate, the `/rate_limit` sampler
   and the quota snapshot. Policy: `docs/PIPELINE-GATES.md` "GitHub quota policy".
+- `agents/permission-prompt.ts` + `overdeck/conversation-permission*.ts` (PAN-4278) —
+  parse Claude Code's terminal permission prompt from a pane, the in-memory
+  PermissionRequest hook registry, the conversation `pendingPermission` feed field,
+  and the arrows + Enter answer route. See `docs/DASHBOARD-ARCHITECTURE.md`.
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
   legacy `model_selection.specialist_harnesses` (PAN-636).
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
@@ -143,4 +147,4 @@ injectable dep: the lib defaults serve the CLI; the route must inject the server
 facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
 imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
-<!-- last-verified: 2026-09-26 -->
+<!-- last-verified: 2026-09-27 -->
