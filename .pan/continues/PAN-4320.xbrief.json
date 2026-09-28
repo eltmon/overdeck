@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4320",
   "created": "2026-09-28T15:34:16.087Z",
-  "updated": "2026-09-28T16:29:03.230Z",
+  "updated": "2026-09-28T16:29:15.027Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "docs-agent-key-rule.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T16:29:03.230Z"
+    },
+    "live-herdr-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:29:15.027Z"
     }
   }
 }
