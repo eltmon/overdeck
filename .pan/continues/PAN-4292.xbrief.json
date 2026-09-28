@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:51:09.247Z",
+  "updated": "2026-09-28T13:51:23.435Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "pan-tell-steer.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T13:51:09.246Z"
+    },
+    "agent-route-steer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:51:23.435Z"
     }
   }
 }
