@@ -55,6 +55,13 @@ vi.mock('../components/simple/TalkItThrough', () => ({
   TalkItThrough: () => <div data-testid="talk-it-through" />,
 }));
 
+// Mock GetSetUpCard (PAN-4282): it fetches /api/prerequisites on mount, which
+// this file's SimpleHomePage case does not stub — the fetch guard in
+// test-setup.ts fails any unmocked request.
+vi.mock('../components/home/GetSetUpCard', () => ({
+  GetSetUpCard: () => null,
+}));
+
 // Now import after all mocks are in place
 import { NeedsYouStrip } from '../components/KanbanBoard/NeedsYouStrip';
 import { ConversationDock } from '../components/dock/ConversationDock';
