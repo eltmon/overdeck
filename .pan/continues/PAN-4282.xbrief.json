@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:22:32.756Z",
+  "updated": "2026-09-28T00:22:36.396Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4282",
       "claimedAt": "2026-09-28T00:18:50.800Z",
       "doneAt": "2026-09-28T00:22:32.756Z"
+    },
+    "doctor-first-run": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-28T00:22:36.396Z"
     }
   }
 }
