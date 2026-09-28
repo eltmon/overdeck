@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T13:14:38.927Z",
+  "updated": "2026-09-28T13:14:53.556Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-1166",
       "claimedAt": "2026-09-28T13:10:08.098Z",
       "doneAt": "2026-09-28T13:14:38.927Z"
+    },
+    "unauthorized-phase": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:14:53.556Z"
     }
   }
 }
