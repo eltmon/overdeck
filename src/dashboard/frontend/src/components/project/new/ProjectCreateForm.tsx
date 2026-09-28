@@ -144,6 +144,19 @@ export function ProjectCreateForm({ create, titleId, onChange, onCancel }: Proje
     [handleSubmit],
   );
 
+  // Plain Enter in the one field clone and create need submits once resolve has
+  // cleared it (FR-6). preventDefault stops the form's own implicit submit, so
+  // this is the only path; modified Enters fall through to handleKeyDown.
+  const handleEnterSubmit = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      handleSubmit();
+    },
+    [handleSubmit],
+  );
+
   const openPicker = useCallback((field: 'path' | 'parentDir', trigger: HTMLButtonElement | null) => {
     browseReturnRef.current = trigger;
     setPicker(field);
@@ -208,6 +221,7 @@ export function ProjectCreateForm({ create, titleId, onChange, onCancel }: Proje
               aria-invalid={findingsFor('url').length > 0}
               aria-describedby={findingsFor('url').length ? `${urlId}-error` : undefined}
               onChange={(event) => setUrl(event.target.value)}
+              onKeyDown={handleEnterSubmit}
             />
             <Findings findings={findingsFor('url')} id={`${urlId}-error`} />
           </div>
@@ -263,6 +277,7 @@ export function ProjectCreateForm({ create, titleId, onChange, onCancel }: Proje
               aria-invalid={findingsFor('name').length > 0}
               aria-describedby={findingsFor('name').length ? `${nameId}-error` : undefined}
               onChange={(event) => setName(event.target.value)}
+              onKeyDown={handleEnterSubmit}
             />
             <Findings findings={findingsFor('name')} id={`${nameId}-error`} />
             {intent && (
