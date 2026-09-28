@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:45:00.157Z",
+  "updated": "2026-09-28T01:49:24.818Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,9 +214,10 @@
       "doneAt": "2026-09-28T01:44:40.673Z"
     },
     "disk-cost-ui": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4283",
-      "claimedAt": "2026-09-28T01:45:00.157Z"
+      "claimedAt": "2026-09-28T01:45:00.157Z",
+      "doneAt": "2026-09-28T01:49:24.818Z"
     }
   }
 }
