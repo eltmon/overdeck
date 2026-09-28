@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4282",
   "created": "2026-09-27T23:47:23.116Z",
-  "updated": "2026-09-28T00:38:15.636Z",
+  "updated": "2026-09-28T00:38:26.479Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "install-gate.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T00:38:15.636Z"
+    },
+    "install-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:26.479Z"
     }
   }
 }
