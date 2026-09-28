@@ -179,33 +179,60 @@ export async function getConversationDiffs(
     const repoRootCache = new Map<string, string | null>();
     const baseCommitCache = new Map<string, string | null>();
 
+    // First pass: group each turn's edits by repo, and build the per-repo
+    // union of paths so each repo's diff runs once instead of once per turn.
+    const turnFiles = new Map<string, Map<string, string[]>>();
+    const repoFiles = new Map<string, Set<string>>();
     for (const [assistantId, edits] of fileEditsByAssistantId) {
+      const filesByRepo = await groupFilesByRepo(edits, repoRootCache);
+      turnFiles.set(assistantId, filesByRepo);
+      for (const [repoRoot, filePaths] of filesByRepo) {
+        let union = repoFiles.get(repoRoot);
+        if (!union) { union = new Set(); repoFiles.set(repoRoot, union); }
+        for (const filePath of filePaths) union.add(filePath);
+      }
+    }
+
+    // Second pass: one diff pair per repo over the union of edited paths,
+    // indexed by path so each turn's summary can pull out only its own files.
+    const repoChanges = new Map<string, Map<string, TurnDiffFileChange>>();
+    for (const [repoRoot, pathSet] of repoFiles) {
+      try {
+        if (!baseCommitCache.has(repoRoot)) {
+          baseCommitCache.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
+        }
+        const baseCommit = baseCommitCache.get(repoRoot) ?? null;
+        const filePaths = [...pathSet];
+        const diffs = baseCommit
+          ? await diffFilesSinceBase(repoRoot, baseCommit, filePaths)
+          : await diffFilesAgainstHead(repoRoot, filePaths);
+        repoChanges.set(repoRoot, new Map(diffs.map(change => [change.path, change])));
+      } catch {
+        // git diff failed — skip this repo
+      }
+    }
+
+    for (const assistantId of fileEditsByAssistantId.keys()) {
       const asstMsg = assistantById.get(assistantId);
       const completedAt = asstMsg?.completedAt ?? asstMsg?.createdAt ?? new Date().toISOString();
-      const filesByRepo = await groupFilesByRepo(edits, repoRootCache);
+      const filesByRepo = turnFiles.get(assistantId) ?? new Map<string, string[]>();
 
-      const allFiles: TurnDiffFileChange[] = [];
+      const files: TurnDiffFileChange[] = [];
       for (const [repoRoot, filePaths] of filesByRepo) {
-        try {
-          if (!baseCommitCache.has(repoRoot)) {
-            baseCommitCache.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
-          }
-          const baseCommit = baseCommitCache.get(repoRoot) ?? null;
-          const diffs = baseCommit
-            ? await diffFilesSinceBase(repoRoot, baseCommit, filePaths)
-            : await diffFilesAgainstHead(repoRoot, filePaths);
-          allFiles.push(...diffs);
-        } catch {
-          // git diff failed — skip this repo
+        const changes = repoChanges.get(repoRoot);
+        if (!changes) continue;
+        for (const filePath of filePaths) {
+          const change = changes.get(filePath);
+          if (change) files.push(change);
         }
       }
 
-      if (allFiles.length > 0) {
+      if (files.length > 0) {
         summaries.push({
           turnId: `conv-turn-${assistantId}`,
           completedAt,
           status: 'completed',
-          files: allFiles,
+          files,
           assistantMessageId: assistantId,
         });
       }
