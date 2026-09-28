@@ -4,17 +4,17 @@
     "created": "2026-09-27T23:24:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4278: Terminal permission prompts (incl. subagents) need an answerable dashboard dialog, and composer input must not be pasted into or lost around them",
-    "updated": "2026-09-27T23:28:37.530Z"
+    "updated": "2026-09-27T23:29:04.444Z"
   },
   "plan": {
     "id": "pan-4278",
     "title": "Terminal permission prompts (incl. subagents) need an answerable dashboard dialog, and composer input must not be pasted into or lost around them",
-    "status": "proposed",
+    "status": "running",
     "uid": "37f97fca-2dae-403b-be89-be4e575f69a8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T23:24:30Z",
-    "updated": "2026-09-27T23:28:37.530Z",
+    "updated": "2026-09-27T23:29:04.444Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4278",
