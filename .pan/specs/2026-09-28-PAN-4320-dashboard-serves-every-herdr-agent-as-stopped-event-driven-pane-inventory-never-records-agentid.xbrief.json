@@ -4,17 +4,17 @@
     "created": "2026-09-28T15:22:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4320: Dashboard serves every Herdr agent as stopped: event-driven pane inventory never records agentId",
-    "updated": "2026-09-28T15:33:16.501Z"
+    "updated": "2026-09-28T15:34:00.462Z"
   },
   "plan": {
     "id": "pan-4320",
     "title": "Dashboard serves every Herdr agent as stopped: event-driven pane inventory never records agentId",
-    "status": "proposed",
+    "status": "running",
     "uid": "7a6b2daf-dbe2-4a69-90e9-3cf17c1fb5f6",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-28T15:22:37Z",
-    "updated": "2026-09-28T15:33:16.501Z",
+    "updated": "2026-09-28T15:34:00.462Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4320",

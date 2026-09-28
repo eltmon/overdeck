@@ -247,5 +247,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   502, for the same `(name, clientMessageId)`. A resend after a
   `permission-pending` hold or a `not-delivered` failure must mint a fresh
   `clientMessageId` and send no `retry` flag, like the not-found Resend.
+- **Agent-to-pane joins must key by `agentId`** (PAN-4320) — on Herdr a
+  `BackendPane`'s `id` (`wKZ:p3`) and `terminalId` (`term_…`) are backend
+  handles, never agent ids. Six server sites joined by `terminalId ?? id` and
+  served every Herdr agent as stopped. Use `indexPanesByAgentKey` /
+  `paneAgentKey` from `@overdeck/contracts` (non-exited pane wins a key
+  collision). Test fixtures must be Herdr-shaped; a tmux-shaped pane
+  (`terminalId` = agent id) hides the bug. Herdr work agents run without the
+  PTY supervisor, so the enrichment poller's `agent.created` is the only way a
+  post-boot agent enters the read model's `agentsById`.
 
 <!-- last-verified: 2026-09-28 -->
