@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:36:41.181Z",
+  "updated": "2026-09-28T00:36:52.711Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "connection-store.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T00:36:41.181Z"
+    },
+    "connection-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:36:52.711Z"
     }
   }
 }
