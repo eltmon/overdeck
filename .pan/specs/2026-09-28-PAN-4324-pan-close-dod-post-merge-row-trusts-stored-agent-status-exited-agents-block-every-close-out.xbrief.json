@@ -1,0 +1,203 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T17:27:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4324: pan close DoD post-merge row trusts stored agent status: exited agents block every close-out",
+    "updated": "2026-09-28T17:28:04.746Z"
+  },
+  "plan": {
+    "id": "pan-4324",
+    "title": "pan close DoD post-merge row trusts stored agent status: exited agents block every close-out",
+    "status": "proposed",
+    "uid": "5e8e221d-e8f5-4b77-9f8d-cc1588be0c90",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-28T17:27:16Z",
+    "updated": "2026-09-28T17:28:04.746Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4324",
+        "label": "PAN-4324",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4324.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "dod-gate",
+      "liveness",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "checkPostMergeRow() in src/lib/lifecycle/dod-gate.ts filters agents on the stored state.json status (starting/running). That status is a spawn-time snapshot: work and planning agents that exit on their own keep 'running', so DoD row 5 reports 'running agents: agent-pan-<n>, planning-pan-<n>' and blocks nearly every pan close until the operator runs pan kill.",
+      "Proposal": "Keep the role and claimed-live prefilter, then confirm each claimed-live agent with the liveness oracle (isAlive from src/lib/agents/liveness.ts) through a new required PostMergeRowDeps.isAlive seam. Agents confirmed dead (isConfirmedDead) no longer block and are named as 'stored running, not live'; alive agents block as 'running agents'; indeterminate or thrown probes block as 'liveness indeterminate'. The gate stays read-only. Document the rule in the close-out section of docs/MERGE-WORKFLOW.md.",
+      "NonGoals": "- Probing agents whose stored status is stopped or any other non-claimed-live status\n- Writing stopped back to state.json, emitting events, or closing panes from the gate\n- Special-casing Herdr alive panes with backendState idle or done as not running\n- Changing any other DoD row, the row 5 definition text in src/lib/lifecycle/dod.ts, or pan close control flow\n- Using tmuxActive or the runtime census as the liveness source\n- Editing docs/TERMINAL-BACKENDS.md (its row 5 note is the PAN-3947 story)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the stored starting/running prefilter and probe only claimed-live rows",
+        "rationale": "Mirrors deriveServedAgentStatuses from PAN-4320 (confirm claimed-live rows, pass others through) and avoids newly blocking issues whose agents pan kill stopped while a Herdr pane outlived the stop."
+      },
+      {
+        "summary": "An indeterminate or thrown liveness probe counts as running (row misses)",
+        "rationale": "Same isConfirmedDead rule every remediator uses: a probe that cannot answer must never let close-out proceed."
+      },
+      {
+        "summary": "An alive pane with Herdr backendState idle/done still counts as running",
+        "rationale": "Issue AC2 requires a live pane after merge to keep failing row 5; the post-merge handoff is responsible for closing those panes."
+      },
+      {
+        "summary": "New PostMergeRowDeps.isAlive seam is required and returns the LivenessVerdict",
+        "rationale": "A verdict (not a boolean) lets the row report indeterminate separately; required (not optional-with-real-default) keeps unit tests off Herdr/tmux."
+      }
+    ],
+    "items": [
+      {
+        "id": "row5-liveness",
+        "title": "DoD row 5 confirms claimed-live agents with the liveness oracle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-28T17:27:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4324",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/lifecycle/dod-gate.test.ts passes including the new PAN-4324 cases",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 in .pan/drafts/pan-4324.md exactly. In src/lib/lifecycle/dod-gate.ts: import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js'; add required `isAlive: (agentId: string) => Promise<LivenessVerdict>` to PostMergeRowDeps (search 'interface PostMergeRowDeps') with a PAN-4324 doc comment; set `isAlive: agentId => isAlive(agentId)` in defaultPostMergeRowDeps. In checkPostMergeRow, rename the existing role+starting/running filter result to claimedLive, probe each with deps.isAlive(id).catch(() => ({ alive: false, reason: 'runtime-indeterminate' })) via Promise.all, split into runningAgents (verdict.alive), indeterminateAgents (!alive && !isConfirmedDead), exitedAgents (isConfirmedDead); blockingAgents = running + indeterminate. agentsObserved = 'running agents: <ids>' and/or 'liveness indeterminate: <ids>' joined by '; ', else 'no running work/planning agents' plus ' (stored running, not live: <ids>)' when any exited. Every branch that tested runningAgents.length === 0 now tests blockingAgents.length === 0. Do not use tmuxActive; do not write any state. In tests/unit/lib/lifecycle/dod-gate.test.ts: add isAlive seams to every existing checkPostMergeRow call (alive:true for running-agent cases), and add the six new cases listed in the PRD (no-session pass, alive miss, indeterminate miss, thrown probe miss, done+pane-dead pass, stopped not probed).",
+          "Hazard": "dod-gate.ts is 962 lines and the file-size ceiling is 1000; keep the change compact. If scripts/lint-file-size.sh flags it, add '<lines> src/lib/lifecycle/dod-gate.ts # PAN-4324' to scripts/file-size-allowlist.txt in the same commit."
+        },
+        "items": [
+          {
+            "id": "row5-liveness.ac1",
+            "title": "Given work and planning agents stored running and isAlive returning no-session, checkPostMergeRow returns status pass and observed contains 'no running work/planning agents' and 'stored running, not live: agent-pan-2715, planning-pan-2715'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row5-liveness.ac2",
+            "title": "Given a stored-running work agent and isAlive returning alive:true with backendState idle, checkPostMergeRow returns status miss and observed contains 'running agents: agent-pan-2715'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row5-liveness.ac3",
+            "title": "Given isAlive returning runtime-indeterminate or rejecting, checkPostMergeRow returns status miss with observed containing 'liveness indeterminate: agent-pan-2715' and not 'post-merge evidence unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row5-liveness.ac4",
+            "title": "Given an agent with stored status stopped, checkPostMergeRow does not call the isAlive seam (vi.fn spy has zero calls) and returns pass on verifying_on_main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row5-liveness.ac5",
+            "title": "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts exits 0, and git grep -n tmuxActive src/lib/lifecycle/dod-gate.ts returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "row5-docs",
+        "title": "Document the DoD row 5 liveness rule in the close-out section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T17:27:16Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4324",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Close-out's DoD row 5 (post-merge) asks the liveness oracle\" docs/MERGE-WORKFLOW.md"
+          ],
+          "expected_outputs": [
+            "grep prints one matching line in the Post-merge handoff and Docker cleanup section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "acJustification": "Single-paragraph doc addition; two checks (presence of the rule and its placement/scope) cover it fully."
+        },
+        "narrative": {
+          "Action": "In docs/MERGE-WORKFLOW.md, section 'Post-merge handoff and Docker cleanup', append the paragraph given verbatim in PRD WI-2 (.pan/drafts/pan-4324.md) directly after the paragraph that starts 'The durable, verified teardown owner is **close-out**'. Leave docs/TERMINAL-BACKENDS.md unchanged."
+        },
+        "items": [
+          {
+            "id": "row5-docs.ac1",
+            "title": "docs/MERGE-WORKFLOW.md contains the sentence starting \"Close-out's DoD row 5 (post-merge) asks the liveness oracle\" linking ../src/lib/agents/liveness.ts, placed after the 'The durable, verified teardown owner is **close-out**' paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "row5-docs.ac2",
+            "title": "Given docs/MERGE-WORKFLOW.md after the change, grep for 'A stored `running` agent with no live pane does not block the row' returns one match, and the same paragraph contains 'runtime-indeterminate' and 'it never writes agent status'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-09-28-PAN-4324-pan-close-dod-post-merge-row-trusts-stored-agent-status-exited-agents-block-every-close-out.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
