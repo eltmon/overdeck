@@ -5,6 +5,7 @@ import { getNewWorkspaceProjectFromSearch } from '../App/routes.js';
 import { FolderPicker } from '../components/CommandDeck/FolderPicker.js';
 import { useAddProjectDialog } from '../components/project/new/addProjectDialogStore.js';
 import { useWorkspaceCreateIntent } from '../components/workspace/new/useWorkspaceCreateIntent.js';
+import { SmartWorkspaceField } from '../components/workspace/new/SmartWorkspaceField.js';
 import { fetchWithTimeout } from '../lib/apiFetch.js';
 
 interface ProjectTargets {
@@ -16,6 +17,8 @@ interface RegisteredProject {
   key: string;
   name: string;
   path: string;
+  /** The project's issue prefix (server: getIssuePrefix), e.g. "PAN". */
+  linearTeam?: string | null;
 }
 
 interface WorkspaceRecency {
@@ -160,6 +163,11 @@ export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps)
     : intent.targetPath || intent.intent?.path || 'Choose target directory';
   const findings = (['name', 'project', 'targetPath', 'parentBranch'] as const)
     .flatMap((field) => intent.findingsFor(field));
+  const issuePrefixes = useMemo(
+    () => registeredProjects.flatMap((project) => (project.linearTeam ? [project.linearTeam] : [])),
+    [registeredProjects],
+  );
+  const selectedProjectPrefix = registeredProjects.find((project) => project.key === intent.projectKey)?.linearTeam ?? null;
   const resolvedParentBranch = intent.parentBranch || intent.intent?.parentBranch;
   const resolvedParentBranchInferred = !intent.parentBranch && intent.intent?.parentBranchGuessed;
 
@@ -247,19 +255,28 @@ export function NewWorkspacePage({ onCancel, onCreated }: NewWorkspacePageProps)
           )}
         </div>
 
-        <input
-          ref={heroRef}
-          data-testid="new-workspace-hero-title"
-          data-region="hero-title"
-          aria-label="Workspace name"
-          className="display-xl mb-7 w-full border-0 bg-transparent p-0 text-foreground caret-primary outline-none placeholder:text-muted-foreground/40"
+        <SmartWorkspaceField
+          inputRef={heroRef}
           value={intent.name}
-          onChange={(event) => intent.setName(event.target.value)}
-          placeholder="Untitled workspace"
-          autoComplete="off"
-          spellCheck={false}
-          autoFocus
+          onChange={intent.setName}
+          prefixes={issuePrefixes}
+          projectPrefix={selectedProjectPrefix}
+          branchCandidates={intent.intent?.branchCandidates ?? []}
+          onOpenIssue={(id) => {
+            window.history.pushState({}, '', `/issues/${encodeURIComponent(id)}`);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }}
+          onPickBranch={(branch) => {
+            intent.setParentBranch(branch);
+            setShowAdvanced(true);
+          }}
+          onUseName={intent.setName}
         />
+        {intent.mode === 'isolated' && intent.intent?.branchName && (
+          <p data-testid="new-workspace-branch-preview" className="-mt-5 mb-7 font-mono text-xs text-muted-foreground">
+            Branch: {intent.intent.branchName}
+          </p>
+        )}
 
         <div data-testid="new-workspace-target-row" data-region="target-row" className="relative mb-10 flex min-h-9 flex-wrap items-center gap-2.5">
           <button
