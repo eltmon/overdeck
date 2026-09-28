@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:01:55.923Z",
+  "updated": "2026-09-28T01:02:11.432Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
     "dod-teardown-row.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T01:01:55.922Z"
+    },
+    "close-out-settings-integration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:02:11.432Z"
     }
   }
 }
