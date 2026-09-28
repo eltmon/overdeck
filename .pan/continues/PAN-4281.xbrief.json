@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T00:13:25.666Z",
+  "updated": "2026-09-28T00:13:32.749Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-4281",
       "claimedAt": "2026-09-28T00:10:11.596Z",
       "doneAt": "2026-09-28T00:13:25.666Z"
+    },
+    "add-project-dialog-shell": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:13:32.749Z"
     }
   }
 }
