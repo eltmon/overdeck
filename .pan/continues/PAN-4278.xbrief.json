@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4278",
   "created": "2026-09-27T23:29:11.482Z",
-  "updated": "2026-09-28T00:29:29.055Z",
+  "updated": "2026-09-28T00:29:40.551Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -260,6 +260,10 @@
     "permission-registry.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T00:29:29.055Z"
+    },
+    "permission-registry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:29:40.551Z"
     }
   }
 }
