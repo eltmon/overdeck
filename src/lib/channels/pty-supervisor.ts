@@ -38,7 +38,7 @@ import {
   type PaneViewport,
 } from '../pane-composer.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
-import { STEER_PTY_BYTES, type SubmitMode } from '../terminal-backends/steer-keys.js';
+import { STEER_PTY_BYTES, SUPERVISOR_STEER_ACK, type SubmitMode } from '../terminal-backends/steer-keys.js';
 import {
   INPUT_ECHO_CONFIRM_INTERVAL_MS,
   INPUT_ECHO_CONFIRM_ATTEMPTS,
@@ -259,7 +259,7 @@ async function appendEchoFailureLog(
 
 /** Success body: bare 'ok' for Enter (unchanged), `{ok, submit}` for a steer (PAN-4292). */
 function deliveredBody(payload: PtySupervisorPayload): unknown {
-  return payload.submit === 'steer' ? { ok: true, submit: 'steer' } : 'ok';
+  return payload.submit === 'steer' ? SUPERVISOR_STEER_ACK : 'ok';
 }
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {

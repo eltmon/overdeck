@@ -46,3 +46,23 @@ export async function steerHerdrPane(
   await new Promise((resolve) => setTimeout(resolve, STEER_SETTLE_MS));
   await api.call('pane.send_keys', { pane_id: paneId, keys: [...STEER_HERDR_KEYS] });
 }
+
+/**
+ * The PTY supervisor's answer to a steer. A supervisor that predates steer
+ * ignores `submit`, presses Enter, and answers a bare `"ok"`; only this body
+ * proves the chord was pressed.
+ */
+export const SUPERVISOR_STEER_ACK = { ok: true, submit: 'steer' } as const;
+
+/** `failure` text when an old PTY supervisor pressed Enter for a steer. */
+export const SUPERVISOR_PREDATES_STEER = 'supervisor predates steer; delivered as a normal submit';
+
+/** True when a PTY supervisor response body is {@link SUPERVISOR_STEER_ACK}. */
+export function isSupervisorSteerAck(body: string): boolean {
+  try {
+    const parsed = JSON.parse(body) as { ok?: unknown; submit?: unknown } | null;
+    return parsed?.ok === true && parsed.submit === 'steer';
+  } catch {
+    return false;
+  }
+}

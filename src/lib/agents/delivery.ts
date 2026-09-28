@@ -10,7 +10,7 @@ import { hostDisplayName, hostSocketPath, hostTokenFile, hostTransportFor, type 
 import { markKimiContextDelivered, prepareKimiMessage, type PreparedKimiMessage } from '../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agents.js';
 import type { PromptResult, PromptSender } from '../terminal-backends/types.js';
-import type { SubmitMode } from '../terminal-backends/steer-keys.js';
+import { isSupervisorSteerAck, SUPERVISOR_PREDATES_STEER, type SubmitMode } from '../terminal-backends/steer-keys.js';
 import {
   normalizeAgentId,
   getAgentState,
@@ -110,16 +110,9 @@ export type DeliveryResult = {
   /** True when the delivery was suppressed by the keyed dedup record — the
    * side effect already happened on an earlier call with the same key. */
   deduplicated?: boolean;
-  /**
-   * Set when the caller asked for `submit: 'steer'` (PAN-4292): true when the
-   * send-now chord was pressed, false when the tier pressed Enter instead (a
-   * PTY supervisor that predates steer). `failure` then says so.
-   */
+  /** For `submit: 'steer'` (PAN-4292): false when the tier pressed Enter instead; `failure` says why. */
   steered?: boolean;
 };
-
-/** `failure` text when an old PTY supervisor pressed Enter for a steer (PAN-4292 D9). */
-export const SUPERVISOR_PREDATES_STEER = 'supervisor predates steer; delivered as a normal submit';
 
 export interface DeliverAgentMessageOptions {
   /** Conversation sessions have no AgentState; identify their Kimi context explicitly. */
@@ -157,12 +150,8 @@ export interface DeliverAgentMessageOptions {
    */
   sender?: PromptSender;
   /**
-   * How to finish the message (PAN-4292). `enter` (default) is today's
-   * submit, which queues behind a running turn. `steer` presses Claude Code's
-   * send-now chord, which interrupts the turn. Only the Herdr, PTY supervisor
-   * and tmux tiers can carry a steer; the app-server, ACP/Prime host and
-   * Channels tiers answer `ok: false, failure: 'steer-unsupported: <tier>'`
-   * rather than delivering a plain submit. A keyed steer is rejected.
+   * PAN-4292: `steer` presses Claude Code's send-now chord instead of Enter. Herdr, supervisor and
+   * tmux carry it; other tiers answer `steer-unsupported: <tier>`, never a plain submit. Never keyed.
    */
   submit?: SubmitMode;
 }
@@ -618,9 +607,8 @@ export async function deliverAgentMessage(
         );
         await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
         if (!steer) return completeDelivery({ ok: true, path: 'supervisor' });
-        // PAN-4292 D9: a supervisor that predates steer ignores `submit` and
-        // presses Enter. Only the new one answers {ok:true, submit:'steer'}.
-        return completeDelivery(supervisorAcknowledgedSteer(supervisorResponse.body)
+        // PAN-4292 D9: a supervisor that predates steer ignores `submit` and presses Enter.
+        return completeDelivery(isSupervisorSteerAck(supervisorResponse.body)
           ? { ok: true, path: 'supervisor', steered: true }
           : { ok: true, path: 'supervisor', steered: false, failure: SUPERVISOR_PREDATES_STEER });
       } catch (err) {
@@ -689,16 +677,6 @@ export async function deliverAgentMessage(
   await assertTmuxTargetCanReceive(normalizedId, caller);
   await Effect.runPromise(pasteAndSubmit());
   return completeDelivery({ ok: true, path: 'tmux', ...steeredResult });
-}
-
-/** True when a PTY supervisor answered a steer with `{ok:true, submit:'steer'}` (PAN-4292 D9). */
-function supervisorAcknowledgedSteer(body: string): boolean {
-  try {
-    const parsed = JSON.parse(body) as { ok?: unknown; submit?: unknown } | null;
-    return parsed !== null && typeof parsed === 'object' && parsed.ok === true && parsed.submit === 'steer';
-  } catch {
-    return false;
-  }
 }
 
 /**
