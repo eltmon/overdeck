@@ -81,13 +81,18 @@ export interface RunawayGroup {
   reason: RunawayReason;
 }
 
+export interface AttributedProcessFact extends RunawayProcessFact {
+  owner: string;
+  ownerAgentId: string | null;
+}
+
 export interface RunawayClassification {
   runaways: RunawayGroup[];
   /** agentId → harness pid (D6). */
   harnessPids: Map<string, number>;
   coreServicePids: number[];
-  /** Every process not excluded above, with its owner. */
-  attributed: Array<RunawayProcessFact & { owner: string }>;
+  /** Every process not excluded above, with its owner and the agent id it resolved to. */
+  attributed: AttributedProcessFact[];
 }
 
 const MINUTE_MS = 60_000;
@@ -273,14 +278,15 @@ export function classifyRunaways(
   coreServicePids.add(context.dashboardPid);
   const excluded = excludedPids(facts, byPid, harnessPids, coreServicePids, context);
 
-  const attributed: Array<RunawayProcessFact & { owner: string }> = [];
-  const groups = new Map<number, Array<RunawayProcessFact & { owner: string; resolvedAgentId: string | null }>>();
+  const attributed: AttributedProcessFact[] = [];
+  const groups = new Map<number, AttributedProcessFact[]>();
   for (const fact of facts) {
     if (excluded.has(fact.pid)) continue;
     const { owner, agentId } = resolveOwner(fact, byPid);
-    attributed.push({ ...fact, owner });
+    const member: AttributedProcessFact = { ...fact, owner, ownerAgentId: agentId };
+    attributed.push(member);
     const members = groups.get(fact.pgid) ?? [];
-    members.push({ ...fact, owner, resolvedAgentId: agentId });
+    members.push(member);
     groups.set(fact.pgid, members);
   }
 
@@ -290,10 +296,10 @@ export function classifyRunaways(
     if (sustained.length === 0) continue;
     const sustainedCores = sustained.reduce((sum, member) => sum + member.sustainedCores!, 0);
     if (sustainedCores < RUNAWAY_MIN_SUSTAINED_CORES) continue;
-    const representative = representativeOf(members) as (typeof members)[number];
+    const representative = representativeOf(members) as AttributedProcessFact;
     const reason = runawayReason(
       representative,
-      representative.resolvedAgentId,
+      representative.ownerAgentId,
       byPid,
       harnessPids,
       harnessPidSet,
@@ -305,7 +311,7 @@ export function classifyRunaways(
     runaways.push({
       key: `${representative.owner}:${pgid}:${leaderStarttime}`,
       owner: representative.owner,
-      agentId: representative.resolvedAgentId,
+      agentId: representative.ownerAgentId,
       pgid,
       leaderStarttime,
       count: members.length,
