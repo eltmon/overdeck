@@ -35,7 +35,8 @@ const KNOWN_CALL_SITES = new Set([
   'dashboard/server/routes/agents/lifecycle-restart.ts|console.log(`[agents/resume] ${id} dispatching resumeAgent() with opts=${JSON.stringify(resumeOpts)}`);',
   'dashboard/server/routes/agents/lifecycle-restart.ts|const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));',
   'dashboard/server/routes/agents/lifecycle-stop.ts|.then(({ resumeAgent }) => resumeAgent(id))',
-  'dashboard/server/routes/agents/messaging.ts|const outcome = await messageAgent(id, message, \'dashboard:user-message\');',
+  // PAN-4292: a dashboard steer passes { steer: true }
+  'dashboard/server/routes/agents/messaging.ts|const outcome = await messageAgent(id, message, \'dashboard:user-message\', ...(options.steer ? [{ steer: true }] as const : []));',
   'dashboard/server/routes/agents/messaging.ts|yield* Effect.promise(() => messageAgent(id, pokeMsg));',
   // PAN-3960: a live planner's user message goes through the backend-aware
   // delivery door (it was a raw tmux sendKeys, which cannot reach a Herdr pane).

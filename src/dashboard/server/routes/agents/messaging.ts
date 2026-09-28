@@ -46,9 +46,8 @@ async function sendAgentMessage(id: string, message: string, options: AgentMessa
     } catch {}
   }
 
-  const outcome = options.steer
-    ? await messageAgent(id, message, 'dashboard:user-message', { steer: true })
-    : await messageAgent(id, message, 'dashboard:user-message');
+  // PAN-4292: a dashboard steer passes { steer: true }; a plain send keeps the three-argument call.
+  const outcome = await messageAgent(id, message, 'dashboard:user-message', ...(options.steer ? [{ steer: true }] as const : []));
   // PAN-4268: Claude Code's input could not be moved to the main agent.
   if (outcome.inputTargetRefusal) return { kind: 'refused', refusal: outcome.inputTargetRefusal };
   // PAN-4292: a steer that cannot reach a running Claude Code turn is refused
