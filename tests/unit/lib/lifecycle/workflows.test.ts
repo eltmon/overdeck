@@ -1158,15 +1158,21 @@ describe('workflows', () => {
       expect(result.steps.some(s => s.step === 'close-out:abort')).toBe(false);
     });
 
-    it('should preserve workspace and branches by default', async () => {
+    it('should remove the workspace and keep branches by default', async () => {
       const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
       mkdirSync(wsPath, { recursive: true });
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git worktree remove')) {
+          rmSync(wsPath, { recursive: true, force: true });
+        }
+        return { stdout: '', stderr: '' };
+      });
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
 
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeUndefined();
-      expect(existsSync(wsPath)).toBe(true);
+      expect(existsSync(wsPath)).toBe(false);
     });
 
     it('should honor close_out branch deletion config', async () => {

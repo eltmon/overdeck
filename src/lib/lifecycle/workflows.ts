@@ -333,7 +333,7 @@ export function closeOut(
     });
     const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
-      deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
+      deleteWorkspace: closeOutConfig?.remove_workspace ?? true,
       deleteBranches: closeOutConfig?.delete_feature_branch ?? false,
     });
     allSteps.push(...teardownSteps);
