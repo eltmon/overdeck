@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:11:48.661Z",
+  "updated": "2026-09-28T01:11:59.832Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "launcher-talk-props.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T01:11:48.661Z"
+    },
+    "home-intents.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:11:59.832Z"
     }
   }
 }
