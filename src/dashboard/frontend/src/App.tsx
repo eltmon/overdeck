@@ -869,7 +869,7 @@ export default function App() {
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
-          <AppRoutes backendDown={backendUnreachable} restarting={dashboardLifecycle.active}
+          <AppRoutes
             activeTab={activeTab}
             issues={issues}
             selectedConvId={selectedConvId}
