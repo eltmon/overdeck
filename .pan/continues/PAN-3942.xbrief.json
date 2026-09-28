@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-3942",
+  "created": "2026-09-28T17:21:05.119Z",
+  "updated": "2026-09-28T17:21:05.119Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "resolver": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3942",
+      "claimedAt": "2026-09-28T17:21:05.119Z"
+    }
+  }
+}
