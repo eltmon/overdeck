@@ -56,6 +56,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/workspace.js'),
     register: (mod, program) => mod.registerWorkspaceCommands(program),
   }),
+  vault: group({
+    names: ['vault'],
+    load: () => import('./commands/vault/index.js'),
+    register: (mod, program) => mod.registerVaultCommands(program),
+  }),
   test: group({
     names: ['test'],
     load: () => import('./commands/test.js'),
