@@ -11,7 +11,7 @@
  * names the projects and issues that override a skill, and a failed save
  * shows an inline error with Retry on its own row.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Lock } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
@@ -62,6 +62,10 @@ export interface SkillOverridesPanelProps {
   issueId?: string;
   /** False while a surrounding disclosure is collapsed: nothing is fetched. */
   enabled?: boolean;
+  /** Called when the issue has no resolvable project, so the host can hide its section. */
+  onUnavailable?: () => void;
+  /** Live agents for this issue; after a save, the panel notes the change applies at their next launch. */
+  liveAgents?: string[];
 }
 
 class RequestError extends Error {
@@ -99,7 +103,7 @@ function belowNote(entry: { projects: string[]; issues: string[] } | undefined):
   return parts.length ? `overridden in ${parts.join(', ')}` : null;
 }
 
-export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true }: SkillOverridesPanelProps) {
+export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true, onUnavailable, liveAgents = [] }: SkillOverridesPanelProps) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>(FILTERS[level][0][0]);
@@ -107,6 +111,7 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, { message: string; enabled: boolean | null }>>({});
   const [notice, setNotice] = useState<string | null>(null);
+  const [changed, setChanged] = useState(false);
 
   const query = useQuery({
     queryKey: [...SKILL_OVERRIDES_QUERY_KEY, level, projectKey ?? null, issueId ?? null],
@@ -128,6 +133,7 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
       const result = (await res.json().catch(() => ({}))) as SaveResult & { error?: string };
       if (!res.ok) throw new Error(result.error ?? `HTTP ${res.status}`);
       setNotice(result.committed && result.pushed === false ? `Saved locally; push pending: ${result.reason ?? 'unknown reason'}` : null);
+      setChanged(true);
       await queryClient.invalidateQueries({ queryKey: SKILL_OVERRIDES_QUERY_KEY });
     } catch (error) {
       setRowErrors(prev => ({ ...prev, [skill]: { message: error instanceof Error ? error.message : String(error), enabled: value } }));
@@ -150,7 +156,11 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
   }), [skills, below, level]);
 
   // Decision #6: an issue no registered project owns has no skills section.
-  if (query.error instanceof RequestError && query.error.code === 'unknown-issue') return null;
+  const unavailable = query.error instanceof RequestError && query.error.code === 'unknown-issue';
+  useEffect(() => {
+    if (unavailable) onUnavailable?.();
+  }, [unavailable, onUnavailable]);
+  if (unavailable) return null;
 
   const needle = search.trim().toLowerCase();
   const visible = skills.filter((skill) => {
@@ -178,6 +188,11 @@ export function SkillOverridesPanel({ level, projectKey, issueId, enabled = true
         <p className="text-sm text-destructive">Could not load skills: {query.error.message}</p>
       )}
       {notice && <p className="text-sm text-muted-foreground" role="status">{notice}</p>}
+      {changed && liveAgents.length > 0 && (
+        <p className="text-sm text-muted-foreground" data-testid="skills-changed-since-launch">
+          Skills changed since launch; applies next launch ({liveAgents.join(', ')} running).
+        </p>
+      )}
 
       {data && (
         <>
@@ -288,7 +303,7 @@ function SkillRow({ skill, level, below, saving, error, onSave }: SkillRowProps)
               onClick={() => onSave(skill.global === false ? null : false)}
               className={cn(
                 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-border transition-colors disabled:cursor-not-allowed',
-                skill.core || skill.global !== false ? 'bg-foreground/70' : 'bg-muted',
+                skill.core || skill.global !== false ? 'bg-foreground' : 'bg-muted',
                 skill.core && 'opacity-50',
               )}
             >
@@ -315,7 +330,7 @@ function SkillRow({ skill, level, below, saving, error, onSave }: SkillRowProps)
                 disabled={saving}
                 onClick={() => onSave(value)}
                 className={cn(
-                  'px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/50',
+                  'px-2 py-1 text-muted-foreground transition-colors hover:bg-muted',
                   current === value && 'bg-muted text-foreground',
                 )}
               >

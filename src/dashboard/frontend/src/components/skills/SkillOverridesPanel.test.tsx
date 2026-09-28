@@ -9,7 +9,10 @@ vi.mock('../../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
 }));
 
+import type { ReactElement } from 'react';
+import { useDashboardStore } from '../../lib/store';
 import { SkillOverridesPanel, type SkillOverridesPanelProps, type SkillState } from './SkillOverridesPanel';
+import { IssueSkillsSection, ProjectSkillsSection } from './SkillOverridesSections';
 
 function skill(overrides: Partial<SkillState> & { name: string }): SkillState {
   return {
@@ -45,6 +48,11 @@ function renderPanel(props: SkillOverridesPanelProps) {
       <SkillOverridesPanel {...props} />
     </QueryClientProvider>,
   );
+}
+
+function renderSection(element: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
 }
 
 function row(name: string): HTMLElement {
@@ -175,5 +183,49 @@ describe('SkillOverridesPanel — issue', () => {
     mockApi(issueSkills);
     renderPanel({ level: 'issue', issueId: 'TST-1', enabled: false });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe('skill override sections', () => {
+  afterEach(() => {
+    useDashboardStore.setState({ backendPanesById: {} });
+  });
+
+  it('issue section fetches nothing until opened, then loads the issue context', async () => {
+    mockApi({ project: 'tst', issue: 'TST-1', skills: [GRILLING] });
+    renderSection(<IssueSkillsSection issueId="TST-1" />);
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skills for this issue' }));
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledWith('/api/skills/overrides?issue=TST-1'));
+  });
+
+  it('hides the issue section when no project owns the issue', async () => {
+    fetchImpl = vi.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: 'no project', code: 'unknown-issue' }) }));
+    vi.stubGlobal('fetch', fetchImpl);
+    renderSection(<IssueSkillsSection issueId="ZZZ-1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Skills for this issue' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Skills for this issue' })).toBeNull());
+  });
+
+  it('notes that a change applies at the next launch while an agent is running', async () => {
+    useDashboardStore.setState({
+      backendPanesById: { p1: { id: 'p1', issue: 'TST-1', role: 'work', harness: 'claude-code', model: 'm', state: 'working' } },
+    });
+    mockApi({ project: 'tst', issue: 'TST-1', skills: [skill({ name: 'grilling', issue: false, enabled: false, source: 'issue' })] });
+    renderSection(<IssueSkillsSection issueId="TST-1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Skills for this issue' }));
+    await waitFor(() => expect(row('grilling')).toBeTruthy());
+    fireEvent.click(within(row('grilling')).getByRole('button', { name: 'On' }));
+    await waitFor(() => expect(screen.getByTestId('skills-changed-since-launch').textContent)
+      .toBe('Skills changed since launch; applies next launch (work agent running).'));
+  });
+
+  it('project section fetches nothing until opened', async () => {
+    mockApi({ project: 'tst', issue: null, skills: [GRILLING] });
+    renderSection(<ProjectSkillsSection projectKey="tst" />);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Skills' }));
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledWith('/api/skills/overrides?project=tst'));
   });
 });
