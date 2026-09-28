@@ -8,12 +8,13 @@
 
 import { execFile } from 'child_process';
 import { existsSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { promisify } from 'util';
 import { withGitHubCaller } from '../github-quota/caller-context.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { readActivePause } from '../github-quota/pause-gate.js';
 import { listProjectsSync } from '../projects.js';
+import { isBranchMerged } from '../close-out.js';
 import { resolveIssueWorkspaceDirs } from './shapes.js';
 
 const execFileAsync = promisify(execFile);
@@ -163,4 +164,89 @@ export async function collectClosedIssueWorkspaces(
     cachedReport = { report, computedAtMs: Date.now() };
   }
   return report;
+}
+
+export interface ClosedIssueWorkspaceCleanupResult {
+  removed: Array<{ issueId: string; freedBytes: number | null }>;
+  skipped: Array<{ issueId: string; reason: string }>;
+}
+
+export interface ClosedIssueWorkspaceCleanupDeps extends ClosedIssueWorkspaceDeps {
+  isMerged: (issueId: string, projectPath: string) => Promise<'merged' | 'unmerged' | 'no-branch'>;
+  isDirty: (path: string) => Promise<boolean>;
+  destroy: (issueId: string, projectPath: string) => Promise<void>;
+}
+
+const DEFAULT_CLEANUP_DEPS: Pick<ClosedIssueWorkspaceCleanupDeps, 'isMerged' | 'isDirty' | 'destroy'> = {
+  isMerged: async (issueId, projectPath) => {
+    const result = await withGitHubCaller('close-out', () =>
+      isBranchMerged(`feature/${issueId.toLowerCase()}`, projectPath)
+    );
+    return result.status;
+  },
+  isDirty: async (path) => {
+    const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { cwd: path, encoding: 'utf-8' });
+    return stdout.trim().length > 0;
+  },
+  destroy: async (issueId, projectPath) => {
+    await execFileAsync('pan', ['workspace', 'destroy', issueId, '--project', projectPath], { timeout: 180_000 });
+  },
+};
+
+/**
+ * Destroys the workspace for every closed, merged, clean, non-polyrepo row.
+ * First failing check wins per row (PAN-4283 D7/D8): polyrepo, then
+ * uncommitted changes, then unmerged, then the destroy call itself.
+ */
+export async function cleanupClosedIssueWorkspaces(
+  deps?: Partial<ClosedIssueWorkspaceCleanupDeps>
+): Promise<ClosedIssueWorkspaceCleanupResult> {
+  const resolved: ClosedIssueWorkspaceCleanupDeps = { ...DEFAULT_DEPS, ...DEFAULT_CLEANUP_DEPS, ...deps };
+  const report = await collectClosedIssueWorkspaces(deps);
+
+  const results = await mapWithConcurrency(report.rows, 2, async (row): Promise<
+    { removed: { issueId: string; freedBytes: number | null } } | { skipped: { issueId: string; reason: string } }
+  > => {
+    if (row.polyrepo) {
+      return { skipped: { issueId: row.issueId, reason: 'polyrepo workspace — run pan workspace destroy by hand' } };
+    }
+
+    for (const path of row.paths) {
+      let dirty: boolean;
+      try {
+        dirty = await resolved.isDirty(path);
+      } catch {
+        return { skipped: { issueId: row.issueId, reason: `cannot read git status in ${basename(path)}` } };
+      }
+      if (dirty) {
+        return { skipped: { issueId: row.issueId, reason: `uncommitted changes in ${basename(path)}` } };
+      }
+    }
+
+    const mergeStatus = await resolved.isMerged(row.issueId, row.projectPath);
+    if (mergeStatus !== 'merged') {
+      return {
+        skipped: {
+          issueId: row.issueId,
+          reason: mergeStatus === 'unmerged' ? 'branch not merged' : 'merge state unknown (no local or remote branch)',
+        },
+      };
+    }
+
+    try {
+      await resolved.destroy(row.issueId, row.projectPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { skipped: { issueId: row.issueId, reason: `destroy failed: ${message.split('\n')[0]}` } };
+    }
+
+    return { removed: { issueId: row.issueId, freedBytes: row.sizeBytes } };
+  });
+
+  const result: ClosedIssueWorkspaceCleanupResult = {
+    removed: results.flatMap((r) => ('removed' in r ? [r.removed] : [])),
+    skipped: results.flatMap((r) => ('skipped' in r ? [r.skipped] : [])),
+  };
+  clearClosedIssueWorkspaceCache();
+  return result;
 }
