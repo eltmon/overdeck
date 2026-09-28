@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T08:24:31.216Z",
+  "updated": "2026-09-28T08:24:41.792Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,10 @@
     "nested-repo-scan.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T08:24:31.216Z"
+    },
+    "nested-repo-scan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:24:41.792Z"
     }
   }
 }
