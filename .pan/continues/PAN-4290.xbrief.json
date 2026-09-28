@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4290",
   "created": "2026-09-28T12:19:35.919Z",
-  "updated": "2026-09-28T12:19:35.919Z",
+  "updated": "2026-09-28T12:29:54.600Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "pr-merged-flag": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4290",
-      "claimedAt": "2026-09-28T12:19:35.919Z"
+      "claimedAt": "2026-09-28T12:19:35.919Z",
+      "doneAt": "2026-09-28T12:29:54.599Z"
     }
   }
 }
