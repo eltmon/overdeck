@@ -4,17 +4,17 @@
     "created": "2026-09-27T23:46:24Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4282: First-run 'Get set up' checklist on Home; pan install/doctor warn instead of failing on optional tools",
-    "updated": "2026-09-27T23:46:26.968Z"
+    "updated": "2026-09-27T23:47:06.876Z"
   },
   "plan": {
     "id": "pan-4282",
     "title": "First-run 'Get set up' checklist on Home; pan install/doctor warn instead of failing on optional tools",
-    "status": "proposed",
+    "status": "running",
     "uid": "34017a49-f253-4291-9492-5f12de67f403",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-27T23:46:24Z",
-    "updated": "2026-09-27T23:46:26.968Z",
+    "updated": "2026-09-27T23:47:06.876Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4282",
