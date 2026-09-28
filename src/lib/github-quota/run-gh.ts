@@ -9,9 +9,12 @@
  *   2. checks the pause gate, so a non-essential caller skips GitHub while its
  *      user-pool bucket is paused (throws `GitHubQuotaPausedError`);
  *   3. execs `gh` asynchronously;
- *   4. appends one ledger line, or on a rate-limit refusal records the pause
- *      and throws `GitHubRateLimitedError`. Any other failure is rethrown
- *      unchanged (callers read `stdout`/`stderr` off it).
+ *   4. appends one ledger line — a `gh pr list`/`gh issue list` call is priced
+ *      per REST page it actually walked (`priceGhListCall`, PAN-4291), every
+ *      other call costs a flat 1 unless `opts.onSuccess` overrides it — or on
+ *      a rate-limit refusal records the pause and throws
+ *      `GitHubRateLimitedError`. Any other failure is rethrown unchanged
+ *      (callers read `stdout`/`stderr` off it).
  *
  * Promise-only by design: no Effect wrapper and no sync twin (NFR-5).
  */
@@ -21,6 +24,7 @@ import { promisify } from 'node:util';
 import type { GitHubQuotaBucket, GitHubQuotaCaller } from '@overdeck/contracts';
 import { currentGitHubCaller } from './caller-context.js';
 import { classifyGitHubRefusal } from './classify.js';
+import { priceGhListCall } from './gh-cost.js';
 import { queueLedgerEntry, type LedgerEntry, type LedgerEntryInput } from './ledger.js';
 import { assertGitHubCallAllowed, GitHubRateLimitedError, recordGitHubRefusal } from './pause-gate.js';
 
@@ -135,6 +139,13 @@ export async function runGh(args: string[], opts: RunGhOptions = {}): Promise<{ 
     throw error;
   }
 
+  let cost = base.cost;
+  try {
+    cost = priceGhListCall(args, result.stdout) ?? base.cost;
+  } catch {
+    // NFR-2: a pricing failure never fails the call, nor over- or under-charges it.
+  }
+
   let extra: Partial<LedgerEntry> = {};
   if (opts.onSuccess) {
     try {
@@ -143,6 +154,6 @@ export async function runGh(args: string[], opts: RunGhOptions = {}): Promise<{ 
       // NFR-2: a metering parse failure never fails the call.
     }
   }
-  queueLedgerEntry({ ...base, ...extra, kind: 'call', caller, pool: 'user', bucket, outcome: 'ok' });
+  queueLedgerEntry({ ...base, cost, ...extra, kind: 'call', caller, pool: 'user', bucket, outcome: 'ok' });
   return result;
 }

@@ -59,6 +59,17 @@ describe('runGh (PAN-4264)', () => {
     ]);
   });
 
+  it('prices a gh pr list call by the REST pages it walked (PAN-4291 AC4)', async () => {
+    const rows = Array.from({ length: 200 }, (_, i) => ({ number: i }));
+    const exec = vi.fn().mockResolvedValue({ stdout: JSON.stringify(rows) });
+    const fields = 'number,url,title,state,mergedAt,mergeable,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup,updatedAt,closedAt,author';
+
+    await runGh(['pr', 'list', '--state', 'all', '--limit', '200', '--json', fields], { caller: 'pr-cache', exec });
+    await flushLedgerWrites();
+
+    expect(readLedgerWindow(Date.now())[0]).toMatchObject({ kind: 'call', caller: 'pr-cache', cost: 6, outcome: 'ok' });
+  });
+
   it('merges onSuccess fields into the ledger line', async () => {
     const exec = vi.fn().mockResolvedValue({
       stdout: JSON.stringify({ data: { rateLimit: { cost: 3, remaining: 4990, limit: 5000, resetAt: '2026-09-27T16:00:00Z' } } }),
