@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:01:35.659Z",
+  "updated": "2026-09-28T16:01:47.280Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -236,6 +236,10 @@
     "lane-door-hold.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T16:01:35.658Z"
+    },
+    "lane-door-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:01:47.279Z"
     }
   }
 }
