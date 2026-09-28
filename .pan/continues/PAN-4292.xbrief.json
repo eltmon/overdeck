@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4292",
   "created": "2026-09-28T12:50:00.908Z",
-  "updated": "2026-09-28T13:45:43.125Z",
+  "updated": "2026-09-28T13:45:56.759Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "tmux-steer-submit.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T13:45:43.124Z"
+    },
+    "supervisor-steer-submit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:45:56.759Z"
     }
   }
 }
