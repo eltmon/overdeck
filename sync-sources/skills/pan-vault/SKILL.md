@@ -46,6 +46,10 @@ pan vault sync                               # settle owned transcripts that gre
 pan vault list                      # from the local cache; works offline
 pan vault list --json
 pan vault show <id>                 # human turns, assistant text and versions, read-only
+pan vault resume <id>               # adopt the conversation here and launch the harness
+pan vault resume <id>@3             # fork at version 3 first
+pan vault resume <id> --cwd <dir> --no-launch
+pan vault resume <id> --on-drift note
 ```
 
 `resume` compares the target directory's git state with the saved state. On a difference it asks on a TTY; `--on-drift continue|note|cancel` answers non-interactively and a non-TTY run without the flag cancels. Claude Code and Codex resume natively; other harnesses get a seed digest file in the target directory.

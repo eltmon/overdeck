@@ -58,6 +58,14 @@ export function registerVaultCommands(program: Command): void {
     .action(lazyAction(() => import('./show.js'), 'showCommand'));
 
   vault
+    .command('resume <id>')
+    .description('Continue a saved conversation here: <id> or <id>@<version>; adopts it and launches the harness')
+    .option('--cwd <dir>', 'Working directory to resume in (default: the saved cwd)')
+    .option('--no-launch', 'Print the launch command instead of running it')
+    .option('--on-drift <choice>', 'When the cwd state differs from the saved state: continue | note | cancel')
+    .action(lazyAction(() => import('./resume.js'), 'resumeCommand'));
+
+  vault
     .command('evict')
     .description('Review the pending-deletion batch (default) or act on it; nothing is deleted without --confirm')
     .option('--review', 'Scan and print the batch with its fingerprint (default)')
