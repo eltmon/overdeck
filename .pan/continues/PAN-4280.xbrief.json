@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T01:21:45.714Z",
+  "updated": "2026-09-28T01:21:57.938Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -354,6 +354,10 @@
     "docs-slice-a.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T01:21:45.714Z"
+    },
+    "docs-slice-a.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:21:57.938Z"
     }
   }
 }
