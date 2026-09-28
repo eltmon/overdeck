@@ -10,8 +10,9 @@
   at root, `src/dashboard/server/`, `packages/contracts/`, `scripts/`); Vite for
   the frontend. `npm run build` builds all.
 - **Server:** Effect.js HTTP + Effect RPC over WebSocket (`/ws/rpc`); raw `ws`
-  + `@homebridge/node-pty-prebuilt-multiarch` for terminal streaming
-  (`/ws/terminal`). SQLite for event store / deacon state.
+  + `@lydell/node-pty` for tmux terminal streaming (`/ws/terminal`); Herdr
+  terminals stream through `herdr terminal session observe|control` NDJSON
+  (`src/lib/terminal-backends/herdr-stream.ts`, base64 bytes decoded as UTF-8). SQLite for event store / deacon state.
 - **Frontend:** React 18, Zustand (shared reducers from `@overdeck/contracts`),
   TanStack Query for settings mutations, CSS modules (`command-deck.module.css`,
   `stage.module.css`) + Tailwind-style utility classes in Settings, lucide-react
@@ -44,4 +45,4 @@
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 
-<!-- last-verified: 2026-09-25 -->
+<!-- last-verified: 2026-09-28 -->
