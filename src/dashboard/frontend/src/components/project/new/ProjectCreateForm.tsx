@@ -20,10 +20,29 @@ import type {
   ProjectIntentFinding,
 } from './projectCreateTypes.js';
 
+/**
+ * The project-versus-workspace guidance. "workspace" is a simple-mode banned
+ * word, so the dialog's start and folder steps show it on the full page only.
+ */
+export function ProjectWorkspaceGuide() {
+  return (
+    <p className="mt-2 text-sm text-muted-foreground">
+      A project is a repository or folder. To make another checkout of a project you already
+      use,{' '}
+      <a className="underline" href="/workspaces/new">
+        create a workspace
+      </a>
+      .
+    </p>
+  );
+}
+
 interface ProjectCreateFormProps {
   create: ReturnType<typeof useProjectCreateIntent>;
   /** Id for the title, so a dialog can label itself with it. */
   titleId?: string;
+  /** A notice shown under the heading, e.g. the repository-root snap. */
+  banner?: React.ReactNode;
   /** "Change": go back to choosing how to add the project. */
   onChange: () => void;
   onCancel: () => void;
@@ -38,10 +57,10 @@ const CTA_LABEL: Record<ProjectCreateMode, string> = {
 /** Fields that live behind the Options disclosure. */
 const OPTION_FIELDS: ReadonlyArray<ProjectIntentField> = ['name', 'issuePrefix', 'parentDir'];
 
-const inputClass =
+export const inputClass =
   'w-full rounded border border-border bg-surface px-3 py-2 text-sm text-foreground ' +
   'focus:outline-none focus:ring-2 focus:ring-accent';
-const labelClass = 'mb-1 block text-sm font-medium text-foreground';
+export const labelClass = 'mb-1 block text-sm font-medium text-foreground';
 export const buttonClass =
   'rounded border border-border px-3 py-2 text-sm text-foreground hover:bg-surface-hover ' +
   'disabled:cursor-not-allowed disabled:opacity-50';
@@ -60,7 +79,7 @@ function Findings({ findings, id }: { findings: ProjectIntentFinding[]; id: stri
   );
 }
 
-export function ProjectCreateForm({ create, titleId, onChange, onCancel }: ProjectCreateFormProps) {
+export function ProjectCreateForm({ create, titleId, banner, onChange, onCancel }: ProjectCreateFormProps) {
   const ids = useId();
   const urlId = `${ids}-url`;
   const pathId = `${ids}-path`;
@@ -197,14 +216,8 @@ export function ProjectCreateForm({ create, titleId, onChange, onCancel }: Proje
           Change
         </button>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
-        A project is a repository or folder. To make another checkout of a project you already
-        use,{' '}
-        <a className="underline" href="/workspaces/new">
-          create a workspace
-        </a>
-        .
-      </p>
+      <ProjectWorkspaceGuide />
+      {banner}
 
       <fieldset disabled={frozen} className="mt-8 space-y-5 border-0 p-0">
         {mode === 'clone' && (

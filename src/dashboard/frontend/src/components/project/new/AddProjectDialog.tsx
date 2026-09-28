@@ -2,8 +2,9 @@
  * The Add-project dialog (PAN-4281 D11): one component that renders as a modal
  * over the app, or as the full `/projects/new` page.
  *
- * Steps: `start` chooses how to add the project; `clone`, `create` and `folder`
- * each show the shared `ProjectCreateForm` in that mode. Every create goes
+ * Steps: `start` chooses how to add the project; `clone` and `create` show the
+ * shared `ProjectCreateForm` in that mode; `folder` picks a folder and reviews
+ * what resolve found in it. Every create goes
  * through `POST /api/projects/resolve` then `POST /api/projects`, the one
  * create core.
  */
@@ -11,13 +12,14 @@
 import { useCallback, useId, useState } from 'react';
 import { AddProjectStartStep } from './AddProjectStartStep.js';
 import { AddProjectFormStep } from './AddProjectFormStep.js';
+import { AddProjectFolderStep } from './AddProjectFolderStep.js';
 import { useAddProjectDialog, type AddProjectMode } from './addProjectDialogStore.js';
 import type { CreatedProject } from './projectCreateTypes.js';
 
 type Step = 'start' | 'clone' | 'create' | 'folder';
 
 const STEP_FOR_MODE: Record<AddProjectMode, Step> = { clone: 'clone', new: 'create', existing: 'folder' };
-const MODE_FOR_STEP = { clone: 'clone', create: 'new', folder: 'existing' } as const;
+const MODE_FOR_STEP = { clone: 'clone', create: 'new' } as const;
 
 interface AddProjectDialogProps {
   variant: 'modal' | 'page';
@@ -38,6 +40,14 @@ export function AddProjectDialog({ variant, initialMode, onCreated, onCancel }: 
         showGuide={variant === 'page'}
         onChoose={(mode) => setStep(STEP_FOR_MODE[mode])}
         onCreated={onCreated}
+        onCancel={onCancel}
+      />
+    ) : step === 'folder' ? (
+      <AddProjectFolderStep
+        titleId={titleId}
+        showGuide={variant === 'page'}
+        onCreated={onCreated}
+        onChange={backToStart}
         onCancel={onCancel}
       />
     ) : (

@@ -130,7 +130,8 @@ describe('WI-5 no-loss inventory', () => {
     renderPage();
     await enterMode(user, 'Open a folder');
 
-    await user.click(screen.getByRole('button', { name: /Browse server folders/i }));
+    // The folder step opens on the picker itself (PAN-4281 WI-9), so there is
+    // no Browse button to press first.
     const select = await screen.findByTestId('folder-picker-select');
     await user.click(select);
 
@@ -308,7 +309,9 @@ describe('WI-5 no-loss inventory', () => {
       ['Create new project', 'Create project'],
     ] as const) {
       await enterMode(user, label);
-      const actions = screen.getByRole('button', { name: cta });
+      // The folder step shows its form once a folder is chosen (PAN-4281 WI-9).
+      if (label === 'Open a folder') await user.click(await screen.findByTestId('folder-picker-select'));
+      const actions = await screen.findByRole('button', { name: cta });
       expect(actions).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Change' }));
     }

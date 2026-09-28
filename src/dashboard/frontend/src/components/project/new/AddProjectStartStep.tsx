@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchWithTimeout } from '../../../lib/apiFetch.js';
-import { buttonClass } from './ProjectCreateForm.js';
+import { buttonClass, ProjectWorkspaceGuide } from './ProjectCreateForm.js';
 import { resolveThenCreateProject } from './resolveThenCreate.js';
 import { PROJECT_SUGGESTIONS_QUERY_KEY, tildePath, useProjectSuggestions } from './useProjectSuggestions.js';
 import type { AddProjectMode } from './addProjectDialogStore.js';
@@ -101,16 +101,7 @@ export function AddProjectStartStep({ titleId, showGuide, onChoose, onCreated, o
           Add a project to start working in it. You can also skip this and just type on Home.
         </p>
       )}
-      {showGuide && (
-        <p className="mt-2 text-sm text-muted-foreground">
-          A project is a repository or folder. To make another checkout of a project you already
-          use,{' '}
-          <a className="underline" href="/workspaces/new">
-            create a workspace
-          </a>
-          .
-        </p>
-      )}
+      {showGuide && <ProjectWorkspaceGuide />}
 
       <div ref={listRef} className="mt-8" onKeyDown={handleKeyDown}>
         <button
