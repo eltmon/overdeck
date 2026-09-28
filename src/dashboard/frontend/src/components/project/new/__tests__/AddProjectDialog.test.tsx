@@ -17,7 +17,7 @@ const fetchMock = vi.hoisted(() => vi.fn());
 vi.mock('../../../../lib/apiFetch.js', () => ({ fetchWithTimeout: fetchMock }));
 vi.mock('../../../../lib/telemetry.js', () => ({ capture: vi.fn() }));
 
-import { AddProjectDialogHost } from '../AddProjectDialog.js';
+import { AddProjectDialog, AddProjectDialogHost } from '../AddProjectDialog.js';
 import { takeAddProjectReturnTo, useAddProjectDialog } from '../addProjectDialogStore.js';
 import { getProjectCreatedNavigation } from '../../../../App/routes.js';
 import { findBannedWords } from '../../../../lib/simple/strings.js';
@@ -157,5 +157,122 @@ describe('AddProjectDialog', () => {
     // Wait for the zero-projects subtitle so its copy is checked too.
     await screen.findByText(/You can also skip this and just type on Home/);
     expect(findBannedWords(container.textContent ?? '')).toEqual([]);
+  });
+
+  it('only resolve and create routes receive POSTs', async () => {
+    const user = userEvent.setup();
+    const base = { ...cloneIntent, notices: [], nestedRepositories: [] };
+    const intents: Record<string, ResolvedProjectIntent> = {
+      '/home/op/repo': { ...base, mode: 'existing', path: '/home/op/repo', cloneUrl: null, wouldClone: false },
+      '/home/op/plain': { ...base, mode: 'existing', path: '/home/op/plain', cloneUrl: null, wouldClone: false, isGitRepository: false },
+      '/home/op/suite': {
+        ...base,
+        mode: 'existing',
+        path: '/home/op/suite',
+        cloneUrl: null,
+        wouldClone: false,
+        isGitRepository: false,
+        nestedRepositories: [
+          { name: 'api', path: '/home/op/suite/api' },
+          { name: 'web', path: '/home/op/suite/web' },
+        ],
+      },
+    };
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { mode: string; path?: string; repos?: string[] }) : null;
+      if (url === '/api/projects/resolve') {
+        if (body?.mode === 'clone') return Promise.resolve(json(base));
+        if (body?.mode === 'new') return Promise.resolve(json({ ...base, mode: 'new', cloneUrl: null, wouldClone: false, wouldGitInit: true }));
+        if (body?.repos) return Promise.resolve(json({ findings: [] }));
+        const intent = body?.path ? intents[body.path] : undefined;
+        return Promise.resolve(json(intent ?? { findings: [] }));
+      }
+      if (url === '/api/projects') {
+        const path = body?.path ?? '/home/op/Projects/widget';
+        const key = path.split('/').pop()!;
+        return Promise.resolve(json({ key, name: key, path }));
+      }
+      if (url === '/api/projects/suggestions') {
+        return Promise.resolve(
+          json({ root: '/home/op/Projects', homeDir: '/home/op', repositories: [{ name: 'found', path: '/home/op/Projects/found' }] }),
+        );
+      }
+      if (url === '/api/registered-projects') return Promise.resolve(json([]));
+      if (url.startsWith('/api/fs/list-dirs')) return Promise.resolve(json({ path: '/home/op', parent: null, entries: [] }));
+      return Promise.resolve(json({}));
+    });
+
+    /** Render a fresh dialog, run one path to a created project, then unmount. */
+    const drive = async (
+      initialMode: 'clone' | 'existing' | 'new' | undefined,
+      steps: () => Promise<void>,
+    ) => {
+      const onCreated = vi.fn();
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const view = render(
+        <QueryClientProvider client={queryClient}>
+          <AddProjectDialog variant="modal" initialMode={initialMode} onCreated={onCreated} onCancel={() => {}} />
+        </QueryClientProvider>,
+      );
+      await steps();
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+      view.unmount();
+    };
+    const chooseFolder = async (folder: string) => {
+      await user.type(screen.getByLabelText('Folder'), folder);
+      await user.click(screen.getByRole('button', { name: 'Continue' }));
+    };
+
+    // Folder: a Git repository.
+    await drive('existing', async () => {
+      await chooseFolder('/home/op/repo');
+      const cta = await screen.findByRole('button', { name: 'Add project' });
+      await waitFor(() => expect(cta).toBeEnabled());
+      await user.click(cta);
+    });
+    // Folder: a plain folder, added as a folder.
+    await drive('existing', async () => {
+      await chooseFolder('/home/op/plain');
+      const add = await screen.findByRole('button', { name: 'Add as folder' });
+      await waitFor(() => expect(add).toBeEnabled());
+      await user.click(add);
+    });
+    // Nested: each repository, then the folder as one project.
+    await drive('existing', async () => {
+      await chooseFolder('/home/op/suite');
+      await user.click(await screen.findByRole('button', { name: 'Add 2 projects' }));
+    });
+    await drive('existing', async () => {
+      await chooseFolder('/home/op/suite');
+      await user.click(await screen.findByRole('button', { name: 'Add this folder as one project' }));
+    });
+    // Clone and create, each submitted with Enter.
+    await drive('clone', async () => {
+      await user.type(screen.getByLabelText('Repository URL'), 'acme/widget');
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Clone repository' })).toBeEnabled());
+      await user.keyboard('{Enter}');
+    });
+    await drive('new', async () => {
+      await user.type(screen.getByLabelText('Project name'), 'widget');
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Create project' })).toBeEnabled());
+      await user.keyboard('{Enter}');
+    });
+    // A suggestion's Add on the start step.
+    await drive(undefined, async () => {
+      await user.click(await screen.findByRole('button', { name: 'Add found' }));
+    });
+
+    const postUrls = fetchMock.mock.calls
+      .filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST')
+      .map(([url]) => url as string);
+    expect(postUrls.length).toBeGreaterThan(0);
+    for (const url of postUrls) {
+      expect(
+        url === '/api/projects/resolve' || url === '/api/projects' || url.startsWith('/api/projects/create-jobs/'),
+      ).toBe(true);
+    }
+    // Every path created something: 1 + 1 + 2 + 1 + 1 + 1 + 1.
+    const creates = postUrls.filter((url) => url === '/api/projects');
+    expect(creates).toHaveLength(8);
   });
 });
