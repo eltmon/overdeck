@@ -50,9 +50,16 @@ vi.mock('../components/drawer/DrawerAgentSession', () => ({
   pickDefaultDrawerAgent: vi.fn((agents: any) => agents?.[0] ?? null),
 }));
 
-// Mock TalkItThrough to avoid unrelated requests
-vi.mock('../components/simple/TalkItThrough', () => ({
-  TalkItThrough: () => <div data-testid="talk-it-through" />,
+// Mock HomeComposer to avoid unrelated requests
+vi.mock('../components/home/HomeComposer', () => ({
+  HomeComposer: () => <div data-testid="home-composer" />,
+}));
+
+// Mock GetSetUpCard (PAN-4282): it fetches /api/prerequisites on mount, which
+// this file's SimpleHomePage case does not stub — the fetch guard in
+// test-setup.ts fails any unmocked request.
+vi.mock('../components/home/GetSetUpCard', () => ({
+  GetSetUpCard: () => null,
 }));
 
 // Now import after all mocks are in place

@@ -144,7 +144,7 @@ function StackDrawer({
 
   const stackActions = ['rebuildAndStart', 'syncMain', 'createWorkspace']
     .map((key) => actions.all.find((v) => v.action.key === key))
-    .filter((v): v is IssueActionView => !!v && v.enabled)
+    .filter((v): v is IssueActionView => !!v && (v.enabled || v.blockedOffline))
 
   return (
     <div className={styles.resources} data-section="StackDrawer">
@@ -219,7 +219,7 @@ function StackDrawer({
           {stackActions.length > 0 && (
             <div className={styles.resActions}>
               {stackActions.map((v) => (
-                <button key={v.action.key} type="button" disabled={v.isPending} onClick={v.invoke} className={styles.resBtn}>
+                <button key={v.action.key} type="button" disabled={v.isPending || v.blockedOffline} title={v.blockedOffline ? v.disabledReason : undefined} onClick={v.invoke} className={styles.resBtn}>
                   {v.action.label}
                 </button>
               ))}

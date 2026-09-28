@@ -117,9 +117,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
-  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts executeCloseOut`
-  is dead (no production caller; PAN-3968 deletes it) — only `isBranchMerged` there is
-  live. Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
+  `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
+  merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
+  only `close_out.remove_workspace` and `delete_feature_branch`; `close_out.auto` and
+  `auto_delay_minutes` have had no consumer since PAN-3917 W4 (`94255f055fe`). The
+  closed-issue reaper (`cloister/reap-issue-residue.ts`, every 60 s) removes the
+  workspace and deletes local+remote branches of any closed, merged issue regardless of
+  `[close_out]` (PAN-4283). Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
   (keeps `state.json`/`sessions.json`); `removeAgentStateDir` is the destructive door
   for deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
   (`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
@@ -225,4 +229,4 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `permission-pending` hold or a `not-delivered` failure must mint a fresh
   `clientMessageId` and send no `retry` flag, like the not-found Resend.
 
-<!-- last-verified: 2026-09-27 -->
+<!-- last-verified: 2026-09-28 -->

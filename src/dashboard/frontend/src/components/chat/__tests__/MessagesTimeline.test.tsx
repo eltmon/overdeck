@@ -13,6 +13,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MessagesTimeline, type RoundMarker } from '../MessagesTimeline';
 import type { ChatMessage, WorkLogEntry } from '../chat-types';
+import { useConnectionState } from '../../../lib/connectionState';
 
 vi.mock('../ChatMarkdown', () => ({
   ChatMarkdownSettingsProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -108,6 +109,26 @@ describe('MessagesTimeline — search', () => {
     expect(screen.getByText('Not delivered: refused: agent_blocked')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Resend' }));
     expect(retry).toHaveBeenCalledWith('not-delivered', 'BTW How can I launch Orca?');
+  });
+
+  it('labels a held message and offers Retry only once the server is live (PAN-4279)', () => {
+    const held = [{ id: 'held', text: 'held ping', kind: 'prompt' as const, createdAt: '', retryable: true, heldOffline: true }];
+    useConnectionState.setState({ serverReachable: false, streamLive: false, restarting: false });
+    try {
+      const { unmount } = render(<MessagesTimeline messages={[]} workLog={[]} streaming={false} failedMessages={held} />);
+      expect(screen.getByText('Waiting to send — will send when the server reconnects')).toBeInTheDocument();
+      expect(screen.queryByText('Failed to send')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
+      unmount();
+
+      useConnectionState.setState({ serverReachable: true, streamLive: true });
+      render(<MessagesTimeline messages={[]} workLog={[]} streaming={false} failedMessages={held} />);
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    } finally {
+      useConnectionState.setState({ serverReachable: true, streamLive: false });
+    }
   });
 
   it('renders a not-found outbox entry with Resend and copies its text to the clipboard (PAN-4247 AC4)', () => {

@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-27T23:39:22.797318Z · model: claude-opus-5-5 · open: 777_
+_Last sequenced: 2026-09-28T01:33:32.399750Z · model: claude-opus-5-5 · open: 778_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,6 +10,7 @@ _Last sequenced: 2026-09-27T23:39:22.797318Z · model: claude-opus-5-5 · open: 
 | 17 | PAN-4280 | L | high | ok |  |  | In-pipeline: part 1 of Type-and-go onboarding; start a conversation or terminal from Home with no project; Simple mode default sticks. |
 | 18 | PAN-4281 | L | medium | ok |  |  | In-pipeline: part 2 of onboarding; Add Project dialog snaps to repo root, imports folder-of-repos as separate or one polyrepo project. |
 | 19 | PAN-4282 | M | medium | ok |  |  | In-pipeline: part 3 of onboarding; first-run "Get set up" checklist on Home; pan install/doctor warn, not fail, on optional tools. |
+| 20 | PAN-4283 | M | medium | ok |  |  | In-pipeline: close-out settings in the dashboard, disk cost + cleanup of kept workspaces (~47 GB), honest DoD teardown row |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -805,6 +806,10 @@ New since the prior run and already in the pipeline, so it is pinned at rank 18 
 
 New since the prior run and already in the pipeline, so it is pinned at rank 19 in a free slot. Turning hard install failures on optional tools into warnings and adding a first-run checklist lowers the setup barrier, so importance is medium. The governor-threshold dependency it cites (#4267) is already merged, and the body gives file-level work items W10 to W12, so condition is ok. It overlaps the older onboarding checklist request in PAN-2625, recorded as an advisory informs edge.
 
+### PAN-4283 (rank 20)
+
+New issue, already in the pipeline, so it is pinned in the free slot right after the other in-pipeline work (rank 20). It exposes the four [close_out] keys in Settings, shows the disk held by closed issues' kept workspaces with a Clean up now action, and fixes DoD row 9 claiming teardown when the workspace was kept; the body has clear acceptance criteria and no cross-references.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1081,10 +1086,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
 
 patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
 
-### PAN-3793 (rank 114)
-
-New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1092,11 +1093,89 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-27T23:39:22.797318Z",
+  "generatedAt": "2026-09-28T01:33:32.399750Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 777,
+  "openCount": 778,
   "nodes": [
+    {
+      "issue": "PAN-4278",
+      "rank": 15,
+      "size": "L",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: terminal permission prompts block agents for hours with no dashboard dialog; composer sends near them get lost.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 15, directly ahead of the in-pipeline cluster, without displacing any existing rank. A subagent sat blocked on an unanswerable permission prompt for 7.5 hours and two operator messages vanished, which breaks the core supervise-from-the-dashboard loop, so importance is high; the body gives a four-part fix with fixture-testable acceptance criteria, so condition is ok. It shares the composer-to-pane delivery path with PAN-4268 and PAN-3630, recorded as advisory informs edges.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4279",
+      "rank": 16,
+      "size": "M",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: a false \"Server unreachable\" modal and several outage screens block the whole UI; replace with one degraded-mode banner.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 16 in a free slot next to PAN-4278 without displacing any existing rank. A healthy server still triggered a full-screen modal over a conversation, which cuts the operator off from the dashboard during exactly the moments supervision matters, so importance is high. The body names each outage surface by file and gives a concrete single-banner design with a health-probe check, so condition is ok. It overlaps the reconnect-loop and restart-banner work in PAN-3778 and PAN-3616, recorded as advisory informs edges.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4280",
+      "rank": 17,
+      "size": "L",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: part 1 of Type-and-go onboarding; start a conversation or terminal from Home with no project; Simple mode default sticks.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 17 in a free slot. It removes the need to register a project and workspace before spawning a terminal, which the operator named as the main out-of-the-box blocker, so importance is high. The PRD-grade body carries operator decisions, per-item files and before/after code, so condition is ok. It holds the shared glossary and decisions that parts 2 and 3 (PAN-4281, PAN-4282) cite, recorded as advisory informs edges.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4281",
+      "rank": 18,
+      "size": "L",
+      "importance": "medium",
+      "score": 66,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: part 2 of onboarding; Add Project dialog snaps to repo root, imports folder-of-repos as separate or one polyrepo project.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 18 in a free slot. It improves project registration for new users but has a working path today, so importance is medium. The body states it depends on nothing in part 1 and gives file-level work items W6 to W9, so it carries no hard dependency and condition is ok. It shares the Orca-style onboarding direction with PAN-3863, recorded as a low-confidence informs edge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4282",
+      "rank": 19,
+      "size": "M",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: part 3 of onboarding; first-run \"Get set up\" checklist on Home; pan install/doctor warn, not fail, on optional tools.",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 19 in a free slot. Turning hard install failures on optional tools into warnings and adding a first-run checklist lowers the setup barrier, so importance is medium. The governor-threshold dependency it cites (#4267) is already merged, and the body gives file-level work items W10 to W12, so condition is ok. It overlaps the older onboarding checklist request in PAN-2625, recorded as an advisory informs edge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4283",
+      "rank": 20,
+      "size": "M",
+      "importance": "medium",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline: close-out settings in the dashboard, disk cost + cleanup of kept workspaces (~47 GB), honest DoD teardown row",
+      "rationale": "New issue, already in the pipeline, so it is pinned in the free slot right after the other in-pipeline work (rank 20). It exposes the four [close_out] keys in Settings, shows the disk held by closed issues' kept workspaces with a Clean up now action, and fixes DoD row 9 claiming teardown when the workspace was kept; the body has clear acceptance criteria and no cross-references.",
+      "gate": "auto",
+      "planning": "auto"
+    },
     {
       "issue": "PAN-4217",
       "rank": 23,
@@ -1895,6 +1974,19 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "dependsOn": [],
       "why": "planning finalizes (issue→planned) but work agent does not auto-spawn",
       "rationale": "Planning finalizes (issue->planned) but the work agent never auto-spawns — silent handoff break.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4269",
+      "rank": 99,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find).",
+      "rationale": "New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9068,6 +9160,21 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "planning": "interactive"
     },
     {
+      "issue": "PAN-4275",
+      "rank": 736,
+      "size": "S",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-1641"
+      ],
+      "why": "Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge",
+      "rationale": "New follow-up carved from PAN-1641's cancelled e2e item; ranked just below its in-pipeline parent as low-importance local-model work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-791",
       "rank": 737,
       "size": "XS",
@@ -10622,99 +10729,6 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       "dependsOn": [],
       "why": "Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content.",
       "rationale": "Demoted from rank 201. PAN-2995 and the just-closed PAN-2828 describe one defect — pan done --strike refusing a squash-merged strike on branch ancestry. PAN-2828's closing comment names #2907/#2915/#3343 as the fix, and the code matches: src/cli/commands/strike-merge-verification.ts:76 falls through ancestry, then a merged-PR lookup by headRefOid, then git cherry, then content equivalence, and src/cli/commands/done.ts:318-320 calls it on the strike path with done.test.ts coverage. The substrate-improvement label keeps importance at the high floor, but impact toward shipping is nil, so it ranks in the verify-and-close tail.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4269",
-      "rank": 99,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find).",
-      "rationale": "New since the prior run: conversations that never progress make Overdeck unusable on macOS, so importance is high, but the cause still needs a Mac repro, so it ranks in the high-bug band at the free rank 99 rather than with the pipeline-blocking criticals.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4275",
-      "rank": 736,
-      "size": "S",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-1641"
-      ],
-      "why": "Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. Blocked on PAN-1641 merge",
-      "rationale": "New follow-up carved from PAN-1641's cancelled e2e item; ranked just below its in-pipeline parent as low-importance local-model work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4278",
-      "rank": 15,
-      "size": "L",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: terminal permission prompts block agents for hours with no dashboard dialog; composer sends near them get lost.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 15, directly ahead of the in-pipeline cluster, without displacing any existing rank. A subagent sat blocked on an unanswerable permission prompt for 7.5 hours and two operator messages vanished, which breaks the core supervise-from-the-dashboard loop, so importance is high; the body gives a four-part fix with fixture-testable acceptance criteria, so condition is ok. It shares the composer-to-pane delivery path with PAN-4268 and PAN-3630, recorded as advisory informs edges.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4279",
-      "rank": 16,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: a false \"Server unreachable\" modal and several outage screens block the whole UI; replace with one degraded-mode banner.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 16 in a free slot next to PAN-4278 without displacing any existing rank. A healthy server still triggered a full-screen modal over a conversation, which cuts the operator off from the dashboard during exactly the moments supervision matters, so importance is high. The body names each outage surface by file and gives a concrete single-banner design with a health-probe check, so condition is ok. It overlaps the reconnect-loop and restart-banner work in PAN-3778 and PAN-3616, recorded as advisory informs edges.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4280",
-      "rank": 17,
-      "size": "L",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: part 1 of Type-and-go onboarding; start a conversation or terminal from Home with no project; Simple mode default sticks.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 17 in a free slot. It removes the need to register a project and workspace before spawning a terminal, which the operator named as the main out-of-the-box blocker, so importance is high. The PRD-grade body carries operator decisions, per-item files and before/after code, so condition is ok. It holds the shared glossary and decisions that parts 2 and 3 (PAN-4281, PAN-4282) cite, recorded as advisory informs edges.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4281",
-      "rank": 18,
-      "size": "L",
-      "importance": "medium",
-      "score": 66,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: part 2 of onboarding; Add Project dialog snaps to repo root, imports folder-of-repos as separate or one polyrepo project.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 18 in a free slot. It improves project registration for new users but has a working path today, so importance is medium. The body states it depends on nothing in part 1 and gives file-level work items W6 to W9, so it carries no hard dependency and condition is ok. It shares the Orca-style onboarding direction with PAN-3863, recorded as a low-confidence informs edge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4282",
-      "rank": 19,
-      "size": "M",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In-pipeline: part 3 of onboarding; first-run \"Get set up\" checklist on Home; pan install/doctor warn, not fail, on optional tools.",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned at rank 19 in a free slot. Turning hard install failures on optional tools into warnings and adding a first-run checklist lowers the setup barrier, so importance is medium. The governor-threshold dependency it cites (#4267) is already merged, and the body gives file-level work items W10 to W12, so condition is ok. It overlaps the older onboarding checklist request in PAN-2625, recorded as an advisory informs edge.",
       "gate": "auto",
       "planning": "auto"
     }

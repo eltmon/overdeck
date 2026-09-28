@@ -66,6 +66,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   `stopped` this way also has `hasLivePane` (and its deprecated alias
   `hasLiveTmuxSession`) served `false`; a row served `unknown` keeps its stored flags.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
+- Outage handling never blocks the UI: see [Degraded mode (PAN-4279)](#degraded-mode-pan-4279).
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 - The Command Deck project list (`command-deck-projects`), project registry
   (`registered-projects`) and conversation list (`conversations`) still load over
@@ -89,14 +90,25 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
   another HTTP error is a settled answer and shows the alert with its Retry
   button. The membership query also joins the reconnect refetch above.
 
-**Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
-starts a discuss-first conversation through `POST /api/conversations` and opens
-`/conv/:name`. The description uses a full row, with the project selector, model
-picker, and action wrapping below it. The model picker follows the configured
-provider harness unless explicit harness permutations are enabled. Click and
-Enter share a pending-launch guard. Launch errors appear below the controls;
-the draft stays available for retry. Browser coverage lives in
-`src/dashboard/frontend/tests/talk-it-through.spec.ts`.
+**Home composer** (PAN-4280): `components/home/HomeComposer.tsx`, mounted on
+both Simple and Advanced Home. It wraps the existing Launcher with the Home
+intent order from `buildHomeIntents` (agent, terminal, optional codex,
+Simple-only "Talk it through first:"), a project chip, and type-to-focus.
+Enter posts the raw typed text to `POST /api/conversations` (no `projectKey`
+when no project is chosen) and opens `/conv/:name`; the Simple discuss-first
+flow sends `seedDiscussPrompt(text)` instead. Ctrl+Enter (or the terminal row)
+writes a terminal hand-off through `components/home/pendingTerminal.ts` — a
+sessionStorage record plus a same-tab `CustomEvent` — then navigates to the
+deck; `Stage` peeks it (non-consuming) to open the drawer, and
+`TerminalDrawer` consumes it to run the command in a fresh shell, so it runs
+exactly once.
+Launch errors appear below the input; the draft stays available for retry.
+Browser coverage lives in `src/dashboard/frontend/tests/home-type-and-go.spec.ts`
+and `tests/talk-it-through.spec.ts`.
+
+`POST /api/terminals` also accepts an optional `command` (a single line, at
+most 2000 characters): once the tmux session exists, it is typed in with
+`send-keys -l` then Enter, and the response reports `commandSent`.
 
 **Pipeline retrospective button:** the Command Deck header's
 `RetrospectiveButton` (`components/CommandDeck/RetrospectiveButton.tsx`) POSTs
@@ -433,6 +445,87 @@ One silent path remains by design: Herdr reports `agent_prompt_stalled`/`timeout
 `agent.prompt` wait as delivered, because it types the text and Enter before it watches, and
 its contract says never to re-send. The frontend's 4-minute "Not found in transcript" timer is
 the only cover for that case.
+
+## Degraded mode (PAN-4279)
+
+When a tab loses touch with its server, the dashboard never blocks the UI. The
+last-known pages stay mounted, visible and navigable, and one banner reports
+the outage. `lib/connectionState.ts` is the single source of truth: a Zustand
+store that holds the inputs and derives one **connection phase** from them.
+
+| Phase | Meaning | Banner (`components/DegradedModeBanner.tsx`) |
+| --- | --- | --- |
+| `restarting` | A planned restart is in progress (`dashboardLifecycle.active`). | "Overdeck server is restarting — showing data from HH:MM", plus the lifecycle issue and reason. |
+| `unreachable` | The server does not answer HTTP. | "Can't reach the Overdeck server — showing data from HH:MM", with **Retry** and **Force Restart**. |
+| `delayed` | HTTP answers, but the `/ws/rpc` domain stream is reconnecting or has not bootstrapped. | "Live updates are delayed — reconnecting · showing data from HH:MM", with **Retry**. |
+| `live` | HTTP answers and the stream has bootstrapped. | Nothing. After any degraded phase, "Reconnected" shows for 2.5 s. |
+
+Precedence is `restarting` > `unreachable` > `delayed` > `live`.
+
+- **Reachability rule.** A response is *reachable* when its body is JSON with a
+  string `status` field, at any HTTP status. `/api/health` answers 503 with
+  JSON in its "incoherent" states, and the server is still up then. A network
+  error, a 3 s timeout, or a non-JSON body (a proxy's 502/503/504 HTML page) is
+  *unreachable*. Two sources write reachability: the App's 5 s `/api/version`
+  poll (2 failed polls mean unreachable, one success means reachable) and
+  EventRouter's `probeServerHealth()` (`GET /api/health`). EventRouter probes on
+  every stream retry, staleness strike and bootstrap failure, so a stream
+  outage reads `delayed`, never `unreachable`, while HTTP still works.
+- **Freshness stamp.** `HH:MM` is `lastLiveAt`: the time of the last successful
+  bootstrap or applied domain-event batch. Before any bootstrap it is the
+  cached snapshot's timestamp (`loadSnapshotCacheEntry()` in
+  `lib/snapshotCache.ts`). The clause is omitted when no time is known.
+- **First-load screen.** `App/BackendConnectionBoundary.tsx` renders the
+  first-load screen ("Can't reach the Overdeck server" or "Overdeck server is
+  restarting", "The dashboard will load as soon as the server answers.",
+  Retry) only when the tab has no snapshot at all (no cache, no bootstrap) and
+  the phase is `unreachable` or `restarting`. It is the only full-page outage
+  state. With a snapshot, the boundary always renders its children. It keeps
+  one duty: when the phase leaves `unreachable`/`restarting`, it invalidates
+  every React Query so queries that failed during the outage refetch.
+- **Bootstrap.** EventRouter races `getSnapshot` against a 20 s timeout
+  (`BOOTSTRAP_TIMEOUT_MS`). A timed-out or failed attempt sets the stream
+  down, probes health, and schedules a reconnect on a fresh transport with the
+  existing backoff (2 s doubling, 30 s cap, ±20 % jitter). Retries continue
+  forever; there is no give-up window. A generation counter makes a superseded
+  attempt a no-op, so a late answer never overwrites newer state. The 2 s
+  fallback poller runs until the first bootstrap succeeds, and it stands down
+  while a backoff reconnect is scheduled.
+- **Retry.** The banner's and first-load screen's Retry calls
+  `requestReconnect()`. EventRouter registers that on mount: it abandons any
+  in-flight attempt (even one that will never settle), resets the backoff, and
+  reconnects on a fresh transport. The banner's Retry also refetches the
+  `backend-health` poll.
+- **Write actions.** While the phase is `unreachable` or `restarting`, every
+  issue action with a server endpoint (`ISSUE_ACTIONS` entries with
+  `endpoint !== null`) is disabled but stays visible, with the reason "Can't
+  reach the Overdeck server — available again when it reconnects."
+  (`blockedOffline` in `useIssueActions.ts`). `delayed` blocks nothing, because
+  HTTP works. Mutations outside the issue-action registry keep failing with
+  their own error toasts.
+- **Held composer messages.** A prompt submitted while `unreachable` or
+  `restarting` is not POSTed. `holdSend` keeps it in the composer outbox as
+  "Waiting to send — will send when the server reconnects", and it is sent
+  once, oldest first, when the phase returns to `live`, keeping its
+  `clientMessageId`. A `/pan` command is not held: it shows "Can't reach the
+  Overdeck server — commands need a live connection" and keeps the draft. Held
+  messages live in the in-memory composer store, so a full page reload drops
+  them; drafts already persist in localStorage.
+- **Asset recovery.** `recovery.tsx`'s "Reconnecting to the dashboard…" modal
+  shows only for the `root_error_boundary` trigger, when React itself is down.
+  Chunk and asset load failures poll `/` silently, then reload.
+
+Outage surfaces that PAN-4279 removed or folded into the banner: the
+`display: none` route wrapper and "Waiting for backend data" page, the
+"Connection lost — reconnecting…" pill, both EventRouter "Server unreachable —
+Retry" overlays (the 3-minute fallback window and the 6-retry escalation), and
+the AppChrome restart, "Backend is unreachable" and "Backend is back up"
+banners. Kept on purpose: the `RootErrorBoundary` crash fallback and the reload
+circuit-breaker overlay (crashes, not connectivity), `XTerminal.tsx`'s inline
+reconnecting status, and region-scoped boundaries (`LoadingBoundary`,
+`ProjectMembershipBoundary`, the Flywheel unreachable chip). Browser coverage
+is `src/dashboard/frontend/tests/pan-4279-degraded-mode.spec.ts`, which runs on
+an isolated dashboard.
 
 ## Agents page: Live and History (PAN-3920, PAN-4197)
 

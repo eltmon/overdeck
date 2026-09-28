@@ -1,0 +1,195 @@
+{
+  "version": "1",
+  "issueId": "PAN-4282",
+  "created": "2026-09-27T23:47:23.116Z",
+  "updated": "2026-09-28T00:47:41.562Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "first-run-checks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-27T23:47:23.115Z",
+      "doneAt": "2026-09-27T23:51:17.097Z"
+    },
+    "prereq-backend-required": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-27T23:51:22.171Z",
+      "doneAt": "2026-09-27T23:55:57.669Z"
+    },
+    "prereq-report-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-27T23:56:14.473Z",
+      "doneAt": "2026-09-27T23:59:29.652Z"
+    },
+    "get-set-up-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-27T23:59:36.295Z",
+      "doneAt": "2026-09-28T00:10:23.393Z"
+    },
+    "banner-hide-home": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-28T00:10:26.670Z",
+      "doneAt": "2026-09-28T00:13:13.013Z"
+    },
+    "home-mount-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-28T00:13:17.066Z",
+      "doneAt": "2026-09-28T00:18:46.091Z"
+    },
+    "install-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-28T00:18:50.800Z",
+      "doneAt": "2026-09-28T00:22:32.756Z"
+    },
+    "doctor-first-run": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-28T00:22:36.396Z",
+      "doneAt": "2026-09-28T00:26:00.744Z"
+    },
+    "docs-first-run": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4282",
+      "claimedAt": "2026-09-28T00:26:04.287Z",
+      "doneAt": "2026-09-28T00:27:06.668Z"
+    },
+    "first-run-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:34:22.473Z"
+    },
+    "first-run-checks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:34:53.958Z"
+    },
+    "first-run-checks.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:35:06.056Z"
+    },
+    "prereq-backend-required.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:35:18.355Z"
+    },
+    "prereq-backend-required.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:35:29.880Z"
+    },
+    "prereq-backend-required.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:35:41.274Z"
+    },
+    "prereq-report-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:35:52.367Z"
+    },
+    "prereq-report-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:36:04.350Z"
+    },
+    "prereq-report-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:36:16.565Z"
+    },
+    "get-set-up-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:36:28.928Z"
+    },
+    "get-set-up-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:36:40.730Z"
+    },
+    "get-set-up-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:36:52.557Z"
+    },
+    "get-set-up-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:04.821Z"
+    },
+    "get-set-up-card.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:16.910Z"
+    },
+    "banner-hide-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:29.458Z"
+    },
+    "banner-hide-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:41.527Z"
+    },
+    "home-mount-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:37:53.132Z"
+    },
+    "install-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:04.242Z"
+    },
+    "install-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:15.636Z"
+    },
+    "install-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:26.479Z"
+    },
+    "install-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:37.891Z"
+    },
+    "doctor-first-run.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:49.156Z"
+    },
+    "doctor-first-run.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:00.022Z"
+    },
+    "doctor-first-run.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:11.666Z"
+    },
+    "doctor-first-run.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:22.727Z"
+    },
+    "docs-first-run.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:33.682Z"
+    },
+    "docs-first-run.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:45.332Z"
+    },
+    "docs-first-run.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:39:57.342Z"
+    },
+    "prereq-report-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:41:06.342Z"
+    },
+    "home-mount-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:45:03.762Z"
+    },
+    "home-mount-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:45:16.531Z"
+    },
+    "first-run-checks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:47:41.561Z"
+    }
+  }
+}

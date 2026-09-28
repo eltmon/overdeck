@@ -49,6 +49,8 @@ export interface FailedMessage {
   notFoundInTranscript?: boolean;
   /** Server failure code, e.g. 'not-delivered' when the terminal refused the message (PAN-4278). */
   code?: string;
+  /** Submitted while the server was unreachable: never POSTed, sent on reconnect (PAN-4279). */
+  heldOffline?: boolean;
 }
 
 export interface WorkLogEntry {

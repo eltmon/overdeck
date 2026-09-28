@@ -8,9 +8,8 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { fetchRegisteredProjects } from './CommandDeck/UnknownProjectState';
-import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './CommandDeck/projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './CommandDeck/projectsData';
 import { OverdeckMark } from './OverdeckMark';
-import { fetchConversations } from './CommandDeck/ConversationList';
 import { useConversationMutations } from './CommandDeck/useConversationMutations';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
@@ -222,14 +221,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   });
   const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
 
-  // PAN-1561: the "No project" bucket appears once a conversation exists that
-  // isn't under any registered project. These queries share keys with the
-  // CommandDeck (react-query dedupes — no extra network).
-  const { data: sidebarConversations = [] } = useQuery({
-    queryKey: ['conversations'],
-    queryFn: fetchConversations,
-    refetchInterval: 10000,
-  });
   // PAN-3527: share the throwing fetcher with the CommandDeck. Turning a failed
   // request into an empty list cached it as a settled answer, which skipped the
   // retry and emptied the deck's conversation partition.
@@ -238,10 +229,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     queryFn: fetchRegisteredProjects,
     staleTime: 60000,
   });
-  const hasUnscopedConversations = useMemo(
-    () => sidebarConversations.some((c) => isUnscopedConversation(c, registeredProjects)),
-    [sidebarConversations, registeredProjects],
-  );
 
   // PAN-1577: drag a conversation row onto a sidebar project to move it.
   const conversationMutations = useConversationMutations(null, () => {});
@@ -710,24 +697,23 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                   );
                 })
               )}
-              {/* No-project bucket — unscoped conversations/terminals (PAN-1561) */}
-              {hasUnscopedConversations && (
-                <button
-                  onClick={() => { onSelectProject?.(NO_PROJECT_KEY); setMobileOpen(false); }}
-                  title={NO_PROJECT_LABEL}
-                  data-testid="sidebar-project-no-project"
-                  className={`
-                    w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2
-                    ${activeTab === 'command-deck' && selectedProject === NO_PROJECT_KEY
-                      ? 'bg-accent text-foreground border-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'
-                    }
-                  `}
-                >
-                  <span className="h-2 w-2 rounded-full shrink-0 bg-muted-foreground/30" aria-hidden="true" />
-                  <span className="truncate italic">{NO_PROJECT_LABEL}</span>
-                </button>
-              )}
+              {/* No-project bucket — always reachable (PAN-4280 FR-10; was
+                  gated on an existing unscoped conversation, PAN-1561) */}
+              <button
+                onClick={() => { onSelectProject?.(NO_PROJECT_KEY); setMobileOpen(false); }}
+                title={NO_PROJECT_LABEL}
+                data-testid="sidebar-project-no-project"
+                className={`
+                  w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2
+                  ${activeTab === 'command-deck' && selectedProject === NO_PROJECT_KEY
+                    ? 'bg-accent text-foreground border-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'
+                  }
+                `}
+              >
+                <span className="h-2 w-2 rounded-full shrink-0 bg-muted-foreground/30" aria-hidden="true" />
+                <span className="truncate italic">{NO_PROJECT_LABEL}</span>
+              </button>
             </div>
           ) : (
             <div className="h-px mx-2 bg-border my-2" />

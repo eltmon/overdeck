@@ -258,6 +258,12 @@ interface ComposerStore {
 
   /** A send POST failed: preserve it in the retry outbox with its original lane. */
   failSend(conversationName: string, text: string, kind?: FailedMessage['kind'], details?: SendFailureDetails): void;
+  /** A prompt submitted while the server is unreachable: hold it, unsent, until reconnect (PAN-4279). */
+  holdSend(
+    conversationName: string,
+    text: string,
+    identity: { clientMessageId: string; deliverAs?: FailedMessage['deliverAs'] },
+  ): void;
   removeFailed(conversationName: string, id: string): void;
 
   addCommandResult(
@@ -561,6 +567,23 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       }),
     })),
 
+  holdSend: (conversationName, text, { clientMessageId, deliverAs }) =>
+    set((state) => ({
+      byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
+        ...s,
+        failed: [...s.failed, {
+          id: `failed-${crypto.randomUUID()}`,
+          text,
+          kind: 'prompt',
+          createdAt: new Date().toISOString(),
+          clientMessageId,
+          deliverAs,
+          retryable: true,
+          heldOffline: true,
+        }],
+      })),
+    })),
+
   removeFailed: (conversationName, id) =>
     set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
@@ -621,18 +644,21 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     // failure needs one too: the server cached that 502 under the old
     // clientMessageId, so a retry with it would replay the failure (PAN-4278).
     const isFreshIdentity = failed.notFoundInTranscript === true || failed.code === 'not-delivered';
+    // A held message was never POSTed (PAN-4279): its first send keeps its
+    // clientMessageId but is not a retry, and its bubble starts its clock now.
+    const neverSent = failed.heldOffline === true;
     const clientMessageId = isFreshIdentity ? crypto.randomUUID() : (failed.clientMessageId ?? crypto.randomUUID());
     if (kind === 'prompt') {
       // Preserve the ordinary prompt path byte-for-byte: move the text onto a
       // recoverable optimistic surface before clearing the outbox and POSTing.
-      addOptimistic(conversationName, text, serverBaseCount, isFreshIdentity
+      addOptimistic(conversationName, text, serverBaseCount, isFreshIdentity || neverSent
         ? { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds }
         : { clientMessageId, echoBaselineIds: failed.echoBaselineIds ?? serverMessageIds, createdAt: failed.createdAt });
     }
     removeFailed(conversationName, failedId);
     try {
       const result = await sendConversationMessage(conversationName, text, agentId, failed.deliverAs, undefined,
-        isFreshIdentity ? { clientMessageId } : { clientMessageId, retry: true });
+        isFreshIdentity || neverSent ? { clientMessageId } : { clientMessageId, retry: true });
       if (kind === 'prompt') get().acknowledgeOptimistic(conversationName, text, clientMessageId);
       if (kind === 'command' && result && result.kind !== 'ui') {
         addCommandResult(conversationName, text, result);

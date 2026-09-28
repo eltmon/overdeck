@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Check, Copy, RefreshCw, X } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Tab } from './Header';
 
 /**
  * SetupChecklistBanner (PAN-774) — first-run host-tool checklist.
@@ -13,9 +14,12 @@ import { toast } from 'sonner';
  * optional integrations (gh, tasks, Docker, Codex) with copyable install
  * commands. Overdeck never runs the installs itself — system packages need
  * sudo/user consent.
+ *
+ * Hidden on the Home tab (PAN-4282 D11) — Home shows the "Get set up" card
+ * (GetSetUpCard) instead.
  */
 
-interface PrerequisiteCheck {
+export interface PrerequisiteCheck {
   id: string;
   name: string;
   required: boolean;
@@ -25,7 +29,7 @@ interface PrerequisiteCheck {
   install: { linux: string; mac: string; win: string };
 }
 
-interface PrerequisitesReport {
+export interface PrerequisitesReport {
   platform: string;
   allRequiredFound: boolean;
   checks: PrerequisiteCheck[];
@@ -33,13 +37,13 @@ interface PrerequisitesReport {
 
 const DISMISS_KEY = 'overdeck-setup-checklist-dismissed';
 
-function installHintFor(check: PrerequisiteCheck, platform: string): string {
+export function installHintFor(check: PrerequisiteCheck, platform: string): string {
   if (platform === 'darwin') return check.install.mac;
   if (platform === 'win32') return check.install.win;
   return check.install.linux;
 }
 
-function CopyableCommand({ command }: { command: string }) {
+export function CopyableCommand({ command }: { command: string }) {
   const copy = () => {
     void navigator.clipboard.writeText(command).then(
       () => toast.success('Copied'),
@@ -87,7 +91,7 @@ function ChecklistRow({ check, platform }: { check: PrerequisiteCheck; platform:
   );
 }
 
-export function SetupChecklistBanner() {
+export function SetupChecklistBanner({ activeTab }: { activeTab?: Tab } = {}) {
   const [expanded, setExpanded] = useState(false);
   const [dismissedSet, setDismissedSet] = useState<string>(() => localStorage.getItem(DISMISS_KEY) ?? '');
 
@@ -110,6 +114,7 @@ export function SetupChecklistBanner() {
 
   if (!report || missingRequired.length === 0) return null;
   if (!expanded && dismissedSet === missingKey) return null;
+  if (activeTab === 'home') return null;
 
   const dismiss = () => {
     localStorage.setItem(DISMISS_KEY, missingKey);
