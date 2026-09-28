@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T00:02:45.855Z",
+  "updated": "2026-09-28T00:07:18.539Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-28T00:02:39.777Z"
     },
     "polyrepo-create": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4281",
-      "claimedAt": "2026-09-28T00:02:45.855Z"
+      "claimedAt": "2026-09-28T00:02:45.855Z",
+      "doneAt": "2026-09-28T00:07:18.539Z"
     }
   }
 }
