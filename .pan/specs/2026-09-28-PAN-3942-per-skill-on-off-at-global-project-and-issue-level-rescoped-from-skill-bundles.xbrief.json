@@ -3,7 +3,8 @@
     "version": "0.8",
     "created": "2026-09-28T10:08:48Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-3942: Per-skill on/off at global, project, and issue level"
+    "description": "Plan for PAN-3942: Per-skill on/off at global, project, and issue level",
+    "updated": "2026-09-28T10:14:34.846Z"
   },
   "plan": {
     "id": "pan-3942",
@@ -11,9 +12,9 @@
     "status": "proposed",
     "uid": "e4192152-b331-4532-9c6e-4ae05a3e03d0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-09-28T10:08:48Z",
-    "updated": "2026-09-28T10:08:48Z",
+    "updated": "2026-09-28T10:14:34.846Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3942",
@@ -35,7 +36,10 @@
       "NonGoals": "- Named or versioned skill bundles, bundle includes, digests, provenance reports (do not plan or file)\n- Conversation-scope overrides\n- Role/audience filtering (#1655)\n- Git/registry skill sources\n- Context-cost estimates\n- Changing pan sync, ~/.claude/skills, ~/.agents/skills, workspace .claude/skills seeding, or any user-owned harness settings file\n- Applying overrides to ohmypi, acp/opencode, kimi-code, muse, or remote (Fly) launches\n- Changing or removing the GET /api/skills route\n- Closing or superseding #1357, #1655, #1656\n- Changing a live session's skill set; overrides apply at the next launch only\n- Adding lines to ratcheted files over 1000 lines (projects.ts, settings-api.ts, schema.ts, src/cli/index.ts, spawn-prep.ts, spawn.ts, conversation-runtime.ts)"
     },
     "autoDecisions": [],
-    "metadata": {},
+    "metadata": {
+      "canonicalFilename": "2026-09-28-PAN-3942-per-skill-on-off-at-global-project-and-issue-level-rescoped-from-skill-bundles.xbrief.json",
+      "promotionIntent": "automatic"
+    },
     "items": [
       {
         "id": "resolver",
@@ -159,7 +163,7 @@
           "parallelSafeReason": "Owns only store.ts, its test, and keyword-only exports in projects.ts/settings-api.ts; no other item touches these files, and its blocks edges already serialize consumers."
         },
         "narrative": {
-          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-2. In src/lib/projects.ts add only the `export` keyword to `interface ProjectsConfigMutation<T>` (line ~617) and `async function updateProjectsConfigAsync` (line ~653); in src/lib/settings-api.ts add only `export` to `function runSettingsWriteSerialized` (line ~888). Create store.ts: readGlobalSkillOverrides/readProjectSkillOverrides/readIssueSkillOverrides/loadSkillOverrideLayers/issueSkillOverridesPath/parseSkillOverrideUpdate/setSkillOverride/SkillOverrideError exactly as specified. Global = ~/.overdeck/config.yaml key skills.overrides via yaml parseDocument setIn/deleteIn inside runSettingsWriteSerialized (comment-preserving). Project = projects.yaml projects.<key>.skill_overrides via updateProjectsConfigAsync. Issue = <planHome>/.pan/skill-overrides/<ISSUE>.yaml (format in PRD), then commitPlanArtifacts({cwd: planHome, paths:[file], message:'chore(workspace): skill overrides for <ISSUE>'}) and pushPlanArtifacts(planHome) when committed; delete the file when empty and commit the deletion. Validation: core -> 'core-skill', not in listSkillCatalog for the context -> 'unknown-skill', unregistered project -> 'unknown-project', issue with no owning project -> 'unknown-issue'; enabled:null always allowed for a stored non-core key. Async fs/git only (no execSync, no new sync config reads)."
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-2. In src/lib/projects.ts add only the `export` keyword to `interface ProjectsConfigMutation<T>` (line ~617) and `async function updateProjectsConfigAsync` (line ~653); in src/lib/settings-api.ts add only `export` to `function runSettingsWriteSerialized` (line ~888). Create store.ts: readGlobalSkillOverrides/readProjectSkillOverrides/readIssueSkillOverrides/loadSkillOverrideLayers/issueSkillOverridesPath/parseSkillOverrideUpdate/setSkillOverride/SkillOverrideError exactly as specified. Global = ~/.overdeck/config.yaml key skills.overrides via yaml parseDocument setIn/deleteIn inside runSettingsWriteSerialized (comment-preserving). Project = projects.yaml projects.<key>.skill_overrides via updateProjectsConfigAsync. Issue = <planHome>/.pan/skill-overrides/<ISSUE>.yaml (format in PRD), then commitPlanArtifacts({cwd: planHome, paths:[file], message:'chore(workspace): skill overrides for <ISSUE>'}) and pushPlanArtifacts(planHome) when committed; delete the file when empty and commit the deletion. Validation: core -> 'core-skill', not in listSkillCatalog for the context -> 'unknown-skill', unregistered project -> 'unknown-project', issue with no owning project -> 'unknown-issue'; enabled:null always allowed for a stored non-core key. Async fs/git only (no execSync, no new sync config reads). Tests set a git committer identity and commit.gpgsign=false in temp repos, mirroring the existing plan-artifact-commit tests."
         },
         "items": [
           {
@@ -237,7 +241,7 @@
           ]
         },
         "narrative": {
-          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-3. Create launch.ts with resolveLaunchDisabledSkills({cwd, issueId}) (issue = explicit ?? issueIdFromWorkspacePath(cwd); project from findProjectByPath(cwd); loadSkillOverrideLayers; disabledSkillNames), claudeSkillSettingsJson(disabled) ('' when empty, else JSON {skillOverrides:{name:'off'}}), writeCodexSkillOverrides(codexHome, disabled) (replace the text between '# overdeck:skill-overrides:begin' and '# overdeck:skill-overrides:end' inclusive, append the [[skills.config]] name=... enabled=false block at end of file when non-empty, TOML-escape names, mode 0o600, idempotent), and launcherSkillOverrideLines({harness, workingDir, issueId}) returning the exact fail-open bash from the PRD (claude-code sets PAN_SKILL_SETTINGS; codex passes --codex-home \"$CODEX_HOME\"), all values through shellQuote."
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-3. Create launch.ts with resolveLaunchDisabledSkills({cwd, issueId}) (issue = explicit ?? issueIdFromWorkspacePath(cwd); project from findProjectByPath(cwd); loadSkillOverrideLayers; disabledSkillNames), claudeSkillSettingsJson(disabled) ('' when empty, else JSON {skillOverrides:{name:'off'}}), writeCodexSkillOverrides(codexHome, disabled) (replace the text between '# overdeck:skill-overrides:begin' and '# overdeck:skill-overrides:end' inclusive, append the [[skills.config]] name=... enabled=false block at end of file when non-empty, TOML-escape names, mode 0o600, idempotent), and launcherSkillOverrideLines({harness, workingDir, issueId}) returning the exact fail-open bash from the PRD (claude-code sets PAN_SKILL_SETTINGS; codex passes --codex-home \"$CODEX_HOME\"), all values through shellQuote. Also export claudeSkillSettingsArg(emitted) returning ' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"}' or ''. Import boundary: launch.ts statically imports only node:fs/promises, node:path, and ../shell-quote.js; resolveLaunchDisabledSkills uses await import() for ./store.js, ./resolve.js, ../projects.js, ../xbrief/io.js inside its body."
         },
         "items": [
           {
@@ -312,7 +316,7 @@
           ]
         },
         "narrative": {
-          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-4. Replace the `pan skills` registration (src/cli/index.ts, search \".command('skills')\") with the list (default) / set <skill> <state> / hidden launch-settings subcommands from the PRD. src/cli/index.ts is ratcheted at 1276 lines and must not grow: put the registration in registerSkillsCommands(program) exported from src/cli/commands/skills.ts and call it with one line. Implement skillsListCommand (table NAME STATE SOURCE DESCRIPTION or --json SkillState[]; --issue alone derives the project), skillsSetCommand (on|off|inherit -> true|false|null; --project with --issue exits 1; SkillOverrideError -> stderr + exit 1; print commit/push outcome), skillsLaunchSettingsCommand (claude-code prints claudeSkillSettingsJson to stdout; codex requires --codex-home and calls writeCodexSkillOverrides; other harness exits 2). Move parseSkillFrontmatter into catalog.ts usage; remove old listSkills/skillsCommand only if `git grep -n commands/skills` shows no other importer. Run npm run generate:slash-commands and commit the regenerated file."
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-4. Replace the `pan skills` registration (src/cli/index.ts, search \".command('skills')\") with the list (default) / set <skill> <state> / hidden launch-settings subcommands from the PRD. src/cli/index.ts is ratcheted at 1276 lines and must not grow: put the registration in registerSkillsCommands(program) exported from src/cli/commands/skills.ts and call it with one line. Implement skillsListCommand (table NAME STATE SOURCE DESCRIPTION or --json SkillState[]; --issue alone derives the project), skillsSetCommand (on|off|inherit -> true|false|null; --project with --issue exits 1; SkillOverrideError -> stderr + exit 1; print commit/push outcome), skillsLaunchSettingsCommand (claude-code prints claudeSkillSettingsJson to stdout; codex requires --codex-home and calls writeCodexSkillOverrides; other harness exits 2). Move parseSkillFrontmatter into catalog.ts usage; remove old listSkills/skillsCommand only if `git grep -n commands/skills` shows no other importer. Run npm run build, then npm run generate:slash-commands, then commit the regenerated file. Bare `pan skills --json` must keep working via isDefault; test it."
         },
         "items": [
           {
@@ -342,6 +346,14 @@
           {
             "id": "cli.ac4",
             "title": "Given a global override grilling off, When `pan skills launch-settings --harness claude-code --cwd <dir>` runs, Then stdout is JSON with skillOverrides.grilling = 'off'; with --harness codex and no --codex-home it exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli.ac5",
+            "title": "Given the old invocation `pan skills --json` with no subcommand, When it runs, Then it prints the JSON skill list exactly like `pan skills list --json`",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -386,7 +398,7 @@
           ]
         },
         "narrative": {
-          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-5. In generateLauncherScript emit launcherSkillOverrideLines only when spawnMode !== 'remote' and harness is claude-code (before the harness command) or codex (immediately after `export CODEX_HOME=`, only when config.codexHome is set), passing issueId from config.overdeckEnv?.issueId. For Claude commands only (conversation branch and buildNonConversationCommand, never the ohmypi/codex/acp/kimi/muse builders) append ' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"}' after the --append-system-prompt-file flags. Keep the file <= 1000 lines. Then run the PRD's three-step live checkpoint (claude -p probe prints 'grilling: no'; codex launch-settings writes the block; inherit restores) and paste the outputs into the PR description; if the Claude probe prints 'yes', stop and report instead of shipping."
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-5. Import only launcherSkillOverrideLines and claudeSkillSettingsArg from ./skill-overrides/launch.js. In generateLauncherScript emit launcherSkillOverrideLines only when spawnMode !== 'remote' and harness is claude-code (before the harness command) or codex (immediately after `export CODEX_HOME=`, only when config.codexHome is set), passing issueId from config.overdeckEnv?.issueId. For Claude commands only (conversation branch and buildNonConversationCommand, never the ohmypi/codex/acp/kimi/muse builders) append ' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"}' after the --append-system-prompt-file flags. Keep the file <= 1000 lines. Then run the PRD's three-step live checkpoint from inside a workspace directory (claude -p probe prints 'grilling: no'; codex launch-settings writes the block; inherit restores) and paste the outputs into the PR description; if the Claude probe prints 'yes', stop and report instead of shipping."
         },
         "items": [
           {
@@ -444,11 +456,13 @@
           "files_scope_confidence": "high",
           "verify_commands": [
             "npx vitest run src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
-            "npm run typecheck"
+            "npm run typecheck",
+            "grep -n 'GET /api/skills/overrides\\|PUT /api/skills/overrides' tests/unit/lib/overdeck/no-loss-matrix.ts"
           ],
           "expected_outputs": [
             "skill-overrides-route.test.ts and no-loss-matrix.test.ts pass",
-            "typecheck completes without errors"
+            "typecheck completes without errors",
+            "both no-loss rows are present"
           ],
           "readiness": "ready",
           "traces": [
@@ -644,11 +658,11 @@
           "files_scope_confidence": "high",
           "verify_commands": [
             "grep -n '## Turning skills on and off' features/skills.mdx",
-            "grep -c 'Cursor, etc' features/skills.mdx"
+            "! grep -q 'Cursor, etc' features/skills.mdx"
           ],
           "expected_outputs": [
             "the heading is found",
-            "the stale 'Cursor, etc' count is 0"
+            "the negated grep exits 0 (stale 'Cursor, etc' text is gone)"
           ],
           "readiness": "ready",
           "traces": [
