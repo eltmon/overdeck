@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T13:25:10.130307Z · model: claude-opus-5-5 · open: 787_
+_Last sequenced: 2026-09-28T13:28:11.801764Z · model: claude-opus-5-5 · open: 788_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -10,6 +10,7 @@ _Last sequenced: 2026-09-28T13:25:10.130307Z · model: claude-opus-5-5 · open: 
 | 3 | PAN-4292 | M | medium | ok |  |  | In-pipeline (live workspace): steer running Claude Code/Codex turns from composer (Ctrl+Enter) and pan tell --steer, not only Pi. |
 | 4 | PAN-4300 | S | high | ok |  |  | In-pipeline (live workspace): dead agents re-emit heartbeat_dead + status→running each minute, ~50k events/day flooding Activity |
 | 5 | PAN-4301 | L | medium | ok |  | PAN-4300 | In-pipeline (live workspace): Awareness feed shows transitions not a live chat index; one card per gauntlet run; telemetry out of feed |
+| 6 | PAN-4310 | S | high | ok |  |  | In-pipeline (live workspace): Herdr stream decodes UTF-8 as Latin-1, so the Terminal tab shows mojibake; stream decoder fix. |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -815,6 +816,10 @@ New issue already in the pipeline with a live workspace, so it is pinned at the 
 
 New issue already in the pipeline with a live workspace and a committed PRD (.pan/drafts/pan-4301.md), so it is pinned at the free rank 5 slot. It is a derive-not-store frontend/read-model redesign built on existing lane and conversation facts; it depends on PAN-4300 removing the dead-agent event flood before telemetry moves into the Detailed stream.
 
+### PAN-4310 (rank 6)
+
+New issue already in the pipeline, so it is pinned in the top tier at the first free rank (6) rather than re-ranked. It is a small, well-scoped regression from the PAN-3917 Herdr adapter: every non-ASCII character in the default terminal backend's dashboard view is garbled. Root cause, fix, and acceptance criteria are all stated, so condition is ok.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1091,10 +1096,6 @@ Every path that starts a new Claude session for an existing agent must repoint s
 
 patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
 
-### PAN-3793 (rank 114)
-
-New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI and a successful deploy, and pan close still reported row 4 missing because neither conventional branch existed; rows 1-3 then could not settle and rows 6/8 lost their merge anchor. Supervised work increasingly uses descriptive branches, so this will recur. The fix is contained: teach the canonical resolver to honour an explicit issue-record PR reference with linked-PR lookup as fallback.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1102,10 +1103,10 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T13:25:10.130307Z",
+  "generatedAt": "2026-09-28T13:28:11.801764Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 787,
+  "openCount": 788,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -10889,6 +10890,19 @@ New this pass. PAN-3790 merged cleanly from feature/muse-harness with green CI a
       ],
       "why": "Settle reaped Fly remote transcripts into the Session Vault; blocked by PAN-2609 (engine) and PAN-4295 (restored Fly auto-reap).",
       "rationale": "New node split from PAN-2609; placed after both blockers (PAN-2609 at 506, PAN-4295 at 566) in a free slot so no other rank moves.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4310",
+      "rank": 6,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): Herdr stream decodes UTF-8 as Latin-1, so the Terminal tab shows mojibake; stream decoder fix.",
+      "rationale": "New issue already in the pipeline, so it is pinned in the top tier at the first free rank (6) rather than re-ranked. It is a small, well-scoped regression from the PAN-3917 Herdr adapter: every non-ASCII character in the default terminal backend's dashboard view is garbled. Root cause, fix, and acceptance criteria are all stated, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     }
