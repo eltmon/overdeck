@@ -136,6 +136,10 @@ memoized 3 s); entry `state` comes from the pane inventory, never stored
 status. PAN-4197 makes the Live view (`?scope=live`) the default and keeps the
 Directory as `?view=history`.
 
+## Awareness rail (Command Deck right column)
+
+`components/sessionFeed/SessionFeedSidebar.tsx`: Needs you = `DecisionsPanel`; Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Awareness feed".
+
 ## Flywheel (PAN-3964, derived view)
 
 The flywheel is the `/pan-flywheel` skill running in conversation `conv-flywheel`; it has
@@ -147,4 +151,4 @@ injectable dep: the lib defaults serve the CLI; the route must inject the server
 facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
 imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
-<!-- last-verified: 2026-09-27 -->
+<!-- last-verified: 2026-09-28 -->

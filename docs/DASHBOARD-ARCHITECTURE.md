@@ -18,6 +18,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Deacon child process** (PAN-3922):
 - The dashboard forks `dist/dashboard/deacon.js` (`src/dashboard/server/deacon-main.ts`) through `services/deacon-supervisor.ts`. Cloister and deacon-lite run only in that child, never in the dashboard process.
 - IPC, parent to child: `{type:'patrol'}` (run one patrol now) and `{type:'reload-config'}`. Child to parent: `{type:'patrol-done', at, error}` after every completed deacon-lite tick, scheduled or manual.
+- Dead-agent events (PAN-4300): each deacon-lite tick checks agents whose `state.json` says `running`. When one is absent from the backend inventory and the liveness oracle confirms it dead, the child emits `agent.heartbeat_dead` and then `agent.status_changed` with `status: stopped`, `previousStatus` set to the recorded status, and `hasLivePane: false`. It emits this pair once per death: it remembers the agent id and launch generation (`startedAt` + `lastResumeAt`) in memory and emits again only after the agent is seen alive, is resumed, or leaves the `running` list. `state.json` is not changed. A deacon child restart emits the pair once more for each agent that is still dead.
 - The supervisor keeps the latest `patrol-done` report in memory, across child restarts. Nothing is written to disk.
 - `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
 - The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
@@ -298,6 +299,15 @@ door that does not exist; a real record read door would be a separate change.
   lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
   names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
   subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
+- Delivery modes (PAN-4292). `HarnessBehavior.steerKind` (`packages/contracts/src/harness-behavior.ts`)
+  says how a harness can be steered: `send-now-keys` (Claude Code), `control-channel` (Pi), or
+  `null`. The composer shows its delivery selector only for a steer-capable harness (Pi only on
+  conversations), and Ctrl/Cmd+Enter sends with `deliverAs: 'steer'`; elsewhere Ctrl+Enter is
+  Enter. Both `POST /api/conversations/:name/message` and `POST /api/agents/:id/message` accept
+  the `deliverAs` body field. A Claude Code steer reaches the delivery door as
+  `submit: 'steer'`. A harness without steer, or `follow_up` on Claude Code, answers **422**
+  `steer-unsupported` and delivers nothing. When an old PTY supervisor pressed Enter instead, the
+  response carries `steerDegraded` with the reason.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
@@ -736,3 +746,60 @@ open with `O_NONBLOCK` and re-check the descriptor with `fstat`, so a FIFO never
 thread. A registration is written to a temp file, fsynced and `link()`ed to `registration.json`,
 so the name only appears with complete content; a file that does not parse counts as absent and
 is replaced. The transcript link is appended with the async `appendSessionIdToHistoryAsync`.
+
+## Awareness feed (PAN-4301)
+
+The Command Deck's right-hand rail is `SessionFeedSidebar`
+(`src/dashboard/frontend/src/components/sessionFeed/`) with three scopes, Needs
+you, Project and Global. Needs you is the `DecisionsPanel`. Project and Global
+show one merged feed with three tabs: All, Chats and Activity. The Git, Files and
+Comments tabs are gone because no source ever wrote rows for them; a stored
+hidden tab falls back to All.
+
+Sources, merged in `useMergedFeed.ts`:
+
+- `GET /api/conversations`, polled every 30 s (`useConversationFeed.ts`).
+- `recentActivity`, the `activity.entry` events in the dashboard store, capped
+  at 50 (`useActivityEntryFeed.ts`).
+- Memory observations (`useObservationFeed.ts`).
+
+**All shows transitions.** A conversation card is dated by a lifecycle fact:
+`endedAt` when the conversation ended, otherwise `createdAt`, labelled `ended` or
+`started`. It is never dated by transcript activity (`lastActivityAt`, the
+transcript file mtime), which moves on every write and used to pull every busy
+conversation back to "Just Now" on each poll. All keeps a conversation only when
+that lifecycle timestamp is inside a 24 h window (`FEED_WINDOW_MS`).
+
+**Chats is a recency index.** It keeps root conversations that are alive or were
+active in the last 24 h, re-dated to the recency timestamp
+(`lastActivityAt ?? lastAttachedAt ?? createdAt`, labelled `active`), newest
+first.
+
+**Gauntlet runs are one card.** Lane conversations never render as their own
+cards. `groupGauntletRuns` (`gauntletRunEntries.ts`) folds them into one run card
+per `(projectKey, gauntletRun)` with a counts line (`6 builders · 6 working`), a
+state dot and the latest event. The card's time is the newest lane report,
+failed start, end or launch, never transcript activity. A run card shows in All
+and Chats while any lane is alive or its latest event is inside the window. The
+card opens the launching conversation; its expand control lists the lanes and
+fetches `GET /api/lanes?run=<run>` only on expand, once, with no polling, for git
+facts and archived lanes.
+
+**Other rules.**
+
+- Activity entries that name an issue collapse to one card per issue: the newest
+  entry's headline, plus `N steps` for the entries folded into it.
+- Singleton runners (`flywheel-orchestrator`, `sequencer-runner`,
+  `SINGLETON_AGENT_IDS` in `@overdeck/contracts`) never render.
+- The conversation card's status dot is derived from the row: waiting when the
+  session is alive with pending input, active when it is alive and working,
+  idle otherwise.
+- **Project scope** keeps an entry when it is system-wide activity, its issue is
+  one of the project's issues, it is a conversation in the Command Deck's
+  resolved project conversation set (`projectConvIdSet`, built with
+  `resolveEffectiveProjectKey`), or it is a run card with a lane in that set.
+
+Everything above is a selector over existing rows and events; nothing is stored.
+`activity.entry` is meant for news (something shipped, failed, finished or needs
+the operator); progress telemetry belongs in `activity.detailed`. Moving the
+remaining telemetry emit sites is tracked in PAN-4306.

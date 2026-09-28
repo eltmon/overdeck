@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T13:36:43.509418Z · model: claude-opus-5-5 · open: 788_
+_Last sequenced: 2026-09-28T16:06:29.924116Z · model: claude-opus-5-5 · open: 791_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -11,6 +11,9 @@ _Last sequenced: 2026-09-28T13:36:43.509418Z · model: claude-opus-5-5 · open: 
 | 4 | PAN-4300 | S | high | ok |  |  | In-pipeline (live workspace): dead agents re-emit heartbeat_dead + status→running each minute, ~50k events/day flooding Activity |
 | 5 | PAN-4301 | L | medium | ok |  | PAN-4300 | In-pipeline (live workspace): Awareness feed shows transitions not a live chat index; one card per gauntlet run; telemetry out of feed |
 | 6 | PAN-4310 | S | high | ok |  |  | In-pipeline (live workspace): Herdr stream decodes UTF-8 as Latin-1, so the Terminal tab shows mojibake; stream decoder fix. |
+| 7 | PAN-4311 | L | high | ok |  |  | In-pipeline (live workspace): CPU weights/nice for agents, observe-only runaway detector, PSI-based CPU dispatch hold |
+| 8 | PAN-4312 | L | high | ok |  |  | In-pipeline (live workspace): conversation open stalls up to 17s behind polling ops on the read lane; duplicate transcript loads |
+| 9 | PAN-4320 | M | high | ok |  |  | In-pipeline (live workspace): Herdr pane inventory never records agentId, so the dashboard serves every live agent as stopped |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
 | 24 | PAN-4219 | S | critical | needs-refinement |  |  | pan done refuses on unclosable AC sub-items; likely duplicate of PAN-4217 (same missing writer); fold into its fix. |
 | 25 | PAN-4229 | S | critical | needs-refinement |  | PAN-4217 | pan task done skips nested AC children, so pan done refuses at the end; third report of the PAN-4217 missing writer; fold into its fix. |
@@ -262,7 +265,7 @@ _Last sequenced: 2026-09-28T13:36:43.509418Z · model: claude-opus-5-5 · open: 
 | 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
 | 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 316 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 316 | PAN-1166 | M | high | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
 | 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28: PAN-3762 per-machine server is default; adds Vault/Fly/paid tracks. Children carry the order. |
 | 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
@@ -820,6 +823,18 @@ New issue already in the pipeline with a live workspace and a committed PRD (.pa
 
 New issue already in the pipeline, so it is pinned in the top tier at the first free rank (6) rather than re-ranked. It is a small, well-scoped regression from the PAN-3917 Herdr adapter: every non-ASCII character in the default terminal backend's dashboard view is garbled. Root cause, fix, and acceptance criteria are all stated, so condition is ok.
 
+### PAN-4311 (rank 7)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (7) rather than ranked against the backlog. It hardens the substrate against the 2026-09-28 load-79 incident: the governor CPU hold gates nothing today, no CPU weights exist, and runaway attribution never runs; the PRD names exact files, so condition is ok at high importance.
+
+### PAN-4312 (rank 8)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (8) rather than ranked against the backlog. Its PRD measures conversation-open stalls of up to 17.6 s caused by polling aggregates sharing the single-slot read worker lane, plus redundant transcript parses and git spawns per open; the fix list and acceptance criteria are concrete, so condition is ok at high importance.
+
+### PAN-4320 (rank 9)
+
+New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (9) rather than ranked against the backlog. The body traces the defect to backend-inventory.ts dropping tokens.agentId on pane-created/metadata events while deriveServedAgentStatuses matches on it, which makes God View, Command Deck and agent counts wrong on the default Herdr backend; acceptance criteria are concrete, so condition is ok at high importance.
+
 ### PAN-4217 (rank 23)
 
 New bug discovered on PAN-4199. The vbrief-ac verification gate and the pan done preflight both count acceptance-criterion sub-items, but updateSubItemStatus has no production caller and the feedback names a nonexistent 'pan task close' verb, so every plan with nested ACs fails verification until an agent hand-writes a script. It blocks the pipeline's verification step directly, so it ranks critical in the free slot right after the other in-pipeline pickup blockers.
@@ -1084,18 +1099,6 @@ Triage: now deacon-lite's stuck-work-nudge routine; verify the ctx-saturation he
 
 Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boots.
 
-### PAN-1618 (rank 111)
-
-Work-spawn docker-health gate has no autonomous recovery — proposed work cannot auto-start when docker is briefly unhealthy.
-
-### PAN-3916 (rank 112)
-
-Every path that starts a new Claude session for an existing agent must repoint session.id and state.json; today the operator loses their own conversation and pan tell reports false non-delivery.
-
-### PAN-3900 (rank 113)
-
-patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached compose networks and calling docker teardown from every worktree-removal shape stops pan start from failing outright.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1103,10 +1106,10 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T13:36:43.509418Z",
+  "generatedAt": "2026-09-28T16:06:29.924116Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 788,
+  "openCount": 791,
   "nodes": [
     {
       "issue": "PAN-4290",
@@ -8708,7 +8711,7 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "issue": "PAN-1166",
       "rank": 316,
       "size": "M",
-      "importance": "low",
+      "importance": "high",
       "score": 21,
       "condition": "ok",
       "dependsOn": [],
@@ -10905,6 +10908,45 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "rationale": "New issue already in the pipeline, so it is pinned in the top tier at the first free rank (6) rather than re-ranked. It is a small, well-scoped regression from the PAN-3917 Herdr adapter: every non-ASCII character in the default terminal backend's dashboard view is garbled. Root cause, fix, and acceptance criteria are all stated, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4311",
+      "rank": 7,
+      "size": "L",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): CPU weights/nice for agents, observe-only runaway detector, PSI-based CPU dispatch hold",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (7) rather than ranked against the backlog. It hardens the substrate against the 2026-09-28 load-79 incident: the governor CPU hold gates nothing today, no CPU weights exist, and runaway attribution never runs; the PRD names exact files, so condition is ok at high importance.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4312",
+      "rank": 8,
+      "size": "L",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): conversation open stalls up to 17s behind polling ops on the read lane; duplicate transcript loads",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (8) rather than ranked against the backlog. Its PRD measures conversation-open stalls of up to 17.6 s caused by polling aggregates sharing the single-slot read worker lane, plus redundant transcript parses and git spawns per open; the fix list and acceptance criteria are concrete, so condition is ok at high importance.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4320",
+      "rank": 9,
+      "size": "M",
+      "importance": "high",
+      "score": 76,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In-pipeline (live workspace): Herdr pane inventory never records agentId, so the dashboard serves every live agent as stopped",
+      "rationale": "New issue already in the pipeline with a live workspace, so it is pinned at the first free rank (9) rather than ranked against the backlog. The body traces the defect to backend-inventory.ts dropping tokens.agentId on pane-created/metadata events while deriveServedAgentStatuses matches on it, which makes God View, Command Deck and agent counts wrong on the default Herdr backend; acceptance criteria are concrete, so condition is ok at high importance.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -12160,6 +12202,27 @@ patrolDockerBridgePool survives the cut but is read-only; reclaiming unattached 
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4311",
+      "to": "PAN-4312",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
+    },
+    {
+      "from": "PAN-3762",
+      "to": "PAN-2609",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4320",
+      "to": "PAN-4300",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }

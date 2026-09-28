@@ -1,0 +1,273 @@
+{
+  "version": "1",
+  "issueId": "PAN-4301",
+  "created": "2026-09-28T13:03:46.534Z",
+  "updated": "2026-09-28T14:01:41.956Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-conversation-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:03:46.534Z",
+      "doneAt": "2026-09-28T13:08:16.507Z"
+    },
+    "lanes-views-shared-activity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:08:21.281Z",
+      "doneAt": "2026-09-28T13:09:27.464Z"
+    },
+    "identity-singletons-from-contracts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:09:28.591Z",
+      "doneAt": "2026-09-28T13:10:28.011Z"
+    },
+    "feed-entry-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:10:33.422Z",
+      "doneAt": "2026-09-28T13:19:49.039Z"
+    },
+    "gauntlet-run-selector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:19:58.580Z",
+      "doneAt": "2026-09-28T13:22:28.238Z"
+    },
+    "conversation-entries-lifecycle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:22:35.081Z",
+      "doneAt": "2026-09-28T13:25:31.708Z"
+    },
+    "gauntlet-run-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:25:37.822Z",
+      "doneAt": "2026-09-28T13:27:56.161Z"
+    },
+    "feed-tab-rules": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:28:03.013Z",
+      "doneAt": "2026-09-28T13:30:57.654Z"
+    },
+    "activity-per-issue-collapse": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:31:04.201Z",
+      "doneAt": "2026-09-28T13:32:41.539Z"
+    },
+    "conversation-card-status-dot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:32:49.691Z",
+      "doneAt": "2026-09-28T13:34:32.849Z"
+    },
+    "sidebar-hidden-tabs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:34:43.930Z",
+      "doneAt": "2026-09-28T13:36:44.386Z"
+    },
+    "project-scope-by-conversation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:36:50.879Z",
+      "doneAt": "2026-09-28T13:38:59.580Z"
+    },
+    "ci-subset-feed-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:39:06.072Z",
+      "doneAt": "2026-09-28T13:39:34.583Z"
+    },
+    "docs-awareness-feed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4301",
+      "claimedAt": "2026-09-28T13:39:35.727Z",
+      "doneAt": "2026-09-28T13:40:39.479Z"
+    },
+    "contracts-conversation-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:52:33.267Z"
+    },
+    "contracts-conversation-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:52:50.292Z"
+    },
+    "contracts-conversation-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:01.822Z"
+    },
+    "contracts-conversation-rows.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:13.418Z"
+    },
+    "lanes-views-shared-activity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:25.089Z"
+    },
+    "lanes-views-shared-activity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:36.948Z"
+    },
+    "identity-singletons-from-contracts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:53:48.801Z"
+    },
+    "identity-singletons-from-contracts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:02.397Z"
+    },
+    "feed-entry-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:15.265Z"
+    },
+    "feed-entry-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:27.583Z"
+    },
+    "gauntlet-run-selector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:39.778Z"
+    },
+    "gauntlet-run-selector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:53.080Z"
+    },
+    "gauntlet-run-selector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:09.042Z"
+    },
+    "gauntlet-run-selector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:22.792Z"
+    },
+    "gauntlet-run-selector.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:37.788Z"
+    },
+    "conversation-entries-lifecycle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:50.760Z"
+    },
+    "conversation-entries-lifecycle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:04.202Z"
+    },
+    "conversation-entries-lifecycle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:17.886Z"
+    },
+    "conversation-entries-lifecycle.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:30.438Z"
+    },
+    "gauntlet-run-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:43.316Z"
+    },
+    "gauntlet-run-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:56.504Z"
+    },
+    "gauntlet-run-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:09.497Z"
+    },
+    "gauntlet-run-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:21.718Z"
+    },
+    "feed-tab-rules.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:33.073Z"
+    },
+    "feed-tab-rules.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:44.955Z"
+    },
+    "feed-tab-rules.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:57.121Z"
+    },
+    "feed-tab-rules.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:08.888Z"
+    },
+    "activity-per-issue-collapse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:20.690Z"
+    },
+    "activity-per-issue-collapse.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:32.803Z"
+    },
+    "activity-per-issue-collapse.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:44.417Z"
+    },
+    "activity-per-issue-collapse.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:56.592Z"
+    },
+    "conversation-card-status-dot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:08.532Z"
+    },
+    "conversation-card-status-dot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:20.992Z"
+    },
+    "sidebar-hidden-tabs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:32.407Z"
+    },
+    "sidebar-hidden-tabs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:44.270Z"
+    },
+    "sidebar-hidden-tabs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:56.236Z"
+    },
+    "project-scope-by-conversation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:10.259Z"
+    },
+    "project-scope-by-conversation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:23.859Z"
+    },
+    "project-scope-by-conversation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:36.408Z"
+    },
+    "ci-subset-feed-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:48.766Z"
+    },
+    "ci-subset-feed-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:01.987Z"
+    },
+    "docs-awareness-feed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:16.873Z"
+    },
+    "docs-awareness-feed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:29.437Z"
+    },
+    "docs-awareness-feed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:41.955Z"
+    }
+  }
+}

@@ -129,6 +129,28 @@ The first match wins.
 Git facts (branch, head, commits ahead of upstream, dirty) are read for
 git-backed lanes that are not archived.
 
+This table is implemented once, as `laneActivityOf` in `@overdeck/contracts`;
+`pan lane list`, `GET /api/lanes` and the Awareness rail all use it.
+
+### In the Awareness rail
+
+The Command Deck's Awareness rail shows a gauntlet run as **one card**, grouped
+by project and run key. Lane conversations do not get cards of their own.
+
+- **Counts line:** role counts, then activity counts, only when non-zero, for
+  example `6 builders · 6 working` or `6 builders · 1 needs you · 5 working`.
+- **Latest event:** the newest lane report, failed start, end or launch, for
+  example `alpha critic i2 reported done · verdict pass`. The card's time is
+  that event's time, not transcript activity, so a busy run does not keep
+  jumping to the top.
+- **Click** opens the conversation that launched the run.
+- **Expand** lists the lanes, each critic or verifier under the builder it
+  judges, and reads `GET /api/lanes?run=<run>` once for git facts and archived
+  lanes. It does not poll.
+
+Nothing is stored for the card: it is derived from the conversation rows on
+every read.
+
 ## Reports
 
 A lane ends its work with `pan lane report --file <markdown>`:

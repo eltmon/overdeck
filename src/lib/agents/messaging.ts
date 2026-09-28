@@ -188,10 +188,44 @@ function deliverWithOptionalKey(
   caller: string,
   deliveryMethod: DeliveryMethod,
   dedupKey: string | undefined,
+  steer = false,
 ) {
+  if (steer) return deliverAgentMessage(normalizedId, message, caller, deliveryMethod, { submit: 'steer' });
   return dedupKey !== undefined
     ? deliverAgentMessage(normalizedId, message, caller, deliveryMethod, { dedupKey })
     : deliverAgentMessage(normalizedId, message, caller, deliveryMethod);
+}
+
+/**
+ * PAN-4292: why a steer to this target must be refused, or undefined when it
+ * may proceed. A steer interrupts a running Claude Code turn, so it needs the
+ * send-now harness and a live, local, running agent; anything else is refused
+ * outright rather than queued, because a queued steer is just a message.
+ */
+async function steerRefusalReason(
+  normalizedId: string,
+  harness: RuntimeName,
+  agentState: AgentState | null,
+  dedupKey: string | undefined,
+): Promise<string | undefined> {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.steerKind !== 'send-now-keys') {
+    const piHint = behavior.steerKind === 'control-channel' ? ', or steer Pi from the dashboard composer' : '';
+    return `steer is supported for Claude Code only; ${normalizedId} runs ${behavior.displayName}. Send it without steer to deliver a normal message${piHint}.`;
+  }
+  if (dedupKey !== undefined) return `a keyed message cannot steer ${normalizedId}`;
+  const notRunning = agentState?.paused === true ? 'paused'
+    : getAgentRuntimeStateSync(normalizedId)?.state === 'suspended' ? 'suspended'
+      : agentState?.status === 'stopped' ? 'stopped'
+        : undefined;
+  if (notRunning) {
+    return `${normalizedId} is ${notRunning}, so it has no running turn to interrupt. Send it without steer to queue the message.`;
+  }
+  const { loadRemoteAgentState } = await import('../remote/remote-agents.js');
+  if (loadRemoteAgentState(normalizedId)?.vmName) {
+    return `steer is not supported for remote agents (${normalizedId}). Send it without steer to deliver a normal message.`;
+  }
+  return undefined;
 }
 
 /**
@@ -261,6 +295,20 @@ export async function messageAgent(
     } catch {
       // The conversations store may be unavailable in minimal installs or
       // tests — fall through to the agent-state default below.
+    }
+  }
+
+  const steer = opts.steer === true;
+  if (steer) {
+    const refusal = await steerRefusalReason(
+      normalizedId,
+      agentState?.harness ?? conversationHarness ?? 'claude-code',
+      agentState,
+      opts.dedupKey,
+    );
+    if (refusal) {
+      logAgentLifecycle(normalizedId, `messageAgent steer refused: ${refusal}`);
+      return { delivered: false, queuedToMail: false, reason: refusal };
     }
   }
 
@@ -685,7 +733,8 @@ export async function messageAgent(
   // and further messages queue until the hook reports the next completion.
   // Claude Code continues to use its hook-driven runtime mirror (PAN-1594);
   // on Herdr the pane's agent_status answers as well (PAN-4186).
-  const promptReady = await waitForAgentIdle(normalizedId, 5000);
+  // A steer interrupts the running turn, so it never waits for idle (PAN-4292).
+  const promptReady = steer || await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
@@ -729,7 +778,11 @@ export async function messageAgent(
       deliveryMethod: agentState.deliveryMethod === 'supervisor' || agentState.supervisorEnabled === true
         ? 'supervisor'
         : deliveryMethod,
+      ...(steer ? { submit: 'steer' as const } : {}),
     });
+    const steerDegraded = steer && confirmedDelivery.lastDelivery?.steered === false
+      ? confirmedDelivery.lastDelivery.failure ?? 'delivered as a normal submit'
+      : undefined;
     await appendTellInterventionForUserSource(normalizedId, caller);
     if (confirmedDelivery.landing.kind === 'subagent') {
       const { agentId: subagentId, description } = confirmedDelivery.landing;
@@ -753,7 +806,7 @@ export async function messageAgent(
       return { delivered: false, queuedToMail: true, confirmed: false, reason, ...mainTarget };
     }
     logAgentLifecycle(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
-    return { delivered: true, queuedToMail: true, confirmed: true, ...mainTarget };
+    return { delivered: true, queuedToMail: true, confirmed: true, ...(steerDegraded ? { reason: steerDegraded } : {}), ...mainTarget };
   }
 
   // Claude Code agent without an identifiable transcript: the confirmed-turn
@@ -776,6 +829,7 @@ export async function messageAgent(
     deliveryCaller,
     deliveryMethod,
     opts.dedupKey,
+    steer,
   );
 
   // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook

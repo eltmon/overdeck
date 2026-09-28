@@ -619,6 +619,26 @@ Spawn guards are backend-aware too: "is this agent already running" is `agentPan
 tmux session or a live Herdr agent of that name, and the tmux-only session options
 (`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
 
+### Steer submit (`PromptOptions.submit`, PAN-4292)
+
+`prompt()` takes `submit: 'enter' | 'steer'` (default `enter`). `steer` finishes the prompt with
+Claude Code's send-now chord, **Ctrl+X Ctrl+S** (`chat:sendNow`), which interrupts the running turn
+and sends the message at once. Every spelling of the chord lives in
+`src/lib/terminal-backends/steer-keys.ts`:
+
+| Path | Steer submit |
+| --- | --- |
+| tmux (`sendKeys`) | paste, then `send-keys C-x C-s` (also for the resend chaser) |
+| Herdr | `pane.send_text` with the text in bracketed-paste markers, a 300 ms settle, then `pane.send_keys ctrl+x ctrl+s`. `agent.prompt` always ends with Enter, so a steer bypasses it; a `blocked` agent is refused. |
+| PTY supervisor | writes `\x18\x13` instead of `\r` and answers `{"ok":true,"submit":"steer"}` |
+
+Claude Code also binds Ctrl+Enter to send-now, but no multiplexer carries it. A byte probe showed
+that tmux `send-keys C-Enter` emits no bytes, and Herdr `send-keys ctrl+enter` emits `\r` (a plain
+submit). So Overdeck never sends Ctrl+Enter. Claude Code runs its tty in raw mode, so the `0x13`
+(XOFF) byte reaches it. The app-server, ACP/Prime host and Channels tiers cannot carry a steer, so
+they answer `steer-unsupported: <tier>` instead of delivering a plain submit. A keyed (`dedupKey`)
+steer is rejected.
+
 ## Reaching an agent from a shell (PAN-3928)
 
 | Backend | Command |
@@ -782,6 +802,13 @@ Verified live on 2026-09-18 against the running `overdeck` session.
   (`{bytes: base64, encoding:"ansi", full, width, height, seq}`) ending in `terminal.closed`;
   `control` takes `{"type":"terminal.input","text":…}` and `{"type":"terminal.resize","cols","rows"}`
   on stdin. An EOF without a close record synthesizes an `exit` frame so no viewer hangs.
+  `bytes` is base64 of UTF-8 terminal output (`encoding: "ansi"` names escape sequences, not a
+  charset). `herdr-stream.ts` decodes it with one streaming `StringDecoder` (from Node's
+  `string_decoder`) per stream, so a character split across two frames decodes whole; a `full`
+  frame starts a fresh decoder, and an incremental frame that decodes to nothing emits no output
+  frame. Invalid bytes become U+FFFD. Decoding as Latin-1 (`'binary'`) was the PAN-4310 mojibake
+  bug. (`TextDecoder` was tried first but `tsconfig.evals.json` restricts `types` to `["node"]`,
+  which does not expose it as a type; `StringDecoder` has the same streaming-buffer semantics.)
 - Lifecycle events arrive as `pane_updated` records carrying the pane's `agent_status`: the
   `pane.agent_status_changed` subscription is per-pane (it requires a `pane_id`), so the
   workspace-wide stream reports state transitions through `pane_updated`. Verified live —

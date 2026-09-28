@@ -1575,6 +1575,7 @@ export function CommandDeck({
                 heading="Awareness"
                 scopeSwitcher
                 projectIssueIds={isNoProject ? undefined : projectIssueIds}
+                projectConversationIds={isNoProject ? undefined : projectConvIdSet}
                 onClose={() => toggleAwareness(true)}
               />
             </div>

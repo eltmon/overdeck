@@ -11,6 +11,9 @@
  *   {"type":"terminal.frame","bytes":"…","full":false,…}  ← incremental output
  *   {"type":"terminal.closed"}                            ← orderly end
  *
+ * `bytes` is base64 of UTF-8 terminal output (`encoding: "ansi"` means escape
+ * sequences, not a charset).
+ *
  * and, on stdin of `control`:
  *
  *   {"type":"terminal.resize","cols":100,"rows":30}
@@ -25,6 +28,7 @@
 
 import { spawn as nodeSpawn } from 'child_process';
 import type { ChildProcessWithoutNullStreams } from 'child_process';
+import { StringDecoder } from 'string_decoder';
 
 import { herdrSessionName, HERDR_BINARY } from './select.js';
 import type { TerminalControl, TerminalFrame, TerminalObservation } from './types.js';
@@ -42,16 +46,33 @@ export interface HerdrTerminalRecord {
   readonly code?: number | null;
 }
 
-/** Size carried forward so an incremental frame can report a resize. */
+/**
+ * Size carried forward so an incremental frame can report a resize, plus the
+ * stream's UTF-8 decoder so a character split across two frames decodes whole.
+ */
 export interface TerminalDecodeState {
   cols: number;
   rows: number;
+  decoder?: StringDecoder;
+}
+
+/**
+ * Frame bytes are UTF-8 terminal output. The decoder is per stream and buffers
+ * a trailing partial multi-byte sequence, so a character split across two
+ * frames decodes whole. Invalid bytes become U+FFFD; they never throw.
+ */
+function decodeFrameData(record: HerdrTerminalRecord, state: TerminalDecodeState): string {
+  if (record.bytes === undefined) return record.text ?? '';
+  state.decoder ??= new StringDecoder('utf8');
+  return state.decoder.write(Buffer.from(record.bytes, 'base64'));
 }
 
 /**
  * Decode one record into the contract's frames. A full frame is a snapshot; an
  * incremental frame is output, preceded by a `size` frame when the geometry
- * changed since the last record.
+ * changed since the last record. Frame bytes decode as UTF-8 through the
+ * stream's decoder; an incremental frame that decodes to nothing (the first
+ * half of a split character) yields no output frame.
  */
 export function decodeTerminalRecord(
   record: HerdrTerminalRecord,
@@ -62,16 +83,16 @@ export function decodeTerminalRecord(
   }
   if (record.type !== 'terminal.frame') return [];
 
-  const data = record.bytes !== undefined
-    ? Buffer.from(record.bytes, 'base64').toString('binary')
-    : record.text ?? '';
   const cols = record.width ?? state.cols;
   const rows = record.height ?? state.rows;
 
   if (record.full) {
+    // A snapshot is a fresh render: drop any partial character left by the
+    // previous frame instead of prepending it as U+FFFD.
+    state.decoder = new StringDecoder('utf8');
     state.cols = cols;
     state.rows = rows;
-    return [{ kind: 'snapshot', cols, rows, data }];
+    return [{ kind: 'snapshot', cols, rows, data: decodeFrameData(record, state) }];
   }
 
   const frames: TerminalFrame[] = [];
@@ -80,7 +101,8 @@ export function decodeTerminalRecord(
     state.rows = rows;
     frames.push({ kind: 'size', cols, rows });
   }
-  frames.push({ kind: 'output', data });
+  const data = decodeFrameData(record, state);
+  if (data.length > 0) frames.push({ kind: 'output', data });
   return frames;
 }
 

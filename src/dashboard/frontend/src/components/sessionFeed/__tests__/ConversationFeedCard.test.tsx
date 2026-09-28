@@ -15,6 +15,11 @@ function entry(overrides: Partial<ConversationSessionFeedEntry> = {}): Conversat
     agent: 'claude_code',
     lastMessageDate: '2026-05-23T01:00:00.000Z',
     lastMessageSnippet: 'A plain text snippet from the conversation',
+    recencyAt: '2026-05-23T01:00:00.000Z',
+    timestampLabel: 'started',
+    sessionAlive: false,
+    agentState: 'idle',
+    projectKey: null,
     ...overrides,
   };
 }
@@ -119,7 +124,7 @@ describe('ConversationFeedCard', () => {
       />,
     );
 
-    const time = screen.getByText('5m ago') as HTMLTimeElement;
+    const time = screen.getByText('started 5m ago') as HTMLTimeElement;
     expect(time.tagName).toBe('TIME');
     expect(time.dateTime).toBe('2026-05-23T01:00:00.000Z');
   });
@@ -150,5 +155,31 @@ describe('ConversationFeedCard', () => {
     fireEvent.click(screen.getByRole('button'));
 
     expect(onSelect).toHaveBeenCalledWith('conversation:conv-a');
+  });
+
+  it.each([
+    ['active', 'bg-info'],
+    ['waiting', 'bg-warning'],
+    ['idle', 'bg-muted-foreground/60'],
+  ] as const)('colors the status dot for agentState %s with %s — PAN-4301 FR-5', (agentState, token) => {
+    render(<ConversationFeedCard entry={entry({ agentState })} onSelect={vi.fn()} now={new Date('2026-05-23T01:05:00.000Z')} />);
+
+    const dot = screen.getByTestId('conversation-feed-status-dot');
+    expect(dot.className).toContain(token);
+    expect(dot.getAttribute('data-state')).toBe(agentState);
+  });
+
+  it('labels the time with the fact it records — PAN-4301 FR-1', () => {
+    render(
+      <ConversationFeedCard
+        entry={entry({ timestamp: '2026-05-23T00:50:00.000Z', timestampLabel: 'ended', lastMessageDate: '2026-05-23T01:04:00.000Z' })}
+        onSelect={vi.fn()}
+        now={new Date('2026-05-23T01:05:00.000Z')}
+      />,
+    );
+
+    const time = screen.getByText(/^ended /) as HTMLTimeElement;
+    expect(time.textContent).toBe('ended 15m ago');
+    expect(time.dateTime).toBe('2026-05-23T00:50:00.000Z');
   });
 });
