@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:13:45.113Z",
+  "updated": "2026-09-28T01:13:55.127Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "close-out-settings-integration.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T01:13:45.113Z"
+    },
+    "close-out-settings-integration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T01:13:55.127Z"
     }
   }
 }
