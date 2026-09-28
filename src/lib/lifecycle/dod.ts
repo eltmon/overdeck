@@ -1,5 +1,7 @@
 /** Shared Definition-of-Done row definitions and gate result types. */
 
+import type { StepResult } from './types.js';
+
 export type DodRowId =
   | 'review'
   | 'tests'
@@ -74,10 +76,37 @@ export const DOD_ROWS: readonly DodRowDef[] = [
     id: 'teardown',
     num: 9,
     title: 'Close-out teardown verified',
-    expected: 'workspace and configured branches removed, planning archived, issue closed, and Docker network removed',
+    expected:
+      'workspace removed or kept per close_out.remove_workspace, branches removed or kept per close_out.delete_feature_branch, planning archived, issue closed, and Docker network removed',
     overridable: false,
   },
 ];
+
+/**
+ * Row 9's `observed` text. A kept workspace/branch is not a miss — the row stays
+ * `pass` — but the text must say what actually happened, not imply removal always
+ * occurred (PAN-4283).
+ */
+export function describeTeardownObserved(
+  steps: ReadonlyArray<Pick<StepResult, 'step' | 'success' | 'skipped' | 'details'>>,
+  opts: { removeWorkspace: boolean; deleteBranches: boolean }
+): string {
+  const clauses: string[] = [];
+  if (!opts.removeWorkspace) {
+    clauses.push('workspace kept (close_out.remove_workspace is off)');
+  } else {
+    clauses.push(
+      steps.some((s) => s.step === 'teardown:worktree' && s.success && !s.skipped)
+        ? 'workspace removed'
+        : 'no workspace on disk'
+    );
+  }
+  if (!opts.deleteBranches) {
+    clauses.push('feature branch kept (close_out.delete_feature_branch is off)');
+  }
+  const details = steps.flatMap((s) => s.details ?? []);
+  return [...clauses, ...details].join('; ');
+}
 
 export function acceptFlagFor(row: DodRowDef): string {
   return `--accept-${row.id}`;
