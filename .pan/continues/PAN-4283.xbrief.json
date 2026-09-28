@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:02:11.432Z",
+  "updated": "2026-09-28T01:13:26.895Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,10 @@
       "doneAt": "2026-09-28T01:01:55.922Z"
     },
     "close-out-settings-integration": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4283",
-      "claimedAt": "2026-09-28T01:02:11.432Z"
+      "claimedAt": "2026-09-28T01:02:11.432Z",
+      "doneAt": "2026-09-28T01:13:26.895Z"
     }
   }
 }
