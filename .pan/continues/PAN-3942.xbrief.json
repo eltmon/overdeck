@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3942",
   "created": "2026-09-28T17:21:05.119Z",
-  "updated": "2026-09-28T18:31:34.336Z",
+  "updated": "2026-09-28T18:31:45.028Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "ui-mounts.ac1": {
       "status": "completed",
       "doneAt": "2026-09-28T18:31:34.336Z"
+    },
+    "ui-mounts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:31:45.028Z"
     }
   }
 }
