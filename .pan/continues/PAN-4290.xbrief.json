@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4290",
   "created": "2026-09-28T12:19:35.919Z",
-  "updated": "2026-09-28T13:58:36.236Z",
+  "updated": "2026-09-28T13:58:52.386Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "pr-merged-flag.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T13:58:36.236Z"
+    },
+    "outcome-derivation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:52.386Z"
     }
   }
 }
