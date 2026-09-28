@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3942",
   "created": "2026-09-28T17:21:05.119Z",
-  "updated": "2026-09-28T18:27:45.523Z",
+  "updated": "2026-09-28T18:27:55.389Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "store.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T18:27:45.522Z"
+    },
+    "store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T18:27:55.389Z"
     }
   }
 }
