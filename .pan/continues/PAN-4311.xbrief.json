@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:57:56.021Z",
+  "updated": "2026-09-28T15:58:07.881Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
     "cpu-class-launch.ac2": {
       "status": "completed",
       "doneAt": "2026-09-28T15:57:56.021Z"
+    },
+    "cpu-class-launch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:58:07.881Z"
     }
   }
 }
