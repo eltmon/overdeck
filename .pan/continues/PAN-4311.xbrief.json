@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T15:22:08.980Z",
+  "updated": "2026-09-28T15:28:06.150Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,10 @@
       "doneAt": "2026-09-28T15:22:05.143Z"
     },
     "gate-admission-psi": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4311",
-      "claimedAt": "2026-09-28T15:22:08.980Z"
+      "claimedAt": "2026-09-28T15:22:08.980Z",
+      "doneAt": "2026-09-28T15:28:06.149Z"
     }
   }
 }
