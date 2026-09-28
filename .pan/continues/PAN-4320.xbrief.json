@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4320",
   "created": "2026-09-28T15:34:16.087Z",
-  "updated": "2026-09-28T16:25:15.664Z",
+  "updated": "2026-09-28T16:25:27.011Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "listing-agent-key.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T16:25:15.664Z"
+    },
+    "enrichment-agent-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:25:27.011Z"
     }
   }
 }
