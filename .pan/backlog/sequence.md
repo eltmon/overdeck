@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-28T16:59:16.823907Z · model: claude-opus-5-5 · open: 791_
+_Last sequenced: 2026-09-28T17:00:05.711724Z · model: claude-opus-5-5 · open: 791_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1106,7 +1106,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-28T16:59:16.823907Z",
+  "generatedAt": "2026-09-28T17:00:05.711724Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 791,
