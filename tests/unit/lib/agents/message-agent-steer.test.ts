@@ -267,7 +267,7 @@ describe('messageAgent steer (PAN-4292)', () => {
 
     expect(outcome).toMatchObject({ delivered: false, queuedToMail: false });
     expect(outcome.reason).toContain(`runs ${displayName}`);
-    expect(outcome.reason).toContain('Drop --steer');
+    expect(outcome.reason).toContain('Send it without steer');
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
     expect(existsSync('/tmp/agent-pan-4292/mail')).toBe(false);
   });

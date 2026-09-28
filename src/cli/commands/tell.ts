@@ -101,7 +101,10 @@ export async function tellCommand(id: string, message: string, options: TellOpti
       }
       return exitCli(1);
     }
-    const deliveredVerb = options.steer ? `Message steered into ${agentId}'s running turn` : `Message delivered to ${agentId}${outcome.inputTarget === 'main' ? "'s main agent" : ''}`;
+    // PAN-4292: a steer that came back with a reason was delivered as a normal submit (an old
+    // PTY supervisor); the headline must not claim it interrupted anything.
+    const steered = options.steer && !outcome.reason;
+    const deliveredVerb = steered ? `Message steered into ${agentId}'s running turn` : `Message delivered to ${agentId}${outcome.inputTarget === 'main' ? "'s main agent" : ''}`;
     console.log(chalk.green(`${deliveredVerb}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
     console.log(chalk.dim(`  "${message}"`));
     if (outcome.switchedFromSubagent) {

@@ -923,9 +923,8 @@ export async function deliverMessageWithTranscriptConfirmation(args: {
       if (landing.kind === 'main') {
         return { delivered: true, attempts: attempt, landing, lastDelivery };
       }
-      if (landing.kind === 'subagent') {
-        return { delivered: false, attempts: attempt, landing, lastDelivery };
-      }
+      // PAN-4292: a steer is never redelivered; a second chord would interrupt the turn it started.
+      if (landing.kind === 'subagent' || args.submit === 'steer') return { delivered: false, attempts: attempt, landing, lastDelivery };
     }
     if (attempt < 2) {
       console.warn(`[${args.caller}] message did not land in ${args.sessionId}; redelivering once.`);

@@ -160,7 +160,7 @@ describe('handleAgentMessage steer (PAN-4292)', () => {
   });
 
   it('answers 422 steer-unsupported when messageAgent refuses the steer', async () => {
-    const reason = 'steer is supported for Claude Code only; agent-pan-42 runs Codex. Drop --steer to send a normal message.';
+    const reason = 'steer is supported for Claude Code only; agent-pan-42 runs Codex. Send it without steer to deliver a normal message.';
     agentMocks.messageAgent.mockResolvedValueOnce({ delivered: false, queuedToMail: false, reason });
 
     const response = await handleAgentMessage('agent-pan-42', 'change course', undefined, { steer: true });

@@ -211,7 +211,7 @@ async function steerRefusalReason(
   const behavior = getHarnessBehavior(harness);
   if (behavior.steerKind !== 'send-now-keys') {
     const piHint = behavior.steerKind === 'control-channel' ? ', or steer Pi from the dashboard composer' : '';
-    return `steer is supported for Claude Code only; ${normalizedId} runs ${behavior.displayName}. Drop --steer to send a normal message${piHint}.`;
+    return `steer is supported for Claude Code only; ${normalizedId} runs ${behavior.displayName}. Send it without steer to deliver a normal message${piHint}.`;
   }
   if (dedupKey !== undefined) return `a keyed message cannot steer ${normalizedId}`;
   const notRunning = agentState?.paused === true ? 'paused'
@@ -219,11 +219,11 @@ async function steerRefusalReason(
       : agentState?.status === 'stopped' ? 'stopped'
         : undefined;
   if (notRunning) {
-    return `${normalizedId} is ${notRunning}, so it has no running turn to interrupt. Drop --steer to queue the message.`;
+    return `${normalizedId} is ${notRunning}, so it has no running turn to interrupt. Send it without steer to queue the message.`;
   }
   const { loadRemoteAgentState } = await import('../remote/remote-agents.js');
   if (loadRemoteAgentState(normalizedId)?.vmName) {
-    return `steer is not supported for remote agents (${normalizedId}). Drop --steer to send a normal message.`;
+    return `steer is not supported for remote agents (${normalizedId}). Send it without steer to deliver a normal message.`;
   }
   return undefined;
 }

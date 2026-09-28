@@ -261,12 +261,28 @@ describe('tellCommand --steer (PAN-4292)', () => {
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('--steer is not supported for remote agents'));
   });
 
+  it('does not claim a steer when the message went out as a normal submit', async () => {
+    agentMocks.messageAgent.mockResolvedValue({
+      delivered: true,
+      queuedToMail: true,
+      confirmed: true,
+      reason: 'supervisor predates steer; delivered as a normal submit',
+    });
+    const { tellCommand } = await import('../tell.js');
+
+    await tellCommand('PAN-123', 'change course', { steer: true });
+
+    expect(console.log).not.toHaveBeenCalledWith(expect.stringContaining('steered into'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Message delivered to agent-pan-123'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('supervisor predates steer'));
+  });
+
   it('exits 1 with the reason when messageAgent refuses the steer', async () => {
     const { exitCli } = await import('../../exit.js');
     agentMocks.messageAgent.mockResolvedValue({
       delivered: false,
       queuedToMail: false,
-      reason: 'steer is supported for Claude Code only; agent-pan-123 runs Codex. Drop --steer to send a normal message.',
+      reason: 'steer is supported for Claude Code only; agent-pan-123 runs Codex. Send it without steer to deliver a normal message.',
     });
     const { tellCommand } = await import('../tell.js');
 

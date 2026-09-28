@@ -1366,6 +1366,37 @@ describe('steer submit mode (PAN-4292)', () => {
     expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
   });
 
+  it('never redelivers a steer whose landing was not seen', async () => {
+    vi.useFakeTimers();
+    try {
+      const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0, fileSize: 100, readOffset: 100 }));
+      const probe = vi.fn(async () => ({ matchedUserRecord: false, compactBoundaryCount: 0 }));
+      const deliver = vi.fn(async () => ({ ok: true, path: 'tmux' as const, steered: true }));
+
+      const result = deliverResumeMessageWithTranscriptConfirmation({
+        agentId: 'agent-steer-once',
+        workspace: '/tmp/workspace',
+        sessionId: 'session-1',
+        message: 'steer now',
+        caller: 'test:steer',
+        submit: 'steer',
+        timeoutMs: 300,
+        intervalMs: 100,
+        deliver,
+        snapshot,
+        probe,
+        captureOffsets: vi.fn(async () => new Map<string, number>()),
+        probeSidechains: vi.fn(async () => null),
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(result).resolves.toMatchObject({ delivered: false, attempts: 1 });
+      expect(deliver).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('transcript confirmation passes submit to every delivery attempt, and omits it by default', async () => {
     const snapshot = vi.fn(async () => ({
       sessionFile: '/tmp/session.jsonl',
