@@ -99,6 +99,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
       "
@@ -121,6 +122,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       export ANTHROPIC_AUTH_TOKEN="tok"
@@ -148,6 +150,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       exec claude --agent pan-work-agent \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} --resume 'sess-123' --model 'gpt-5.4'
@@ -441,6 +444,7 @@ describe('generateLauncherScript', () => {
       fi
       export PATH="<OVERDECK_HOME>/agents/plan-abc/git-guard:$PATH"
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       trap '' HUP
@@ -642,6 +646,7 @@ describe('generateLauncherScript', () => {
       fi
       export PATH="<OVERDECK_HOME>/agents/spec-123/git-guard:$PATH"
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -745,6 +750,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -781,6 +787,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       unset OVERDECK_AGENT_ID OVERDECK_ISSUE_ID OVERDECK_SESSION_TYPE
@@ -819,6 +826,7 @@ describe('generateLauncherScript', () => {
       export OVERDECK_ISSUE_ID='PAN-824'
       export ANTHROPIC_BASE_URL="http://proxy"
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       trap '' HUP
       claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} --session-id 'sess-conv' --effort "high"
@@ -869,6 +877,7 @@ describe('generateLauncherScript', () => {
       export LC_ALL=C.UTF-8
       export COLORFGBG='15;0'
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       trap '' HUP
       claude \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} --resume 'sess-resume'
@@ -919,6 +928,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/init-prompt.txt')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} "$prompt"
@@ -942,6 +952,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"} 'Please read the continuation prompt and continue.'
       "
@@ -983,6 +994,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
+      case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       exec claude --model claude-sonnet-4-6 \${PAN_SKILL_SETTINGS:+--settings "$PAN_SKILL_SETTINGS"}
       "
     `);
@@ -1329,6 +1341,7 @@ describe('generateLauncherWrapper', () => {
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
           'export SKIP_DOCS_INDEX=1',
           `if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi`,
+          `case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac`,
           "cd -- '/workspace/project'",
           "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} --session-id 'sess-abc'",
           '',

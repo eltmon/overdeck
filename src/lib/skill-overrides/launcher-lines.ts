@@ -18,7 +18,12 @@ export function launcherSkillOverrideLines(opts: {
   if (opts.issueId) args.push(`--issue ${shellQuote(opts.issueId)}`);
   const command = `pan skills launch-settings ${args.join(' ')}`;
   if (opts.harness === 'claude-code') {
-    return [`if ! PAN_SKILL_SETTINGS="$(${command})"; then ${WARNING}; PAN_SKILL_SETTINGS=''; fi`];
+    // A zero exit with stray stdout (an update notice, a banner) must not reach
+    // `claude --settings`: keep only empty output or one JSON object.
+    return [
+      `if ! PAN_SKILL_SETTINGS="$(${command})"; then ${WARNING}; PAN_SKILL_SETTINGS=''; fi`,
+      `case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) ${WARNING}; PAN_SKILL_SETTINGS='' ;; esac`,
+    ];
   }
   return [`${command} --codex-home "$CODEX_HOME" || ${WARNING}`];
 }

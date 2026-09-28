@@ -113,11 +113,24 @@ describe('launcherSkillOverrideLines', () => {
     );
   });
 
+  const runStep = (panBody: string): string => {
+    const lines = launcherSkillOverrideLines({ harness: 'claude-code', workingDir: '/w' });
+    const script = `pan() { ${panBody} }\n${lines.join('\n')}\nprintf '[%s]' "$PAN_SKILL_SETTINGS"`;
+    return execFileSync('bash', ['-c', script], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  };
+
   it('fails open in bash when pan exits non-zero', () => {
-    const [line] = launcherSkillOverrideLines({ harness: 'claude-code', workingDir: '/w' });
-    const script = `pan() { echo partial; return 3; }\n${line}\nprintf '[%s]' "$PAN_SKILL_SETTINGS"`;
-    const result = execFileSync('bash', ['-c', script], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    expect(result).toBe('[]');
+    expect(runStep('echo partial; return 3;')).toBe('[]');
+  });
+
+  it('fails open when pan exits zero but prints something other than one JSON object', () => {
+    expect(runStep(`echo 'update available'; echo '{"a":1}';`)).toBe('[]');
+    expect(runStep(`echo '{"a":1}'; echo 'trailing notice';`)).toBe('[]');
+  });
+
+  it('keeps empty output and a JSON object', () => {
+    expect(runStep('return 0;')).toBe('[]');
+    expect(runStep(`echo '{"skillOverrides":{"grilling":"off"}}';`)).toBe('[{"skillOverrides":{"grilling":"off"}}]');
   });
 
   it('expands to --settings only when settings were produced', () => {
