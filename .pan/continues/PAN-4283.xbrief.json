@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4283",
   "created": "2026-09-28T00:30:23.576Z",
-  "updated": "2026-09-28T01:51:49.122Z",
+  "updated": "2026-09-28T01:52:02.049Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -238,6 +238,11 @@
     "disk-cost-ui.ac5": {
       "status": "completed",
       "doneAt": "2026-09-28T01:51:49.122Z"
+    },
+    "close-out-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4283",
+      "claimedAt": "2026-09-28T01:52:02.049Z"
     }
   }
 }
