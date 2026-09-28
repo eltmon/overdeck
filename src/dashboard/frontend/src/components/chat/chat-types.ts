@@ -18,7 +18,10 @@ export interface ChatMessage {
   /** Local send identity and transcript reconciliation metadata. */
   clientMessageId?: string;
   echoBaselineIds?: string[];
-  deliveryState?: 'pending' | 'accepted' | 'unknown' | 'subagent';
+  deliveryState?: 'pending' | 'accepted' | 'unknown' | 'subagent' | 'held';
+  /** When deliveryState is 'held': epoch ms the server refused the paste because a
+   * permission prompt was up (PAN-4278). Release waits for a newer feed read. */
+  heldAt?: number;
   /** Set when deliveryState is 'subagent': the message routed into this running
    * subagent instead of the main conversation (PAN-4247). */
   deliveredToSubagent?: { agentId: string; description: string };

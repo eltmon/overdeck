@@ -8,6 +8,7 @@ import type { PlanApprovalSubject } from '../../components/PlanApprovalDialog';
 import type { TerminalPendingPermission } from '../../components/TerminalPermissionDialog';
 import { useTerminalPermissionDialog } from './useTerminalPermissionDialog';
 import { showPendingInputNotification, usePermissionNotifications } from './usePermissionNotifications';
+import { useHeldMessageRelease } from './useHeldMessageRelease';
 import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAskUserQuestion, selectAgentsWithPendingProposedPlan, selectChannelPermissionRequests } from '../../lib/store';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
@@ -152,6 +153,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     useTerminalPermissionDialog(convAskUserQuestionRows, currentChannelPermissionRequest !== null);
   focusTerminalPermissionRef.current = focusTerminalPermission;
   usePermissionNotifications(convAskUserQuestionRows, requestAskUserQuestionReopen);
+  useHeldMessageRelease();
 
   // PAN-1520 (FR-3) — plan-approval subjects across agents and conversations,
   // mirroring the AUQ subject assembly below.
