@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4312",
   "created": "2026-09-28T14:11:29.588Z",
-  "updated": "2026-09-28T14:50:16.682Z",
+  "updated": "2026-09-28T14:54:36.317Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-28T14:50:13.417Z"
     },
     "diffs-poll-live-only": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4312",
-      "claimedAt": "2026-09-28T14:50:16.682Z"
+      "claimedAt": "2026-09-28T14:50:16.682Z",
+      "doneAt": "2026-09-28T14:54:36.317Z"
     }
   }
 }
