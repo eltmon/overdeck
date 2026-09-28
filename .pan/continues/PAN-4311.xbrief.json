@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4311",
   "created": "2026-09-28T13:59:42.470Z",
-  "updated": "2026-09-28T16:01:58.729Z",
+  "updated": "2026-09-28T16:02:11.136Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -244,6 +244,10 @@
     "lane-door-hold.ac4": {
       "status": "completed",
       "doneAt": "2026-09-28T16:01:58.729Z"
+    },
+    "flywheel-spawn-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:02:11.136Z"
     }
   }
 }
