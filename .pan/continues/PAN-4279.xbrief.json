@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4279",
   "created": "2026-09-27T23:48:05.677Z",
-  "updated": "2026-09-28T00:38:16.024Z",
+  "updated": "2026-09-28T00:38:26.928Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "eventrouter-bootstrap.ac5": {
       "status": "completed",
       "doneAt": "2026-09-28T00:38:16.024Z"
+    },
+    "degraded-banner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T00:38:26.927Z"
     }
   }
 }
