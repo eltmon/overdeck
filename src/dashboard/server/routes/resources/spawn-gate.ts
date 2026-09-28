@@ -104,7 +104,8 @@ export function getResourcesHealthEvidenceEffect():
   }).pipe(
     Effect.map(({ accepted, compatibility }) => ({
       accepted,
-      decision: evaluateSpawnGuardrails(compatibility),
+      // PAN-4311: the resources page preview shows no CPU warning.
+      decision: evaluateSpawnGuardrails(compatibility, null),
     })),
     Effect.catch(() => Effect.succeed({ accepted: null, decision: null })),
   );

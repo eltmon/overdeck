@@ -12,6 +12,7 @@ import {
 import { readAutoSpawnConsentWorkModel } from '../../../../lib/planning/auto-spawn-consent.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
+import { assessCpuPressure, type CpuPressureVerdict } from '../../../../lib/cloister/cpu-pressure.js';
 import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
 import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../../lib/harness-policy.js';
@@ -110,9 +111,10 @@ export function resolveSpawnGuardrailRefusal(
   issueId: string,
   health: SystemHealthSnapshot,
   acknowledgement: SpawnGuardrailAcknowledgement,
+  cpu: CpuPressureVerdict | null = null,
 ): { decision: SpawnGuardrailDecision; refusal: { status: number; body: Record<string, unknown> } | null } {
   emitStartAgentPhase(issueId, 'guardrails', 'start', 'evaluating spawn guardrails');
-  const spawnGuardrails = evaluateSpawnGuardrails(health);
+  const spawnGuardrails = evaluateSpawnGuardrails(health, cpu);
   if (spawnGuardrails.blocked) {
     emitStartAgentPhase(issueId, 'guardrails', 'failure', spawnGuardrails.error ?? 'guardrails blocked', {
       status: spawnGuardrails.status,
@@ -455,7 +457,8 @@ export const postAgentsRoute = HttpRouter.add(
     }
 
     const health = yield* Effect.promise(() => getSystemHealthSnapshot());
-    const { decision: spawnGuardrails, refusal: guardrailRefusal } = resolveSpawnGuardrailRefusal(issueId, health, guardrailAcknowledgement);
+    const cpu = yield* Effect.promise(() => assessCpuPressure());
+    const { decision: spawnGuardrails, refusal: guardrailRefusal } = resolveSpawnGuardrailRefusal(issueId, health, guardrailAcknowledgement, cpu);
     if (guardrailRefusal) return jsonResponse(guardrailRefusal.body, { status: guardrailRefusal.status });
 
     // PAN-3022: a consent-bearing spawn with no explicit body model honors the

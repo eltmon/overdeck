@@ -42,6 +42,7 @@ import { hasCompletionMarkerForAgent } from '../../../../lib/agents/supervisor-c
 import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../../services/system-health-service.js';
 import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
+import type { CpuPressureVerdict } from '../../../../lib/cloister/cpu-pressure.js';
 import { capturePane } from '../../../../lib/tmux.js';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { FLYWHEEL_STARTED_BY, normalizeFlywheelRunId } from '../../../../lib/agents/provenance.js';
@@ -472,13 +473,15 @@ export const SPAWN_GUARDRAIL_WARNING_KINDS = [
   'agent_count_high',
   'agent_count_ceiling',
   'leaked_specialists',
+  'cpu_saturated',
 ] as const;
 export type SpawnGuardrailWarningKind = typeof SPAWN_GUARDRAIL_WARNING_KINDS[number];
 
 /**
  * PAN-3977: what an unattended caller (the planning auto-handoff) may
  * acknowledge. Tight RAM and a high agent count below the ceiling only. The
- * ceiling and leaked specialists need an operator.
+ * ceiling, leaked specialists and CPU saturation (PAN-4311) need an operator,
+ * so a deferred handoff waits them out and retries.
  */
 export const AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT: readonly SpawnGuardrailWarningKind[] = [
   'memory_tight',
@@ -487,7 +490,7 @@ export const AUTOMATIC_SPAWN_GUARDRAIL_ACKNOWLEDGEMENT: readonly SpawnGuardrailW
 
 interface SpawnGuardrailAdvisory {
   severity: 'warning' | 'critical';
-  code: 'memory_pressure' | 'agent_capacity' | 'leaked_specialists' | 'health_snapshot_unavailable';
+  code: 'memory_pressure' | 'agent_capacity' | 'leaked_specialists' | 'cpu_pressure' | 'health_snapshot_unavailable';
   /** Set on acknowledgeable (warning-severity) advisories only. */
   kind?: SpawnGuardrailWarningKind;
   message: string;
@@ -604,7 +607,14 @@ export function hasActiveAgentGateOrRetry(
   return Number.isFinite(retryAtMs) && retryAtMs > nowMs;
 }
 
-export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
+/**
+ * `cpu` is the stateless CPU pressure verdict (PAN-4311), computed by the
+ * caller so this stays pure; null adds no CPU warning.
+ */
+export function evaluateSpawnGuardrails(
+  health: SystemHealthSnapshot,
+  cpu: CpuPressureVerdict | null = null,
+): SpawnGuardrailDecision {
   const warnings: SpawnGuardrailAdvisory[] = [];
   if (health.freshness.status !== 'fresh') {
     const message = health.freshness.status === 'stale'
@@ -681,6 +691,15 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
       code: 'leaked_specialists',
       ...(leakedCritical ? {} : { kind: 'leaked_specialists' as const }),
       message: `Leaked specialist sessions detected: ${formatLeakedSpecialistSummary(leakedSpecialists)}${leakedSpecialists.length > 3 ? `, +${leakedSpecialists.length - 3} more` : ''}.`,
+    });
+  }
+
+  if (cpu?.saturated) {
+    warnings.push({
+      severity: 'warning',
+      code: 'cpu_pressure',
+      kind: 'cpu_saturated',
+      message: `CPU is saturated (${cpu.signal} ${cpu.reading} ≥ ${cpu.threshold}).`,
     });
   }
 
