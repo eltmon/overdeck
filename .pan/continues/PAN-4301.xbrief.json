@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4301",
   "created": "2026-09-28T13:03:46.534Z",
-  "updated": "2026-09-28T13:58:44.418Z",
+  "updated": "2026-09-28T13:58:56.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "activity-per-issue-collapse.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T13:58:44.417Z"
+    },
+    "activity-per-issue-collapse.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:56.592Z"
     }
   }
 }
