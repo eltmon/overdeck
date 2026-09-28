@@ -59,11 +59,31 @@ const execFileAsync = promisify(execFile);
  */
 export type ProjectRegistrationExtras = Pick<
   ProjectConfig,
-  'tracker' | 'github_repo' | 'gitlab_repo' | 'issue_prefix' | 'workspace'
+  'tracker' | 'github_repo' | 'gitlab_repo' | 'issue_prefix' | 'workspace' | 'pan_records'
 >;
 
 function buildExtras(intent: ResolvedProjectIntent): ProjectRegistrationExtras {
   const extras: ProjectRegistrationExtras = {};
+
+  if (intent.workspaceRepos.length > 0) {
+    // A multi-repo project, in the shape the live polyrepo projects use. No
+    // tracker: one cannot be inferred from N remotes. `.pan/` goes in the first
+    // repo because the plain-folder root is not a git checkout.
+    if (intent.proposedIssuePrefix) extras.issue_prefix = intent.proposedIssuePrefix;
+    extras.workspace = {
+      type: 'polyrepo',
+      workspaces_dir: 'workspaces',
+      repos: intent.workspaceRepos.map((repo) => ({
+        name: repo.name,
+        path: repo.path,
+        branch_prefix: 'feature/',
+        ...(repo.defaultBranch ? { default_branch: repo.defaultBranch } : {}),
+        ...(repo.forge ? { forge: repo.forge } : {}),
+      })),
+    };
+    extras.pan_records = { repo: intent.workspaceRepos[0]!.name };
+    return extras;
+  }
 
   if (intent.provider === 'github' && intent.repoSlug) {
     extras.tracker = 'github';
@@ -284,6 +304,18 @@ export async function finishProjectSetup(args: {
     hooksInstalled = installGitHooksInDir(rootGit);
   } catch {
     // Not a git repository (a plain folder added as a project): nothing to hook.
+  }
+  // A multi-repo project's root is a plain folder, so its member repositories
+  // are what agents could check out in; hook each one, as `pan project add` does.
+  if (config.workspace?.type === 'polyrepo') {
+    for (const repo of config.workspace.repos ?? []) {
+      const repoGit = join(canonicalRegistered, repo.path, '.git');
+      try {
+        if ((await stat(repoGit)).isDirectory()) hooksInstalled += installGitHooksInDir(repoGit);
+      } catch {
+        // Member repository missing: nothing to hook.
+      }
+    }
   }
 
   await excludeWorkspacesDir(canonicalRegistered, config.workspace?.workspaces_dir || 'workspaces');

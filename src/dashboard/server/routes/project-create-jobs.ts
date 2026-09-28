@@ -109,6 +109,7 @@ export function operationFingerprint(intent: ResolvedProjectIntent): string {
     name: intent.name,
     prefix: intent.proposedIssuePrefix,
     slug: intent.repoSlug,
+    repos: intent.workspaceRepos.map((repo) => repo.name),
   });
 }
 

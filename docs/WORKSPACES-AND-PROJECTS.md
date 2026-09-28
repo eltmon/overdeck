@@ -202,6 +202,41 @@ so an unknown host still clones and still yields a usable folder name.
 `issue_prefix`, then creates the main workspace row. A detached or unborn HEAD
 yields *no* default branch rather than a guessed `main`.
 
+**Notices.** Resolve returns blocking `findings` and non-blocking `notices`; a
+create with notices but no findings proceeds. In `existing` mode a folder inside
+a Git checkout snaps to the checkout root (PAN-4281): `path` becomes the root,
+the auto name and key come from the root's folder name unless a name was typed,
+and the notice `using-repository-root` ("Using the repository root <root>.")
+says so. The already-registered checks run against the root. The old
+`repository-root-elsewhere` finding that refused the subfolder is retired. A home
+directory that is itself a repository (a dotfiles-managed `~`) never snaps, so
+`~/Projects` stays a plain folder. `pan project add <subfolder>` prints the
+notice as a dim `ℹ` line.
+
+**Folders of repositories.** When an `existing` folder is not a repository,
+resolve lists `nestedRepositories`: its immediate children that hold a `.git`
+(directory or linked-worktree file), dot-folders skipped, sorted by name, at most
+50, read with one `readdir` and no child processes (`create-scan.ts`). The
+dialog then offers two things. It can add each checked repository as its own
+project, or add the folder as **one multi-repo project** by sending
+`repos: [<child folder names>]`. Resolve validates each name (one path segment,
+holds a `.git`, unique slug) into `workspaceRepos` or a `repos-invalid` finding,
+and registration writes the shape the live polyrepo projects use:
+
+```yaml
+workspace:
+  type: polyrepo
+  workspaces_dir: workspaces
+  repos:
+    - { name: frontend, path: frontend, branch_prefix: feature/, default_branch: main, forge: github }
+pan_records: { repo: frontend }   # the first repo, so .pan/ lands inside a git checkout
+```
+
+`default_branch` and `forge` appear per repo only when detected. No `tracker` or
+`github_repo` is written, because one tracker cannot be inferred from several
+remotes. `finishProjectSetup` installs the branch-protection git hooks in each
+member repository.
+
 **Safe public DTOs.** The core holds the raw transport URL; routes and the CLI
 serialize `toPublicProjectIntent`, which redacts URL userinfo. Diagnostics are
 sanitized once (ANSI stripped, credentials and auth headers removed) and bounded
@@ -212,6 +247,7 @@ to a 4 KiB tail before they reach a response, a log, or a job record.
 | Route | Auth | Behavior |
 | --- | --- | --- |
 | `POST /api/projects/resolve` | mutation guard (auth + origin + CSRF) despite read-only semantics | 200 with the safe intent and its `findings`. Forces `homeBoundary: true` and does **not** refresh the remote probe — it runs once per settled keystroke and must read the 60 s memo. |
+| `GET /api/projects/suggestions` | read guard | `{ root, homeDir, repositories: [{ path, name }] }`: at most 20 Git repositories directly under `getDefaultCwd()` (`~/Projects`, else `~`) that are not registered, compared by canonical path. Never writes. `root` is also where the dialog's folder picker starts. |
 | `POST /api/projects` | mutation guard | 422 on findings; 202 `{jobId, operationId}` for clone; 200 `{key, name, path, operationId}` for existing/new; 409 for a real conflict — `conflict` when the body's `operationId` was already used for different input, `target-busy` when another operation owns the destination; 500 for an unexpected failure. Reserves the operation and its destination **after** resolving, because the fingerprint and target path are only known once the intent is resolved; every exit past the reservation settles it, so a failure releases the destination instead of pinning it. Refreshes the probe, because this one is about to write. |
 | `GET /api/projects/create-jobs/:jobId` | read guard | Safe job status. **404 means unknown to this runtime, not confirmed failure.** |
 | `POST /api/projects/create-jobs/:jobId/cancel` | mutation guard | 202 `cancelling` while the child is stopping; 409 `cannot-cancel-setup` once registration began; the terminal result if it already finished; 404 for an unknown job. Idempotent. |
@@ -269,16 +305,33 @@ that failed later during setup.
 
 ### Entry points
 
-The sidebar `+`, the workspace-page chips ("clone repo", "add existing", "new
-project"), and the HomePage `New project` button all reach `/projects/new`; the
-`?mode=` query param preselects a tab and `returnTo` brings a workspace-origin
-creation back to `/workspaces/new?project=<key>`.
+The sidebar `+`, the command palette, the workspace-page chips ("clone repo",
+"add existing", "new project"), and the HomePage `New project` button all open
+the **Add-project dialog** as a modal (`AddProjectDialog`, mounted once in the
+app chrome and opened through the `useAddProjectDialog` store). `/projects/new`
+renders the same dialog as a full page, and `?mode=clone|existing|new` skips its
+start step. A chip passes `returnTo=/workspaces/new` through the store, so the
+created project lands back on `/workspaces/new?project=<key>` with the project
+selected; otherwise the app opens the project's deck and focuses its Launcher.
+
+The dialog's steps: the start step ("Open a folder", "Clone from URL", "Create
+new project", plus "Repositories in ~/Projects" suggestions); clone and create
+forms, where a plain Enter submits once resolve has no findings; and the folder
+step, which reviews a chosen folder as a repository (with the snap notice), a
+plain folder (explained, then **Add as folder**), or a folder of repositories
+(the nested step). A suggestion's **Add** and the nested step's adds have no form
+of their own, so they use `resolveThenCreateProject`, which posts to the same two
+routes: `POST /api/projects/resolve`, then `POST /api/projects`. There is still
+one create core.
 
 ### Maintainers' tests
 
 `tests/unit/lib/projects/{repo-url,create-intent,create-perform,create-recovery,create-errors}.test.ts`,
 `tests/unit/dashboard/routes/{project-create-jobs,project-create-routes}.test.ts`,
-`tests/unit/cli/project-commands.test.ts`, and the frontend page/hook suites.
+`tests/unit/lib/projects/create-scan.test.ts`,
+`tests/unit/cli/project-commands.test.ts`, and the frontend page/hook suites
+plus `components/project/new/__tests__/AddProject*.test.tsx` (the dialog, its
+steps, and the route audit that every dialog path posts only to the create core).
 
 **Project vs. workspace.** A project is a repository. A workspace is a checkout
 of that repository on a specific branch. Register a project once, then create

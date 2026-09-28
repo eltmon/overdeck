@@ -29,7 +29,7 @@ afterEach(async () => {
 describe('handleConversationMessage title behavior', () => {
   it('sets a deterministic auto title for titleSource=default and still calls generateAiTitle', async () => {
     vi.doMock('../../../../src/lib/agents.js', () => ({
-      deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
+      deliverAgentMessage: vi.fn().mockResolvedValue({ ok: true, path: 'tmux' }),
       injectPiConversationMemory: vi.fn().mockImplementation(async (_ctx: unknown, message: string) => message),
     }));
     vi.doMock('../../../../src/dashboard/server/http-helpers.js', () => ({
@@ -76,7 +76,7 @@ describe('handleConversationMessage title behavior', () => {
 
   it('does not write a title when titleSource is not default', async () => {
     vi.doMock('../../../../src/lib/agents.js', () => ({
-      deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
+      deliverAgentMessage: vi.fn().mockResolvedValue({ ok: true, path: 'tmux' }),
       injectPiConversationMemory: vi.fn().mockImplementation(async (_ctx: unknown, message: string) => message),
     }));
     vi.doMock('../../../../src/dashboard/server/http-helpers.js', () => ({

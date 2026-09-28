@@ -222,11 +222,7 @@ describe('resolveProjectCreateIntent', () => {
     expect(intent.findings).toHaveLength(0);
   });
 
-  it('flags a subdirectory of a repository and offers its root (D-15)', async () => {
-    const root = makeProjectDir('repo-root');
-    const nested = join(root, 'packages', 'inner');
-    mkdirSync(nested, { recursive: true });
-
+  function mockGitRoot(root: string) {
     execFileMock.mockImplementation((cmd, args, opts, cb) => {
       if (cmd === 'git' && args[0] === 'rev-parse' && args[1] === '--show-toplevel') {
         cb(null, { stdout: `${root}\n`, stderr: '' });
@@ -234,6 +230,13 @@ describe('resolveProjectCreateIntent', () => {
         cb(new Error('Unknown command'));
       }
     });
+  }
+
+  it('existing subfolder snaps to repo root with notice', async () => {
+    const root = makeProjectDir('repo-root');
+    const nested = join(root, 'packages', 'inner');
+    mkdirSync(nested, { recursive: true });
+    mockGitRoot(root);
 
     const intent = await resolveProjectCreateIntent({
       mode: 'existing',
@@ -242,14 +245,189 @@ describe('resolveProjectCreateIntent', () => {
       homeDir: TEST_HOME,
     });
 
-    // Registering here would root a second project inside an existing checkout.
-    expect(intent.findings).toContainEqual(
-      expect.objectContaining({
-        field: 'path',
-        code: 'repository-root-elsewhere',
+    // Registering the subfolder would root a second project inside an existing
+    // checkout, so resolve registers the checkout itself (Orca parity).
+    expect(intent.path).toBe(realPathOf(root));
+    expect(intent.notices).toEqual([
+      {
+        code: 'using-repository-root',
+        message: `Using the repository root ${realPathOf(root)}.`,
         detail: realPathOf(root),
-      }),
-    );
+      },
+    ]);
+    expect(intent.findings).toHaveLength(0);
+    const rootName = realPathOf(root).split('/').pop()!;
+    expect(intent.name).toBe(rootName);
+    expect(intent.key).toBe(rootName.toLowerCase());
+  });
+
+  it('snapped root that is already registered reports already-registered', async () => {
+    const root = makeProjectDir('registered-root');
+    const nested = join(root, 'src');
+    mkdirSync(nested, { recursive: true });
+    mockGitRoot(root);
+    const key = realPathOf(root).split('/').pop()!.toLowerCase();
+    writeFileSync(PROJECTS_CONFIG_FILE, `projects:\n  ${key}:\n    name: ${key}\n    path: ${root}\n`);
+    invalidateProjectsConfigCache();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: nested,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(expect.objectContaining({ code: 'project-exists-here' }));
+    expect(intent.registeredKeyAtPath).toBe(key);
+  });
+
+  it('a typed name survives the snap', async () => {
+    const root = makeProjectDir('named-root');
+    const nested = join(root, 'lib');
+    mkdirSync(nested, { recursive: true });
+    mockGitRoot(root);
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: nested,
+      name: 'custom',
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.path).toBe(realPathOf(root));
+    expect(intent.name).toBe('custom');
+    expect(intent.key).toBe('custom');
+  });
+
+  it('a folder under a git-managed home does not snap', async () => {
+    // A dotfiles-managed home: the home directory itself is the repository root.
+    const projects = join(TEST_HOME, 'Projects');
+    mkdirSync(projects, { recursive: true });
+    mockGitRoot(TEST_HOME);
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: projects,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.notices).toHaveLength(0);
+    expect(intent.isGitRepository).toBe(false);
+    expect(intent.path).toBe(realPathOf(projects));
+    expect(intent.gitRoot).toBe(realPathOf(TEST_HOME));
+  });
+
+  function mockNoGit() {
+    execFileMock.mockImplementation((cmd, args, opts, cb) => {
+      cb(new Error('not a git repository'));
+    });
+  }
+
+  it('non-git folder lists nested repositories', async () => {
+    const dir = makeProjectDir('folder-of-repos');
+    mkdirSync(join(dir, 'a', '.git'), { recursive: true });
+    mkdirSync(join(dir, 'b'), { recursive: true });
+    writeFileSync(join(dir, 'b', '.git'), 'gitdir: /somewhere/.git/worktrees/b\n');
+    mkdirSync(join(dir, 'c'), { recursive: true });
+    mkdirSync(join(dir, '.hidden', '.git'), { recursive: true });
+    mockNoGit();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.isGitRepository).toBe(false);
+    expect(intent.nestedRepositories).toEqual([
+      { name: 'a', path: join(realPathOf(dir), 'a') },
+      { name: 'b', path: join(realPathOf(dir), 'b') },
+    ]);
+  });
+
+  it('nested scan is capped at 50', async () => {
+    const dir = makeProjectDir('many-repos');
+    for (let i = 0; i < 55; i++) {
+      mkdirSync(join(dir, `repo-${String(i).padStart(2, '0')}`, '.git'), { recursive: true });
+    }
+    mockNoGit();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.nestedRepositories).toHaveLength(50);
+    expect(intent.nestedRepositories[0]!.name).toBe('repo-00');
+  });
+
+  it('repos selection resolves workspaceRepos for a non-git folder', async () => {
+    const dir = makeProjectDir('suite');
+    mkdirSync(join(dir, 'frontend', '.git'), { recursive: true });
+    mkdirSync(join(dir, 'Back_End', '.git'), { recursive: true });
+    const frontend = join(realPathOf(dir), 'frontend');
+    execFileMock.mockImplementation((cmd, args, opts: { cwd?: string }, cb) => {
+      if (opts?.cwd === frontend && args[0] === 'symbolic-ref') {
+        cb(null, { stdout: 'origin/main\n', stderr: '' });
+      } else if (opts?.cwd === frontend && args[0] === 'remote') {
+        cb(null, { stdout: 'git@github.com:acme/frontend.git\n', stderr: '' });
+      } else {
+        cb(new Error('not a git repository'));
+      }
+    });
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      repos: ['frontend', 'Back_End'],
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toHaveLength(0);
+    expect(intent.workspaceRepos).toEqual([
+      { name: 'frontend', path: 'frontend', defaultBranch: 'main', forge: 'github' },
+      { name: 'back-end', path: 'Back_End', defaultBranch: null, forge: null },
+    ]);
+  });
+
+  it('repos entry that is not a child repository is repos-invalid', async () => {
+    const dir = makeProjectDir('suite-bad');
+    mkdirSync(join(dir, 'plain'), { recursive: true });
+    mockNoGit();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      repos: ['../x', 'missing', 'plain'],
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    const invalid = intent.findings.filter((f) => f.code === 'repos-invalid');
+    expect(invalid.map((f) => f.detail)).toEqual(['../x', 'missing', 'plain']);
+    expect(intent.workspaceRepos).toEqual([]);
+  });
+
+  it('repos on a folder that is itself a repository is repos-invalid', async () => {
+    const dir = makeProjectDir('single-repo');
+    mockGitRoot(dir);
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: dir,
+      repos: ['anything'],
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(expect.objectContaining({ code: 'repos-invalid' }));
+    expect(intent.workspaceRepos).toEqual([]);
   });
 
   it('detects a linked worktree, whose .git is a file not a directory (D-15)', async () => {

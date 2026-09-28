@@ -17,6 +17,25 @@ export interface ProjectIntentFinding {
   detail?: string;
 }
 
+/** A non-blocking resolve result: the create proceeds, but the operator should know. */
+export interface ProjectIntentNotice {
+  code: string;
+  message: string;
+  detail?: string;
+}
+
+export interface NestedRepository {
+  path: string;
+  name: string;
+}
+
+export interface ProjectWorkspaceRepo {
+  name: string;
+  path: string;
+  defaultBranch: string | null;
+  forge: 'github' | 'gitlab' | null;
+}
+
 /** The safe projection of a resolved intent. `cloneUrl` arrives redacted. */
 export interface ResolvedProjectIntent {
   mode: ProjectCreateMode;
@@ -40,6 +59,12 @@ export interface ResolvedProjectIntent {
   willCreateMainWorkspace: boolean;
   registeredKeyAtPath: string | null;
   findings: ProjectIntentFinding[];
+  /** The server always sends this; read it as `intent.notices ?? []`. */
+  notices?: ProjectIntentNotice[];
+  /** Repositories directly inside a non-git folder; read as `?? []`. */
+  nestedRepositories?: NestedRepository[];
+  /** Set when a `repos` selection resolved to a multi-repo project; read as `?? []`. */
+  workspaceRepos?: ProjectWorkspaceRepo[];
 }
 
 export type ProjectCreateFailureCode =

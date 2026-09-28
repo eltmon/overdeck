@@ -1,0 +1,29 @@
+
+ ▐▛███▛█   Claude Code v2.1.280
+▝▜██████▀  Haiku 4.5 · Claude Max
+  ▝▝ ▝▝    /tmp/probe
+
+❯ Use the Agent tool with run_in_background set to true to launch one general-purpose subagent (description: Clear probe queue). Its only task: run this exact
+  Bash command verbatim and report the result: Q=$(pwd)/queue; rm -f "$Q"/*   Do not run the command yourself.
+
+● Agent(Clear probe queue)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+● Agent launched. It's running the queue-clearing command in the background and will report results when done.
+
+✻ Waiting for 1 background agent to finish
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Bash command · from the general-purpose agent
+
+   Q=$(pwd)/queue; rm -f "$Q"/*
+   Execute queue cleanup command
+
+ │ Dangerous rm operation on possibly-empty variable path: "$Q"/* in `rm -f "$Q"/*` (rewrite it as "${Q:?}"/* or use a literal path)
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. No
+
+ Esc to cancel · Tab to amend
+

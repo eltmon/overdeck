@@ -641,6 +641,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             <div className={styles.failedMessageActions}>
               <span className={styles.failedMessageLabel}>
                 {fm.heldOffline ? 'Waiting to send — will send when the server reconnects'
+                  : fm.code === 'not-delivered' ? 'Not delivered — resend'
                   : fm.notFoundInTranscript ? 'Not found in transcript'
                   : fm.deliveryUnknown ? 'Delivery not confirmed'
                   : fm.kind === 'command' ? 'Command request failed' : 'Failed to send'}
@@ -654,10 +655,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 <button
                   className={styles.failedMessageBtn}
                   onClick={() => onRetryFailed?.(fm.id, fm.text)}
-                  title={fm.notFoundInTranscript ? 'Resend as a new message' : 'Retry sending'}
+                  title={fm.notFoundInTranscript || fm.code === 'not-delivered' ? 'Resend as a new message' : 'Retry sending'}
                 >
                   <RotateCcw size={12} />
-                  {fm.notFoundInTranscript ? 'Resend' : 'Retry'}
+                  {fm.notFoundInTranscript || fm.code === 'not-delivered' ? 'Resend' : 'Retry'}
                 </button>
               )}
               {fm.kind === 'prompt' && (

@@ -499,3 +499,112 @@ describe('NewWorkspacePage shell', () => {
     expect(onCreated).toHaveBeenCalledWith('workspace/id');
   });
 });
+
+describe('Smart workspace field (PAN-4281 FR-12)', () => {
+  /**
+   * Type `name` into an empty field: onChange opens the list and calls the
+   * mocked setName, then the page re-renders with the hook now holding it.
+   */
+  function typeInto(name: string) {
+    intentInitialized = true;
+    const { rerender } = render(<NewWorkspacePage />);
+    fireEvent.change(screen.getByTestId('new-workspace-hero-title'), { target: { value: name } });
+    currentIntent = { ...currentIntent, name };
+    rerender(<NewWorkspacePage />);
+  }
+
+  function withResolved(overrides: Record<string, unknown>) {
+    currentIntent = {
+      ...makeIntent('project'),
+      intent: { ...makeResolvedIntent(), ...overrides },
+      stale: false,
+    };
+  }
+
+  it('typing a branch prefix shows branch suggestions', () => {
+    withResolved({ branchCandidates: ['feature/login'] });
+    typeInto('fe');
+
+    expect(screen.getByRole('listbox', { name: 'Suggestions' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Start from branch feature/login' })).toBeInTheDocument();
+    expect(currentIntent.setName).toHaveBeenCalledWith('fe');
+  });
+
+  it('picking a branch suggestion sets the parent branch', () => {
+    withResolved({ branchCandidates: ['feature/login'] });
+    typeInto('fe');
+
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Start from branch feature/login' }));
+
+    expect(currentIntent.setParentBranch).toHaveBeenCalledWith('feature/login');
+    // The Advanced row opens so the chosen parent branch is visible.
+    expect(screen.getByTestId('new-workspace-parent-branch-input')).toBeInTheDocument();
+  });
+
+  it('plain text offers the slugged name', () => {
+    withResolved({});
+    typeInto('Fix login redirect bug!');
+
+    const option = screen.getByRole('option', { name: 'Use "fix-login-redirect-bug" as the name' });
+    // Text that cannot be a name as typed highlights its one answer, so Enter takes it.
+    expect(option).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(screen.getByTestId('new-workspace-hero-title'), { key: 'Enter' });
+
+    expect(currentIntent.setName).toHaveBeenCalledWith('fix-login-redirect-bug');
+  });
+
+  it('an issue reference opens that issue', async () => {
+    mockProjectData([{ key: 'project', name: 'Project', path: '/repo', linearTeam: 'PAN' } as never]);
+    withResolved({});
+    const popstate = vi.fn();
+    window.addEventListener('popstate', popstate);
+    typeInto('#12');
+
+    const option = await screen.findByRole('option', { name: 'Open PAN-12 and start work' });
+    fireEvent.mouseDown(option);
+
+    expect(window.location.pathname).toBe('/issues/PAN-12');
+    expect(popstate).toHaveBeenCalled();
+    window.removeEventListener('popstate', popstate);
+  });
+
+  it('a valid name with branch matches still submits on Enter', async () => {
+    withResolved({ branchCandidates: ['fix-login'] });
+    currentIntent = { ...currentIntent, canCreate: true };
+    typeInto('fix');
+
+    expect(screen.getByRole('option', { name: 'Start from branch fix-login' })).toHaveAttribute('aria-selected', 'false');
+    await userEvent.type(screen.getByTestId('new-workspace-hero-title'), '{Enter}');
+
+    expect(currentIntent.submitIntent).toHaveBeenCalledTimes(1);
+    expect(currentIntent.setParentBranch).not.toHaveBeenCalled();
+  });
+
+  it('shows the branch the isolated worktree will get', () => {
+    currentIntent = {
+      ...makeIntent('project'),
+      mode: 'isolated',
+      intent: { ...makeResolvedIntent(), branchName: 'scratch/fix-login' },
+      stale: false,
+    };
+    intentInitialized = true;
+    render(<NewWorkspacePage />);
+
+    expect(screen.getByTestId('new-workspace-branch-preview')).toHaveTextContent('Branch: scratch/fix-login');
+  });
+});
+
+describe('returning from Add project (PAN-4281)', () => {
+  it('selects the project named by ?project= when the page mounts', async () => {
+    window.history.replaceState(null, '', '/workspaces/new?project=widget');
+    mockProjectData([
+      { key: 'other', name: 'Other', path: '/other' },
+      { key: 'widget', name: 'Widget', path: '/widget' },
+    ]);
+    render(<NewWorkspacePage />);
+
+    const chip = await screen.findByRole('button', { name: 'Widget' });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(mockUseWorkspaceCreateIntent).toHaveBeenCalledWith(expect.objectContaining({ initialProjectKey: 'widget' }));
+  });
+});

@@ -55,6 +55,9 @@ function makeIntent(overrides: Partial<ResolvedProjectIntent> = {}): ResolvedPro
     willCreateMainWorkspace: true,
     registeredKeyAtPath: null,
     findings: [],
+    notices: [],
+    nestedRepositories: [],
+    workspaceRepos: [],
     ...overrides,
   };
 }

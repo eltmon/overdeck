@@ -1,0 +1,1447 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-27T23:44:35Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4281: Orca-style onboarding: Add Project dialog with repo-root snap, folder-of-repos import (separate or one multi-repo project), and a Smart field on New Workspace",
+    "updated": "2026-09-27T23:54:23.299Z"
+  },
+  "plan": {
+    "id": "pan-4281",
+    "title": "Orca-style onboarding: Add Project dialog with repo-root snap, folder-of-repos import (separate or one multi-repo project), and a Smart field on New Workspace",
+    "status": "running",
+    "uid": "2b6ff99c-a8e5-4027-b32a-b82e9a129998",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-27T23:44:35Z",
+    "updated": "2026-09-27T23:54:23.299Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4281",
+        "label": "PAN-4281",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4280#issuecomment-5860876536",
+        "label": "Shared onboarding PRD context",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "onboarding",
+      "dashboard",
+      "projects",
+      "workspaces",
+      "frontend",
+      "create-core"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator already split the onboarding program into three sibling issues (PAN-4280/4281/4282) and assigned W6-W9 here. W6-W8 share the project create core, the one AddProjectDialog, and post-create navigation in App.tsx; W9's Smart field shares NewWorkspacePage.tsx with the dialog's chip wiring. The surface is wide mainly because of tests and four doc files; each of the 18 items is a small vertical slice.",
+      "prd": ".pan/drafts/pan-4281.md",
+      "canonicalFilename": "2026-09-27-PAN-4281-orca-style-onboarding-add-project-dialog-with-repo-root-snap-folder-of-repos-import-separate-or-one-multi-repo-project-and-a-smart-field-on-new-workspace.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Adding a project is a full page (/projects/new) that refuses a subfolder of a repo (repository-root-elsewhere), registers a folder of repos as one plain project, suggests nothing, submits clone only on Ctrl/Cmd+Enter, explains nothing for a non-git folder, and leaves the Launcher unfocused afterwards. New Workspace has a plain title input and says 'Multiple projects are registered' when there are none. The operator wants Orca-grade onboarding, and a folder of repos must be addable as separate projects or as one multi-repo (polyrepo) project.",
+      "Proposal": "Extend the create core (snap to repo root as a notice, depth-1 nested scan, multi-repo registration via a repos input, read-only suggestions route), extract the page form into ProjectCreateForm, and build one AddProjectDialog (modal via a zustand store, page at /projects/new) with start/clone/create/folder/nested steps that register only through POST /api/projects/resolve then POST /api/projects. Focus the Launcher after a create. On New Workspace add project-missing and branchCandidates to workspace resolve and a Smart field that classifies issue refs, branches and names. Full detail: .pan/drafts/pan-4281.md.",
+      "NonGoals": "- No change to Home, the Launcher's intents, the No-project deck or terminals (PAN-4280)\n- No first-run checklist, prerequisites, pan install or pan doctor changes (PAN-4282)\n- No Orca onboarding wizard (agent/theme/notifications)\n- No editing of an existing project's repos from the dialog; no grouping beyond the single multi-repo choice\n- No git init offer for a non-git folder\n- No new spawn path: the Smart field never starts an agent; issue refs route to /issues/<ID>\n- No GitLab/Jira/Linear URL lookup in the Smart field\n- No second project-registration route\n- No change to pan workspace new --dry-run output"
+    },
+    "autoDecisions": [
+      {
+        "summary": "'Add this folder as one project' registers one multi-repo (workspace.type: polyrepo) project over the checked child repos, keeping W7's label with a sub-line.",
+        "rationale": "Operator decision (3) in the issue body says a folder of repos can be one multi-repo project; W7's button label predates it, so the label stays and its meaning follows the decision."
+      },
+      {
+        "summary": "Multi-repo registration writes workspace {type: polyrepo, workspaces_dir: workspaces, repos[{name,path,branch_prefix: feature/, default_branch?, forge?}]} plus pan_records.repo = first repo, and no tracker.",
+        "rationale": "That is the shape of the live mind-your-now and auricle entries; pan_records keeps .pan/ inside a git checkout when the root is a plain folder (resolveInfraRepo defaults to the root); one tracker cannot be inferred from N remotes."
+      },
+      {
+        "summary": "Nested-batch and suggestion adds use a new resolveThenCreateProject helper instead of the stateful useProjectCreateIntent hook.",
+        "rationale": "The hook drives one debounced form and has no repos field; FR-17/AC-7 constrain routes (resolve then create), which the helper honors."
+      },
+      {
+        "summary": "A nested batch calls onCreated once with the last success; failures keep the dialog open with per-row errors and a Done button.",
+        "rationale": "Per-row onCreated would navigate repeatedly mid-batch; a failure must stay visible."
+      },
+      {
+        "summary": "returnTo in modal mode travels through the dialog store (takeAddProjectReturnTo) into getProjectCreatedNavigation's new optional parameter.",
+        "rationale": "getProjectCreatedNavigation reads window.location.search, which is /workspaces/new in modal mode; App.tsx is at its 1019-line ceiling so logic lives in the store module."
+      },
+      {
+        "summary": "The Smart field's 'Use as the name' sets a slug (toWorkspaceSlug), and the Branch preview shows the core's intent.branchName (scratch/<name>).",
+        "rationale": "validateFeatureName rejects spaces; the issue's implementation checkpoint says to reuse the core's branch derivation, which exists at workspaces/create.ts:339."
+      },
+      {
+        "summary": "The NewProjectPage chosen-mode body moves unchanged into ProjectCreateForm; the two page tests change only entry-label regexes.",
+        "rationale": "Moving rather than rewriting preserves every no-loss row; the issue's final copy renames the entry actions, so label regexes must follow."
+      },
+      {
+        "summary": "pan project add prints resolve notices; the --dry-run JSON carries notices, nestedRepositories and workspaceRepos automatically.",
+        "rationale": "The snap changes CLI behavior silently otherwise; the CLI and dashboard share the core."
+      },
+      {
+        "summary": "GET /api/projects/suggestions returns {root, repositories} and lives in project-create-routes.ts with a no-loss-matrix READ row.",
+        "rationale": "The folder step needs getDefaultCwd() as its picker start; projects.ts is at 955 lines; every new route needs a matrix row or CI fails."
+      },
+      {
+        "summary": "Issue prefixes for the Smart field come from /api/registered-projects rows' linearTeam (getIssuePrefix).",
+        "rationale": "The route already returns the prefix under that field; no new route is needed."
+      },
+      {
+        "summary": "New frontend test files are appended to root package.json test:frontend-subset.",
+        "rationale": "CI runs only that frontend list (codebase map conventions.md); unlisted tests would never gate a PR."
+      },
+      {
+        "summary": "Keep W9 in this issue and set plan.metadata.sizeJustification instead of filing another sibling.",
+        "rationale": "The operator already split the program into three issues and assigned W6-W9 here; auto mode should not shrink assigned scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "snap-repo-root",
+        "title": "Snap an existing-mode subfolder to its repository root with a notice",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/create.ts",
+            "src/cli/commands/project.ts",
+            "src/dashboard/frontend/src/components/project/new/projectCreateTypes.ts",
+            "tests/unit/lib/projects/create-intent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/create-intent.test.ts tests/unit/cli/project-commands.test.ts",
+            "grep -rn \"repository-root-elsewhere\" src/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "create-intent.test.ts and project-commands.test.ts pass",
+            "grep prints nothing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/pan-4281.md). In src/lib/projects/create.ts add ProjectIntentNotice {code:'using-repository-root';message;detail?} and notices:[] on ResolvedProjectIntent; delete 'repository-root-elsewhere' from ProjectIntentCode. Move existing-mode detectGitRoot ahead of `const registered = getProjectSync(key);`: when canonicalRoot !== intent.path set intent.path=canonicalRoot, push the notice 'Using the repository root <root>.', and unless input.name was typed re-derive intent.name=basename(root) and key/intent.key (make key a let). Guard: when canonicalRoot equals the canonicalized home (the `home` already computed in resolveProjectCreateIntent), do NOT snap and treat the folder as non-git (gitRoot stays set for information) so the nested scan still runs for e.g. ~/Projects under a dotfiles-managed home. Step-4 existing block keeps only origin/default-branch detection. Mirror notices in frontend projectCreateTypes.ts as an OPTIONAL field (notices?: ProjectIntentNotice[]; consumers read `?? []`) so existing test fixtures need no edit. In src/cli/commands/project.ts projectAddCommand print each notice as chalk.dim('ℹ '+message) before the findings check (not in --dry-run). Rewrite the test at create-intent.test.ts:225 ('flags a subdirectory…') instead of deleting it."
+        },
+        "items": [
+          {
+            "id": "snap-repo-root.ac1",
+            "title": "Given a folder inside a git repo, when resolveProjectCreateIntent runs in existing mode, then it returns path equal to the repo root, a using-repository-root notice, and no findings (test 'existing subfolder snaps to repo root with notice')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snap-repo-root.ac2",
+            "title": "Given the repo root is already registered, when its subfolder is resolved, then the result carries finding project-exists-here and registeredKeyAtPath (test 'snapped root that is already registered reports already-registered')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snap-repo-root.ac3",
+            "title": "Given name 'custom' is supplied, when a subfolder snaps, then intent.name stays 'custom' (test 'a typed name survives the snap')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snap-repo-root.ac4",
+            "title": "Given the home directory is itself a git repo, when ~/Projects is resolved, then it does not snap, isGitRepository is false and no notice is returned (test 'a folder under a git-managed home does not snap')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snap-repo-root.ac5",
+            "title": "grep -rn 'repository-root-elsewhere' src/ prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "nested-repo-scan",
+        "title": "Scan a non-git folder for nested repositories",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/create-scan.ts",
+            "src/lib/projects/create.ts",
+            "src/dashboard/frontend/src/components/project/new/projectCreateTypes.ts",
+            "tests/unit/lib/projects/create-intent.test.ts",
+            "tests/unit/lib/projects/create-scan.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/create-intent.test.ts tests/unit/lib/projects/create-scan.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. New src/lib/projects/create-scan.ts exporting NestedRepository {path,name} and findNestedRepositories(dir, limit=50): readdir withFileTypes (error → []), directories not starting with '.', keep those where stat(join(dir,name,'.git')) succeeds (dir or file), sort by name.localeCompare, slice to limit. No child processes. Add nestedRepositories: NestedRepository[] (default []) to ResolvedProjectIntent and set it in the non-git else of step 4. Mirror in projectCreateTypes.ts as an optional field (nestedRepositories?: …; consumers read `?? []`)."
+        },
+        "items": [
+          {
+            "id": "nested-repo-scan.ac1",
+            "title": "Given a temp folder with a/.git dir, b/.git file, plain c/ and .hidden/.git, when resolved in existing mode, then nestedRepositories returns exactly a and b in name order (test 'non-git folder lists nested repositories')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nested-repo-scan.ac2",
+            "title": "Given 55 child repositories, when resolved, then nestedRepositories returns 50 entries starting with the lexicographically smallest (test 'nested scan is capped at 50')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "nested-repo-scan.ac3",
+            "title": "Given an unreadable directory, when findNestedRepositories runs, then it returns an empty list (create-scan.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "polyrepo-create",
+        "title": "Register a folder of repos as one multi-repo (polyrepo) project",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/projects/create.ts",
+            "src/lib/projects/create-perform.ts",
+            "src/dashboard/server/routes/projects.ts",
+            "src/dashboard/server/routes/project-create-routes.ts",
+            "src/dashboard/frontend/src/components/project/new/projectCreateTypes.ts",
+            "tests/unit/lib/projects/create-intent.test.ts",
+            "tests/unit/lib/projects/create-perform.test.ts",
+            "tests/unit/dashboard/routes/project-create-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/create-intent.test.ts tests/unit/lib/projects/create-perform.test.ts tests/unit/dashboard/routes/project-create-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "dialog-nested-step"
+          ],
+          "readinessReason": "Runs in its own slot once its blocks-edges clear; its files_scope overlaps only items it is already ordered against by an edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and decision D17. ProjectCreateInput.repos?: string[] (child folder names). New finding code 'repos-invalid'. ResolvedProjectIntent.workspaceRepos: {name,path,defaultBranch,forge}[] default []. In the non-git else with input.repos: reject empty, '/', '\\\\', '.', '..', entries whose join(path,entry)/.git is missing, and duplicate slugs (name = entry lowercased, [^a-z0-9-] → '-'); for valid ones detect defaultBranch via detectDefaultBranch and forge via detectOriginUrl→parseRepoUrl provider (Promise.all). repos on a git folder → repos-invalid 'This folder is already a Git repository; add it as a single project.' create-perform.ts: add 'pan_records' to the ProjectRegistrationExtras Pick; buildExtras emits workspace {type:'polyrepo', workspaces_dir:'workspaces', repos:[{name,path,branch_prefix:'feature/', default_branch only if detected, forge only if detected}]} and pan_records {repo: first repo name}; no tracker. Pass repos (string array only) through both postProjectsResolveRoute (projects.ts) and postProjectsRoute (project-create-routes.ts). Mirror workspaceRepos in projectCreateTypes.ts as an optional field."
+        },
+        "items": [
+          {
+            "id": "polyrepo-create.ac1",
+            "title": "Given a non-git folder with child repos fe and api, when resolved with repos ['fe','api'], then workspaceRepos lists both with no findings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-create.ac2",
+            "title": "Given repos ['../x','missing','plain'], when resolved, then each produces a repos-invalid finding and workspaceRepos is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-create.ac3",
+            "title": "Given a resolved multi-repo intent, when performProjectCreate runs, then projects.yaml persists workspace.type polyrepo, workspaces_dir workspaces, one repos entry per folder with branch_prefix feature/, pan_records.repo equal to the first repo, and no tracker (test 'multi-repo intent registers a polyrepo workspace with pan_records')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-create.ac4",
+            "title": "Given POST /api/projects/resolve with body repos, when the route runs, then the core receives the repos array (route test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "suggestions-route",
+        "title": "Add read-only GET /api/projects/suggestions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/create-scan.ts",
+            "src/dashboard/server/routes/project-create-routes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/dashboard/routes/project-create-routes.test.ts",
+            "tests/unit/lib/projects/create-scan.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/project-create-routes.test.ts tests/unit/lib/projects/create-scan.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and D10. create-scan.ts: listSuggestedRepositories(root, registeredPaths:Set<string>, limit=20) = findNestedRepositories(root,50), canonicalize each path with canonicalizePath from create.ts, drop registered, slice limit. project-create-routes.ts: GET /api/projects/suggestions guarded by rejectUnauthorizedDashboardRequest, returns {root: getDefaultCwd(), repositories}; registered paths = canonicalized listProjectsAsync() config paths; add to projectCreateJobRoutesLayer. Add the no-loss-matrix row {surface:'GET /api/projects/suggestions', kind:'http', disposition:'READ', door:'listSuggestedRepositories (read-only onboarding suggestions, PAN-4281)'} next to the POST /api/projects/resolve row."
+        },
+        "items": [
+          {
+            "id": "suggestions-route.ac1",
+            "title": "Given a default cwd holding two repos of which one is registered, when GET /api/projects/suggestions is called, then it returns root and exactly the unregistered repo, and no registration function is called (test 'suggestions excludes registered repos and performs no writes')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "suggestions-route.ac2",
+            "title": "Given 25 unregistered repos, when listSuggestedRepositories runs, then it returns 20",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "suggestions-route.ac3",
+            "title": "grep -n 'GET /api/projects/suggestions' tests/unit/lib/overdeck/no-loss-matrix.ts matches and no-loss-matrix.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-project-create-form",
+        "title": "Extract ProjectCreateForm from NewProjectPage without behavior change",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4281",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/NewProjectPage.tsx",
+            "src/dashboard/frontend/src/components/project/new/ProjectCreateForm.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/pages/__tests__/NewProjectPage.test.tsx src/pages/__tests__/NewProjectPage.no-loss.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both page test files pass unmodified",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "foundationFor": [
+            "add-project-dialog-shell",
+            "clone-create-enter-submit",
+            "dialog-folder-step"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and D24. Move everything NewProjectPage renders once `chosen` is non-null (Change header, mode fields, Options disclosure, FolderPicker panel, destination summary, guidance text with the create-a-workspace link, progress/failure/repair actions, Findings, handleKeyDown, openPicker/closePicker, focus effects) into components/project/new/ProjectCreateForm.tsx with props {create: ReturnType<typeof useProjectCreateIntent>; mode; onChange(); onCancel()}. Labels, data-testids, aria attributes and ids stay byte-identical. NewProjectPage keeps its entry chooser and renders ProjectCreateForm. Do not modify either page test file in this commit."
+        },
+        "items": [
+          {
+            "id": "extract-project-create-form.ac1",
+            "title": "Given the extraction commit, when NewProjectPage.test.tsx and NewProjectPage.no-loss.test.tsx run, then vitest exits 0 and git diff shows no change to either test file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-project-create-form.ac2",
+            "title": "Given the refactored page, when a mode is chosen, then it renders ProjectCreateForm from components/project/new/ProjectCreateForm.tsx (grep -n 'ProjectCreateForm' src/dashboard/frontend/src/pages/NewProjectPage.tsx matches)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-project-dialog-shell",
+        "title": "Add the AddProjectDialog modal/page shell with store, start step and wiring",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/addProjectDialogStore.ts",
+            "src/dashboard/frontend/src/components/project/new/AddProjectDialog.tsx",
+            "src/dashboard/frontend/src/components/project/new/AddProjectStartStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/AddProjectCloneStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/AddProjectCreateStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectDialog.test.tsx",
+            "src/dashboard/frontend/src/pages/NewProjectPage.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App/routes.ts",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewProjectPage.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewProjectPage.no-loss.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/project/new/__tests__/AddProjectDialog.test.tsx src/pages/__tests__/NewProjectPage.test.tsx src/pages/__tests__/NewProjectPage.no-loss.test.tsx src/pages/__tests__/NewWorkspacePage.test.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "file-size lint passes (App.tsx <= 1019 lines)",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "clone-create-enter-submit",
+            "dialog-suggestions",
+            "dialog-folder-step",
+            "dialog-nested-step",
+            "launcher-focus-after-create",
+            "smart-workspace-field"
+          ],
+          "readinessReason": "Runs in its own slot once its blocks-edges clear; its files_scope overlaps only items it is already ordered against by an edge."
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (D11, D21, D24). addProjectDialogStore.ts: zustand {open, mode?, returnTo?, show(mode?, returnTo?), hide()} plus takeAddProjectReturnTo() that returns and clears returnTo. AddProjectDialog {variant:'modal'|'page', initialMode?, onCreated, onCancel}; steps start|clone|create|folder (folder = existing-mode ProjectCreateForm until dialog-folder-step); modal = role=dialog aria-modal, Esc → onCancel; export AddProjectDialogHost that renders while store.open and calls hide() on cancel/create. Start step copy is final per PRD WI-6 step 3 ('Add a project'; zero-project subtitle; 'Open a folder — A project folder, a Git repository, or a folder with many repositories' focused with ⏎ hint; 'Other ways to add': 'Clone from URL — Download a Git repository', 'Create new project — Start an empty Git repository'); ArrowUp/ArrowDown move focus, Enter activates. Clone/Create steps own useProjectCreateIntent and render ProjectCreateForm. NewProjectPage becomes <AddProjectDialog variant='page' initialMode={getNewProjectModeFromSearch() ?? undefined} …/>. App.tsx handleNewProject → useAddProjectDialog.getState().show(); handleProjectCreated passes takeAddProjectReturnTo() to getProjectCreatedNavigation(projectKey, returnTo = getNewProjectReturnToFromSearch()) in App/routes.ts; AppChrome gains onProjectCreated and mounts AddProjectDialogHost. NewWorkspacePage chips call show(mode, '/workspaces/new'). Because the modal leaves NewWorkspacePage mounted and its project preset is one-shot on mount, App/AppRoutes.tsx renders <NewWorkspacePage key={getNewWorkspaceProjectFromSearch() ?? ''} …/> so the ?project=<key> pushed by handleProjectCreated remounts it and preselects the new project. In both page tests change only entry-label regexes (/Open existing folder/ → /Open a folder/, entry 'Clone repository' → 'Clone from URL'); keep every interaction assertion. App.tsx must stay <= 1019 lines."
+        },
+        "items": [
+          {
+            "id": "add-project-dialog-shell.ac1",
+            "title": "Given the dialog opens, when the start step renders, then 'Open a folder' has focus and ArrowDown moves focus to 'Clone from URL'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-project-dialog-shell.ac2",
+            "title": "Given show('clone') is called, when the host renders, then the Repository URL field shows without the start step, and when Esc is pressed the store's open flag becomes false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-project-dialog-shell.ac3",
+            "title": "Given the start step renders, when findBannedWords runs on its text, then it returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-project-dialog-shell.ac4",
+            "title": "grep -n 'window.location.href = `/projects/new' src/dashboard/frontend/src/pages/NewWorkspacePage.tsx prints nothing and both NewProjectPage test files exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-project-dialog-shell.ac5",
+            "title": "Given the dialog was opened from a New Workspace chip, when a project is created, then the URL becomes /workspaces/new?project=<key> and the New Workspace page renders that project's chip as selected (test 'adding from a chip selects the new project')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clone-create-enter-submit",
+        "title": "Plain Enter submits the clone URL and the create Name",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/ProjectCreateForm.tsx",
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectCloneCreate.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/project/new/__tests__/AddProjectCloneCreate.test.tsx src/pages/__tests__/NewProjectPage.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In ProjectCreateForm the Repository URL input and the create-mode Name input handle plain Enter (no modifiers, not isComposing) by calling handleSubmit() when canCreate is true. Ctrl/Cmd+Enter keeps working. Keep a single focus mechanism for autofocus."
+        },
+        "items": [
+          {
+            "id": "clone-create-enter-submit.ac1",
+            "title": "Given a clone URL that resolved with no findings, when Enter is pressed in the URL field, then exactly one POST /api/projects is sent (test 'Enter in the clone URL submits when there are no findings')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clone-create-enter-submit.ac2",
+            "title": "Given a resolve with findings, when Enter is pressed in the URL field, then no POST /api/projects is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clone-create-enter-submit.ac3",
+            "title": "Given a valid create-mode name, when Enter is pressed in Name, then one POST /api/projects is sent, and NewProjectPage.test.tsx 'submits once for Ctrl+Enter' still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-suggestions",
+        "title": "List ~/Projects repositories on the start step with one-click Add",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/AddProjectStartStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/resolveThenCreate.ts",
+            "src/dashboard/frontend/src/components/project/new/useProjectSuggestions.ts",
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectSuggestions.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/project/new/__tests__/AddProjectSuggestions.test.tsx src/pages/__tests__/NewProjectPage.no-loss.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (D19). resolveThenCreate.ts: resolveThenCreateProject(body {mode:'existing', path, name?, repos?}) POSTs /api/projects/resolve (fetchWithTimeout, dashboardMutationJsonHeaders, credentials include); findings → {ok:false, message: findings[0].message}; else POST /api/projects with operationId crypto.randomUUID(); non-2xx → {ok:false, message}; 200 → {ok:true, project:{key,name,path}}. New useProjectSuggestions.ts exports useProjectSuggestions() = useQuery({queryKey:['project-suggestions'], staleTime 30s}) fetching /api/projects/suggestions and normalizing to {root: string | undefined, repositories: array or []} — the one owner of this query (dialog-folder-step reuses it). Start step renders nothing unless repositories is non-empty; heading 'Repositories in <root with home shown as ~>'; each row name, muted path, Add button → resolveThenCreateProject({mode:'existing', path}) → onCreated or inline error. Suggestion rows join the arrow-key order after the action rows."
+        },
+        "items": [
+          {
+            "id": "dialog-suggestions.ac1",
+            "title": "Given one suggestion, when Add is clicked, then /api/projects/resolve is POSTed with mode existing and that path, followed by one POST /api/projects, and onCreated receives the project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-suggestions.ac2",
+            "title": "Given resolve returns a finding, when Add is clicked, then the finding message renders on that row and no POST /api/projects is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-suggestions.ac3",
+            "title": "Given the suggestions response is {}, when the start step renders, then no 'Repositories in' heading is shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-folder-step",
+        "title": "Folder step with picker, repo-root notice and non-git explanation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/AddProjectFolderStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/AddProjectDialog.tsx",
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectFolderStep.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/project/new/__tests__/AddProjectFolderStep.test.tsx src/components/project/new/__tests__/AddProjectDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. AddProjectFolderStep shows FolderPicker (components/CommandDeck/FolderPicker.tsx) with initialPath = useProjectSuggestions().root (from dialog-suggestions); choosing a folder calls setPath on a useProjectCreateIntent({initialMode:'existing'}) and waits for the resolve. Then: notices has using-repository-root → show 'Using the repository root <root, home as ~>.' above the existing-mode ProjectCreateForm; non-git with nested repositories → nested step (interim: the non-git explanation until dialog-nested-step lands); non-git → 'This folder isn't a Git repository. Agents and terminals work here; branches, isolated copies and pull requests won't.' with 'Add as folder' (hook submit) and 'Back' (return to the picker); git → existing-mode ProjectCreateForm. AddProjectDialog renders this step for 'folder'."
+        },
+        "items": [
+          {
+            "id": "dialog-folder-step.ac1",
+            "title": "Given a chosen non-git folder with no nested repos, when resolve returns, then the non-git explanation renders with 'Add as folder' and 'Back' buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-folder-step.ac2",
+            "title": "Given resolve returns a using-repository-root notice, when the folder step renders, then 'Using the repository root' text with the root path is shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-folder-step.ac3",
+            "title": "Given the folder step renders, when findBannedWords runs on its text, then it returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-nested-step",
+        "title": "Nested step: add each repo as a project or one multi-repo project",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/AddProjectNestedStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/AddProjectDialog.tsx",
+            "src/dashboard/frontend/src/components/project/new/AddProjectFolderStep.tsx",
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectNestedStep.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/project/new/__tests__/AddProjectNestedStep.test.tsx src/components/project/new/__tests__/AddProjectFolderStep.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 (D18, D20). Folder step routes non-git folders with nestedRepositories to step 'nested' with {folder, repositories} and the interim fallback is removed. Nested step: 'Found N repositories in <folder>', checkbox per repo (all checked). 'Add N projects' runs resolveThenCreateProject({mode:'existing', path}) sequentially per checked repo, rows show Adding…/Added/error, failures do not stop later rows; all succeed → onCreated(last) once and close; any failure → stay open with a Done button that calls onCreated(last success, if any). 'Add this folder as one project' with sub-line 'One multi-repo project spanning the checked repositories.' sends one resolveThenCreateProject({mode:'existing', path: folder, repos: checked repo names}). Buttons disabled when nothing is checked or a run is in progress."
+        },
+        "items": [
+          {
+            "id": "dialog-nested-step.ac1",
+            "title": "Given three checked repos, when 'Add 3 projects' is clicked, then POST /api/projects is sent three times sequentially, once per repo path (test 'nested step creates each checked repo by calling create once per repo')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-nested-step.ac2",
+            "title": "Given the second create fails, when the batch runs, then the third still runs, the failure message renders on row two, and the dialog stays open with a Done button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-nested-step.ac3",
+            "title": "Given two checked repos, when 'Add this folder as one project' is clicked, then exactly one POST /api/projects carries path = folder and repos = the two folder names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-nested-step.ac4",
+            "title": "Given the nested step renders, when findBannedWords runs on its text, then it returns an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-route-audit",
+        "title": "Audit that every dialog path POSTs only to resolve/create routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/project/new/__tests__/AddProjectDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/project/new/__tests__/AddProjectDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "AddProjectDialog.test.tsx passes including 'only resolve and create routes receive POSTs'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11 (shared AC-7). Add test 'only resolve and create routes receive POSTs' to AddProjectDialog.test.tsx: mock fetchWithTimeout, drive folder (git), folder (non-git → Add as folder), nested (Add N and Add this folder as one project), clone (Enter), create (Enter) and suggestion Add; assert every call with method POST targets /api/projects/resolve, /api/projects, or /api/projects/create-jobs/… poll/cancel/reconcile."
+        },
+        "items": [
+          {
+            "id": "dialog-route-audit.ac1",
+            "title": "Given every dialog path is driven, when POST calls are collected, then each targets only /api/projects/resolve, /api/projects, or a /api/projects/create-jobs/ URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-route-audit.ac2",
+            "title": "Given the audit test exists, when AddProjectDialog.test.tsx runs, then vitest exits 0 for the shell cases and the audit case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-focus-after-create",
+        "title": "Focus the Launcher after a project is added",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/launcherFocusStore.ts",
+            "src/dashboard/frontend/src/components/Stage/launcherFocusStore.test.ts",
+            "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Stage/launcherFocusStore.test.ts src/components/Stage/HomePane/Launcher.test.tsx",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "file-size lint passes (App.tsx <= 1019 lines)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. launcherFocusStore.ts zustand {pendingDeckKey, requestFocus(deckKey), clear()} plus requestLauncherFocusAfterCreate(tab, projectKey) that requests only when tab === 'command-deck'. App.tsx handleProjectCreated adds one line after ensureHome: requestLauncherFocusAfterCreate(target.tab, project.key). Launcher gets optional focusKey prop, an input ref and one useEffect that focuses and clears when focusKey equals pendingDeckKey; no other Launcher change (PAN-4280 edits this file). ProjectHome passes focusKey={api.deckKey}."
+        },
+        "items": [
+          {
+            "id": "launcher-focus-after-create.ac1",
+            "title": "Given requestLauncherFocusAfterCreate('command-deck','app'), when the store is read, then pendingDeckKey is 'app'; given tab 'workspace-new', then it stays null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-focus-after-create.ac2",
+            "title": "Given a pending request for deck 'app', when a Launcher with focusKey 'app' mounts, then its input has focus and the request is cleared (test 'focuses when a focus request matches its deck')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-focus-after-create.ac3",
+            "title": "Given a pending request for deck 'other', when a Launcher with focusKey 'app' mounts, then its input does not take focus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-project-missing",
+        "title": "Workspace resolve returns project-missing with zero projects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/create.ts",
+            "tests/unit/lib/workspaces/create-intent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/create-intent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "create-intent.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. WorkspaceIntentCode gains 'project-missing'. In resolveProjectRef (src/lib/workspaces/create.ts), after the projectKey branch and before `if (all.length === 1)`, return {finding:{field:'project', code:'project-missing', message:'Add a project first.'}} when all.length === 0. The project-ambiguous message stays unchanged."
+        },
+        "items": [
+          {
+            "id": "workspace-project-missing.ac1",
+            "title": "Given zero registered projects, when resolveWorkspaceCreateIntent runs without projectKey, then it returns finding project-missing with message 'Add a project first.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-project-missing.ac2",
+            "title": "Given two registered projects and no key, when resolved, then it still returns project-ambiguous and grep -n 'Multiple projects are registered' src/lib/workspaces/create.ts matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-branch-candidates",
+        "title": "Workspace resolve returns branchCandidates for a branchQuery",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/create.ts",
+            "src/dashboard/server/routes/workspace-registry.ts",
+            "tests/unit/lib/workspaces/create-intent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/create-intent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "create-intent.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. WorkspaceCreateInput.branchQuery?: string; ResolvedWorkspaceIntent.branchCandidates: string[] default [] (not in WorkspaceIntentDryRun/toDryRunPayload). When branchQuery trimmed length >= 2 after the project resolves: execFileAsync('git', ['for-each-ref','--format=%(refname:short)','refs/heads','refs/remotes'], {cwd: config.path, timeout: 5000}); error → []; drop '*/HEAD' and bare 'origin'; case-insensitive prefix matches first then substring; dedupe; cap 20. workspace-registry.ts toCreateInput adds branchQuery: str(body.branchQuery). Test with a real temp git repo (real timers)."
+        },
+        "items": [
+          {
+            "id": "workspace-branch-candidates.ac1",
+            "title": "Given a temp repo with branches main, feature/login and fix-login, when resolved with branchQuery 'log', then branchCandidates contains feature/login and fix-login (test 'branchQuery returns matching branches')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-branch-candidates.ac2",
+            "title": "Given branchQuery 'fe', when resolved, then prefix matches are ordered before substring matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-branch-candidates.ac3",
+            "title": "Given branchQuery 'l', when resolved, then branchCandidates is empty and pan workspace new --dry-run output keys are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "smart-field-classifier",
+        "title": "Add classifySmartInput and toWorkspaceSlug",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/workspace/new/smartField.ts",
+            "src/dashboard/frontend/src/components/workspace/new/__tests__/smartField.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/workspace/new/__tests__/smartField.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "smartField.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. classifySmartInput(text, prefixes) on trimmed text: ^#(\\d+)$ → {kind:'issue', id:'#<n>'}; ^([A-Za-z][A-Za-z0-9]*)-(\\d+)$ with a case-insensitively registered prefix → {kind:'issue', id:'<PREFIX>-<n>'} upper-cased; ^https?://github\\.com/[^/]+/[^/]+/(issues|pull)/(\\d+) → {kind:'url', id:'#<n>', url}; other ^https?:// → {kind:'url', url}; else {kind:'text'}. toWorkspaceSlug(name) = name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')."
+        },
+        "items": [
+          {
+            "id": "smart-field-classifier.ac1",
+            "title": "Given '#12', when classified, then it returns kind issue with id '#12'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smart-field-classifier.ac2",
+            "title": "Given 'pan-12' with prefixes ['PAN'], when classified, then it returns kind issue with id 'PAN-12'; given 'XYZ-12', then kind text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smart-field-classifier.ac3",
+            "title": "Given 'https://github.com/o/r/issues/12', when classified, then it returns kind url with id '#12'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smart-field-classifier.ac4",
+            "title": "Given 'Fix login redirect bug!', when toWorkspaceSlug runs, then it returns 'fix-login-redirect-bug'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "smart-workspace-field",
+        "title": "Replace the New Workspace title input with the Smart field",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/workspace/new/SmartWorkspaceField.tsx",
+            "src/dashboard/frontend/src/components/workspace/new/useWorkspaceCreateIntent.ts",
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/pages/__tests__/NewWorkspacePage.test.tsx src/pages/__tests__/NewWorkspacePage.parity.test.tsx src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16 (D12, D22). useWorkspaceCreateIntent adds branchQuery state sent only when >= 2 chars and exposes branchCandidates. SmartWorkspaceField keeps data-testid new-workspace-hero-title, aria-label 'Workspace name', classes, placeholder 'Untitled workspace' and autoFocus; typing sets branchQuery and shows a listbox: issue/url with id → 'Open <ID> and start work' navigating to /issues/<ID> via pushState + popstate ('#<n>' becomes '<PREFIX>-<n>' with the selected project's prefix, else no issue row); each branchCandidate → sets parentBranch and opens Advanced; text → 'Use \"<toWorkspaceSlug(text)>\" as the name' → setName(slug). Arrow keys, Enter, Esc. Prefixes come from /api/registered-projects rows' linearTeam (add linearTeam to the page's RegisteredProject type). Under the field show 'Branch: <intent.intent.branchName>' when mode is isolated. Idea cards also set the field text."
+        },
+        "items": [
+          {
+            "id": "smart-workspace-field.ac1",
+            "title": "Given resolve returns branchCandidates ['feature/login'], when 'fea' is typed, then a 'feature/login' suggestion renders (test 'typing a branch prefix shows branch suggestions')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smart-workspace-field.ac2",
+            "title": "Given a branch suggestion, when it is picked, then the parent branch input value becomes 'feature/login'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smart-workspace-field.ac3",
+            "title": "Given plain text 'Fix login bug', when typed, then the suggestion 'Use \"fix-login-bug\" as the name' renders and picking it sets the name to fix-login-bug",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smart-workspace-field.ac4",
+            "title": "Given the page renders, when it mounts, then the input with data-testid new-workspace-hero-title and aria-label 'Workspace name' has focus (existing autofocus test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-ci-subset",
+        "title": "Add the new frontend tests to test:frontend-subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset"
+          ],
+          "expected_outputs": [
+            "frontend subset passes and includes the eight added files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 (D25). Append to root package.json test:frontend-subset: src/components/project/new/__tests__/AddProjectDialog.test.tsx, AddProjectCloneCreate.test.tsx, AddProjectSuggestions.test.tsx, AddProjectFolderStep.test.tsx, AddProjectNestedStep.test.tsx (same folder), src/components/workspace/new/__tests__/smartField.test.ts, src/components/Stage/launcherFocusStore.test.ts, src/pages/__tests__/NewProjectPage.no-loss.test.tsx."
+        },
+        "items": [
+          {
+            "id": "frontend-ci-subset.ac1",
+            "title": "Given the updated script, when npm run test:frontend-subset runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-ci-subset.ac2",
+            "title": "grep -c 'AddProjectNestedStep.test.tsx' package.json prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-onboarding",
+        "title": "Document the dialog, repo-root snap, folder-of-repos import, suggestions and Smart field",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-27T23:44:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4281",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "configuration/projects.mdx",
+            "configuration/workspaces.mdx",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"suggestions\" docs/WORKSPACES-AND-PROJECTS.md",
+            "grep -n \"polyrepo\" configuration/projects.mdx",
+            "grep -n \"Smart\" configuration/workspaces.mdx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one line",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18. docs/WORKSPACES-AND-PROJECTS.md 'Creating a project (PAN-3836)': Notices paragraph (snap, using-repository-root, retired repository-root-elsewhere); Folders of repositories paragraph (depth-1 scan cap 50; add each, or one multi-repo project with the D17 YAML shape incl. pan_records); routes-table row for GET /api/projects/suggestions; sentence that batch/suggestion adds use resolveThenCreateProject over the same two routes. configuration/projects.mdx '### Dashboard': describe the Add-a-project dialog (Open a folder with snap, non-git explanation and found-repositories step with both choices incl. polyrepo; Clone from URL with Enter; Create new project; Repositories in ~/Projects suggestions; /projects/new still works). configuration/workspaces.mdx: the Smart field and 'Add a project first.'. CLAUDE.md line 23: project creation UI is the Add-project dialog (modal from sidebar +, workspace-page chips, HomePage button; /projects/new?mode= renders it as a page)."
+        },
+        "items": [
+          {
+            "id": "docs-onboarding.ac1",
+            "title": "grep -n 'suggestions' docs/WORKSPACES-AND-PROJECTS.md matches a routes-table row naming GET /api/projects/suggestions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-onboarding.ac2",
+            "title": "Given configuration/projects.mdx, when grep -n 'polyrepo' runs, then it prints the line describing a folder of repositories added as one multi-repo project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-onboarding.ac3",
+            "title": "grep -n 'Smart' configuration/workspaces.mdx matches, and grep -n 'Project creation UI at `/projects/new`' CLAUDE.md prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "snap-repo-root",
+        "to": "nested-repo-scan",
+        "type": "blocks"
+      },
+      {
+        "from": "nested-repo-scan",
+        "to": "polyrepo-create",
+        "type": "blocks"
+      },
+      {
+        "from": "nested-repo-scan",
+        "to": "suggestions-route",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-create",
+        "to": "suggestions-route",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-project-create-form",
+        "to": "add-project-dialog-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-dialog-shell",
+        "to": "clone-create-enter-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "suggestions-route",
+        "to": "dialog-suggestions",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-dialog-shell",
+        "to": "dialog-suggestions",
+        "type": "blocks"
+      },
+      {
+        "from": "snap-repo-root",
+        "to": "dialog-folder-step",
+        "type": "blocks"
+      },
+      {
+        "from": "nested-repo-scan",
+        "to": "dialog-folder-step",
+        "type": "blocks"
+      },
+      {
+        "from": "suggestions-route",
+        "to": "dialog-folder-step",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-dialog-shell",
+        "to": "dialog-folder-step",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-suggestions",
+        "to": "dialog-folder-step",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-create",
+        "to": "dialog-nested-step",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-suggestions",
+        "to": "dialog-nested-step",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-folder-step",
+        "to": "dialog-nested-step",
+        "type": "blocks"
+      },
+      {
+        "from": "clone-create-enter-submit",
+        "to": "dialog-route-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-suggestions",
+        "to": "dialog-route-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-nested-step",
+        "to": "dialog-route-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-dialog-shell",
+        "to": "launcher-focus-after-create",
+        "type": "blocks"
+      },
+      {
+        "from": "snap-repo-root",
+        "to": "polyrepo-create",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-project-create-form",
+        "to": "clone-create-enter-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-dialog-shell",
+        "to": "dialog-nested-step",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-dialog-shell",
+        "to": "dialog-route-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-project-missing",
+        "to": "workspace-branch-candidates",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-branch-candidates",
+        "to": "smart-workspace-field",
+        "type": "blocks"
+      },
+      {
+        "from": "smart-field-classifier",
+        "to": "smart-workspace-field",
+        "type": "blocks"
+      },
+      {
+        "from": "add-project-dialog-shell",
+        "to": "smart-workspace-field",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-route-audit",
+        "to": "frontend-ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-focus-after-create",
+        "to": "frontend-ci-subset",
+        "type": "blocks"
+      },
+      {
+        "from": "smart-field-classifier",
+        "to": "frontend-ci-subset",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

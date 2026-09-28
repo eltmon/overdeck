@@ -187,6 +187,23 @@ describe('useWorkspaceCreateIntent', () => {
     expect(onCreated).toHaveBeenCalledWith('ws-new');
   });
 
+  it('asks resolve for branches matching the typed name, but never sends that to create (PAN-4281)', async () => {
+    const { result } = renderHook(() => useWorkspaceCreateIntent({ initialProjectKey: 'overdeck' }));
+    act(() => result.current.setName('f'));
+    await settleResolve();
+    expect(resolveBodies().at(-1)?.branchQuery).toBeUndefined();
+
+    act(() => result.current.setName('fe'));
+    await settleResolve();
+    expect(resolveBodies().at(-1)).toMatchObject({ name: 'fe', branchQuery: 'fe' });
+
+    await act(async () => {
+      await result.current.submitIntent();
+    });
+    const createCall = mockFetch.mock.calls.find(([url]) => url === '/api/workspace-registry');
+    expect(JSON.parse((createCall?.[1] as RequestInit).body as string)).not.toHaveProperty('branchQuery');
+  });
+
   it('suppresses onCreated when the page unmounts during submission', async () => {
     const onCreated = vi.fn();
     let releaseCreate!: (response: Response) => void;

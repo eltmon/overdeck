@@ -227,6 +227,40 @@ describe('resolveWorkspaceCreateIntent — resolution writes nothing (AC-3)', ()
   });
 });
 
+describe('resolveWorkspaceCreateIntent — branch candidates (PAN-4281 FR-12)', () => {
+  beforeEach(() => {
+    for (const branch of ['feature/login', 'fix-login', 'release']) {
+      execFileSync('git', ['branch', branch], { cwd: projectRoot });
+    }
+  });
+
+  it('branchQuery returns matching branches', async () => {
+    const byLog = await resolveWorkspaceCreateIntent({ name: 'x', projectKey: PROJECT_KEY, branchQuery: 'log' });
+    expect(byLog.branchCandidates).toEqual(['feature/login', 'fix-login']);
+
+    // Prefix matches come before substring matches.
+    const byFe = await resolveWorkspaceCreateIntent({ name: 'x', projectKey: PROJECT_KEY, branchQuery: 'fe' });
+    expect(byFe.branchCandidates[0]).toBe('feature/login');
+  });
+
+  it('answers while the name is still empty', async () => {
+    const intent = await resolveWorkspaceCreateIntent({ name: '', projectKey: PROJECT_KEY, branchQuery: 'rel' });
+
+    expect(intent.findings).toEqual([expect.objectContaining({ code: 'invalid-name' })]);
+    expect(intent.branchCandidates).toEqual(['release']);
+  });
+
+  it('short branchQuery returns no candidates', async () => {
+    const intent = await resolveWorkspaceCreateIntent({ name: 'x', projectKey: PROJECT_KEY, branchQuery: 'f' });
+    expect(intent.branchCandidates).toEqual([]);
+  });
+
+  it('keeps branchCandidates out of the dry-run payload', async () => {
+    const intent = await resolveWorkspaceCreateIntent({ name: 'x', projectKey: PROJECT_KEY, branchQuery: 'log' });
+    expect(toDryRunPayload(intent)).not.toHaveProperty('branchCandidates');
+  });
+});
+
 describe('resolveWorkspaceCreateIntent — no ambient working directory (AC-4)', () => {
   // Two registered projects, so the sole-project shortcut cannot decide, and a
   // registry row at projectRoot — exactly what a cwd lookup would resolve
@@ -256,6 +290,18 @@ describe('resolveWorkspaceCreateIntent — no ambient working directory (AC-4)',
     expect(intent.projectId).toBeNull();
     expect(intent.findings).toEqual([
       expect.objectContaining({ field: 'project', code: 'project-ambiguous' }),
+    ]);
+  });
+
+  it('zero projects returns project-missing', async () => {
+    unregisterProject(SECOND_PROJECT_KEY);
+    unregisterProject(PROJECT_KEY);
+
+    const intent = await resolveWorkspaceCreateIntent({ name: 'nothing-yet' });
+
+    expect(intent.projectId).toBeNull();
+    expect(intent.findings).toEqual([
+      { field: 'project', code: 'project-missing', message: 'Add a project first.' },
     ]);
   });
 

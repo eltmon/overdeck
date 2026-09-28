@@ -463,3 +463,50 @@ describe('performProjectCreate — partial registration is repairable, not stran
     expect(config?.issue_prefix).toBe('WIDGET');
   });
 });
+
+describe('performProjectCreate — multi-repo project (PAN-4281 WI-3)', () => {
+  it('multi-repo intent registers a polyrepo workspace with pan_records', async () => {
+    const root = join(TEST_HOME, 'suite');
+    mkdirSync(join(root, 'frontend', '.git'), { recursive: true });
+    mkdirSync(join(root, 'backend', '.git'), { recursive: true });
+    execFileMock.mockImplementation(
+      (cmd: string, args: string[], opts: { cwd?: string }, cb: Function) => {
+        if (opts?.cwd?.endsWith('/frontend') && args[0] === 'symbolic-ref') {
+          cb(null, { stdout: 'origin/main\n', stderr: '' });
+        } else if (opts?.cwd?.endsWith('/frontend') && args[0] === 'remote') {
+          cb(null, { stdout: 'git@github.com:acme/frontend.git\n', stderr: '' });
+        } else {
+          cb(new Error('not a git repository'));
+        }
+      },
+    );
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'existing',
+      path: root,
+      repos: ['frontend', 'backend'],
+      homeBoundary: false,
+      homeDir: TEST_HOME,
+    });
+    expect(intent.findings).toHaveLength(0);
+
+    const result = await performProjectCreate(intent);
+
+    const config = getProjectSync(result.key);
+    expect(config?.workspace).toEqual({
+      type: 'polyrepo',
+      workspaces_dir: 'workspaces',
+      repos: [
+        { name: 'frontend', path: 'frontend', branch_prefix: 'feature/', default_branch: 'main', forge: 'github' },
+        { name: 'backend', path: 'backend', branch_prefix: 'feature/' },
+      ],
+    });
+    expect(config?.pan_records).toEqual({ repo: 'frontend' });
+    expect(config?.tracker).toBeUndefined();
+    expect(config?.github_repo).toBeUndefined();
+    expect(config?.issue_prefix).toBe('SUITE');
+    // The plain-folder root has no .git; each member repository gets the hooks.
+    expect(existsSync(join(root, 'frontend', '.git', 'hooks'))).toBe(true);
+    expect(existsSync(join(root, 'backend', '.git', 'hooks'))).toBe(true);
+  });
+});

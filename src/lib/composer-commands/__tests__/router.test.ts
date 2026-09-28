@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   compact: vi.fn(),
-  deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
+  deliverAgentMessage: vi.fn().mockResolvedValue({ ok: true, path: 'tmux' }),
   deliverControl: vi.fn().mockResolvedValue(undefined),
   getConversationByName: vi.fn(),
   getHarnessBehavior: vi.fn(() => ({

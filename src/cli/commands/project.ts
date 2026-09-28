@@ -173,6 +173,11 @@ export async function projectAddCommand(
 
   const intent = await resolveProjectCreateIntent(input);
 
+  // The dry-run document carries notices itself.
+  if (!options.dryRun) {
+    for (const notice of intent.notices) console.log(chalk.dim(`ℹ ${notice.message}`));
+  }
+
   const alreadyHere = intent.findings.find((f) => f.code === 'project-exists-here');
   if (alreadyHere) {
     // Same folder, same key: this *is* the project, not a name collision, so
@@ -252,22 +257,24 @@ export async function projectAddCommand(
   }
   console.log('');
 
-  // Check what the project has and guide them on next steps
-  const hasDevcontainer = existsSync(join(fullPath, '.devcontainer'));
+  // Check what the project has and guide them on next steps. Resolve may have
+  // snapped a subfolder to its repository root, so look at the registered path.
+  const projectRoot = regResult.config.path;
+  const hasDevcontainer = existsSync(join(projectRoot, '.devcontainer'));
   const hasDevcontainerTemplate =
-    existsSync(join(fullPath, 'infra', '.devcontainer-template')) ||
-    existsSync(join(fullPath, '.devcontainer-template'));
+    existsSync(join(projectRoot, 'infra', '.devcontainer-template')) ||
+    existsSync(join(projectRoot, '.devcontainer-template'));
 
   // Detect repo structure (monorepo vs polyrepo)
-  const hasRootGit = existsSync(join(fullPath, '.git'));
+  const hasRootGit = existsSync(join(projectRoot, '.git'));
   const subRepos: string[] = [];
 
   if (!hasRootGit) {
     const { readdirSync, statSync } = await import('fs');
     try {
-      const entries = readdirSync(fullPath);
+      const entries = readdirSync(projectRoot);
       for (const entry of entries) {
-        const entryPath = join(fullPath, entry);
+        const entryPath = join(projectRoot, entry);
         try {
           if (statSync(entryPath).isDirectory() && existsSync(join(entryPath, '.git'))) {
             subRepos.push(entry);
@@ -287,7 +294,7 @@ export async function projectAddCommand(
   let hooksInstalled = regResult.hooksInstalled;
   if (isPolyrepo) {
     for (const repo of subRepos) {
-      hooksInstalled += installGitHooksInDir(join(fullPath, repo, '.git'));
+      hooksInstalled += installGitHooksInDir(join(projectRoot, repo, '.git'));
     }
   }
 

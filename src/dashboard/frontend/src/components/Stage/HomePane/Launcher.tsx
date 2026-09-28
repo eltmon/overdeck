@@ -1,7 +1,8 @@
-import { useState, type ReactNode, type KeyboardEvent, type Ref } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type KeyboardEvent, type Ref } from 'react'
 import { Terminal, Globe, MessagesSquare } from 'lucide-react'
 import { AgentIcon } from './AgentIcon'
 import { orderIntents } from './launcherOrdering'
+import { useLauncherFocusStore } from '../launcherFocusStore'
 import styles from '../stage.module.css'
 
 export type LauncherIntentKind = 'agent' | 'terminal' | 'web' | 'talk'
@@ -62,6 +63,8 @@ export interface LauncherProps {
   errorText?: string
   /** Id of the last-run agent in this workspace; floats it to position 1. */
   lastUsedAgentId?: string | null
+  /** This Launcher's deck key; it takes a pending focus request for that deck. */
+  focusKey?: string
   /** Forwarded to the underlying input's ref, for callers that need focus control. */
   inputRef?: Ref<HTMLInputElement>
   /** Forwarded to the underlying input's autoFocus. */
@@ -85,11 +88,29 @@ export function Launcher({
   busy = false,
   errorText,
   lastUsedAgentId,
+  focusKey,
   inputRef,
   autoFocus,
   inputTestId,
 }: LauncherProps) {
   const [query, setQuery] = useState('')
+  // The input serves both the caller's inputRef and this Launcher's own
+  // focus-request handling, so one callback ref feeds both.
+  const ownInputRef = useRef<HTMLInputElement | null>(null)
+  const setInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      ownInputRef.current = node
+      if (typeof inputRef === 'function') inputRef(node)
+      else if (inputRef) (inputRef as { current: HTMLInputElement | null }).current = node
+    },
+    [inputRef],
+  )
+  const pendingDeckKey = useLauncherFocusStore((state) => state.pendingDeckKey)
+  useEffect(() => {
+    if (!focusKey || focusKey !== pendingDeckKey) return
+    ownInputRef.current?.focus()
+    useLauncherFocusStore.getState().clear()
+  }, [focusKey, pendingDeckKey])
   const [selected, setSelected] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const hasQuery = query.length > 0
@@ -145,7 +166,7 @@ export function Launcher({
     <div className={styles.launcher}>
       <div className={styles.launchBar}>
         <input
-          ref={inputRef}
+          ref={setInputRef}
           autoFocus={autoFocus}
           data-testid={inputTestId}
           className={styles.launchInput}

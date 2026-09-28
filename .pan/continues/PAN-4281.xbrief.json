@@ -1,0 +1,353 @@
+{
+  "version": "1",
+  "issueId": "PAN-4281",
+  "created": "2026-09-27T23:54:39.995Z",
+  "updated": "2026-09-28T08:34:05.887Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "snap-repo-root": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-27T23:54:39.995Z",
+      "doneAt": "2026-09-28T00:00:16.316Z"
+    },
+    "nested-repo-scan": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:00:28.278Z",
+      "doneAt": "2026-09-28T00:02:39.777Z"
+    },
+    "polyrepo-create": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:02:45.855Z",
+      "doneAt": "2026-09-28T00:07:18.539Z"
+    },
+    "suggestions-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:07:24.074Z",
+      "doneAt": "2026-09-28T00:10:06.402Z"
+    },
+    "extract-project-create-form": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:10:11.596Z",
+      "doneAt": "2026-09-28T00:13:25.666Z"
+    },
+    "add-project-dialog-shell": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:13:32.749Z",
+      "doneAt": "2026-09-28T00:19:56.463Z"
+    },
+    "clone-create-enter-submit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:20:12.440Z",
+      "doneAt": "2026-09-28T00:21:37.748Z"
+    },
+    "dialog-suggestions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:21:47.059Z",
+      "doneAt": "2026-09-28T00:24:55.072Z"
+    },
+    "dialog-folder-step": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:25:04.810Z",
+      "doneAt": "2026-09-28T00:34:11.924Z"
+    },
+    "dialog-nested-step": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:34:50.107Z",
+      "doneAt": "2026-09-28T00:41:24.836Z"
+    },
+    "dialog-route-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:41:49.581Z",
+      "doneAt": "2026-09-28T00:42:17.421Z"
+    },
+    "launcher-focus-after-create": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:42:23.599Z",
+      "doneAt": "2026-09-28T00:45:35.227Z"
+    },
+    "workspace-project-missing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:45:40.584Z",
+      "doneAt": "2026-09-28T00:48:39.242Z"
+    },
+    "workspace-branch-candidates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:48:44.556Z",
+      "doneAt": "2026-09-28T00:54:46.689Z"
+    },
+    "smart-field-classifier": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:55:02.930Z",
+      "doneAt": "2026-09-28T00:56:01.313Z"
+    },
+    "smart-workspace-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T00:56:06.717Z",
+      "doneAt": "2026-09-28T01:09:15.042Z"
+    },
+    "frontend-ci-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T01:09:27.023Z",
+      "doneAt": "2026-09-28T01:10:07.973Z"
+    },
+    "docs-onboarding": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4281",
+      "claimedAt": "2026-09-28T01:10:13.009Z",
+      "doneAt": "2026-09-28T01:11:39.227Z"
+    },
+    "snap-repo-root.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:23:33.086Z"
+    },
+    "snap-repo-root.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:23:43.667Z"
+    },
+    "snap-repo-root.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:23:54.715Z"
+    },
+    "snap-repo-root.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:24:07.495Z"
+    },
+    "snap-repo-root.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:24:19.233Z"
+    },
+    "nested-repo-scan.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:24:31.216Z"
+    },
+    "nested-repo-scan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:24:41.792Z"
+    },
+    "nested-repo-scan.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:24:53.519Z"
+    },
+    "polyrepo-create.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:25:05.594Z"
+    },
+    "polyrepo-create.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:25:18.100Z"
+    },
+    "polyrepo-create.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:25:29.682Z"
+    },
+    "polyrepo-create.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:25:40.524Z"
+    },
+    "suggestions-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:25:51.560Z"
+    },
+    "suggestions-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:26:02.271Z"
+    },
+    "suggestions-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:26:12.827Z"
+    },
+    "extract-project-create-form.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:26:23.715Z"
+    },
+    "extract-project-create-form.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:26:35.365Z"
+    },
+    "add-project-dialog-shell.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:26:45.781Z"
+    },
+    "add-project-dialog-shell.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:26:56.039Z"
+    },
+    "add-project-dialog-shell.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:27:05.873Z"
+    },
+    "add-project-dialog-shell.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:27:16.717Z"
+    },
+    "add-project-dialog-shell.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:27:27.143Z"
+    },
+    "clone-create-enter-submit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:27:38.286Z"
+    },
+    "clone-create-enter-submit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:27:49.775Z"
+    },
+    "clone-create-enter-submit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:28:01.377Z"
+    },
+    "dialog-suggestions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:28:13.420Z"
+    },
+    "dialog-suggestions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:28:24.467Z"
+    },
+    "dialog-suggestions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:28:36.253Z"
+    },
+    "dialog-folder-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:28:47.277Z"
+    },
+    "dialog-folder-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:28:58.419Z"
+    },
+    "dialog-folder-step.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:29:10.082Z"
+    },
+    "dialog-nested-step.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:29:21.223Z"
+    },
+    "dialog-nested-step.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:29:31.904Z"
+    },
+    "dialog-nested-step.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:29:42.983Z"
+    },
+    "dialog-nested-step.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:29:53.077Z"
+    },
+    "dialog-route-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:30:03.319Z"
+    },
+    "dialog-route-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:30:14.517Z"
+    },
+    "launcher-focus-after-create.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:30:24.816Z"
+    },
+    "launcher-focus-after-create.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:30:35.084Z"
+    },
+    "launcher-focus-after-create.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:30:44.966Z"
+    },
+    "workspace-project-missing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:30:55.152Z"
+    },
+    "workspace-project-missing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:31:06.519Z"
+    },
+    "workspace-branch-candidates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:31:19.424Z"
+    },
+    "workspace-branch-candidates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:31:31.504Z"
+    },
+    "workspace-branch-candidates.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:31:42.382Z"
+    },
+    "smart-field-classifier.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:31:53.286Z"
+    },
+    "smart-field-classifier.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:32:04.266Z"
+    },
+    "smart-field-classifier.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:32:16.326Z"
+    },
+    "smart-field-classifier.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:32:28.227Z"
+    },
+    "smart-workspace-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:32:39.697Z"
+    },
+    "smart-workspace-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:32:50.408Z"
+    },
+    "smart-workspace-field.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:33:01.538Z"
+    },
+    "smart-workspace-field.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:33:12.188Z"
+    },
+    "frontend-ci-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:33:23.041Z"
+    },
+    "frontend-ci-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:33:34.020Z"
+    },
+    "docs-onboarding.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:33:45.295Z"
+    },
+    "docs-onboarding.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:33:55.996Z"
+    },
+    "docs-onboarding.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T08:34:05.886Z"
+    }
+  }
+}

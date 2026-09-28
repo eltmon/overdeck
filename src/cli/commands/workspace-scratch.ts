@@ -27,6 +27,8 @@ function cliMessageFor(finding: WorkspaceIntentFinding): string {
       return `No project registered with key '${finding.detail}'. Run 'pan projects list' to see registered keys.`;
     case 'project-ambiguous':
       return `Multiple projects are registered; specify --project <key>. Run 'pan projects list' to see registered keys.`;
+    case 'project-missing':
+      return `No projects are registered. Add one first with 'pan project add <path>'.`;
     case 'target-not-a-directory':
       return `--target-path must be an existing directory: ${finding.detail}`;
     case 'path-exists':

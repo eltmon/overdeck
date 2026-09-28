@@ -140,8 +140,7 @@ export function getNewProjectReturnToFromSearch(search = window.location.search)
 }
 
 /** Where App lands after a project is created: back to the workspace page when it asked for it, else the command deck. */
-export function getProjectCreatedNavigation(projectKey: string): { tab: Extract<Tab, 'workspace-new' | 'command-deck'>; path: string; state: Record<string, unknown> } {
-  const returnTo = getNewProjectReturnToFromSearch();
+export function getProjectCreatedNavigation(projectKey: string, returnTo = getNewProjectReturnToFromSearch()): { tab: Extract<Tab, 'workspace-new' | 'command-deck'>; path: string; state: Record<string, unknown> } {
   if (returnTo?.startsWith('/workspaces/new')) {
     return { tab: 'workspace-new', path: `/workspaces/new?project=${encodeURIComponent(projectKey)}`, state: { tab: 'workspace-new' } };
   }

@@ -13,6 +13,9 @@
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { ResolvedProjectIntent, ProjectCreateResult } from '../../../../src/lib/projects/create.js';
 
 const routeMocks = vi.hoisted(() => ({
@@ -23,6 +26,9 @@ const routeMocks = vi.hoisted(() => ({
   finishProjectSetup: vi.fn(),
   resolveProjectCreateRecovery: vi.fn(),
   getProjectSync: vi.fn(),
+  listProjectsAsync: vi.fn(),
+  registerProject: vi.fn(),
+  getDefaultCwd: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects/create.js', async () => {
@@ -45,8 +51,17 @@ vi.mock('../../../../src/lib/projects.js', async () => {
   const actual = await vi.importActual<typeof import('../../../../src/lib/projects.js')>(
     '../../../../src/lib/projects.js',
   );
-  return { ...actual, getProjectSync: routeMocks.getProjectSync };
+  return {
+    ...actual,
+    getProjectSync: routeMocks.getProjectSync,
+    listProjectsAsync: routeMocks.listProjectsAsync,
+    registerProject: routeMocks.registerProject,
+  };
 });
+
+vi.mock('../../../../src/lib/default-cwd.js', () => ({
+  getDefaultCwd: routeMocks.getDefaultCwd,
+}));
 
 vi.mock('../../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
@@ -78,6 +93,9 @@ function makeResolvedIntent(mode: 'clone' | 'existing' | 'new', overrides: Parti
     wouldGitInit: mode === 'new',
     willCreateMainWorkspace: true,
     findings: [],
+    notices: [],
+    nestedRepositories: [],
+    workspaceRepos: [],
     ...overrides,
   };
 }
@@ -199,6 +217,70 @@ describe('project-create routes', () => {
       // This route runs once per settled keystroke; forcing a refresh here would
       // spawn a `git ls-remote` per character typed.
       expect(input.refreshRemote).toBeFalsy();
+    });
+  });
+
+  describe('GET /api/projects/suggestions', () => {
+    it('suggestions excludes registered repos and performs no writes', async () => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'project-suggestions-')));
+      try {
+        mkdirSync(join(root, 'alpha', '.git'), { recursive: true });
+        mkdirSync(join(root, 'beta', '.git'), { recursive: true });
+        routeMocks.getDefaultCwd.mockReturnValue(root);
+        routeMocks.listProjectsAsync.mockResolvedValue([
+          { key: 'alpha', config: { name: 'alpha', path: join(root, 'alpha') } },
+        ]);
+
+        const { status, body } = await requestProjectsRoute('/api/projects/suggestions');
+
+        expect(status).toBe(200);
+        expect(body).toEqual({
+          root,
+          homeDir: expect.any(String),
+          repositories: [{ name: 'beta', path: join(root, 'beta') }],
+        });
+        expect(routeMocks.registerProject).not.toHaveBeenCalled();
+        expect(routeMocks.performProjectCreate).not.toHaveBeenCalled();
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects an unauthenticated request before scanning', async () => {
+      routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(
+        new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }),
+      );
+
+      const { status } = await requestProjectsRoute('/api/projects/suggestions');
+
+      expect(status).toBe(401);
+      expect(routeMocks.getDefaultCwd).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/projects/resolve — multi-repo selection', () => {
+    it('resolve passes a repos array to the core', async () => {
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(makeResolvedIntent('existing'));
+
+      await requestProjectsRoute('/api/projects/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'existing', path: '/home/user/suite', repos: ['frontend', 'backend'] }),
+      });
+
+      const input = routeMocks.resolveProjectCreateIntent.mock.calls[0][0];
+      expect(input.repos).toEqual(['frontend', 'backend']);
+    });
+
+    it('drops a repos value that is not an array of strings', async () => {
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(makeResolvedIntent('existing'));
+
+      await requestProjectsRoute('/api/projects/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'existing', path: '/home/user/suite', repos: ['frontend', 3] }),
+      });
+
+      const input = routeMocks.resolveProjectCreateIntent.mock.calls[0][0];
+      expect(input.repos).toBeUndefined();
     });
   });
 
