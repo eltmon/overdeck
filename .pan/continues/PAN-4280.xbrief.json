@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4280",
   "created": "2026-09-27T23:49:56.773Z",
-  "updated": "2026-09-28T00:23:21.135Z",
+  "updated": "2026-09-28T00:25:15.845Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,10 @@
       "doneAt": "2026-09-28T00:23:17.589Z"
     },
     "mount-advanced-home": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4280",
-      "claimedAt": "2026-09-28T00:23:21.134Z"
+      "claimedAt": "2026-09-28T00:23:21.134Z",
+      "doneAt": "2026-09-28T00:25:15.845Z"
     }
   }
 }
