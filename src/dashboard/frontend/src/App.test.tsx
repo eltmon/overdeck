@@ -148,6 +148,7 @@ vi.mock('./lib/store', () => ({
   selectPendingInputSubjects: () => [],
   selectMemoryObservations: () => () => [],
   selectRestartGate: (state: { restartGate?: unknown }) => state.restartGate ?? null,
+  selectGitHubQuota: (state: { githubQuota?: unknown }) => state.githubQuota ?? null,
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,

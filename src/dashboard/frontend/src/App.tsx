@@ -29,6 +29,7 @@ import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { CostWarningStyles } from './components/shared/costWarning';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgents, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { useConnectionState } from './lib/connectionState';
 import { usePanesStore } from './lib/panesStore';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from './lib/experimentalFeatures';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
@@ -280,7 +281,7 @@ export default function App() {
   const dashboardLifecycle = useDashboardStore(selectDashboardLifecycle);
 
   // Backend health check — poll every 5s so we catch outages quickly
-  const { isError: backendDown, failureCount: backendFailureCount } = useQuery({
+  const { isError: backendDown, failureCount: backendFailureCount, dataUpdatedAt, errorUpdatedAt } = useQuery({
     queryKey: ['backend-health'],
     queryFn: fetchBackendHealth,
     refetchInterval: 5000,
@@ -289,37 +290,15 @@ export default function App() {
     retryDelay: 1000,
     staleTime: 0,
   });
-  // Banner state machine for the backend health indicator.
-  //   'down'        — red banner, retrying, force-restart available
-  //   'recovering'  — yellow banner, "back up", auto-hides after a short pause
-  //   null          — hidden (steady state)
-  // The "down" entry threshold is still 2 failed polls so a single hiccup
-  // doesn't latch the banner. Recovery is one success — but rather than
-  // snapping closed we transition to a yellow confirmation that fades on a
-  // timer, so the user gets explicit feedback that things are back instead
-  // of having the banner just disappear.
-  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [bannerState, setBannerState] = useState<'down' | 'recovering' | null>(null);
+  // Feed the connection store (PAN-4279) on every poll: 2 failed polls ⇒
+  // unreachable, one success ⇒ reachable, so a single hiccup never latches it.
+  const backendUnreachable = backendDown && backendFailureCount >= 2;
   useEffect(() => {
-    if (backendDown) {
-      if (recoveryTimerRef.current) {
-        clearTimeout(recoveryTimerRef.current);
-        recoveryTimerRef.current = null;
-      }
-      if (backendFailureCount >= 2) setBannerState('down');
-    } else if (bannerState === 'down') {
-      setBannerState('recovering');
-      recoveryTimerRef.current = setTimeout(() => {
-        setBannerState(null);
-        recoveryTimerRef.current = null;
-      }, 2500);
-    }
-  }, [backendDown, backendFailureCount, bannerState]);
-  useEffect(() => () => {
-    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
-  }, []);
-  // Restart banner: shown when dashboard is in a planned restart (lifecycle active)
-  const showRestartBanner = dashboardLifecycle.active;
+    useConnectionState.getState().setServerReachable(!backendUnreachable);
+  }, [backendUnreachable, dataUpdatedAt, errorUpdatedAt]);
+  useEffect(() => {
+    useConnectionState.getState().setRestarting(dashboardLifecycle.active);
+  }, [dashboardLifecycle.active]);
 
   // Check tracker status for missing API keys
   const { data: trackerStatus } = useQuery({
@@ -870,8 +849,6 @@ export default function App() {
           selectedProjectKey={selectedProjectKey}
           runningAgentCount={runningAgentCount}
           dashboardLifecycle={dashboardLifecycle}
-          showRestartBanner={showRestartBanner}
-          bannerState={bannerState}
           missingKeyTrackers={missingKeyTrackers}
           trackerBannerDismissed={trackerBannerDismissed}
           showCliproxyBanner={showCliproxyBanner}
@@ -892,7 +869,7 @@ export default function App() {
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
-          <AppRoutes backendDown={bannerState === 'down'} restarting={showRestartBanner}
+          <AppRoutes backendDown={backendUnreachable} restarting={dashboardLifecycle.active}
             activeTab={activeTab}
             issues={issues}
             selectedConvId={selectedConvId}
