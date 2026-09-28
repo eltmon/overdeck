@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4281",
   "created": "2026-09-27T23:54:39.995Z",
-  "updated": "2026-09-28T00:00:28.278Z",
+  "updated": "2026-09-28T00:02:39.777Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-28T00:00:16.316Z"
     },
     "nested-repo-scan": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4281",
-      "claimedAt": "2026-09-28T00:00:28.278Z"
+      "claimedAt": "2026-09-28T00:00:28.278Z",
+      "doneAt": "2026-09-28T00:02:39.777Z"
     }
   }
 }
