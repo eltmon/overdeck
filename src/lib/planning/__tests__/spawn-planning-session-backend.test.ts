@@ -153,7 +153,7 @@ describe('spawnPlanningSession launches through the host backend (PAN-3960)', ()
     expect(spec).toMatchObject({
       name: sessionName,
       cwd: workspace,
-      argv: ['bash', launcherScript],
+      argv: ['nice', '-n', '10', '--', 'bash', launcherScript],
       tokens: { issue: 'PAN-3960', role: 'plan', harness: 'claude-code', model: 'claude-sonnet-5' },
       env: expect.objectContaining({
         TERM: 'xterm-256color',

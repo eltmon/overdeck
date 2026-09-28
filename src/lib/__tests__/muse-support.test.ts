@@ -203,7 +203,7 @@ describe('Muse model and harness support', () => {
       expect(tmuxCreateSession).not.toHaveBeenCalled();
       const launcher = join(root, 'agents', agentId, 'launcher.sh');
       expect(backend.starts).toHaveLength(1);
-      expect(backend.starts[0]!.spec).toMatchObject({ name: agentId, argv: ['bash', launcher], tokens: { harness: 'muse' } });
+      expect(backend.starts[0]!.spec).toMatchObject({ name: agentId, argv: ['nice', '-n', '10', '--', 'bash', launcher], tokens: { harness: 'muse' } });
       expect(await readFile(launcher, 'utf8')).toContain('pty-supervisor');
     } finally {
       if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
@@ -239,7 +239,7 @@ describe('Muse model and harness support', () => {
       const launcher = join(root, 'agents', agentId, 'launcher.sh');
       expect(backend.starts).toHaveLength(1);
       expect(backend.starts[0]!.spec).toMatchObject({
-        name: agentId, cwd: '/tmp/muse-workspace', argv: ['bash', launcher], detection: 'not-required',
+        name: agentId, cwd: '/tmp/muse-workspace', argv: ['nice', '-n', '10', '--', 'bash', launcher], detection: 'not-required',
         tokens: { harness: 'muse', model: 'muse-spark-1.3' },
       });
       expect(await readFile(launcher, 'utf8')).toContain('pty-supervisor');
