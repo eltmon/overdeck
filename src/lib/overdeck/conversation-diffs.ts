@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -35,6 +36,24 @@ export interface ConversationDiffDependencies {
 
 function result(body: unknown, status?: number): ConversationDiffResult {
   return status === undefined ? { body } : { body, status };
+}
+
+const DIFFS_CACHE_MAX = 32;
+const DIFFS_CACHE_TTL_MS = 30_000;
+interface DiffsCacheEntry {
+  size: number;
+  mtimeMs: number;
+  at: number;
+  body: { summaries: unknown[] };
+}
+const diffsCache = new Map<string, DiffsCacheEntry>();
+
+function cacheDiffsResult(cacheKey: string, entry: DiffsCacheEntry): void {
+  diffsCache.set(cacheKey, entry);
+  if (diffsCache.size > DIFFS_CACHE_MAX) {
+    const firstKey = diffsCache.keys().next().value;
+    if (firstKey !== undefined) diffsCache.delete(firstKey);
+  }
 }
 
 function lookupConversation(name: string): Conversation | null {
@@ -159,10 +178,27 @@ export async function getConversationDiffs(
       return result({ summaries: [] });
     }
 
+    // Repo HEAD is deliberately not part of the cache key: `git diff <base> -- <paths>`
+    // compares against the working tree, so the transcript's own stat signature is
+    // what decides whether the edited-file set (and therefore the diff) could differ.
+    const cacheKey = `${conv.name}\0${sessionFile}`;
+    const fileStats = await stat(sessionFile);
+    const cached = diffsCache.get(cacheKey);
+    if (
+      cached &&
+      cached.size === fileStats.size &&
+      cached.mtimeMs === fileStats.mtimeMs &&
+      Date.now() - cached.at < DIFFS_CACHE_TTL_MS
+    ) {
+      return result(cached.body);
+    }
+
     const parsed = await deps.getCachedMessages(sessionFile, false);
     const { fileEditsByAssistantId } = parsed;
     if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) {
-      return result({ summaries: [] });
+      const body = { summaries: [] };
+      cacheDiffsResult(cacheKey, { size: fileStats.size, mtimeMs: fileStats.mtimeMs, at: Date.now(), body });
+      return result(body);
     }
 
     const summaries: Array<{
@@ -238,7 +274,9 @@ export async function getConversationDiffs(
       }
     }
 
-    return result({ summaries });
+    const body = { summaries };
+    cacheDiffsResult(cacheKey, { size: fileStats.size, mtimeMs: fileStats.mtimeMs, at: Date.now(), body });
+    return result(body);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[conversations] diffs failed:', msg);
