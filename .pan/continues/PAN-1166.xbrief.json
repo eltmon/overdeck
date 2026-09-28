@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1166",
   "created": "2026-09-28T12:44:25.371Z",
-  "updated": "2026-09-28T14:01:02.059Z",
+  "updated": "2026-09-28T14:01:16.982Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -210,6 +210,10 @@
     "xterminal-mint-first.ac3": {
       "status": "completed",
       "doneAt": "2026-09-28T14:01:02.058Z"
+    },
+    "autopreso-hook-mint-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:16.982Z"
     }
   }
 }
