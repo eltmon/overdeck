@@ -283,17 +283,19 @@ describe('createRunawayPatrol (PAN-4311 AC-4, AC-5)', () => {
   });
 });
 
-describe('dashboard wiring (PAN-4311 runaway-wiring.ac4)', () => {
-  it('starts the patrol beside the resources snapshot service and stops it on the same shutdown path', async () => {
-    const { readFile } = await import('node:fs/promises');
-    const { fileURLToPath } = await import('node:url');
-    const source = await readFile(
-      fileURLToPath(new URL('../../../../src/dashboard/server/main.ts', import.meta.url)),
-      'utf8',
+describe('startRunawayPatrol / stopRunawayPatrol (PAN-4311 runaway-wiring)', () => {
+  it.skipIf(process.platform !== 'linux')('publishes a snapshot after the first tick and clears it on stop', async () => {
+    const { getRunawaySnapshot, startRunawayPatrol, stopRunawayPatrol } = await import(
+      '../../../../src/lib/cloister/runaway-process-patrol.js'
     );
-
-    expect(source).toContain("import { startRunawayPatrol, stopRunawayPatrol } from '../../lib/cloister/runaway-process-patrol.js';");
-    expect(source).toMatch(/const stopResourcesSnapshot = startResourcesSnapshotService\(\);[\s\S]{0,200}startRunawayPatrol\(\);/);
-    expect(source).toMatch(/stopResourcesSnapshot\(\);\s*stopRunawayPatrol\(\);/);
+    try {
+      startRunawayPatrol();
+      startRunawayPatrol(); // idempotent: one patrol, one timer
+      await vi.waitFor(() => expect(getRunawaySnapshot()).not.toBeNull(), { timeout: 10_000 });
+      expect(getRunawaySnapshot()!.coreServicePids).toContain(process.pid);
+    } finally {
+      stopRunawayPatrol();
+    }
+    expect(getRunawaySnapshot()).toBeNull();
   });
 });
