@@ -56,7 +56,7 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
   mattpocock: {
     id: 'mattpocock',
     kind: 'pack',
-    url: 'https://github.com/mattpocock/skills',
+    url: 'https://github.com/eltmon/skills',
     adapter: 'claude-plugin',
     optIn: ['setup-matt-pocock-skills'],
   },

@@ -171,6 +171,14 @@ describe('cost module', () => {
       const pricing = getPricing('anthropic', 'claude-unknown-model');
       expect(pricing).toBeNull();
     });
+
+    it('prices gpt-6.1-sol distinctly from gpt-6-sol', () => {
+      const sol61 = getPricing('openai', 'gpt-6.1-sol');
+      const sol6 = getPricing('openai', 'gpt-6-sol');
+      expect(sol61?.model).toBe('gpt-6.1-sol');
+      expect(sol61?.cacheReadPer1k).toBe(0.0001);
+      expect(sol6?.cacheReadPer1k).toBe(0.0002);
+    });
   });
 
   describe('calculateCost - Standard Calculation', () => {

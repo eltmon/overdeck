@@ -211,6 +211,7 @@ describe('KNOWN_PACKS', () => {
   it('marks mattpocock as a claude-plugin pack with its opt-in skill', () => {
     expect(KNOWN_PACKS['mattpocock']).toMatchObject({
       kind: 'pack',
+      url: 'https://github.com/eltmon/skills',
       adapter: 'claude-plugin',
       optIn: ['setup-matt-pocock-skills'],
     });

@@ -628,6 +628,7 @@ describe('codexModelMinimumVersion (PAN-4363)', () => {
   it('returns the floor for gpt-6-sol and gpt-6-luna', () => {
     expect(codexModelMinimumVersion('gpt-6-luna')).toBe('0.156.1');
     expect(codexModelMinimumVersion('gpt-6-sol')).toBe('0.156.1');
+    expect(codexModelMinimumVersion('gpt-6.1-sol')).toBe('0.159.0');
   });
 
   it('returns undefined for models without a floor and for inherited prototype keys', () => {
