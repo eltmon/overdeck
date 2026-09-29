@@ -166,6 +166,8 @@ describe('evals/lib/review-recall-scorer', () => {
         expect(c.provenance.reviewedSha).toMatch(/^[0-9a-f]{40}$/);
         expect(c.provenance.mergeBase).toMatch(/^[0-9a-f]{40}$/);
         expect(c.diff).toContain(`diff --git a/${c.blocker.file} `);
+        // Committed diffs stay small so the branch diff fits the verification gate's git buffer.
+        expect(c.diff.length, c.id).toBeLessThanOrEqual(15_000);
       }
     });
 
