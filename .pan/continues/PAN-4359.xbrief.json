@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4359",
   "created": "2026-09-29T03:48:03.128Z",
-  "updated": "2026-09-29T04:38:41.468Z",
+  "updated": "2026-09-29T04:45:01.981Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,9 +62,10 @@
       "doneAt": "2026-09-29T04:38:35.284Z"
     },
     "doctor-claude-code": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4359",
-      "claimedAt": "2026-09-29T04:38:41.468Z"
+      "claimedAt": "2026-09-29T04:38:41.468Z",
+      "doneAt": "2026-09-29T04:45:01.981Z"
     }
   }
 }
