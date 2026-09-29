@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:45:51.665Z",
+  "updated": "2026-09-29T11:46:03.087Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "turn-end-store.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T11:45:51.665Z"
+    },
+    "turn-end-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:03.087Z"
     }
   }
 }
