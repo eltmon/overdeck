@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4329",
   "created": "2026-09-29T09:48:46.123Z",
-  "updated": "2026-09-29T10:33:43.882Z",
+  "updated": "2026-09-29T10:33:57.394Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "wip-apply.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T10:33:43.882Z"
+    },
+    "resume-wip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:33:57.394Z"
     }
   }
 }
