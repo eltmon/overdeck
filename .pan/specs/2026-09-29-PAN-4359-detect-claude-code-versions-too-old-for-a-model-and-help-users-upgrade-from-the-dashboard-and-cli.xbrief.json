@@ -4,17 +4,17 @@
     "created": "2026-09-29T03:42:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4359: Detect Claude Code versions too old for a model, and help users upgrade from the dashboard and CLI",
-    "updated": "2026-09-29T03:47:02.299Z"
+    "updated": "2026-09-29T03:47:52.356Z"
   },
   "plan": {
     "id": "pan-4359",
     "title": "Detect Claude Code versions too old for a model, and help users upgrade from the dashboard and CLI",
-    "status": "proposed",
+    "status": "running",
     "uid": "a9d49aa2-03c2-49ad-b914-d15cacbb1176",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T03:42:40Z",
-    "updated": "2026-09-29T03:47:02.299Z",
+    "updated": "2026-09-29T03:47:52.356Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4359",
