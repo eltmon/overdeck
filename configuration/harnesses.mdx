@@ -87,8 +87,8 @@ A steer never falls back silently to a queued message. A harness without steer a
   and `gpt-5.6-luna[372k]` picker variants opt into a `372000`-token pin for
   long-research sessions that accept the surcharge; the `[372k]` suffix is
   Overdeck-side only and is stripped before the model id reaches the API.
-  The GPT-6 models (`gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`) have no `[372k]`
-  variant — the 372K pin was measured on `gpt-5.6-sol` and has not been
+  The GPT-6 models (`gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-6.1-sol`) have no
+  `[372k]` variant — the 372K pin was measured on `gpt-5.6-sol` and has not been
   re-measured for GPT-6.
   The maximum tells Claude Code the route's capacity; the auto-compact window is
   the capacity used by Claude Code's normal proactive compaction calculation,
@@ -194,7 +194,7 @@ internal configuration records are excluded from the chat feed.
 ### OpenAI Codex CLI (alternative)
 
 - First-party OpenAI agent loop for the GPT model family (GPT-6 Astra/Sol/Luna,
-  GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with
+  GPT-6.1 Sol, GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with
   ChatGPT-subscription or API-key auth.
 - `gpt-5.6-sol` is the default OpenAI model surfaced by this harness. `gpt-6-astra`
   is the newest and most capable OpenAI model but is opt-in — pick it explicitly.
@@ -203,6 +203,9 @@ internal configuration records are excluded from the chat feed.
   ChatGPT sign-in, `gpt-6-sol` and `gpt-6-luna` need Codex CLI `0.156.1` or
   newer — OpenAI answers HTTP 400 below that version
   ([openai/codex#47784](https://github.com/openai/codex/issues/47784)).
+  `gpt-6.1-sol` (September 29, 2026) is the GPT-6.1 successor to GPT-6 Sol at
+  the same $2/$10 price with $0.10 cached input; it is opt-in. Under ChatGPT
+  sign-in it needs Codex CLI `0.159.0` or newer.
   `gpt-6-astra` and API-key auth have no floor. Overdeck refuses such a
   launch before it starts (`pan start`, the dashboard, conversations, and
   every other spawn path), names the required version, and never
@@ -210,7 +213,7 @@ internal configuration records are excluded from the chat feed.
   `pan install` does not manage the Codex CLI. `pan doctor` shows a
   `Codex model floor` row per model. On the claude-code harness through
   CLIProxy, CLIProxy `7.3.16` (the version `pan install` pins) was verified
-  on 2026-09-29 to serve both models under ChatGPT sign-in.
+  on 2026-09-29 to serve all three models under ChatGPT sign-in.
 - Work agents use a persistent `codex app-server` child by default. Overdeck
   talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
   readiness, and interruption are structured protocol events rather than TUI
