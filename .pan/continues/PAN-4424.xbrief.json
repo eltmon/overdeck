@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4424",
   "created": "2026-09-29T22:24:30.151Z",
-  "updated": "2026-09-29T23:01:18.328Z",
+  "updated": "2026-09-29T23:01:34.269Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "verify-managed-claude.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T23:01:18.327Z"
+    },
+    "verify-managed-claude.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:01:34.269Z"
     }
   }
 }
