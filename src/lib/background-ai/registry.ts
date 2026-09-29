@@ -16,6 +16,9 @@ export const BACKGROUND_AI_FEATURES = [
   'sessionEmbeddings',
   'summaryFork',
   'ttsSummarizer',
+  'jevTurnEndAssessment',
+  'jevAcceptanceCriteriaReview',
+  'jevMemoryRelevance',
 ] as const;
 
 export type BackgroundAiFeature = (typeof BACKGROUND_AI_FEATURES)[number];
@@ -36,6 +39,7 @@ export interface BackgroundAiFeatureMeta {
  * until the user flips a toggle:
  *   - sessionEmbeddings defaults OFF  (conversations.embeddings default false)
  *   - ttsSummarizer defaults OFF      (ttsSummarizer.enabled default false)
+ *   - jev* features default OFF       (optional third-party judgment calls, PAN-4369)
  *   - everything else defaults ON.
  */
 export const BACKGROUND_AI_FEATURE_META: readonly BackgroundAiFeatureMeta[] = [
@@ -85,6 +89,27 @@ export const BACKGROUND_AI_FEATURE_META: readonly BackgroundAiFeatureMeta[] = [
     key: 'ttsSummarizer',
     label: 'TTS activity narration',
     description: 'Summarize recent activity into spoken narration utterances.',
+    defaultEnabled: false,
+  },
+  {
+    key: 'jevTurnEndAssessment',
+    label: 'Jev: turn-end classification',
+    description:
+      "Sends an agent's last message (trimmed to about 6,000 characters) and its role to TypeSafe to classify why the agent stopped.",
+    defaultEnabled: false,
+  },
+  {
+    key: 'jevAcceptanceCriteriaReview',
+    label: 'Jev: acceptance-criteria review',
+    description:
+      'Sends the id and text of every acceptance criterion in a plan to TypeSafe at plan finalize, for advisory warnings.',
+    defaultEnabled: false,
+  },
+  {
+    key: 'jevMemoryRelevance',
+    label: 'Jev: memory relevance filter',
+    description:
+      'Sends your prompt and up to 20 memory snippets (about 600 characters each) to TypeSafe to drop irrelevant memories before injection.',
     defaultEnabled: false,
   },
 ] as const;
