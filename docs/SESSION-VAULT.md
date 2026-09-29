@@ -427,3 +427,49 @@ src/cli/commands/vault/*.ts       the pan vault verbs
 these modules imports the dashboard, the terminal backends, `src/lib/overdeck/*`, Effect or
 node-pty (P-14). `tests/unit/lib/vault/two-machine.e2e.test.ts` runs the whole flow across
 two temp homes and scans every object in the bare repository for plaintext.
+
+## Windows
+
+PAN-4331 checked the continue flow (`vault join` → `list` → `resume`, with the code snapshot)
+on 2026-09-29 in the `windows-smoke` workflow,
+[run 36615182191](https://github.com/eltmon/overdeck/actions/runs/36615182191). The environment
+was GitHub's `windows-2022` runner (Windows Server 2022 Datacenter 10.0.20348) with Git for
+Windows 2.55.0 and Node 22.23, plus Ubuntu 24.04 in WSL2 on the same runner (Node 22.23,
+Git 2.43). Windows 11, and continuing a conversation after dual-booting the machine that saved
+it, were not verified.
+
+- **WSL2: supported.** Join, list, resume, the materialized transcript that Claude Code picks
+  up, the Claude Code launch and the code snapshot all pass with the checkout in the Linux
+  filesystem (`~/w/proj`). Line endings, the exec bit and a symlink arrive as saved. A
+  checkout under `/mnt/c` was not tested. The runners have no Claude credentials, so "picks
+  up" means `claude --resume <id> -p ping` answers "Not logged in" for the materialized id and
+  "No conversation found" for a random one; no reply was exchanged.
+- **Native Windows: not supported.** `pan vault join` fails when git has `core.autocrlf=true`,
+  the Git for Windows default: `<url> is neither empty nor a vault (no VAULT-FORMAT on main)`
+  ([#4418](https://github.com/eltmon/overdeck/issues/4418)). The checkout converts the
+  `VAULT-FORMAT` marker to CRLF, and the byte comparison in `initGitVault` rejects it. Every
+  later step depends on join, so the native runs stop there.
+- **Behind that blocker**, a diagnostic run that first sets `git config --global core.autocrlf
+  false` got further. That configuration is not supported. In it, list, `resume --no-launch`
+  and the code snapshot work, and the transcript lands in
+  `%USERPROFILE%\.claude\projects\D--a--temp-w-proj\`, where Claude Code finds it. Launching
+  fails: `resume` without `--no-launch` stops with `Error: spawn claude ENOENT`, because
+  `defaultSpawn` runs `claude` without a shell and npm installs it as `claude.cmd`
+  ([#4419](https://github.com/eltmon/overdeck/issues/4419)). `--no-launch` prints
+  `cd 'D:\a\_temp\w\proj' && claude --resume <id>`, with the path in POSIX single quotes;
+  running that printed command by hand was not tested.
+- **Line endings, exec bit, symlinks** (diagnostic run; the native runs never applied a
+  snapshot): `lf.txt` and `crlf.txt` arrived byte for byte (LF and CRLF). `run.sh` arrived as
+  mode 100644, not 100755, because `core.filemode` is `false`. `link-to-lf` arrived as a real
+  symlink (`core.symlinks=true` on the runner).
+- **Dashboard on native Windows:** `npx @overdeck/core` starts the server and its API answers,
+  but every page returns 404, because the static root is built from a URL path
+  ([#4420](https://github.com/eltmon/overdeck/issues/4420)). Starting a conversation fails
+  with "Terminal backend 'herdr' is selected but unavailable: … Run `pan install` … or set
+  terminal.backend: tmux in ~/.overdeck/config.yaml". Whether `pan install` provides Herdr
+  on Windows was not tested.
+
+To check a fix, run the workflow again (Actions → windows-smoke → Run workflow). It also runs
+on any push that changes `scripts/windows-smoke/**`. The fixture builder, the two probes and
+the summarizer live in `scripts/windows-smoke/`; the step catalogue and results schema are in
+`.pan/drafts/PAN-4331.md`.
