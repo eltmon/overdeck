@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4305",
   "created": "2026-09-29T00:33:19.689Z",
-  "updated": "2026-09-29T00:58:08.934Z",
+  "updated": "2026-09-29T00:58:21.034Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "docs-delivery-landing.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T00:58:08.934Z"
+    },
+    "docs-delivery-landing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:58:21.034Z"
     }
   }
 }
