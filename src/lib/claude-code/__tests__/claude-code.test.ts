@@ -10,6 +10,7 @@ import {
   listConfiguredModels,
   minClaudeCodeVersionFor,
 } from '../requirements.js';
+import { getClaudeCodeStatus } from '../status.js';
 import {
   claudeCodeUpgradePlan,
   detectClaudeInstall,
@@ -290,5 +291,70 @@ describe('requirements', () => {
         required: '2.1.284',
       });
     });
+  });
+});
+
+describe('status', () => {
+  it('reports not found without treating it as outdated', async () => {
+    const status = await getClaudeCodeStatus(
+      {},
+      {
+        resolveBinary: async () => null,
+      },
+    );
+    expect(status).toMatchObject({ found: false, outdated: false, binaryPath: null, version: null, shadows: [] });
+  });
+
+  it('is outdated with a runnable npm plan when the installed version is too old for a configured model', async () => {
+    const config: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'defaultConversationModel'> = {
+      roles: { work: { model: 'claude-sonnet-5-5' } },
+    } as never;
+
+    const status = await getClaudeCodeStatus(
+      {},
+      {
+        resolveBinary: async () => '/usr/local/bin/claude',
+        readVersion: async () => '2.1.280',
+        resolveRealPath: async (p) => p,
+        detectInstall: () => ({ method: 'npm', realPath: '/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js', npmPrefix: '/usr/local' }),
+        upgradePlan: async () => ({
+          method: 'npm',
+          argv: ['npm', 'install', '-g', '--prefix', '/usr/local', '@anthropic-ai/claude-code@latest'],
+          display: 'npm install -g --prefix /usr/local @anthropic-ai/claude-code@latest',
+          runnable: true,
+        }),
+        loadConfig: () => config,
+        listBinaries: async () => [],
+      },
+    );
+
+    expect(status.found).toBe(true);
+    expect(status.outdated).toBe(true);
+    expect(status.upgrade?.runnable).toBe(true);
+  });
+
+  it('lists a second binary on PATH as a shadow with its own version', async () => {
+    const versionsByPath = new Map([
+      ['/usr/local/bin/claude', '2.1.284'],
+      ['/opt/shadow/claude', '2.0.19'],
+    ]);
+
+    const status = await getClaudeCodeStatus(
+      {},
+      {
+        resolveBinary: async () => '/usr/local/bin/claude',
+        readVersion: async (path) => versionsByPath.get(path) ?? null,
+        resolveRealPath: async (p) => p,
+        detectInstall: () => ({ method: 'npm', realPath: '/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js', npmPrefix: '/usr/local' }),
+        upgradePlan: async () => ({ method: 'npm', argv: null, display: 'claude update', runnable: false, reason: 'not-writable' }),
+        loadConfig: () => ({} as never),
+        listBinaries: async () => [
+          { path: '/usr/local/bin/claude', realPath: '/usr/local/bin/claude' },
+          { path: '/opt/shadow/claude', realPath: '/opt/shadow/claude' },
+        ],
+      },
+    );
+
+    expect(status.shadows).toEqual([{ path: '/opt/shadow/claude', realPath: '/opt/shadow/claude', version: '2.0.19' }]);
   });
 });
