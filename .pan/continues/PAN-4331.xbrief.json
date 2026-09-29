@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T19:14:14.319Z",
+  "updated": "2026-09-29T19:14:25.544Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "run-matrix.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T19:14:14.319Z"
+    },
+    "run-matrix.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T19:14:25.543Z"
     }
   }
 }
