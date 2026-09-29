@@ -4,17 +4,17 @@
     "created": "2026-09-29T04:34:01.359Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4370: Prompt-time memory injection almost never injects a memory: query expansion fails 100% with extraction-failed, no extraction cost events",
-    "updated": "2026-09-29T04:38:04.226Z"
+    "updated": "2026-09-29T13:04:07.749Z"
   },
   "plan": {
     "id": "pan-4370",
     "title": "Prompt-time memory injection almost never injects a memory: query expansion fails 100% with extraction-failed, no extraction cost events",
-    "status": "proposed",
+    "status": "running",
     "uid": "4bc99b39-2214-4818-a576-e6281a58eb61",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T04:34:01.359Z",
-    "updated": "2026-09-29T04:38:04.226Z",
+    "updated": "2026-09-29T13:04:07.749Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4370",
@@ -649,5 +649,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
