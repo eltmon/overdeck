@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:24:42.323Z",
+  "updated": "2026-09-29T16:24:56.862Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,10 @@
     "live-revocation.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T16:24:42.323Z"
+    },
+    "live-revocation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:24:56.861Z"
     }
   }
 }
