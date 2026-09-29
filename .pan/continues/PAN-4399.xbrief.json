@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4399",
   "created": "2026-09-29T13:22:15.132Z",
-  "updated": "2026-09-29T15:50:42.050Z",
+  "updated": "2026-09-29T15:54:07.703Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
       "claimedBy": "agent-pan-4399",
       "claimedAt": "2026-09-29T15:41:13.626Z",
       "doneAt": "2026-09-29T15:50:42.050Z"
+    },
+    "deferral-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:54:07.703Z"
     }
   }
 }
