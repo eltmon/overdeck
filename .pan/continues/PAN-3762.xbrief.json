@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:30:44.607Z",
+  "updated": "2026-09-29T16:30:57.311Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -290,6 +290,10 @@
     "e2e-pairing-journey.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:30:44.606Z"
+    },
+    "e2e-pairing-journey.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:30:57.311Z"
     }
   }
 }
