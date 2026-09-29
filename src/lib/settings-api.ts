@@ -187,6 +187,7 @@ export interface ApiSettingsConfig {
     openrouter?: string;
     nous?: string;
     dashscope?: string;
+    typesafe?: string;
   };
   agents?: {
     rtk?: {
@@ -953,6 +954,7 @@ async function saveSettingsApiPromiseUnlocked(
       openrouter: settings.api_keys.openrouter,
       nous: settings.api_keys.nous,
       dashscope: settings.api_keys.dashscope,
+      typesafe: settings.api_keys.typesafe,
     },
     agents: (settings.agents?.rtk !== undefined || settings.agents?.tldr !== undefined)
       ? {

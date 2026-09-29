@@ -60,6 +60,8 @@ export interface ApiKeysConfig {
   openrouter?: string;
   nous?: string;
   dashscope?: string;
+  /** PAN-4369: TypeSafe console key or OpenCode Zen key for the optional Jev client. */
+  typesafe?: string;
 }
 
 export interface TrackerKeysConfig {
