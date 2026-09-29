@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1728",
   "created": "2026-09-29T01:58:51.551Z",
-  "updated": "2026-09-29T02:22:29.304Z",
+  "updated": "2026-09-29T02:22:43.626Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "runner-wiring.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T02:22:29.304Z"
+    },
+    "work-role-guidance": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T02:22:43.625Z"
     }
   }
 }
