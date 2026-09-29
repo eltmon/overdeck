@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T09:51:55.548Z",
+  "updated": "2026-09-29T10:00:33.245Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "turn-end-assessor": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4371",
-      "claimedAt": "2026-09-29T09:51:55.547Z"
+      "claimedAt": "2026-09-29T09:51:55.547Z",
+      "doneAt": "2026-09-29T10:00:33.244Z"
     }
   }
 }
