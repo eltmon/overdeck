@@ -36,6 +36,9 @@ vi.mock('../../agents/liveness.js', () => ({
     !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
 
+vi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
+
+import { requestOperatorDecision, type OperatorDecision } from '../../cloister/operator-decision.js';
 import {
   classifyParked,
   IDLE_RUNNING_THRESHOLD_MS,
@@ -292,5 +295,48 @@ describe('resolveParkedPopulation', () => {
     await resolveParkedPopulation({ now: NOW, isClosed });
 
     expect(isClosed).not.toHaveBeenCalled();
+  });
+});
+
+// PAN-4383: an agent waiting on a `pan ask` decision is gated on the operator.
+describe('open operator decision', () => {
+  const decision: OperatorDecision = {
+    questionId: 'od-12345678',
+    issueId: 'PAN-1',
+    agentId: 'agent-pan-1',
+    question: 'Rotate the leaked token?',
+    options: ['Yes', 'No'],
+    askedAt: new Date(NOW - 7 * HOUR).toISOString(),
+  };
+
+  it('emits one operator-decision gate row and no idle-running row', () => {
+    const rows = classifyParked(signals({ liveAgents: liveIdle(), openOperatorDecision: decision }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].orbit).toBe('operator-gate');
+    expect(rows[0].parkedAt).toBe(decision.askedAt);
+    expect(rows[0].details).toEqual({ gate: 'operator-decision', questionId: 'od-12345678', agentId: 'agent-pan-1' });
+    expect(rows[0].parkReason).toBe('agent-pan-1 asked the operator: Rotate the leaked token?');
+  });
+
+  it('a closed issue yields no decision row', () => {
+    const rows = classifyParked(signals({ liveAgents: liveIdle(), issueClosed: true, openOperatorDecision: decision }));
+    expect(rows.map((r) => r.orbit)).toEqual(['zombie-session']);
+  });
+
+  it('the gather reads the decision from the agent workspace journal', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'parked-decision-'));
+    try {
+      requestOperatorDecision(workspace, { issueId: 'PAN-503', agentId: 'agent-pan-503', question: 'q?', options: ['a', 'b'] });
+      const live = { ...baseAgent({ id: 'agent-pan-503', issueId: 'PAN-503', workspace }), tmuxActive: true };
+      gather.agents = [live];
+      gather.liveAgents = [live];
+
+      const rows = await resolveParkedPopulation({ now: NOW, isClosed: vi.fn(async () => false) });
+
+      expect(rows.map((row) => `${row.issueId}:${row.orbit}:${String(row.details?.gate)}`))
+        .toEqual(['PAN-503:operator-gate:operator-decision']);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 });

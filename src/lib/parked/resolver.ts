@@ -29,6 +29,7 @@ import { listAgentStates, listRunningAgentsSync } from '../agents/queries.js';
 import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 import type { AgentState } from '../agents.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
+import { readOpenOperatorDecision, type OperatorDecision } from '../cloister/operator-decision.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { existsSync } from 'fs';
 import { join } from 'path';
@@ -91,6 +92,8 @@ export interface ParkedSignals {
   /** Tracker-closed (only resolved for live-agent candidates; null = unknown/not checked). */
   issueClosed: boolean | null;
   now: number;
+  /** PAN-4383: the open `pan ask` decision in the issue's workspace journal. */
+  openOperatorDecision?: OperatorDecision | null;
 }
 
 function isoOr(ts: string | number | null | undefined, fallback: number): string {
@@ -187,6 +190,15 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
       } else {
         push('operator-gate', row.parkedAt, `${names} explicitly stopped by the operator with no completed handoff to re-drive`, 'pan start <id> (operator-only; explicit start clears the stop gate)', { gate, agentIds: row.agentIds });
       }
+    }
+    // PAN-4383: an agent waiting on an operator decision is gated on the
+    // operator, not idle — this row also keeps idle-running from firing.
+    if (s.openOperatorDecision) {
+      const d = s.openOperatorDecision;
+      push('operator-gate', d.askedAt,
+        `${d.agentId} asked the operator: ${d.question.length > 160 ? `${d.question.slice(0, 159)}…` : d.question}`,
+        `answer it from the dashboard Needs-you, or run pan tell ${d.agentId} "<answer>"`,
+        { gate: 'operator-decision', questionId: d.questionId, agentId: d.agentId });
     }
   }
 
@@ -293,12 +305,14 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
     if (issueClosed === null && live.length > 0) {
       try { issueClosed = await isClosed(issueId); closedByIssue.set(issueId, issueClosed); } catch { issueClosed = null; }
     }
+    const workspace = (agentsByIssue.get(issueId) ?? []).find((agent) => agent.workspace)?.workspace;
     return classifyParked({
       issueId,
       agents: agentsByIssue.get(issueId) ?? [],
       liveAgents: live,
       issueClosed,
       now,
+      openOperatorDecision: workspace ? readOpenOperatorDecision(workspace) : null,
     });
   };
 
