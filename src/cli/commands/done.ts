@@ -272,6 +272,27 @@ export async function recordTestWaiver(workspacePath: string, reason: string): P
 }
 
 /**
+ * Commit any pending `.pan/continues/` or `.pan/specs/` changes the server
+ * dirtied inside the workspace before `pan done` rebases — a dirty tracked
+ * file makes `git rebase` refuse, and server writers (feedback, session
+ * history, spec transitions) never commit their own writes (PAN-4225).
+ */
+export async function commitPendingIssueArtifacts(workspacePath: string, issueId: string): Promise<void> {
+  const planHome = resolvePlanHome(workspacePath);
+  const paths = [join('.pan', 'continues'), join('.pan', 'specs')].filter((p) => existsSync(join(planHome, p)));
+  if (paths.length === 0) return;
+
+  const result = await commitPlanArtifacts({
+    cwd: planHome,
+    paths,
+    message: planArtifactCommitMessage(issueId),
+  });
+  if (!result.committed && result.reason !== 'nothing to commit') {
+    throw new Error(`Could not commit pending plan artifacts for ${issueId}: ${result.reason}`);
+  }
+}
+
+/**
  * Ask the dashboard to start verification → review for the issue (PAN-3917
  * W12). Reuses the `pan review request` door; the result is advisory, so the
  * caller prints the line and carries on.
@@ -376,6 +397,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   const spinner = ora('Marking work as done...').start();
 
   try {
+    await commitPendingIssueArtifacts(workspacePath, issueId);
+
     // Step 1: rebase onto the target branch and push. `pan done` is one command
     // for the agent; the fetch/rebase/push it used to do by hand lives here.
     const mergeSet = buildMergeSetForIssue(issueId);
