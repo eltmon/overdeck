@@ -39,6 +39,7 @@ import { initRestartGate } from './services/restart-gate.js';
 import { initDeployProgress } from './services/deploy-progress.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { ensureInternalToken } from '../../lib/internal-token.js';
+import { refreshAccessTokens, startAccessTokenRefresh } from '../../lib/access-tokens.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
@@ -130,6 +131,12 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalToken();
+
+// Load the device/access-token registry before serving (PAN-3762), then keep the
+// snapshot fresh so a revocation written by the CLI is honored within 5 s. A
+// corrupt registry is already logged loudly and accepts no token.
+await refreshAccessTokens().catch(() => undefined);
+startAccessTokenRefresh();
 
 // PAN-785 prepared the managed tmux context here, before any code path could spawn
 // tmux. Since PAN-1379 made that boot hook an Effect, the `await` here returned
