@@ -149,3 +149,60 @@ Skill packs (1)
 mattpocock                                  on     issue
   mattpocock/ask-matt                       on     issue-pack
 ```
+
+## Managed Claude Code launch
+
+Precondition (from `## Levels`): pack on at issue PAN-4424, off globally, inherit at project.
+
+```
+$ pan worker run --issue PAN-4424 --harness claude-code --model claude-haiku-4-5 --read-only --detach --name pack-probe-claude --prompt "List every available skill whose name contains 'grilling' or 'setup-matt-pocock', exactly as named in your skill list, one per line. Do not invoke any skill. Then record that list as your worker report with pan worker report."
+agent-pan-4424-worker-1
+
+$ pan worker wait agent-pan-4424-worker-1 --timeout 600
+# Skills Matching Query
+
+## Available Skills Containing 'grilling' or 'setup-matt-pocock'
+
+- grilling
+- mattpocock:grilling
+
+Note: No skills found containing 'setup-matt-pocock' as a substring.
+worker agent-pan-4424-worker-1 report 1: done; next: pan worker wait agent-pan-4424-worker-1 --after 1
+(exit code 0)
+```
+
+Report: `mattpocock:grilling` present, `grilling` present (bundled), no `mattpocock:setup-matt-pocock-skills` — matches expectation.
+
+`herdr pane list` found the worker's pane at `wQA:p4` (title `agent-pan-4424-worker-1`). Captured while the worker was still alive, before stopping it:
+
+```
+$ herdr pane read wQA:p4
+  Made 1 scratchpad edit +9, ran 1 shell command
+
+● Done. I've identified the skills matching your query and submitted the worker report:
+
+  Skills matching 'grilling' or 'setup-matt-pocock':
+  - grilling
+  - mattpocock:grilling
+
+  The report has been recorded via pan worker report agent-pan-4424-worker-1 --file <report>.
+
+✻ Sautéed for 19s · done 6:51 PM
+
+────────────────────────────────────────────────────────────────────────────────────────────── agent-pan-4424-worker-1 ─
+❯
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 4.5 (claude-haiku-4-5)  /home/eltmon/Projects/overdeck/workspaces/feature-pan-4424  main
+  ctx 33%  8/200.0k  out 184  cost $0.1042  +9/-0
+  5h 13% (1h18m)  7d 50% (122h8m)
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent
+```
+
+The worker sits at the ordinary input prompt (`❯`) with no plugin-consent or trust dialog text anywhere in the captured pane. The worker reaching its report also proves the pane was not held by a dialog.
+
+```
+$ pan kill agent-pan-4424-worker-1
+[agents] Stopping agent-pan-4424-worker-1 (async): tmux=false stateStatus=stopped
+  agent-pan-4424-worker-1: killed
+Skipping Docker teardown: 1 live sibling agent(s) (agent-pan-4424) still using this workspace
+```
