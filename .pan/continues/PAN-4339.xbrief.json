@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4339",
   "created": "2026-09-29T02:04:26.104Z",
-  "updated": "2026-09-29T03:15:30.120Z",
+  "updated": "2026-09-29T03:15:44.140Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "claim-contention-test.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T03:15:30.119Z"
+    },
+    "claim-contention-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:15:44.139Z"
     }
   }
 }
