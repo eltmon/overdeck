@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4358",
   "created": "2026-09-29T03:41:33.107Z",
-  "updated": "2026-09-29T04:28:13.619Z",
+  "updated": "2026-09-29T04:28:39.125Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "palette-server-grouping.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T04:28:13.619Z"
+    },
+    "palette-grouped-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:28:39.125Z"
     }
   }
 }
