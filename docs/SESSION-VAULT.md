@@ -12,12 +12,12 @@ projects (NFR-7). `pan vault` sends no telemetry (P-12).
 | Term | Meaning |
 | --- | --- |
 | **Vault** | One user's encrypted store of conversations, keyed by one 32-byte vault key. Lives in a git remote the user owns (`pan vault setup <git-url>`); a `dir:<path>` backend exists for tests and NAS mounts. |
-| **Backend** | An immutable object store plus compare-and-swap refs (`src/lib/vault/store/types.ts`). Layout on both backends: `VAULT-FORMAT` marker, `objects/<id[0:2]>/<id>`, `refs/<name>`. Ref names are keyed HMACs, so the backend cannot link records to conversations. |
+| **Backend** | An immutable object store plus compare-and-swap refs (`src/lib/vault/store/types.ts`). Layout on both backends: `VAULT-FORMAT` marker, `objects/<id[0:2]>/<id>`, `refs/<name>`. Ref names are keyed HMACs, so the backend cannot link records to conversations. One object name is reserved rather than content-addressed: `objects/keywrap/v1`, the scrypt-wrapped vault key for the optional passphrase (PAN-4328); Phase A never writes it. |
 | **Record** | One saved conversation: an encrypted ref value (`r/<hmac>`) holding owner, harness, title, cwd, the LOG, the VIEW pointer, segments, settlements and lineage (`SessionRecord` in `src/lib/vault/format.ts`). |
 | **Chunk** | The lines one settlement added, stored as `{ v, codec: "zstd", lineHashes, lines }`, compressed and sealed with AES-256-GCM. The chunk id is `HMAC-SHA256(K_id, plaintext)[:40]` and is the associated data, so a chunk cannot be swapped under another id. |
 | **LOG** | The ordered chunk ids of a record: every native line ever saved, byte for byte. |
 | **VIEW** | Where a resumed session starts: the LOG position of the last compaction boundary (Claude Code `isCompactSummary`, Codex `{"type":"compacted"}`), running to the end. |
-| **Settlement** | One save of a transcript: continuity check, secret scan, chunk upload, record update, CAS. Version *n* is the state after settlement *n*. |
+| **Settlement** | One save of a transcript: continuity check, secret scan, chunk upload, record update, CAS. Version *n* is the state after settlement *n*. Each entry has a reserved optional `wip` field (PAN-4329 WIP code snapshots); Phase A never writes it and readers tolerate its absence. |
 | **Owner** | The machine whose native file the record follows. Only the owner appends; another machine takes over by **adoption**. |
 | **Adoption** | `pan vault resume` on another machine: a CAS that adds a segment for the new machine, then materializes the VIEW into a fresh native session file. Two machines racing get exactly one owner; the loser sees `Already continued on <label>`. |
 | **Segment** | One owner period in a record: `{ environmentId, nativeSessionId, logStart, prefix, tail }`. The prefix describes the lines an adopter materialized; the tail is the last 16 line hashes of the native file as settled. |

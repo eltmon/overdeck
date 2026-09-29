@@ -147,6 +147,21 @@ describe('vault format: refs', () => {
     await expect(decryptRef(name, tampered, keys)).rejects.toBeInstanceOf(VaultAuthenticationError);
   });
 
+  it('settlements tolerate the reserved wip field being absent or present (PAN-4329 reservation)', async () => {
+    const record = sampleRecord();
+    const name = refName('record', record.vaultId, keys.K_ref);
+    const plain = await readSessionRecord(name, await encryptRef(name, record, keys), keys) as SessionRecord;
+    expect(plain.settlements[0]).not.toHaveProperty('wip');
+    const withWip: SessionRecord = {
+      ...record,
+      settlements: [{ ...record.settlements[0]!, wip: { base: 'b'.repeat(40), branch: 'main', tree: 't'.repeat(40), objects: ['c'.repeat(40)], bytes: 1234, at: '2026-09-28T00:00:00.000Z' } }],
+    };
+    const read = await readSessionRecord(name, await encryptRef(name, withWip, keys), keys) as SessionRecord;
+    expect(read.settlements[0]!.wip).toEqual(withWip.settlements[0]!.wip);
+    const skipped: SessionRecord = { ...record, settlements: [{ ...record.settlements[0]!, wip: { skipped: 'too-large', bytes: 99 } }] };
+    expect(((await readSessionRecord(name, await encryptRef(name, skipped, keys), keys)) as SessionRecord).settlements[0]!.wip).toEqual({ skipped: 'too-large', bytes: 99 });
+  });
+
   it('ac5: a ref value of another type reads as null without throwing', async () => {
     const name = refName('record', 'v-task', keys.K_ref);
     const taskValue = { v: 1, type: 'task', vaultId: 'v-task', title: 'reserved for PAN-2565' };

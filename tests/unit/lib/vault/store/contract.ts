@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import type { VaultStore } from '../../../../../src/lib/vault/store/types.js';
+import { KEYWRAP_OBJECT_NAME, type VaultStore } from '../../../../../src/lib/vault/store/types.js';
 
 const ID_A = 'a'.repeat(40);
 const ID_B = 'b'.repeat(40);
@@ -83,6 +83,17 @@ export function runVaultStoreContract(makeStore: () => Promise<VaultStore>): voi
         store.casRef('m/' + ID_C, null, Buffer.from('m2')),
       ]);
       expect(creates.sort()).toEqual(['conflict', 'ok']);
+    });
+
+    it('the reserved keywrap/v1 slot stores and reads like an object (PAN-4328 reservation)', async () => {
+      const store = await makeStore();
+      expect(await store.getObject(KEYWRAP_OBJECT_NAME)).toBeNull();
+      expect(await store.hasObjects([KEYWRAP_OBJECT_NAME, ID_A])).toEqual(new Set());
+      const wrapped = randomBytes(96);
+      await store.putObjects([{ id: KEYWRAP_OBJECT_NAME, bytes: wrapped }]);
+      expect(Buffer.from((await store.getObject(KEYWRAP_OBJECT_NAME))!).equals(wrapped)).toBe(true);
+      expect(await store.hasObjects([KEYWRAP_OBJECT_NAME])).toEqual(new Set([KEYWRAP_OBJECT_NAME]));
+      await expect(store.getObject('keywrap/v2')).rejects.toThrow(/Invalid vault object id/);
     });
 
     it('listRefs filters by prefix and reports current versions', async () => {

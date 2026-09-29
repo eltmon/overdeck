@@ -29,8 +29,8 @@ import {
   VAULT_FORMAT_MARKER,
   VAULT_FORMAT_MARKER_FILE,
   VaultOfflineError,
-  assertObjectId,
   assertRefName,
+  objectRelativePath,
   type CasResult,
   type VaultRef,
   type VaultStore,
@@ -174,8 +174,7 @@ export class GitVaultStore implements VaultStore {
   }
 
   private objectPath(id: string): string {
-    assertObjectId(id);
-    return join(this.cloneDir, 'objects', id.slice(0, 2), id);
+    return join(this.cloneDir, 'objects', ...objectRelativePath(id).split('/'));
   }
 
   private refRelPath(name: string): string {

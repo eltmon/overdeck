@@ -53,10 +53,28 @@ export class VaultOfflineError extends Error {
 /** Object ids are 40 lowercase hex chars (truncated HMAC-SHA256). */
 export const OBJECT_ID_PATTERN = /^[0-9a-f]{40}$/;
 
+/**
+ * Reserved object name for PAN-4328 (vault passphrase, anywhere-accounts
+ * design 6.5): the scrypt-wrapped copy of the vault key. Stored at
+ * `objects/keywrap/v1` on every backend. Phase A never writes it; reserving
+ * the name now means PAN-4328 lands without a format bump.
+ */
+export const KEYWRAP_OBJECT_NAME = 'keywrap/v1';
+
+/** Object names that are not content ids but fixed, well-known slots. */
+export const RESERVED_OBJECT_NAMES: ReadonlySet<string> = new Set([KEYWRAP_OBJECT_NAME]);
+
+/** Relative path of an object below `objects/`: `<id[0:2]>/<id>` for ids, the name itself for reserved slots. */
+export function objectRelativePath(id: string): string {
+  assertObjectId(id);
+  return RESERVED_OBJECT_NAMES.has(id) ? id : `${id.slice(0, 2)}/${id}`;
+}
+
 /** Ref names are `<prefix>/<40 hex>` or the fixed `h/header`; never `..`, never absolute. */
 export const REF_NAME_PATTERN = /^[a-z]\/[0-9a-z]{1,64}$/;
 
 export function assertObjectId(id: string): void {
+  if (RESERVED_OBJECT_NAMES.has(id)) return;
   if (!OBJECT_ID_PATTERN.test(id)) throw new Error(`Invalid vault object id: ${JSON.stringify(id)}`);
 }
 

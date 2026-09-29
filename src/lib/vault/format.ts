@@ -88,6 +88,24 @@ export interface RecordSegment {
   tail: Tail;
 }
 
+/**
+ * Reserved for PAN-4329 (WIP code snapshots, anywhere-accounts design 6.7):
+ * an encrypted snapshot of the owner's uncommitted code taken with this
+ * settlement, or the reason one was skipped. Phase A never writes it; readers
+ * tolerate its absence and ignore fields they do not know.
+ */
+export type WipSnapshotRef =
+  | {
+      base: string;
+      branch: string | null;
+      tree: string;
+      /** Chunk ids holding the encrypted bundle. */
+      objects: string[];
+      bytes: number;
+      at: string;
+    }
+  | { skipped: 'too-large' | 'secret' | 'no-git' | 'error'; bytes?: number; reason?: string };
+
 export interface Settlement {
   at: string;
   /** Last chunk id written by this settlement. */
@@ -97,6 +115,8 @@ export interface Settlement {
   /** Cumulative LOG line count after this settlement; versions map onto it (P-7). */
   lines: number;
   cwdState: CwdState | null;
+  /** Reserved (PAN-4329). Absent in every Phase A settlement. */
+  wip?: WipSnapshotRef;
 }
 
 export interface SessionRecord {

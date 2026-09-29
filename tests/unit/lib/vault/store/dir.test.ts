@@ -33,6 +33,8 @@ describe('DirVaultStore layout', () => {
     expect(readFileSync(join(root, 'refs', 'r', id), 'utf8')).toBe('ref');
     expect((await store.readRef('r/' + id))!.version).toBe(refVersion(Buffer.from('ref')));
     expect(readdirSync(join(root, 'refs', 'r'))).toEqual([id]);
+    await store.putObjects([{ id: 'keywrap/v1', bytes: Buffer.from('wrapped') }]);
+    expect(readFileSync(join(root, 'objects', 'keywrap', 'v1'), 'utf8')).toBe('wrapped');
   });
 
   it('re-opens an existing vault and refuses a non-empty non-vault or foreign marker', async () => {
