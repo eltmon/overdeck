@@ -2,8 +2,8 @@
  * `pan spawn` against a fake terminal backend (PAN-3917 W9, AC-9).
  *
  * The adapters land with W8; this pins the contract `pan spawn` codes against:
- * the pane goes into the issue's workspace, carries the FR-5 tokens with role
- * `worker`, and an item with a `files_scope` gets its own worktree.
+ * the pane carries the FR-5 tokens with role `worker`, and every worker gets
+ * its own item worktree unless `--shared` (PAN-4340).
  */
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -86,6 +86,8 @@ function plan(metadata?: Record<string, unknown>) {
   return { plan: { id: 'PAN-1', items: [{ id: 'item-a', title: 'A', status: 'pending', metadata }], edges: [] } };
 }
 
+const itemWorktree = vi.fn(async (workspacePath: string, itemId: string) => `${workspacePath}/.swarm/${itemId}`);
+
 describe('pan spawn', () => {
   let started: Started[];
   let printed: string[];
@@ -100,23 +102,24 @@ describe('pan spawn', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('starts a worker pane in the issue workspace and prints the pane id', async () => {
+  it('starts a worker for an item with no files_scope in its own item worktree and prints the pane id', async () => {
     await spawnCommand(
       { issue: 'PAN-1', item: 'item-a', model: 'opus', harness: 'claude-code' },
-      { resolveBackend: async () => fakeBackend(started) },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree },
     );
 
+    expect(itemWorktree).toHaveBeenCalledWith('/tmp/proj/workspaces/feature-pan-1', 'item-a');
     expect(started).toHaveLength(1);
     expect(started[0].workspace.issueId).toBe('PAN-1');
     expect(started[0].workspace.cwd).toBe('/tmp/proj/workspaces/feature-pan-1');
-    expect(started[0].spec.cwd).toBe('/tmp/proj/workspaces/feature-pan-1');
+    expect(started[0].spec.cwd).toBe('/tmp/proj/workspaces/feature-pan-1/.swarm/item-a');
     expect(printed).toEqual(['w1:p2']);
   });
 
   it('stamps the FR-5 metadata tokens with role worker', async () => {
     await spawnCommand(
       { issue: 'PAN-1', item: 'item-a', model: 'sonnet', harness: 'codex' },
-      { resolveBackend: async () => fakeBackend(started) },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree },
     );
 
     expect(started[0].spec.tokens).toEqual({
@@ -131,7 +134,7 @@ describe('pan spawn', () => {
   it('stamps OVERDECK_CLAIM_ID with the pane agent name (PAN-4339 FR-7)', async () => {
     await spawnCommand(
       { issue: 'PAN-1', item: 'item-a', model: 'opus', harness: 'claude-code' },
-      { resolveBackend: async () => fakeBackend(started) },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree },
     );
 
     expect(started[0].spec.name).toBe('pan-1-item-a');
@@ -155,13 +158,43 @@ describe('pan spawn', () => {
     expect(started[0].spec.cwd).toBe('/tmp/proj/workspaces/feature-pan-1/.swarm/item-a');
   });
 
+  it('runs a --shared worker in the issue workspace without creating a worktree', async () => {
+    mocks.readPlan.mockReturnValue(plan({ files_scope: ['src/lib/**'] }));
+
+    await spawnCommand(
+      { issue: 'PAN-1', item: 'item-a', model: 'opus', shared: true },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree, env: {} },
+    );
+
+    expect(itemWorktree).not.toHaveBeenCalled();
+    expect(started[0].spec.cwd).toBe('/tmp/proj/workspaces/feature-pan-1');
+  });
+
+  it('refuses --shared from a pan spawn worker pane', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+
+    await spawnCommand(
+      { issue: 'PAN-1', item: 'item-a', model: 'opus', shared: true },
+      {
+        resolveBackend: async () => fakeBackend(started),
+        createWorktree: itemWorktree,
+        env: { OVERDECK_ITEM_ID: 'other-item' },
+      },
+    );
+
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(started).toHaveLength(0);
+    expect(itemWorktree).not.toHaveBeenCalled();
+    exit.mockRestore();
+  });
+
   it('refuses an item that is not in the issue xBRIEF', async () => {
     const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
     mocks.readPlan.mockReturnValue(plan());
 
     await spawnCommand(
       { issue: 'PAN-1', item: 'nope', model: 'opus' },
-      { resolveBackend: async () => fakeBackend(started) },
+      { resolveBackend: async () => fakeBackend(started), createWorktree: itemWorktree },
     );
 
     expect(started).toHaveLength(0);
@@ -202,7 +235,7 @@ describe('pan spawn pre-trusts the worker cwd (PAN-3905)', () => {
   it('leaves ~/.claude.json alone for a worker on another harness', async () => {
     await spawnCommand(
       { issue: 'PAN-1', item: 'item-a', model: 'sonnet', harness: 'codex' },
-      { resolveBackend: async () => fakeBackend([]) },
+      { resolveBackend: async () => fakeBackend([]), createWorktree: itemWorktree },
     );
 
     expect(readFileSync(claudeJsonPath, 'utf-8')).toBe(JSON.stringify({ projects: {} }));

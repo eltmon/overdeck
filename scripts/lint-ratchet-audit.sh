@@ -213,14 +213,7 @@ NODE
 
 commit_has_issue_ref() {
   local commit="$1"
-  # Capture into a variable rather than piping straight into `grep -q`:
-  # -q exits on the first match without draining stdin, so under `pipefail`
-  # a big commit body can make `git log` catch SIGPIPE before it finishes
-  # writing, and its 141 exit outranks grep's 0 — a real match reported as
-  # "no issue ref" (observed flaking on already-merged commits, PAN-4363).
-  local message
-  message=$(git log -1 --format=%B "$commit")
-  grep -Eq "$ISSUE_REF_RE" <<< "$message"
+  grep -Eq "$ISSUE_REF_RE" <<< "$(git log -1 --format=%B "$commit")"
 }
 
 audit_commit() {
