@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2444",
   "created": "2026-09-29T22:31:10.767Z",
-  "updated": "2026-09-29T23:19:03.506Z",
+  "updated": "2026-09-29T23:19:07.047Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-2444",
       "claimedAt": "2026-09-29T23:16:32.087Z",
       "doneAt": "2026-09-29T23:19:03.506Z"
+    },
+    "claude-launch-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2444",
+      "claimedAt": "2026-09-29T23:19:07.047Z"
     }
   }
 }
