@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T22:51:54.521Z",
+  "updated": "2026-09-29T22:52:01.187Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-3943",
       "claimedAt": "2026-09-29T22:48:41.935Z",
       "doneAt": "2026-09-29T22:51:54.520Z"
+    },
+    "deft-project-mode": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:52:01.187Z"
     }
   }
 }
