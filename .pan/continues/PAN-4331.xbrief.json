@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T15:13:04.329Z",
+  "updated": "2026-09-29T15:13:41.299Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4331",
       "claimedAt": "2026-09-29T14:56:18.359Z",
       "doneAt": "2026-09-29T15:13:04.329Z"
+    },
+    "probe-wsl.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:13:41.298Z"
     }
   }
 }
