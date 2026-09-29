@@ -11,10 +11,16 @@
  */
 import type { ChoiceResponse, NoulResponse, Questions, ScoreResponse } from '@typesafe-ai/sdk';
 import { subItemsOf, type XBriefDocument } from '../xbrief/types.js';
-import type { QualityIssue } from '../xbrief/quality-lint.js';
+import { OBSERVABLE_TERMS, type QualityIssue } from '../xbrief/quality-lint.js';
 import { assess, type JevAssessOptions, type JevFailureReason } from './client.js';
 import type { JevUnavailableReason } from './config.js';
-import { JEV_AC_COMPOUND_MAX_NOUL, JEV_AC_OBSERVABLE_MIN_NOUL, acceptanceCriteriaQuestions } from './questions.js';
+import { appendAcceptanceCriteriaEvalLog, type AcceptanceCriteriaEvalRow } from './eval-log.js';
+import {
+  JEV_AC_COMPOUND_MAX_NOUL,
+  JEV_AC_OBSERVABLE_MIN_NOUL,
+  QUESTION_SET_VERSION,
+  acceptanceCriteriaQuestions,
+} from './questions.js';
 
 export interface ReviewedCriterion {
   itemId: string;
@@ -62,6 +68,11 @@ function noulValue(answer: NoulResponse | ScoreResponse | ChoiceResponse | undef
   return answer?.type === 'noul' ? answer.noul : null;
 }
 
+function keywordVerdict(title: string): 'observable' | 'not-observable' {
+  const lowered = title.toLowerCase();
+  return OBSERVABLE_TERMS.some(term => lowered.includes(term)) ? 'observable' : 'not-observable';
+}
+
 export type ReviewAcceptanceCriteriaOptions = JevAssessOptions & {
   /** Shadow eval log home directory override, for tests (wired by the eval-log writer, PAN-4372 WI-2). */
   evalLogHome?: string;
@@ -84,6 +95,8 @@ export async function reviewAcceptanceCriteria(
   if (result.status === 'failed') return { status: 'failed', reason: result.reason, issues: [] };
 
   const issues: QualityIssue[] = [];
+  const evalRows: AcceptanceCriteriaEvalRow[] = [];
+  const timestamp = (options.now ?? (() => new Date()))().toISOString();
   for (const criterion of request.criteria) {
     const observable = noulValue(result.answers[`observable_${criterion.acId}`]);
     if (observable !== null && observable < JEV_AC_OBSERVABLE_MIN_NOUL) {
@@ -104,7 +117,19 @@ export async function reviewAcceptanceCriteria(
         message: `Acceptance criterion ${criterion.acId} may describe more than one behavior (Jev noul ${compound.toFixed(2)}; advisory)`,
       });
     }
+
+    evalRows.push({
+      timestamp,
+      planId: doc.plan.id,
+      acId: criterion.acId,
+      questionSetVersion: QUESTION_SET_VERSION,
+      model: result.model,
+      keywordVerdict: keywordVerdict(criterion.title),
+      jevNoul: { observable, compound },
+    });
   }
+
+  await appendAcceptanceCriteriaEvalLog(evalRows, { home: options.evalLogHome, now: options.now });
 
   return { status: 'answered', issues, model: result.model };
 }

@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import type { Fetch } from '@typesafe-ai/sdk';
 import type { CostEvent } from '../../costs/events.js';
 
@@ -82,9 +85,20 @@ function doc(items: XBriefItem[]): XBriefDocument {
   };
 }
 
+const tmpDirs: string[] = [];
+async function tmpHome(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'jev-ac-review-'));
+  tmpDirs.push(dir);
+  return dir;
+}
+
 beforeEach(() => {
   resetJevMemo();
   captured.length = 0;
+});
+
+afterEach(async () => {
+  await Promise.all(tmpDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })));
 });
 
 describe('buildAcceptanceCriteriaRequest (PAN-4372)', () => {
@@ -120,7 +134,7 @@ describe('reviewAcceptanceCriteria (PAN-4372)', () => {
     const { fetch, calls } = fakeFetch(() =>
       jsonResponse({ model: 'test-model-x', answers: {}, usage: { input_tokens: 40, output_tokens: 0 } }),
     );
-    const result = await reviewAcceptanceCriteria(plan, { config: config(), fetch, env: {} });
+    const result = await reviewAcceptanceCriteria(plan, { config: config(), fetch, env: {}, evalLogHome: await tmpHome() });
     expect(fetch).toHaveBeenCalledTimes(1);
     const expectedIds = ['item-1.ac1', 'item-1.ac2', 'item-3.ac1', 'item-3.ac2'];
     const expectedKeys = expectedIds.flatMap(id => [`observable_${id}`, `compound_${id}`]).sort();
@@ -140,7 +154,7 @@ describe('reviewAcceptanceCriteria (PAN-4372)', () => {
         usage: { input_tokens: 40, output_tokens: 0 },
       }),
     );
-    const result = await reviewAcceptanceCriteria(plan, { config: config(), fetch, env: {} });
+    const result = await reviewAcceptanceCriteria(plan, { config: config(), fetch, env: {}, evalLogHome: await tmpHome() });
     expect(result.status).toBe('answered');
     if (result.status !== 'answered') throw new Error('unreachable');
     expect(result.issues).toHaveLength(2);
