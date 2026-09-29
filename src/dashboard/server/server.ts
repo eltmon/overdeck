@@ -54,6 +54,7 @@ import { resourcesRouteLayer } from './routes/resources.js'
 import { commandDeckRouteLayer } from './routes/command-deck.js'
 import { remoteRouteLayer } from './routes/remote.js'
 import { settingsRouteLayer } from './routes/settings.js'
+import { modelPresetsRouteLayer } from './routes/model-presets.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
 import { metricsRouteLayer } from './routes/metrics.js'
@@ -363,6 +364,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   commandDeckRouteLayer,
   remoteRouteLayer,
   settingsRouteLayer,
+  modelPresetsRouteLayer,
   voiceRouteLayer,
   autopresoRouteLayer,
   metricsRouteLayer,
