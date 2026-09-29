@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T10:19:12.879Z",
+  "updated": "2026-09-29T10:19:16.032Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4371",
       "claimedAt": "2026-09-29T10:13:53.462Z",
       "doneAt": "2026-09-29T10:19:12.878Z"
+    },
+    "enrichment-attach": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:19:16.032Z"
     }
   }
 }
