@@ -4,17 +4,17 @@
     "created": "2026-09-29T13:11:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4398: Work agents that finished normally show \"Ended unexpectedly\": no \"Handed to review\" outcome",
-    "updated": "2026-09-29T13:12:59.776Z"
+    "updated": "2026-09-29T13:13:39.749Z"
   },
   "plan": {
     "id": "pan-4398",
     "title": "Work agents that finished normally show \"Ended unexpectedly\": no \"Handed to review\" outcome",
-    "status": "proposed",
+    "status": "running",
     "uid": "e0e7f0ad-19a3-4f05-8737-b7b9f4b796c8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T13:11:54Z",
-    "updated": "2026-09-29T13:12:59.776Z",
+    "updated": "2026-09-29T13:13:39.749Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4398",
@@ -291,5 +291,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
