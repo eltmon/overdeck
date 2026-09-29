@@ -213,6 +213,43 @@ describe('deriveIssueState — the three attention states', () => {
   });
 });
 
+// PAN-4399: a not-started work-start read is its own attention, distinct
+// from needs-you/api-error/stuck, and only means anything while no PR and no
+// live pane already tell the same story.
+describe('deriveIssueState — work-not-started (PAN-4399)', () => {
+  const workStart = { status: 'not-started' as const, at: '2026-09-29T10:00:00.000Z', error: 'gave up' };
+
+  it('a not-started workStart with an ahead branch, no PR and no panes is working + work-not-started', () => {
+    const branch = { name: 'feature/pan-3917', aheadOfMain: 1, pushed: true };
+    const state = deriveIssueState(facts({ branch, workStart }));
+    expect(state.state).toBe('working');
+    expect(state.attention).toBe('work-not-started');
+    expect(state.workStart).toEqual(workStart);
+  });
+
+  it('a live pane means the terminal backend already tells the story — no workStart carried', () => {
+    const branch = { name: 'feature/pan-3917', aheadOfMain: 1, pushed: true };
+    const state = deriveIssueState(facts({ branch, panes: [pane()], workStart }));
+    expect(state.workStart).toBeUndefined();
+    expect(state.attention).toBeUndefined();
+  });
+
+  it('a retrying workStart carries through without becoming an attention', () => {
+    const branch = { name: 'feature/pan-3917', aheadOfMain: 1, pushed: true };
+    const retrying = { status: 'retrying' as const, at: '2026-09-29T10:00:00.000Z', nextRetryAt: '2026-09-29T10:10:00.000Z' };
+    const state = deriveIssueState(facts({ branch, workStart: retrying }));
+    expect(state.workStart).toEqual(retrying);
+    expect(state.attention).toBeUndefined();
+  });
+
+  it('an already-derived attention outranks work-not-started', () => {
+    const branch = { name: 'feature/pan-3917', aheadOfMain: 1, pushed: true };
+    const state = deriveIssueState(facts({ branch, apiError: true, workStart }));
+    expect(state.attention).toBe('api-error');
+    expect(state.workStart).toEqual(workStart);
+  });
+});
+
 describe('deriveIssueState — payload', () => {
   it('carries the PR and branch facts through unchanged', () => {
     const pr = { url: 'https://github.com/o/r/pull/12', number: 12, reviewState: 'approved' as const, checks: 'green' as const, mergeable: true };
@@ -304,6 +341,7 @@ describe('api-error pane capture', () => {
       readIssue: async () => ({ open: true, labels: [] }),
       readPr: async () => null,
       readBranch: async () => null,
+      readWorkStart: () => null,
     });
     expect(facts.apiError).toBe(false);
   });
@@ -320,6 +358,7 @@ describe('api-error pane capture', () => {
       readPr: async () => null,
       readBranch: async () => null,
       readPaneText: async (pane) => { reads.push(pane.id); return 'API Error: 429 rate limit'; },
+      readWorkStart: () => null,
     });
     expect(facts.apiError).toBe(true);
     expect(reads).toEqual(['agent-pan-3917']);
@@ -334,6 +373,7 @@ describe('api-error pane capture', () => {
       readPr: async () => null,
       readBranch: async () => null,
       readPaneText: async (pane) => { reads.push(pane.id); return '429'; },
+      readWorkStart: () => null,
     });
     expect(reads).toEqual([]);
   });

@@ -58,6 +58,7 @@ import type {
   DerivedBranchState,
   DerivedIssueState,
   DerivedPrState,
+  DerivedWorkStart,
   IssueAttention,
   IssueState,
   PrChecksState,
@@ -74,6 +75,7 @@ import { inferProjectForge } from '../project-repos.js';
 import { cachedApprovalAtHead } from '../cloister/approval-at-head.js';
 import { runGh } from '../github-quota/run-gh.js';
 import { prListingTtlMs, shouldListPullRequests } from './pr-cache-policy.js';
+import { deriveWorkStart, readWorkStartFacts, type WorkStartFacts } from './work-start-state.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -138,6 +140,8 @@ export interface IssueStateFacts {
   readonly now: number;
   /** Override for `DEFAULT_STUCK_AFTER_MS`. */
   readonly stuckAfterMs?: number;
+  /** The workspace journal's read on a post-planning auto-start (PAN-4399), when one exists. */
+  readonly workStart?: DerivedWorkStart;
 }
 
 // ─── the pure function ───────────────────────────────────────────────────────
@@ -214,6 +218,14 @@ export function deriveIssueState(facts: IssueStateFacts): DerivedIssueState {
   if (facts.issueOpen === null) derived.trackerUnknown = true;
   if (facts.pr) derived.pr = facts.pr;
   if (facts.branch) derived.branch = facts.branch;
+  // PAN-4399: a post-planning auto-start's journal read only means anything
+  // while there is no PR and no live pane already telling the same story.
+  if (!facts.pr && !facts.prMerged && facts.panes.filter(isLive).length === 0 && facts.workStart) {
+    derived.workStart = facts.workStart;
+    if (facts.workStart.status === 'not-started' && !derived.attention) {
+      derived.attention = 'work-not-started';
+    }
+  }
   return derived;
 }
 
@@ -239,6 +251,8 @@ export interface IssueStateLoaderDeps {
    * `cachedApprovalAtHead` (no forge read) by default.
    */
   readonly approvalAtHead?: (issueId: string, headSha: string | null | undefined) => boolean | undefined;
+  /** The workspace journal read behind `workStart` (PAN-4399); `readWorkStartFacts` by default. */
+  readonly readWorkStart?: (issueId: string, projectPath: string) => WorkStartFacts | null;
 }
 
 /** The tracker's answer for one issue. */
@@ -730,6 +744,10 @@ export async function loadIssueStateFacts(
     if (paneLooksLikeApiError(await readPaneText(pane))) { apiError = true; break; }
   }
 
+  const readWorkStart = deps.readWorkStart ?? readWorkStartFacts;
+  const workStartFacts = !pr ? readWorkStart(issueId, projectPath) : null;
+  const workStart = workStartFacts ? deriveWorkStart(workStartFacts, now) : undefined;
+
   const facts: IssueStateFacts = {
     issueId: issueId.toUpperCase(),
     // No tracker answer is `null` — unknown — and never a silent "open".
@@ -745,6 +763,7 @@ export async function loadIssueStateFacts(
     ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable, ...(pr.merged ? { merged: true } : {}) } } : {}),
     ...(pr && !pr.merged ? { prApprovedAtHead: (deps.approvalAtHead ?? cachedApprovalAtHead)(issueId, pr.headSha) === true } : {}),
     ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
+    ...(workStart ? { workStart } : {}),
   };
   return facts;
 }
@@ -836,6 +855,7 @@ export async function loadIssueStatesForProject(
 
   const panes = deps.panes ?? await listPanesWithBackend(now);
   const approvalAtHead = deps.approvalAtHead ?? cachedApprovalAtHead;
+  const readWorkStart = deps.readWorkStart ?? readWorkStartFacts;
   const out = new Map<string, DerivedIssueState>();
 
   // PAN-3969: the default branch read is one batched `for-each-ref` pair for
@@ -857,6 +877,8 @@ export async function loadIssueStatesForProject(
       : await (deps.readBranch ?? readBranchBatched)(projectPath, featureBranchFor(issueId));
 
     const issue = deps.issues?.[issueId] ?? null;
+    const workStartFacts = !pr ? readWorkStart(issueId, projectPath) : null;
+    const workStart = workStartFacts ? deriveWorkStart(workStartFacts, now) : undefined;
     const facts: IssueStateFacts = {
       issueId,
       issueOpen: issue ? issue.open : null,
@@ -871,6 +893,7 @@ export async function loadIssueStatesForProject(
       ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable, ...(pr.merged ? { merged: true } : {}) } } : {}),
       ...(pr && !pr.merged ? { prApprovedAtHead: approvalAtHead(issueId, pr.headSha) === true } : {}),
       ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
+      ...(workStart ? { workStart } : {}),
     };
     out.set(issueId, deriveIssueState(facts));
   }
