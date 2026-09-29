@@ -4,17 +4,17 @@
     "created": "2026-09-29T09:39:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4328: Session Vault: optional passphrase unlock so a new machine needs no 24 words",
-    "updated": "2026-09-29T09:42:15.688Z"
+    "updated": "2026-09-29T09:42:47.066Z"
   },
   "plan": {
     "id": "pan-4328",
     "title": "Session Vault: optional passphrase unlock so a new machine needs no 24 words",
-    "status": "proposed",
+    "status": "running",
     "uid": "001236ee-b6c9-4787-bee8-b007166aa245",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T09:39:32Z",
-    "updated": "2026-09-29T09:42:15.688Z",
+    "updated": "2026-09-29T09:42:47.066Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4328",
