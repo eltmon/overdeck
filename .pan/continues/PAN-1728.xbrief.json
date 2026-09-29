@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1728",
   "created": "2026-09-29T01:58:51.551Z",
-  "updated": "2026-09-29T02:11:55.314Z",
+  "updated": "2026-09-29T02:12:08.298Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
       "claimedBy": "agent-pan-1728",
       "claimedAt": "2026-09-29T02:10:03.581Z",
       "doneAt": "2026-09-29T02:11:55.314Z"
+    },
+    "finalize-trailer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:12:08.298Z"
     }
   }
 }
