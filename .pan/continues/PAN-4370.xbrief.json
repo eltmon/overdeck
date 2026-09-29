@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:11:10.255Z",
+  "updated": "2026-09-29T16:11:26.166Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "provider-auth-error.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:11:10.255Z"
+    },
+    "provider-auth-error.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:11:26.166Z"
     }
   }
 }
