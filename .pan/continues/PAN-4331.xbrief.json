@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T14:35:59.758Z",
+  "updated": "2026-09-29T14:36:29.562Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "fixture-script.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T14:35:59.758Z"
+    },
+    "probe-windows": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4331",
+      "claimedAt": "2026-09-29T14:36:29.561Z"
     }
   }
 }
