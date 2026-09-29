@@ -184,5 +184,3 @@ Refresh embeddings.
 - Re-embed only concepts whose normalized content hash changed.
 - Write sorted JSONL shards under `embeddings/`.
 - Rebuild the local `.okf-index/` cache, which is derived and gitignored.
-
-D11 checkpoint deliberate drift line
