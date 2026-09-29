@@ -1,0 +1,443 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T04:12:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4343: Operator-grant labels (`released`, `auto-merge`, `hold-for-uat`) honored only from a non-agent actor",
+    "updated": "2026-09-29T04:16:43.852Z"
+  },
+  "plan": {
+    "id": "pan-4343",
+    "title": "Operator-grant labels (`released`, `auto-merge`, `hold-for-uat`) honored only from a non-agent actor",
+    "status": "proposed",
+    "uid": "12df2838-5c6f-437f-bc81-c576900ae2e1",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T04:12:08Z",
+    "updated": "2026-09-29T04:16:43.852Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4343",
+        "label": "PAN-4343",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4343.md",
+        "label": "PRD PAN-4343",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/deft-adoption.md",
+        "label": "Parent PRD (Issue 9)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "security",
+      "gh-shim",
+      "launcher",
+      "flywheel",
+      "labels"
+    ],
+    "narratives": {
+      "Problem": "Pickup (`released`) and merge policy (`auto-merge`, `hold-for-uat`) read label presence only, and agents run `gh` with the operator's token, so an agent-applied grant label is indistinguishable from the operator's. The Flywheel runs as a conversation (`conv-flywheel`), and conversation launchers get no `gh` shim at all (`src/lib/launcher-generator.ts:381`, `spawnMode !== 'conversation'`).",
+      "Proposal": "Make the `gh` shim the load-bearing layer. (1) Add a POSIX-sh grant-label deny block to the shim built by `buildGhShimLines` in `src/lib/launcher-git-guard.ts`, enabled for every agent pane; it refuses `gh issue|pr edit|create` label flags and `gh api` label-carrier writes naming `released`, `auto-merge` or `hold-for-uat` (add or remove), before the ledger append, with no bypass env. (2) Export `buildConversationGhShimLines(id, denyGrantLabels)` that writes a gh-only shim at `<OVERDECK_HOME>/conversations/<id>/git-guard/gh`. (3) Add `LauncherConfig.ghShim` and emit it for `spawnMode: 'conversation'` in `launcher-generator.ts` with zero net line growth. (4) `spawnConversationSession` sets `ghShim: { id: tmuxSession, denyGrantLabels: tmuxSession === FLYWHEEL_CONVERSATION_SESSION }`. (5) Document the rule in MERGE-WORKFLOW, PIPELINE-GATES, auto-merge.mdx and the pan-flywheel skill. Full detail, reference shell code and test tables are in `.pan/drafts/PAN-4343.md`.",
+      "NonGoals": "- No events-API actor check (`GET /repos/{o}/{r}/issues/{n}/events`); it names the operator while agents share the operator token.\n- No routing of agent `gh` writes through the GitHub App installation token.\n- No blocking of absolute-path `/usr/bin/gh`, `gh api --input <file>` bodies, or GraphQL `addLabelsToLabelable`/`removeLabelsFromLabelable` (label node IDs); cheap-path prevention only.\n- No distinction between lane, `pan handoff`, or other agent-driven conversations and operator conversations: every `conv-*` other than `conv-flywheel` passes.\n- No git guard for conversations.\n- No new `GitHubQuotaCaller` value; conversation calls log as `caller: 'agent'` with `agent: <conv id>`.\n- No change to how pickup (`pickup.ts`) or auto-merge eligibility read labels.\n- No deny for labels outside the closed set (`vetoed`, `parked`, `ready`, `objection`, etc.).\n- No bypass environment variable for the deny (neither `OVERDECK_GH_METERED` nor `OVERDECK_PAN_GIT_OP` skips it).\n- No raise of any `scripts/file-size-allowlist.txt` cap; `launcher-generator.ts` must stay at or under 1000 lines."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Refuse both adding and removing grant labels, not only adding.",
+        "rationale": "Removing `hold-for-uat` is itself the merge grant, and the pan-flywheel skill already says the loop never adds or removes `released`; denying both directions on the closed set is the consistent reading of 'honored only from a non-agent actor'."
+      },
+      {
+        "summary": "Include `gh issue create` / `gh pr create` label flags and `gh api` issue create/patch label fields, not only `edit` and the labels endpoint.",
+        "rationale": "Creating an issue already labeled `released` bypasses the pickup gate exactly like editing one; leaving it open would make the deny trivially sidestepped on the cheap path."
+      },
+      {
+        "summary": "`gh api` is matched on label-carrier arguments (`*labels*=*` fields or `issues/*/labels/<name>` paths) plus gh's effective method, instead of any argument containing a label name.",
+        "rationale": "Matching any argument would refuse ordinary issue comments that mention the word 'released'; the carrier rule was run under dash against every test case during planning."
+      },
+      {
+        "summary": "Conversation shim lives at `<OVERDECK_HOME>/conversations/<tmuxSession>/git-guard/gh`.",
+        "rationale": "The launcher prelude and `pan restart` (`src/cli/commands/restart.ts:245`) strip PATH segments ending in `/git-guard`; any other name could leak the Flywheel's deny shim into the dashboard server PATH and silently break the operator's Release button (`label-ops.ts` swallows gh errors)."
+      },
+      {
+        "summary": "Use an explicit `LauncherConfig.ghShim` field set by conversation-runtime rather than inferring from `managedStateKey` inside the generator.",
+        "rationale": "Keeps the flywheel identity decision in the one module that knows the conversation, avoids a flywheel import in the generator, and leaves existing conversation inline snapshots unchanged."
+      },
+      {
+        "summary": "Log conversation `gh` calls as `caller: 'agent'` with `agent: <conv id>`.",
+        "rationale": "Adding a contracts enum value is out of scope; the `agent` field already identifies the conversation."
+      }
+    ],
+    "items": [
+      {
+        "id": "gh-shim-grant-deny",
+        "title": "Agent gh shim refuses grant-label writes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:12:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4343",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "conversation-gh-shim-builder",
+            "launcher-conversation-gh-shim",
+            "conversation-runtime-gh-shim"
+          ],
+          "files_scope": [
+            "src/lib/launcher-git-guard.ts",
+            "src/lib/__tests__/launcher-git-guard-gh-shim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-git-guard-gh-shim.test.ts src/lib/__tests__/launcher-git-guard-behavior.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launcher-git-guard-gh-shim.test.ts and launcher-git-guard-behavior.test.ts pass, including the new grant-label deny cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 in src/lib/launcher-git-guard.ts: add const GRANT_LABEL_DENY_SH (the reference POSIX sh body in the PRD, verbatim in behavior) with a `$`-escaper like branchCheckShimLines; add a third parameter `denyGrantLabels: boolean` to buildGhShimLines and splice the deny lines directly after the `_OVERDECK_REAL_GH=\"$_OVERDECK_REAL_GH\"` heredoc line, before `_overdeck_gh_bucket=graphql`, so a refused call is never counted; buildGitGuardLines passes `true` (default and read-only modes). The deny ignores OVERDECK_GH_METERED and OVERDECK_PAN_GIT_OP. Update the module header (lines 29-30) and the buildGhShimLines doc comment, which currently say the shim never blocks. Extend launcher-git-guard-gh-shim.test.ts with the PRD WI-1 step 5 refused/passed tables and the OVERDECK_GH_METERED=1 case."
+        },
+        "items": [
+          {
+            "id": "gh-shim-grant-deny.ac1",
+            "title": "Given the agent shim, when `gh issue edit 1 --add-label released` runs, then it exits 1, prints `operator grant label` on stderr, never runs the real gh (empty stdout), and appends no ledger line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-shim-grant-deny.ac2",
+            "title": "Given the agent shim, when `gh issue edit 1 --add-label bug` runs, then it exits with the real gh's exit code (3 in the fixture), passes stdout through, and appends exactly one ledger line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-shim-grant-deny.ac3",
+            "title": "Given the agent shim, each flag variant (`--add-label=Released`, comma list `bug, auto-merge`, `--remove-label hold-for-uat`, `pr edit --add-label auto-merge`, `issue create -l released`, `pr create -lhold-for-uat`) exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-shim-grant-deny.ac4",
+            "title": "Given the agent shim, `gh api` label-carrier writes (labels endpoint POST with `labels[]=released`, `-X DELETE .../labels/hold-for-uat`, `--method=post` with `AUTO-MERGE`, issue create with `labels[]=released`, `-X PATCH` with `labels[]=hold-for-uat`) exit 1, while the labels GET read, a comment body `released`, the `issues?labels=released` listing and `api graphql` pass through",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-shim-grant-deny.ac5",
+            "title": "Given OVERDECK_GH_METERED=1 in the environment, when the agent shim runs `gh issue edit 1 --add-label released`, then it still exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-gh-shim-builder",
+        "title": "Export a gh-only shim builder for conversations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-git-guard.ts",
+            "src/lib/__tests__/launcher-git-guard-gh-shim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-git-guard-gh-shim.test.ts src/lib/__tests__/launcher-git-guard-behavior.test.ts src/lib/__tests__/launcher-generator.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass, including the new conversation gh shim describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2 in src/lib/launcher-git-guard.ts: extract the inherited-guard-dir PATH drop (lines 296-302) into a private dropInheritedGuardDirLines() that buildGitGuardLines spreads at the same position (its output stays byte-identical); export buildConversationGhShimLines(conversationId, denyGrantLabels) returning [...dropInheritedGuardDirLines(), mkdir -p <guardDir>, ...buildGhShimLines(conversationId, guardDir, denyGrantLabels), export PATH=\"<guardDir>:$PATH\"] where guardDir = join(getOverdeckHome(), 'conversations', conversationId, 'git-guard'). The directory name must be exactly `git-guard`. Write no git shim. Add the PRD WI-2 step 3 tests to launcher-git-guard-gh-shim.test.ts."
+        },
+        "items": [
+          {
+            "id": "conversation-gh-shim-builder.ac1",
+            "title": "Given `buildConversationGhShimLines('conv-42', false)` run through bash, then `<home>/conversations/conv-42/git-guard/gh` exists and `<home>/conversations/conv-42/git-guard/git` does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-gh-shim-builder.ac2",
+            "title": "Given the conv-42 shim, both `issue edit 1 --add-label released` and `issue edit 1 --add-label bug` pass through with the real gh's exit code, and the last ledger line has caller `agent` and agent `conv-42`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-gh-shim-builder.ac3",
+            "title": "Given `buildConversationGhShimLines('conv-flywheel', true)`, `issue edit 1 --add-label released` exits 1 and `issue edit 1 --add-label bug` passes through",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-gh-shim-builder.ac4",
+            "title": "Given an inherited PATH whose first segment is another `.../git-guard` dir holding a gh, the new shim's baked `_OVERDECK_REAL_GH` resolves to the fixture's fake-bin gh, not the inherited shim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-conversation-gh-shim",
+        "title": "Conversation launchers emit the gh shim from LauncherConfig.ghShim",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:12:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/launcher-generator.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "launcher-generator.test.ts passes with existing inline snapshots unchanged",
+            "typecheck completes without errors",
+            "wc -l prints a count of 1000 or less for src/lib/launcher-generator.ts",
+            "lint-file-size.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: import buildConversationGhShimLines on the existing line-11 import; add one line `ghShim?: { id: string; denyGrantLabels: boolean }; // PAN-4343: conversation gh shim (spawnMode 'conversation' only)` under `managedStateKey?: string;`; replace the three-line git-guard block at lines 381-383 with the two-line if/else from the PRD so conversations emit buildConversationGhShimLines when ghShim is set and agent panes keep buildGitGuardLines. Net line change must be 0 (file stays at 999, hard limit 1000; agents cannot raise the allowlist). Add the PRD WI-3 step 4 test; keep the existing assertion that a conversation without ghShim has no git-guard."
+        },
+        "items": [
+          {
+            "id": "launcher-conversation-gh-shim.ac1",
+            "title": "Given a conversation LauncherConfig with `ghShim: { id: 'conv-123', denyGrantLabels: false }`, generateLauncherScript produces a script containing `conversations/conv-123/git-guard/gh' <<EOF` and `git-guard:$PATH\"`, and not containing `_OVERDECK_REAL_GIT`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-conversation-gh-shim.ac2",
+            "title": "Given a conversation LauncherConfig without ghShim, the generated script contains no `git-guard`, and the existing conversation inline snapshots pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-conversation-gh-shim.ac3",
+            "title": "`wc -l src/lib/launcher-generator.ts` returns 1000 or less and `bash scripts/lint-file-size.sh` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-runtime-gh-shim",
+        "title": "spawnConversationSession stamps ghShim with the flywheel deny",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:12:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-runtime-launch.test.ts passes including the two new ghShim cases",
+            "typecheck completes without errors",
+            "lint-file-size.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: add `import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';` to src/lib/overdeck/conversation-runtime.ts and, in the generateLauncherScript call with spawnMode 'conversation', add `ghShim: { id: tmuxSession, denyGrantLabels: tmuxSession === FLYWHEEL_CONVERSATION_SESSION },` directly after `managedStateKey: tmuxSession,`. Net +2 lines (cap 1248). Add two tests to conversation-runtime-launch.test.ts using the existing spawn() helper and fakeBackend('herdr')."
+        },
+        "items": [
+          {
+            "id": "conversation-runtime-gh-shim.ac1",
+            "title": "When spawnConversationSession runs for `conv-x`, the captured launcher config's ghShim equals `{ id: 'conv-x', denyGrantLabels: false }`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-runtime-gh-shim.ac2",
+            "title": "When spawnConversationSession runs for `conv-flywheel`, the captured launcher config's ghShim equals `{ id: 'conv-flywheel', denyGrantLabels: true }`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-grant-labels-operator-only",
+        "title": "Document grant labels as operator-only and shim-enforced",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:12:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4343",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "docs/PIPELINE-GATES.md",
+            "configuration/auto-merge.mdx",
+            "sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/prompts/prompt-invariants.test.ts tests/unit/evals/prompt-rails.test.ts tests/unit/flywheel/no-loss.test.ts",
+            "grep -n 'hold-for-uat' docs/MERGE-WORKFLOW.md docs/PIPELINE-GATES.md configuration/auto-merge.mdx sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "expected_outputs": [
+            "the three prompt/flywheel test files pass",
+            "grep finds hold-for-uat in each of the four doc files, alongside the new operator-only sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 using the exact sentences in the PRD: add the 'Grant labels are operator-only' paragraph after line 26 of docs/MERGE-WORKFLOW.md; rewrite the ledger sentence at docs/PIPELINE-GATES.md line 776 to say the agent gh shim counts every call and refuses grant-label writes for agent panes and the Flywheel conversation, and that conversations get the shim alone; add the 'Only you set these labels' sentence to the Per-issue override section of configuration/auto-merge.mdx; append the auto-merge/hold-for-uat and shim-enforcement sentence after 'this loop never adds or removes either one.' in sync-sources/skills/pan-flywheel/SKILL.md without removing or rewording existing text."
+        },
+        "items": [
+          {
+            "id": "docs-grant-labels-operator-only.ac1",
+            "title": "docs/MERGE-WORKFLOW.md contains a paragraph naming `released`, `auto-merge` and `hold-for-uat` as operator-only, stating the gh shim refuses agent-pane and Flywheel writes, and naming the `/usr/bin/gh` and GraphQL-node-ID bypasses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-grant-labels-operator-only.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, the ledger paragraph no longer calls the agent gh shim count-only and contains a sentence saying the shim refuses grant-label writes for agent panes and the Flywheel conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-grant-labels-operator-only.ac3",
+            "title": "Given configuration/auto-merge.mdx, its Per-issue override section contains a sentence telling the operator that agents and the Flywheel cannot add or remove `auto-merge`, `hold-for-uat` or `released` because their gh refuses the write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-grant-labels-operator-only.ac4",
+            "title": "sync-sources/skills/pan-flywheel/SKILL.md states the Flywheel conversation's gh shim refuses grant-label writes and exits non-zero, and the prompt-invariants, prompt-rails and flywheel no-loss tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gh-shim-grant-deny",
+        "to": "conversation-gh-shim-builder",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-gh-shim-builder",
+        "to": "launcher-conversation-gh-shim",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-conversation-gh-shim",
+        "to": "conversation-runtime-gh-shim",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4343-operator-grant-labels-released-auto-merge-hold-for-uat-honored-only-from-a-non-agent-actor.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
