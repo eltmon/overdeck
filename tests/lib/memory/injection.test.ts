@@ -492,7 +492,7 @@ describe('prompt-time memory injection', () => {
         });
       }));
 
-      const resultPromise = injectPromptTimeMemory({
+      const resultPromise = injectWithLog({
         prompt: 'timeout abort expansion prompt',
         identity,
         now: new Date('2026-05-16T22:30:00.000Z'),
@@ -506,9 +506,11 @@ describe('prompt-time memory injection', () => {
       await Promise.resolve();
       vi.advanceTimersByTime(751);
       await Promise.resolve();
+      const { decision } = await resultPromise;
 
       expect(expansion).toHaveBeenCalledOnce();
       expect(signalAborted).toBe(true);
+      expect(decision.expansion.reason).toBe('timeout');
     } finally {
       vi.useRealTimers();
     }

@@ -211,14 +211,20 @@ async function resolveQueryExpansion(
     if (surface !== 'user-prompt') return await expansion;
 
     return await withTimeout(expansion, PROMPT_TIME_EXPANSION_TIMEOUT_MS, () => controller?.abort());
-  } catch {
+  } catch (error) {
     return {
       query: input.prompt,
       expandedTerms: [],
       cacheKey: '',
       status: 'fallback',
-      reason: 'extraction-failed',
+      reason: error instanceof QueryExpansionTimeoutError ? 'timeout' : 'extraction-failed',
     };
+  }
+}
+
+class QueryExpansionTimeoutError extends Error {
+  constructor() {
+    super('query expansion timed out');
   }
 }
 
@@ -230,7 +236,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout:
       new Promise<T>((_, reject) => {
         timeout = setTimeout(() => {
           onTimeout();
-          reject(new Error('query expansion timed out'));
+          reject(new QueryExpansionTimeoutError());
         }, timeoutMs);
       }),
     ]);

@@ -10,6 +10,7 @@ import {
   expandMemoryQuery,
   type QueryExpansionCall,
 } from '../../../src/lib/memory/query-expansion.js';
+import { ExtractionProviderAuthError } from '../../../src/lib/memory/providers/index.js';
 
 // Background AI is off-by-default since PAN-1589 (cheapMode). These unit tests
 // exercise the query-expansion mechanics, which only run when the feature gate
@@ -214,6 +215,58 @@ describe('memory query expansion', () => {
     expect(result.status).toBe('expanded');
     const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/main-workspace-uuid/rag-runs/2026-05-16.jsonl'), 'utf8');
     expect(JSON.parse(ragRuns.trim())).toMatchObject({ id: 'main-run-1', outcome: 'expanded' });
+  });
+
+  // PAN-4370 WI-5: an auth failure gets its own expansion reason so the
+  // operator can tell "no credentials" apart from any other expansion failure.
+  it('reports provider-auth-failed when the provider drops with ExtractionProviderAuthError', async () => {
+    const result = await expandMemoryQuery({
+      prompt: 'raw search text',
+      identity,
+      now: new Date('2026-05-16T20:00:00.000Z'),
+      id: 'auth-failed-run',
+      expand: async () => ({
+        status: 'dropped',
+        reason: 'extraction-failed',
+        error: new ExtractionProviderAuthError('anthropic', 'no ANTHROPIC_API_KEY'),
+      }),
+    });
+
+    expect(result).toMatchObject({
+      query: 'raw search text',
+      expandedTerms: [],
+      status: 'fallback',
+      reason: 'provider-auth-failed',
+    });
+
+    const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/feature-pan-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
+    expect(JSON.parse(ragRuns.trim())).toMatchObject({
+      id: 'auth-failed-run',
+      outcome: 'expansion-failed',
+      reason: 'provider-auth-failed',
+    });
+  });
+
+  it('reports timeout when the provider drops after the passed signal is aborted', async () => {
+    const controller = new AbortController();
+    const result = await expandMemoryQuery({
+      prompt: 'raw search text',
+      identity,
+      now: new Date('2026-05-16T20:00:00.000Z'),
+      id: 'timeout-run',
+      signal: controller.signal,
+      expand: async () => {
+        controller.abort();
+        return { status: 'dropped', reason: 'extraction-failed', error: new Error('aborted') };
+      },
+    });
+
+    expect(result).toMatchObject({
+      query: 'raw search text',
+      expandedTerms: [],
+      status: 'fallback',
+      reason: 'timeout',
+    });
   });
 
   it('falls back to the raw prompt when the provider returns malformed terms', async () => {
