@@ -7,8 +7,24 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { runGh } from './github-quota/run-gh.js';
 
 const execAsync = promisify(exec);
+
+/** How long a "no merged PR found" answer for one `(project, branch, tip)` is trusted. */
+export const CLOSE_OUT_NEGATIVE_TTL_MS = 60 * 60_000;
+
+/** `${projectPath}\0${branchName}\0${tipSha}` -> the ms timestamp it was last answered "not merged". */
+const negativeAnswerCache = new Map<string, number>();
+
+/** Test-only: clear the negative-answer cache between test cases. */
+export function resetCloseOutCacheForTests(): void {
+  negativeAnswerCache.clear();
+}
+
+function negativeCacheKey(projectPath: string, branchName: string, tipSha: string): string {
+  return `${projectPath}\0${branchName}\0${tipSha}`;
+}
 
 // Planning/pipeline artifact paths ignored when deciding whether a branch
 // still holds unmerged CODE. `.pan/` is the current artifact home (PAN-967);
@@ -26,42 +42,70 @@ const ARTIFACT_EXCLUSIONS = ARTIFACT_PATH_PREFIXES
  * has this branch as head, its merge commit landed on main, and the branch has
  * no post-merge code commits, the branch is merged. Returns false on any
  * failure (no gh, GitLab remote, no PR) so callers fall through conservatively.
+ *
+ * The forge lookup is metered through `runGh` (PAN-4291: it used to run
+ * unmetered, hiding real GraphQL spend from the ledger) and a "no merged PR"
+ * answer is cached for `CLOSE_OUT_NEGATIVE_TTL_MS` per `(project, branch,
+ * tip)`, since the closed-issue reaper calls this every tick for the same
+ * still-unmerged branch. Only a negative answer is cached — a failure (no
+ * gh, offline, rate-limited) is retried on the very next call.
  */
 async function isSquashMergedViaPr(
   branchName: string,
   tipRef: string,
   projectPath: string,
 ): Promise<boolean> {
+  let tipSha: string;
   try {
-    const { stdout } = await execAsync(
-      `gh pr list --head "${branchName}" --state merged --json headRefOid,mergeCommit --limit 1`,
-      { cwd: projectPath, encoding: 'utf-8', timeout: 15000 },
-    );
-    const prs = JSON.parse(stdout) as Array<{ headRefOid?: string; mergeCommit?: { oid?: string } }>;
-    const pr = prs[0];
-    if (!pr?.headRefOid || !pr.mergeCommit?.oid) return false;
+    const { stdout } = await execAsync(`git rev-parse "${tipRef}"`, { cwd: projectPath, encoding: 'utf-8' });
+    tipSha = stdout.trim();
+  } catch {
+    return false;
+  }
 
+  const key = negativeCacheKey(projectPath, branchName, tipSha);
+  const answeredAt = negativeAnswerCache.get(key);
+  if (answeredAt !== undefined && Date.now() - answeredAt < CLOSE_OUT_NEGATIVE_TTL_MS) return false;
+
+  let prs: Array<{ headRefOid?: string; mergeCommit?: { oid?: string } }>;
+  try {
+    const { stdout } = await runGh(
+      ['pr', 'list', '--head', branchName, '--state', 'merged', '--json', 'headRefOid,mergeCommit', '--limit', '1'],
+      { cwd: projectPath, timeout: 15_000 },
+    );
+    prs = JSON.parse(stdout) as Array<{ headRefOid?: string; mergeCommit?: { oid?: string } }>;
+  } catch {
+    return false;
+  }
+
+  const pr = prs[0];
+  if (!pr?.headRefOid || !pr.mergeCommit?.oid) {
+    negativeAnswerCache.set(key, Date.now());
+    return false;
+  }
+
+  try {
     // The PR's merge commit must actually be on main.
     await execAsync(`git merge-base --is-ancestor ${pr.mergeCommit.oid} main`, {
       cwd: projectPath,
       encoding: 'utf-8',
     });
+  } catch {
+    return false;
+  }
 
-    const { stdout: tipSha } = await execAsync(`git rev-parse "${tipRef}"`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-    if (tipSha.trim() === pr.headRefOid) return true;
+  if (tipSha === pr.headRefOid) return true;
 
+  try {
     // Commits after the merged PR head: merged only if they touch artifacts alone.
     const { stdout: filesOut } = await execAsync(
       `git log ${pr.headRefOid}..${tipRef} --name-only --pretty=format:`,
       { cwd: projectPath, encoding: 'utf-8' },
     );
     const files = filesOut.split('\n').map((line) => line.trim()).filter(Boolean);
-    return files.every((file) =>
-      ARTIFACT_PATH_PREFIXES.some((prefix) => file.startsWith(prefix)),
-    );
+    const merged = files.every((file) => ARTIFACT_PATH_PREFIXES.some((prefix) => file.startsWith(prefix)));
+    if (!merged) negativeAnswerCache.set(key, Date.now());
+    return merged;
   } catch {
     return false;
   }

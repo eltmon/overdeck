@@ -87,3 +87,15 @@ it('includes Claude Opus 5.5 in the offline fallback catalog', () => {
     costPer1MTokens: 12,
   }));
 });
+
+it('lists Claude Sonnet 5.5 in the offline fallback catalog before Sonnet 5 (PAN-4327)', () => {
+  const anthropic = FALLBACK_GROUPS.find(group => group.provider === 'anthropic');
+  expect(anthropic?.models).toContainEqual(expect.objectContaining({
+    id: 'claude-sonnet-5-5',
+    costPer1MTokens: 6,
+  }));
+  const sonnet55Index = anthropic!.models.findIndex(m => m.id === 'claude-sonnet-5-5');
+  const sonnet5Index = anthropic!.models.findIndex(m => m.id === 'claude-sonnet-5');
+  expect(sonnet55Index).toBeGreaterThanOrEqual(0);
+  expect(sonnet55Index).toBeLessThan(sonnet5Index);
+});

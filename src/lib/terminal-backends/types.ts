@@ -22,6 +22,7 @@ import type {
   PaneTokens,
   TerminalBackendName,
 } from '@overdeck/contracts';
+import type { SubmitMode } from './steer-keys.js';
 
 export type { AgentRole, AgentState, BackendAgentSnapshot, PaneTokens, TerminalBackendName };
 
@@ -134,6 +135,12 @@ export interface PromptOptions {
   readonly wait?: { readonly until?: readonly AgentState[]; readonly timeoutMs?: number };
   /** Who is sending. The guard accepts the target issue's `work` pane or an operator conversation. */
   readonly sender: PromptSender;
+  /**
+   * How to finish the prompt (PAN-4292). `enter` (default) submits, which
+   * queues behind a running turn. `steer` presses Claude Code's send-now
+   * chord, Ctrl+X Ctrl+S (see `steer-keys.ts`), which interrupts the turn.
+   */
+  readonly submit?: SubmitMode;
 }
 
 /**
@@ -204,9 +211,9 @@ export interface TerminalControl {
 /** Backend lifecycle events, normalized across adapters. */
 export type BackendEvent =
   | { readonly kind: 'agent-state'; readonly paneId: string; readonly state: AgentState }
-  | { readonly kind: 'pane-created'; readonly paneId: string; readonly workspaceId: string }
+  | { readonly kind: 'pane-created'; readonly paneId: string; readonly workspaceId: string; readonly terminalId?: string; readonly agentId?: string }
   | { readonly kind: 'pane-exited'; readonly paneId: string; readonly code: number | null }
-  | { readonly kind: 'metadata'; readonly paneId: string; readonly tokens: Partial<PaneTokens> }
+  | { readonly kind: 'metadata'; readonly paneId: string; readonly tokens: Partial<PaneTokens>; readonly agentId?: string }
   | { readonly kind: 'workspace-closed'; readonly workspaceId: string };
 
 export interface BackendEventStream {

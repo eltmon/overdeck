@@ -35,15 +35,23 @@ export function gitHubRateLimitBannerText(quota: GitHubQuotaSnapshot, pause: Git
     return `GitHub secondary rate limit for ${who}: calls paused until ${until}. Overdeck sent requests too fast; pollers resume automatically.`;
   }
 
+  // PAN-4291: the operator-visible fact GitHub itself reports, alongside the
+  // metered estimate below (which can under- or over-count the real spend).
+  const sample = quota.samples.find((s) => s.pool === pause.pool && s.bucket === pause.bucket);
+  const reported = sample ? ` GitHub reports ${sample.limit - sample.remaining} of ${sample.limit} points used this hour.` : '';
+
   const bucketPoints = (usage: GitHubQuotaSnapshot['callers'][number]) => usage[pause.bucket].points;
   const machinePoints = quota.callers.reduce((sum, usage) => sum + bucketPoints(usage), 0);
   if (quota.ownUsageLow && pause.pool === 'user') {
-    return `GitHub rate limit for ${who}: calls paused until ${until}; not caused by this machine (this machine used ${machinePoints} points in the last hour). Another tool or Overdeck install using this account is spending the shared limit.`;
+    const pausedClause = sample
+      ? `calls paused until ${until}.${reported} Not caused by this machine`
+      : `calls paused until ${until}; not caused by this machine`;
+    return `GitHub rate limit for ${who}: ${pausedClause} (this machine used ${machinePoints} points in the last hour). Another tool or Overdeck install using this account is spending the shared limit.`;
   }
 
   const top = [...quota.callers].sort((a, b) => bucketPoints(b) - bucketPoints(a))[0];
   if (top && bucketPoints(top) > 0) {
-    return `GitHub rate limit for ${who}: calls paused until ${until}. This machine used ${machinePoints} points in the last hour; top caller: ${top.caller} (${bucketPoints(top)} points).`;
+    return `GitHub rate limit for ${who}: calls paused until ${until}.${reported} This machine used ${machinePoints} points in the last hour; top caller: ${top.caller} (${bucketPoints(top)} points).`;
   }
   return `GitHub rate limit for ${who}: calls paused until ${until}.`;
 }

@@ -56,6 +56,23 @@ describe('cost module', () => {
       expect(pricing?.cacheWrite1hPer1k).toBe(0.004);
     });
 
+    it('should price claude-sonnet-5-5 distinctly from claude-sonnet-5 at the same rates', () => {
+      const pricing = getPricing('anthropic', 'claude-sonnet-5-5');
+      expect(pricing).toBeDefined();
+      expect(pricing?.model).toBe('claude-sonnet-5-5');
+      expect(pricing?.inputPer1k).toBe(0.002);
+      expect(pricing?.outputPer1k).toBe(0.010);
+      expect(pricing?.cacheReadPer1k).toBe(0.0002);
+      expect(pricing?.cacheWrite5mPer1k).toBe(0.0025);
+      expect(pricing?.cacheWrite1hPer1k).toBe(0.004);
+
+      const cost = calculateCost({ inputTokens: 1_000_000, outputTokens: 1_000_000 }, pricing!);
+      expect(cost).toBe(12);
+
+      const cacheCost = calculateCost({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000 }, pricing!);
+      expect(cacheCost).toBe(0.2);
+    });
+
     it('should have correct pricing for claude-haiku-4-5', () => {
       const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-haiku-4-5');
       expect(pricing).toBeDefined();

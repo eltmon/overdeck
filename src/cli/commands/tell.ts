@@ -7,6 +7,8 @@ import { loadRemoteAgentState, sendToRemoteAgent } from '../../lib/remote/index.
 export interface TellOptions {
   /** Deliver to a critic or verifier lane that already filed its verdict (PAN-4223 FR-16). */
   force?: boolean;
+  /** Interrupt the running turn and send now: Claude Code's send-now chord (PAN-4292). */
+  steer?: boolean;
 }
 
 /**
@@ -52,6 +54,11 @@ export async function tellCommand(id: string, message: string, options: TellOpti
     // VM's tmux through the remote provider instead.
     const remoteState = loadRemoteAgentState(agentId);
     if (remoteState?.location === 'remote' && remoteState.vmName) {
+      if (options.steer) {
+        console.error(chalk.red(`--steer is not supported for remote agents (${agentId} runs on ${remoteState.vmName}). Nothing was sent.`));
+        console.error(chalk.dim('  Drop --steer to send a normal message.'));
+        return exitCli(1);
+      }
       const remoteResult = await sendToRemoteAgent(agentId, remoteState.vmName, message);
       if (!remoteResult.ok) {
         console.error(chalk.red(`Message NOT delivered to ${agentId} (remote: ${remoteState.vmName})`));
@@ -67,6 +74,7 @@ export async function tellCommand(id: string, message: string, options: TellOpti
     const issueId = getAgentState(agentId)?.issueId;
     const outcome = await messageAgent(agentId, message, 'pan-tell', {
       owesRework: await issueOwesRework(issueId),
+      ...(options.steer ? { steer: true } : {}),
     });
     if (outcome.inputTargetRefusal) {
       console.error(chalk.red(`Message NOT delivered to ${agentId}: Claude Code's typed input could not be moved to the main agent.`));
@@ -93,7 +101,11 @@ export async function tellCommand(id: string, message: string, options: TellOpti
       }
       return exitCli(1);
     }
-    console.log(chalk.green(`Message delivered to ${agentId}${outcome.inputTarget === 'main' ? "'s main agent" : ''}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
+    // PAN-4292: a steer that came back with a reason was delivered as a normal submit (an old
+    // PTY supervisor); the headline must not claim it interrupted anything.
+    const steered = options.steer && !outcome.reason;
+    const deliveredVerb = steered ? `Message steered into ${agentId}'s running turn` : `Message delivered to ${agentId}${outcome.inputTarget === 'main' ? "'s main agent" : ''}`;
+    console.log(chalk.green(`${deliveredVerb}${outcome.confirmed ? ' (turn confirmed)' : ''}`));
     console.log(chalk.dim(`  "${message}"`));
     if (outcome.switchedFromSubagent) {
       console.log(chalk.dim(`  Switched Claude Code's input from subagent "${outcome.switchedFromSubagent}" back to the main agent first.`));

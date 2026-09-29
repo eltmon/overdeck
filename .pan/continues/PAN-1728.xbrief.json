@@ -1,0 +1,155 @@
+{
+  "version": "1",
+  "issueId": "PAN-1728",
+  "created": "2026-09-29T01:58:51.551Z",
+  "updated": "2026-09-29T02:30:10.136Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "trailer-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T01:58:51.551Z",
+      "doneAt": "2026-09-29T01:59:36.174Z"
+    },
+    "spec-diff": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T01:59:53.896Z",
+      "doneAt": "2026-09-29T02:01:10.303Z"
+    },
+    "spec-diff.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:01:24.018Z"
+    },
+    "spec-diff.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:01:37.249Z"
+    },
+    "spec-diff.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:01:50.674Z"
+    },
+    "spec-diff.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:02:02.548Z"
+    },
+    "spec-diff.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:02:15.662Z"
+    },
+    "trailer-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:02:49.941Z"
+    },
+    "trailer-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:03:03.243Z"
+    },
+    "trailer-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:03:14.862Z"
+    },
+    "plan-integrity-run": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T02:03:30.809Z",
+      "doneAt": "2026-09-29T02:08:23.603Z"
+    },
+    "plan-integrity-run.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:08:37.094Z"
+    },
+    "plan-integrity-run.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:08:50.123Z"
+    },
+    "plan-integrity-run.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:09:03.032Z"
+    },
+    "plan-integrity-run.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:09:15.496Z"
+    },
+    "plan-integrity-run.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:09:27.837Z"
+    },
+    "finalize-trailer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T02:10:03.581Z",
+      "doneAt": "2026-09-29T02:11:55.314Z"
+    },
+    "finalize-trailer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:12:08.298Z"
+    },
+    "finalize-trailer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:12:21.832Z"
+    },
+    "finalize-trailer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:12:34.158Z"
+    },
+    "runner-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T02:12:50.515Z",
+      "doneAt": "2026-09-29T02:21:39.607Z"
+    },
+    "runner-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:21:53.147Z"
+    },
+    "runner-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:22:05.608Z"
+    },
+    "runner-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:22:17.878Z"
+    },
+    "runner-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:22:29.304Z"
+    },
+    "work-role-guidance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T02:22:43.625Z",
+      "doneAt": "2026-09-29T02:27:56.552Z"
+    },
+    "work-role-guidance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:28:10.932Z"
+    },
+    "work-role-guidance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:28:24.145Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1728",
+      "claimedAt": "2026-09-29T02:28:40.345Z",
+      "doneAt": "2026-09-29T02:29:34.131Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:29:46.314Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:29:58.004Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:30:10.136Z"
+    }
+  }
+}

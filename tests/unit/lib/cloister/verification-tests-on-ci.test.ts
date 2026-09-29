@@ -43,6 +43,9 @@ vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
 vi.mock('../../../../src/lib/cloister/test-skip-run.js', () => ({
   evaluateTestSkipGate: vi.fn(async () => ({ failed: false, evidence: '' })),
 }));
+vi.mock('../../../../src/lib/cloister/plan-integrity-run.js', () => ({
+  evaluatePlanIntegrityGate: vi.fn(async () => ({ failed: false, evidence: '' })),
+}));
 vi.mock('../../../../src/lib/cloister/verification-check-run.js', () => ({
   postVerificationCheckRun: vi.fn(async () => null),
 }));

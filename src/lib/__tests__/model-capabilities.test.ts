@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, MODEL_CAPABILITIES } from '../model-capabilities.js';
+import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, MODEL_CAPABILITIES, modelSupportsSamplingParams } from '../model-capabilities.js';
 
 describe('model capabilities', () => {
   it('locks gpt-5.5 contextWindow to the CLIProxy Codex ceiling', () => {
@@ -143,5 +143,29 @@ describe('model capabilities', () => {
     expect(swift.displayName).toBe('QL Swift 8B');
     expect(swift.contextWindow).toBe(128000);
     expect(swift.maxOutputTokens).toBe(8192);
+  });
+
+  // PAN-4327: Sonnet 5+, Opus 4.7+ and Fable reject non-default sampling params.
+  it.each([
+    'claude-fable-5-1',
+    'claude-fable-5',
+    'claude-opus-5-5',
+    'claude-opus-5',
+    'claude-opus-4-8',
+    'claude-opus-4-7',
+    'claude-sonnet-5',
+  ])('modelSupportsSamplingParams returns false for %s', (model) => {
+    expect(modelSupportsSamplingParams(model)).toBe(false);
+  });
+
+  it.each([
+    'claude-opus-4-6',
+    'claude-sonnet-4-6',
+    'claude-haiku-4-5',
+    'claude-haiku-4-5-20251001',
+    'gpt-4.1-nano',
+    'not-a-model',
+  ])('modelSupportsSamplingParams returns true for %s', (model) => {
+    expect(modelSupportsSamplingParams(model)).toBe(true);
   });
 });

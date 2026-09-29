@@ -2,8 +2,17 @@ import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { AgentRuntimeSnapshot, SessionNode as SessionNodeType } from '@overdeck/contracts';
+import type { SessionOutcome } from '../../lib/sessionOutcome';
 import { AgentStepRow } from './AgentStepRow';
 import { AGENT_ROW_SECTIONS } from './inventory';
+
+// PAN-4290: `../../lib/store` (below) is mocked to serve only agentRuntimeById,
+// so a hook reading derivedIssueStateByIssueId through it would throw. Mock
+// the outcome hook directly instead of widening the store mock.
+let sessionOutcome: SessionOutcome | null = null;
+vi.mock('../../lib/useSessionOutcome', () => ({
+  useSessionNodeOutcome: () => sessionOutcome,
+}));
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -169,6 +178,7 @@ describe('AgentStepRow', () => {
   beforeEach(() => {
     runtimeById = {};
     costSessions = [];
+    sessionOutcome = null;
   });
 
   it('renders a cockpit row with label, model, and duration', () => {
@@ -363,5 +373,84 @@ describe('AgentStepRow', () => {
     );
 
     expect(screen.queryByTestId('context-menu')).toBeNull();
+  });
+
+  // PAN-4290 — ended-session outcome labels (WI-4).
+  it('shows Merged with the muted class for an ended work row whose PR merged', () => {
+    sessionOutcome = { kind: 'merged', label: 'Merged', detail: "The work agent's PR merged.", tone: 'quiet' };
+    render(
+      <AgentStepRow
+        session={makeSession({ presence: 'ended', status: 'stopped' })}
+        issueId="PAN-821"
+        density="cockpit"
+        onAction={() => {}}
+      />,
+    );
+
+    const status = screen.getByText('Merged');
+    expect(status).toHaveClass('muted');
+    expect(status).not.toHaveClass('bad');
+  });
+
+  it('shows Changes requested for an ended review row without the bad class', () => {
+    sessionOutcome = { kind: 'changes-requested', label: 'Changes requested', detail: 'The reviewer exited after requesting changes.', tone: 'quiet' };
+    render(
+      <AgentStepRow
+        session={makeSession({ type: 'review', presence: 'ended', status: 'error' })}
+        issueId="PAN-821"
+        density="cockpit"
+        onAction={() => {}}
+      />,
+    );
+
+    const status = screen.getByText('Changes requested');
+    expect(status).toHaveClass('muted');
+    expect(status).not.toHaveClass('bad');
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('data-status', 'done');
+  });
+
+  it('shows Ended unexpectedly with the bad class for an ended work row that errored', () => {
+    sessionOutcome = { kind: 'ended-unexpectedly', label: 'Ended unexpectedly', detail: 'The session recorded an error before it ended.', tone: 'attention' };
+    render(
+      <AgentStepRow
+        session={makeSession({ presence: 'ended', status: 'error' })}
+        issueId="PAN-821"
+        density="cockpit"
+        onAction={() => {}}
+      />,
+    );
+
+    const status = screen.getByText('Ended unexpectedly');
+    expect(status).toHaveClass('bad');
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('data-status', 'error');
+  });
+
+  it('shows the outcome text in a rail row for an ended session', () => {
+    sessionOutcome = { kind: 'stopped-by-close-out', label: 'Stopped by close-out', detail: 'Close-out stopped this session after the issue closed.', tone: 'quiet' };
+    render(
+      <AgentStepRow
+        session={makeSession({ presence: 'ended', status: 'stopped' })}
+        issueId="PAN-821"
+        density="rail"
+        onAction={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Stopped by close-out')).toBeInTheDocument();
+  });
+
+  it('the status tooltip no longer contains "Session ended cleanly"', () => {
+    sessionOutcome = { kind: 'stopped-by-close-out', label: 'Stopped by close-out', detail: 'Close-out stopped this session after the issue closed.', tone: 'quiet' };
+    render(
+      <AgentStepRow
+        session={makeSession({ presence: 'ended', status: 'stopped' })}
+        issueId="PAN-821"
+        density="cockpit"
+        onAction={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId('status-dot')).not.toHaveAttribute('title', expect.stringContaining('Session ended cleanly'));
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('title', expect.stringContaining('Stopped by close-out: Close-out stopped this session after the issue closed.'));
   });
 });

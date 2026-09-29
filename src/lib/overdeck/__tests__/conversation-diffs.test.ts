@@ -1,0 +1,239 @@
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+
+const execMock = vi.hoisted(() => vi.fn());
+vi.mock('node:child_process', () => ({ exec: execMock }));
+
+const statMock = vi.hoisted(() => vi.fn());
+vi.mock('node:fs/promises', () => ({ stat: statMock }));
+
+const checkpointMocks = vi.hoisted(() => ({
+  findCommitAtTime: vi.fn(),
+  diffFilesAgainstHead: vi.fn(),
+}));
+vi.mock('../../checkpoint/checkpoint-manager.js', () => ({
+  findCommitAtTime: checkpointMocks.findCommitAtTime,
+  diffFilesAgainstHead: checkpointMocks.diffFilesAgainstHead,
+  diffPatchSinceCommit: vi.fn(),
+  diffPatchFilesAgainstHead: vi.fn(),
+}));
+
+const conversationMocks = vi.hoisted(() => ({
+  getConversationByName: vi.fn(),
+  getConversationById: vi.fn(),
+}));
+vi.mock('../conversations.js', () => ({
+  getConversationByName: conversationMocks.getConversationByName,
+  getConversationById: conversationMocks.getConversationById,
+}));
+
+vi.mock('node:fs', () => ({ existsSync: vi.fn(() => true) }));
+
+import { getConversationDiffs } from '../conversation-diffs.js';
+import type { LegacyConversation } from '../conversations.js';
+
+type ExecCallback = (error: Error | null, result: { stdout: string; stderr: string }) => void;
+
+describe('getConversationDiffs', () => {
+  beforeEach(() => {
+    execMock.mockReset();
+    statMock.mockReset();
+    checkpointMocks.findCommitAtTime.mockReset();
+    checkpointMocks.diffFilesAgainstHead.mockReset();
+    conversationMocks.getConversationByName.mockReset();
+    conversationMocks.getConversationById.mockReset();
+  });
+
+  it('runs one git diff pair per repo, scopes each summary to its own turn, and repeats shared paths with matching numbers', async () => {
+    conversationMocks.getConversationByName.mockReturnValue({
+      id: 1,
+      name: 'conv-1',
+      createdAt: '2025-12-01T00:00:00Z',
+    } as unknown as LegacyConversation);
+    checkpointMocks.findCommitAtTime.mockResolvedValue('abc123');
+    statMock.mockResolvedValue({ size: 500, mtimeMs: 500 });
+
+    let revParseCalls = 0;
+    let numstatCalls = 0;
+    let nameStatusCalls = 0;
+    const diffCommands: string[] = [];
+    execMock.mockImplementation((command: string, _options: unknown, callback: ExecCallback) => {
+      if (/git rev-parse --show-toplevel/.test(command)) {
+        revParseCalls += 1;
+        callback(null, { stdout: '/repo\n', stderr: '' });
+      } else if (/--numstat/.test(command)) {
+        numstatCalls += 1;
+        diffCommands.push(command);
+        callback(null, {
+          stdout: [
+            '3\t1\tfile1.ts',
+            '2\t0\tfile2.ts',
+            '1\t1\tfile3.ts',
+            '5\t2\tfile4.ts',
+            '4\t3\tfile5.ts',
+          ].join('\n'),
+          stderr: '',
+        });
+      } else if (/--name-status/.test(command)) {
+        nameStatusCalls += 1;
+        diffCommands.push(command);
+        callback(null, {
+          stdout: [
+            'M\tfile1.ts',
+            'M\tfile2.ts',
+            'M\tfile3.ts',
+            'M\tfile4.ts',
+            'M\tfile5.ts',
+          ].join('\n'),
+          stderr: '',
+        });
+      } else {
+        callback(new Error(`unexpected command: ${command}`), { stdout: '', stderr: '' });
+      }
+    });
+
+    const fileEditsByAssistantId = new Map<string, Array<{ tool: string; filePath: string }>>([
+      ['asst-1', [{ tool: 'Edit', filePath: '/repo/file1.ts' }]],
+      ['asst-2', [{ tool: 'Edit', filePath: '/repo/file2.ts' }]],
+      ['asst-3', [{ tool: 'Edit', filePath: '/repo/file3.ts' }]],
+      ['asst-4', [{ tool: 'Edit', filePath: '/repo/file4.ts' }]],
+      // asst-5 re-edits file1.ts (already touched by asst-1) and also file5.ts.
+      ['asst-5', [{ tool: 'Edit', filePath: '/repo/file1.ts' }, { tool: 'Edit', filePath: '/repo/file5.ts' }]],
+    ]);
+    const messages = ['asst-1', 'asst-2', 'asst-3', 'asst-4', 'asst-5'].map((id, i) => ({
+      role: 'assistant' as const,
+      id,
+      createdAt: `2026-01-0${i + 1}T00:00:00Z`,
+      completedAt: `2026-01-0${i + 1}T00:00:01Z`,
+    }));
+
+    const result = await getConversationDiffs('conv-1', {
+      resolveSessionFile: async () => '/tmp/session.jsonl',
+      getCachedMessages: async () => ({ messages, fileEditsByAssistantId }),
+    });
+    const body = result.body as { summaries: Array<{ assistantMessageId: string; files: Array<{ path: string; kind?: string; additions: number; deletions: number }> }> };
+
+    // AC1 — one diff pair for the whole repo, not one pair per turn.
+    expect(numstatCalls).toBe(1);
+    expect(nameStatusCalls).toBe(1);
+    expect(revParseCalls).toBe(1);
+
+    // Both diff commands disable rename detection and quoted paths — a per-turn
+    // lookup keyed by the input path would otherwise drop a renamed or
+    // non-ASCII file entirely.
+    for (const command of diffCommands) {
+      expect(command).toContain('--no-renames');
+      expect(command).toContain('core.quotePath=false');
+    }
+
+    // AC2 — each summary lists only the paths its own turn edited.
+    expect(body.summaries).toHaveLength(5);
+    const byTurn = new Map(body.summaries.map(s => [s.assistantMessageId, s]));
+    expect(byTurn.get('asst-1')?.files.map(f => f.path)).toEqual(['file1.ts']);
+    expect(byTurn.get('asst-2')?.files.map(f => f.path)).toEqual(['file2.ts']);
+    expect(byTurn.get('asst-5')?.files.map(f => f.path)).toEqual(['file1.ts', 'file5.ts']);
+
+    // AC3 — a path edited in two turns appears in both, with the same numbers.
+    const turn1File1 = byTurn.get('asst-1')?.files.find(f => f.path === 'file1.ts');
+    const turn5File1 = byTurn.get('asst-5')?.files.find(f => f.path === 'file1.ts');
+    expect(turn1File1).toEqual({ path: 'file1.ts', kind: 'M', additions: 3, deletions: 1 });
+    expect(turn5File1).toEqual(turn1File1);
+  });
+});
+
+describe('getConversationDiffs result cache (PAN-4312)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    execMock.mockReset();
+    statMock.mockReset();
+    checkpointMocks.findCommitAtTime.mockReset();
+    checkpointMocks.diffFilesAgainstHead.mockReset();
+    conversationMocks.getConversationByName.mockReset();
+    conversationMocks.getConversationById.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function setupExec(numstat: string, nameStatus: string, counts: { numstat: number; nameStatus: number }) {
+    execMock.mockImplementation((command: string, _options: unknown, callback: ExecCallback) => {
+      if (/git rev-parse --show-toplevel/.test(command)) {
+        callback(null, { stdout: '/repo\n', stderr: '' });
+      } else if (/--numstat/.test(command)) {
+        counts.numstat += 1;
+        callback(null, { stdout: numstat, stderr: '' });
+      } else if (/--name-status/.test(command)) {
+        counts.nameStatus += 1;
+        callback(null, { stdout: nameStatus, stderr: '' });
+      } else {
+        callback(new Error(`unexpected command: ${command}`), { stdout: '', stderr: '' });
+      }
+    });
+  }
+
+  function makeDeps(sessionFile: string) {
+    const fileEditsByAssistantId = new Map<string, Array<{ tool: string; filePath: string }>>([
+      ['asst-1', [{ tool: 'Edit', filePath: '/repo/file1.ts' }]],
+    ]);
+    const messages = [{ role: 'assistant' as const, id: 'asst-1', createdAt: '2026-02-01T00:00:00Z', completedAt: '2026-02-01T00:00:01Z' }];
+    return {
+      resolveSessionFile: async () => sessionFile,
+      getCachedMessages: async () => ({ messages, fileEditsByAssistantId }),
+    };
+  }
+
+  it('serves an unchanged size and mtimeMs from cache without spawning git (AC1)', async () => {
+    conversationMocks.getConversationByName.mockReturnValue({ id: 2, name: 'conv-cache-1', createdAt: '2025-12-01T00:00:00Z' } as unknown as LegacyConversation);
+    checkpointMocks.findCommitAtTime.mockResolvedValue('abc123');
+    statMock.mockResolvedValue({ size: 100, mtimeMs: 1_000 });
+    const counts = { numstat: 0, nameStatus: 0 };
+    setupExec('3\t1\tfile1.ts', 'M\tfile1.ts', counts);
+    const deps = makeDeps('/tmp/session-cache-1.jsonl');
+
+    const first = await getConversationDiffs('conv-cache-1', deps);
+    expect(counts.numstat).toBe(1);
+    expect(counts.nameStatus).toBe(1);
+
+    const second = await getConversationDiffs('conv-cache-1', deps);
+
+    expect(counts.numstat).toBe(1);
+    expect(counts.nameStatus).toBe(1);
+    expect(second.body).toEqual(first.body);
+  });
+
+  it('spawns the diff pair again once 30s have passed (AC2)', async () => {
+    conversationMocks.getConversationByName.mockReturnValue({ id: 3, name: 'conv-cache-2', createdAt: '2025-12-01T00:00:00Z' } as unknown as LegacyConversation);
+    checkpointMocks.findCommitAtTime.mockResolvedValue('abc123');
+    statMock.mockResolvedValue({ size: 100, mtimeMs: 1_000 });
+    const counts = { numstat: 0, nameStatus: 0 };
+    setupExec('3\t1\tfile1.ts', 'M\tfile1.ts', counts);
+    const deps = makeDeps('/tmp/session-cache-2.jsonl');
+
+    await getConversationDiffs('conv-cache-2', deps);
+    expect(counts.numstat).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await getConversationDiffs('conv-cache-2', deps);
+
+    expect(counts.numstat).toBe(2);
+  });
+
+  it('recomputes and returns new summaries when mtimeMs changes (AC3)', async () => {
+    conversationMocks.getConversationByName.mockReturnValue({ id: 4, name: 'conv-cache-3', createdAt: '2025-12-01T00:00:00Z' } as unknown as LegacyConversation);
+    checkpointMocks.findCommitAtTime.mockResolvedValue('abc123');
+    statMock.mockResolvedValue({ size: 100, mtimeMs: 1_000 });
+    const counts = { numstat: 0, nameStatus: 0 };
+    setupExec('3\t1\tfile1.ts', 'M\tfile1.ts', counts);
+    const deps = makeDeps('/tmp/session-cache-3.jsonl');
+
+    const first = await getConversationDiffs('conv-cache-3', deps);
+    expect(counts.numstat).toBe(1);
+
+    statMock.mockResolvedValue({ size: 100, mtimeMs: 2_000 });
+    setupExec('9\t4\tfile1.ts', 'M\tfile1.ts', counts);
+    const second = await getConversationDiffs('conv-cache-3', deps);
+
+    expect(counts.numstat).toBe(2);
+    expect(second.body).not.toEqual(first.body);
+  });
+});

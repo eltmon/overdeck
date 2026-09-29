@@ -10,7 +10,6 @@ export const EXPERIMENTAL_TAB_IDS = new Set<Tab>([
   'metrics',
   'costs',
   'health',
-  'skills',
   'god-view',
 ]);
 

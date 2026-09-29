@@ -1,0 +1,189 @@
+{
+  "version": "1",
+  "issueId": "PAN-4320",
+  "created": "2026-09-28T15:34:16.087Z",
+  "updated": "2026-09-28T16:29:37.598Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pane-agent-key-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T15:34:16.087Z",
+      "doneAt": "2026-09-28T15:38:04.941Z"
+    },
+    "listing-agent-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T15:38:09.744Z",
+      "doneAt": "2026-09-28T15:44:14.081Z"
+    },
+    "enrichment-agent-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T15:44:19.286Z",
+      "doneAt": "2026-09-28T15:50:59.266Z"
+    },
+    "state-seed-agent-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T15:51:02.694Z",
+      "doneAt": "2026-09-28T15:54:30.009Z"
+    },
+    "projection-agent-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T15:54:32.777Z",
+      "doneAt": "2026-09-28T16:01:10.631Z"
+    },
+    "refresh-trigger-agent-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T16:01:13.610Z",
+      "doneAt": "2026-09-28T16:03:43.052Z"
+    },
+    "event-path-agent-id": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T16:03:48.758Z",
+      "doneAt": "2026-09-28T16:08:32.660Z"
+    },
+    "enrichment-census-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T16:08:37.899Z",
+      "doneAt": "2026-09-28T16:15:02.405Z"
+    },
+    "docs-agent-key-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T16:15:05.834Z",
+      "doneAt": "2026-09-28T16:15:42.860Z"
+    },
+    "live-herdr-verification": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4320",
+      "claimedAt": "2026-09-28T16:15:47.588Z",
+      "doneAt": "2026-09-28T16:18:13.245Z"
+    },
+    "pane-agent-key-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:24:01.191Z"
+    },
+    "pane-agent-key-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:24:32.462Z"
+    },
+    "pane-agent-key-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:24:42.381Z"
+    },
+    "listing-agent-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:24:52.786Z"
+    },
+    "listing-agent-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:25:03.349Z"
+    },
+    "listing-agent-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:25:15.664Z"
+    },
+    "enrichment-agent-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:25:27.011Z"
+    },
+    "enrichment-agent-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:25:37.998Z"
+    },
+    "enrichment-agent-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:25:48.741Z"
+    },
+    "enrichment-agent-key.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:25:59.773Z"
+    },
+    "state-seed-agent-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:26:11.205Z"
+    },
+    "state-seed-agent-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:26:23.505Z"
+    },
+    "projection-agent-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:26:35.218Z"
+    },
+    "projection-agent-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:26:46.943Z"
+    },
+    "refresh-trigger-agent-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:26:58.194Z"
+    },
+    "refresh-trigger-agent-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:27:09.222Z"
+    },
+    "event-path-agent-id.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:27:21.359Z"
+    },
+    "event-path-agent-id.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:27:33.570Z"
+    },
+    "event-path-agent-id.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:27:45.214Z"
+    },
+    "event-path-agent-id.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:27:57.173Z"
+    },
+    "enrichment-census-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:28:08.489Z"
+    },
+    "enrichment-census-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:28:19.969Z"
+    },
+    "enrichment-census-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:28:30.799Z"
+    },
+    "docs-agent-key-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:28:41.147Z"
+    },
+    "docs-agent-key-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:28:51.759Z"
+    },
+    "docs-agent-key-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:29:03.230Z"
+    },
+    "live-herdr-verification.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:29:15.027Z"
+    },
+    "live-herdr-verification.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:29:26.341Z"
+    },
+    "live-herdr-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T16:29:37.598Z"
+    }
+  }
+}

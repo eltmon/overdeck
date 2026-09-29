@@ -30,6 +30,7 @@ import {
 import { readPipelineJournal } from '../../../../lib/cloister/pipeline-journal.js';
 import { readAutoSpawnOnFinalizeFlagAsync, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
+import { planFinalizedHash } from '../../../../lib/xbrief/plan-finalized.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 import type { AgentState } from '../../../../lib/agents/agent-state-read.js';
 
@@ -221,6 +222,71 @@ describe('commitCompletePlanningWorkspaceGit', () => {
       ['add', '.gitignore'],
       ['diff', '--cached', '--quiet'],
       ['commit', '-m', 'chore(plan): complete planning for PAN-3902', '--no-verify'],
+      ['remote'],
+    ]);
+  });
+
+  // PAN-1728: the finalize commit carries the Plan-Finalized trailer in the repo that holds the spec.
+  function makeGitWorkspace(issueId: string, specDir: string): { workspacePath: string; specPath: string; hash: string } {
+    const { workspacePath } = makeProject(issueId);
+    mkdirSync(join(workspacePath, '.git'), { recursive: true });
+    mkdirSync(join(workspacePath, 'src'), { recursive: true });
+    writeFileSync(join(workspacePath, 'src', 'index.ts'), 'export {};\n');
+    const specPath = join(workspacePath, specDir, '.pan', 'specs', `2026-09-29-${issueId}-plan.xbrief.json`);
+    mkdirSync(join(specPath, '..'), { recursive: true });
+    const bytes = '{\n  "plan": { "id": "finalized" }\n}\n';
+    writeFileSync(specPath, bytes);
+    return { workspacePath, specPath, hash: planFinalizedHash(bytes) };
+  }
+
+  function gitSpy(specRepo: string) {
+    const calls: Array<{ args: string[]; cwd: string }> = [];
+    const execSpy = vi.fn(async (_cmd: string, args: string[], options: { cwd: string }) => {
+      calls.push({ args, cwd: options.cwd });
+      if (args[0] === 'diff') throw new Error('staged changes present');
+      if (args[0] === 'rev-parse') return { stdout: `${specRepo}\n`, stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
+    return { calls, execSpy };
+  }
+
+  it('writes the Plan-Finalized trailer on the finalize commit when the spec is in gitRoot', async () => {
+    const { workspacePath, specPath, hash } = makeGitWorkspace('PAN-1801', '');
+    const { calls, execSpy } = gitSpy(workspacePath);
+
+    await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-1801', null, execSpy as never, specPath);
+
+    const commits = calls.filter((call) => call.args[0] === 'commit');
+    expect(commits).toEqual([{
+      args: ['commit', '-m', 'chore(plan): complete planning for PAN-1801', '-m', `Plan-Finalized: ${hash}`, '--no-verify'],
+      cwd: workspacePath,
+    }]);
+  });
+
+  it('commits the polyrepo spec in its own repo with the trailer and leaves the wrapper commit bare', async () => {
+    const { workspacePath, specPath, hash } = makeGitWorkspace('PAN-1802', 'infra');
+    const specRepo = join(workspacePath, 'infra');
+    const { calls, execSpy } = gitSpy(specRepo);
+
+    await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-1802', null, execSpy as never, specPath);
+
+    expect(calls.filter((call) => call.args[0] === 'commit')).toEqual([
+      { args: ['commit', '-m', 'chore(plan): complete planning for PAN-1802', '--no-verify'], cwd: workspacePath },
+      { args: ['commit', '-m', 'chore(plan): complete planning for PAN-1802', '-m', `Plan-Finalized: ${hash}`, '--no-verify'], cwd: specRepo },
+    ]);
+    expect(calls).toContainEqual({ args: ['add', '.pan/'], cwd: specRepo });
+  });
+
+  it('keeps today\'s commit arguments when no spec path is given', async () => {
+    const { workspacePath } = makeGitWorkspace('PAN-1803', '');
+    const { calls, execSpy } = gitSpy(workspacePath);
+
+    await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-1803', null, execSpy as never);
+
+    expect(calls.map((call) => call.args)).toEqual([
+      ['add', '.pan/'],
+      ['diff', '--cached', '--quiet'],
+      ['commit', '-m', 'chore(plan): complete planning for PAN-1803', '--no-verify'],
       ['remote'],
     ]);
   });

@@ -255,7 +255,7 @@ describe('TieredExecutionSection', () => {
       difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
     });
     expect(next.tiered_execution?.supervisor).toEqual({
-      model: 'claude-sonnet-5',
+      model: 'claude-sonnet-5-5',
       harness: 'claude-code',
       subscribe: 'flagged',
     });

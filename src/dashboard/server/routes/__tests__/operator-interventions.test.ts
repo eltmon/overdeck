@@ -335,7 +335,7 @@ describe('operator.intervention dashboard routes', () => {
     agentMocks.saveAgentState.mockReturnValue(Effect.succeed(undefined));
     agentMocks.saveAgentRuntimeState.mockResolvedValue(undefined);
     agentMocks.restartAgent.mockResolvedValue({ success: true });
-    agentMocks.messageAgent.mockResolvedValue(undefined);
+    agentMocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: true });
     agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed({ ...agentState, paused: false }));
     agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed({ ...agentState, troubled: false, consecutiveFailures: 0 }));
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
@@ -476,6 +476,16 @@ describe('operator.intervention dashboard routes', () => {
 
     expect(response.status).toBe(200);
     expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-1', 'please continue', 'dashboard:user-message');
+  });
+
+  it('passes deliverAs steer to messageAgent as steer: true (PAN-4292)', async () => {
+    agentMocks.messageAgent.mockResolvedValueOnce({ delivered: true, queuedToMail: true, confirmed: true });
+    const { response } = await requestAgents('/api/agents/agent-pan-1/message', {
+      body: JSON.stringify({ message: 'change course', deliverAs: 'steer' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-1', 'change course', 'dashboard:user-message', { steer: true });
   });
 
   it('emits deep_wipe from the successful dashboard deep-wipe route', async () => {

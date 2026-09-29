@@ -148,7 +148,7 @@ export class TmuxBackend implements TerminalBackend {
       if ('refused' in verdict) return { refused: true, reason: verdict.reason };
       if ('dropped' in verdict) return { dropped: true, reason: verdict.reason };
 
-      await Effect.runPromise(sendKeys(sessionName, text, 'tmux-backend:prompt'));
+      await Effect.runPromise(sendKeys(sessionName, text, 'tmux-backend:prompt', { submit: options.submit }));
       return { delivered: true, messageId: options.messageId };
     });
   }

@@ -5,20 +5,21 @@
 # opt in with OVERDECK_OPERATOR_PUSH=1.
 #
 # Operator-supervised conversations (OVERDECK_AGENT_ID prefixed `conv-`) are
-# exempt without the manual opt-in — see sync-sources/rules/operator-authorized-merges.md.
-# The incident this guard exists for (PAN-2194) was the unsupervised flywheel
-# orchestrator, not a conversation; `conv-` is already the codebase's standing
-# marker for the human-supervised category (src/lib/agents/identity.ts
-# AGENT_PREFIXES, src/lib/conversations/current.ts).
+# exempt without the manual opt-in, except the Flywheel (`conv-flywheel`) —
+# the unsupervised orchestrator this guard was written for (PAN-2194). `conv-`
+# is already the codebase's standing marker for the human-supervised category
+# (src/lib/agents/identity.ts AGENT_PREFIXES, src/lib/conversations/current.ts).
+# Identity comes from scripts/lib/pusher-identity.sh.
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/lib/pusher-identity.sh
 
 if [[ "${OVERDECK_OPERATOR_PUSH:-}" == "1" ]]; then
   exit 0
 fi
 
-if [[ "${OVERDECK_AGENT_ID:-}" == conv-* ]]; then
+if ! overdeck_pusher_is_agent; then
   exit 0
 fi
 
@@ -33,23 +34,6 @@ if [[ "$RANGE" != *..* || "$RANGE" == ..* || "$RANGE" == *.. ]]; then
   echo "✖ agent main-push guard: undeterminable push range '$RANGE'; refusing because this is a trust gate." >&2
   echo "Agents land code via PR — run pan done. Operator escape hatch: OVERDECK_OPERATOR_PUSH=1 git push ..." >&2
   exit 1
-fi
-
-is_agent=0
-if [[ -n "${OVERDECK_AGENT_ID:-}" ]]; then
-  is_agent=1
-fi
-
-# Agent workspaces commit as the GitHub App's bot, `<app-slug>[bot]` (the slug
-# comes from the installed App, e.g. overdeck-agent; #4066 review). Any `[bot]`
-# identity is an agent's, never the operator's.
-git_user_name=$(git config user.name 2>/dev/null || true)
-if [[ "$git_user_name" == *"[bot]" ]]; then
-  is_agent=1
-fi
-
-if [[ "$is_agent" -eq 0 ]]; then
-  exit 0
 fi
 
 changed_paths=$(git diff --name-only "$RANGE" -- 2>/dev/null || true)

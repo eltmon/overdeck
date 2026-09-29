@@ -21,9 +21,11 @@ export function topGitHubQuotaCallers(quota: GitHubQuotaSnapshot): GitHubQuotaCa
 
 /**
  * GitHubQuotaPill (PAN-4264) — the user account's GitHub GraphQL budget
- * (`GH <remaining>/<limit>` from the latest `/rate_limit` sample, `GH —`
- * before the first sample). The popover lists the five callers that spent
- * the most points this hour plus the points no metered caller claims.
+ * (`GH <remaining>/<limit>` from the latest GraphQL `rateLimit` sample, not
+ * REST `/rate_limit` — PAN-4291 found the REST bucket badly under-reports
+ * it — `GH —` before the first sample). The popover lists the five callers
+ * that spent the most points this hour plus the points no metered caller
+ * claims.
  *
  * Neutral at rest; amber while GitHub calls are paused (the operator should
  * know). Never green: a healthy budget is the rest state, not an outcome.

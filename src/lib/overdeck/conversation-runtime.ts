@@ -3,8 +3,7 @@ import { resolveMuseSessionPath, museSessionId } from '../runtimes/storage/muse.
 import { randomUUID } from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile, readdir, stat, realpath, rename, rm } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { mkdir, writeFile, readFile, readdir, stat, rename, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
@@ -36,6 +35,7 @@ import { detectionPolicyFor, keepTmuxSessionOpen, launchAgentPane, resolveLaunch
 import type { AgentPaneRef, TerminalBackend, TerminalBackendName } from '../terminal-backends/types.js';
 import type { AgentRole } from '@overdeck/contracts';
 import { conversationStateDir, readConversationPaneRole, writeConversationPaneRole } from './conversation-pane-role.js';
+import { validateCwdContainment } from './cwd-containment.js';
 import { closeConversationPane, conversationHarnessAlive, conversationSessionAlive, listLiveConversationSessions, waitForConversationSession } from './conversation-liveness.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -217,20 +217,6 @@ export async function isInsideGitWorkTree(dir: string): Promise<boolean> {
   try {
     const { stdout } = await execAsync('git rev-parse --is-inside-work-tree', { cwd: dir, encoding: 'utf-8' });
     return stdout.trim() === 'true';
-  } catch {
-    return false;
-  }
-}
-async function validateCwdContainment(cwd: string): Promise<boolean> {
-  if (!cwd.startsWith('/')) return false;
-  const segments = cwd.split('/').filter(Boolean);
-  if (segments.includes('..')) return false;
-  try {
-    const resolved = await realpath(cwd);
-    const stats = await stat(resolved);
-    if (!stats.isDirectory()) return false;
-    const home = homedir();
-    return resolved.startsWith(`${home}/`) || resolved === home;
   } catch {
     return false;
   }

@@ -1,0 +1,762 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-28T10:08:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3942: Per-skill on/off at global, project, and issue level",
+    "updated": "2026-09-28T17:20:51.765Z"
+  },
+  "plan": {
+    "id": "pan-3942",
+    "title": "Per-skill on/off at global, project, and issue level (rescoped from skill bundles)",
+    "status": "running",
+    "uid": "e4192152-b331-4532-9c6e-4ae05a3e03d0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 3,
+    "created": "2026-09-28T10:08:48Z",
+    "updated": "2026-09-28T17:20:51.765Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3942",
+        "label": "PAN-3942",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skills",
+      "launcher",
+      "claude-code",
+      "codex",
+      "dashboard",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Every Overdeck-managed agent sees the whole synced skill corpus. Operators cannot choose which skills apply globally, per project, or per issue, so niche skills cost context in every session and cannot be switched off for one project or issue.",
+      "Proposal": "Per-skill on/off overrides at three levels resolved issue > project > global > default on, with 11 core workflow skills always on. Global overrides live in ~/.overdeck/config.yaml skills.overrides, project overrides in projects.yaml skill_overrides, issue overrides in <planHome>/.pan/skill-overrides/<ISSUE>.yaml committed on main through the plan-artifact commit door. Generated launchers run a hidden `pan skills launch-settings` step (fail-open) that hides disabled skills by name: Claude Code via --settings skillOverrides 'off', Codex via [[skills.config]] enabled=false in the per-agent config.toml. Both mechanisms were verified live during planning. CLI `pan skills list|set`, dashboard API GET/PUT /api/skills/overrides, a shared SkillOverridesPanel on the Skills page (global), project settings (project), and issue view (issue), and a docs section in features/skills.mdx. Full detail: .pan/drafts/PAN-3942.md.",
+      "NonGoals": "- Named or versioned skill bundles, bundle includes, digests, provenance reports (do not plan or file)\n- Conversation-scope overrides\n- Role/audience filtering (#1655)\n- Git/registry skill sources\n- Context-cost estimates\n- Changing pan sync, ~/.claude/skills, ~/.agents/skills, workspace .claude/skills seeding, or any user-owned harness settings file\n- Applying overrides to ohmypi, acp/opencode, kimi-code, muse, or remote (Fly) launches\n- Changing or removing the GET /api/skills route\n- Closing or superseding #1357, #1655, #1656\n- Changing a live session's skill set; overrides apply at the next launch only\n- Adding lines to ratcheted files over 1000 lines (projects.ts, settings-api.ts, schema.ts, src/cli/index.ts, spawn-prep.ts, spawn.ts, conversation-runtime.ts)"
+    },
+    "autoDecisions": [],
+    "metadata": {
+      "canonicalFilename": "2026-09-28-PAN-3942-per-skill-on-off-at-global-project-and-issue-level-rescoped-from-skill-bundles.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "resolver",
+        "title": "Add the skill-override resolver, core-skill list, and skill catalog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3942",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/resolve.ts",
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-overrides/__tests__/resolve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/resolve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resolve.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "store",
+            "launch-lib",
+            "cli",
+            "api",
+            "ui-panel"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-1. Create resolve.ts (pure: CORE_SKILLS constant with exactly the 11 names from decision D4, isCoreSkill, resolveSkillStates, disabledSkillNames, the exported types SkillOverrideLevel/SkillStateSource/SkillOverrideMap/SkillOverrideLayers/SkillState) and catalog.ts (async listSkillCatalog over <home>/.overdeck/skills, <home>/.claude/skills, <home>/.agents/skills and optional <projectRoot>/.pan/skills; name = dir name; description = frontmatter description first line; dedupe first-found; sort by name; skip missing roots; fs/promises only; home injectable). Precedence: issue > project > global > default true; core skills always enabled with source 'core'. disabledSkillNames returns the sorted non-core names whose resolved value is false, including names absent from any catalog."
+        },
+        "items": [
+          {
+            "id": "resolver.ac1",
+            "title": "Given global {grilling:false}, project {grilling:true}, issue undefined, When resolveSkillStates runs, Then grilling returns enabled true with source 'project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver.ac2",
+            "title": "Given issue {grilling:false} and project {grilling:true}, When resolved, Then grilling returns enabled false with source 'issue'; a skill with no value anywhere returns enabled true with source 'default'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver.ac3",
+            "title": "Given pan-done set to false at global, project, and issue, When resolved, Then pan-done returns enabled true, core true, source 'core' and disabledSkillNames excludes pan-done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver.ac4",
+            "title": "Given two catalog roots that both contain a skill named grilling and one missing root, When listSkillCatalog runs, Then it returns grilling once, sorted with the others, without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store",
+        "title": "Persist skill overrides at global, project, and issue level",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3942",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/store.ts",
+            "src/lib/skill-overrides/__tests__/store.test.ts",
+            "src/lib/projects.ts",
+            "src/lib/settings-api.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/store.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "store.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors (file-size ratchet unchanged for projects.ts and settings-api.ts)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "launch-lib",
+            "cli",
+            "api"
+          ],
+          "parallelSafeReason": "Owns only store.ts, its test, and keyword-only exports in projects.ts/settings-api.ts; no other item touches these files, and its blocks edges already serialize consumers."
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-2. In src/lib/projects.ts add only the `export` keyword to `interface ProjectsConfigMutation<T>` (line ~617) and `async function updateProjectsConfigAsync` (line ~653); in src/lib/settings-api.ts add only `export` to `function runSettingsWriteSerialized` (line ~888). Create store.ts: readGlobalSkillOverrides/readProjectSkillOverrides/readIssueSkillOverrides/loadSkillOverrideLayers/issueSkillOverridesPath/parseSkillOverrideUpdate/setSkillOverride/SkillOverrideError exactly as specified. Global = ~/.overdeck/config.yaml key skills.overrides via yaml parseDocument setIn/deleteIn inside runSettingsWriteSerialized (comment-preserving). Project = projects.yaml projects.<key>.skill_overrides via updateProjectsConfigAsync. Issue = <planHome>/.pan/skill-overrides/<ISSUE>.yaml (format in PRD), then commitPlanArtifacts({cwd: planHome, paths:[file], message:'chore(workspace): skill overrides for <ISSUE>'}) and pushPlanArtifacts(planHome) when committed; delete the file when empty and commit the deletion. Validation: core -> 'core-skill', not in listSkillCatalog for the context -> 'unknown-skill', unregistered project -> 'unknown-project', issue with no owning project -> 'unknown-issue'; enabled:null always allowed for a stored non-core key. Async fs/git only (no execSync, no new sync config reads). Tests set a git committer identity and commit.gpgsign=false in temp repos, mirroring the existing plan-artifact-commit tests."
+        },
+        "items": [
+          {
+            "id": "store.ac1",
+            "title": "Given ~/.overdeck/config.yaml containing a comment and an unrelated key, When setSkillOverride sets global grilling false, Then the file persists skills.overrides.grilling: false and preserves the comment and the unrelated key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store.ac2",
+            "title": "Given an issue in a registered temp git project, When setSkillOverride sets issue grilling false, Then it creates <planHome>/.pan/skill-overrides/<ISSUE>.yaml and produces a commit with subject 'chore(workspace): skill overrides for <ISSUE>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store.ac3",
+            "title": "Given that issue file holds only grilling, When setSkillOverride clears it with enabled null, Then the file is removed and the deletion is committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store.ac4",
+            "title": "Given a write for pan-done or for a name not in the catalog, When setSkillOverride runs, Then it rejects with SkillOverrideError code 'core-skill' or 'unknown-skill' and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store.ac5",
+            "title": "Given the diff against origin/main, When git diff runs on src/lib/projects.ts and src/lib/settings-api.ts, Then it shows only three added `export` keywords and no line-count change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-lib",
+        "title": "Resolve disabled skills for a launch and render Claude Code and Codex hide settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launch.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-3. Create launch.ts with resolveLaunchDisabledSkills({cwd, issueId}) (issue = explicit ?? issueIdFromWorkspacePath(cwd); project from findProjectByPath(cwd); loadSkillOverrideLayers; disabledSkillNames), claudeSkillSettingsJson(disabled) ('' when empty, else JSON {skillOverrides:{name:'off'}}), writeCodexSkillOverrides(codexHome, disabled) (replace the text between '# overdeck:skill-overrides:begin' and '# overdeck:skill-overrides:end' inclusive, append the [[skills.config]] name=... enabled=false block at end of file when non-empty, TOML-escape names, mode 0o600, idempotent), and launcherSkillOverrideLines({harness, workingDir, issueId}) returning the exact fail-open bash from the PRD (claude-code sets PAN_SKILL_SETTINGS; codex passes --codex-home \"$CODEX_HOME\"), all values through shellQuote. Also export claudeSkillSettingsArg(emitted) returning ' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"}' or ''. Import boundary: launch.ts statically imports only node:fs/promises, node:path, and ../shell-quote.js; resolveLaunchDisabledSkills uses await import() for ./store.js, ./resolve.js, ../projects.js, ../xbrief/io.js inside its body."
+        },
+        "items": [
+          {
+            "id": "launch-lib.ac1",
+            "title": "Given disabled ['grilling','domain-modeling'], When claudeSkillSettingsJson runs, Then it returns JSON whose skillOverrides maps both names to 'off'; given [] it returns ''",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-lib.ac2",
+            "title": "Given a config.toml with Overdeck-managed keys, When writeCodexSkillOverrides runs twice with ['grilling'], Then the file contains exactly one marked block with name = \"grilling\" and enabled = false and the original keys are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-lib.ac3",
+            "title": "Given a later call with [], When writeCodexSkillOverrides runs, Then the marked block is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-lib.ac4",
+            "title": "Given cwd '/p/workspaces/feature-pan-1' and no explicit issue, When resolveLaunchDisabledSkills runs, Then it loads layers for issue PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli",
+        "title": "Add pan skills list, set, and the hidden launch-settings subcommand",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills.ts",
+            "src/cli/index.ts",
+            "src/cli/commands/__tests__/skills.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "skills.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors (src/cli/index.ts does not grow)",
+            "lint:slash-commands reports no drift"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-4. Replace the `pan skills` registration (src/cli/index.ts, search \".command('skills')\") with the list (default) / set <skill> <state> / hidden launch-settings subcommands from the PRD. src/cli/index.ts is ratcheted at 1276 lines and must not grow: put the registration in registerSkillsCommands(program) exported from src/cli/commands/skills.ts and call it with one line. Implement skillsListCommand (table NAME STATE SOURCE DESCRIPTION or --json SkillState[]; --issue alone derives the project), skillsSetCommand (on|off|inherit -> true|false|null; --project with --issue exits 1; SkillOverrideError -> stderr + exit 1; print commit/push outcome), skillsLaunchSettingsCommand (claude-code prints claudeSkillSettingsJson to stdout; codex requires --codex-home and calls writeCodexSkillOverrides; other harness exits 2). Move parseSkillFrontmatter into catalog.ts usage; remove old listSkills/skillsCommand only if `git grep -n commands/skills` shows no other importer. Run npm run build, then npm run generate:slash-commands, then commit the regenerated file. Bare `pan skills --json` must keep working via isDefault; test it."
+        },
+        "items": [
+          {
+            "id": "cli.ac1",
+            "title": "Given a temp home, When `pan skills set grilling off` then `pan skills list --json` run, Then the JSON lists grilling with enabled false and source 'global'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli.ac2",
+            "title": "Given `pan skills set pan-done off`, When it runs, Then it exits 1 and prints a message containing 'core skill'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli.ac3",
+            "title": "Given `pan skills set grilling maybe` or both --project and --issue, When it runs, Then it exits 1 with a usage message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli.ac4",
+            "title": "Given a global override grilling off, When `pan skills launch-settings --harness claude-code --cwd <dir>` runs, Then stdout is JSON with skillOverrides.grilling = 'off'; with --harness codex and no --codex-home it exits non-zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli.ac5",
+            "title": "Given the old invocation `pan skills --json` with no subcommand, When it runs, Then it prints the JSON skill list exactly like `pan skills list --json`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-wiring",
+        "title": "Apply skill overrides in generated Claude Code and Codex launchers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "launcher-generator.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors (launcher-generator.ts stays at or under 1000 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-5. Import only launcherSkillOverrideLines and claudeSkillSettingsArg from ./skill-overrides/launch.js. In generateLauncherScript emit launcherSkillOverrideLines only when spawnMode !== 'remote' and harness is claude-code (before the harness command) or codex (immediately after `export CODEX_HOME=`, only when config.codexHome is set), passing issueId from config.overdeckEnv?.issueId. For Claude commands only (conversation branch and buildNonConversationCommand, never the ohmypi/codex/acp/kimi/muse builders) append ' ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"}' after the --append-system-prompt-file flags. Keep the file <= 1000 lines. Then run the PRD's three-step live checkpoint from inside a workspace directory (claude -p probe prints 'grilling: no'; codex launch-settings writes the block; inherit restores) and paste the outputs into the PR description; if the Claude probe prints 'yes', stop and report instead of shipping."
+        },
+        "items": [
+          {
+            "id": "launcher-wiring.ac1",
+            "title": "Given a claude-code work launcher config and a conversation launcher config, When generateLauncherScript runs, Then both scripts contain 'pan skills launch-settings --harness claude-code' and '--settings \"$PAN_SKILL_SETTINGS\"' on the claude command line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-wiring.ac2",
+            "title": "Given a codex launcher with codexHome, When generated, Then the codex launch-settings step appears after the 'export CODEX_HOME=' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-wiring.ac3",
+            "title": "Given spawnMode 'remote' or harness 'ohmypi', When generated, Then the script contains no 'pan skills launch-settings' step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-wiring.ac4",
+            "title": "Given a global override grilling off, When the live checkpoint runs claude -p with --settings from `pan skills launch-settings`, Then the model reports 'grilling: no' and the output is recorded in the PR description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api",
+        "title": "Add GET and PUT /api/skills/overrides dashboard routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/skill-overrides.ts",
+            "src/dashboard/server/routes/misc.ts",
+            "src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck",
+            "grep -n 'GET /api/skills/overrides\\|PUT /api/skills/overrides' tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "expected_outputs": [
+            "skill-overrides-route.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors",
+            "both no-loss rows are present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-6. Create skill-overrides.ts in the meta.ts route style (HttpRouter.add, jsonResponse, exported RouteLayer) and add it to Layer.mergeAll in routes/misc.ts. GET /api/skills/overrides?project=&issue= returns {project, issue, skills: SkillState[]} (project from resolveProjectForIssue when only issue is given; catalog includes <projectRoot>/.pan/skills when a project is in context). PUT /api/skills/overrides takes {level, skill, enabled, projectKey?, issueId?}, validates with parseSkillOverrideUpdate, writes with setSkillOverride, returns {ok, committed, pushed, reason, skills}. Map SkillOverrideError: core-skill 409, unknown-skill/unknown-project/unknown-issue 404, bad-request 400. Match the mutation auth handling of the existing PUT in routes/misc/project-mappings.ts. Add the two no-loss rows next to the 'GET /api/skills' row."
+        },
+        "items": [
+          {
+            "id": "api.ac1",
+            "title": "Given mocked store and catalog, When GET /api/skills/overrides?issue=PAN-1 is requested, Then it returns 200 with the resolved skills array and the owning project key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api.ac2",
+            "title": "Given PUT with skill pan-done, When the request is handled, Then it returns 409 with the core-skill message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api.ac3",
+            "title": "Given a valid PUT, When the request is handled, Then it returns 200 with the refreshed skills list and the commit/push fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api.ac4",
+            "title": "Given the no-loss matrix, When no-loss-matrix.test.ts runs, Then it passes with rows for GET and PUT /api/skills/overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-panel",
+        "title": "Build the skill overrides panel and use it for global toggles on the Skills page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.test.tsx",
+            "src/dashboard/frontend/src/components/SkillsList.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/skills/SkillOverridesPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SkillOverridesPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-7. Create SkillOverridesPanel({level, projectKey?, issueId?, enabled=true}) using useQuery(['skill-overrides', level, projectKey, issueId]) against GET /api/skills/overrides and PUT via fetch with dashboardMutationJsonHeaders, invalidating ['skill-overrides'] on success. Rows: name, description, control, effective on/off, source label. Global level = on/off switch (off sends false, on sends null). Project/issue = segmented Inherit|On|Off (null|true|false). Core rows disabled and labeled 'Core — always on'. Name filter box. Header note 'Changes apply to Claude Code and Codex agents at their next launch.' Show the error body on failure and 'Saved locally; push pending: <reason>' when pushed is false. SkillsList.tsx renders <SkillOverridesPanel level=\"global\" />. Follow the pan-style-guide skill (Broadsheet; no pill badges; no decorative red/green)."
+        },
+        "items": [
+          {
+            "id": "ui-panel.ac1",
+            "title": "Given a mocked GET with a core row and a normal row, When the panel renders, Then it shows both rows with source labels and the core row's control is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-panel.ac2",
+            "title": "Given level 'issue', When the operator clicks Off then Inherit on grilling, Then the panel sends PUT bodies with enabled false and then enabled null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-panel.ac3",
+            "title": "Given level 'global', When the operator switches grilling off then on, Then the panel sends enabled false then enabled null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-panel.ac4",
+            "title": "Given the /skills route in a browser (isolated Playwright profile), When it loads, Then every catalog skill renders with a global switch and core skills show 'Core — always on'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-mounts",
+        "title": "Show skill overrides in project settings and the issue view",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
+            "src/dashboard/frontend/src/components/issue-view/IssueView.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueView.test.tsx src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueView.test.tsx and ProjectSettingsDisclosure.test.tsx pass unchanged",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-8. In ProjectSettingsSection (ProjectSettingsDisclosure.tsx, search 'function ProjectSettingsSection') add a collapsed-by-default 'Skills' subsection rendering <SkillOverridesPanel level=\"project\" projectKey={projectKey} enabled={open} />. In IssueView at density === 'console', after the StartAgentCta block, add <div data-section=\"SkillOverrides\"> with a collapsed-by-default disclosure 'Skills for this issue' rendering <SkillOverridesPanel level=\"issue\" issueId={issueId} enabled={open} />. Collapsed panels must not fetch, so the existing tests stay green without edits."
+        },
+        "items": [
+          {
+            "id": "ui-mounts.ac1",
+            "title": "Given the existing IssueView and ProjectSettingsDisclosure tests, When they run, Then they pass without modification and no request to /api/skills/overrides is made while the disclosures are collapsed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-mounts.ac2",
+            "title": "Given the dashboard in an isolated Playwright browser, When the operator opens project settings > Skills and sets grilling Off, Then the row shows effective off with source 'project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-mounts.ac3",
+            "title": "Given the issue view at console density, When the operator opens 'Skills for this issue' and sets grilling On, Then the row shows source 'issue' and <planHome>/.pan/skill-overrides/<ISSUE>.yaml exists in a 'chore(workspace): skill overrides for <ISSUE>' commit on main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document per-level skill on/off in features/skills.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-28T10:08:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Turning skills on and off' features/skills.mdx",
+            "! grep -q 'Cursor, etc' features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "the heading is found",
+            "the negated grep exits 0 (stale 'Cursor, etc' text is gone)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-3942.md WI-9. Add '## Turning skills on and off' after '## Skill Distribution' covering precedence (issue > project > global > default on), the 11 core skill names from D4, the three storage locations, the pan skills list/set syntax, the dashboard locations, the Claude Code/Codex next-launch scope (not other harnesses, remote Fly launches, or unmanaged sessions), and that pan sync still installs every skill. Replace the stale 'Cursor, etc.' sync wording with Claude Code (~/.claude/skills) and Codex/Pi (~/.agents/skills)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given features/skills.mdx, When a reader opens '## Turning skills on and off', Then it states the precedence issue > project > global > default on and lists all 11 core skill names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given the same section, When read, Then it names ~/.overdeck/config.yaml skills.overrides, projects.yaml skill_overrides, and <planHome>/.pan/skill-overrides/<ISSUE>.yaml and shows `pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given the same section, When read, Then it says overrides apply to Overdeck-managed Claude Code and Codex sessions at their next launch and not to remote or unmanaged sessions, and the page no longer contains 'Cursor, etc'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resolver",
+        "to": "store",
+        "type": "blocks"
+      },
+      {
+        "from": "store",
+        "to": "launch-lib",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver",
+        "to": "launch-lib",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-lib",
+        "to": "cli",
+        "type": "blocks"
+      },
+      {
+        "from": "store",
+        "to": "cli",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-lib",
+        "to": "launcher-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "cli",
+        "to": "launcher-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "store",
+        "to": "api",
+        "type": "blocks"
+      },
+      {
+        "from": "api",
+        "to": "ui-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-panel",
+        "to": "ui-mounts",
+        "type": "blocks"
+      },
+      {
+        "from": "cli",
+        "to": "docs",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

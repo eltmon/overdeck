@@ -35,6 +35,13 @@ vi.mock('../../services/agent-projection.js', () => ({
   saveAgentStateAndEmitEventProgram: vi.fn(() => Effect.void),
 }));
 
+// PAN-4290: the stop route now also checks tmux liveness (for the
+// agent.status_changed hasLivePane fold) — mock it so this stays a fast,
+// hermetic unit test instead of spawning a real `tmux has-session`.
+vi.mock('../../../../lib/tmux.js', () => ({
+  sessionExists: vi.fn(() => Effect.succeed(false)),
+}));
+
 vi.mock('../../../../lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
 }));
@@ -133,6 +140,29 @@ describe('createAgentStopHandler lifecycle events', () => {
     expect(mockSaveAgentStateAndEmitEventProgram).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-TEST' }),
       expect.objectContaining({ type: 'agent.stopped' }),
+    );
+  });
+
+  it('PAN-4290: also emits agent.status_changed carrying stoppedByUser, so the live store folds it', async () => {
+    // stopAgent (mocked as a no-op) is the code path that actually sets
+    // stoppedByUser on disk; simulate that here so the emitted payload
+    // reflects it.
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-test',
+      issueId: 'PAN-TEST',
+      role: 'work',
+      status: 'stopped',
+      stoppedByUser: true,
+    } as any);
+
+    await runAgentStopHandler('agent.stop_requested');
+
+    expect(mockSaveAgentStateAndEmitEventProgram).toHaveBeenCalledWith(
+      expect.objectContaining({ issueId: 'PAN-TEST' }),
+      expect.objectContaining({
+        type: 'agent.status_changed',
+        payload: expect.objectContaining({ agentId: 'agent-pan-test', stoppedByUser: true }),
+      }),
     );
   });
 });

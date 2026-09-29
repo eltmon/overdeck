@@ -2,6 +2,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sessionFilePath } from './runtimes/storage/claude-code.js';
+import { stripPastedContentWrappers } from './pasted-content.js';
 
 const DEFAULT_TAIL_BYTES = 512 * 1024;
 
@@ -250,9 +251,10 @@ export async function probeTranscriptSince(
         }
         const queuedText = queuedPromptText(entry);
         if (queuedText !== null) {
+          const strippedQueuedText = stripPastedContentWrappers(queuedText);
           if (
-            !queuedText.trimStart().startsWith(TASK_NOTIFICATION_PREFIX)
-            && normalizeForContentMatch(queuedText).includes(needle)
+            !strippedQueuedText.trimStart().startsWith(TASK_NOTIFICATION_PREFIX)
+            && normalizeForContentMatch(strippedQueuedText).includes(needle)
           ) {
             matchedUserRecord = true;
           }
@@ -264,11 +266,12 @@ export async function probeTranscriptSince(
         }
         const text = userRecordText(entry);
         if (text === null) continue;
+        const strippedText = stripPastedContentWrappers(text);
         if (isLandedUserRecord(entry)) {
-          afterTaskNotification = text.startsWith(TASK_NOTIFICATION_PREFIX);
+          afterTaskNotification = strippedText.startsWith(TASK_NOTIFICATION_PREFIX);
         }
-        if (META_USER_CONTENT_PREFIXES.some((prefix) => text.startsWith(prefix))) continue;
-        if (normalizeForContentMatch(text).includes(needle)) matchedUserRecord = true;
+        if (META_USER_CONTENT_PREFIXES.some((prefix) => strippedText.startsWith(prefix))) continue;
+        if (normalizeForContentMatch(strippedText).includes(needle)) matchedUserRecord = true;
       } catch {
         // Partial trailing line mid-append; the next probe sees it complete.
       }
@@ -290,12 +293,12 @@ const SIDECHAIN_HUMAN_SUFFIX_MARKER = '\n\nThis is how Claude Code surfaces';
 
 /** Strip Claude Code's sidechain wrapper, if present, to the operator's own text. */
 export function extractSidechainHumanText(content: string): string {
-  if (!content.startsWith(SIDECHAIN_HUMAN_PREFIX)) return content.trim();
+  if (!content.startsWith(SIDECHAIN_HUMAN_PREFIX)) return stripPastedContentWrappers(content.trim());
 
   const stripped = content.slice(SIDECHAIN_HUMAN_PREFIX.length);
   const cutIndex = stripped.indexOf(SIDECHAIN_HUMAN_SUFFIX_MARKER);
   const body = cutIndex === -1 ? stripped : stripped.slice(0, cutIndex);
-  return body.trim();
+  return stripPastedContentWrappers(body.trim());
 }
 
 export interface SidechainHumanInput {

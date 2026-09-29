@@ -28,7 +28,34 @@ export const AUDITED_MODEL_ADDITIONS = {
       'context-length': 95,
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
     notes: 'Fable 5.1 requires Claude Code 2.1.255 or newer. Native 1M context; always-adaptive thinking, High default. API input $10/M, output $50/M, cache read $0.25/M.',
+  },
+
+  'claude-sonnet-5-5': {
+    model: 'claude-sonnet-5-5',
+    provider: 'anthropic',
+    displayName: 'Claude Sonnet 5.5',
+    // Equal input/output blend of $2/M in, $10/M out; exact cache rates live in cost.ts.
+    costPer1MTokens: 6,
+    contextWindow: 1000000,
+    maxOutputTokens: 128000,
+    skills: {
+      'code-generation': 96,
+      'code-review': 96,
+      debugging: 94,
+      planning: 92,
+      documentation: 94,
+      testing: 94,
+      security: 90,
+      performance: 90,
+      synthesis: 92,
+      speed: 70,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
+    notes: 'Released 2026-09-28. Requires Claude Code 2.1.284 or newer (older versions treat it as an unrecognized model with a 200K window). Native 1M context, 128K max output, adaptive thinking with High default. Non-default temperature/top_p/top_k and forced tool_choice return 400. API $2/M input, $10/M output, $0.20/M cache read. Skill scores inherit the Sonnet 5 baseline until benchmarked.',
   },
 
   'gemini-3.8-flash': {

@@ -103,6 +103,19 @@ export function createAgentStopHandler(
         timestamp: new Date().toISOString(),
         payload: { agentId: id, issueId: stateAfterStop.issueId || stateBeforeStop?.issueId || '' },
       });
+      // PAN-4290: `agent.stopped`'s payload carries only agentId/issueId, so the
+      // live store's stoppedByUser fold never runs on an operator stop — the
+      // row reads "Ended unexpectedly" (attention) instead of "Stopped by
+      // operator" until the next dashboard restart re-seeds agentsById from
+      // disk. Emit agent.status_changed alongside it (not instead of it) so
+      // agent.stopped's permission-request/session-index cleanup still runs,
+      // and this fold (buildAgentControlEventPayload) carries stoppedByUser.
+      const hasLiveTmuxSessionAfterStop = yield* sessionExists(id);
+      yield* saveAgentStateAndEmitEventProgram(stateAfterStop, {
+        type: 'agent.status_changed',
+        timestamp: new Date().toISOString(),
+        payload: buildAgentControlEventPayload(stateAfterStop, toAgentStatusPayload(stateBeforeStop?.status), hasLiveTmuxSessionAfterStop),
+      });
     }
     const issueId = stateBeforeStop?.issueId;
     // PAN-1048: derive label from role; legacy state.phase no longer exists.

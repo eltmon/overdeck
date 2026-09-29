@@ -205,7 +205,7 @@ Skills can be distributed via:
 ### Syncing Skills
 
 ```bash
-# Sync all skills to AI tools (Claude Code, Cursor, etc.)
+# Sync all skills to Claude Code (~/.claude/skills) and Codex/Pi (~/.agents/skills)
 pan sync
 
 # Only sync skills (skip agents, hooks)
@@ -222,105 +222,148 @@ The `pan sync` command:
 - Preserves user-owned and user-modified files, reporting modified stale files instead of deleting them
 - Ignores empty bundled skill directories so they do not reappear in caches or harness targets
 
-## Subagents
+## Turning skills on and off
 
-Overdeck includes specialized subagent templates for common development tasks. Subagents are invoked via the Task tool or convoy orchestration for parallel execution.
+Every skill has an on/off state that you can set at three levels: a **global default**, a **project override**, and an **issue override**. The narrowest level that has a value wins:
 
-### Code Review Subagents
+**issue > project > global > default (on)**
 
-| Subagent | Model | Focus | Output |
-|----------|-------|-------|--------|
-| `code-review-correctness` | haiku | Logic errors, edge cases, type safety | `.claude/reviews/<timestamp>-correctness.md` |
-| `code-review-security` | sonnet | OWASP Top 10, vulnerabilities | `.claude/reviews/<timestamp>-security.md` |
-| `code-review-performance` | haiku | Algorithms, N+1 queries, memory | `.claude/reviews/<timestamp>-performance.md` |
-| `code-review-synthesis` | sonnet | Combines all findings into unified report | `.claude/reviews/<timestamp>-synthesis.md` |
+A skill with no value at any level is on. The global level is two-state: a skill is either on (no stored value) or off. Project and issue levels are three-state: **Inherit**, **On**, or **Off**, so a project can turn on a skill that is off globally, and an issue can turn off a skill its project turned on.
 
-**Usage Example:**
-```bash
-/pan-code-review --files "src/auth/*.ts"
-```
+### Core skills are always on
 
-This spawns all three reviewers in parallel, then synthesizes their findings into a prioritized report.
+The pipeline depends on these 11 skills, so they are always on and cannot be overridden at any level:
 
-### Planning & Exploration Subagents
+`pan`, `pan-done`, `pan-flywheel`, `pan-foreman`, `pan-plan`, `pan-start`, `pan-task`, `pan-tell`, `pan-worker`, `work-complete`, `write-xbrief`
 
-Overdeck ships no custom planning or exploration subagent files. Planning runs as the `plan` role (`roles/plan.md`), and any role that needs parallel read-only exploration uses Claude Code's built-in `Explore` and `general-purpose` subagent types, which inherit the parent session's model and provider routing. Custom `.claude/agents/` files with a pinned `model:` broke under CLIProxy-routed sessions; see the "Why no ambient subagents" section in `docs/ROLES.md`.
+### Where each level is stored
 
-## Best Practices
+| Level | Stored in |
+|-------|-----------|
+| Global | `~/.overdeck/config.yaml`, under `skills.overrides` (`<skill>: false`) |
+| Project | `~/.overdeck/projects.yaml`, under `projects.<key>.skill_overrides` |
+| Issue | `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` in the project's plan home, committed and pushed on `main` as `chore(workspace): skill overrides for <ISSUE>` |
 
-- Tip 1
-- Tip 2
-EOF
+Clearing the last override for an issue deletes its file and commits the deletion. Skills that exist only in a project's `.pan/skills/` directory are **project skills**: they appear in that project's settings and its issues, never on the global Skills page.
 
-# Sync to all AI tools
-pan sync
-```
-
-**Skill anatomy:**
-
-```markdown
-# Skill Title
-
-One-line description.
-
-## When to Use
-
-When to invoke this skill (triggers).
-
-## Steps
-
-1. Detailed step-by-step instructions
-2. With specific commands or patterns
-3. And expected outcomes
-
-## Checklist
-
-- [ ] Item 1
-- [ ] Item 2
-- [ ] Item 3
-
-## Examples
-
-\`\`\`bash
-# Example command
-\`\`\`
-
-## Related Skills
-
-- /other-skill - When to use instead
-- /complementary-skill - Use together with this
-```
-
-See the [Claude skill creator](/cli/core-commands) or use `/pan-skill-creator` for guided creation.
-
-## Skill Distribution
-
-Skills can be distributed via:
-
-1. **Project-specific** - Store in `.overdeck/skills/` in your repo
-2. **User-specific** - Store in `~/.overdeck/skills/` (synced to AI tools)
-3. **Team-shared** - Commit to version control and share via git
-4. **Public packages** - Distribute via npm or GitHub
-
-### Syncing Skills
+### From the CLI
 
 ```bash
-# Sync all skills to AI tools (Claude Code, Cursor, etc.)
-pan sync
+# Every skill with its effective state and where it comes from
+pan skills
+pan skills list --project <key> --issue <id>
+pan skills list --json
 
-# Only sync skills (skip agents, hooks)
-pan sync --skills-only
-
-# Verify sync status
-pan sync --dry-run
+# Set a skill on, off, or back to inherit (global unless you pass a level)
+pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
 ```
 
-The `pan sync` command:
-- Copies skills from `~/.overdeck/skills/` to each AI tool's config directory
-- Updates existing skills if versions differ
-- Removes manifest-managed skills from harness directories after their bundled source is removed
-- Preserves user-owned and user-modified files, reporting modified stale files instead of deleting them
-- Ignores empty bundled skill directories so they do not reappear in caches or harness targets
+At the global level, `pan skills set <skill> on` clears the override, because on is the default. Setting a core skill, an unknown skill, an unregistered project, or an issue that no registered project owns fails with an error.
+
+### From the dashboard
+
+- **Skills page** (sidebar → Skills): every skill with a global on/off switch. Each row notes when projects or issues override it, and the **Overridden below** filter lists those skills.
+- **Project settings → Skills**: Inherit / On / Off for every skill in that project. The Inherit button shows the value it inherits, for example `Inherit (off via global)`.
+- **Issue view → Skills for this issue**: the same controls for one issue, in the issue's Overview. It opens filtered to skills overridden here or off at launch; select **All** to see the rest. The section is hidden for an issue that no registered project owns.
+
+### When changes apply
+
+Overrides are resolved when Overdeck launches an agent. They apply to Overdeck-managed **Claude Code** and **Codex** sessions at their **next launch** (a fresh start or a resume). A running agent keeps the skills it launched with.
+
+- Claude Code launches receive `--settings '{"skillOverrides":{"<skill>":"off"}}'`, which hides every copy of the skill by name.
+- Codex launches get `[[skills.config]] name = "<skill>" enabled = false` entries in the agent's own `$CODEX_HOME/config.toml`.
+
+Overrides do not apply to other harnesses, to remote (Fly) launches, or to sessions you start yourself outside Overdeck. If the override step fails at launch, the agent starts with every skill and the launcher prints a warning.
+
+`pan sync` still installs every skill everywhere; hiding happens per launch, and no skill files are copied, moved, or deleted.
+
+## Skill packs
+
+A **skill pack** is a third-party git repository of skills, such as [mattpocock/skills](https://github.com/mattpocock/skills). Overdeck pins each pack to one commit you approve, caches that commit, and mounts the pack skills you turn on into each launch through the harness's own plugin system. Pack skills are never copied into `~/.claude/skills` or `~/.agents/skills`, so they cannot collide with Overdeck's own skills or leak into sessions you start outside Overdeck.
+
+### Adding a pack
+
+```bash
+pan skills pack add mattpocock https://github.com/mattpocock/skills --ref v1.2.3
+```
+
+Overdeck fetches the repository, resolves the ref to a commit, reads the pack, and prints a preview before it writes anything:
+
+```
+Pack mattpocock
+  Source       https://github.com/mattpocock/skills @ v1.2.3 (c55ee46)
+  Adapter      claude-plugin
+  License      MIT
+  Skills       25 (1 opt-in: setup-matt-pocock-skills)
+  Executables  skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh, …
+  Not applied  none
+Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack mattpocock on
+```
+
+Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (`claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
+
+### Pinning and updates
+
+The registry stores the **ref** you asked for (a tag or a branch) and the **trusted commit** you approved. Every launch mounts exactly the trusted commit, even if the tag or branch moves.
+
+```bash
+pan skills pack update mattpocock            # re-resolve the ref
+pan skills pack update mattpocock --ref v1.3.0
+```
+
+`update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows when the ref has moved (`update available`); `--offline` skips that network check.
+
+### Names: `pack/skill` and `pack:skill`
+
+Overdeck names a pack skill `pack/skill`, for example `mattpocock/grilling`. You use that id in the CLI, the dashboard, and the override files. The agent sees the skill as `pack:skill` (`mattpocock:grilling`), because the harness namespaces plugin skills. Overdeck's own `grilling` and `mattpocock:grilling` can both be present in the same session.
+
+### Turning packs and pack skills on
+
+Pack skills are **off** until you turn them on. You can turn on a whole pack or single skills, at the same three levels as other skills:
+
+```bash
+pan skills set --pack mattpocock on                      # the whole pack, globally
+pan skills set --pack mattpocock off --issue PAN-12      # off for one issue
+pan skills set mattpocock/grilling on --project myapp    # one skill in one project
+```
+
+For a pack skill, Overdeck checks the levels from narrowest to widest. At each level, a value for the skill itself beats that level's pack toggle, and the first level with any value decides. With no value anywhere, the skill is off.
+
+| Global | Project | Issue | Result |
+|--------|---------|-------|--------|
+| pack on | `mattpocock/tdd` off | — | `tdd` off (project) |
+| pack on | — | pack off | every skill off (issue pack) |
+| — | `mattpocock/grilling` on | pack off | `grilling` off (the issue level decides first) |
+| `mattpocock/grilling` on | — | — | only `grilling` on |
+| pack on | — | — | `setup-matt-pocock-skills` off (opt-in) |
+
+**Opt-in skills** are skills that change files Overdeck owns, such as `setup-matt-pocock-skills`, which edits `CLAUDE.md`/`AGENTS.md` and writes tracker docs. The pack toggle never turns them on; only a value for that skill does.
+
+### What is not applied
+
+Overdeck mounts skill directories only. If a pack also carries hooks, MCP servers, commands, agents, context injection, git hooks, or scripts, the preview and the dashboard list them as **Not applied**, and none of them reach the agent. Scripts inside a skill directory are copied with the skill but never run by Overdeck.
+
+### Where pack state is stored
+
+| What | Stored in |
+|------|-----------|
+| Registry (url, ref, trusted commit) | `~/.overdeck/config.yaml`, under `skills.packs.<id>` |
+| Global pack toggle | `~/.overdeck/config.yaml`, under `skills.pack_overrides.<id>: true` |
+| Project pack toggle | `~/.overdeck/projects.yaml`, under `projects.<key>.skill_pack_overrides.<id>` |
+| Issue pack toggle | The issue's skill override file, under `packs.<id>` |
+| Single pack skills | The same `skills.overrides`, `skill_overrides`, and issue `skills:` maps, with `pack/skill` keys |
+
+The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time: `pan skills pack sync [id]` re-fetches it, and `pan skills pack gc [--max-age-days <n>]` removes mounts no launch uses. `pan skills pack remove <id>` unregisters a pack, clears its global toggle and global skill values, and deletes its cache; project and issue values stay but do nothing until the pack is added again.
+
+### When pack changes apply
+
+Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their next launch, like other skill changes. Claude Code receives the pack as `--plugin-dir`; Codex gets a local `overdeck-packs` plugin marketplace in the agent's own `$CODEX_HOME`. Remote (Fly) launches and other harnesses get no packs. A launch never touches the network: if the trusted commit is not cached, the launch skips that pack and prints `run pan skills pack sync <id>`. If Claude Code also has the same upstream plugin installed, the dashboard warns that its skills will appear twice.
+
+In the dashboard, packs appear above the skill list on the Skills page, in project settings, and in the issue view. The dashboard can turn packs on and off but not add them; it shows the `pan skills pack add` command instead.
+
+### SageOx and Deft are not plain packs
+
+SageOx installs hooks, git hooks, and a daemon that record sessions, so hiding its skills would not turn it off. It needs an integration, tracked in [#2444](https://github.com/eltmon/overdeck/issues/2444); `pan skills pack add sageox` refuses with that pointer. Deft's skills depend on its engine and project files, so it needs its own adapter, tracked in [#3943](https://github.com/eltmon/overdeck/issues/3943).
 
 ## Subagents
 

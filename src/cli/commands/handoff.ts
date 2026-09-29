@@ -18,6 +18,7 @@ interface HandoffOptions {
   authorModel?: string;
   authorHarness?: string;
   title?: string;
+  allowPrimary?: boolean;
 }
 
 function resolveConversation(convRef: string) {
@@ -134,6 +135,7 @@ export async function handoffCommand(
       title: customTitle,
       handoffAuthor: author,
       handoffAuthorModel: options.authorModel,
+      allowPrimary: options.allowPrimary,
     });
   } catch (err) {
     if (err instanceof ForkServerError) {

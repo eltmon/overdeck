@@ -16,13 +16,13 @@
  *      (`resolveConversationBranch`: a linked worktree's or agent's branch,
  *      never the default branch or the primary checkout's) becomes a
  *      `branch` link. A dismissed row blocks re-insertion. A link whose PR drops
- *      out of the listing is never deleted (the listing is capped at 200).
+ *      out of the listing is never deleted (the listing is capped at 100).
  *   4. Snapshot refresh of every due linked PR: never synced or open → every
  *      sweep; closed → the 15-minute slow lane; merged → never (final).
  *      Dismissed links are not refreshed. A write (and a
  *      `conversation.pull_requests_changed` event) happens only when the
  *      snapshot changed.
- *   5. Fallback: a due linked GitHub PR no listing covered (beyond the 200-row
+ *   5. Fallback: a due linked GitHub PR no listing covered (beyond the 100-row
  *      cap, another repository, or a conversation outside every GitHub
  *      project) gets one `gh pr view`. Three failed reads in a row skip that
  *      repository for 15 minutes.
@@ -321,7 +321,7 @@ function recordRepoFailure(repo: string, now: number): void {
 
 /**
  * Fallback for linked GitHub PRs no project listing covered this sweep: PRs
- * beyond the 200-row listing, in another repository than the project's, or on
+ * beyond the 100-row listing, in another repository than the project's, or on
  * a conversation outside every GitHub project. One `gh pr view` per distinct
  * due PR, at most once per sweep. After 3 consecutive failed reads a
  * repository is skipped for 15 minutes.
@@ -366,7 +366,7 @@ async function readGithubPullRequest(key: PullRequestKey): Promise<GhPrRow | nul
 
 /**
  * Forced refresh right after an explicit link, outside the sweep schedule, so
- * the badge fills in within seconds, including PRs outside the 200-row listing.
+ * the badge fills in within seconds, including PRs outside the 100-row listing.
  * GitHub PRs only; one `gh pr view`. Writes the snapshot and returns the
  * conversations whose link changed (no event: the caller emits).
  */

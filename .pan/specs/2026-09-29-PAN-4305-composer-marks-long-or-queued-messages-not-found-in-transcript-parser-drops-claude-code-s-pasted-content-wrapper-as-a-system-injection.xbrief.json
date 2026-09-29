@@ -1,0 +1,453 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T00:28:19Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4305: Composer marks long or queued messages \"Not found in transcript\": parser drops Claude Code's <pasted_content> wrapper as a system injection",
+    "updated": "2026-09-29T00:32:25.369Z"
+  },
+  "plan": {
+    "id": "pan-4305",
+    "title": "Composer marks long or queued messages \"Not found in transcript\": parser drops Claude Code's <pasted_content> wrapper as a system injection",
+    "status": "running",
+    "uid": "01e2a087-323e-420d-b672-0c0ee90b3f8e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T00:28:19Z",
+    "updated": "2026-09-29T00:32:25.369Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4305",
+        "label": "PAN-4305",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4305.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "composer",
+      "conversation-parser",
+      "transcript-landing",
+      "claude-code"
+    ],
+    "narratives": {
+      "Problem": "Claude Code records a long composer paste as <pasted_content id=\"N\">…</pasted_content id=\"N\"> in both landed user records and queued_command prompts. The parser's renderableUserText() drops the queued form entirely (isSystemInjection() rejects any text starting with '<') and renders the landed form (leading \\n\\n dodges the check) with the tags still inside its text. The composer's reconcileComposerEchoes() compares exact text, so both forms fail to match; a queued prompt whose image references Claude Code joined with a space, or that merges adjacent content, also fails. After 4 idle minutes the bubble turns red ('Not found in transcript') and invites a Resend that duplicates the message. The server landing probe (probeTranscriptSince) already matches all these shapes through whitespace-collapsed includes(); the red state comes from parser output plus the frontend matcher.",
+      "Proposal": "Add src/lib/pasted-content.ts (hasPastedContentWrapper, stripPastedContentWrappers) with the exact contract in PRD D2. renderableUserText() unwraps pasted_content per PRD D3 so landed and queued wrapped messages render as the operator's text. probeTranscriptSince() and extractSidechainHumanText() strip the wrapper before prefix checks (hygiene; matching semantics unchanged) and gain regression fixtures. reconcileComposerEchoes() compares whitespace-collapsed text and adds a bounded containment pass (PRD D5) so merged queued prompts clear their bubbles. docs/DASHBOARD-ARCHITECTURE.md documents the unwrap, the matching rules, and why delivery keeps bracketed paste.",
+      "NonGoals": "- Changing composer delivery (tmux paste-buffer -p, Herdr pane.send_text / agent.prompt) to avoid Claude Code's paste wrapper\n- Changing how the agent perceives <pasted_content> text (Claude Code labels it as pasted third-party text)\n- Fixing src/lib/conversations/summary-fork.ts:478, which drops user text starting with '<' from handoff summaries (follow-up issue)\n- Rewriting probeTranscriptSince() matching: MATCH_PREFIX_CHARS, includes() semantics, and byte-range reading stay as they are\n- Editing src/dashboard/server/services/conversation/parser.ts (it already routes all user text through renderableUserText)\n- Changing the 4-minute TURN_STALL_MS timer, composer receipts, or Resend semantics\n- Non-Claude harness parsers (Pi, Codex, ACP) and the OKF knowledge bundle in ../overdeck-knowledge"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Resolve the issue's delivery checkpoint in planning: keep bracketed-paste delivery and document why instead of changing it.",
+        "rationale": "Every delivery path pastes (tmux paste-buffer -p at src/lib/tmux.ts:1061/1099; Herdr send_text wrapped in \\x1b[200~ at steer-keys.ts:44; Herdr agent.prompt produced the wrapped record 3401 in conv 2972), and steer-keys.ts:33-35 records that raw bytes submit a multi-line message at its first newline. Avoiding the wrapper would break multi-line composer messages. The issue's own fallback is 'if not, document why'."
+      },
+      {
+        "summary": "Put the unwrap helper in a new src/lib/pasted-content.ts module shared by the dashboard parser filter and the lib landing probe.",
+        "rationale": "transcript-landing.ts must not import from src/dashboard (its comment at :370-374); one helper keeps the two consumers on one regex contract."
+      },
+      {
+        "summary": "Strip wrappers anywhere in the text (not only a whole-text wrapper), accept closing tags with or without an id, and skip isSystemInjection on the unwrapped operator text; a text that starts with a real system injection stays hidden even if it quotes a paste.",
+        "rationale": "Real records carry `</pasted_content id=\"N\">` closers and typed-prefix-plus-paste is plausible; an operator paste can legitimately start with '<' (XML/HTML), and hiding it would recreate the bug."
+      },
+      {
+        "summary": "Add a bounded containment pass to the composer echo matcher, in addition to whitespace-collapsed exact and joined-run matching.",
+        "rationale": "The issue reports a one-image bubble whose queued record held two images plus text; only containment clears that. The server probe already accepts containment, so the frontend now agrees with it. Bounds (created-at order, baseline ids, clientMessageId equality, non-empty text) keep false positives to the case of a truly lost message whose full text reappears inside a later message, which is accepted and recorded as a hazard."
+      },
+      {
+        "summary": "Leave summary-fork.ts's startsWith('<') filter out of scope.",
+        "rationale": "Same root cause but a different surface (handoff summaries) with its own tests; the issue scopes the composer and timeline. Recorded in NonGoals and the codebase map concerns so a follow-up can pick it up."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Five small items across 4 code subsystems (lib helper, dashboard parser filter, lib landing probe, frontend composer) plus 1 doc; well under the 25-file / 6-subsystem limits.",
+      "canonicalFilename": "2026-09-29-PAN-4305-composer-marks-long-or-queued-messages-not-found-in-transcript-parser-drops-claude-code-s-pasted-content-wrapper-as-a-system-injection.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pasted-content-helper",
+        "title": "Add src/lib/pasted-content.ts wrapper helper with fixture tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:28:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4305",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pasted-content.ts",
+            "src/lib/__tests__/pasted-content.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/pasted-content.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pasted-content.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/pasted-content.ts exactly as PRD WI-1 shows: OPENING_TAG /<pasted_content(?: id=\"[^\"]*\")?>\\n?/ (non-global), OPENING_TAGS (same, global), CLOSING_TAGS /\\n?<\\/pasted_content(?: id=\"[^\"]*\")?>/g; export hasPastedContentWrapper(text) (non-global test, no lastIndex state) and stripPastedContentWrappers(text), which returns the same string when no wrapper exists and otherwise removes every opening and closing tag and trims. Add a module header comment naming PAN-4305. Create src/lib/__tests__/pasted-content.test.ts using the PRD fixtures LANDED_WRAPPED, QUEUED_WRAPPED, TYPED_PLUS_PASTE, PASTE_OF_XML (inline, paths redacted) plus a two-block text, an id-less closer, and a plain text identity case."
+        },
+        "items": [
+          {
+            "id": "pasted-content-helper.ac1",
+            "title": "Given LANDED_WRAPPED (leading \\n\\n, closer `</pasted_content id=\"9469\">`), stripPastedContentWrappers returns exactly the inner text with no 'pasted_content' substring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pasted-content-helper.ac2",
+            "title": "Given TYPED_PLUS_PASTE, stripPastedContentWrappers returns 'see below\\n\\nline one\\nline two', and given a text with two wrapped blocks it preserves both bodies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pasted-content-helper.ac3",
+            "title": "Given a plain text without a wrapper, stripPastedContentWrappers returns the identical string (toBe) and hasPastedContentWrapper returns false on repeated calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pasted-content-helper.ac4",
+            "title": "Given a closing tag without an id attribute (`</pasted_content>`), stripPastedContentWrappers removes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parser-unwrap-pasted",
+        "title": "renderableUserText renders pasted_content-wrapped landed and queued user text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:28:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4305",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/message-filters.ts",
+            "src/dashboard/server/services/conversation/__tests__/message-filters.test.ts",
+            "src/dashboard/server/services/conversation/__tests__/parser-pasted-content.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/message-filters.test.ts src/dashboard/server/services/conversation/__tests__/parser-pasted-content.test.ts src/dashboard/server/services/conversation/__tests__/parser-compact-summary.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "message-filters.test.ts, parser-pasted-content.test.ts and parser-compact-summary.test.ts pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit renderableUserText() in src/dashboard/server/services/conversation/message-filters.ts to the PRD WI-2 'After' code: keep the <channel> unwrap first; then if hasPastedContentWrapper(text): return null when text.trimStart() does not start with '<pasted_content' and isSystemInjection(text.trimStart()) is true; otherwise return stripPastedContentWrappers(text) or null if empty (do NOT run isSystemInjection on the stripped text); otherwise keep `isSystemInjection(text) ? null : text`. Import from '../../../../lib/pasted-content.js'. Do not edit parser.ts. Add message-filters.test.ts and parser-pasted-content.test.ts (temp-dir JSONL pattern from parser-compact-summary.test.ts) with the PRD fixtures: landed string record, landed array record with a text block, and a queued_command attachment record {type:'attachment', uuid, timestamp, attachment:{type:'queued_command', commandMode:'prompt', prompt: QUEUED_WRAPPED}}. UAT for ac5 (test role, or the work agent only with a throwaway dashboard): isolated Playwright profile, idle Claude Code conversation, send ~6 lines of ~100 characters each, screenshot the rendered message."
+        },
+        "items": [
+          {
+            "id": "parser-unwrap-pasted.ac1",
+            "title": "renderableUserText(LANDED_WRAPPED) and renderableUserText(QUEUED_WRAPPED) return the inner text without tags, and renderableUserText(PASTE_OF_XML) returns text starting with '<config>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-unwrap-pasted.ac2",
+            "title": "renderableUserText returns null for '<system-reminder>x</system-reminder>' and for a <system-reminder> whose body contains a pasted_content block, and still returns 'hi' for a <channel> message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-unwrap-pasted.ac3",
+            "title": "Given a JSONL with a queued_command attachment whose prompt is QUEUED_WRAPPED, parseConversationMessages emits one role 'user' message whose text equals the inner text (today it emits none)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-unwrap-pasted.ac4",
+            "title": "Given landed user records with LANDED_WRAPPED as string content and as a text block, parseConversationMessages emits user messages whose text equals the inner text and contains no 'pasted_content'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parser-unwrap-pasted.ac5",
+            "title": "Given the built dashboard (npm run build) and an idle Claude Code conversation, when a ~600-character multi-line message is sent from the composer, the timeline renders it as a user message whose visible text contains no pasted_content tags (browser UAT, isolated Playwright profile)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "landing-strip-pasted",
+        "title": "Landing probe strips pasted_content before prefix checks, with queued/wrapped/merged/missing fixtures",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:28:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4305",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/transcript-landing.ts",
+            "src/lib/__tests__/transcript-landing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/transcript-landing.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "transcript-landing.test.ts passes including the new PAN-4305 describe block",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/transcript-landing.ts probeTranscriptSince(), pass the queuedPromptText(entry) result and the userRecordText(entry) result through stripPastedContentWrappers() before the TASK_NOTIFICATION_PREFIX check, the META_USER_CONTENT_PREFIXES check, and normalizeForContentMatch(). In extractSidechainHumanText(), strip wrappers from the returned body. Do NOT change MATCH_PREFIX_CHARS, the includes() semantics, or byte-range reading — the probe already matches these shapes; this is hygiene plus regression locks. Add describe('probeTranscriptSince pasted and queued prompts (PAN-4305)') to src/lib/__tests__/transcript-landing.test.ts using the existing writeSession/userRecord/queueEnqueueRecord/queuedCommandAttachmentRecord helpers and the PRD fixtures."
+        },
+        "items": [
+          {
+            "id": "landing-strip-pasted.ac1",
+            "title": "probeTranscriptSince returns matchedUserRecord true for a plain queued prompt, a LANDED_WRAPPED user record, and a QUEUED_WRAPPED queued_command attachment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-strip-pasted.ac2",
+            "title": "Given QUEUED_MERGED ('@a @b\\ntext'), probeTranscriptSince returns matchedUserRecord true for both the two-image composer text ('@a\\n@b\\ntext') and the one-image bubble text ('@b\\ntext')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-strip-pasted.ac3",
+            "title": "Given a transcript with only unrelated records, probeTranscriptSince returns matchedUserRecord false; a queued prompt whose wrapped body starts with '<task-notification>' does not match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landing-strip-pasted.ac4",
+            "title": "extractSidechainHumanText returns the operator text without pasted_content tags for a wrapped sidechain body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-echo-matching",
+        "title": "Composer echo matcher collapses whitespace and clears bubbles contained in merged queued prompts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:28:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4305",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerEchoes.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerEchoes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/composerEchoes.test.ts src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "composerEchoes.test.ts (existing PAN-4247 tests plus new PAN-4305 tests) and MessagesTimeline.test.tsx pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/lib/composerEchoes.ts: (D4) make pass 1 (1:1) and pass 2 (joined runs) compare with normalizeWs instead of normalizeText; remove normalizeText if unused. (D5) After pass 2 and before the subagent pass, add a containment pass over still-unmatched entries (optimistic plus failed kind==='prompt'), in createdAt order: an entry matches a message when message.role==='user', message.id is not in the entry's echoBaselineIds, message.id is not in `used` unless this containment pass claimed it, not (both have clientMessageId), Date.parse(message.createdAt) >= Date.parse(entry.createdAt), normalizeWs(entry.text) is non-empty, and normalizeWs(message.text).includes(normalizeWs(entry.text)). One message may clear several entries; add claimed ids to `used`. Remove matched entries from optimistic and failed. Update the early-return condition so an unchanged state is still returned by identity, and update the doc comment to describe four passes. Add describe('reconcileComposerEchoes pasted and merged prompts (PAN-4305)') with the 7 cases listed in PRD WI-4. The existing PAN-4247 tests in composerEchoes.test.ts must keep passing unmodified. UAT for ac5 follows continue.json H6."
+        },
+        "items": [
+          {
+            "id": "composer-echo-matching.ac1",
+            "title": "Given a two-image bubble '@a\\n@b\\nWhat just happned here?' and a timeline message '@a @b\\nWhat just happned here?', reconcileComposerEchoes returns no optimistic entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-echo-matching.ac2",
+            "title": "Given a one-image bubble '@b\\nWhat just happned here?' and a later message '@a @b\\nWhat just happned here?', the bubble clears and the message id appears in consumedEchoIds; two leftover bubbles contained in one later message both clear",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-echo-matching.ac3",
+            "title": "Given a failed entry with notFoundInTranscript true whose text is contained in a later user message, reconcileComposerEchoes removes it from failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-echo-matching.ac4",
+            "title": "Given a bubble whose text appears in no user message, or only in a message created before the bubble, reconcileComposerEchoes returns the identical state object (toBe) so the 4-minute timer still produces 'Not found in transcript'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-echo-matching.ac5",
+            "title": "Given the built dashboard and an idle Claude Code conversation, when a ~600-character multi-line composer message is sent and the agent replies, the composer shows no red Not found in transcript entry for it 4 minutes later (browser UAT, isolated Playwright profile)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-delivery-landing",
+        "title": "Document pasted_content unwrap, echo matching rules, and bracketed-paste delivery in DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:28:19Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4305",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pasted_content' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'src/lib/pasted-content.ts' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n -i 'bracketed paste' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one line inside the 'Conversation loading and delivery' section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/DASHBOARD-ARCHITECTURE.md, extend the 'HTTP acceptance and transcript confirmation are distinct' bullet under **Conversation loading and delivery** (search for `moves to the outbox as \"Not found in transcript\"`). Add: (1) Claude Code records a long composer paste as `<pasted_content id=\"N\">…</pasted_content id=\"N\">` in landed and queued records; renderableUserText() and the landing probe strip it through src/lib/pasted-content.ts, so the timeline shows the operator's text. (2) Echo matching collapses whitespace and also clears a bubble whose full text is contained in a later user record (a merged queued prompt); the red state appears only when no landed or queued record matches. (3) Delivery keeps bracketed paste because raw typed bytes submit a multi-line message at its first newline, so the agent sees long composer messages inside <pasted_content>, which Claude Code labels as pasted text — a known, accepted side effect."
+        },
+        "items": [
+          {
+            "id": "docs-delivery-landing.ac1",
+            "title": "The delivery bullet in docs/DASHBOARD-ARCHITECTURE.md names `<pasted_content id=\"N\">` and src/lib/pasted-content.ts and states the timeline renders the operator's unwrapped text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-delivery-landing.ac2",
+            "title": "The same bullet states that echo matching collapses whitespace and clears bubbles contained in a merged queued prompt, and that the red state appears only when no landed or queued record matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-delivery-landing.ac3",
+            "title": "The same bullet contains the explanation that delivery keeps bracketed paste because raw bytes submit at the first newline, and records the agent-side pasted-text labelling as an accepted side effect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pasted-content-helper",
+        "to": "parser-unwrap-pasted",
+        "type": "blocks"
+      },
+      {
+        "from": "pasted-content-helper",
+        "to": "landing-strip-pasted",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

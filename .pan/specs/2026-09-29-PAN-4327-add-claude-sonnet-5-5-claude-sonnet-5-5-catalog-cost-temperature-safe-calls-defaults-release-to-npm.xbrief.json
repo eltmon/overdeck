@@ -1,0 +1,1010 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T00:20:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4327: Add Claude Sonnet 5.5 (claude-sonnet-5-5): catalog, cost, temperature-safe calls, defaults; release to npm",
+    "updated": "2026-09-29T00:24:49.528Z"
+  },
+  "plan": {
+    "id": "pan-4327",
+    "title": "Add Claude Sonnet 5.5 (claude-sonnet-5-5): catalog, cost, temperature-safe calls, defaults; release to npm",
+    "status": "running",
+    "uid": "d1c052ff-cbe0-45bf-9309-f2e6951031a5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T00:20:00Z",
+    "updated": "2026-09-29T00:24:49.528Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4327",
+        "label": "PAN-4327",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4327.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "models",
+      "anthropic",
+      "sonnet-5-5",
+      "cost",
+      "defaults",
+      "memory"
+    ],
+    "metadata": {
+      "sizeJustification": "Mechanical addition of one model across the catalog, cost, memory, compaction and defaults layers plus docs (~40 files counting tests). Every item is small and file-disjoint where possible; splitting into sibling issues would force several releases for one model launch that the operator wants shipped in one release today.",
+      "canonicalFilename": "2026-09-29-PAN-4327-add-claude-sonnet-5-5-claude-sonnet-5-5-catalog-cost-temperature-safe-calls-defaults-release-to-npm.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Anthropic released Claude Sonnet 5.5 (claude-sonnet-5-5) on 2026-09-28. Overdeck does not list, price or default to it. Overdeck's memory providers and TTS summarizer always send temperature, which returns HTTP 400 on Sonnet 5.5 and on every Sonnet 5+, Opus 4.7+ and Fable model. Claude Code 2.1.284 now resolves the 'sonnet' alias to Sonnet 5.5, so Overdeck's claude-sonnet-5 -> 'sonnet' flag mapping would launch the wrong model.",
+      "Proposal": "Add a supportsSamplingParams capability flag plus modelSupportsSamplingParams() helper; register claude-sonnet-5-5 in the ModelId union, capability additions, class, provider and pricing tables, session cost normalization, compaction budget and all dashboard pickers; make memory providers and the TTS summarizer omit temperature for sampling-restricted models; pass full Sonnet IDs to claude --model; flip Sonnet-tier defaults to claude-sonnet-5-5; document the Claude Code 2.1.284 requirement and add a v0.63.0 changelog entry. Full detail: .pan/drafts/PAN-4327.md.",
+      "NonGoals": "- Releasing to npm; after merge the operator or flywheel runs `pan release stable --version 0.63.0` from main.\n- Changing the Opus or Haiku alias rows in getClaudeModelFlag (same bug class, follow-up).\n- Setting supportsSamplingParams on any GPT, Gemini or other non-Anthropic model.\n- Exporting CLAUDE_CODE_MAX_CONTEXT_TOKENS for Sonnet 5.5 on Claude Code older than 2.1.284.\n- Rebuilding sync-sources/hooks/record-cost-event.js (its prefix fallback already prices Sonnet 5.5 at the identical Sonnet 5 rate).\n- Editing src/lib/memory/query-expansion.ts, src/lib/registry/feature-registry-population.ts or src/dashboard/server/routes/settings.ts.\n- Installing, pinning or version-gating Claude Code from Overdeck.\n- Changing the expensive (Opus) or cheap (Haiku) workhorse defaults.\n- Changing a model the user configured explicitly.\n- Removing claude-sonnet-5 from any picker or catalog."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ship the defaults flip (issue item 3) in this issue.",
+        "rationale": "The issue's checkpoint condition is that installed Claude Code 2.1.280 launches --model claude-sonnet-5-5; it does (API served the request). Its degraded 200K window is fixed by upgrading to Claude Code 2.1.284, which is documented as a requirement."
+      },
+      {
+        "summary": "Document 'Sonnet 5.5 requires Claude Code 2.1.284 or newer' instead of exporting CLAUDE_CODE_MAX_CONTEXT_TOKENS.",
+        "rationale": "Probe: 2.1.284 reports a native 1M window; 2.1.280 with CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000 still reported 200K, so the env workaround is unverified. Same pattern as the existing Fable 5.1 note."
+      },
+      {
+        "summary": "Flag name supportsSamplingParams (tri-state, false only when proven) with helper modelSupportsSamplingParams next to modelSupportsImages.",
+        "rationale": "Mirrors the existing supportsImages precedent; unknown and dated IDs keep today's behavior."
+      },
+      {
+        "summary": "Mark all sampling-restricted Anthropic models, not only Sonnet 5.5: fable-5-1, fable-5, opus-5-5, opus-5, opus-4-8, opus-4-7, sonnet-5, sonnet-5-5.",
+        "rationale": "The issue asks for 'any other model with the same restriction'; the Claude API thinking/sampling table lists sampling as removed (400) for exactly these."
+      },
+      {
+        "summary": "Put the Sonnet 5.5 capability entry in model-capability-additions.ts after claude-fable-5-1.",
+        "rationale": "model-capabilities.ts is at its file-size cap; additions spread first, so Sonnet 5.5 lists before Sonnet 5 as the issue requires."
+      },
+      {
+        "summary": "Fix the sonnet alias drift for the whole Sonnet family in getClaudeModelFlag; leave Opus rows for a follow-up.",
+        "rationale": "Claude Code 2.1.284 resolves 'sonnet' to Sonnet 5.5, and claude-sonnet-4-6 -> 'sonnet' already runs Sonnet 5; the Opus family is outside this issue's model."
+      },
+      {
+        "summary": "Apply the temperature guard to the TTS summarizer although it calls api.openai.com.",
+        "rationale": "The issue lists it; the change is a harmless request-shape guard. No GPT model gets the flag without a verified source."
+      },
+      {
+        "summary": "Skip edits to query-expansion.ts, feature-registry-population.ts, routes/settings.ts, router-config.ts and record-cost-event.js.",
+        "rationale": "The first two reach the fixed providers via extractWithProviderPolicy; routes/settings.ts MODEL_API_IDS has no Anthropic ids; router-config.ts no longer exists; the hook bundle's prefix fallback prices Sonnet 5.5 correctly."
+      },
+      {
+        "summary": "Pre-seed a v0.63.0 Update block in changelog.mdx; the npm release itself is a post-merge step.",
+        "rationale": "Releases run only from main via pan release stable; the release step reconciles the label if another version ships first."
+      },
+      {
+        "summary": "Also flip DEFAULT_DEEP_ENRICHMENT_MODEL, getBestAnthropicAtTier and DEFAULT_SETTINGS specialists test_agent/merge_agent.",
+        "rationale": "They are Sonnet-tier defaults and fallbacks of the same kind the issue lists; none reads user configuration."
+      }
+    ],
+    "items": [
+      {
+        "id": "sampling-capability-flag",
+        "title": "Add supportsSamplingParams capability flag and modelSupportsSamplingParams helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capability-types.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/model-capability-additions.ts",
+            "scripts/file-size-allowlist.txt",
+            "src/lib/__tests__/model-capabilities.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "model-capabilities.test.ts reports all tests passed",
+            "lint-file-size.sh exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "sonnet-55-catalog-entry",
+            "memory-providers-omit-sampling",
+            "tts-summarizer-omit-sampling"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add optional supportsSamplingParams?: boolean to ModelCapability in model-capability-types.ts after supportsImages. Set supportsSamplingParams: false on claude-fable-5, claude-opus-5-5, claude-opus-5, claude-opus-4-8, claude-opus-4-7, claude-sonnet-5 in model-capabilities.ts and on claude-fable-5-1 in model-capability-additions.ts. Add exported modelSupportsSamplingParams(model) after modelSupportsImages(): resolve deprecated IDs, return false only when the flag is false. Append '<wc -l count> src/lib/model-capabilities.ts # PAN-4327' as the LAST line of scripts/file-size-allowlist.txt. Add the test matrix from the PRD. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sampling-capability-flag.ac1",
+            "title": "modelSupportsSamplingParams returns false for claude-fable-5-1, claude-fable-5, claude-opus-5-5, claude-opus-5, claude-opus-4-8, claude-opus-4-7 and claude-sonnet-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sampling-capability-flag.ac2",
+            "title": "modelSupportsSamplingParams returns true for claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5, claude-haiku-4-5-20251001, gpt-4.1-nano and an unknown id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sampling-capability-flag.ac3",
+            "title": "scripts/file-size-allowlist.txt ends with a model-capabilities.ts row tagged PAN-4327 and lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-catalog-entry",
+        "title": "Register claude-sonnet-5-5 as a ModelId with capability, class and provider entries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/providers.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "tests/lib/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts src/lib/__tests__/settings-model-catalog.test.ts tests/lib/settings.test.ts tests/lib/model-fallback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the four named test files report all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, one commit. Add 'claude-sonnet-5-5' before 'claude-sonnet-5' in the AnthropicModel union and getAvailableModelsSync() list in settings.ts. Add the claude-sonnet-5-5 capability entry (exact literal in the PRD, including supportsSamplingParams: false and the Claude Code 2.1.284 note) directly after claude-fable-5-1 in model-capability-additions.ts. Reword the claude-sonnet-5 notes to 'Previous Sonnet generation'. Add the workhorse class row, the MODEL_PROVIDERS row and both providers.ts list entries before the Sonnet 5 entries. Extend the catalog-audit table and the settings-model-catalog no-loss test (sonnet55 constant, filter it alongside opus55, assert it sorts before claude-sonnet-5). See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-catalog-entry.ac1",
+            "title": "getAvailableModelsApi().anthropic contains claude-sonnet-5-5 named 'Claude Sonnet 5.5 (1M context)' with contextWindow 1000000, costPer1MTokens 6 and effortLevels low through max",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-catalog-entry.ac2",
+            "title": "getAvailableModelsApi().anthropic returns claude-sonnet-5-5 at a lower index than claude-sonnet-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-catalog-entry.ac3",
+            "title": "getProviderForModelSync('claude-sonnet-5-5') returns the anthropic provider and MODEL_CAPABILITY_CLASSES maps it to workhorse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-catalog-entry.ac4",
+            "title": "getAvailableModelsSync returns claude-sonnet-5-5 in the anthropic list while claude-sonnet-5 stays present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-flag-full-sonnet-ids",
+        "title": "Pass full Sonnet model IDs to claude --model instead of the sonnet alias",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/__tests__/claude-model-flag.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/claude-model-flag.test.ts"
+          ],
+          "expected_outputs": [
+            "claude-model-flag.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In getClaudeModelFlag() in settings.ts replace the three Sonnet rows that map to 'sonnet' with identity rows for claude-sonnet-5-5, claude-sonnet-5, claude-sonnet-4-6 and claude-sonnet-4-5, with the comment from the PRD (Claude Code 2.1.284 resolves the sonnet alias to Sonnet 5.5). Leave Opus and Haiku rows unchanged. Update claude-model-flag.test.ts: replace the 'sonnet' expectation with identity expectations and add a getAgentCommand('claude-sonnet-5-5') assertion. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "claude-flag-full-sonnet-ids.ac1",
+            "title": "getClaudeModelFlag returns the input id unchanged for claude-sonnet-5-5, claude-sonnet-5, claude-sonnet-4-6 and claude-sonnet-4-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-flag-full-sonnet-ids.ac2",
+            "title": "getAgentCommand('claude-sonnet-5-5') returns args ['--model', 'claude-sonnet-5-5']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-flag-full-sonnet-ids.ac3",
+            "title": "getClaudeModelFlag still returns 'haiku' for claude-haiku-4-5 and claude-opus-5-5 for claude-opus-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-cost-pricing",
+        "title": "Add the claude-sonnet-5-5 row to DEFAULT_PRICING",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost.test.ts"
+          ],
+          "expected_outputs": [
+            "cost.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Insert the claude-sonnet-5-5 pricing row (input 0.002, output 0.010, cacheRead 0.0002, cacheWrite5m 0.0025, cacheWrite1h 0.004 per 1K) directly before the claude-sonnet-5 row in DEFAULT_PRICING in cost.ts, and extend the long-context comment to name Sonnet 5.5. Add tests that getPricing returns the exact Sonnet 5.5 row and calculateCost prices one million input plus one million output tokens at 12 USD. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-cost-pricing.ac1",
+            "title": "getPricing('anthropic', 'claude-sonnet-5-5') returns a row whose model is claude-sonnet-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-cost-pricing.ac2",
+            "title": "calculateCost returns 12 for 1,000,000 input plus 1,000,000 output tokens on the Sonnet 5.5 row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-cost-pricing.ac3",
+            "title": "calculateCost returns 0.2 for 1,000,000 cache-read tokens on the Sonnet 5.5 row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-cost-normalization",
+        "title": "Keep claude-sonnet-5-5 distinct from claude-sonnet-5 in session cost parsing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost-parsers/jsonl-parser.ts",
+            "tests/lib/cost-parsers/jsonl-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost-parsers/jsonl-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "jsonl-parser.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In normalizeModelName() in jsonl-parser.ts add a sonnet-5-5 / sonnet-5.5 / sonnet.5.5 branch that sets claude-sonnet-5-5 BEFORE the existing sonnet-5 branch (turn the existing if into else if), because includes('sonnet-5') also matches sonnet-5-5. Add normalization tests for bare, Bedrock-prefixed and Sonnet 5 ids. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-cost-normalization.ac1",
+            "title": "normalizeModelName('claude-sonnet-5-5') returns model claude-sonnet-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-cost-normalization.ac2",
+            "title": "normalizeModelName('anthropic.claude-sonnet-5-5') returns model claude-sonnet-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-cost-normalization.ac3",
+            "title": "normalizeModelName('claude-sonnet-5') still returns model claude-sonnet-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-compaction-budget",
+        "title": "Give claude-sonnet-5-5 the 1M-window smart-compaction chunk budget",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/smart-compaction.ts",
+            "scripts/file-size-allowlist.txt",
+            "tests/lib/conversations/smart-compaction.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/conversations/smart-compaction.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "smart-compaction.test.ts reports all tests passed",
+            "lint-file-size.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Add a 'claude-sonnet-5-5': 1_200_000 row before the claude-sonnet-5 row of CHUNK_BUDGET_CHARS_BY_MODEL in smart-compaction.ts, export getChunkBudgetChars (keyword only), append '<wc -l count> src/lib/conversations/smart-compaction.ts # PAN-4327' as the LAST line of scripts/file-size-allowlist.txt, and add budget tests. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-compaction-budget.ac1",
+            "title": "getChunkBudgetChars('claude-sonnet-5-5') returns 1200000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-compaction-budget.ac2",
+            "title": "getChunkBudgetChars(undefined) returns 300000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-compaction-budget.ac3",
+            "title": "scripts/file-size-allowlist.txt contains a smart-compaction.ts row tagged PAN-4327 and lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-frontend-pickers",
+        "title": "Show Claude Sonnet 5.5 in the dashboard model pickers and Settings catalog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/shared/ModelPicker/ModelPicker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ModelPicker.test.ts reports all tests passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add the claude-sonnet-5-5 row before the Sonnet 5 row in modelCatalog.ts (label 'Claude Sonnet 5.5 (1M context)', cost 6, description naming Claude Code 2.1.284+) and relabel Sonnet 5 as 'Previous Sonnet'. In chat/ModelPicker.tsx add the id to ClaudeModelId, MODEL_EFFORT_SUPPORT (low through max) and FALLBACK_GROUPS ($6/1M). In shared/ModelPicker/ModelPicker.tsx add the fallback row before Sonnet 5. Add a ModelPicker.test.ts case mirroring the Opus 5.5 one. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-frontend-pickers.ac1",
+            "title": "shared FALLBACK_GROUPS anthropic group contains claude-sonnet-5-5 with costPer1MTokens 6 at a lower index than claude-sonnet-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-frontend-pickers.ac2",
+            "title": "chat ModelPicker FALLBACK_GROUPS contains claude-sonnet-5-5 labelled 'Claude Sonnet 5.5 (1M context)' with effortLevels low through max",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-frontend-pickers.ac3",
+            "title": "MODELS_BY_PROVIDER anthropic list contains claude-sonnet-5-5 before claude-sonnet-5 and describes claude-sonnet-5 as the previous Sonnet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-friendly-name",
+        "title": "Render Sonnet 5.5 as the friendly model name in the dashboard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/dashboard-utils.ts",
+            "src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "expected_outputs": [
+            "dashboard-utils.test.ts reports all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In getFriendlyModelName() in dashboard-utils.ts insert a sonnet-5-5 / sonnet-5.5 / sonnet.5.5 check returning 'Sonnet 5.5' directly before the sonnet-5 check, and add tests for both names. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-friendly-name.ac1",
+            "title": "getFriendlyModelName('claude-sonnet-5-5') returns 'Sonnet 5.5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-friendly-name.ac2",
+            "title": "getFriendlyModelName('claude-sonnet-5') still returns 'Sonnet 5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-providers-omit-sampling",
+        "title": "Omit temperature in memory extraction providers for sampling-restricted models",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/providers/anthropic.ts",
+            "src/lib/memory/providers/cliproxy.ts",
+            "tests/lib/memory/providers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/providers.test.ts tests/lib/memory/provider-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "providers.test.ts and provider-policy.test.ts report all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In anthropic.ts and cliproxy.ts import modelSupportsSamplingParams from ../../model-capabilities.js and replace 'temperature: options.temperature ?? 0' with a conditional spread that adds temperature only when modelSupportsSamplingParams(model) is true. Do NOT edit query-expansion.ts or feature-registry-population.ts: they reach the providers through extractWithProviderPolicy and are fixed transitively. Add the four request-shape tests from the PRD. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "memory-providers-omit-sampling.ac1",
+            "title": "Given model claude-sonnet-5-5, the CLIProxy provider sends a JSON body without a temperature key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-providers-omit-sampling.ac2",
+            "title": "Given model gpt-4.1-nano, the CLIProxy provider sends temperature 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-providers-omit-sampling.ac3",
+            "title": "Given model claude-sonnet-5-5, the Anthropic provider calls messages.create with params that contain no temperature key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-providers-omit-sampling.ac4",
+            "title": "Given the default model claude-haiku-4-5-20251001, the Anthropic provider sends temperature 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tts-summarizer-omit-sampling",
+        "title": "Omit temperature in the TTS summarizer request for sampling-restricted models",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/tts-summarizer.ts",
+            "src/dashboard/server/services/__tests__/tts-summarizer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/tts-summarizer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tts-summarizer.test.ts reports all tests passed",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Extract the callSummarizer() request body in tts-summarizer.ts into an exported buildSummarizerRequestBody(model, items) that adds temperature 0.4 only when modelSupportsSamplingParams(model) is true, and use it in callSummarizer(). Create the new test file. The endpoint stays api.openai.com; this is a request-shape change only. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "tts-summarizer-omit-sampling.ac1",
+            "title": "buildSummarizerRequestBody('gpt-5.4-mini', items) returns a body with temperature 0.4 and max_tokens 80",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-summarizer-omit-sampling.ac2",
+            "title": "buildSummarizerRequestBody('claude-sonnet-5-5', items) returns a body without a temperature key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-backend-defaults",
+        "title": "Default the backend Sonnet tier to claude-sonnet-5-5",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/roles.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/settings.ts",
+            "tests/lib/model-fallback.test.ts",
+            "tests/integration/config-precedence.test.ts",
+            "src/lib/__tests__/config-yaml-roles.test.ts",
+            "src/lib/__tests__/status-review-model.test.ts",
+            "src/lib/conversations/__tests__/summary-fork-model.test.ts",
+            "tests/lib/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/model-fallback.test.ts tests/integration/config-precedence.test.ts src/lib/__tests__/config-yaml-roles.test.ts src/lib/__tests__/status-review-model.test.ts src/lib/conversations/__tests__/summary-fork-model.test.ts tests/lib/settings.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the six named test files report all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Change to claude-sonnet-5-5: defaultConversationModel, statusReviewModel, providerFallbackModel and conversations.forkSummaryModel in defaults.ts; DEFAULT_WORKHORSES.mid in roles.ts; the two schema.ts default doc comments; every FALLBACK_MAP value of claude-sonnet-5, DEFAULT_DEEP_ENRICHMENT_MODEL and getBestAnthropicAtTier() in model-fallback.ts; DEFAULT_SETTINGS.models.specialists test_agent and merge_agent in settings.ts. Update only test assertions about these defaults (find them with git grep for claude-sonnet-5 in test files); leave fixtures that use Sonnet 5 as an arbitrary model. Never change code that reads a user-configured model. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-backend-defaults.ac1",
+            "title": "Given a fresh config, DEFAULT_CONFIG defaults to claude-sonnet-5-5 for defaultConversationModel, statusReviewModel, providerFallbackModel and conversations.forkSummaryModel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-backend-defaults.ac2",
+            "title": "DEFAULT_WORKHORSES.mid returns claude-sonnet-5-5, so resolving workhorse:mid for the work role returns claude-sonnet-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-backend-defaults.ac3",
+            "title": "applyFallback maps gpt-5.5 to claude-sonnet-5-5 when the openai provider is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-backend-defaults.ac4",
+            "title": "Given a config.yaml with workhorses.mid set to claude-sonnet-5, the loaded config preserves claude-sonnet-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-dashboard-defaults",
+        "title": "Default the dashboard Roles mid slot and tiered supervisor to claude-sonnet-5-5",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts"
+          ],
+          "expected_outputs": [
+            "TieredExecutionSection.test.tsx and tiered-crews.test.ts report all tests passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Set DEFAULT_WORKHORSES.mid in RolesPanel.tsx and DEFAULT_SUPERVISOR_MODEL in TieredExecutionSection.tsx to claude-sonnet-5-5 and update the two test files' assertions that expect claude-sonnet-5 as the default. The rule that frontier models are never the unchosen default must keep holding (Sonnet 5.5 is workhorse class). See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-dashboard-defaults.ac1",
+            "title": "DEFAULT_SUPERVISOR_MODEL returns claude-sonnet-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-dashboard-defaults.ac2",
+            "title": "The Roles panel mid workhorse slot defaults to claude-sonnet-5-5 when no workhorse is configured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-dashboard-defaults.ac3",
+            "title": "The tiered-execution test that rejects frontier defaults passes with the new supervisor default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-docs",
+        "title": "Document Sonnet 5.5, its Claude Code 2.1.284 requirement and the new Sonnet defaults",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md",
+            "docs/MODEL-CALLS.md",
+            "docs/CONFIGURATION.md",
+            "docs/MODEL_ROUTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n claude-sonnet-5-5 -- configuration/harnesses.mdx docs/MODEL-CONTEXT-AUDIT.md docs/MODEL-CALLS.md docs/CONFIGURATION.md docs/MODEL_ROUTING.md"
+          ],
+          "expected_outputs": [
+            "git grep prints at least one match in each of the five files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Add the Sonnet 5.5 bullet (1M context, 128K output, $2/$10, requires Claude Code 2.1.284+, Sonnet-tier default) and the sampling-parameter sentence to configuration/harnesses.mdx after the Opus 5.5 bullet; add the Sonnet 5.5 source line to docs/MODEL-CONTEXT-AUDIT.md; change the default cells and default examples that WI-11 flips from claude-sonnet-5 to claude-sonnet-5-5 in docs/MODEL-CALLS.md, docs/CONFIGURATION.md and docs/MODEL_ROUTING.md, leaving historical prose alone. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-docs.ac1",
+            "title": "configuration/harnesses.mdx contains a claude-sonnet-5-5 bullet that states the Claude Code 2.1.284 requirement and the $2/$10 pricing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-docs.ac2",
+            "title": "docs/MODEL-CONTEXT-AUDIT.md contains a Sources line linking the Sonnet 5.5 overview with 1M context and 128K output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-docs.ac3",
+            "title": "docs/MODEL-CALLS.md shows claude-sonnet-5-5 as the default for the work role, workhorse mid, status review and fork summary rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sonnet-55-changelog",
+        "title": "Add the Sonnet 5.5 entry to the public changelog for v0.63.0",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T00:20:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4327",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'label=\"v0.63.0\"' changelog.mdx",
+            "git grep -n claude-sonnet-5-5 changelog.mdx"
+          ],
+          "expected_outputs": [
+            "one v0.63.0 Update block label is printed",
+            "the Sonnet 5.5 bullet line is printed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. Insert the v0.63.0 Update block from the PRD above the v0.62.1 block in changelog.mdx, with the Sonnet 5.5 New bullet (pickers, cost, new Sonnet-tier default, Claude Code 2.1.284 requirement with upgrade command, temperature omission) and the v0.62.1...v0.63.0 compare link. If an unreleased block newer than package.json already sits on top, add the bullet there instead. See .pan/drafts/PAN-4327.md"
+        },
+        "items": [
+          {
+            "id": "sonnet-55-changelog.ac1",
+            "title": "changelog.mdx contains exactly one Update block labelled v0.63.0 above the v0.62.1 block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sonnet-55-changelog.ac2",
+            "title": "The v0.63.0 block contains a claude-sonnet-5-5 bullet that names the Claude Code 2.1.284 requirement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sampling-capability-flag",
+        "to": "sonnet-55-catalog-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "sampling-capability-flag",
+        "to": "sonnet-55-compaction-budget",
+        "type": "blocks"
+      },
+      {
+        "from": "sampling-capability-flag",
+        "to": "memory-providers-omit-sampling",
+        "type": "blocks"
+      },
+      {
+        "from": "sampling-capability-flag",
+        "to": "tts-summarizer-omit-sampling",
+        "type": "blocks"
+      },
+      {
+        "from": "sonnet-55-catalog-entry",
+        "to": "claude-flag-full-sonnet-ids",
+        "type": "blocks"
+      },
+      {
+        "from": "sonnet-55-catalog-entry",
+        "to": "memory-providers-omit-sampling",
+        "type": "blocks"
+      },
+      {
+        "from": "sonnet-55-catalog-entry",
+        "to": "sonnet-55-backend-defaults",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-flag-full-sonnet-ids",
+        "to": "sonnet-55-backend-defaults",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-providers-omit-sampling",
+        "to": "sonnet-55-backend-defaults",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-providers-omit-sampling",
+        "to": "sonnet-55-dashboard-defaults",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

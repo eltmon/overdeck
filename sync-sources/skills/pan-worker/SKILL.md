@@ -64,6 +64,9 @@ pan worker list --parent conv-orchestrator --json
 `--model`, `--harness`, `--read-only`, `--cwd` (must be inside the issue workspace), `--parent`,
 `--name`, `--detach`, `--timeout <seconds>`, `--stop-after-report`.
 
+- **Primary checkout refusal.** A read-write worker's `--cwd` that resolves (symlinks followed) to a
+  project's primary checkout is refused with `--cwd <path> is the primary checkout of <project>; use a
+  worktree`. `--read-only` workers are not checked.
 - **Working directory.** By default the worker gets its own git worktree at
   `<workspace>/.swarm/worker-<n>/` on branch `<feature-branch>-worker-<n>`. With `--read-only` it runs
   in the issue workspace behind a `git` PATH shim that prevents accidental git writes to the issue's

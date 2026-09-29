@@ -1,0 +1,79 @@
+{
+  "version": "1",
+  "issueId": "PAN-4337",
+  "created": "2026-09-29T02:00:38.123Z",
+  "updated": "2026-09-29T02:16:07.387Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "shim-branch-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4337",
+      "claimedAt": "2026-09-29T02:00:38.123Z",
+      "doneAt": "2026-09-29T02:10:17.442Z"
+    },
+    "shim-branch-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4337",
+      "claimedAt": "2026-09-29T02:10:22.206Z",
+      "doneAt": "2026-09-29T02:10:53.793Z"
+    },
+    "branch-check-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4337",
+      "claimedAt": "2026-09-29T02:10:59.230Z",
+      "doneAt": "2026-09-29T02:11:57.039Z"
+    },
+    "shim-branch-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:13:38.972Z"
+    },
+    "shim-branch-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:13:52.671Z"
+    },
+    "shim-branch-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:14:05.888Z"
+    },
+    "shim-branch-check.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:14:18.087Z"
+    },
+    "shim-branch-check.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:14:30.163Z"
+    },
+    "shim-branch-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:14:45.494Z"
+    },
+    "shim-branch-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:15:00.148Z"
+    },
+    "shim-branch-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:15:13.770Z"
+    },
+    "shim-branch-tests.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:15:26.889Z"
+    },
+    "shim-branch-tests.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:15:39.212Z"
+    },
+    "branch-check-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:15:54.667Z"
+    },
+    "branch-check-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:16:07.387Z"
+    }
+  }
+}

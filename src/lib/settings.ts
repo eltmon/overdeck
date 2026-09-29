@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5-5' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
   // Supported (Codex CLI catalog, 2026-09-07)
   | 'gpt-6-astra'
@@ -84,8 +84,8 @@ const DEFAULT_SETTINGS: SettingsConfig = {
   models: {
     specialists: {
       review_agent: 'claude-opus-4-6',
-      test_agent: 'claude-sonnet-5',
-      merge_agent: 'claude-sonnet-5',
+      test_agent: 'claude-sonnet-5-5',
+      merge_agent: 'claude-sonnet-5-5',
     },
     status_review: 'claude-opus-4-6',
   },
@@ -201,6 +201,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     'claude-opus-4-8',
     'claude-opus-4-7',
     'claude-opus-4-6',
+    'claude-sonnet-5-5',
     'claude-sonnet-5',
     'claude-sonnet-4-6',
     'claude-haiku-4-5',
@@ -281,9 +282,12 @@ export function getClaudeModelFlag(modelId: ModelId | string): string {
     'claude-opus-4-8': 'opus',
     'claude-opus-4-7': 'opus',
     'claude-opus-4-6': 'opus',
-    'claude-sonnet-5': 'sonnet',
-    'claude-sonnet-4-6': 'sonnet',
-    'claude-sonnet-4-5': 'sonnet',
+    // Pass full Sonnet IDs: Claude Code 2.1.284 resolves the short `sonnet`
+    // alias to Sonnet 5.5, so the alias would launch a different model (PAN-4327).
+    'claude-sonnet-5-5': 'claude-sonnet-5-5',
+    'claude-sonnet-5': 'claude-sonnet-5',
+    'claude-sonnet-4-6': 'claude-sonnet-4-6',
+    'claude-sonnet-4-5': 'claude-sonnet-4-5',
     'claude-haiku-4-5': 'haiku',
   };
   // Unknown IDs (a newer release, a dated ID) pass through unchanged: the

@@ -61,7 +61,7 @@ function runLint(root: string, baseRef = 'base'): { ok: boolean; output: string 
 }
 
 describe('lint-file-size.sh', () => {
-  it('rejects a new god file with the allowlist remedy', () => {
+  it('rejects a new god file and names only the shrink remedy', () => {
     const root = makeTempRepo();
     writeLines(root, 'src/new-god-file.ts', 1001);
 
@@ -69,7 +69,10 @@ describe('lint-file-size.sh', () => {
 
     expect(ok).toBe(false);
     expect(output).toContain('src/new-god-file.ts is 1001 lines (allowed 1000)');
-    expect(output).toContain('1001 src/new-god-file.ts # <ISSUE-REF>');
+    expect(output).not.toMatch(/^\s*\d+ \S+ # /m);
+    expect(output).toContain('shrink src/new-god-file.ts to 1000 lines or fewer');
+    expect(output).toContain('The allowlist number must not increase');
+    expect(output).toContain('Raising a ceiling is an operator decision');
   });
 
   it('accepts the base count and rejects growth past it', () => {
@@ -83,6 +86,7 @@ describe('lint-file-size.sh', () => {
     expect(unchanged.output).toContain('file-size guard passed');
     expect(grown.ok).toBe(false);
     expect(grown.output).toContain('src/existing-god-file.ts is 1201 lines (allowed 1200)');
+    expect(grown.output).not.toMatch(/^\s*\d+ \S+ # /m);
   });
 
   it('permits audited growth only through the declared allowlist count', () => {
@@ -130,9 +134,9 @@ describe('lint-file-size.sh', () => {
     expect(ok).toBe(true);
     expect(output).toContain('file-size guard passed');
     expect(existsSync(join(root, 'scripts', 'file-size-baseline.txt'))).toBe(false);
-    // The guard must not REWRITE the allowlist — asserting a literal header
-    // instead would fail the moment anyone lands an audited exception, which
-    // is the very remedy the guard's own failure message prescribes.
+    // The guard must not REWRITE the allowlist. Compare against the source copy
+    // rather than a literal header, because the operator may land audited rows
+    // at any time.
     expect(readFileSync(join(root, 'scripts', 'file-size-allowlist.txt'), 'utf-8')).toBe(
       readFileSync(ALLOWLIST_SOURCE, 'utf-8'),
     );

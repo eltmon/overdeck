@@ -1,0 +1,205 @@
+{
+  "version": "1",
+  "issueId": "PAN-4312",
+  "created": "2026-09-28T14:11:29.588Z",
+  "updated": "2026-09-28T15:51:32.640Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "poll-lane": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T14:11:29.588Z",
+      "doneAt": "2026-09-28T14:16:20.850Z"
+    },
+    "search-stats-cursor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T14:16:40.346Z",
+      "doneAt": "2026-09-28T14:28:40.101Z"
+    },
+    "messages-read-context-usage": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T14:28:47.051Z",
+      "doneAt": "2026-09-28T14:43:40.065Z"
+    },
+    "context-usage-memo": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T14:43:45.124Z",
+      "doneAt": "2026-09-28T14:50:13.417Z"
+    },
+    "diffs-poll-live-only": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T14:50:16.682Z",
+      "doneAt": "2026-09-28T14:54:36.317Z"
+    },
+    "messages-http-fallback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T14:54:39.756Z",
+      "doneAt": "2026-09-28T15:19:46.533Z"
+    },
+    "claude-initial-snapshot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T15:19:49.860Z",
+      "doneAt": "2026-09-28T15:29:37.070Z"
+    },
+    "diffs-batch-per-repo": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T15:29:40.635Z",
+      "doneAt": "2026-09-28T15:37:55.914Z"
+    },
+    "diffs-result-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T15:37:58.766Z",
+      "doneAt": "2026-09-28T15:41:24.823Z"
+    },
+    "docs-architecture": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4312",
+      "claimedAt": "2026-09-28T15:41:27.997Z",
+      "doneAt": "2026-09-28T15:43:48.832Z"
+    },
+    "poll-lane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:44:56.504Z"
+    },
+    "poll-lane.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:45:18.913Z"
+    },
+    "poll-lane.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:45:30.254Z"
+    },
+    "search-stats-cursor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:45:42.083Z"
+    },
+    "search-stats-cursor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:45:53.775Z"
+    },
+    "search-stats-cursor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:46:06.578Z"
+    },
+    "messages-read-context-usage.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:46:19.084Z"
+    },
+    "messages-read-context-usage.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:46:30.713Z"
+    },
+    "messages-read-context-usage.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:46:42.215Z"
+    },
+    "context-usage-memo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:46:53.129Z"
+    },
+    "context-usage-memo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:47:02.970Z"
+    },
+    "context-usage-memo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:47:14.784Z"
+    },
+    "diffs-poll-live-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:47:25.003Z"
+    },
+    "diffs-poll-live-only.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:47:36.266Z"
+    },
+    "messages-http-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:47:53.967Z"
+    },
+    "messages-http-fallback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:48:05.973Z"
+    },
+    "messages-http-fallback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:48:17.685Z"
+    },
+    "messages-http-fallback.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:48:28.437Z"
+    },
+    "messages-http-fallback.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:48:40.280Z"
+    },
+    "claude-initial-snapshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:48:52.898Z"
+    },
+    "claude-initial-snapshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:49:04.422Z"
+    },
+    "claude-initial-snapshot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:49:15.770Z"
+    },
+    "claude-initial-snapshot.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:49:28.308Z"
+    },
+    "claude-initial-snapshot.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:49:40.714Z"
+    },
+    "diffs-batch-per-repo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:49:52.887Z"
+    },
+    "diffs-batch-per-repo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:50:05.537Z"
+    },
+    "diffs-batch-per-repo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:50:19.392Z"
+    },
+    "diffs-result-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:50:31.891Z"
+    },
+    "diffs-result-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:50:44.462Z"
+    },
+    "diffs-result-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:50:56.197Z"
+    },
+    "docs-architecture.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:51:08.199Z"
+    },
+    "docs-architecture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:51:20.472Z"
+    },
+    "docs-architecture.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T15:51:32.640Z"
+    }
+  }
+}

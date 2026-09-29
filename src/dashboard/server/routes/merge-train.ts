@@ -57,7 +57,12 @@ import {
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
 import { removeQueuedMerge } from '../../../lib/overdeck/merge.js';
-import { listReadyIssuesForProject } from '../services/derived-issue-state.js';
+import {
+  issueIdFromBranch,
+  listReadyIssuesForProject,
+  listRepoPullRequestsStaleOk,
+  loadIssueStatesForProject,
+} from '../services/derived-issue-state.js';
 import { evaluateIssueMergeGate, type MergeGateResult } from '../../../lib/cloister/merge-gate.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import type { PipelineMembership } from '../../../lib/pipeline-membership.js';
@@ -705,7 +710,6 @@ export async function getAutoMergePolicyPayload(): Promise<{
   issues: Array<{ issueId: string; autoMerge: boolean }>;
 }> {
   const globalRequireUat = isFlywheelRequireUatBeforeMerge();
-  const { loadIssueStatesForProject } = await import('../services/derived-issue-state.js');
   const IN_FLIGHT = new Set(['working', 'in-review', 'changes-requested', 'ready']);
 
   // PAN-3925: the projects derive in parallel, each over its PR listing
@@ -739,7 +743,6 @@ export async function getAutoMergePolicyPayload(): Promise<{
 
 /** Issue ids with an open PR in the project — the only ones the train can route. */
 async function listCandidateIssueIds(projectPath: string): Promise<string[]> {
-  const { listRepoPullRequestsStaleOk, issueIdFromBranch } = await import('../services/derived-issue-state.js');
   const rows = await listRepoPullRequestsStaleOk(projectPath);
   return rows.flatMap((row) => {
     const issueId = issueIdFromBranch(row.headRefName);

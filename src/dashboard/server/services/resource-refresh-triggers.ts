@@ -9,6 +9,12 @@ import { getBackendPanes } from './backend-inventory.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig } from '../../../lib/projects.js';
 import { getEventStore, type Unsubscribe } from '../event-store.js';
 import { enqueueProjectsResourceRefresh } from './project-resource-refresh-queue.js';
+import { indexPanesByAgentKey, type BackendPane } from '@overdeck/contracts';
+
+/** The issue token of the pane that answers for this agent (PAN-4320). */
+export function issueForAgentFromPanes(panes: readonly BackendPane[], agentId: string): string | null {
+  return indexPanesByAgentKey(panes).get(agentId)?.issue ?? null;
+}
 
 const TRIGGER_EVENT_TYPES = new Set([
   'agent.created',
@@ -84,7 +90,7 @@ export function startResourceRefreshTriggers(): Unsubscribe {
     // from the backend inventory rather than from a persisted agent mirror.
     issueForAgent: async (agentId) => {
       try {
-        return (await getBackendPanes()).find((pane) => pane.id === agentId)?.issue ?? null;
+        return issueForAgentFromPanes(await getBackendPanes(), agentId);
       } catch {
         return null;
       }

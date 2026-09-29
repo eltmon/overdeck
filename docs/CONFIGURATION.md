@@ -24,7 +24,7 @@ Complete guide to configuring Overdeck's multi-model routing system.
    ```yaml
    workhorses:
      expensive: claude-opus-4-8
-     mid: claude-sonnet-5
+     mid: claude-sonnet-5-5
      cheap: claude-haiku-4-5
    ```
 
@@ -65,7 +65,7 @@ models:
 # Model slots that roles reference as workhorse:<slot>
 workhorses:
   expensive: claude-opus-4-8
-  mid: claude-sonnet-5
+  mid: claude-sonnet-5-5
   cheap: claude-haiku-4-5
 
 # Per-role models (optional; see MODEL-CALLS.md for every role's default)
@@ -391,7 +391,7 @@ When the enrichment model's provider is disabled, `applyFallback`
 
 1. the model's entry in `FALLBACK_MAP` in `src/lib/model-fallback.ts`, if it
    has one;
-2. otherwise `models.provider_fallback_model` (default `claude-sonnet-5`, set
+2. otherwise `models.provider_fallback_model` (default `claude-sonnet-5-5`, set
    in `src/lib/config-yaml/defaults.ts`).
 
 If Anthropic is also disabled, it keeps the original model. Each substitution
@@ -400,7 +400,7 @@ logs a warning. Role agents never fall back (see
 
 ```yaml
 models:
-  provider_fallback_model: claude-sonnet-5
+  provider_fallback_model: claude-sonnet-5-5
 ```
 
 See [MODEL-CALLS.md](MODEL-CALLS.md) ("Provider-disabled substitute") for where

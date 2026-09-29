@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { shortName, useMergeTrainData } from '../merge-train/MergeTrainView';
+import { ProjectSkillsSection } from '../skills/SkillOverridesSections';
 
 interface VersionSyncConfig {
   set?: Array<{ path: string; json_field: string }>;
@@ -445,6 +446,7 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
       </div>
       <VersionShipSettings projectKey={projectKey} />
       <MergeTrainSummary projectKey={projectKey} />
+      <ProjectSkillsSection projectKey={projectKey} />
     </div>
   );
 }

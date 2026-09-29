@@ -1,0 +1,139 @@
+{
+  "version": "1",
+  "issueId": "PAN-3308",
+  "created": "2026-09-29T01:57:57.115Z",
+  "updated": "2026-09-29T03:12:54.808Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "guard-message": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3308",
+      "claimedAt": "2026-09-29T01:57:57.115Z",
+      "doneAt": "2026-09-29T02:05:17.460Z"
+    },
+    "identity-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3308",
+      "claimedAt": "2026-09-29T02:05:22.100Z",
+      "doneAt": "2026-09-29T02:14:26.882Z"
+    },
+    "main-push-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3308",
+      "claimedAt": "2026-09-29T02:14:33.859Z",
+      "doneAt": "2026-09-29T02:27:21.734Z"
+    },
+    "raise-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3308",
+      "claimedAt": "2026-09-29T02:27:25.813Z",
+      "doneAt": "2026-09-29T02:36:48.495Z"
+    },
+    "pre-push-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3308",
+      "claimedAt": "2026-09-29T02:36:52.154Z",
+      "doneAt": "2026-09-29T02:48:07.490Z"
+    },
+    "planner-prompt": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3308",
+      "claimedAt": "2026-09-29T02:48:13.568Z",
+      "doneAt": "2026-09-29T02:59:14.977Z"
+    },
+    "a3-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3308",
+      "claimedAt": "2026-09-29T02:59:18.360Z",
+      "doneAt": "2026-09-29T03:05:25.069Z"
+    },
+    "guard-message.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:07:49.744Z"
+    },
+    "guard-message.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:08:17.722Z"
+    },
+    "guard-message.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:08:30.863Z"
+    },
+    "identity-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:08:43.977Z"
+    },
+    "identity-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:08:58.299Z"
+    },
+    "identity-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:09:13.232Z"
+    },
+    "main-push-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:09:28.367Z"
+    },
+    "main-push-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:09:43.484Z"
+    },
+    "main-push-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:09:57.506Z"
+    },
+    "main-push-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:10:12.476Z"
+    },
+    "raise-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:10:29.549Z"
+    },
+    "raise-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:10:44.432Z"
+    },
+    "raise-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:00.075Z"
+    },
+    "raise-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:14.586Z"
+    },
+    "raise-guard.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:28.590Z"
+    },
+    "pre-push-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:43.033Z"
+    },
+    "pre-push-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:11:57.283Z"
+    },
+    "planner-prompt.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:11.127Z"
+    },
+    "planner-prompt.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:25.097Z"
+    },
+    "a3-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:39.792Z"
+    },
+    "a3-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T03:12:54.808Z"
+    }
+  }
+}

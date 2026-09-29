@@ -48,6 +48,7 @@ Kimi's bare Overdeck `k3` historically denotes the smaller window. It now transl
 - [Codex configuration reference](https://developers.openai.com/codex/config-reference)
 - [Claude Code model, effort, and context configuration](https://code.claude.com/docs/en/model-config): Fable 5.1 requires Claude Code 2.1.255 or newer. Availability depends on the account.
 - [Claude Opus 5.5](https://platform.claude.com/docs/en/models/opus-5-5/overview): `claude-opus-5-5`, 1M context, 128K maximum output, $4/M input, $20/M output, and $0.20/M cache reads.
+- [Claude Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview): `claude-sonnet-5-5`, 1M context, 128K maximum output, $2/M input, $10/M output, $0.20/M cache reads; requires Claude Code 2.1.284 or newer.
 - [Fable 5.1](https://platform.claude.com/docs/en/models/fable-5-1/overview) and [pricing changes](https://platform.claude.com/docs/en/models/fable-5-1/whats-new-fable-5-1): $10/M input, $50/M output, $0.25/M cache reads.
 - [Gemini model catalog](https://ai.google.dev/gemini-api/docs/models), [3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [3.5 Flash Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
 - [GLM 5.3](https://docs.z.ai/guides/llm/glm-5.3): some accounts with a Coding Plan history currently require the OpenAI-compatible endpoint; the Anthropic route is not universally available.

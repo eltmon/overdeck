@@ -18,6 +18,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Deacon child process** (PAN-3922):
 - The dashboard forks `dist/dashboard/deacon.js` (`src/dashboard/server/deacon-main.ts`) through `services/deacon-supervisor.ts`. Cloister and deacon-lite run only in that child, never in the dashboard process.
 - IPC, parent to child: `{type:'patrol'}` (run one patrol now) and `{type:'reload-config'}`. Child to parent: `{type:'patrol-done', at, error}` after every completed deacon-lite tick, scheduled or manual.
+- Dead-agent events (PAN-4300): each deacon-lite tick checks agents whose `state.json` says `running`. When one is absent from the backend inventory and the liveness oracle confirms it dead, the child emits `agent.heartbeat_dead` and then `agent.status_changed` with `status: stopped`, `previousStatus` set to the recorded status, and `hasLivePane: false`. It emits this pair once per death: it remembers the agent id and launch generation (`startedAt` + `lastResumeAt`) in memory and emits again only after the agent is seen alive, is resumed, or leaves the `running` list. `state.json` is not changed. A deacon child restart emits the pair once more for each agent that is still dead.
 - The supervisor keeps the latest `patrol-done` report in memory, across child restarts. Nothing is written to disk.
 - `GET /api/deacon/status` and `GET /api/cloister/status` compose `deaconLite` from that report: `running` is whether the child process is running, `intervalMs` is 60000, and `lastRunAt`/`lastRunError` are the relayed report.
 - The `pan up` supervisor watchdog restarts the dashboard when `deaconLite.lastRunAt` is older than three intervals. A null `lastRunAt` never produces a verdict.
@@ -61,14 +62,19 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
 - The snapshot's agent `status` is derived when it is served, not copied from the stored
   record (#4098). A row stored as `running`/`starting` with no non-exited pane in the
-  backend inventory (matched by terminal id, pane id or the `agentId` token, the way
-  `GET /api/agents` matches) is served `stopped`. Before the inventory has answered even
-  once (Herdr not up at dashboard boot), such rows are served `unknown`, never dead; after
-  that, a failed read keeps the last-good panes. Stored `stopped`/`error` and the `paused`
-  / `stoppedByUser` intent fields pass through unchanged. Only `agent-`, `planning-` and
-  `strike-` ids are derived, the set the inventory answers for
-  (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`). A row served
-  `stopped` this way also has `hasLivePane` (and its deprecated alias
+  backend inventory is served `stopped`. Every agent-to-pane join in the server, including
+  this one, goes through `indexPanesByAgentKey` in `packages/contracts/src/backend-pane.ts`
+  (PAN-4320): the key is `agentId ?? terminalId ?? id`, and when two panes share a key —
+  a restarted Herdr agent beside its exited pane — the non-exited pane wins. On Herdr, the
+  enrichment poller's `agent.created` is the only way an agent started after dashboard boot
+  enters `agentsById` (Herdr work agents run without the PTY supervisor), and under Herdr
+  the poller skips a cycle only while the backend inventory is degraded, never for lack of a
+  tmux census. Before the inventory has answered even once (Herdr not up at dashboard boot),
+  such rows are served `unknown`, never dead; after that, a failed read keeps the last-good
+  panes. Stored `stopped`/`error` and the `paused` / `stoppedByUser` intent fields pass
+  through unchanged. Only `agent-`, `planning-` and `strike-` ids are derived, the set the
+  inventory answers for (`deriveServedAgentStatuses` in `src/dashboard/server/read-model.ts`).
+  A row served `stopped` this way also has `hasLivePane` (and its deprecated alias
   `hasLiveTmuxSession`) served `false`; a row served `unknown` keeps its stored flags.
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Outage handling never blocks the UI: see [Degraded mode (PAN-4279)](#degraded-mode-pan-4279).
@@ -184,11 +190,17 @@ so neither reaches `feedback`, `scopeDrift`, `sessionHistory`, or
 door that does not exist; a real record read door would be a separate change.
 
 **DB job worker lanes:**
-- The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
-  reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
-  The `parse` lane runs `parseTranscriptSnapshot`. Transcript parsing is CPU-bound and
-  can take seconds, so its own lane cannot block interactive reads or wait behind bulk
-  sweeps.
+- Five lanes. The `read` lane handles interactive point lookups only (e.g.
+  `getConversationByName`). The `poll` lane runs the four polling aggregates —
+  `getCostsByIssueSnapshot`, `getConversationSearchStats`, `getConversationLedgerCosts`,
+  and `getAgentCostStats` — so their multi-second refreshes never queue behind, or ahead
+  of, an interactive lookup. The `long` lane handles bulk scans and reconciliation, and
+  the `semantic` lane isolates embedding and semantic-search work. The `parse` lane runs
+  `parseTranscriptSnapshot`. Transcript parsing is CPU-bound and can take seconds, so its
+  own lane cannot block interactive reads or wait behind bulk sweeps. Rule: an aggregate
+  or scan never shares a lane with a lookup that sits on an interactive path (PAN-4312 —
+  before this, the polling aggregates shared `read` with `getConversationByName`, so a
+  live conversation subscribe could wait behind a 13-second search-stats refresh).
 - Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
   Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
   the main thread and worker remain type-safe.
@@ -222,21 +234,50 @@ door that does not exist; a real record read door would be a separate change.
   transfer memory without repeated parsing while preserving EventBus publication and
   durable skip-cache updates.
 - Cost polling, conversation-list ledger totals, and search counters use shared worker
-  snapshots. Concurrent refreshes coalesce. Cost snapshots refresh after 15 seconds;
-  search counters refresh after 60 seconds. Successful values remain usable for at most
-  five minutes during refresh failures, with a five-second retry backoff. Search
-  configuration, provider availability, and runtime health are still read per request.
+  snapshots on the `poll` lane. Concurrent refreshes coalesce. Cost snapshots refresh
+  after 15 seconds; search counters refresh after 60 seconds and read `lastIndexedAt`
+  from `max(file_cursors.updated_at)` rather than scanning every row of the `chunks`
+  table (PAN-4312 — that scan cost ~9s on a 3GB embeddings DB). Successful values remain
+  usable for at most five minutes during refresh failures, with a five-second retry
+  backoff. Search configuration, provider availability, and runtime health are still
+  read per request.
 - Agent resource costs use one grouped worker query and a 15-second shared snapshot,
   invalidated when agent membership changes. Hourly burn remains twice the sum in the
   last 30 minutes, with the inclusive cutoff and rounding to cents preserved. SQLite's
   more accurate summation can correct a cent at a half-cent floating-point boundary.
   Resource polling no longer materializes each agent's full ledger history.
-- `subscribeConversationMessages` resolves transcript paths on the main thread and
-  shares worker parse results across subscribers. Codex consumes appended records;
-  other full-parser harnesses still parse changed files in the worker. Clients receive
-  complete initial history, then changed message/tool rows and metadata. Explicit resets
-  replace history after truncation/replacement, and metadata snapshots clear removed
-  plans or compact boundaries. Full tool results remain accessible.
+- `subscribeConversationMessages` resolves the conversation row with a `read`-lane point
+  lookup (`getConversationByName`), then resolves transcript paths on the main thread and
+  shares worker parse results across subscribers. The Claude initial transcript snapshot
+  goes through `sharedTranscriptParser('claude-initial')`: reused while the file's stat
+  signature is unchanged, with each subscriber getting its own copy of the mutable
+  parse-state containers (`parseStateFromSnapshot`), since the incremental parser mutates
+  those containers in place and a shared copy would corrupt other subscribers. A missing
+  session file (a freshly spawned conversation subscribing before its transcript exists)
+  still dispatches an uncached parse rather than throwing; `watchConversation` then polls
+  until the file appears. Codex consumes appended records; other full-parser harnesses
+  still parse changed files in the worker. Clients receive complete initial history, then
+  changed message/tool rows and metadata. Explicit resets replace history after
+  truncation/replacement, and metadata snapshots clear removed plans or compact
+  boundaries. Full tool results remain accessible.
+  - The client shows the loading skeleton until the first WS payload arrives, and falls
+    back to HTTP `GET .../messages` only after `MESSAGES_HTTP_FALLBACK_MS` (1500 ms) pass
+    without one (`useMessagesHttpFallback`, PAN-4312). Resume, switch-model, and fork
+    completion re-read over HTTP with `queryClient.fetchQuery({ ..., staleTime: 0 })`
+    rather than `invalidateQueries`, since `invalidateQueries` does not refetch a
+    disabled query, and `fetchQuery` without `staleTime: 0` would return cached data
+    without a request whenever a recent stream event left the query fresh under the
+    app's default 30 s `staleTime`.
+  - Context usage comes from the parse result (`contextUsageFromParseResult`) on both the
+    WS path and HTTP `/messages`, instead of a second file parse. `GET
+    /api/conversations/:id` uses a memoized `computeContextUsage`, keyed by session file
+    and model and validated against file size and mtime, so a repeat read with an
+    unchanged transcript never reopens the file.
+  - `/diffs` polls only while the conversation's session is alive (an ended conversation
+    cannot gain new edits), runs one `git diff` pair per repo across every edited turn
+    instead of one pair per turn, and caches its result for 30 seconds keyed by the
+    transcript's size and mtime (repo `HEAD` is not part of the key, since `git diff
+    <base> -- <paths>` compares against the working tree either way).
 - Global issue updates use `issues.delta`: complete changed rows at their original
   array positions plus the resulting length. Initial/reconnect snapshots retain all
   rows and descriptions. Shared reducers preserve order, removal, and arbitrary tracker
@@ -303,6 +344,15 @@ door that does not exist; a real record read door would be a separate change.
   lookup under `~/.claude/projects/` and is served read-only (no composer). `agent-*`
   names never trigger a scan: work agents use `/api/agents/:id/conversation`, and
   subagent hits open their parent conversation with `?agentId=<bare id>` (PAN-3982).
+- Delivery modes (PAN-4292). `HarnessBehavior.steerKind` (`packages/contracts/src/harness-behavior.ts`)
+  says how a harness can be steered: `send-now-keys` (Claude Code), `control-channel` (Pi), or
+  `null`. The composer shows its delivery selector only for a steer-capable harness (Pi only on
+  conversations), and Ctrl/Cmd+Enter sends with `deliverAs: 'steer'`; elsewhere Ctrl+Enter is
+  Enter. Both `POST /api/conversations/:name/message` and `POST /api/agents/:id/message` accept
+  the `deliverAs` body field. A Claude Code steer reaches the delivery door as
+  `submit: 'steer'`. A harness without steer, or `follow_up` on Claude Code, answers **422**
+  `steer-unsupported` and delivers nothing. When an old PTY supervisor pressed Enter instead, the
+  response carries `steerDegraded` with the reason.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
@@ -325,7 +375,22 @@ door that does not exist; a real record read door would be a separate change.
   streaming, the same delay proves nothing, since a message queued behind a long tool
   call is legitimately unrendered until consumed. Two or more quick sends that Claude
   Code joins into one queued message are reconciled together: the single transcript
-  record clears every contributing bubble at once, not just the first.
+  record clears every contributing bubble at once, not just the first. Claude Code
+  records a long composer paste as `<pasted_content id="N">…</pasted_content id="N">`
+  in both landed and queued records; the parser (`renderableUserText()`) and the
+  landing probe strip that wrapper through `src/lib/pasted-content.ts` before any
+  further checks, so the timeline shows the operator's own text with no tags
+  (PAN-4305). `reconcileComposerEchoes()` compares bubble and transcript text with
+  whitespace collapsed rather than exact, so attachment references Claude Code joins
+  with a space still match a bubble that joined them with a newline, and it also
+  clears a bubble whose full text is contained in a later user record (a merged
+  queued prompt with extra content) — the red "Not found in transcript" state now
+  appears only when no landed or queued record matches or contains the bubble's text
+  at all. Composer delivery still pastes the raw, unwrapped text: every delivery path
+  (tmux `paste-buffer -p`, Herdr `pane.send_text`, Herdr `agent.prompt`) submits with
+  bracketed paste because raw typed bytes submit a multi-line message at its first
+  newline, so the agent sees a long composer message inside `<pasted_content>` too —
+  a known, accepted side effect, not something delivery works around.
 - The PTY supervisor reports what it observes about its harness to
   `POST /api/agents/:id/lifecycle`, authenticated by the session's pty-token. It emits
   `session-started`, `turn-started` (on a confirmed injection) and `exited`. The route

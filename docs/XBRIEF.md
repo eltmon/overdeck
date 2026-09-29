@@ -6,7 +6,7 @@ Overdeck uses [xBRIEF](https://github.com/deftai/xBRIEF) for machine-readable wo
 
 The xBRIEF checklist is the task source of truth. Completion state lives in `.pan/continues/<issue-lowercase>.xbrief.json`, plus the `Item: <item-id>` trailer on the commit that finished it — nothing is duplicated into a separate pipeline record.
 
-Agents use the smallest loop: `pan task next`, `pan task claim <item-id>`, implement and push the change, then `pan task done <item-id>`. `pan task done` verifies the pushed commit carries the `Item:` trailer before recording completion in the continue file. Two agents may race to claim an item; exactly one claim succeeds, and the loser rereads the plan and selects the next dispatchable item.
+Agents use the smallest loop: `pan task next`, `pan task claim <item-id>`, implement and push the change, then `pan task done <item-id>`. `pan task done` verifies the pushed commit carries the `Item:` trailer before recording completion in the continue file. `pan task claim` refuses (exit 1, nothing written) when a running agent holds the item, or holds another item whose `files_scope` overlaps it — a low-confidence `files_scope` on either side counts as overlap, since Overdeck can't prove the two touch different files. Liveness is read live at claim time, never leased or cached. Two concurrent `pan task claim` processes on the same item are serialized by the task-state lock, so exactly one wins; the loser rereads the plan and selects the next dispatchable item. `--steal` is the foreman/operator override for both refusal kinds — a worker should never pass it.
 
 ## xBRIEF v0.8
 
@@ -63,7 +63,7 @@ Every project's plan artifacts (drafts, specs, continues, orders, notes, backlog
   backlog/sequence.md
 ```
 
-The canonical spec is immutable after planning except for lifecycle status changes and explicit re-planning. Task claims and completion state live in the matching `continues/<issue>.xbrief.json` file, keyed by commit trailers — never in a separate pipeline record.
+The canonical spec is immutable after planning except for lifecycle status changes and explicit re-planning. The verification gate enforces this with the `plan-integrity` check ([PIPELINE-GATES.md](PIPELINE-GATES.md#plan-integrity-gate-pan-1728)). Task claims and completion state live in the matching `continues/<issue>.xbrief.json` file, keyed by commit trailers — never in a separate pipeline record.
 
 #### Workspace runtime state
 
@@ -84,8 +84,8 @@ Workspace runtime files are local and gitignored.
 PRDs and xBRIEFs are distinct artifacts that flow through the same pipeline:
 
 1. **PRD drafted** — a human writes a markdown PRD to `.pan/drafts/<issue>.md`, or a planning agent authors a workspace-local draft that gets promoted there. `pan plan finalize` enforces the PRD's existence (PRD-first gate, PAN-2234), never overwriting an existing canonical draft.
-2. **Planning completes** — the planning agent converts the PRD into a machine-readable workspace xBRIEF, stamps it `status: "proposed"`, and `complete-planning` promotes it into `.pan/specs/` on the feature branch. For GitHub issues, `complete-planning` then adds the `planned` label, only after the spec is written and only when it is on disk; starting a planning session adds only the `planning` label (PAN-3953). Explicit `--no-promote` leaves the spec at `status: "proposed"` for a human to promote later with `pan plan done <issue-id>`.
-3. **Work starts** — `pan start` sets the spec's top-level `status` to `"active"` and `plan.status` to `"running"`, then commits and pushes that transition on the feature branch before returning. Work agents read the canonical spec via `findPlan()` and track item progress in `.pan/continues/<issue>.xbrief.json`.
+2. **Planning completes** — the planning agent converts the PRD into a machine-readable workspace xBRIEF, stamps it `status: "proposed"`, and `complete-planning` promotes it into `.pan/specs/` on the feature branch. The finalize commit carries a `Plan-Finalized: <sha256>` trailer (the SHA-256 of the spec's bytes) in the repo that holds the spec; for a polyrepo `pan_records.repo` project that is a second commit in the nested plan-home repo. For GitHub issues, `complete-planning` then adds the `planned` label, only after the spec is written and only when it is on disk; starting a planning session adds only the `planning` label (PAN-3953). Explicit `--no-promote` leaves the spec at `status: "proposed"` for a human to promote later with `pan plan done <issue-id>`.
+3. **Work starts** — `pan start` sets the spec's top-level `status` to `"active"` and `plan.status` to `"running"`, and writes that change to the spec in the plan home. `pan start` does not commit it; the change reaches the feature branch with a later commit. It touches only lifecycle status fields, which the `plan-integrity` check allows. Work agents read the canonical spec via `findPlan()` and track item progress in `.pan/continues/<issue>.xbrief.json`.
 4. **Active plan repair** — if an item's declared scope and verification are mechanically incompatible, stop its running work session and return the issue to planning. Preserve stable item IDs, repair the ownership or verification in the planning draft, and re-finalize it. Planning quality-lints the replacement and rewrites the same canonical filename; matching continue-file state continues to apply.
 5. **Work completes** — after merge, `status` is updated to `"completed"` in the spec.
 
@@ -132,7 +132,7 @@ There is no workspace-local copy of the spec during work execution. Work agents 
 | Resource | Writer | Readers | Contention |
 |----------|--------|---------|------------|
 | `.pan/specs/<file>` | Planning and lifecycle writers only | Dashboard, agents (via `findPlan()`) | None — structure is immutable during work; explicit re-planning may replace the document at the same canonical filename |
-| `.pan/continues/<issue>.xbrief.json` | `pan task claim`/`pan task done` | Dashboard, agents | Serialized per issue |
+| `.pan/continues/<issue>.xbrief.json` | `pan task claim`/`done`/`block`/`unblock`/`reopen`/`cancel` | Dashboard, agents | Serialized per issue by the task-state lock (`overdeck-task-state.lock` in the plan home's git dir) |
 | `.overdeck/continue.json` in a workspace | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
 | `.overdeck/sessions.jsonl` in a workspace | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
 | `.overdeck/feedback/*.md` in a workspace | Pipeline only | Agent (injected into prompt) | None — single writer |
