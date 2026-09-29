@@ -122,7 +122,7 @@ describe('model capabilities', () => {
 
   // No [372k] opt-in variant ships for the GPT-6 family: the 372K pin was
   // measured on gpt-5.6-sol only. Guard against adding the id without measuring.
-  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna'])('does not surface a %s[372k] variant', async (model) => {
+  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol'])('does not surface a %s[372k] variant', async (model) => {
     const { GPT56_LONG_CONTEXT_VARIANTS } = await import('../model-context-windows.js');
     expect(Object.keys(GPT56_LONG_CONTEXT_VARIANTS)).not.toContain(`${model}[372k]`);
     expect((MODEL_CAPABILITIES as Record<string, unknown>)[`${model}[372k]`]).toBeUndefined();
