@@ -35,7 +35,7 @@ describe('callOpenAIResponses', () => {
       }),
     );
 
-    await callOpenAIResponses(baseConfig({ openaiVia: 'api' }), { system: 'sys', user: 'usr' }, { OPENAI_API_KEY: 'sk-test' }, fetchMock);
+    await callOpenAIResponses(baseConfig({ openaiVia: 'api' }), { system: 'sys', messages: [{ role: 'user', content: 'usr' }] }, { OPENAI_API_KEY: 'sk-test' }, fetchMock);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
@@ -51,7 +51,7 @@ describe('callOpenAIResponses', () => {
       }),
     );
 
-    await callOpenAIResponses(baseConfig({ openaiVia: 'cliproxy' }), { system: 'sys', user: 'usr' }, {}, fetchMock);
+    await callOpenAIResponses(baseConfig({ openaiVia: 'cliproxy' }), { system: 'sys', messages: [{ role: 'user', content: 'usr' }] }, {}, fetchMock);
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('http://127.0.0.1:8317/v1/responses');
@@ -68,7 +68,7 @@ describe('callOpenAIResponses', () => {
 
     await callOpenAIResponses(
       baseConfig({ openaiVia: 'api', effort: 'high', maxTokens: 128000 }),
-      { system: 'sys prompt', user: 'usr prompt' },
+      { system: 'sys prompt', messages: [{ role: 'user', content: 'usr prompt' }] },
       { OPENAI_API_KEY: 'sk-test' },
       fetchMock,
     );
@@ -95,7 +95,7 @@ describe('callOpenAIResponses', () => {
       }),
     );
 
-    const result = await callOpenAIResponses(baseConfig(), { system: 'sys', user: 'usr' }, { OPENAI_API_KEY: 'sk-test' }, fetchMock);
+    const result = await callOpenAIResponses(baseConfig(), { system: 'sys', messages: [{ role: 'user', content: 'usr' }] }, { OPENAI_API_KEY: 'sk-test' }, fetchMock);
 
     expect(result.text).toBe('hello\nworld');
     expect(result.usage).toEqual({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 2 });
@@ -108,7 +108,36 @@ describe('callOpenAIResponses', () => {
     );
 
     await expect(
-      callOpenAIResponses(baseConfig({ model: 'gpt-6-sol', apiModel: 'gpt-6-sol' }), { system: 'sys', user: 'usr' }, { OPENAI_API_KEY: 'sk-test' }, fetchMock),
+      callOpenAIResponses(baseConfig({ model: 'gpt-6-sol', apiModel: 'gpt-6-sol' }), { system: 'sys', messages: [{ role: 'user', content: 'usr' }] }, { OPENAI_API_KEY: 'sk-test' }, fetchMock),
     ).rejects.toThrow(/gpt-6-sol.*unknown provider/s);
+  });
+  it('maps messages to Responses input items with assistant role', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        output: [{ type: 'message', content: [{ type: 'output_text', text: 'hi' }] }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }),
+    );
+
+    await callOpenAIResponses(
+      baseConfig({ openaiVia: 'api' }),
+      {
+        system: 'sys',
+        messages: [
+          { role: 'user', content: 'kickoff' },
+          { role: 'assistant', content: 'progress' },
+          { role: 'user', content: 'feedback' },
+        ],
+      },
+      { OPENAI_API_KEY: 'sk-test' },
+      fetchMock,
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.input).toEqual([
+      { role: 'user', content: 'kickoff' },
+      { role: 'assistant', content: 'progress' },
+      { role: 'user', content: 'feedback' },
+    ]);
   });
 });

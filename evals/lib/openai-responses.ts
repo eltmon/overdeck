@@ -1,5 +1,6 @@
 import { CLIPROXY_AUTH_TOKEN, CLIPROXY_BASE_URL } from '../../src/lib/cliproxy.js';
 import type { EvalModelConfig } from './eval-model.js';
+import type { ScenarioMessage } from './prompt-harness.js';
 import { usageFromOpenAI, type EvalUsage, type OpenAIUsageLike } from './eval-usage.js';
 
 export const OPENAI_API_BASE_URL = 'https://api.openai.com';
@@ -20,7 +21,7 @@ interface OpenAIResponsesBody {
 
 export async function callOpenAIResponses(
   config: EvalModelConfig,
-  prompt: { system: string; user: string },
+  prompt: { system: string; messages: ScenarioMessage[] },
   env: Record<string, string | undefined>,
   fetchImpl: typeof fetch = fetch,
 ): Promise<OpenAIResponsesCall> {
@@ -30,7 +31,7 @@ export async function callOpenAIResponses(
   const body: Record<string, unknown> = {
     model: config.apiModel,
     instructions: prompt.system,
-    input: [{ role: 'user', content: prompt.user }],
+    input: prompt.messages.map((m) => ({ role: m.role, content: m.content })),
     max_output_tokens: config.maxTokens,
     ...(config.effort !== null ? { reasoning: { effort: config.effort } } : {}),
   };
