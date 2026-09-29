@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:35:33.582Z",
+  "updated": "2026-09-29T06:35:46.224Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -566,6 +566,10 @@
     "cli-evict-restore.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T06:35:33.581Z"
+    },
+    "cli-evict-restore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:35:46.224Z"
     }
   }
 }
