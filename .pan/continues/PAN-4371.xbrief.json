@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:08:21.212Z",
+  "updated": "2026-09-29T11:27:48.980Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-09-29T11:08:16.442Z"
     },
     "eval-fixtures-metrics": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4371",
-      "claimedAt": "2026-09-29T11:08:21.211Z"
+      "claimedAt": "2026-09-29T11:08:21.211Z",
+      "doneAt": "2026-09-29T11:27:48.980Z"
     }
   }
 }
