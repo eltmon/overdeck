@@ -706,6 +706,14 @@ The first match wins. "Issue agent" means `kind: 'agent'`, an issue, and role `w
 | 13 | `idle` | idle — no known blocker | Idle | waiting |
 | 14 | otherwise | agent stopped | Idle | waiting |
 
+`deriveIssueState`'s fourth attention value, `work-not-started` (PAN-4399, a
+gave-up or stalled post-planning auto-start read from the workspace journal —
+see "Work agent not started" in `docs/PIPELINE-GATES.md`), never appears in
+this table: it is derived only when there is no live pane at all, so no row
+here can carry it. Command Deck's state badge (`featureStateBadge.ts`) and
+the Needs-you strip's "Start work" card (`NeedsYouStrip.tsx`) render it
+instead.
+
 Needs you sorts oldest wait first. Live sorts by start time so rows never reshuffle under the
 pointer as agents write output; Waiting and Idle sort most recent activity first. A subagent
 nests under its parent row (at most three lines, then `+N more`, each with its state glyph). A
