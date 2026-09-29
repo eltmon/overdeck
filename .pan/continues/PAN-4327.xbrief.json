@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T00:43:42.498Z",
+  "updated": "2026-09-29T00:46:06.790Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-29T00:43:38.038Z"
     },
     "sonnet-55-cost-normalization": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4327",
-      "claimedAt": "2026-09-29T00:43:42.498Z"
+      "claimedAt": "2026-09-29T00:43:42.498Z",
+      "doneAt": "2026-09-29T00:46:06.789Z"
     }
   }
 }
