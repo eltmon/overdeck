@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:15:18.402Z",
+  "updated": "2026-09-29T11:15:29.762Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -316,6 +316,10 @@
     "summary-prompts-extract.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:15:18.402Z"
+    },
+    "summary-prompts-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:15:29.762Z"
     }
   }
 }
