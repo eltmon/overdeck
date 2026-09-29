@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:28:33.794Z",
+  "updated": "2026-09-29T16:28:50.317Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "remote-request-gate.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:28:33.794Z"
+    },
+    "remote-request-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:28:50.317Z"
     }
   }
 }
