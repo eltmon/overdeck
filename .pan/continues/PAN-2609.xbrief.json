@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:35:09.009Z",
+  "updated": "2026-09-29T06:35:21.410Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -558,6 +558,10 @@
     "vault-evict-confirm.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T06:35:09.009Z"
+    },
+    "cli-evict-restore.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:35:21.410Z"
     }
   }
 }
