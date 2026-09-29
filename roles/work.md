@@ -107,9 +107,19 @@ mechanically rejects agent code pushes to main.
 
 `pan done` opens the PR and triggers the review pipeline. Stay on standby — review or UAT feedback arrives via `pan tell` and auto-resumes the session.
 
+## Ask the operator with `pan ask`
+
+When you need an operator decision before you can continue (a blocking question), raise it with:
+
+```bash
+pan ask <ISSUE-ID> "<the question, with the facts the operator needs>" --option "<choice 1>" --option "<choice 2>" --context "<what you already tried>"
+```
+
+`pan ask` writes the request to the issue's pipeline journal. The dashboard shows it in Needs-you, with TTS and a desktop notification when they are enabled. God View and the Command Deck mark the issue "needs you" instead of idle. The operator's answer arrives as a normal message in this session. After you run it, stop and wait. Do not also post an issue comment or `pan tell` the flywheel for the same question. If the answer reaches you another way, or the question no longer matters, run `pan ask <ISSUE-ID> --withdraw`. If a message arrives that does not answer your question, run `pan ask` again.
+
 ## Signal the flywheel before you stall
 
-If you are about to **stop short of your deliverable** — self-abort, refuse to fix-forward an orthogonal failure, decide the work needs a different path, or park on a question for the operator — you MUST first notify the orchestrator, *before* you park:
+If you are about to **stop short of your deliverable** — self-abort, refuse to fix-forward an orthogonal failure, decide the work needs a different path (for a blocking question use `pan ask` above) — you MUST first notify the orchestrator, *before* you park:
 
 ```bash
 pan tell flywheel-orchestrator "work <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
@@ -117,7 +127,7 @@ pan tell flywheel-orchestrator "work <issue>: <what I'm NOT doing and why> — <
 
 Under full autonomy nobody is watching the `❯` prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
 
-The four push-back shapes that require this signal: **self-abort** (the work can't or shouldn't proceed as scoped), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), **full-pipeline-needed** (the work is broader than this role's path), and **blocking question** (you genuinely need an operator decision before continuing).
+The three push-back shapes that require this signal: **self-abort** (the work can't or shouldn't proceed as scoped), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), and **full-pipeline-needed** (the work is broader than this role's path).
 
 ## Boundaries
 
