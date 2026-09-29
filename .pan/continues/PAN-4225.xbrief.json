@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4225",
   "created": "2026-09-29T02:27:12.817Z",
-  "updated": "2026-09-29T04:17:15.952Z",
+  "updated": "2026-09-29T04:28:53.924Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
       "claimedBy": "agent-pan-4225",
       "claimedAt": "2026-09-29T04:13:58.867Z",
       "doneAt": "2026-09-29T04:17:15.952Z"
+    },
+    "continue-adapters-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:28:53.923Z"
     }
   }
 }
