@@ -4,17 +4,17 @@
     "created": "2026-09-29T22:24:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3943: Toggleable Deft Directive compatibility profile and skill bundle",
-    "updated": "2026-09-29T22:31:03.547Z"
+    "updated": "2026-09-29T22:31:54.689Z"
   },
   "plan": {
     "id": "pan-3943",
     "title": "Toggleable Deft Directive compatibility profile and skill bundle",
-    "status": "proposed",
+    "status": "running",
     "uid": "54731952-1942-4559-87a3-1fc1698c3505",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T22:24:40Z",
-    "updated": "2026-09-29T22:31:03.547Z",
+    "updated": "2026-09-29T22:31:54.689Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3943",
@@ -982,5 +982,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
