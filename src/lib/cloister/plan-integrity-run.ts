@@ -203,7 +203,15 @@ export async function evaluatePlanIntegrityGate(
   workspacePath: string,
   roots: readonly PlanIntegrityRepoRoot[],
 ): Promise<PlanIntegrityEvaluation> {
-  const planHome = resolvePlanHome(workspacePath);
+  let planHome: string;
+  try {
+    planHome = resolvePlanHome(workspacePath);
+  } catch (error) {
+    // A misconfigured `pan_records.repo` is not the agent's spec edit, but the
+    // gate cannot vouch for the spec either: fail closed with the diagnostic.
+    const message = `plan-integrity: cannot resolve the plan home for ${workspacePath}: ${errorMessage(error)}`;
+    return { failed: true, evidence: message, error: message };
+  }
 
   let topLevel: string;
   try {

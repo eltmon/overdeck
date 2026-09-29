@@ -149,3 +149,4 @@
 1160 src/lib/agents/delivery.ts # PAN-4292
 1167 src/lib/tmux.ts # PAN-4292
 997 src/lib/overdeck/planning-promotion.ts # PAN-1728
+961 src/lib/cloister/verification-runner.ts # PAN-1728

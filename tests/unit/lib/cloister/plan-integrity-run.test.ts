@@ -9,9 +9,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { mockResolvePlanHome } = vi.hoisted(() => ({ mockResolvePlanHome: vi.fn((path: string) => path) }));
+
 vi.mock('../../../../src/lib/pan-dir/paths.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../src/lib/pan-dir/paths.js')>()),
-  resolvePlanHome: (path: string) => path,
+  resolvePlanHome: mockResolvePlanHome,
 }));
 
 import { evaluatePlanIntegrityGate, resolvePlanReference } from '../../../../src/lib/cloister/plan-integrity-run.js';
@@ -238,6 +240,16 @@ describe('evaluatePlanIntegrityGate (PAN-1728)', () => {
 
     expect(result.failed).toBe(false);
     expect(result.evidence).toContain('not a git work tree');
+  });
+
+  it('fails closed with the diagnostic when the plan home cannot be resolved', async () => {
+    mockResolvePlanHome.mockImplementationOnce(() => { throw new Error('pan_records.repo "infra" not found'); });
+
+    const result = await run();
+
+    expect(result.failed).toBe(true);
+    expect(result.error).toContain('cannot resolve the plan home');
+    expect(result.evidence).toContain('pan_records.repo "infra" not found');
   });
 
   it('fails closed with the git diagnostic when origin/<target> is missing', async () => {

@@ -91,6 +91,10 @@ vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
   runTestSkipGate: mockRunTestSkipGate,
 }));
 
+vi.mock('../../../../src/lib/cloister/plan-integrity-run.js', () => ({
+  evaluatePlanIntegrityGate: vi.fn(async () => ({ failed: false, evidence: '' })),
+}));
+
 vi.mock('../../../../src/lib/cloister/test-skip-waiver.js', () => ({
   resolveActiveTestSkipWaiver: vi.fn(() => null),
 }));
