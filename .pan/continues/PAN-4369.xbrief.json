@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4369",
   "created": "2026-09-29T04:37:53.207Z",
-  "updated": "2026-09-29T04:57:35.308Z",
+  "updated": "2026-09-29T05:11:02.720Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,7 +88,7 @@
     "jev-config-resolution": {
       "status": "in_progress",
       "claimedBy": "agent-pan-4369",
-      "claimedAt": "2026-09-29T04:57:35.308Z"
+      "claimedAt": "2026-09-29T05:11:02.720Z"
     }
   }
 }
