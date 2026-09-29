@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:51:45.369Z",
+  "updated": "2026-09-29T15:53:11.248Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,9 +208,10 @@
       "doneAt": "2026-09-29T15:51:27.761Z"
     },
     "docs-rotation": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4333",
-      "claimedAt": "2026-09-29T15:51:45.368Z"
+      "claimedAt": "2026-09-29T15:51:45.368Z",
+      "doneAt": "2026-09-29T15:53:11.248Z"
     }
   }
 }
