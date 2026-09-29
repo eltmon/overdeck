@@ -63,6 +63,8 @@ export function registerVaultCommands(program: Command): void {
     .option('--cwd <dir>', 'Working directory to resume in (default: the saved cwd)')
     .option('--no-launch', 'Print the launch command instead of running it')
     .option('--on-drift <choice>', 'When the cwd state differs from the saved state: continue | note | cancel')
+    .option('--no-code', 'Do not apply the saved code snapshot; only continue the conversation')
+    .option('--worktree <dir>', 'Apply the code snapshot into a new git worktree at <dir> instead of the target checkout')
     .action(lazyAction(() => import('./resume.js'), 'resumeCommand'));
 
   vault

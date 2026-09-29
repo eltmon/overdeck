@@ -23,7 +23,7 @@ import { readCwdState } from './cwd-state.js';
 import { decodeWipParts, VaultAuthenticationError, type SessionRecord, type WipSnapshotRef } from './format.js';
 import type { VaultSubkeys } from './identity.js';
 import type { VaultStore } from './store/types.js';
-import { latestWipEntry, runWipGit, WipGitError, type CapturedWip } from './wip-capture.js';
+import { buildWipCommit, latestWipEntry, runWipGit, WipGitError, type CapturedWip } from './wip-capture.js';
 
 export type { CapturedWip } from './wip-capture.js';
 
@@ -54,6 +54,26 @@ export interface ApplyWipInWorktreeOptions {
 /** The record's latest WIP entry (D-11): what resume applies or reports. */
 export function findLatestWip(record: SessionRecord): WipSnapshotRef | null {
   return latestWipEntry(record.settlements);
+}
+
+/**
+ * True when the checkout at `cwd` already holds exactly this snapshot: same
+ * base and the same working tree (minus ignored files). Resume then has
+ * nothing to apply, even when the checkout is dirty.
+ */
+export async function isWipPresent(cwd: string, wip: CapturedWip): Promise<boolean> {
+  let commit: Awaited<ReturnType<typeof buildWipCommit>>;
+  try {
+    commit = await buildWipCommit(cwd);
+  } catch {
+    return false;
+  }
+  if (commit === null) return false;
+  try {
+    return commit.base === wip.base && commit.tree === wip.tree;
+  } finally {
+    await commit.cleanup();
+  }
 }
 
 /** An apply step failed; `message` is the operator-facing reason. */
