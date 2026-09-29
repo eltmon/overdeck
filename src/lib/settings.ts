@@ -282,9 +282,12 @@ export function getClaudeModelFlag(modelId: ModelId | string): string {
     'claude-opus-4-8': 'opus',
     'claude-opus-4-7': 'opus',
     'claude-opus-4-6': 'opus',
-    'claude-sonnet-5': 'sonnet',
-    'claude-sonnet-4-6': 'sonnet',
-    'claude-sonnet-4-5': 'sonnet',
+    // Pass full Sonnet IDs: Claude Code 2.1.284 resolves the short `sonnet`
+    // alias to Sonnet 5.5, so the alias would launch a different model (PAN-4327).
+    'claude-sonnet-5-5': 'claude-sonnet-5-5',
+    'claude-sonnet-5': 'claude-sonnet-5',
+    'claude-sonnet-4-6': 'claude-sonnet-4-6',
+    'claude-sonnet-4-5': 'claude-sonnet-4-5',
     'claude-haiku-4-5': 'haiku',
   };
   // Unknown IDs (a newer release, a dated ID) pass through unchanged: the
