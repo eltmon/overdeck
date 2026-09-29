@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:47:50.653Z",
+  "updated": "2026-09-29T11:48:01.156Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "resolver-turn-end.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:47:50.653Z"
+    },
+    "resolver-turn-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:48:01.156Z"
     }
   }
 }
