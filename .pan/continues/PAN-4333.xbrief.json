@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:41:46.684Z",
+  "updated": "2026-09-29T15:42:02.078Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
       "claimedBy": "agent-pan-4333",
       "claimedAt": "2026-09-29T15:30:11.408Z",
       "doneAt": "2026-09-29T15:41:46.683Z"
+    },
+    "guarded-open-vault.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:42:02.077Z"
     }
   }
 }
