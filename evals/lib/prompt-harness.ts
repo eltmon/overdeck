@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { EffortLevel } from '@overdeck/contracts';
 import { resolveEvalModelConfig, type EvalModelConfig, type EvalProvider, type OpenAIVia } from './eval-model.js';
 import { evalCostUsd, usageFromAnthropic, type EvalUsage } from './eval-usage.js';
+import { callOpenAIResponses } from './openai-responses.js';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(moduleDir, '..', '..');
@@ -77,10 +78,7 @@ async function callAnthropic(config: EvalModelConfig, opts: RunPromptScenarioOpt
 export async function runPromptScenario(opts: RunPromptScenarioOptions): Promise<PromptScenarioResult> {
   const config = resolveEvalModelConfig(process.env, { maxTokens: opts.maxTokens });
   const startedAt = Date.now();
-  if (config.provider !== 'anthropic') {
-    throw new Error(`Eval provider "${config.provider}" is not wired yet`);
-  }
-  const result = await callAnthropic(config, opts);
+  const result = config.provider === 'openai' ? await callOpenAIResponses(config, opts, process.env) : await callAnthropic(config, opts);
   return {
     text: result.text,
     run: {

@@ -121,6 +121,29 @@ describe('evals/lib/prompt-harness', () => {
       expect(run.costBasis).toBe('api');
       expect(run.stopReason).toBe('end_turn');
     });
+
+    it('gpt-6-luna via cliproxy calls fetch, not the Anthropic client, and reports api-equivalent cost', async () => {
+      vi.stubEnv('OVERDECK_EVAL_MODEL', 'gpt-6-luna');
+      vi.stubEnv('OVERDECK_EVAL_OPENAI_VIA', 'cliproxy');
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          status: 'completed',
+          output: [{ type: 'message', content: [{ type: 'output_text', text: 'hi' }] }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }),
+      });
+
+      const { run } = await runPromptScenario({ system: 'sys', user: 'usr' });
+
+      expect(anthropicCtor).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(run.provider).toBe('openai');
+      expect(run.costBasis).toBe('api-equivalent');
+      expect(typeof run.costUsd).toBe('number');
+    });
   });
 
   describe('extractJsonArray', () => {
