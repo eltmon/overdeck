@@ -19,6 +19,8 @@ import type { AuthMode } from '../../../../src/lib/subscription-types.js';
 function deps(authMode: AuthMode | null = 'subscription', configText = ''): PresetPlanDeps {
   return {
     readConfigText: async () => configText,
+    hasCredentials: async () => authMode !== null,
+    resolveHarnessBinary: async (harness) => `/usr/bin/${harness}`,
     getAuthMode: async () => authMode ?? undefined,
     resolveCodexContext: async () => ({}),
   };
@@ -72,6 +74,27 @@ describe('planPresetApply', () => {
 
     const anthropic = await plan('anthropic', '', null);
     expect(anthropic.blocked?.reason).toMatch(/Sign in \(claude\)/);
+  });
+
+  it('does not ask for an auth mode when the provider has no credentials', async () => {
+    let asked = false;
+    const result = await planPresetApplyFromText(getPreset('openai')!, '', {
+      ...deps('api-key'),
+      hasCredentials: async () => false,
+      getAuthMode: async () => { asked = true; return 'api-key'; },
+    });
+    expect(result.blocked?.reason).toMatch(/^OpenAI has no credentials/);
+    expect(asked).toBe(false);
+    expect(result.rows.some((r) => r.status === 'change')).toBe(false);
+  });
+
+  it('blocks when the preset harness CLI is not installed', async () => {
+    const result = await planPresetApplyFromText(getPreset('openai')!, '', {
+      ...deps('subscription'),
+      resolveHarnessBinary: async () => null,
+    });
+    expect(result.blocked?.reason).toMatch(/codex harness CLI is not installed.*npm install -g @openai\/codex/);
+    expect(result.rows.some((r) => r.status === 'change')).toBe(false);
   });
 
   it('skips a role whose explicit harness the policy denies', async () => {

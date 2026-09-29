@@ -16,6 +16,7 @@ import { readFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { isNode, parseDocument, type Document } from 'yaml';
 import { getGlobalConfigPath } from '../config-yaml/load.js';
+import { CODEX_CLI_INSTALL_COMMAND } from '../codex/model-floors.js';
 import { canUseHarness, type HarnessPolicyContext } from '../harness-policy.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { AuthMode } from '../subscription-types.js';
@@ -51,6 +52,14 @@ export interface PresetPlan {
 
 export interface PresetPlanDeps {
   readConfigText(): Promise<string>;
+  /**
+   * Whether any credentials for the provider exist. This is a presence check:
+   * getAuthMode reports a *mode* and, for OpenAI, falls back to 'api-key'
+   * even when no key exists, so it cannot gate the plan.
+   */
+  hasCredentials(provider: ModelPreset['provider']): Promise<boolean>;
+  /** Path of the harness CLI, or null when it is not installed. */
+  resolveHarnessBinary(harness: RuntimeName): Promise<string | null>;
   getAuthMode(model: string): Promise<AuthMode | undefined>;
   resolveCodexContext(harness: RuntimeName, model: string, authMode: AuthMode | undefined): Promise<HarnessPolicyContext>;
 }
@@ -83,10 +92,35 @@ async function readGlobalConfigText(): Promise<string> {
   }
 }
 
-// runtime-command.js and codex/policy-context.js pull in the agent runtime;
-// load them only when a real plan is computed.
+/**
+ * Anthropic: a Claude sign-in or an Anthropic API key (the same check
+ * getProviderAuthMode makes). OpenAI: the facts Settings → Providers shows —
+ * a Codex sign-in, an OpenAI API key in the Codex auth file or environment —
+ * or an `api_keys.openai` / provider `api_key` that resolves to a value.
+ */
+async function providerHasCredentials(provider: ModelPreset['provider']): Promise<boolean> {
+  if (provider === 'anthropic') {
+    const { Effect } = await import('effect');
+    const { getClaudeAuthStatus } = await import('../claude-auth.js');
+    const status = await Effect.runPromise(getClaudeAuthStatus());
+    return status.loggedIn || status.hasAnthropicApiKey;
+  }
+  const { getOpenAIAuthStatus } = await import('../openai-auth.js');
+  const status = await getOpenAIAuthStatus();
+  if (status.loggedIn || status.hasOpenAIApiKey) return true;
+  const { loadConfigNoMigration } = await import('../config-yaml/load.js');
+  return Boolean((await loadConfigNoMigration()).config.apiKeys.openai);
+}
+
+// runtime-command.js, codex/policy-context.js and the auth modules pull in the
+// agent runtime; load them only when a real plan is computed.
 export const defaultPresetPlanDeps: PresetPlanDeps = {
   readConfigText: readGlobalConfigText,
+  hasCredentials: providerHasCredentials,
+  async resolveHarnessBinary(harness) {
+    const { resolveHarnessBinary } = await import('../harness-binary.js');
+    return resolveHarnessBinary(harness);
+  },
   async getAuthMode(model) {
     const { getProviderAuthMode } = await import('../agents/runtime-command.js');
     return getProviderAuthMode(model);
@@ -240,6 +274,25 @@ function providerDisplayName(provider: ModelPreset['provider']): string {
   return provider === 'anthropic' ? 'Anthropic' : 'OpenAI';
 }
 
+function noCredentialsReason(preset: ModelPreset): string {
+  const login = preset.provider === 'anthropic' ? 'claude' : 'codex login';
+  return `${providerDisplayName(preset.provider)} has no credentials. Sign in (${login}) or set an API key in Settings → Providers.`;
+}
+
+const HARNESS_INSTALL_HINTS: Partial<Record<RuntimeName, string>> = {
+  'claude-code': 'Install Claude Code (https://github.com/anthropics/claude-code).',
+  codex: `Install it with \`${CODEX_CLI_INSTALL_COMMAND}\`.`,
+};
+
+/** D8: the whole preset needs its provider's credentials and its harness CLI. */
+async function availabilityBlock(preset: ModelPreset, deps: PresetPlanDeps): Promise<{ reason: string } | undefined> {
+  if (!(await deps.hasCredentials(preset.provider))) return { reason: noCredentialsReason(preset) };
+  if ((await deps.resolveHarnessBinary(preset.harness)) === null) {
+    return { reason: `The ${preset.harness} harness CLI is not installed on this host. ${HARNESS_INSTALL_HINTS[preset.harness] ?? ''}`.trim() };
+  }
+  return undefined;
+}
+
 export async function planPresetApplyFromText(preset: ModelPreset, configText: string, deps: PresetPlanDeps): Promise<PresetPlan> {
   const doc = parseConfigDocument(configText);
   const notes: string[] = [];
@@ -248,13 +301,11 @@ export async function planPresetApplyFromText(preset: ModelPreset, configText: s
     draft.status ??= isDeepStrictEqual(draft.before, draft.after) ? 'same' : 'change';
   }
 
-  let blocked: { reason: string } | undefined;
+  let blocked = await availabilityBlock(preset, deps);
   const midModel = concreteModels(preset, 'workhorse:mid')[0]!;
-  const authMode = await deps.getAuthMode(midModel);
-  if (authMode === undefined) {
-    const login = preset.provider === 'anthropic' ? 'claude' : 'codex login';
-    blocked = { reason: `${providerDisplayName(preset.provider)} has no credentials. Sign in (${login}) or set an API key in Settings → Providers.` };
-  } else {
+  const authMode = blocked ? undefined : await deps.getAuthMode(midModel);
+  if (!blocked && authMode === undefined) blocked = { reason: noCredentialsReason(preset) };
+  if (!blocked) {
     const contexts = new Map<string, Promise<HarnessPolicyContext>>();
     const skipReasons = new Map<string, string>();
     for (const draft of drafts) {
@@ -303,6 +354,32 @@ export async function planPresetApplyFromText(preset: ModelPreset, configText: s
     notes,
     digest: digestRows(rows),
   };
+}
+
+const REDACTED = '[redacted]';
+
+function redactValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactValue);
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(Object.entries(value).map(([key, inner]) => [
+    key,
+    // A `$VAR` reference is not a secret; a literal key is.
+    key === 'api_key' && typeof inner === 'string' && !inner.startsWith('$') ? REDACTED : redactValue(inner),
+  ]));
+}
+
+/**
+ * Copy of the rows for display (route responses, CLI output, the Settings
+ * dialog), with literal `api_key` values masked. Only ever redact a copy:
+ * apply writes `row.after` from its own fresh, unredacted plan, and the
+ * digest is computed over the unredacted rows.
+ */
+export function redactPresetRows<T extends Pick<PresetPlanRow, 'before' | 'after'>>(rows: readonly T[]): T[] {
+  return rows.map((row) => ({ ...row, before: redactValue(row.before), after: redactValue(row.after) }));
+}
+
+export function redactPresetPlan(plan: PresetPlan): PresetPlan {
+  return { ...plan, rows: redactPresetRows(plan.rows) };
 }
 
 export async function planPresetApply(presetId: string, deps: PresetPlanDeps = defaultPresetPlanDeps): Promise<PresetPlan> {

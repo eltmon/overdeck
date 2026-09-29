@@ -78,6 +78,9 @@ its next autosave can write some of them back over the preset.
 - **Anything without credentials.** If the preset's provider has no credentials
   (no `claude` or `codex login` sign-in and no API key), the whole preset is
   blocked and nothing is written. The dialog and the CLI show the sign-in step.
+- **Anything without its harness.** If the preset's harness CLI (`claude` for
+  the Anthropic presets, `codex` for the OpenAI preset) is not installed, the
+  whole preset is blocked, with the install command.
 - **Anything the harness policy forbids.** Each change is checked against the
   harness that would run it. A role with an explicit harness that cannot run
   the preset's model (for example `roles.work.harness: kimi-code` with the

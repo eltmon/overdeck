@@ -41,7 +41,7 @@ keep their text. A preset never auto-applies, including when a newer preset vers
 - `list` shows each preset's version, evidence, what was last applied, and whether an update is available.
 - `show` prints the per-setting diff against your config (before → after), the settings the preset will not set and why, and notes.
 - `apply` prints the diff and asks to confirm. `--yes` skips the prompt; `--dry-run` writes nothing.
-  A plan blocked by missing credentials or a harness-policy check exits 1 and prints the reason.
+  A plan blocked by missing credentials, a missing harness CLI or a harness-policy check exits 1 and prints the reason.
 - `undo` restores the values the last apply replaced. A setting changed since the apply is left as is.
 
 `--json` on `show` and `apply --dry-run` prints the same plan object that the dashboard's

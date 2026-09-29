@@ -73,6 +73,8 @@ afterEach(() => {
 function deps(authMode: AuthMode | null = 'subscription'): PresetApplyDeps {
   return {
     ...configFileDeps(configPath),
+    hasCredentials: async () => authMode !== null,
+    resolveHarnessBinary: async (harness) => `/usr/bin/${harness}`,
     getAuthMode: async () => authMode ?? undefined,
     resolveCodexContext: async () => ({}),
   };
@@ -124,6 +126,17 @@ describe('applyPreset', () => {
     // A second plan against the written file has nothing left to change.
     const again = await planPresetApply('anthropic', deps());
     expect(again.rows.filter((row) => row.status === 'change')).toEqual([]);
+  });
+
+  it('keeps the file\'s flow-collection style on untouched lines', async () => {
+    const original = `${FIXTURE}custom_list: [a, b]\nnested:\n  pairs: {x: 1}\n`;
+    writeFileSync(configPath, original);
+    await applyFresh('anthropic');
+    const text = readConfig();
+    expect(text).toContain('custom_list: [a, b]\n');
+    expect(text).toContain('  pairs: {x: 1}\n');
+    await undoLastPresetApply(deps());
+    expect(readConfig()).toBe(original);
   });
 
   it('undo restores the previous values exactly', async () => {
