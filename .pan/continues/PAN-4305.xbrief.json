@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4305",
   "created": "2026-09-29T00:33:19.689Z",
-  "updated": "2026-09-29T00:47:08.707Z",
+  "updated": "2026-09-29T00:47:55.544Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-29T00:47:03.874Z"
     },
     "docs-delivery-landing": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4305",
-      "claimedAt": "2026-09-29T00:47:08.707Z"
+      "claimedAt": "2026-09-29T00:47:08.707Z",
+      "doneAt": "2026-09-29T00:47:55.544Z"
     }
   }
 }
