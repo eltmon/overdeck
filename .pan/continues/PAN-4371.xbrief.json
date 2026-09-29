@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:48:22.237Z",
+  "updated": "2026-09-29T11:48:32.849Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,10 @@
     "sweeper-evidence.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:48:22.237Z"
+    },
+    "sweeper-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:48:32.849Z"
     }
   }
 }
