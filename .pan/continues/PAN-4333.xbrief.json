@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:08:50.221Z",
+  "updated": "2026-09-29T15:09:25.675Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "keyring-format.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T15:08:50.221Z"
+    },
+    "keyring-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4333",
+      "claimedAt": "2026-09-29T15:09:25.675Z"
     }
   }
 }
