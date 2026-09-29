@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4343",
   "created": "2026-09-29T04:18:07.024Z",
-  "updated": "2026-09-29T04:42:51.067Z",
+  "updated": "2026-09-29T05:04:04.102Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,10 @@
       "claimedBy": "agent-pan-4343",
       "claimedAt": "2026-09-29T04:38:20.243Z",
       "doneAt": "2026-09-29T04:42:51.067Z"
+    },
+    "gh-shim-grant-deny.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:04:04.102Z"
     }
   }
 }
