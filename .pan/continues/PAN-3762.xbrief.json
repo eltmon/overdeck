@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:19:04.356Z",
+  "updated": "2026-09-29T16:19:18.787Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "env-contract.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T16:19:04.356Z"
+    },
+    "env-descriptor-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:19:18.787Z"
     }
   }
 }
