@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T23:27:26.473Z",
+  "updated": "2026-09-29T23:38:38.175Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
       "claimedBy": "agent-pan-3943",
       "claimedAt": "2026-09-29T23:24:42.288Z",
       "doneAt": "2026-09-29T23:27:26.473Z"
+    },
+    "deft-skill-map.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:38:38.175Z"
     }
   }
 }
