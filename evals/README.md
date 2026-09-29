@@ -159,6 +159,11 @@ Estimates price every case's real prompt (system + user, about 4 characters per 
 | `claude-haiku-4-5` | ≈ $0.97 | ≈ $1.11 | ≈ $0.28 | ≈ $0.11 |
 | `gpt-6-luna` | ≈ $0.10 | ≈ $0.11 | ≈ $0.03 | ≈ $0.01 |
 
+Measured values (replace an estimate when a model is measured; the full table is on [PAN-4362](https://github.com/eltmon/overdeck/issues/4362#issuecomment-5888916557)):
+
+- `gpt-6-luna` (via `cliproxy`, effort `high`, 2026-09-29), cost basis `api-equivalent`: review-recall — 20 cases, 177,968 input / 28,834 output tokens, $0.0315, mean score 0.100 (2 of 20 blockers found). plan-quality — 8 cases, 151,435 / 48,161 tokens, $0.0392, mean 0.444 (7 of 8 schema-valid, none lint-clean). summary-faithfulness — 10 cases, 34,125 / 8,477 tokens, $0.0053, mean 0.719. feedback-acceptance — 6 cases, 16,793 / 3,212 tokens, $0.0022, mean 1.000. All four suites: 380,321 input / 88,684 output tokens, $0.078.
+- `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-4-5` (need `ANTHROPIC_API_KEY`) and `gpt-6-sol` (needs `OPENAI_API_KEY`): pending an operator run with the commands above.
+
 ### Fixture rules
 
 - Fixtures load through [`evals/lib/fixtures.ts`](./lib/fixtures.ts), which rejects any fixture containing a credential-shaped string. Tests never call `readFile` themselves; they use `loadFixtureDir` and `readRepoText`.
