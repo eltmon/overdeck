@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:07:12.499Z",
+  "updated": "2026-09-29T15:07:43.945Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,10 @@
     "store-cas-refs.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T15:06:42.065Z"
+    },
+    "keyring-format.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:07:43.944Z"
     }
   }
 }
