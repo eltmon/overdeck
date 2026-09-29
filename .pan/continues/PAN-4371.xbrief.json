@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:49:37.669Z",
+  "updated": "2026-09-29T11:49:48.602Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,10 @@
     "bare-turn-end.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T11:49:37.669Z"
+    },
+    "bare-turn-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:49:48.602Z"
     }
   }
 }
