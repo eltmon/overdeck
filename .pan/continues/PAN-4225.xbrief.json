@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4225",
   "created": "2026-09-29T02:27:12.817Z",
-  "updated": "2026-09-29T04:38:25.981Z",
+  "updated": "2026-09-29T04:38:39.557Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,10 @@
     "continue-readers-plan-home.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T04:38:25.981Z"
+    },
+    "continue-readers-plan-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:38:39.556Z"
     }
   }
 }
