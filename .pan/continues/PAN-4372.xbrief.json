@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4372",
   "created": "2026-09-29T09:44:00.403Z",
-  "updated": "2026-09-29T10:25:50.444Z",
+  "updated": "2026-09-29T10:44:13.216Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -87,6 +87,10 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-4372",
       "claimedAt": "2026-09-29T10:25:50.443Z"
+    },
+    "ac-eval-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:44:13.216Z"
     }
   }
 }
