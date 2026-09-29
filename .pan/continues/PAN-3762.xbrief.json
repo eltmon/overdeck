@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T14:16:30.657Z",
+  "updated": "2026-09-29T14:16:42.973Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-3762",
       "claimedAt": "2026-09-29T14:15:38.137Z",
       "doneAt": "2026-09-29T14:16:30.657Z"
+    },
+    "env-descriptor-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T14:16:42.973Z"
     }
   }
 }
