@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T00:40:58.347Z",
+  "updated": "2026-09-29T00:41:08.919Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4327",
       "claimedAt": "2026-09-29T00:38:41.677Z",
       "doneAt": "2026-09-29T00:40:58.347Z"
+    },
+    "sonnet-55-cost-pricing": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:41:08.919Z"
     }
   }
 }
