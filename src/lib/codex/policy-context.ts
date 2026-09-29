@@ -1,13 +1,10 @@
 import { configuredHarnessBinaryPath, resolveHarnessBinary } from '../harness-binary.js';
+import type { HarnessPolicyContext } from '../harness-policy.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import { codexModelMinimumVersion, readCodexCliVersion } from './app-server-manager.js';
 
-/** Host facts the pure harness policy cannot read itself (PAN-4363). */
-export interface HarnessPolicyContext {
-  /** Installed Codex CLI version; set only when a codex floor could apply. */
-  codexCliVersion?: string;
-}
+export type { HarnessPolicyContext } from '../harness-policy.js';
 
 export interface CodexPolicyContextDeps {
   resolveBinary?: () => Promise<string | null>;

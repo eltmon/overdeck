@@ -33,7 +33,6 @@
  */
 
 import { CODEX_CLI_INSTALL_COMMAND, codexModelMinimumVersion, compareVersions } from './codex/app-server-manager.js'
-import type { HarnessPolicyContext } from './codex/policy-context.js'
 import type { RuntimeName } from './runtimes/types.js'
 import type { AuthMode } from './subscription-types.js'
 import { getProviderForModel } from './providers.js'
@@ -41,6 +40,18 @@ import { getProviderForModel } from './providers.js'
 export type HarnessPolicyDecision = {
   allowed: boolean
   reason?: string
+}
+
+/**
+ * Host facts the pure harness policy cannot read itself (PAN-4363). Defined
+ * here (not in ./codex/policy-context.js, which resolves it) so canUseHarness
+ * needs no import from that module — resolving it does I/O through
+ * harness-binary.js/config-yaml.js, which would otherwise close a cycle back
+ * through agents/tier-table.js's own import of canUseHarness.
+ */
+export interface HarnessPolicyContext {
+  /** Installed Codex CLI version; set only when a codex floor could apply. */
+  codexCliVersion?: string
 }
 
 const ALLOWED: HarnessPolicyDecision = { allowed: true }
