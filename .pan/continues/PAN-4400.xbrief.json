@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4400",
   "created": "2026-09-29T14:25:17.551Z",
-  "updated": "2026-09-29T15:46:06.668Z",
+  "updated": "2026-09-29T15:46:21.486Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "preset-data.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T15:46:06.667Z"
+    },
+    "preset-data.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:46:21.486Z"
     }
   }
 }
