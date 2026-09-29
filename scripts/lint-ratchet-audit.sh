@@ -213,7 +213,9 @@ NODE
 
 commit_has_issue_ref() {
   local commit="$1"
-  git log -1 --format=%B "$commit" | grep -Eq "$ISSUE_REF_RE"
+  # No pipe: grep -q exits on the first match, and under pipefail a large
+  # body makes git log die of SIGPIPE (141), failing a message that matched.
+  grep -Eq "$ISSUE_REF_RE" <<< "$(git log -1 --format=%B "$commit")"
 }
 
 audit_commit() {
