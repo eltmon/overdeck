@@ -14,6 +14,7 @@ import {
   readSkillFrontmatter,
   type PackCapabilities,
 } from '../adapters.js';
+import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
 
 const roots: string[] = [];
 
@@ -156,21 +157,48 @@ describe('plain adapter', () => {
     const manifest = await readPackManifest(root, 'plain');
     expect(manifest.skills.map((skill) => [skill.name, skill.description])).toEqual([['dup', 'First.']]);
   });
+
+  it('scans skillsRoot instead of skills/ when given', async () => {
+    const root = fixture({
+      'extensions/skills/sageox/SKILL.md': skillMd('sageox', 'Team context.'),
+      'extensions/skills/ox-cli-init/SKILL.md': skillMd('ox-cli-init', 'Init.'),
+      'skills/ignored/SKILL.md': skillMd('ignored', 'Not under the root.'),
+    });
+    const manifest = await readPackManifest(root, 'plain', { skillsRoot: 'extensions/skills', optIn: ['ox-cli-init'] });
+    expect(manifest.skills.map((skill) => [skill.name, skill.dir, skill.optIn])).toEqual([
+      ['ox-cli-init', 'extensions/skills/ox-cli-init', true],
+      ['sageox', 'extensions/skills/sageox', false],
+    ]);
+  });
 });
 
 describe('KNOWN_PACKS', () => {
   it('marks mattpocock as a claude-plugin pack with its opt-in skill', () => {
     expect(KNOWN_PACKS['mattpocock']).toMatchObject({
-      kind: 'pack',
       adapter: 'claude-plugin',
       optIn: ['setup-matt-pocock-skills'],
     });
   });
 
-  it('marks sageox as an integration pointing to issue 2444', () => {
-    const sageox = KNOWN_PACKS['sageox'];
-    expect(sageox?.kind).toBe('integration');
-    expect(sageox?.note).toContain('issues/2444');
+  it('marks sageox as a plain pack from the fork with repo-writing skills opt-in', () => {
+    expect(KNOWN_PACKS['sageox']).toEqual({
+      id: 'sageox',
+      url: 'https://github.com/eltmon/ox',
+      adapter: 'plain',
+      skillsRoot: 'extensions/skills',
+      optIn: [
+        'ox-cli-init',
+        'ox-cli-attest',
+        'ox-cli-skill-manager',
+        'ox-cli-pr-header',
+        'ox-cli-plan',
+        'ox-cli-cart',
+        'ox-cli-cart-start',
+        'ox-cli-cart-done',
+        'ox-cli-cart-drop',
+      ],
+      disclosure: SAGEOX_DISCLOSURE,
+    });
   });
 });
 

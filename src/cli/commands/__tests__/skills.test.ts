@@ -340,10 +340,13 @@ describe('pan skills pack', () => {
     expect(logs.join('\n')).toContain('Turn it on with: pan skills set --pack mattpocock on');
   });
 
-  it('refuses sageox with the integration note', async () => {
-    mocks.addPack.mockRejectedValue(new mocks.PackSourceError('integration', 'SageOx is an integration, not a skill pack; see https://github.com/eltmon/overdeck/issues/2444'));
-    await expect(run('pack', 'add', 'sageox', 'https://github.com/sageox/ox', '--ref', 'main', '--yes')).rejects.toThrow('exit 1');
-    expect(errors.join('\n')).toContain('issues/2444');
+  it('adds sageox like any pack', async () => {
+    await run('pack', 'add', 'sageox', 'https://github.com/eltmon/ox', '--ref', 'overdeck/host-managed', '--yes');
+    expect(mocks.addPack).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'sageox', url: 'https://github.com/eltmon/ox', ref: 'overdeck/host-managed' }),
+      expect.any(Function),
+    );
+    expect(mocks.writePackEntry).toHaveBeenCalledOnce();
   });
 
   it('rejects an unknown adapter before any work', async () => {
