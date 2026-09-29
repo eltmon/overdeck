@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { loadFixtureDir } from '../../../../evals/lib/fixtures.js';
 import {
   findingMatchesBlocker,
   parseFindings,
@@ -144,6 +145,35 @@ describe('evals/lib/review-recall-scorer', () => {
     it('rejects a diff over 60,000 chars and a security lane', () => {
       expect(() => parseReviewRecallCase(reviewCase({ diff: 'x'.repeat(60_001) }))).toThrow(/over 60000/);
       expect(() => parseReviewRecallCase({ ...reviewCase(), lane: 'security' })).toThrow(/lane must be one of/);
+    });
+  });
+
+  describe('committed fixtures', () => {
+    const cases = loadFixtureDir('evals/fixtures/review-recall').map((f) => parseReviewRecallCase(f.data));
+
+    it('holds 12 to 20 cases, none in the security lane, with at least 2 per scored lane', () => {
+      expect(cases.length).toBeGreaterThanOrEqual(12);
+      expect(cases.length).toBeLessThanOrEqual(20);
+      for (const lane of ['correctness', 'performance', 'requirements'] as const) {
+        expect(cases.filter((c) => c.lane === lane).length).toBeGreaterThanOrEqual(2);
+      }
+    });
+
+    it('records provenance pointing at an eltmon/overdeck pull request comment', () => {
+      for (const c of cases) {
+        expect(c.id.startsWith(`${c.provenance.pr}-`)).toBe(true);
+        expect(c.provenance.commentUrl).toMatch(new RegExp(`^https://github\\.com/eltmon/overdeck/pull/${c.provenance.pr}#issuecomment-\\d+$`));
+        expect(c.provenance.reviewedSha).toMatch(/^[0-9a-f]{40}$/);
+        expect(c.provenance.mergeBase).toMatch(/^[0-9a-f]{40}$/);
+        expect(c.diff).toContain(`diff --git a/${c.blocker.file} `);
+      }
+    });
+
+    it('scores recall 1 for each case when its own blocker is reported as a canonical heading', () => {
+      for (const c of cases) {
+        const report = `## Findings\n\n### ! ${c.blocker.title} — \`${c.blocker.file}:${c.blocker.lines[0]}\`\n`;
+        expect(scoreReviewRecall(report, c).recall, c.id).toBe(1);
+      }
     });
   });
 });
