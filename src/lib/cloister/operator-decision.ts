@@ -20,7 +20,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { getAgentState } from '../agents/agent-state.js';
+import { getAgentState } from '../agents/agent-state-read.js';
 import {
   appendPipelineEntry,
   readPipelineJournal,

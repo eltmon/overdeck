@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 
 const getAgentStateMock = vi.fn();
-vi.mock('../../agents/agent-state.js', () => ({
+vi.mock('../../agents/agent-state-read.js', () => ({
   getAgentState: (id: string) => getAgentStateMock(id),
 }));
 
