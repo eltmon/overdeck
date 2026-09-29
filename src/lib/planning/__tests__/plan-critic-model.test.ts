@@ -55,6 +55,15 @@ describe('resolvePlanCritic', () => {
     expect(resolveHarnessImpl).toHaveBeenCalledWith('gpt-5.6-sol');
   });
 
+  it('accepts the gpt-5.5 alias as a gpt-family critic', async () => {
+    const result = await resolvePlanCritic({
+      plannerModel: 'claude-opus-4-8',
+      config: { roles: { plan: { model: 'workhorse:expensive', sub: { critic: { model: 'gpt-5.5' } } } }, workhorses },
+      resolveHarnessImpl: vi.fn().mockResolvedValue('codex'),
+    });
+    expect(result).toMatchObject({ ok: true, family: 'gpt', plannerFamily: 'claude', harness: 'codex' });
+  });
+
   it('dereferences a workhorse ref', async () => {
     const result = await resolvePlanCritic({
       plannerModel: 'claude-opus-4-8',
