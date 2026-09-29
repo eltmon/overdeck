@@ -4,17 +4,17 @@
     "created": "2026-09-29T01:54:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1728: bug(work): PAN-1700 agent committed .pan/specs/*.vbrief.json mutations — PAN-1124 immutability violated on feature branch",
-    "updated": "2026-09-29T01:58:01.295Z"
+    "updated": "2026-09-29T01:58:37.368Z"
   },
   "plan": {
     "id": "pan-1728",
     "title": "bug(work): PAN-1700 agent committed .pan/specs/*.vbrief.json mutations — PAN-1124 immutability violated on feature branch",
-    "status": "proposed",
+    "status": "running",
     "uid": "864cb482-420e-426d-9505-ad8e22e0ca92",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T01:54:40Z",
-    "updated": "2026-09-29T01:58:01.295Z",
+    "updated": "2026-09-29T01:58:37.368Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1728",
