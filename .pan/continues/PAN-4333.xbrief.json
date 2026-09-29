@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:43:03.189Z",
+  "updated": "2026-09-29T15:46:40.645Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,9 +146,10 @@
       "doneAt": "2026-09-29T15:42:46.048Z"
     },
     "cli-rotate-key": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4333",
-      "claimedAt": "2026-09-29T15:43:03.188Z"
+      "claimedAt": "2026-09-29T15:43:03.188Z",
+      "doneAt": "2026-09-29T15:46:40.644Z"
     }
   }
 }
