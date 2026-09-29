@@ -68,6 +68,8 @@ For every item:
 
 Never batch multiple tasks into a single commit. Each commit's `Item:` trailer is how `pan task done` finds its evidence, and a one-item diff is what makes review and rollback tractable.
 
+Never edit `.pan/specs/` and never write a `Plan-Finalized` trailer. The spec is immutable after planning; completion goes to the continue file through `pan task done`. The verification gate's required `plan-integrity` check fails any change to the spec beyond its lifecycle status fields. If the plan is wrong, stop and ask for re-planning.
+
 ## Foreman gated-command protocol
 
 Use this protocol when the xBRIEF is swarm-eligible. The parent Work agent stays resident and owns judgment; canonical `pan swarm` commands own every state change.

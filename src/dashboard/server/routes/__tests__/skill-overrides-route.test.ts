@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   listSkillStates: vi.fn(),
   setSkillOverride: vi.fn(),
   listLowerLevelOverrides: vi.fn(),
+  listLowerLevelPackOverrides: vi.fn(),
 }));
 
 vi.mock('../../../../lib/skill-overrides/store.js', async importOriginal => ({
@@ -17,6 +18,7 @@ vi.mock('../../../../lib/skill-overrides/store.js', async importOriginal => ({
   listSkillStates: mocks.listSkillStates,
   setSkillOverride: mocks.setSkillOverride,
   listLowerLevelOverrides: mocks.listLowerLevelOverrides,
+  listLowerLevelPackOverrides: mocks.listLowerLevelPackOverrides,
 }));
 
 import { SkillOverrideError } from '../../../../lib/skill-overrides/store.js';
@@ -49,6 +51,7 @@ beforeEach(() => {
     project: ctx.projectKey ?? (ctx.issueId ? 'tst' : null), issue: ctx.issueId ?? null, skills: [grilling],
   }));
   mocks.listLowerLevelOverrides.mockResolvedValue({ grilling: { projects: ['tst'], issues: ['TST-1'] } });
+  mocks.listLowerLevelPackOverrides.mockResolvedValue({ mattpocock: { projects: ['tst'], issues: [] } });
   mocks.setSkillOverride.mockResolvedValue({ committed: true, sha: 'abc', pushed: true });
 });
 
@@ -64,6 +67,19 @@ describe('GET /api/skills/overrides', () => {
     const result = await request('/api/skills/overrides');
     expect(result.status).toBe(200);
     expect(result.body.overriddenBelow).toEqual({ grilling: { projects: ['tst'], issues: ['TST-1'] } });
+  });
+
+  it('returns packs and the pack toggles below global (PAN-4334)', async () => {
+    mocks.listSkillStates.mockResolvedValue({ project: null, issue: null, skills: [grilling], packs: [{ id: 'mattpocock' }] });
+    const result = await request('/api/skills/overrides');
+    expect(result.body.packs).toEqual([{ id: 'mattpocock' }]);
+    expect(result.body.packOverriddenBelow).toEqual({ mattpocock: { projects: ['tst'], issues: [] } });
+    expect(mocks.listSkillStates).toHaveBeenCalledWith({ projectKey: undefined, issueId: undefined });
+  });
+
+  it('forwards checkUpdates=1 to the store', async () => {
+    await request('/api/skills/overrides?checkUpdates=1');
+    expect(mocks.listSkillStates).toHaveBeenCalledWith({ projectKey: undefined, issueId: undefined }, { checkUpdates: true });
   });
 
   it('maps an issue with no project to 404', async () => {
@@ -94,6 +110,22 @@ describe('PUT /api/skills/overrides', () => {
     mocks.setSkillOverride.mockRejectedValue(new SkillOverrideError(code, `failed: ${code}`));
     const result = await put({ level: 'global', skill: 'grilling', enabled: false });
     expect(result).toEqual({ status, body: { error: `failed: ${code}`, code } });
+  });
+
+  it('writes a pack toggle and returns the refreshed packs (PAN-4334)', async () => {
+    const pack = { id: 'mattpocock', project: false, enabled: false, source: 'project', skills: [] };
+    mocks.listSkillStates.mockResolvedValue({ project: 'tst', issue: null, skills: [grilling], packs: [pack] });
+    const result = await put({ level: 'project', projectKey: 'tst', pack: 'mattpocock', enabled: false });
+    expect(mocks.setSkillOverride).toHaveBeenCalledWith({ level: 'project', projectKey: 'tst', pack: 'mattpocock', enabled: false });
+    expect(mocks.listSkillStates).toHaveBeenCalledWith({ projectKey: 'tst', issueId: undefined });
+    expect(result.status).toBe(200);
+    expect(result.body.packs).toEqual([pack]);
+  });
+
+  it('maps an unknown pack to 404', async () => {
+    mocks.setSkillOverride.mockRejectedValue(new SkillOverrideError('unknown-pack', 'unknown pack: nope'));
+    const result = await put({ level: 'global', pack: 'nope', enabled: true });
+    expect(result).toEqual({ status: 404, body: { error: 'unknown pack: nope', code: 'unknown-pack' } });
   });
 
   it('rejects a malformed body with 400 before writing', async () => {

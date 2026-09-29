@@ -119,7 +119,7 @@ Thinking blocks are handled differently depending on fork mode:
 | Property | Preserved? | Notes |
 |----------|-----------|-------|
 | Issue ID | Yes | New conversation is linked to the same issue |
-| Working directory (`cwd`) | Yes | Defaults to source conversation's cwd |
+| Working directory (`cwd`) | Yes | Defaults to source conversation's cwd. An explicit `cwd` that is a project's primary checkout is refused unless an operator passes `--allow-primary`. |
 | Effort level | Yes | Inherited from source |
 | Model | Configurable | Defaults to source model, overrideable at fork time |
 | Message history | Mode-dependent | Summary fork: distilled; Plain fork: copied raw |

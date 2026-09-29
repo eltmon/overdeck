@@ -274,5 +274,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   in landed and queued records (closer carries the id). Any filter that drops
   user text starting with `<` (`isSystemInjection`, `summary-fork.ts`) hides
   the operator's own message; unwrap through `src/lib/pasted-content.ts` first.
+- **The spec is immutable after planning** (PAN-1728) — the required
+  `plan-integrity` verification check (`cloister/plan-integrity-run.ts`) fails
+  any change to `.pan/specs/<…>-<ISSUE>-*.xbrief.json` beyond five lifecycle
+  fields: top-level `status`, `plan.status`, `plan.updated`, `plan.sequence`,
+  `xBRIEFInfo.updated`. A new spec writer that touches anything else must make
+  a finalize commit with a valid `Plan-Finalized: <sha256>` trailer
+  (`xbrief/plan-finalized.ts`) or every open branch fails verification. For a
+  polyrepo `pan_records.repo` project, finalize makes that commit in the nested
+  plan-home repo, not the wrapper.
 
 <!-- last-verified: 2026-09-29 -->

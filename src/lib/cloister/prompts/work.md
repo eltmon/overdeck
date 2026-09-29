@@ -238,7 +238,8 @@ completion — one item per commit keeps that trailer unambiguous.
 
 **Workflow for EVERY item:**
 1. `pan task next {{ISSUE_ID}}` — find the next unblocked item for this issue
-2. `pan task claim {{ISSUE_ID}} <item-id>` — claim it
+2. `pan task claim {{ISSUE_ID}} <item-id>` — claim it.
+   If the claim is refused, run `pan task next` and pick another item — never pass `--steal` for a worker.
 3. Implement only that item's work
 4. `git add` specific files and `git commit` — one item = one commit, with the body line
    `Item: <item-id>`. Before committing, check `git status`: every staged file must be required

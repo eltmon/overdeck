@@ -21,6 +21,9 @@ function makeHookFixture(): { root: string; hook: string } {
   writeFileSync(join(root, 'scripts', 'guard-hook-bundle-freshness.sh'), '#!/usr/bin/env bash\nexit 0\n', {
     mode: 0o755,
   });
+  writeFileSync(join(root, 'scripts', 'guard-allowlist-raise.sh'), '#!/usr/bin/env bash\nexit 0\n', {
+    mode: 0o755,
+  });
   return { root, hook };
 }
 
@@ -101,6 +104,27 @@ describe('.husky/pre-push', () => {
     expect(result.ok).toBe(true);
     expect(readFileSync(join(root, 'ratchet-args.txt'), 'utf-8').trim()).toBe(
       `--range ${mainSha}..${localSha}`,
+    );
+  });
+
+  it('runs the allowlist raise guard with the push range and the remote tip', () => {
+    const { root, hook } = makeHookFixture();
+    writeFileSync(join(root, 'scripts', 'guard-agent-main-push.sh'), '#!/usr/bin/env bash\nexit 0\n', {
+      mode: 0o755,
+    });
+    writeFileSync(
+      join(root, 'scripts', 'guard-allowlist-raise.sh'),
+      '#!/usr/bin/env bash\necho "$*" > raise-args.txt\nexit 0\n',
+      { mode: 0o755 },
+    );
+
+    const localSha = '1111111111111111111111111111111111111111';
+    const remoteSha = '2222222222222222222222222222222222222222';
+    const result = runHook(root, hook, `HEAD ${localSha} refs/heads/main ${remoteSha}\n`);
+
+    expect(result.ok).toBe(true);
+    expect(readFileSync(join(root, 'raise-args.txt'), 'utf-8').trim()).toBe(
+      `--range ${remoteSha}..${localSha} --prior ${remoteSha}`,
     );
   });
 

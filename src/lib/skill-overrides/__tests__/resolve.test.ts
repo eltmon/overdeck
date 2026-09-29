@@ -3,7 +3,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listSkillCatalog, parseSkillDescription } from '../catalog.js';
-import { CORE_SKILLS, disabledSkillNames, isCoreSkill, resolveSkillStates } from '../resolve.js';
+import {
+  CORE_SKILLS,
+  disabledSkillNames,
+  isCoreSkill,
+  isPackSkillId,
+  resolvePackSkill,
+  resolvePackToggle,
+  resolveSkillStates,
+} from '../resolve.js';
 
 const catalog = [
   { name: 'grilling', description: 'Grill the plan' },
@@ -130,5 +138,69 @@ describe('parseSkillDescription', () => {
   it('returns empty for missing frontmatter or description', () => {
     expect(parseSkillDescription('# no frontmatter')).toBe('');
     expect(parseSkillDescription('---\nname: x\n---\n')).toBe('');
+  });
+});
+
+describe('resolvePackSkill (PAN-4334 §4.3)', () => {
+  it('lets a project per-skill off beat a global pack on', () => {
+    const layers = { global: {}, project: { 'mattpocock/tdd': false }, packs: { global: { mattpocock: true } } };
+    expect(resolvePackSkill('mattpocock/tdd', false, layers)).toEqual({ enabled: false, source: 'project' });
+    expect(resolvePackSkill('mattpocock/grilling', false, layers)).toEqual({ enabled: true, source: 'global-pack' });
+  });
+
+  it('lets an issue pack off turn every skill off', () => {
+    const layers = { global: {}, packs: { global: { mattpocock: true }, issue: { mattpocock: false } } };
+    expect(resolvePackSkill('mattpocock/tdd', false, layers)).toEqual({ enabled: false, source: 'issue-pack' });
+  });
+
+  it('decides at the issue pack toggle before a project per-skill on', () => {
+    const layers = { global: {}, project: { 'mattpocock/grilling': true }, packs: { issue: { mattpocock: false } } };
+    expect(resolvePackSkill('mattpocock/grilling', false, layers)).toEqual({ enabled: false, source: 'issue-pack' });
+  });
+
+  it('turns on a single skill at global without the pack', () => {
+    const layers = { global: { 'mattpocock/grilling': true } };
+    expect(resolvePackSkill('mattpocock/grilling', false, layers)).toEqual({ enabled: true, source: 'global' });
+    expect(resolvePackSkill('mattpocock/tdd', false, layers)).toEqual({ enabled: false, source: 'default' });
+  });
+
+  it('keeps an opt-in skill off when only the pack is on', () => {
+    const layers = { global: {}, packs: { global: { mattpocock: true } } };
+    expect(resolvePackSkill('mattpocock/setup-matt-pocock-skills', true, layers)).toEqual({ enabled: false, source: 'default' });
+  });
+
+  it('turns an opt-in skill on through its own global value', () => {
+    const layers = { global: { 'mattpocock/setup-matt-pocock-skills': true }, packs: { global: { mattpocock: false } } };
+    expect(resolvePackSkill('mattpocock/setup-matt-pocock-skills', true, layers)).toEqual({ enabled: true, source: 'global' });
+  });
+
+  it('skips only the skipped level per-skill value', () => {
+    const layers = {
+      global: { 'mattpocock/tdd': true },
+      project: { 'mattpocock/tdd': false },
+      issue: { 'mattpocock/tdd': true },
+    };
+    expect(resolvePackSkill('mattpocock/tdd', false, layers, 'issue')).toEqual({ enabled: false, source: 'project' });
+    expect(resolvePackSkill('mattpocock/tdd', false, { global: { 'mattpocock/tdd': true }, issue: { 'mattpocock/tdd': false } }, 'issue'))
+      .toEqual({ enabled: true, source: 'global' });
+    const withToggle = { global: {}, issue: { 'mattpocock/tdd': true }, packs: { issue: { mattpocock: false } } };
+    expect(resolvePackSkill('mattpocock/tdd', false, withToggle, 'issue')).toEqual({ enabled: false, source: 'issue-pack' });
+  });
+});
+
+describe('resolvePackToggle', () => {
+  it('returns the narrowest defined toggle, honoring skip, else off', () => {
+    const layers = { global: {}, packs: { global: { mattpocock: true }, project: { mattpocock: false } } };
+    expect(resolvePackToggle('mattpocock', layers)).toEqual({ enabled: false, source: 'project' });
+    expect(resolvePackToggle('mattpocock', layers, 'project')).toEqual({ enabled: true, source: 'global' });
+    expect(resolvePackToggle('other', layers)).toEqual({ enabled: false, source: 'default' });
+  });
+});
+
+describe('pack skill ids and disabledSkillNames', () => {
+  it('never hides a pack skill id by name', () => {
+    expect(isPackSkillId('mattpocock/tdd')).toBe(true);
+    expect(isPackSkillId('grilling')).toBe(false);
+    expect(disabledSkillNames({ global: { 'mattpocock/tdd': false, grilling: false } })).toEqual(['grilling']);
   });
 });

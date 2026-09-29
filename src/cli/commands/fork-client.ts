@@ -1,5 +1,6 @@
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import type { AgentRole } from '@overdeck/contracts';
+import { readAncestorAgentIds, verdictCallerFromEnv } from '../../lib/cloister/verdict-caller.js';
 
 /**
  * Drive a conversation fork/handoff through the dashboard server.
@@ -39,6 +40,10 @@ export interface ForkViaServerOptions {
   handoffAuthor?: 'source' | 'external';
   handoffAuthorModel?: string;
   handoffAuthorHarness?: RuntimeName;
+  /** Operator only: let --cwd be a project's primary checkout (PAN-4338). */
+  allowPrimary?: boolean;
+  /** Who is asking; defaults to the caller's own environment. */
+  callerKind?: 'operator' | 'agent';
 }
 
 export interface ForkResultConv {
@@ -99,6 +104,8 @@ export async function forkConversationViaServer(
   if (opts.handoffAuthor) body['handoffAuthor'] = opts.handoffAuthor;
   if (opts.handoffAuthorModel) body['handoffAuthorModel'] = opts.handoffAuthorModel;
   if (opts.handoffAuthorHarness) body['handoffAuthorHarness'] = opts.handoffAuthorHarness;
+  body['callerKind'] = opts.callerKind ?? verdictCallerFromEnv(process.env, readAncestorAgentIds).kind;
+  if (opts.allowPrimary) body['allowPrimary'] = true;
 
   let res: Response;
   try {

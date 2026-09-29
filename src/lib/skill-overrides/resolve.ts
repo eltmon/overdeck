@@ -4,6 +4,10 @@
  * Pure, no I/O. A skill's effective state is the narrowest defined override:
  * issue > project > global > default (on). Core workflow skills that the
  * pipeline depends on are always on and ignore every override.
+ *
+ * Pack skills (PAN-4334) have ids `pack/skill` and resolve differently: at
+ * each level a per-skill value beats that level's pack toggle, and with no
+ * value anywhere they are off. They are never hidden by name.
  */
 import type { SkillCatalogEntry } from './catalog.js';
 
@@ -16,11 +20,21 @@ export type SkillOverrideLevel = 'global' | 'project' | 'issue';
 export type SkillStateSource = 'core' | SkillOverrideLevel | 'default';
 export type SkillOverrideMap = Readonly<Record<string, boolean>>;
 
+export interface PackToggleLayers {
+  global?: SkillOverrideMap;
+  project?: SkillOverrideMap;
+  issue?: SkillOverrideMap;
+}
+
 export interface SkillOverrideLayers {
   global: SkillOverrideMap;
   project?: SkillOverrideMap;
   issue?: SkillOverrideMap;
+  /** Pack toggles keyed by pack id (PAN-4334). */
+  packs?: PackToggleLayers;
 }
+
+export type PackSkillSource = SkillOverrideLevel | 'issue-pack' | 'project-pack' | 'global-pack' | 'default';
 
 export interface SkillState {
   name: string;
@@ -56,6 +70,49 @@ function resolveOne(name: string, layers: SkillOverrideLayers): { enabled: boole
   return { enabled: true, source: 'default' };
 }
 
+const LEVELS_NARROWEST_FIRST = ['issue', 'project', 'global'] as const;
+
+export function isPackSkillId(id: string): boolean {
+  return id.includes('/');
+}
+
+/**
+ * §4.3: narrowest level first; at each level a per-skill value beats the pack
+ * toggle; the first level with either wins; otherwise off. Opt-in skills
+ * ignore pack toggles. `skip` ignores that level's per-skill value only, so
+ * the UI can show what "inherit" would resolve to.
+ */
+export function resolvePackSkill(
+  id: string,
+  optIn: boolean,
+  layers: SkillOverrideLayers,
+  skip?: SkillOverrideLevel,
+): { enabled: boolean; source: PackSkillSource } {
+  const pack = id.slice(0, id.indexOf('/'));
+  for (const level of LEVELS_NARROWEST_FIRST) {
+    const value = level === skip ? null : overrideValue(layers[level], id);
+    if (value !== null) return { enabled: value, source: level };
+    if (optIn) continue;
+    const toggle = overrideValue(layers.packs?.[level], pack);
+    if (toggle !== null) return { enabled: toggle, source: `${level}-pack` };
+  }
+  return { enabled: false, source: 'default' };
+}
+
+/** The narrowest defined pack toggle (skipping `skip`), else off. */
+export function resolvePackToggle(
+  pack: string,
+  layers: SkillOverrideLayers,
+  skip?: SkillOverrideLevel,
+): { enabled: boolean; source: SkillOverrideLevel | 'default' } {
+  for (const level of LEVELS_NARROWEST_FIRST) {
+    if (level === skip) continue;
+    const toggle = overrideValue(layers.packs?.[level], pack);
+    if (toggle !== null) return { enabled: toggle, source: level };
+  }
+  return { enabled: false, source: 'default' };
+}
+
 export function resolveSkillStates(
   catalog: readonly SkillCatalogEntry[],
   layers: SkillOverrideLayers,
@@ -77,7 +134,8 @@ export function resolveSkillStates(
 /**
  * Every non-core skill name whose resolved value is off, sorted. Names absent
  * from any catalog are included, so a skill that exists only in a workspace
- * copy still hides.
+ * copy still hides. Pack skill ids are never included: pack skills are
+ * filtered when the mount is built.
  */
 export function disabledSkillNames(layers: SkillOverrideLayers): string[] {
   const names = new Set([
@@ -86,6 +144,6 @@ export function disabledSkillNames(layers: SkillOverrideLayers): string[] {
     ...Object.keys(layers.issue ?? {}),
   ]);
   return [...names]
-    .filter(name => !resolveOne(name, layers).enabled)
+    .filter(name => !isPackSkillId(name) && !resolveOne(name, layers).enabled)
     .sort((a, b) => a.localeCompare(b));
 }
