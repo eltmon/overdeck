@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:37:57.642Z",
+  "updated": "2026-09-29T06:38:11.029Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -610,6 +610,10 @@
     "e2e-two-machine.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T06:37:57.642Z"
+    },
+    "e2e-two-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:38:11.029Z"
     }
   }
 }
