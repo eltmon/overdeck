@@ -4,17 +4,17 @@
     "created": "2026-09-29T20:40:44Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4422: Add GPT-6.1 Sol (gpt-6.1-sol): catalog, cost, Codex floor 0.159.0; release to npm",
-    "updated": "2026-09-29T20:40:49.519Z"
+    "updated": "2026-09-29T20:41:20.468Z"
   },
   "plan": {
     "id": "pan-4422",
     "title": "Add GPT-6.1 Sol (gpt-6.1-sol): catalog, cost, Codex floor 0.159.0; release to npm",
-    "status": "proposed",
+    "status": "running",
     "uid": "3a319dbf-dd23-42b3-bac7-e5883479f553",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T20:40:44Z",
-    "updated": "2026-09-29T20:40:49.519Z",
+    "updated": "2026-09-29T20:41:20.468Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4422",
@@ -735,5 +735,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
