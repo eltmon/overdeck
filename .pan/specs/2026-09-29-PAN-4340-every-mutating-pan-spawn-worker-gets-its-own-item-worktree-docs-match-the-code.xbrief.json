@@ -4,17 +4,17 @@
     "created": "2026-09-29T04:07:29Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4340: Every mutating `pan spawn` worker gets its own item worktree; docs match the code",
-    "updated": "2026-09-29T04:08:52.784Z"
+    "updated": "2026-09-29T04:09:39.348Z"
   },
   "plan": {
     "id": "pan-4340",
     "title": "Every mutating `pan spawn` worker gets its own item worktree; docs match the code",
-    "status": "proposed",
+    "status": "running",
     "uid": "e394166a-9eb6-4cb1-af12-5437069aeba8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T04:07:29Z",
-    "updated": "2026-09-29T04:08:52.784Z",
+    "updated": "2026-09-29T04:09:39.348Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4340",
