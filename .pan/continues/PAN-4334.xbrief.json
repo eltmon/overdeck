@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T01:39:20.706Z",
+  "updated": "2026-09-29T01:43:34.981Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,9 +82,10 @@
       "doneAt": "2026-09-29T01:39:15.084Z"
     },
     "cli-pack-verbs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4334",
-      "claimedAt": "2026-09-29T01:39:20.706Z"
+      "claimedAt": "2026-09-29T01:39:20.706Z",
+      "doneAt": "2026-09-29T01:43:34.980Z"
     }
   }
 }
