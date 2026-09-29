@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1728",
   "created": "2026-09-29T01:58:51.551Z",
-  "updated": "2026-09-29T02:29:34.131Z",
+  "updated": "2026-09-29T02:29:46.315Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
       "claimedBy": "agent-pan-1728",
       "claimedAt": "2026-09-29T02:28:40.345Z",
       "doneAt": "2026-09-29T02:29:34.131Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:29:46.314Z"
     }
   }
 }
