@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T10:32:57.849Z",
+  "updated": "2026-09-29T10:40:19.338Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-29T10:32:54.286Z"
     },
     "enrichment-poll-schedule": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4371",
-      "claimedAt": "2026-09-29T10:32:57.849Z"
+      "claimedAt": "2026-09-29T10:32:57.849Z",
+      "doneAt": "2026-09-29T10:40:19.338Z"
     }
   }
 }
