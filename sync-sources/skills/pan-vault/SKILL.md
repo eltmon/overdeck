@@ -22,8 +22,9 @@ pan vault setup <git-url> --hooks  # also register the Claude Code Stop hook (sa
 pan vault setup <git-url> --generate-passphrase        # also turn on passphrase unlock with a generated 6-word passphrase
 pan vault setup <git-url> --passphrase-file <path>     # also turn on passphrase unlock with the passphrase in this file
 pan vault setup <git-url> --no-passphrase              # do not offer passphrase unlock
-pan vault join <git-url>           # second machine: enter the phrase
+pan vault join <git-url>           # second machine: the vault passphrase if one is set, else the phrase
 pan vault join <git-url> --phrase-file <path>
+pan vault join <git-url> --passphrase-file <path>
 pan vault status                   # backend, this machine, owned records, last sync, machines
 pan vault status --json
 ```
@@ -43,7 +44,7 @@ pan vault passphrase set --passphrase-file <path> # read the passphrase from a f
 pan vault passphrase remove                       # turn passphrase unlock off; joining needs the recovery phrase again
 ```
 
-`set` stores the vault key wrapped under the passphrase on the backend, so a new machine can join by typing the passphrase instead of the 24 words. The passphrase itself is never stored, and the vault key never changes, so the recovery phrase keeps working.
+When a passphrase is set, `pan vault join` asks for it first; press Enter to use the recovery phrase instead. A wrong passphrase prints `The passphrase did not unlock this vault.` and writes nothing. `set` stores the vault key wrapped under the passphrase on the backend, so a new machine can join by typing the passphrase instead of the 24 words. The passphrase itself is never stored, and the vault key never changes, so the recovery phrase keeps working.
 
 ## Save and sync
 

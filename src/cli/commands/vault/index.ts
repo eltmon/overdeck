@@ -24,8 +24,9 @@ export function registerVaultCommands(program: Command): void {
 
   vault
     .command('join <git-url>')
-    .description('Join an existing vault from another machine with the recovery phrase')
+    .description('Join an existing vault from another machine with the vault passphrase or the recovery phrase')
     .option('--phrase-file <path>', 'Read the 24-word recovery phrase from a file instead of prompting')
+    .option('--passphrase-file <path>', 'Read the vault passphrase from a file instead of prompting')
     .action(lazyAction(() => import('./join.js'), 'joinCommand'));
 
   const passphrase = vault
