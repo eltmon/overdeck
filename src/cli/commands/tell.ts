@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { getAgentState, messageAgent, resolveAgentTarget } from '../../lib/agents.js';
 import { issueOwesRework } from '../../lib/work-agent-lifecycle.js';
 import { loadRemoteAgentState, sendToRemoteAgent } from '../../lib/remote/index.js';
+import { closeOpenDecisionOnOperatorMessage } from '../../lib/cloister/operator-decision.js';
 
 export interface TellOptions {
   /** Deliver to a critic or verifier lane that already filed its verdict (PAN-4223 FR-16). */
@@ -101,6 +102,8 @@ export async function tellCommand(id: string, message: string, options: TellOpti
       }
       return exitCli(1);
     }
+    // PAN-4383: a delivered operator message answers the agent's open `pan ask` decision.
+    const closedDecision = closeOpenDecisionOnOperatorMessage(agentId, message, 'pan-tell');
     // PAN-4292: a steer that came back with a reason was delivered as a normal submit (an old
     // PTY supervisor); the headline must not claim it interrupted anything.
     const steered = options.steer && !outcome.reason;
@@ -115,6 +118,9 @@ export async function tellCommand(id: string, message: string, options: TellOpti
     // mail file, so the reader can check or hand-deliver the message.
     if (outcome.reason) {
       console.log(chalk.dim(`  ${outcome.reason}`));
+    }
+    if (closedDecision) {
+      console.log(chalk.dim(`  Closed the open operator decision for ${agentId}.`));
     }
     return exitCli(0);
   } catch (error: any) {

@@ -54,6 +54,14 @@ vi.mock('../../exit.js', () => ({
   exitCli: vi.fn(async (_code: number) => undefined as never),
 }));
 
+const decisionMocks = vi.hoisted(() => ({
+  closeOpenDecisionOnOperatorMessage: vi.fn(() => false),
+}));
+
+vi.mock('../../../lib/cloister/operator-decision.js', () => ({
+  closeOpenDecisionOnOperatorMessage: decisionMocks.closeOpenDecisionOnOperatorMessage,
+}));
+
 vi.mock('../../../lib/remote/index.js', () => ({
   loadRemoteAgentState: remoteMocks.loadRemoteAgentState,
   sendToRemoteAgent: remoteMocks.sendToRemoteAgent,
@@ -290,5 +298,37 @@ describe('tellCommand --steer (PAN-4292)', () => {
 
     expect(exitCli).toHaveBeenCalledWith(1);
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('runs Codex'));
+  });
+});
+
+describe('tellCommand closes an open operator decision (PAN-4383)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    remoteMocks.loadRemoteAgentState.mockReturnValue(null);
+    decisionMocks.closeOpenDecisionOnOperatorMessage.mockReturnValue(false);
+  });
+
+  it('closes the decision with pan-tell after a delivered message', async () => {
+    agentMocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
+    decisionMocks.closeOpenDecisionOnOperatorMessage.mockReturnValue(true);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { tellCommand } = await import('../tell.js');
+
+    await tellCommand('PAN-7', 'Yes, rotate it');
+
+    expect(decisionMocks.closeOpenDecisionOnOperatorMessage).toHaveBeenCalledWith('agent-pan-7', 'Yes, rotate it', 'pan-tell');
+    expect(log.mock.calls.map(([line]) => String(line)).join('\n')).toContain('Closed the open operator decision for agent-pan-7.');
+    log.mockRestore();
+  });
+
+  it('does not close the decision when the message was not delivered', async () => {
+    agentMocks.messageAgent.mockResolvedValue({ delivered: false, queuedToMail: true, reason: 'busy' });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { tellCommand } = await import('../tell.js');
+
+    await tellCommand('PAN-7', 'Yes, rotate it');
+
+    expect(decisionMocks.closeOpenDecisionOnOperatorMessage).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 });

@@ -8,6 +8,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, messageAgent } from '../../../../lib/agents.js';
 import type { MessageDeliveryOutcome } from '../../../../lib/agents/messaging.js';
+import { closeOpenDecisionOnOperatorMessage } from '../../../../lib/cloister/operator-decision.js';
 import {
   ComposerCommandConfirmationError,
   composerCommandConfirmationFromBody,
@@ -55,6 +56,8 @@ async function sendAgentMessage(id: string, message: string, options: AgentMessa
   if (options.steer && !outcome.delivered && !outcome.queuedToMail) {
     return { kind: 'steer-refused', reason: outcome.reason ?? 'steer is not available for this agent' };
   }
+  // PAN-4383: a delivered operator message answers the agent's open `pan ask` decision.
+  if (outcome.delivered) closeOpenDecisionOnOperatorMessage(id, message, 'dashboard-message');
   const steerDegraded = options.steer && outcome.delivered && outcome.reason ? { steerDegraded: outcome.reason } : {};
   return { kind: 'sent', body: isRemote ? { success: true, remote: true, ...steerDegraded } : { success: true, ...steerDegraded } };
 }
