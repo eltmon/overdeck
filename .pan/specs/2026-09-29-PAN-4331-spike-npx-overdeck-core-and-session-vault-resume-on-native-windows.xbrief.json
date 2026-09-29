@@ -4,17 +4,17 @@
     "created": "2026-09-29T14:00:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4331: Spike: `npx @overdeck/core` and Session Vault resume on native Windows",
-    "updated": "2026-09-29T14:04:25.420Z"
+    "updated": "2026-09-29T14:06:06.411Z"
   },
   "plan": {
     "id": "pan-4331",
     "title": "Spike: `npx @overdeck/core` and Session Vault resume on native Windows",
-    "status": "proposed",
+    "status": "running",
     "uid": "df728e05-9dad-4d3b-bc0b-db4626756731",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T14:00:04Z",
-    "updated": "2026-09-29T14:04:25.420Z",
+    "updated": "2026-09-29T14:06:06.411Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4331",
@@ -695,5 +695,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
