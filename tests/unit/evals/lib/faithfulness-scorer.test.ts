@@ -52,6 +52,11 @@ describe('evals/lib/faithfulness-scorer', () => {
     });
   });
 
+  it('unsupportedIdentifiers matches issue ids case-insensitively', () => {
+    expect(unsupportedIdentifiers('Work on PAN-4245 continues.', 'cd workspaces/feature-pan-4245')).toEqual([]);
+    expect(unsupportedIdentifiers('See Src/Lib/A.ts', 'src/lib/a.ts')).toEqual(['Src/Lib/A.ts']);
+  });
+
   it('unsupportedIdentifiers lists identifiers absent from the source', () => {
     expect(unsupportedIdentifiers('Fixed src/lib/server/port.ts and src/lib/server/other.ts for PAN-4101', SOURCE)).toEqual([
       'src/lib/server/other.ts',

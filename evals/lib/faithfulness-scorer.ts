@@ -76,9 +76,15 @@ export function extractIdentifiers(text: string): string[] {
   return [...found].filter((id) => id.length > 0);
 }
 
-/** Extracted identifiers that do not occur (case-sensitive substring) anywhere in the source. */
+/**
+ * Extracted identifiers that do not occur anywhere in the source: a case-sensitive substring
+ * match, except issue ids, which match case-insensitively (branches and paths spell PAN-12 as pan-12).
+ */
 export function unsupportedIdentifiers(summary: string, source: string): string[] {
-  return extractIdentifiers(summary).filter((id) => !source.includes(id));
+  const lowerSource = source.toLowerCase();
+  return extractIdentifiers(summary).filter((id) =>
+    /^[A-Z]{2,}-\d+$/.test(id) ? !lowerSource.includes(id.toLowerCase()) : !source.includes(id),
+  );
 }
 
 const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+|\n+/;
