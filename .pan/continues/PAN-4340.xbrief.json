@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4340",
   "created": "2026-09-29T04:09:59.174Z",
-  "updated": "2026-09-29T04:25:57.709Z",
+  "updated": "2026-09-29T04:27:06.385Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,10 @@
       "claimedBy": "agent-pan-4340",
       "claimedAt": "2026-09-29T04:09:59.173Z",
       "doneAt": "2026-09-29T04:25:57.709Z"
+    },
+    "spawn-item-worktree-default.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:27:06.385Z"
     }
   }
 }
