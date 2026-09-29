@@ -1,0 +1,596 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T05:10:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4361: Live evals can't run Sonnet 5.5, Opus 5.x or any GPT model: make the prompt harness provider-neutral and sampling-safe",
+    "updated": "2026-09-29T04:28:33.195Z"
+  },
+  "plan": {
+    "id": "pan-4361",
+    "title": "Live evals can't run Sonnet 5.5, Opus 5.x or any GPT model: make the prompt harness provider-neutral and sampling-safe",
+    "status": "proposed",
+    "uid": "de69dfb7-ee3c-4a3a-a096-7bebefefa704",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T05:10:00Z",
+    "updated": "2026-09-29T04:28:33.195Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4361",
+        "label": "PAN-4361",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4361.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/model-routing-2026-09.md",
+        "label": "Parent PRD (Issue A)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "evals",
+      "model-routing",
+      "anthropic",
+      "openai",
+      "cliproxy"
+    ],
+    "narratives": {
+      "Problem": "evals/lib/prompt-harness.ts always sends temperature 0 and max_tokens 4096 through the Anthropic SDK only. Sonnet 5.5, Opus 5, Opus 5.5 and Fable reject non-default sampling params with 400, thinking output is truncated, Opus 5.5 runs at its API-default medium effort, no GPT model can be evaluated, and runs report no usage or cost. The flywheel-launch and review-synthesis evals therefore cannot confirm any model placement, which blocks #4362 and #4364-#4367.",
+      "Proposal": "Split the harness into a pure model resolver (catalog-gated, deprecated/unknown/unsupported ids reject before any network call; effort from OVERDECK_EVAL_EFFORT or DEFAULT_EFFORT gated on the row's effortLevels; adaptive thinking for effort-capable Anthropic rows; temperature 0 only with thinking off and sampling allowed; max tokens from maxOutputTokens), a usage/cost module on src/lib/cost.ts, a streamed Anthropic call, and an OpenAI Responses call via fetch to api.openai.com or the local CLIProxy. runPromptScenario returns { text, run } and both live evals store run in their outputs. evals/README.md documents providers, env vars, request shape, run info and expected cost; a live gpt-6-luna smoke run records measured cost.",
+      "NonGoals": "- No change to src/lib/model-capabilities.ts, model-capability-additions.ts, model-fallback.ts, cost.ts or cliproxy.ts (read-only consumers)\n- No new evals or scorers (that is #4362)\n- No change to any default model, workhorse slot, tier or role placement (#4364-#4367)\n- No providers other than Anthropic and OpenAI\n- No openai or other new npm dependency\n- No CI wiring for npm run eval\n- No OPENAI_BASE_URL or custom endpoint beyond api and cliproxy\n- No retries, backoff or refusal fallbacks in the harness\n- No change to evals/memory-status-rollup.eval.ts\n- No edits to roles/*.md or sync-sources/skills/pan-flywheel/SKILL.md\n- Never a hardcoded fallback model id; OVERDECK_EVAL_MODEL stays mandatory\n- Never a literal effort default; the default comes from DEFAULT_EFFORT"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Unknown ids are detected by catalog membership (MODEL_CAPABILITIES row, dated -YYYYMMDD snapshots resolve to their base) before getModelProvider runs.",
+        "rationale": "getModelProvider returns 'anthropic' for any unrecognized id, so it cannot fail loudly on its own as the issue requires."
+      },
+      {
+        "summary": "Deprecated ids (MODEL_DEPRECATIONS keys) reject naming the replacement instead of being silently resolved.",
+        "rationale": "An eval must measure exactly the model the operator named; silently swapping in the replacement would corrupt placement decisions."
+      },
+      {
+        "summary": "Adaptive thinking and output_config.effort are sent only to Anthropic rows that enumerate effortLevels; others (Haiku 4.5) get neither.",
+        "rationale": "Haiku 4.5 and Sonnet 4.5 error on effort; every effort-capable row accepts adaptive thinking, and explicit adaptive makes Opus 4.7/4.8 think as in Claude Code, keeping comparisons fair."
+      },
+      {
+        "summary": "temperature 0 is sent only when thinking is off AND modelSupportsSamplingParams is true; this is stricter than the issue's 'omit when supportsSamplingParams === false'.",
+        "rationale": "The Claude API rejects non-default temperature whenever thinking is on, so Sonnet 4.6/Opus 4.6 with adaptive thinking would 400 under the literal issue rule."
+      },
+      {
+        "summary": "The Anthropic call streams via messages.stream().finalMessage().",
+        "rationale": "SDK 0.96 throws 'Streaming is required' for non-streaming requests with max_tokens above about 21K, and the fix sets max_tokens to 128000 for current models."
+      },
+      {
+        "summary": "OpenAI is called with fetch, not the openai package.",
+        "rationale": "node_modules/openai does not exist; the issue says to use fetch in that case (NFR-2)."
+      },
+      {
+        "summary": "OVERDECK_EVAL_OPENAI_VIA defaults to api; a missing OPENAI_API_KEY rejects before network and points at cliproxy.",
+        "rationale": "Matches the issue wording and never sends a request that is guaranteed to fail."
+      },
+      {
+        "summary": "EVAL_DEFAULT_MAX_OUTPUT_TOKENS = 16000 applies when a catalog row has no maxOutputTokens.",
+        "rationale": "It is a token count, not a model fallback, so the no-hardcoded-model-fallbacks rule does not apply; 16000 is the standard safe default and below Haiku 4.5's real cap."
+      },
+      {
+        "summary": "An explicit OVERDECK_EVAL_EFFORT on a model with no effort levels, or outside the row's levels, rejects before network.",
+        "rationale": "A silently ignored effort setting would make a run look like it measured something it did not."
+      },
+      {
+        "summary": "costBasis is 'api-equivalent' for CLIProxy calls and 'api' otherwise; costUsd is null when src/lib/cost.ts has no pricing row.",
+        "rationale": "Operators want hypothetical API cost even on subscriptions; null avoids reporting a fake $0."
+      },
+      {
+        "summary": "Resolution, usage/cost and the OpenAI call live in separate evals/lib modules; the return-type change and both eval consumers land in one item.",
+        "rationale": "Pure modules are unit-testable without mocks; folding the consumers keeps typecheck:evals green on every commit."
+      },
+      {
+        "summary": "evals/vitest.config.ts gains the @overdeck/contracts source alias the root config already has.",
+        "rationale": "The new runtime import of DEFAULT_EFFORT would otherwise resolve to the gitignored packages/contracts/dist build, which may be stale or absent."
+      },
+      {
+        "summary": "The live Sonnet 5.5 acceptance criterion is an implementation checkpoint with a documented fallback (unit-test evidence plus an operator command in the PR).",
+        "rationale": "The agent environment has no ANTHROPIC_API_KEY; gpt-6-luna via CLIProxy is runnable and covers the live OpenAI criterion; gpt-6-sol is not served by the local CLIProxy."
+      }
+    ],
+    "items": [
+      {
+        "id": "eval-model-config",
+        "title": "Add the eval model resolution module (evals/lib/eval-model.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T05:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4361",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "anthropic-path-and-run-info",
+            "openai-responses-path"
+          ],
+          "files_scope": [
+            "evals/lib/eval-model.ts",
+            "tests/unit/evals/lib/eval-model.test.ts",
+            "evals/vitest.config.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/eval-model.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/evals/lib/eval-model.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-11",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4361.md WI-1 exactly: create evals/lib/eval-model.ts exporting EVAL_DEFAULT_MAX_OUTPUT_TOKENS (16_000), EvalProvider, OpenAIVia, EvalModelConfig and resolveEvalModelConfig(env, opts). Follow the 11 ordered steps in the PRD (unset model -> deprecated -> catalog membership incl. -YYYYMMDD snapshot strip -> getModelProvider supports only anthropic/openai -> OVERDECK_EVAL_EFFORT validated, default DEFAULT_EFFORT from @overdeck/contracts -> effortLevels gate -> adaptive thinking for effort-capable Anthropic rows -> temperature 0 only when thinking is off and modelSupportsSamplingParams(catalogId) -> maxTokens = min(opts.maxTokens, maxOutputTokens ?? 16000) -> OVERDECK_EVAL_OPENAI_VIA api|cliproxy with OPENAI_API_KEY required for api -> apiModel via apiLaunchModelId for openai). Every throw happens before any I/O and uses the PRD's message text. Add the @overdeck/contracts alias to evals/vitest.config.ts (PRD D14). Write the named test cases listed under WI-1."
+        },
+        "items": [
+          {
+            "id": "eval-model-config.ac1",
+            "title": "Given OVERDECK_EVAL_MODEL=claude-nonexistent-9, resolveEvalModelConfig throws an error whose message contains 'Unknown eval model \"claude-nonexistent-9\"'; given claude-sonnet-4-5 it throws naming the replacement claude-sonnet-4-6",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-model-config.ac2",
+            "title": "Given OVERDECK_EVAL_MODEL=claude-sonnet-5-5 and no OVERDECK_EVAL_EFFORT, resolveEvalModelConfig returns thinking 'adaptive', effort 'high', temperature null and maxTokens 128000; given claude-sonnet-4-6 it returns temperature null with thinking 'adaptive'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-model-config.ac3",
+            "title": "Given OVERDECK_EVAL_MODEL=claude-haiku-4-5-20251001, resolveEvalModelConfig returns catalogId claude-haiku-4-5, temperature 0, effort null, thinking null and maxTokens 16000; setting OVERDECK_EVAL_EFFORT=high for it throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-model-config.ac4",
+            "title": "Given OVERDECK_EVAL_MODEL=gpt-6-luna with no OPENAI_API_KEY and no OVERDECK_EVAL_OPENAI_VIA, resolveEvalModelConfig throws naming OPENAI_API_KEY; with OVERDECK_EVAL_OPENAI_VIA=cliproxy it returns openaiVia 'cliproxy', effort 'high', temperature null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-model-config.ac5",
+            "title": "evals/vitest.config.ts resolves @overdeck/contracts to packages/contracts/src/index.ts, and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eval-usage-cost",
+        "title": "Add usage normalization and cost pricing module (evals/lib/eval-usage.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T05:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "evals/lib/eval-usage.ts",
+            "tests/unit/evals/lib/eval-usage.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/eval-usage.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/evals/lib/eval-usage.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-13",
+            "FR-14",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: create evals/lib/eval-usage.ts exporting EvalUsage, AnthropicUsageLike, OpenAIUsageLike, usageFromAnthropic, usageFromOpenAI (inputTokens = input_tokens - cached_tokens; reasoningTokens from output_tokens_details) and evalCostUsd(provider: 'anthropic' | 'openai', model, usage) using getPricing + calculateCost from src/lib/cost.ts, returning null when getPricing returns null. Declare the provider union inline; do NOT import from ./eval-model.js, because this item runs in parallel with eval-model-config. Write the WI-2 named tests."
+        },
+        "items": [
+          {
+            "id": "eval-usage-cost.ac1",
+            "title": "Given OpenAI usage {input_tokens: 314, output_tokens: 5, input_tokens_details: {cached_tokens: 100}, output_tokens_details: {reasoning_tokens: 0}}, usageFromOpenAI returns inputTokens 214, cacheReadTokens 100, outputTokens 5, reasoningTokens 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-usage-cost.ac2",
+            "title": "Given Anthropic usage with cache_read_input_tokens null, usageFromAnthropic returns cacheReadTokens 0 and reasoningTokens null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-usage-cost.ac3",
+            "title": "evalCostUsd('anthropic', 'claude-sonnet-5-5', 1M input + 1M output) returns 12, evalCostUsd('openai', 'gpt-6-luna', same) returns 0.6, and a model with no pricing row returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anthropic-path-and-run-info",
+        "title": "Stream the Anthropic call from resolved config and return { text, run } to both live evals",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T05:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "evals/lib/prompt-harness.ts",
+            "tests/unit/evals/lib/prompt-harness.test.ts",
+            "evals/review-synthesis.eval.ts",
+            "evals/flywheel-launch.eval.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/prompt-harness.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/evals/lib/prompt-harness.test.ts passes",
+            "typecheck (including typecheck:evals) completes without errors",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "FR-13",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: in evals/lib/prompt-harness.ts add PromptScenarioRun and PromptScenarioResult, make runPromptScenario call resolveEvalModelConfig(process.env, { maxTokens }), stream the Anthropic call with client.messages.stream(params).finalMessage() adding temperature/thinking/output_config only when the config says so, and return { text, run } with usage from usageFromAnthropic and cost from evalCostUsd. Until WI-4 lands, a non-anthropic config throws 'Eval provider \"openai\" is not wired yet'. In the same commit update evals/review-synthesis.eval.ts and both run functions in evals/flywheel-launch.eval.ts to read .text and add run: PromptScenarioRun to their evalite output generics and returned objects (PRD D13, before/after snippets in WI-3). Extend tests/unit/evals/lib/prompt-harness.test.ts with vi.mock('@anthropic-ai/sdk') (vi.hoisted fns) and a vi.stubGlobal fetch stub; keep existing cases."
+        },
+        "items": [
+          {
+            "id": "anthropic-path-and-run-info.ac1",
+            "title": "Given OVERDECK_EVAL_MODEL=claude-sonnet-5-5, the object passed to messages.stream has no temperature, top_p or top_k key, has thinking {type:'adaptive'}, output_config {effort:'high'} and max_tokens 128000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anthropic-path-and-run-info.ac2",
+            "title": "Given OVERDECK_EVAL_MODEL=claude-haiku-4-5-20251001, the streamed request sends temperature 0 and has no thinking or output_config key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anthropic-path-and-run-info.ac3",
+            "title": "Given an unknown model id, runPromptScenario rejects with a message naming the id, and neither the mocked Anthropic constructor nor the stubbed fetch is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anthropic-path-and-run-info.ac4",
+            "title": "runPromptScenario returns run with provider 'anthropic', usage.outputTokens from the mocked message, a numeric costUsd, costBasis 'api' and stopReason 'end_turn'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anthropic-path-and-run-info.ac5",
+            "title": "review-synthesis and both flywheel-launch evalite tasks return a run field next to their existing output fields, and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "openai-responses-path",
+        "title": "Add the OpenAI Responses API path (direct API or CLIProxy) via fetch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T05:10:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "evals/lib/openai-responses.ts",
+            "tests/unit/evals/lib/openai-responses.test.ts",
+            "evals/lib/prompt-harness.ts",
+            "tests/unit/evals/lib/prompt-harness.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/openai-responses.test.ts tests/unit/evals/lib/prompt-harness.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "FR-13",
+            "FR-14",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: create evals/lib/openai-responses.ts exporting OPENAI_API_BASE_URL and callOpenAIResponses(config, prompt, env, fetchImpl = fetch). POST <base>/v1/responses with Bearer OPENAI_API_KEY (api) or CLIPROXY_AUTH_TOKEN at CLIPROXY_BASE_URL (cliproxy, both imported from src/lib/cliproxy.ts); body {model: apiModel, instructions, input: [{role:'user', content}], max_output_tokens, reasoning: {effort} when effort is not null}; never temperature. Reject on !ok or non-null error with 'OpenAI Responses call for \"<model>\" via <route> failed (HTTP <status>): <message>'. Join output_text parts; usage via usageFromOpenAI. Replace the WI-3 guard in prompt-harness.ts with the provider dispatch. No openai npm package."
+        },
+        "items": [
+          {
+            "id": "openai-responses-path.ac1",
+            "title": "Given openaiVia 'cliproxy', callOpenAIResponses posts to http://127.0.0.1:8317/v1/responses with header Authorization 'Bearer overdeck-local-cliproxy-key'; given 'api' it posts to https://api.openai.com/v1/responses with 'Bearer <OPENAI_API_KEY>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-responses-path.ac2",
+            "title": "Given effort 'high', callOpenAIResponses sends a JSON body that contains reasoning {effort:'high'}, instructions, one input item and max_output_tokens, and no temperature key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-responses-path.ac3",
+            "title": "Given a 400 response with error.message 'unknown provider for model gpt-6-sol', callOpenAIResponses rejects with a message containing gpt-6-sol and 'unknown provider'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-responses-path.ac4",
+            "title": "Given OVERDECK_EVAL_MODEL=gpt-6-luna and OVERDECK_EVAL_OPENAI_VIA=cliproxy, runPromptScenario calls fetch, never constructs the Anthropic client, and returns run.provider 'openai', costBasis 'api-equivalent' and a numeric costUsd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "evals-readme-docs",
+        "title": "Document providers, env vars, request shape, run info and expected cost in evals/README.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T05:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "evals/README.md"
+          ],
+          "verify_commands": [
+            "grep -n 'Supported providers and models\\|Environment variables\\|Request shape per model\\|Run info and cost\\|Expected cost per eval run\\|Known limits' evals/README.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep prints all six section headings",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-11",
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 sections 1-8 in evals/README.md: rewrite the runPromptScenario bullet and add the three new lib modules; add sections 'Supported providers and models', 'Environment variables' (OVERDECK_EVAL_MODEL, OVERDECK_EVAL_EFFORT, OVERDECK_EVAL_OPENAI_VIA, OPENAI_API_KEY, ANTHROPIC_API_KEY; note effort is always sent because Opus 5.5 defaults to medium), 'Request shape per model', 'Run info and cost', 'Expected cost per eval run' (the PRD table verbatim plus the measured-values lead-in sentence and an empty measured list), 'Known limits' (gpt-6-sol not on local CLIProxy; xhigh/max on OpenAI verified only via CLIProxy); fix the stale 'offline and deterministic' caveat. Write from the PRD; no code dependency."
+        },
+        "items": [
+          {
+            "id": "evals-readme-docs.ac1",
+            "title": "evals/README.md contains an 'Environment variables' table that lists OVERDECK_EVAL_MODEL, OVERDECK_EVAL_EFFORT with default high, OVERDECK_EVAL_OPENAI_VIA with values api and cliproxy, and OPENAI_API_KEY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evals-readme-docs.ac2",
+            "title": "evals/README.md contains the statement that Sonnet 5.5, Opus 5, Opus 5.5 and Fable never receive temperature, and contains a description of run info with costBasis api or api-equivalent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evals-readme-docs.ac3",
+            "title": "evals/README.md contains the 'Expected cost per eval run' table with rows for claude-opus-5-5, claude-sonnet-5-5, gpt-6-sol, claude-haiku-4-5 and gpt-6-luna for both flywheel-launch and review-synthesis",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evals-readme-docs.ac4",
+            "title": "evals/README.md no longer contains the sentence 'The current suite is offline and deterministic'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-eval-smoke",
+        "title": "Run the live evals on gpt-6-luna via CLIProxy and record measured cost; Sonnet 5.5 per checkpoint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T05:10:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4361",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "sequential",
+          "files_scope": [
+            "evals/README.md"
+          ],
+          "verify_commands": [
+            "OVERDECK_EVAL_MODEL=gpt-6-luna OVERDECK_EVAL_OPENAI_VIA=cliproxy npm run eval"
+          ],
+          "expected_outputs": [
+            "evalite completes flywheel-launch and review-synthesis with no thrown harness error, and each task output shows run.usage and run.costUsd"
+          ],
+          "traces": [
+            "FR-11",
+            "FR-13",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6. Run OVERDECK_EVAL_MODEL=gpt-6-luna OVERDECK_EVAL_OPENAI_VIA=cliproxy npm run eval; scores are not the gate, a harness error is. Add measured total input/output tokens, total cost and cost basis per eval to the README measured-values list with the date. IMPLEMENTATION CHECKPOINT: if an Anthropic credential resolves, also run OVERDECK_EVAL_MODEL=claude-sonnet-5-5 npm run eval and record it (must finish with no HTTP 400). FALLBACK when no credential exists: add 'claude-sonnet-5-5: pending operator run' with the exact command to the README list and to the PR body under 'Operator live check', and say so in the pan done summary. Never fabricate a measured value."
+        },
+        "items": [
+          {
+            "id": "live-eval-smoke.ac1",
+            "title": "Given OVERDECK_EVAL_MODEL=gpt-6-luna and OVERDECK_EVAL_OPENAI_VIA=cliproxy, npm run eval completes flywheel-launch and review-synthesis without a thrown harness error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-eval-smoke.ac2",
+            "title": "evals/README.md contains measured input tokens, output tokens and cost with costBasis api-equivalent for gpt-6-luna on both evals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-eval-smoke.ac3",
+            "title": "evals/README.md and the PR body contain either measured claude-sonnet-5-5 values from a run that produces no HTTP 400, or the line 'claude-sonnet-5-5: pending operator run' with the exact command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "eval-model-config",
+        "to": "anthropic-path-and-run-info",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-usage-cost",
+        "to": "anthropic-path-and-run-info",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-model-config",
+        "to": "openai-responses-path",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-usage-cost",
+        "to": "openai-responses-path",
+        "type": "blocks"
+      },
+      {
+        "from": "anthropic-path-and-run-info",
+        "to": "openai-responses-path",
+        "type": "blocks"
+      },
+      {
+        "from": "openai-responses-path",
+        "to": "live-eval-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "evals-readme-docs",
+        "to": "live-eval-smoke",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4361-live-evals-can-t-run-sonnet-5-5-opus-5-x-or-any-gpt-model-make-the-prompt-harness-provider-neutral-and-sampling-safe.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
