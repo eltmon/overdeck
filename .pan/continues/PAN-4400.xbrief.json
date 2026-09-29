@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4400",
   "created": "2026-09-29T14:25:17.551Z",
-  "updated": "2026-09-29T15:53:37.065Z",
+  "updated": "2026-09-29T15:53:51.715Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,10 @@
     "settings-formdata-refresh.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T15:53:37.065Z"
+    },
+    "settings-formdata-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:53:51.714Z"
     }
   }
 }
