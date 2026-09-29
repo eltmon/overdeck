@@ -34,6 +34,12 @@ describe('windows-smoke summarize renderTable', () => {
     expect(failRow.split(/(?<!\\)\|/)).toHaveLength(5);
   });
 
+  it('shows the note of a fail that has one instead of its first evidence line', () => {
+    const md = renderTable([results('windows-pwsh', [step('1c', 'fail', '--- serve stdout ---\nGET / -> 404', 'server up, GET / -> 404')])]);
+
+    expect(row(md, '1c')).toContain('❌ fail: server up, GET / -> 404');
+  });
+
   it('marks a step a results file lacks as missing', () => {
     const md = renderTable([wsl, pwsh]);
 

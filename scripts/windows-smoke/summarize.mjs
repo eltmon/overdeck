@@ -76,7 +76,8 @@ export function renderCell(step) {
     case 'pass':
       return '✅ pass';
     case 'fail':
-      return `❌ fail: ${escapeCell(truncate(firstLine(step.evidence) || step.note || '', 120))}`;
+      // A probe's note names the failure more precisely than any evidence line.
+      return `❌ fail: ${escapeCell(truncate(step.note || firstLine(step.evidence), 120))}`;
     case 'partial':
       return `⚠️ partial: ${escapeCell(step.note ?? '')}`;
     default:
