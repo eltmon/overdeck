@@ -193,6 +193,9 @@ function applyEnvironmentFallbacks(config: NormalizedConfig, explicitlyDisabled:
   if (process.env.VOYAGE_API_KEY && !config.apiKeys.voyage) {
     config.apiKeys.voyage = process.env.VOYAGE_API_KEY;
   }
+  if (process.env.TYPESAFE_API_KEY && !config.apiKeys.typesafe) {
+    config.apiKeys.typesafe = process.env.TYPESAFE_API_KEY;
+  }
   if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
     config.apiKeys.google = process.env.GOOGLE_API_KEY;
     if (!explicitlyDisabled.has('google')) config.enabledProviders.add('google');
