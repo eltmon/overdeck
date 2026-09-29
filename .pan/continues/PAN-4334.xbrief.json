@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T02:30:59.605Z",
+  "updated": "2026-09-29T02:31:17.767Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -414,6 +414,9 @@
     "live-checkpoint.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T02:30:59.605Z"
+    },
+    "live-checkpoint.ac4": {
+      "status": "cancelled"
     }
   }
 }
