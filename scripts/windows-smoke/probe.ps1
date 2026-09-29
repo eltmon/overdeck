@@ -234,7 +234,8 @@ Invoke-Step '1b' 'npx --yes @overdeck/core@latest vault list' {
 
 # ---- 1c-2b: dashboard ------------------------------------------------------
 
-$ServeUp = $false
+$ServeUp = $false        # GET / answered 200
+$ServeAnswers = $false   # the server answered HTTP at all; 2a/2b need only this
 if ($SkipServe) {
   foreach ($id in '1c', '1d', '2a', '2b') { Add-Step $id 'not-run' '' $null '' 'skipped by -SkipServe' }
 } else {
@@ -249,22 +250,27 @@ if ($SkipServe) {
     $script:serve = Start-Timed $PanBin @('serve', '--port', "$Port")
     Remove-Item Env:OVERDECK_INTERNAL_TOKEN -ErrorAction SilentlyContinue
     if (-not $script:serve.Process) { return @{ status = 'fail'; evidence = $script:serve.Error; note = 'serve did not start' } }
+    # Stop at 200, or 30 s after the first HTTP answer of any status.
     $last = $null
+    $firstAnswer = $null
     $deadline = (Get-Date).AddSeconds(300)
     while ((Get-Date) -lt $deadline) {
       $last = Get-HttpStatus 'GET' "http://localhost:$Port/" @{} $null
       if ($last.Status -eq 200) { break }
+      if ($null -ne $last.Status -and -not $firstAnswer) { $firstAnswer = Get-Date }
+      if ($firstAnswer -and ((Get-Date) - $firstAnswer).TotalSeconds -gt 30) { break }
       if ($script:serve.Process.HasExited) { break }
       Start-Sleep -Seconds 3
     }
     $script:ServeUp = $last.Status -eq 200
+    $script:ServeAnswers = $null -ne $last.Status
     $script:ServePoll = "GET / -> $($last.Status)$(if ($last.Status -ne 200) { "`n$($last.Body)" })`n$(Get-ServeSnapshot $script:serve.Process.Id $Port)"
     $exit = if ($script:serve.Process.HasExited) { $script:serve.Process.ExitCode } else { $null }
     @{ status = $(if ($script:ServeUp) { 'pass' } else { 'fail' }); exitCode = $exit; evidence = $script:ServePoll }
   }
 
   Invoke-Step '2a' "GET /api/{health,conversations,projects,settings,issues} with x-overdeck-internal-token" {
-    if (-not $ServeUp) { return @{ status = 'not-run'; note = '1c failed: the server is not up' } }
+    if (-not $ServeAnswers) { return @{ status = 'not-run'; note = '1c failed: the server does not answer HTTP' } }
     # Failing endpoints first, so the summary cell (first evidence line) names one.
     $bad = @()
     $good = @()
@@ -278,7 +284,7 @@ if ($SkipServe) {
   }
 
   Invoke-Step '2b' "POST /api/conversations {`"message`":`"hello`"} with Origin and x-overdeck-internal-token" {
-    if (-not $ServeUp) { return @{ status = 'not-run'; note = '1c failed: the server is not up' } }
+    if (-not $ServeAnswers) { return @{ status = 'not-run'; note = '1c failed: the server does not answer HTTP' } }
     $headers = @{ 'Origin' = "http://localhost:$Port"; 'x-overdeck-internal-token' = $Token; 'content-type' = 'application/json' }
     $r = Get-HttpStatus 'POST' "http://localhost:$Port/api/conversations" $headers '{"message":"hello"}'
     $ok = $r.Status -ge 200 -and $r.Status -lt 300
