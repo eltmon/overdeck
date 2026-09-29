@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T15:57:13.896Z",
+  "updated": "2026-09-29T15:57:27.927Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "okf-license-notice.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T15:57:13.896Z"
+    },
+    "okf-ci-selftest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:57:27.926Z"
     }
   }
 }
