@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:29:45.241Z",
+  "updated": "2026-09-29T06:29:57.581Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -458,6 +458,10 @@
     "cli-list-show.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T06:29:45.240Z"
+    },
+    "cli-list-show.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:29:57.581Z"
     }
   }
 }
