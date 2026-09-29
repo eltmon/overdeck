@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:50:23.133Z",
+  "updated": "2026-09-29T11:50:34.313Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "eval-fixtures-metrics.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T11:50:23.133Z"
+    },
+    "eval-fixtures-metrics.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:50:34.313Z"
     }
   }
 }
