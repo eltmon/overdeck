@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4400",
   "created": "2026-09-29T14:25:17.551Z",
-  "updated": "2026-09-29T15:53:21.229Z",
+  "updated": "2026-09-29T15:53:37.065Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "ui-preset-undo-notice.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T15:53:21.229Z"
+    },
+    "settings-formdata-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:53:37.065Z"
     }
   }
 }
