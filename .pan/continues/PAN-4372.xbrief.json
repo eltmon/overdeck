@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4372",
   "created": "2026-09-29T09:44:00.403Z",
-  "updated": "2026-09-29T10:45:49.049Z",
+  "updated": "2026-09-29T10:46:55.529Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,9 +104,10 @@
       "status": "cancelled"
     },
     "docs-xbrief-advisory": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4372",
-      "claimedAt": "2026-09-29T10:45:49.049Z"
+      "claimedAt": "2026-09-29T10:45:49.049Z",
+      "doneAt": "2026-09-29T10:46:55.529Z"
     }
   }
 }
