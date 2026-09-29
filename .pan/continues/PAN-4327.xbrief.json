@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T01:13:11.578Z",
+  "updated": "2026-09-29T01:15:53.004Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,10 @@
       "doneAt": "2026-09-29T01:13:07.020Z"
     },
     "sonnet-55-dashboard-defaults": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4327",
-      "claimedAt": "2026-09-29T01:13:11.578Z"
+      "claimedAt": "2026-09-29T01:13:11.578Z",
+      "doneAt": "2026-09-29T01:15:53.004Z"
     }
   }
 }
