@@ -152,4 +152,3 @@
 1148 src/lib/conversations/smart-compaction.ts # PAN-4327
 997 src/lib/overdeck/planning-promotion.ts # PAN-1728
 961 src/lib/cloister/verification-runner.ts # PAN-1728
-1041 src/cli/commands/doctor.ts # PAN-4363
