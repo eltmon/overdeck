@@ -68,6 +68,15 @@ A steer never falls back silently to a queued message. A harness without steer a
   128K maximum output, always-on adaptive thinking, and low through max effort.
   API pricing is $4/M input and $20/M output; subscription availability depends
   on the Anthropic account.
+- The model picker includes Claude Sonnet 5.5 (`claude-sonnet-5-5`): 1M
+  context, 128K maximum output, adaptive thinking, and low through max
+  effort. API pricing is $2/M input and $10/M output. It requires Claude
+  Code 2.1.284 or newer; older versions treat it as an unrecognized model
+  with a 200K window. It is the default for the Sonnet tier
+  (`workhorses.mid`, the default conversation model, status review, fork
+  summaries and provider fallback). Overdeck omits `temperature` for models
+  that reject sampling parameters (Sonnet 5 and newer, Opus 4.7 and newer,
+  Fable).
 - Proxied models use a dedicated Claude Code context policy rather than copying
   every value from the generic model registry. GPT-6 Astra, Sol, and Luna and
   GPT-5.6 Sol, Terra, and Luna default to a `272000`-token pin for both
