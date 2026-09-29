@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { loadFixtureDir } from '../../../../evals/lib/fixtures.js';
 import {
   decoyViolations,
   extractIdentifiers,
+  factRecalled,
   parseSummaryCase,
   parseTitleOutput,
   plantedRecall,
@@ -10,6 +12,7 @@ import {
   unsupportedIdentifiers,
   type SummaryCase,
 } from '../../../../evals/lib/faithfulness-scorer.js';
+import { serializeConversation } from '../../../../src/lib/conversations/smart-compaction.js';
 
 const SOURCE = [
   'USER: the dashboard fails to start on port 4000.',
@@ -109,6 +112,42 @@ describe('evals/lib/faithfulness-scorer', () => {
     it('accepts a valid case and rejects a handoff without focus', () => {
       expect(parseSummaryCase(summaryCase()).id).toBe('fork-port');
       expect(() => parseSummaryCase(summaryCase({ kind: 'handoff' }))).toThrow(/needs a focus/);
+    });
+  });
+
+  describe('committed fixtures', () => {
+    const fixtures = loadFixtureDir('evals/fixtures/summaries');
+    const cases = fixtures.map((f) => parseSummaryCase(f.data));
+
+    it('holds 10 cases: 3 fork, 3 compaction, 2 handoff, 2 title', () => {
+      const count = (kind: SummaryCase['kind']) => cases.filter((c) => c.kind === kind).length;
+      expect(cases).toHaveLength(10);
+      expect([count('fork'), count('compaction'), count('handoff'), count('title')]).toEqual([3, 3, 2, 2]);
+    });
+
+    it('keeps each source within 40 entries and 60,000 serialized chars, with no home path', () => {
+      for (const c of cases) {
+        expect(c.entries.length, c.id).toBeLessThanOrEqual(40);
+        expect(serializeConversation(c.entries, false).length, c.id).toBeLessThanOrEqual(60_000);
+        expect(JSON.stringify(c), c.id).not.toContain('/home/');
+      }
+    });
+
+    it('plants every fact in the serialized source', () => {
+      for (const c of cases) {
+        const source = serializeConversation(c.entries, false);
+        for (const fact of c.plantedFacts) expect(factRecalled(source, fact), `${c.id}/${fact.id}`).toBe(true);
+      }
+    });
+
+    it('states every decoy in the source only as retracted', () => {
+      for (const c of cases) {
+        const source = serializeConversation(c.entries, false);
+        for (const decoy of c.decoys) {
+          expect(source.toLowerCase(), `${c.id}/${decoy.id}`).toContain(decoy.anchor.toLowerCase());
+          expect(decoyViolations(source, [decoy]), `${c.id}/${decoy.id}`).toEqual([]);
+        }
+      }
     });
   });
 });

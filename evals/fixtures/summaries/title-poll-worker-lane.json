@@ -1,0 +1,556 @@
+{
+  "id": "title-poll-worker-lane",
+  "kind": "title",
+  "source": "real session excerpt, overdeck PAN-4312, 2026-09, scrubbed; planted facts and decoys edited in",
+  "entries": [
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": "PAN-4312: conversation open stalls behind polling aggregates on the read lane. Move the polling snapshots to their own database worker lane."
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01VqhAaxBzpK7Aj6C1SNqxNj",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4312/src/dashboard/server/services/dashboard-db-task.ts",
+              "old_string": "const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null };",
+              "new_string": "const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null, poll: null };"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01VqhAaxBzpK7Aj6C1SNqxNj",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4312/src/dashboard/server/services/dashboard-db-task.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_012PyoxgH7E3HjBiYyt9DW38",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4312/src/dashboard/server/services/dashboard-db-task.ts",
+              "old_string": "  if (isPollingSnapshot(operation)) return 'read';",
+              "new_string": "  if (isPollingSnapshot(operation)) return 'poll';"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_012PyoxgH7E3HjBiYyt9DW38",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4312/src/dashboard/server/services/dashboard-db-task.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01P3rsgdSgVBfNZxoFcX3DTj",
+            "name": "Bash",
+            "input": {
+              "command": "grep -rn \"WorkerLane\" src/dashboard/server/ src/dashboard/ 2>/dev/null | grep -v \"\\.test\\.ts\""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01P3rsgdSgVBfNZxoFcX3DTj",
+            "content": "src/dashboard/server/services/dashboard-db-task.ts:64:export type WorkerLane = 'read' | 'long' | 'semantic' | 'parse' | 'poll';\nsrc/dashboard/server/services/dashboard-db-task.ts:81:  lane: WorkerLane;\nsrc/dashboard/server/services/dashboard-db-task.ts:92:  lane: WorkerLane;\nsrc/dashboard/server/services/dashboard-db-task.ts:130:const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null, parse: null, poll: null };\nsrc/dashboard/server/services/dashboard-db-task.ts:137:  lane: WorkerLane;\nsrc/dashboard/server/services/dashboard-db-task.ts:166:  for (const lane of Object.keys(workers) as WorkerLane[]) {\nsrc/dashboard/server/services/dashboard-db-task.ts:175:function failPendingForLane(lane: WorkerLane, err: Error): void {\nsrc/dashboard/server/services/dashboard-db-task.ts:202:export function workerLane(operation: DashboardDbOperation): WorkerLane {\nsrc/dash …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Good, no exhaustive switches elsewhere to update. Now let's update the test file."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01ViW3tfn61HhrDYD352zdQ3",
+            "name": "Bash",
+            "input": {
+              "command": "cat src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01ViW3tfn61HhrDYD352zdQ3",
+            "content": "import { EventEmitter } from 'node:events';\nimport { describe, expect, it, vi } from 'vitest';\n\nconst { instances } = vi.hoisted(() => ({ instances: [] as Array<{\n  postMessage: ReturnType<typeof vi.fn>; emit: (event: string, value: unknown) => boolean;\n}> }));\nvi.mock('node:worker_threads', () => ({\n  Worker: class extends EventEmitter {\n    postMessage = vi.fn();\n    constructor() { super(); instances.push(this); }\n  },\n}));\nimport { runDashboardDbJob, workerLane } from '../dashboard-db-task.js';\n\n// Exercise the actual worker dispatch path, including under Vitest: these\n// expensive polls must never use the test-only synchronous inline resolver.\ndescribe('polling reads dispatch to database worker', () => {\n  it.each(['getCostsByIssueSnapshot', 'getConversationSearchStats', 'getConversationLedgerCosts', 'getAgentCostStats'] as const)(\n    'coalesces %s and receives its result from the  …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Dxsb8NMN5XTZVEd9AJW4L4",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4312/src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts",
+              "old_string": "      expect(workerLane(operation)).toBe('read');",
+              "new_string": "      expect(workerLane(operation)).toBe('poll');"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Dxsb8NMN5XTZVEd9AJW4L4",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4312/src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_017gUwtHKNFHYrXsMdcvV8Tu",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4312/src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts",
+              "old_string": "  it('rejects failed worker reads and allows the next refresh', async () => {",
+              "new_string": "  it('keeps point lookups on the read lane', () => {\n    expect(workerLane('getConversationByName')).toBe('read');\n  });\n\n  it('rejects failed worker reads and allows the next refresh', async () => {"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_017gUwtHKNFHYrXsMdcvV8Tu",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4312/src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's run the touched tests."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01USGstRBJDq9UqgrzAJ7sur",
+            "name": "Bash",
+            "input": {
+              "command": "npx vitest run src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts 2>&1 | tail -60"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01USGstRBJDq9UqgrzAJ7sur",
+            "content": "Command did not complete within its 120s timeout and was moved to the background (ID: ble3zui9v). Output is being written to: /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4312/da2217d9-8596-4b5a-841d-c0d258c71597/tasks/ble3zui9v.output. You will be notified when it completes. To check interim output, use Read on that file path."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I'll wait for the test run to finish in the background."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Th4JM6ADGGdTy3sootoVS7",
+            "name": "Bash",
+            "input": {
+              "command": "sleep 90 && cat /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4312/da2217d9-8596-4b5a-841d-c0d258c71597/tasks/ble3zui9v.output 2>&1 | tail -60"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Th4JM6ADGGdTy3sootoVS7",
+            "content": "<tool_use_error>Blocked: sleep 90 followed by: cat /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4312/da2217d9-8596-4b5a-841d-c0d258c71597/tasks/ble3zui9v.output tail -60. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_error>"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I'll just wait for the background task notification instead of polling."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01VsxNDkeFxjaxdJn6uCg8hW",
+            "name": "Read",
+            "input": {
+              "file_path": "/tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4312/da2217d9-8596-4b5a-841d-c0d258c71597/tasks/ble3zui9v.output"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01VsxNDkeFxjaxdJn6uCg8hW",
+            "content": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I'll wait for the background test run notification instead of polling further."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XY7WoEddACa6HCfBD1YA8x",
+            "name": "ToolSearch",
+            "input": {
+              "query": "select:Monitor",
+              "max_results": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01XY7WoEddACa6HCfBD1YA8x",
+            "content": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "The test is already running in the background and I'll get notified when it completes — no need to poll further. I'll wait for that notification."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_013TcRPsCvYYmNk97PUiKW5m",
+            "name": "Bash",
+            "input": {
+              "command": "echo \"waiting for background test job ble3zui9v to complete\""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_013TcRPsCvYYmNk97PUiKW5m",
+            "content": "waiting for background test job ble3zui9v to complete"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "The poll-lane test run is executing in the background; I'll continue once it completes and finishes verifying, committing, and pushing this item."
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": "<task-notification>\n<task-id>ble3zui9v</task-id>\n<tool-use-id>toolu_01USGstRBJDq9UqgrzAJ7sur</tool-use-id>\n<output-file>/tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4312/da2217d9-8596-4b5a-841d-c0d258c71597/tasks/ble3zui9v.output</output-file>\n<status>completed</status>\n<summary>Background command \"npx vitest run src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts 2&gt;&amp;1 | tail -60\" completed (exit code 0)</summary>\n</task-notification>"
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Tests passed. Let me check the output for confirmation, then commit and push."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01NABK8KW8jxx2pbGzhmYwfy",
+            "name": "Read",
+            "input": {
+              "file_path": "/tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4312/da2217d9-8596-4b5a-841d-c0d258c71597/tasks/ble3zui9v.output"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01NABK8KW8jxx2pbGzhmYwfy",
+            "content": "1\tsrc/lib/acp/session-runtime.d.ts (22:885) \u001b[33m[IMPORT_IS_UNDEFINED] Warning:\u001b[0m Import `AcpError` will always be undefined because there is no matching export in 'packages/effect-acp/src/errors.d.ts'\n2\t -  in src/lib/acp/session-runtime.d.ts at 2767..2791\n3\t\n4\tsrc/lib/acp/session-runtime.d.ts (22:926) \u001b[33m[IMPORT_IS_UNDEFINED] Warning:\u001b[0m Import `SetSessionConfigOptionResponse` will always be undefined because there is no matching export in 'packages/effect-acp/src/schema.d.ts'\n5\t -  in src/lib/acp/session-runtime.d.ts at 2808..2854\n6\t\n7\tsrc/lib/acp/session-runtime.d.ts (22:974) \u001b[33m[IMPORT_IS_UNDEFINED] Warning:\u001b[0m Import `AcpError` will always be undefined because there is no matching export in 'packages/effect-acp/src/errors.d.ts'\n8\t -  in src/lib/acp/session-runtime.d.ts at 2856..2880\n9\t\n10\tsrc/lib/acp/session-runtime.d.ts (22:1015) \u001b[33m[IMPORT_IS_UNDEFINED] Warning:\u001b[0m Imp …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "All 6 tests pass. Now let's commit and push."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01R6TTn3VgDr8YaBmRjJacKJ",
+            "name": "Bash",
+            "input": {
+              "command": "git status"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Raising the read-lane worker count to four was rejected; polls get their own lane instead."
+          }
+        ]
+      }
+    }
+  ],
+  "plantedFacts": [
+    {
+      "id": "poll",
+      "anyOf": [
+        [
+          "poll"
+        ]
+      ]
+    },
+    {
+      "id": "lane",
+      "anyOf": [
+        [
+          "lane"
+        ],
+        [
+          "worker"
+        ]
+      ]
+    },
+    {
+      "id": "conversation",
+      "anyOf": [
+        [
+          "conversation"
+        ],
+        [
+          "read"
+        ]
+      ]
+    }
+  ],
+  "decoys": [
+    {
+      "id": "worker-count",
+      "anchor": "worker count to four"
+    }
+  ]
+}
