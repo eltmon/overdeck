@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:14:05.675Z",
+  "updated": "2026-09-29T16:14:19.239Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "memory-doctor-cause.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T16:14:05.675Z"
+    },
+    "doctor-memory-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:14:19.239Z"
     }
   }
 }
