@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T14:54:51.957Z",
+  "updated": "2026-09-29T14:55:28.784Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "probe-windows.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T14:54:51.956Z"
+    },
+    "probe-windows.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:55:28.784Z"
     }
   }
 }
