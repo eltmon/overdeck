@@ -113,3 +113,57 @@ describe('agent gh shim (PAN-4264)', () => {
     expect(existsSync(join(elsewhere, 'github-quota'))).toBe(false);
   });
 });
+
+describe('grant-label deny (PAN-4343)', () => {
+  async function runShim(args: string[], env: NodeJS.ProcessEnv = process.env) {
+    return execFileAsync('sh', [ghShim, ...args], { encoding: 'utf8', env })
+      .then(
+        ({ stdout, stderr }) => ({ code: 0, stdout, stderr }),
+        (e: { code?: number; stdout?: string; stderr?: string }) => ({ code: e.code, stdout: e.stdout, stderr: e.stderr }),
+      );
+  }
+
+  it.each([
+    [['issue', 'edit', '1', '--add-label', 'released']],
+    [['issue', 'edit', '1', '--add-label=Released']],
+    [['issue', 'edit', '1', '--add-label', 'bug, auto-merge']],
+    [['issue', 'edit', '1', '--remove-label', 'hold-for-uat']],
+    [['pr', 'edit', '5', '--add-label', 'auto-merge']],
+    [['issue', 'create', '--title', 't', '-l', 'released']],
+    [['pr', 'create', '-lhold-for-uat']],
+    [['api', 'repos/o/r/issues/1/labels', '-f', 'labels[]=released']],
+    [['api', '-X', 'DELETE', 'repos/o/r/issues/1/labels/hold-for-uat']],
+    [['api', '--method=post', 'repos/o/r/issues/1/labels', '-f', 'labels[]=AUTO-MERGE']],
+    [['api', 'repos/o/r/issues', '-f', 'title=t', '-f', 'labels[]=released']],
+    [['api', '-X', 'PATCH', 'repos/o/r/issues/1', '-F', 'labels[]=hold-for-uat']],
+  ])('refuses gh %j without running gh or counting it', async (args) => {
+    const before = ledgerLines().length;
+    const result = await runShim(args);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('operator grant label');
+    expect(ledgerLines()).toHaveLength(before);
+  });
+
+  it.each([
+    [['issue', 'edit', '1', '--add-label', 'bug']],
+    [['issue', 'edit', '1', '--title', 'released']],
+    [['api', 'repos/o/r/issues/1/labels']],
+    [['api', 'repos/o/r/issues/1/comments', '-f', 'body=released']],
+    [['api', 'repos/o/r/issues?labels=released']],
+    [['api', 'graphql', '-f', 'query=released']],
+  ])('passes gh %j through and counts it', async (args) => {
+    const before = ledgerLines().length;
+    const result = await runShim(args);
+    expect(result.code).toBe(3);
+    expect(result.stdout).toBe(`real-gh ${args.join(' ')}\n`);
+    expect(ledgerLines()).toHaveLength(before + 1);
+  });
+
+  it('refuses even when OVERDECK_GH_METERED=1', async () => {
+    const result = await runShim(['issue', 'edit', '1', '--add-label', 'released'], { ...process.env, OVERDECK_GH_METERED: '1' });
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('operator grant label');
+  });
+});

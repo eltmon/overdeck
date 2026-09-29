@@ -26,8 +26,10 @@
  * switch `pan`'s own git operations use), and file-system and network writes are
  * not restricted at all.
  *
- * The same guard directory also holds a count-only `gh` shim (PAN-4264) that
- * records each agent `gh` call in the GitHub quota ledger and never blocks.
+ * The same guard directory also holds a `gh` shim (PAN-4264) that records each
+ * agent `gh` call in the GitHub quota ledger and, first, refuses writes of the
+ * operator grant labels `released`, `auto-merge` and `hold-for-uat`
+ * (PAN-4343). An absolute `/usr/bin/gh` bypasses it too.
  *
  * Default mode also refuses `commit`, `push`, `merge` and `cherry-pick` in a
  * drifted worktree (PAN-4337): when the target's toplevel is a linked worktree
@@ -275,6 +277,89 @@ function branchCheckShimLines(): string[] {
 }
 
 /**
+ * PAN-4343: the `gh` shim's grant-label deny. `released`, `auto-merge` and
+ * `hold-for-uat` carry operator decisions, so adding or removing one is
+ * refused: `gh issue|pr edit|create` label flags (comma lists, `=` and
+ * attached forms, any case), and `gh api` calls whose effective method is not
+ * GET with a label carrier (a `labels…=` field or an `issues/<n>/labels/<name>`
+ * path) naming a grant label. The implied method follows `gh api`: POST when a
+ * field or `--input` is given, else GET. A refusal exits 1 before the ledger
+ * append, so it is never counted. Plain POSIX sh; every `$` is a runtime
+ * expansion, escaped by `grantLabelDenyShimLines`.
+ */
+const GRANT_LABEL_DENY_SH = [
+  '_overdeck_gh_refuse() {',
+  '  echo "Overdeck refused gh: \'$1\' is an operator grant label (released, auto-merge, hold-for-uat). Only the operator adds or removes it. Ask the operator instead of changing it." >&2',
+  '  exit 1',
+  '}',
+  '_overdeck_gh_grant_in() {',
+  '  _og_list="$(printf \'%s\' "$1" | tr -d \'[:space:]\' | tr \'[:upper:]\' \'[:lower:]\')"',
+  '  _og_ifs="$IFS"; IFS=\',\'',
+  '  for _og_v in $_og_list; do',
+  '    case "$_og_v" in',
+  '      released|auto-merge|hold-for-uat) IFS="$_og_ifs"; printf \'%s\\n\' "$_og_v"; return 0 ;;',
+  '    esac',
+  '  done',
+  '  IFS="$_og_ifs"',
+  '  return 1',
+  '}',
+  'case "$1:$2" in',
+  '  issue:edit|issue:create|pr:edit|pr:create)',
+  '    _og_next=0',
+  '    for _og_arg in "$@"; do',
+  '      if [ "$_og_next" = 1 ]; then',
+  '        _og_next=0',
+  '        _og_hit="$(_overdeck_gh_grant_in "$_og_arg")" && _overdeck_gh_refuse "$_og_hit"',
+  '        continue',
+  '      fi',
+  '      case "$_og_arg" in',
+  '        --add-label|--remove-label|--label|-l) _og_next=1 ;;',
+  '        --add-label=*|--remove-label=*|--label=*)',
+  '          _og_hit="$(_overdeck_gh_grant_in "${_og_arg#*=}")" && _overdeck_gh_refuse "$_og_hit" ;;',
+  '        -l?*)',
+  '          _og_v="${_og_arg#-l}"; _og_v="${_og_v#=}"',
+  '          _og_hit="$(_overdeck_gh_grant_in "$_og_v")" && _overdeck_gh_refuse "$_og_hit" ;;',
+  '      esac',
+  '    done',
+  '    ;;',
+  '  api:*)',
+  '    _og_method=""; _og_fields=0; _og_hit=""; _og_next=0',
+  '    for _og_arg in "$@"; do',
+  '      if [ "$_og_next" = 1 ]; then _og_next=0; _og_method="$_og_arg"; continue; fi',
+  '      case "$_og_arg" in',
+  '        -X|--method) _og_next=1; continue ;;',
+  '        --method=*) _og_method="${_og_arg#--method=}" ;;',
+  '        -X?*) _og_method="${_og_arg#-X}" ;;',
+  '        -f|-F|--field|--raw-field|--input|-f?*|-F?*|--field=*|--raw-field=*|--input=*) _og_fields=1 ;;',
+  '      esac',
+  '      _og_low="$(printf \'%s\' "$_og_arg" | tr \'[:upper:]\' \'[:lower:]\')"',
+  '      case "$_og_low" in',
+  '        *labels*=*|*issues/*/labels/*)',
+  '          case "$_og_low" in',
+  '            *released*) _og_hit=released ;;',
+  '            *auto-merge*) _og_hit=auto-merge ;;',
+  '            *hold-for-uat*) _og_hit=hold-for-uat ;;',
+  '          esac',
+  '          ;;',
+  '      esac',
+  '    done',
+  '    if [ -z "$_og_method" ]; then',
+  '      if [ "$_og_fields" = 1 ]; then _og_method=POST; else _og_method=GET; fi',
+  '    fi',
+  '    _og_method="$(printf \'%s\' "$_og_method" | tr \'[:lower:]\' \'[:upper:]\')"',
+  '    if [ -n "$_og_hit" ] && [ "$_og_method" != GET ]; then',
+  '      _overdeck_gh_refuse "$_og_hit"',
+  '    fi',
+  '    ;;',
+  'esac',
+];
+
+/** The grant-label deny, escaped for the launcher's unquoted heredoc. */
+function grantLabelDenyShimLines(): string[] {
+  return GRANT_LABEL_DENY_SH.map((line) => line.replace(/\$/g, '\\$'));
+}
+
+/**
  * Emit the launcher lines that materialize and install the per-agent git guard.
  *
  * @param agentId   Owning agent id — the guard lives in `~/.overdeck/agents/<id>/git-guard`.
@@ -446,7 +531,7 @@ export function buildGitGuardLines(agentId: string, guardRoot: string, mode: Git
     ]),
     'EOF',
     `chmod 0755 ${shellQuote(guardPath)}`,
-    ...buildGhShimLines(agentId, guardDir),
+    ...buildGhShimLines(agentId, guardDir, true),
     `export PATH="${pathForDoubleQuotes}:$PATH"`,
   ];
 }
@@ -461,14 +546,19 @@ function heredocShellQuote(value: string): string {
  * appends one line to the GitHub quota ledger (caller `agent`, estimated cost
  * 1, outcome `unknown` because the shim `exec`s the real gh and never sees
  * its exit status), then execs the real gh with the same arguments, so stdout,
- * stderr and the exit code pass through untouched. It never blocks a call.
+ * stderr and the exit code pass through untouched.
+ *
+ * With `denyGrantLabels` (every agent pane and the Flywheel conversation,
+ * PAN-4343) the shim first refuses grant-label writes (`GRANT_LABEL_DENY_SH`)
+ * and exits 1 before counting; `OVERDECK_GH_METERED` does not skip that
+ * check. It is a PATH shim: an absolute `/usr/bin/gh` bypasses it.
  *
  * The ledger directory is resolved here, at launch, and baked in as a literal:
  * the shim never reads `$OVERDECK_HOME` at call time, so a polluted temp home
  * in an agent shell cannot redirect agent counts. Emitted after the inherited
  * guard dirs are dropped from PATH, so "real gh" is never another agent's shim.
  */
-function buildGhShimLines(agentId: string, guardDir: string): string[] {
+function buildGhShimLines(agentId: string, guardDir: string, denyGrantLabels: boolean): string[] {
   const ghPath = join(guardDir, 'gh');
   const ledgerDir = heredocShellQuote(getGitHubQuotaDir());
   const agentArg = heredocShellQuote(agentId.replace(/["\\]/g, ''));
@@ -478,6 +568,8 @@ function buildGhShimLines(agentId: string, guardDir: string): string[] {
     `cat > ${shellQuote(ghPath)} <<EOF`,
     '#!/bin/sh',
     '_OVERDECK_REAL_GH="$_OVERDECK_REAL_GH"',
+    // Refuse before counting: a refused call never reached GitHub.
+    ...(denyGrantLabels ? grantLabelDenyShimLines() : []),
     '_overdeck_gh_bucket=graphql',
     'if [ "\\$1" = "run" ] || { [ "\\$1" = "api" ] && [ "\\$2" != "graphql" ]; }; then _overdeck_gh_bucket=rest; fi',
     // runGh sets OVERDECK_GH_METERED=1 on its own exec: that call is already
