@@ -10,6 +10,14 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". */}
 
+<Update label="v0.63.0" description="2026-09-28">
+  #### New
+
+  - **Claude Sonnet 5.5:** Anthropic's `claude-sonnet-5-5` is in the model pickers, the Settings catalog and the cost tables ($2/M input, $10/M output, 1M context), and it is now the default for the Sonnet tier: `workhorses.mid`, new conversations, status reviews, fork summaries and the provider fallback. Models you set yourself are unchanged. Sonnet 5.5 needs Claude Code 2.1.284 or newer; run `npm install -g @anthropic-ai/claude-code@latest` first. Overdeck no longer sends `temperature` to models that reject it, so memory extraction and registry classification work with Sonnet 5 and newer.
+
+  [Compare v0.62.1...v0.63.0](https://github.com/eltmon/overdeck/compare/v0.62.1...v0.63.0)
+</Update>
+
 <Update label="v0.62.1" description="2026-09-27">
   #### Fixed
 
