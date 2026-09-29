@@ -54,6 +54,13 @@ export async function fetchConversationMessageLocator(name: string, byteOffset: 
   return res.json();
 }
 
+/** A title-only hit (PAN-4358) has no byte offset to resolve into a message locator. */
+export function conversationHitNeedsLocator(
+  hit: Pick<ConversationPaletteOpenRequest, 'byteOffset'>,
+): hit is ConversationPaletteOpenRequest & { byteOffset: number } {
+  return hit.byteOffset !== null;
+}
+
 export function describeConversationHitOpenFailure(hit: ConversationPaletteOpenRequest, err: unknown): string {
   const reason = err instanceof Error ? err.message : 'Unable to open conversation hit';
   const details = [
