@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:22:17.216Z",
+  "updated": "2026-09-29T16:22:30.430Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "pairing-exchange.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T16:22:17.216Z"
+    },
+    "pairing-exchange.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:22:30.430Z"
     }
   }
 }
