@@ -17,6 +17,11 @@
  *      (PAN-3668). Every other prime-agent cell follows the model-level rules.
  *   4. A harness with no explicit rule below is denied, never allowed by
  *      default, so a new RuntimeName cannot bypass rules 2 and 3 silently.
+ *   5. Under ChatGPT sign-in, some OpenAI models need a Codex CLI version
+ *      newer than what the host has installed (PAN-4363) — OpenAI's backend
+ *      rejects them below that version. The caller supplies the installed
+ *      version via `context.codexCliVersion`; without it, this rule cannot
+ *      fire and the cell is allowed.
  *
  * Allowed cells:
  *   - claude-code + any provider + any authMode -> allowed (modulo rule 1)
@@ -27,6 +32,8 @@
  *     subscription is in play, so the ToS bar is not engaged)
  */
 
+import { CODEX_CLI_INSTALL_COMMAND, codexModelMinimumVersion, compareVersions } from './codex/app-server-manager.js'
+import type { HarnessPolicyContext } from './codex/policy-context.js'
 import type { RuntimeName } from './runtimes/types.js'
 import type { AuthMode } from './subscription-types.js'
 import { getProviderForModel } from './providers.js'
@@ -116,10 +123,30 @@ export function canUseModelWithAuth(
   return ALLOWED
 }
 
+/** PAN-4363: ChatGPT sign-in refuses some models below a Codex CLI version. */
+function codexModelFloorDecision(
+  model: string,
+  authMode: AuthMode | undefined,
+  context: HarnessPolicyContext | undefined,
+): HarnessPolicyDecision {
+  const installed = context?.codexCliVersion
+  const floor = codexModelMinimumVersion(model)
+  if (authMode !== 'subscription' || !installed || !floor || compareVersions(installed, floor) >= 0) {
+    return ALLOWED
+  }
+  return {
+    allowed: false,
+    reason:
+      `${model} needs Codex CLI ${floor} or newer under ChatGPT sign-in; this host has ${installed}, and OpenAI rejects the model with HTTP 400 below that version. ` +
+      `Upgrade with \`${CODEX_CLI_INSTALL_COMMAND}\`, then check \`codex --version\`, or pick a different model.`,
+  }
+}
+
 export function canUseHarness(
   harness: RuntimeName,
   model: string,
   authMode: AuthMode | undefined,
+  context?: HarnessPolicyContext,
 ): HarnessPolicyDecision {
   const providerName = getProviderForModel(model).name;
   const isOpenCodeProvider = providerName === 'opencode' || providerName === 'opencode-go';
@@ -161,7 +188,7 @@ export function canUseHarness(
   }
 
   if (harness === 'codex') {
-    return ALLOWED
+    return codexModelFloorDecision(model, authMode, context)
   }
 
   if (harness === 'acp') {
@@ -183,7 +210,7 @@ export function canUseHarness(
   // Legacy 'pi' is normally rewritten to 'ohmypi' at settings load; a raw value
   // that slips through gets the ohmypi rules, never a free pass.
   if ((harness as string) === 'pi') {
-    return canUseHarness('ohmypi', model, authMode)
+    return canUseHarness('ohmypi', model, authMode, context)
   }
 
   if (harness === 'prime-agent') {
