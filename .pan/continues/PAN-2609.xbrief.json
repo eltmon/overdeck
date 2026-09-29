@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:30:50.449Z",
+  "updated": "2026-09-29T06:31:02.985Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -478,6 +478,10 @@
     "vault-materialize.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T06:30:50.448Z"
+    },
+    "vault-adopt.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:31:02.984Z"
     }
   }
 }
