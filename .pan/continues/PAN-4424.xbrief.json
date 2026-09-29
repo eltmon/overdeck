@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4424",
+  "created": "2026-09-29T22:24:30.151Z",
+  "updated": "2026-09-29T22:24:30.151Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fork-default-cli": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4424",
+      "claimedAt": "2026-09-29T22:24:30.151Z"
+    }
+  }
+}
