@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4329",
   "created": "2026-09-29T09:48:46.123Z",
-  "updated": "2026-09-29T10:27:27.949Z",
+  "updated": "2026-09-29T10:27:42.106Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "wip-format.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T10:27:27.949Z"
+    },
+    "wip-format.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:27:42.105Z"
     }
   }
 }
