@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4329",
   "created": "2026-09-29T09:48:46.123Z",
-  "updated": "2026-09-29T10:29:19.381Z",
+  "updated": "2026-09-29T10:29:32.936Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "wip-capture.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T10:29:19.381Z"
+    },
+    "wip-capture.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:29:32.936Z"
     }
   }
 }
