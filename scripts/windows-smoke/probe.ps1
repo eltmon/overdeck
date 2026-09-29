@@ -202,8 +202,7 @@ $Result = [ordered]@{
   subject = "$(Split-Path -Leaf $Subject) @ $(if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { 'local' })"
 }
 
-# Install the subject into the npx cache once, so 1c's 90 s budget measures the
-# server and not the download.
+# Install the subject into the npx cache once, so later steps measure the command and not the download.
 $warmClock = [System.Diagnostics.Stopwatch]::StartNew()
 $warm = Invoke-Pan @('--version') 600
 $Result.subjectInstall = [ordered]@{ exitCode = $warm.ExitCode; evidence = (Get-Tail $warm.Output); seconds = [Math]::Round($warmClock.Elapsed.TotalSeconds, 1) }
@@ -229,16 +228,18 @@ if ($SkipServe) {
   foreach ($id in '1c', '1d', '2a', '2b') { Add-Step $id 'not-run' '' $null '' 'skipped by -SkipServe' }
 } else {
   # serve runs through the same launcher as every other step. Its output is
-  # read once the tree is killed after 2b; 1c's evidence gets it then.
+  # read once the tree is killed after 2b; 1c's evidence gets it then. The
+  # budget is 300 s, not 90 s: on windows-2022 every `npx -p <tgz>` call spends
+  # 90-120 s before pan runs (run 36595332191), and 1c measures the server.
   $serve = $null
   $ServePoll = ''
-  Invoke-Step '1c' "$(Format-Pan @('serve', '--port', "$Port")) (background); GET http://localhost:$Port/" {
+  Invoke-Step '1c' "$(Format-Pan @('serve', '--port', "$Port")) (background); GET http://localhost:$Port/ (300 s budget, npx start-up included)" {
     $env:OVERDECK_INTERNAL_TOKEN = $Token
     $script:serve = Start-Timed 'npx' @('--yes', '-p', $Subject, 'pan', 'serve', '--port', "$Port")
     Remove-Item Env:OVERDECK_INTERNAL_TOKEN -ErrorAction SilentlyContinue
     if (-not $script:serve.Process) { return @{ status = 'fail'; evidence = $script:serve.Error; note = 'serve did not start' } }
     $last = $null
-    $deadline = (Get-Date).AddSeconds(90)
+    $deadline = (Get-Date).AddSeconds(300)
     while ((Get-Date) -lt $deadline) {
       $last = Get-HttpStatus 'GET' "http://localhost:$Port/" @{} $null
       if ($last.Status -eq 200) { break }
@@ -277,7 +278,10 @@ if ($SkipServe) {
   if ($serve -and $serve.Process) {
     if (-not $serve.Process.HasExited) { Stop-Tree $serve }
     $ServeOutput = Get-TimedOutput $serve
-    $Steps['1c'].evidence = Get-Tail "$ServePoll`n--- serve stdout+stderr ---`n$ServeOutput"
+    # The poll result and snapshot go last so the 4000-character tail keeps
+    # them; the serve output contributes its head (the banner) and its tail.
+    $out = if ($ServeOutput.Length -gt 2400) { "$($ServeOutput.Substring(0, 1200))`n[...]`n$($ServeOutput.Substring($ServeOutput.Length - 1200))" } else { $ServeOutput }
+    $Steps['1c'].evidence = Get-Tail "--- serve stdout+stderr ---`n$out`n$ServePoll"
   }
 
   Invoke-Step '1d' 'read serve output for "Open your browser to:"' {
@@ -473,17 +477,17 @@ Invoke-Step '3f' 'record HOME, USERPROFILE, os.homedir(), OVERDECK_HOME and the 
 }
 
 $launchArgs = @('vault', 'resume', $FixtureInfo.vaultId, '--cwd', $ClonePath, '--on-drift', 'continue')
-Invoke-Step '3g' "$(Format-Pan $launchArgs) (launches claude; 90 s, stdin closed)" {
+Invoke-Step '3g' "$(Format-Pan $launchArgs) (launches claude; 300 s including npx start-up, stdin closed)" {
   # After 3c adopted the session this machine owns it, so resume prints nothing
   # of its own before spawning claude: any output is claude's or a spawn error.
   if (-not $NewSessionId) { return @{ status = 'not-run'; note = '3c failed: the session was not adopted' } }
-  $r = Invoke-Pan $launchArgs 90 $ClonePath
+  $r = Invoke-Pan $launchArgs 300 $ClonePath
   if ($r.Output -match 'EINVAL|ENOENT|spawn .*claude') {
     return @{ status = 'fail'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'spawn error' }
   }
   $text = ($r.Output -replace '\[probe: killed after \d+ s\]', '').Trim()
   if ($text) { return @{ status = 'pass'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'claude produced output' } }
-  if ($r.TimedOut) { return @{ status = 'partial'; evidence = $r.Output; note = 'no output within 90 s' } }
+  if ($r.TimedOut) { return @{ status = 'partial'; evidence = $r.Output; note = 'no output within 300 s' } }
   @{ status = 'fail'; exitCode = $r.ExitCode; evidence = $r.Output; note = 'exited without output' }
 }
 
