@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T01:58:41.362Z",
+  "updated": "2026-09-29T01:58:47.880Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
       "claimedBy": "agent-pan-4334",
       "claimedAt": "2026-09-29T01:55:01.799Z",
       "doneAt": "2026-09-29T01:58:41.362Z"
+    },
+    "docs-skill-packs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:58:47.880Z"
     }
   }
 }
