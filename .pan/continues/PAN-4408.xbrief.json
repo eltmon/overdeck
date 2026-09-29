@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T16:08:20.993Z",
+  "updated": "2026-09-29T16:08:35.077Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -284,6 +284,10 @@
     "docs-knowledge-mdx.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T16:08:20.993Z"
+    },
+    "docs-claude-md.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:08:35.077Z"
     }
   }
 }
