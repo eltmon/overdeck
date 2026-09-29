@@ -4,17 +4,17 @@
     "created": "2026-09-29T13:21:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4399: Post-planning auto-spawn fails silently when the workspace Docker stack rebuild fails; issue sits with no work agent",
-    "updated": "2026-09-29T13:21:18.627Z"
+    "updated": "2026-09-29T13:22:02.658Z"
   },
   "plan": {
     "id": "pan-4399",
     "title": "Post-planning auto-spawn fails silently when the workspace Docker stack rebuild fails; issue sits with no work agent",
-    "status": "proposed",
+    "status": "running",
     "uid": "ac39fc76-bd29-4f78-a807-0d70c2184cdb",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T13:21:04Z",
-    "updated": "2026-09-29T13:21:18.627Z",
+    "updated": "2026-09-29T13:22:02.658Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4399",
@@ -669,5 +669,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

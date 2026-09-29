@@ -255,4 +255,60 @@ describe('retryDeferredHandoffs', () => {
     expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.abandoned', data: { outcome: 'stood-down' } });
     expect(appended).toEqual([]);
   });
+
+  // PAN-4399: a `stack-unhealthy` deferral carries its reason through every
+  // journal entry in the retry chain, distinct from a guardrail refusal.
+  describe('a stack-unhealthy deferral', () => {
+    beforeEach(() => {
+      deferred.recordHandoffDeferred({
+        workspacePath: workspace,
+        issueId: ISSUE,
+        error: 'Docker stack unhealthy',
+        reason: 'stack-unhealthy',
+      });
+    });
+
+    it('retries and carries reason: stack-unhealthy forward on refusal', async () => {
+      spawn.mockResolvedValueOnce({ spawned: false, skippedReason: 'stack-unhealthy', error: 'Docker stack unhealthy' });
+
+      await tick(2); // T0+2: first retry, refused
+
+      expect(spawn).toHaveBeenCalledTimes(1);
+      const retried = handoffEntries().at(-1)!;
+      expect(retried).toMatchObject({
+        type: 'handoff.retried',
+        data: { attempt: 1, reason: 'stack-unhealthy', skipReason: 'stack-unhealthy' },
+      });
+      expect(Date.parse(String(retried.data!['nextRetryAt']))).toBeGreaterThan(T0 + 2 * MINUTE);
+    });
+
+    it('starts the work agent once the spawn succeeds', async () => {
+      spawn.mockResolvedValueOnce({ spawned: true, agentId: 'agent-pan-4155' });
+
+      await tick(2); // T0+2: first retry, accepted
+
+      expect(handoffEntries().at(-1)).toMatchObject({
+        type: 'handoff.started',
+        data: { attempt: 1, agentId: 'agent-pan-4155' },
+      });
+    });
+
+    it('gives up after two hours with skipReason stack-unhealthy and a pan start warning', async () => {
+      spawn.mockResolvedValue({ spawned: false, skippedReason: 'stack-unhealthy', error: 'Docker stack unhealthy' });
+
+      for (let minute = 0; minute < 125; minute += 1) await tick(1);
+
+      const abandoned = handoffEntries().at(-1)!;
+      expect(abandoned).toMatchObject({
+        type: 'handoff.abandoned',
+        data: { outcome: 'gave-up', skipReason: 'stack-unhealthy' },
+      });
+      expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+        source: 'plan',
+        level: 'warn',
+        issueId: ISSUE,
+        message: expect.stringContaining(`pan start ${ISSUE}`),
+      }));
+    });
+  });
 });

@@ -2,11 +2,12 @@
  * Deferred planning hand-off (PAN-4155).
  *
  * When planning finalizes with auto-start, `completePlanningAutoSpawn` POSTs
- * `/api/agents` once. A spawn guardrail can refuse that request: the agent
- * ceiling, leaked specialists, critical RAM, or a stale health snapshot. The
- * operator's auto-start consent is still `granted` then, because the refusal
- * comes before the consent is claimed. Before this module nothing retried, and
- * the issue sat planned with no work agent until someone ran `pan start`.
+ * `/api/agents` once. The spawn can be refused for two reasons: a guardrail
+ * (the agent ceiling, leaked specialists, critical RAM, or a stale health
+ * snapshot) or an unhealthy workspace Docker stack. The operator's auto-start
+ * consent is still `granted` then, because the refusal comes before the
+ * consent is claimed. Before this module nothing retried, and the issue sat
+ * planned with no work agent until someone ran `pan start`.
  *
  * Now the refusal is journaled as `handoff.deferred`, and deacon-lite's
  * `retryDeferredHandoffs` re-sends the spawn on a backoff with NO guardrail
@@ -42,16 +43,22 @@ export function deferredHandoffDelayMs(attempt: number): number {
   return Math.min(DEFERRED_HANDOFF_BASE_DELAY_MS * 2 ** Math.max(0, attempt), DEFERRED_HANDOFF_MAX_DELAY_MS);
 }
 
+/** Why the auto-spawn was refused: a spawn guardrail, or an unhealthy workspace Docker stack. */
+export type DeferredHandoffReason = 'guardrails' | 'stack-unhealthy';
+
 /** The schedule each `handoff.deferred` / `handoff.retried` entry carries. */
 interface DeferredHandoffSchedule {
   deferredAt: string;
   attempt: number;
   nextRetryAt: string;
+  reason: DeferredHandoffReason;
+  lastError?: string;
 }
 
 /**
- * Journal a guardrail-refused planning hand-off. Written by complete-planning
- * at the moment of the refusal; deacon-lite picks it up from there.
+ * Journal a guardrail- or stack-health-refused planning hand-off. Written by
+ * complete-planning at the moment of the refusal; deacon-lite picks it up
+ * from there.
  */
 export function recordHandoffDeferred(options: {
   workspacePath: string;
@@ -59,11 +66,12 @@ export function recordHandoffDeferred(options: {
   error: string;
   httpStatus?: number;
   now?: number;
+  reason?: DeferredHandoffReason;
   /** True when the Deacon was frozen at the moment of the deferral (PAN-4210): the retry is journaled but held until it thaws. */
   deaconPaused?: boolean;
 }): PipelineJournalEntry {
   const now = options.now ?? Date.now();
-  const schedule: DeferredHandoffSchedule = {
+  const schedule = {
     deferredAt: new Date(now).toISOString(),
     attempt: 0,
     nextRetryAt: new Date(now + deferredHandoffDelayMs(0)).toISOString(),
@@ -74,12 +82,17 @@ export function recordHandoffDeferred(options: {
     source: 'complete-planning',
     data: {
       ...schedule,
-      reason: 'guardrails',
+      reason: options.reason ?? 'guardrails',
       error: options.error,
       ...(options.httpStatus !== undefined ? { httpStatus: options.httpStatus } : {}),
       ...(options.deaconPaused === true ? { deaconPaused: true } : {}),
     },
   });
+}
+
+/** The deferral reason a journal entry carries, defaulting to `'guardrails'`. */
+function readReason(entry: PipelineJournalEntry): DeferredHandoffReason {
+  return entry.data?.['reason'] === 'stack-unhealthy' ? 'stack-unhealthy' : 'guardrails';
 }
 
 function readSchedule(entry: PipelineJournalEntry): DeferredHandoffSchedule | null {
@@ -88,7 +101,8 @@ function readSchedule(entry: PipelineJournalEntry): DeferredHandoffSchedule | nu
   const attempt = typeof data['attempt'] === 'number' ? data['attempt'] : 0;
   const nextRetryAt = typeof data['nextRetryAt'] === 'string' ? data['nextRetryAt'] : null;
   if (Number.isNaN(Date.parse(deferredAt)) || !nextRetryAt || Number.isNaN(Date.parse(nextRetryAt))) return null;
-  return { deferredAt, attempt, nextRetryAt };
+  const lastError = typeof data['error'] === 'string' ? data['error'] : undefined;
+  return { deferredAt, attempt, nextRetryAt, reason: readReason(entry), ...(lastError !== undefined ? { lastError } : {}) };
 }
 
 /** Why the operator's own action makes the retry moot, or null when it may go ahead. */
@@ -214,7 +228,10 @@ async function retryOne(input: {
   }
 
   if (now - deferredAtMs >= DEFERRED_HANDOFF_WINDOW_MS) {
-    giveUpHandoff(workspacePath, issueId, schedule, 'guardrails', 'spawn guardrails still refused the work agent', emitActivity);
+    const message = schedule.lastError ?? (schedule.reason === 'stack-unhealthy'
+      ? 'the workspace docker stack is still unhealthy'
+      : 'spawn guardrails still refused the work agent');
+    giveUpHandoff(workspacePath, issueId, schedule, schedule.reason, message, emitActivity);
     return `gave up after ${schedule.attempt} retries`;
   }
   if (now < Date.parse(schedule.nextRetryAt)) return null;
@@ -265,6 +282,7 @@ async function retryOne(input: {
       deferredAt: schedule.deferredAt,
       attempt,
       nextRetryAt: new Date(now + deferredHandoffDelayMs(attempt)).toISOString(),
+      reason: schedule.reason,
       skipReason,
       error,
     },
