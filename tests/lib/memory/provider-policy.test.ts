@@ -5,6 +5,7 @@ import {
   extractWithProviderPolicy,
   getTodayMemoryExtractionSpendUsd,
   registerExtractionProvider,
+  ExtractionProviderAuthError,
   type ExtractionProvider,
   type ExtractionProviderOptions,
   type ExtractionProviderResult,
@@ -150,6 +151,7 @@ describe('memory extraction provider policy', () => {
     expect(recordHealth).toHaveBeenCalledWith(identity, {
       status: 'degraded',
       reason: 'cost-cap',
+      detail: expect.stringContaining('daily memory extraction cap'),
       success: false,
     });
   });
@@ -206,6 +208,36 @@ describe('memory extraction provider policy', () => {
       status: 'failing',
       reason: 'extraction-failed',
       detail: expect.stringContaining('failed'),
+      success: false,
+    });
+  });
+
+  // PAN-4370 WI-4: an auth failure gets its own health reason so the operator
+  // can tell "no credentials configured" apart from any other extraction error.
+  it('records health reason provider-auth-failed when the provider throws ExtractionProviderAuthError', async () => {
+    class AuthFailingProvider implements ExtractionProvider {
+      readonly name = 'anthropic';
+      readonly defaultModel = 'claude-haiku-4-5-20251001';
+      async extract<T>(): Promise<ExtractionProviderResult<T>> {
+        throw new ExtractionProviderAuthError(this.name, 'no ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN in this process environment');
+      }
+    }
+    registerExtractionProvider(new AuthFailingProvider());
+    const recordHealth = vi.fn(async () => undefined);
+
+    const result = await extractWithProviderPolicy<ExtractedPayload>('summarize', { type: 'object' }, {
+      identity,
+    }, {
+      selection: { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', fallbackChain: [], source: 'settings' },
+      getDailySpendUsd: () => 0,
+      recordHealth,
+    });
+
+    expect(result).toEqual({ status: 'dropped', reason: 'extraction-failed', error: expect.any(ExtractionProviderAuthError) });
+    expect(recordHealth).toHaveBeenCalledWith(identity, {
+      status: 'failing',
+      reason: 'provider-auth-failed',
+      detail: expect.stringContaining('ANTHROPIC_API_KEY'),
       success: false,
     });
   });

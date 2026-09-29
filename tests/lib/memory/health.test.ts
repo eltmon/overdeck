@@ -7,6 +7,13 @@ import {
   updateMemoryHealth,
   type MemoryHealthChangedPayload,
 } from '../../../src/lib/memory/health.js';
+import {
+  extractWithProviderPolicy,
+  registerExtractionProvider,
+  ExtractionProviderAuthError,
+  type ExtractionProvider,
+  type ExtractionProviderResult,
+} from '../../../src/lib/memory/providers/index.js';
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
@@ -108,5 +115,60 @@ describe('updateMemoryHealth detail handling', () => {
 
     const persisted = await readMemoryHealthSnapshot(identity);
     expect(persisted.last_failure_detail).toBeNull();
+  });
+});
+
+describe('last_failure_reason (PAN-4370)', () => {
+  it('sets last_failure_reason from a detailed failure, preserves it across a detail-less write, and clears it on success', async () => {
+    const emit = vi.fn();
+    await updateMemoryHealth(
+      identity,
+      { status: 'failing', reason: 'provider-auth-failed', detail: 'anthropic: no ANTHROPIC_API_KEY', success: false },
+      { emitHealthChanged: emit },
+    );
+
+    const afterDetailless = await updateMemoryHealth(
+      identity,
+      { status: 'failing', reason: 'extraction-failed', success: false },
+      { emitHealthChanged: emit },
+    );
+    expect(afterDetailless.last_failure_reason).toBe('provider-auth-failed');
+
+    const afterSuccess = await updateMemoryHealth(identity, { status: 'healthy', success: true }, { emitHealthChanged: emit });
+    expect(afterSuccess.last_failure_reason).toBeNull();
+  });
+
+  // PAN-4370 AC2/AC3: drive the real policy → real updateMemoryHealth so the
+  // persisted health.json reflects what an actual auth failure produces.
+  it('records failed_by_reason and last_failure_reason for a real provider-auth-failed run through the policy', async () => {
+    class AuthFailingProvider implements ExtractionProvider {
+      readonly name = 'anthropic';
+      readonly defaultModel = 'claude-haiku-4-5-20251001';
+      async extract<T>(): Promise<ExtractionProviderResult<T>> {
+        throw new ExtractionProviderAuthError(this.name, 'no ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN in this process environment');
+      }
+    }
+    registerExtractionProvider(new AuthFailingProvider());
+
+    await extractWithProviderPolicy('summarize', { type: 'object' }, { identity }, {
+      selection: { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', fallbackChain: [], source: 'settings' },
+      getDailySpendUsd: () => 0,
+      recordHealth: (id, update) => updateMemoryHealth(id, update, { emitHealthChanged: async () => {} }),
+    });
+
+    const afterAuthFailure = await readMemoryHealthSnapshot(identity);
+    expect(afterAuthFailure.failed_by_reason['provider-auth-failed']).toBe(1);
+    expect(afterAuthFailure.last_failure_reason).toBe('provider-auth-failed');
+    expect(afterAuthFailure.last_failure_detail).toContain('ANTHROPIC_API_KEY');
+
+    const afterDetailless = await updateMemoryHealth(
+      identity,
+      { status: 'failing', reason: 'extraction-failed', success: false },
+      { emitHealthChanged: async () => {} },
+    );
+    expect(afterDetailless.last_failure_reason).toBe('provider-auth-failed');
+
+    const afterSuccess = await updateMemoryHealth(identity, { status: 'healthy', success: true }, { emitHealthChanged: async () => {} });
+    expect(afterSuccess.last_failure_reason).toBeNull();
   });
 });
