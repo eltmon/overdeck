@@ -4,17 +4,17 @@
     "created": "2026-09-29T01:57:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4338: Handoffs, forks and workers refuse a project's primary checkout as cwd",
-    "updated": "2026-09-29T01:59:19.781Z"
+    "updated": "2026-09-29T02:00:06.577Z"
   },
   "plan": {
     "id": "pan-4338",
     "title": "Handoffs, forks and workers refuse a project's primary checkout as cwd",
-    "status": "proposed",
+    "status": "running",
     "uid": "b34334d3-9433-4e60-aefa-f474ef6f6c8c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T01:57:13Z",
-    "updated": "2026-09-29T01:59:19.781Z",
+    "updated": "2026-09-29T02:00:06.577Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4338",
