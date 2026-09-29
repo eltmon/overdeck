@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4329",
   "created": "2026-09-29T09:48:46.123Z",
-  "updated": "2026-09-29T10:32:31.281Z",
+  "updated": "2026-09-29T10:32:42.740Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "allow-secret-code.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T10:32:31.281Z"
+    },
+    "allow-secret-code.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:32:42.739Z"
     }
   }
 }
