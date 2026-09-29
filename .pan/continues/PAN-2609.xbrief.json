@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:25:22.205Z",
+  "updated": "2026-09-29T06:25:35.080Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -378,6 +378,10 @@
     "vault-exclude.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T06:25:22.204Z"
+    },
+    "vault-settle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:25:35.079Z"
     }
   }
 }
