@@ -21,7 +21,7 @@ const KIND_META: Record<NeedsYouKind, { label: string; tone: string }> = {
   stuck: { label: 'Stuck', tone: 'border-destructive/40' },
 };
 
-function NeedsYouRow({
+export function NeedsYouRow({
   item,
   kind,
   question,
@@ -43,18 +43,26 @@ function NeedsYouRow({
   const answerTarget = conversationName || questionAgent?.id;
   const busy = actions.tell.isPending || actions.recover.isPending || actions.answer.isPending || actions.startWork.isPending;
   const meta = KIND_META[kind];
+  // PAN-4399: a gave-up post-planning auto-start is still "Start work" (same
+  // button, same action) but the operator needs to see it never ran, not
+  // that a plan is merely ready.
+  const label = kind === 'start-work' && item.workStartError ? 'Work agent not started' : meta.label;
 
   return (
     <div className={`flex-none w-[340px] rounded-xl border bg-card p-3 shadow-sm ${meta.tone}`} data-needs-you={item.issue.identifier}>
       <div className="flex items-center gap-2">
         <span className="font-mono text-[10px] text-muted-foreground">{item.issue.identifier}</span>
-        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{meta.label}</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
       </div>
       <button onClick={() => onOpen(item.issue.identifier)} className="mt-1 block w-full truncate text-left text-xs font-medium hover:underline">
         {item.issue.title}
       </button>
       <div className="mt-1 text-[11.5px] text-muted-foreground line-clamp-2">
-        {kind === 'question' && question ? question : item.display.sentence}
+        {kind === 'question' && question
+          ? question
+          : kind === 'start-work' && item.workStartError
+            ? item.workStartError
+            : item.display.sentence}
       </div>
       <div className="mt-2 flex items-center gap-2">
         {kind === 'question' && (

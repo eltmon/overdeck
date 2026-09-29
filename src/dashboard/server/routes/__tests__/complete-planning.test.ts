@@ -504,6 +504,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1146',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -527,6 +528,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634a',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -547,6 +549,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634b',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -568,6 +571,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-3634c',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -693,6 +697,46 @@ describe('completePlanningArtifacts', () => {
     }
   });
 
+  // PAN-4399: a stack-unhealthy deferral journals its own reason and never
+  // mentions "guardrails" — the operator sees the real cause.
+  it('journals a stack-unhealthy deferred handoff with its own reason', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-4399-stack-unhealthy-'));
+    try {
+      const emitActivity = vi.fn();
+      const result = recordPlanningAutoHandoffDeferred({
+        issueId: 'PAN-4399',
+        workspacePath: workspace,
+        result: {
+          workAgentSpawned: false,
+          workAgentSkipReason: 'stack-unhealthy',
+          workAgentError: 'Workspace docker stack for PAN-4399 is not healthy: no containers found',
+          workAgentHttpStatus: 422,
+          workAgentDeferred: true,
+        },
+        emitActivity,
+        readDeaconPaused: () => false,
+      });
+
+      expect(result).toEqual({ error: 'Workspace docker stack for PAN-4399 is not healthy: no containers found', deaconPaused: false });
+      const entries = readPipelineJournal(workspace);
+      expect(entries[0]).toMatchObject({
+        type: 'handoff.deferred',
+        issueId: 'PAN-4399',
+        source: 'complete-planning',
+        data: { reason: 'stack-unhealthy' },
+      });
+      expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+        source: 'plan',
+        level: 'warn',
+        issueId: 'PAN-4399',
+        message: expect.stringContaining('the workspace docker stack is unhealthy'),
+      }));
+      expect(emitActivity.mock.calls[0]![0].message).not.toMatch(/guardrails/);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   it('reports queued container startup without claiming launch acceptance', async () => {
     await expect(completePlanningAutoSpawn({
       issueId: 'PAN-1146',
@@ -707,6 +751,7 @@ describe('completePlanningArtifacts', () => {
       workAgentSpawned: true,
       workAgentQueued: true,
       workAgentSession: 'agent-pan-1146',
+      workAgentRequestedAt: expect.any(String),
     });
   });
 
@@ -769,26 +814,21 @@ describe('completePlanningArtifacts', () => {
     }));
   });
 
-  it('queues rebuild-and-start without consuming consent before the chained start succeeds', async () => {
-    const consumeAutoSpawnConsent = vi.fn(async () => undefined);
+  // PAN-4399: a stack-unhealthy refusal is deferred to deacon-lite's retry,
+  // same as a guardrail refusal — completePlanningAutoSpawn no longer chains
+  // a rebuild-and-start request of its own.
+  it('defers a stack-unhealthy refusal instead of chaining rebuild-and-start', async () => {
     const requests: string[] = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       requests.push(String(input));
       expect(init?.headers).toMatchObject({ [INTERNAL_TOKEN_HEADER]: 'test-internal-token' });
-      if (String(input).endsWith('/api/agents')) {
-        return new Response(JSON.stringify({
-          success: false,
-          blocked: true,
-          skipped: true,
-          error: 'Workspace docker stack for PAN-1147 is not healthy: no containers found',
-          stackHealth: { healthy: false, reasons: ['no containers found'] },
-        }), { status: 422 });
-      }
-      expect(JSON.parse(String(init?.body))).toEqual({
-        startedBy: 'planning-auto-handoff',
-        autoSpawnConsentRequired: true,
-      });
-      return new Response(JSON.stringify({ success: true, activityId: 'activity-rebuild' }), { status: 200 });
+      return new Response(JSON.stringify({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: 'Workspace docker stack for PAN-1147 is not healthy: no containers found',
+        stackHealth: { healthy: false, reasons: ['no containers found'] },
+      }), { status: 422 });
     };
 
     await expect(completePlanningAutoSpawn({
@@ -796,16 +836,14 @@ describe('completePlanningArtifacts', () => {
       autoSpawn: true,
       dashboardOrigin: 'http://127.0.0.1:3011',
       fetchImpl,
-      consumeAutoSpawnConsent,
     })).resolves.toEqual({
-      workAgentSpawned: true,
-      workAgentSession: 'agent-pan-1147',
+      workAgentSpawned: false,
+      workAgentError: 'Workspace docker stack for PAN-1147 is not healthy: no containers found',
+      workAgentSkipReason: 'stack-unhealthy',
+      workAgentHttpStatus: 422,
+      workAgentDeferred: true,
     });
-    expect(requests).toEqual([
-      'http://127.0.0.1:3011/api/agents',
-      'http://127.0.0.1:3011/api/workspaces/PAN-1147/rebuild-and-start',
-    ]);
-    expect(consumeAutoSpawnConsent).not.toHaveBeenCalled();
+    expect(requests).toEqual(['http://127.0.0.1:3011/api/agents']);
   });
 
   it('kills the planning session immediately after autoSpawn succeeds', async () => {
@@ -827,6 +865,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1148',
+      workAgentRequestedAt: expect.any(String),
     });
     expect(events).toEqual(['spawn', 'kill:planning-pan-1148']);
   });
@@ -884,6 +923,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1151',
+      workAgentRequestedAt: expect.any(String),
     });
     expect(events).toEqual([]);
   });

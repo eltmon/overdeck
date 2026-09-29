@@ -34,6 +34,7 @@ export const IssueAttention = Schema.Literals([
   /** An unanswered AskUserQuestion or a permission prompt (a `blocked` pane). */ "needs-you",
   /** Idle for N minutes with unpushed commits. */ "stuck",
   /** 429 or provider-failure text in a pane. */ "api-error",
+  /** Auto-start was attempted but no work agent came up. */ "work-not-started",
 ])
 export type IssueAttention = typeof IssueAttention.Type
 
@@ -72,6 +73,18 @@ export const DerivedBranchState = Schema.Struct({
 })
 export type DerivedBranchState = typeof DerivedBranchState.Type
 
+/** The workspace journal's read on a post-planning auto-start (PAN-4399). */
+export const DerivedWorkStart = Schema.Struct({
+  status: Schema.Literals(["retrying", "not-started"]),
+  /** ISO time of the journal entry the status was read from. */
+  at: Schema.String,
+  error: Schema.optional(Schema.String),
+  nextRetryAt: Schema.optional(Schema.String),
+  /** The retry is journaled but not actually running because the Deacon is frozen (PAN-4210). Present only when true. */
+  held: Schema.optional(Schema.Literal(true)),
+})
+export type DerivedWorkStart = typeof DerivedWorkStart.Type
+
 /** Everything the dashboard needs to render an issue's pipeline position. */
 export const DerivedIssueState = Schema.Struct({
   issueId: Schema.String,
@@ -85,6 +98,8 @@ export const DerivedIssueState = Schema.Struct({
    * unresolved tracker read is never reported as an open issue.
    */
   trackerUnknown: Schema.optional(Schema.Literal(true)),
+  /** A deferred or gave-up post-planning auto-start read from the workspace journal (PAN-4399). */
+  workStart: Schema.optional(DerivedWorkStart),
 })
 export type DerivedIssueState = typeof DerivedIssueState.Type
 
@@ -113,7 +128,7 @@ export const ISSUE_STATE_PRECEDENCE: readonly IssueState[] = [
   "backlog",
 ]
 
-export const ISSUE_ATTENTIONS: readonly IssueAttention[] = ["needs-you", "stuck", "api-error"]
+export const ISSUE_ATTENTIONS: readonly IssueAttention[] = ["needs-you", "stuck", "api-error", "work-not-started"]
 
 export function isIssueState(value: unknown): value is IssueState {
   return typeof value === "string" && (ISSUE_STATES as readonly string[]).includes(value)

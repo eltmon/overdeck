@@ -80,6 +80,54 @@ describe('resolveFeatureStateBadge', () => {
     expect(resolveFeatureStateBadge({})).toBeNull();
   });
 
+  // PAN-4399: a work-start read overrides the plain state badge, since the
+  // operator needs to know the auto-start itself is the story, not "Working".
+  it('shows Work agent not started for a not-started workStart', () => {
+    const badge = resolveFeatureStateBadge({
+      restState: 'working',
+      workStart: { status: 'not-started', at: '2026-09-29T10:00:00.000Z', error: 'gave up' },
+    });
+    expect(badge).toEqual({
+      key: 'work-not-started',
+      label: 'Work agent not started',
+      tone: 'human',
+      title: 'Planning finished but the work agent never started. Start it from Needs you or run pan start.',
+    });
+  });
+
+  it('shows Work start retrying for a retrying workStart', () => {
+    const badge = resolveFeatureStateBadge({
+      restState: 'working',
+      workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z' },
+    });
+    expect(badge).toEqual({
+      key: 'work-start-retrying',
+      label: 'Work start retrying',
+      tone: 'machine',
+      title: 'The automatic work-agent start was refused and is being retried.',
+    });
+  });
+
+  it('shows the ordinary Working badge when workStart is absent', () => {
+    const badge = resolveFeatureStateBadge({ restState: 'working' });
+    expect(badge?.label).toBe('Working');
+  });
+
+  // PAN-4210, review non-blocking #3: a frozen Deacon holds the retry, so the
+  // badge must say so instead of claiming an active retry is in flight.
+  it('shows Work start held for a retrying workStart held by a frozen Deacon', () => {
+    const badge = resolveFeatureStateBadge({
+      restState: 'working',
+      workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z', held: true },
+    });
+    expect(badge).toEqual({
+      key: 'work-start-held',
+      label: 'Work start held',
+      tone: 'machine',
+      title: 'The automatic work-agent start is deferred and held while the Deacon is frozen — unfreeze it, or run pan start.',
+    });
+  });
+
   it('never returns the label Allocated', () => {
     const inputs: FeatureStateBadgeInput[] = [
       ...(Object.keys(EXPECTED_BY_STATE) as IssueState[]).map((restState) => ({ restState })),

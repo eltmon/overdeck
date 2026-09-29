@@ -102,6 +102,7 @@ vi.mock('../issue-reads.js', () => ({
 
 import { getAgentState } from '../../agents.js';
 import { saveAgentStateAndEmitEvent } from '../../../dashboard/server/services/agent-projection.js';
+import { readPipelineJournal } from '../../cloister/pipeline-journal.js';
 import { completePlanningForIssue } from '../planning-promotion.js';
 
 const roots: string[] = [];
@@ -292,6 +293,37 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
           payload: expect.objectContaining({ status: 'stopped', hasLiveTmuxSession: false }),
         }),
       );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  // PAN-4399: an accepted auto-start journals handoff.started so the
+  // dashboard's derived work-start state can tell "spawn requested" from
+  // "nothing ever ran" without polling the terminal backend.
+  it('journals handoff.started when the auto-start is accepted', async () => {
+    const { workspacePath } = createWorkspace();
+    testState.sessionAlive = true;
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ success: true, agentId: 'agent-pan-3230' }), { status: 200 })) as unknown as typeof fetch;
+    try {
+      const deps = serviceDependencies();
+      deps.body = { noPrd: false, skipKill: false, autoSpawn: true };
+
+      const response = await completePlanningForIssue(deps);
+
+      expect(response.status).toBe(200);
+      const entries = readPipelineJournal(workspacePath).filter((entry) => entry.type.startsWith('handoff.'));
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        type: 'handoff.started',
+        issueId: 'PAN-3230',
+        source: 'complete-planning',
+        data: { agentId: 'agent-pan-3230' },
+      });
+      // PAN-4399 review fix: requestedAt is stamped before the spawn POST,
+      // so deriveWorkStart can tell a real start apart from a never-started one.
+      expect(typeof entries[0]!.data!['requestedAt']).toBe('string');
     } finally {
       global.fetch = originalFetch;
     }

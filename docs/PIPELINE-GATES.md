@@ -871,6 +871,16 @@ Auto-resume is intentionally suppressible:
   retried, until the freeze thaws — the warn activity line, `pan plan
   finalize`/`pan plan done`'s output, and `pan show` all say so (PAN-4210).
   See "Deacon-lite" below for the schedule and stop conditions.
+- **Stack-unhealthy deferral (PAN-4399):** a 422 answer that carries a
+  `stackHealth` verdict is deferred exactly like a guardrail refusal, with
+  `reason: 'stack-unhealthy'` on the `handoff.deferred`/`.retried` journal
+  entries instead of `'guardrails'`. `completePlanningAutoSpawn` no longer
+  chains its own `/api/workspaces/:id/rebuild-and-start` request on this
+  refusal — deacon-lite's ordinary retry loop owns it. Each retried
+  `/api/agents` call runs the same bounded spawn-time stack rebuild every
+  spawn already gets (`SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3`,
+  `SPAWN_STACK_REBUILD_COOLDOWN_MS` = 15 minutes, `agents/spawn-prep.ts`), so
+  the rebuild still happens, just from one call path instead of two.
 - **Preemptive scheduler** (opt-in via `[concurrency] preemption = true`,
   PAN-2507) may **yield** an idle work agent — pause it to free capacity for
   a blocked review/test dispatch. A yield reuses the same `paused: true`
@@ -1004,11 +1014,49 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
 | `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
-| `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail refused the auto-start |
-| `handoff.retried` / `.started` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
+| `handoff.deferred` | `completePlanningForIssue` (`overdeck/planning-promotion.ts`), when a spawn guardrail or a stack-unhealthy answer (`reason: 'guardrails'` \| `'stack-unhealthy'`) refused the auto-start |
+| `handoff.retried` / `.abandoned` | deacon-lite's `retryDeferredHandoffs`, on each retry and when it stops |
+| `handoff.started` | `completePlanningForIssue`, when the auto-start is accepted; also deacon-lite's `retryDeferredHandoffs`, when a deferred retry is accepted |
 
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
+
+### Work agent not started (PAN-4399)
+
+`work-start-state.ts` (`lib/overdeck/`) derives a `workStart` read from an
+issue's `handoff.*` journal, but only when the derived issue state has no PR
+and no live pane — the moment either exists, the terminal backend or the
+forge already tells that story better. `WORK_START_GRACE_MS` (10 minutes) is
+the one tunable: a `handoff.deferred`/`.retried` entry always reads as
+`status: 'retrying'`; a `handoff.abandoned` with `outcome: 'gave-up'` always
+reads as `status: 'not-started'`; and an accepted `handoff.started` reads as
+`not-started` only once it is older than the grace window with still no live
+work agent — inside the window it reads as nothing at all, since the spawn
+may simply not have produced a pane yet. A real accepted spawn is never
+misread as "never started": `pan start` writes the work agent's own
+`startedAt` before the `/api/agents` route answers, so `handoff.started` is
+journaled after a successful launch already happened. Both writers
+(`completePlanningForIssue` and deacon-lite's `retryDeferredHandoffs`) stamp
+`data.requestedAt` right before the spawn call, and `deriveWorkStart`
+compares the work agent's `startedAt` against that instead of the entry's own
+`at` — the one field that is guaranteed to precede a real start. An open
+issue only: a closed issue never carries a `workStart` or the
+`work-not-started` attention, whatever its journal says. `deriveIssueState`
+(FR-6) promotes a `not-started` workStart to `attention: 'work-not-started'`
+when nothing else already claimed the attention slot (`needs-you` and
+`api-error` still outrank it). While the Deacon is frozen (PAN-4210) the last
+journal entry still carries `data.deaconPaused: true`, which `deriveWorkStart`
+surfaces as `held: true` on a `retrying` read — the badge and subline say
+"held", not "retrying", since nothing is actually being retried.
+
+Command Deck's state badge renders "Work agent not started" (a `not-started`
+workStart), "Work start retrying" (a `retrying`, unheld one), or "Work start
+held" (a `retrying`, `held` one) in place of the ordinary state badge
+(`featureStateBadge.ts`), and groups `work-not-started` into Needs-you with a
+subline naming the recorded error. The Needs-you strip's "Start work" card
+(`NeedsYouStrip.tsx`) shows the same "Work agent not started" label and error
+text in place of the generic "Plan ready" card, with its existing Start work
+button (`POST /api/agents`) unchanged.
 
 ## Deacon-lite: seven routines
 
@@ -1195,4 +1243,7 @@ auto-start consent is no longer `granted`, or the retried spawn answers
 hours after the first refusal, or on an `unauthorized` answer, it gives up: a
 `handoff.abandoned` entry with `outcome: 'gave-up'`, a `planning.failed` event
 with `stage: 'auto-handoff'`, and a warn-level activity line that tells the
-operator to run `pan start`.
+operator to run `pan start`. The give-up message names the deferral's own
+reason — "spawn guardrails still refused the work agent" for `'guardrails'`,
+"the workspace docker stack is still unhealthy" for `'stack-unhealthy'` —
+preferring the last retry's own recorded error when one is present (PAN-4399).
