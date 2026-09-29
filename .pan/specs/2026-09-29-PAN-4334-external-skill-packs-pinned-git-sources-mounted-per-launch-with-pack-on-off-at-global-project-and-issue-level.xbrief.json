@@ -1,0 +1,1527 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T00:43:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4334: External skill packs: pinned git sources mounted per launch, with pack on/off at global, project, and issue level",
+    "updated": "2026-09-29T00:44:23.656Z"
+  },
+  "plan": {
+    "id": "pan-4334",
+    "title": "External skill packs: pinned git sources mounted per launch, with pack on/off at global, project, and issue level",
+    "status": "running",
+    "uid": "61a8bfb0-61c4-405a-a49e-2ce136be74bf",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T00:43:48Z",
+    "updated": "2026-09-29T00:44:23.656Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4334",
+        "label": "PAN-4334",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-4334/.pan/drafts/PAN-4334.md",
+        "label": "PRD draft (.pan/drafts/pan-4334.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "skills",
+      "skill-packs",
+      "launcher",
+      "claude-code",
+      "codex",
+      "dashboard",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "25 files in 6 subsystems: exactly the finalize limit. The pack mechanism (sources, adapters, mount, resolution, launch, CLI, API, UI, docs) is one vertical feature; the PRD's documented split (API+UI to a sibling issue) is not needed because the surface fits.",
+      "canonicalFilename": "2026-09-29-PAN-4334-external-skill-packs-pinned-git-sources-mounted-per-launch-with-pack-on-off-at-global-project-and-issue-level.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-3942 lets operators turn skills on and off at global, project and issue level, but only for skills already on disk. Third-party skill collections (first mattpocock/skills) can only arrive by vendoring into sync-sources (unattributed, stale copies) or by user-scope plugin installs that leak into every session. Copying pack skills into ~/.claude/skills or ~/.agents/skills would collide by directory name and leak project-scoped packs into unmanaged sessions.",
+      "Proposal": "A pack is a git repo pinned to an operator-approved commit, registered in config.yaml skills.packs and cached under ~/.overdeck/packs. Adapters (plain, claude-plugin, KNOWN_PACKS) derive the skill list and non-skill capabilities, which are reported as Not applied and never mounted. Pack skills (id pack/skill) are off by default and resolve with pack toggles and per-skill overrides at the three PAN-3942 levels. The existing pan skills launch-settings step builds a content-addressed mount and exposes it per launch through each harness plugin system: Claude Code via a per-launch --plugin-dir symlink, Codex via a local marketplace block plus a plugin cache copy in the per-agent CODEX_HOME. Both show skills as pack:skill so they never collide with bundled names. CLI verbs, API fields and a Skill packs UI section complete the feature. See PRD Part II (sections 11-15).",
+      "NonGoals": "- npm pack sources\n- repo-declared packs (a committed file that enables or trusts a pack)\n- adding packs from the dashboard (CLI-only in v1)\n- capability grants: hooks, MCP servers, commands, env are never mounted or applied\n- the Deft adapter (#3943)\n- SageOx as a pack (#2444); it is refused as an integration\n- retiring or editing the vendored Matt Pocock skill copies in sync-sources\n- harnesses other than Claude Code and Codex\n- remote (Fly) launches\n- rewriting a live session's skills (changes apply at next launch)\n- any edit to src/lib/launcher-generator.ts\n- network or git calls inside the launch step\n- user-scope Claude plugin installs or writes to ~/.claude/plugins"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pack skills are returned in listSkillStates().packs, not merged into listSkillCatalog()/skills (PD-1).",
+        "rationale": "The existing panel's inherited() treats absent global as on, which is wrong for default-off pack skills; a separate list keeps PAN-3942 behavior untouched."
+      },
+      {
+        "summary": "Launch key = managedStateKey ?? overdeckEnv.agentId ?? sessionId computed in launcher-lines.ts; no key means no packs for that launch (PD-2).",
+        "rationale": "Keeps launcher-generator.ts (999 lines, ratchet) unchanged and keeps generated scripts deterministic for snapshots."
+      },
+      {
+        "summary": "updateAvailable (git ls-remote) runs only on GET ?checkUpdates=1, fetched separately by the UI at global level (PD-3).",
+        "rationale": "The GET body is also the PUT response; network there would slow every toggle. No new route is needed."
+      },
+      {
+        "summary": "The launch step runs no git; an uncached trusted commit skips the pack with a warning (PD-4).",
+        "rationale": "Rebuilding from a blobless repo can lazy-fetch blobs (network); launches must be offline and fail open."
+      },
+      {
+        "summary": "Codex primary route (local marketplace block + hand-populated plugins/cache copy) is used; the $CODEX_HOME/skills fallback stays a documented contingency only.",
+        "rationale": "A planning probe on codex-cli 0.158.0 listed probepack:zebra-probe from a hand-populated cache and showed the cache copy is required (PRD §11)."
+      },
+      {
+        "summary": "Symlinks inside pack repos are never copied into mounts (PD-8).",
+        "rationale": "A pack symlink could point at host files; skills do not need symlinks and Codex drops them anyway."
+      },
+      {
+        "summary": "pan skills set takes <args...> with --pack <id> (PD-9); list --json keeps the native array.",
+        "rationale": "Matches the issue's AC-5 command lines without breaking existing JSON consumers."
+      },
+      {
+        "summary": "The live checkpoint runs its host-mutating setup by hand and ends by turning the pack off globally and back to inherit for the issue; its verify_commands are read-only.",
+        "rationale": "pan skills pack add --yes and set --pack on write the operator real config.yaml and would enable the pack for every future launch on this machine."
+      },
+      {
+        "summary": "sources.ts receives reserved ids (CORE_SKILLS) from the CLI instead of importing resolve.ts.",
+        "rationale": "madge counts import type edges; importing resolve.ts from sources.ts would close a catalog -> sources -> resolve -> catalog cycle and fail lint:circular."
+      },
+      {
+        "summary": "Keep all pack store code in store.ts and all CLI code in skills.ts; no scripts/ edits.",
+        "rationale": "Holds the plan at 25 files and 6 subsystems (the finalize limit) without splitting the feature."
+      }
+    ],
+    "items": [
+      {
+        "id": "pack-adapters",
+        "title": "Add pack adapters (plain, claude-plugin) and the KNOWN_PACKS table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "pack-lifecycle",
+            "pack-store-reads",
+            "cli-pack-verbs",
+            "ui-skill-packs"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-1 exactly: new src/lib/skill-packs/adapters.ts exporting PackAdapterId, PackSkill, PackCapabilities, PackManifest, KnownPack, KNOWN_PACKS (mattpocock = claude-plugin with opt-in setup-matt-pocock-skills; sageox = integration with the #2444 note), readSkillFrontmatter, detectAdapter, readPackManifest, notAppliedLabels. readSkillFrontmatter reuses the body of catalog.ts:18-30 parseSkillDescription and also returns frontmatter name; do NOT edit catalog.ts here and do NOT import catalog.ts from adapters.ts (ESM cycle). All fs async. Tests use temp fixture trees."
+        },
+        "items": [
+          {
+            "id": "pack-adapters.ac1",
+            "title": "Given a claude-plugin fixture whose plugin.json lists 3 of 4 skill dirs, readPackManifest returns exactly those 3 skill names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-adapters.ac2",
+            "title": "When optIn [setup-matt-pocock-skills] is passed, readPackManifest marks only that skill optIn true and lists it in capabilities.projectMutatingSkills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-adapters.ac3",
+            "title": "Given a fixture with hooks/hooks.json, .mcp.json and a skill-local *.sh file, readPackManifest reports capabilities.hooks true, mcpServers true, and that script in executables",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-adapters.ac4",
+            "title": "Given a plain fixture with skills/a/b/SKILL.md and skills/c/SKILL.md, readPackManifest returns both skills and detectAdapter returns plain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-adapters.ac5",
+            "title": "KNOWN_PACKS.sageox contains kind integration and a note that contains issues/2444",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-registry",
+        "title": "Store the pack registry in config.yaml skills.packs with cache path helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-2: new src/lib/skill-packs/sources.ts with PACK_ID_PATTERN, PackRegistryEntry, packsHome/packCacheDir/packRepoDir/packExtractDir (throw on bad id or non-40-hex commit), listPacks, getPack, writePackEntry, deletePackEntry. Writes use the yaml Document API inside runSettingsWriteSerialized on getGlobalConfigPath(), following store.ts:282-303. deletePackEntry also removes skills.pack_overrides.<id> and global skills.overrides keys starting <id>/, pruning empty maps. Tests set OVERDECK_HOME to a temp dir in vi.hoisted like store.test.ts:15-22."
+        },
+        "items": [
+          {
+            "id": "pack-registry.ac1",
+            "title": "writePackEntry then listPacks returns the same {id,url,ref,commit} entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-registry.ac2",
+            "title": "writePackEntry preserves an existing \"# keep me\" comment and an unrelated models: key in config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-registry.ac3",
+            "title": "deletePackEntry removes skills.packs.mattpocock, skills.pack_overrides.mattpocock and skills.overrides mattpocock/* keys but preserves skills.overrides.grilling: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-registry.ac4",
+            "title": "packCacheDir throws for an id that fails ^[a-z0-9][a-z0-9-]*$ such as ../x",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-git-cache",
+        "title": "Add async git clone, fetch, resolve, extract and ls-remote for pack sources",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes including the git cache cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-3 in sources.ts: fetchPackSource (blobless bare clone or fetch), resolveRef (rev-parse --verify <ref>^{commit}), extractCommit (git archive -o tmp.tar then tar -xf into a temp dir then rename; reuse if present), treeHash, packUpdateAvailable (ls-remote with execFile timeout 5000; errors and pinned-SHA refs return null). Every git call is promisified execFile with env GIT_TERMINAL_PROMPT=0; never execSync. Tests build a local bare repo with two commits and a tag (execFileSync allowed in tests only); no network."
+        },
+        "items": [
+          {
+            "id": "pack-git-cache.ac1",
+            "title": "Given a local bare repo with tag v1, fetchPackSource then resolveRef(v1) returns the 40-hex tag commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-git-cache.ac2",
+            "title": "extractCommit creates packs/<id>/<commit>/ holding the committed files and a second call reuses the same directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-git-cache.ac3",
+            "title": "After a new upstream commit, fetchPackSource then resolveRef(main) returns the new commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-git-cache.ac4",
+            "title": "packUpdateAvailable returns the new remote SHA for a branch ref and returns null for an unreachable URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-lifecycle",
+        "title": "Add addPack, updatePack, removePack and syncPack with preview and confirmation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes including add/update cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-4 in sources.ts: PackPreview, ConfirmPack, PackSourceError (bad-id|exists|integration|unknown-pack|git), addPack, updatePack, removePack (PD-11), syncPack. addPack takes input.reservedIds (the CLI passes CORE_SKILLS) and refuses bad ids, reserved ids, KNOWN_PACKS integrations and already-registered ids before any network. Adapter default per PD-13. The registry is written only when confirm(preview) resolves true. updatePack computes added/removed names, changed names by treeHash, and newCapabilities from notAppliedLabels. sources.ts, adapters.ts and mount.ts must never import anything under src/lib/skill-overrides/ (madge counts import type edges; catalog.ts -> sources.ts -> resolve.ts -> catalog.ts would be a new cycle and fail lint:circular)."
+        },
+        "items": [
+          {
+            "id": "pack-lifecycle.ac1",
+            "title": "When confirm resolves false, addPack returns written false and config.yaml is byte-for-byte unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-lifecycle.ac2",
+            "title": "When confirm resolves true, addPack persists skills.packs.<id> with a 40-hex commit and preserves an unrelated config comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-lifecycle.ac3",
+            "title": "addPack for id sageox rejects with PackSourceError code integration and makes no git call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-lifecycle.ac4",
+            "title": "After a new upstream commit, updatePack leaves commit unchanged when declined, changes it when confirmed, and the preview lists the added skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-claude",
+        "title": "Build content-addressed skill-pack mounts and link them for Claude Code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/mount.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "mount.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "mount-codex",
+            "mount-gc",
+            "launch-pack-apply",
+            "live-checkpoint"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-5: new src/lib/skill-packs/mount.ts with MOUNT_FORMAT_VERSION, CODEX_PACK_MARKETPLACE, MountPack, MountSelection, Mount, mountsDir, mountHash, buildMount, linkClaudeMount. Layout per PRD §4.7 and §14 WI-5 (marketplace.json, .claude-plugin/plugin.json with explicit skills[], .codex-plugin/plugin.json with skills \"./skills/\", version = hash). Copy skill dirs with fs.cp and a filter that lstat-rejects symlinks (PD-8). Build in a .tmp- dir then rename; reuse and utimes-touch an existing mount. linkClaudeMount replaces the link atomically (tmp symlink + rename) or removes it for null."
+        },
+        "items": [
+          {
+            "id": "mount-claude.ac1",
+            "title": "buildMount returns the same hash and path for the same selection given in either pack order, and the second call reuses the directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-claude.ac2",
+            "title": "A selection with a different skill set produces a different hash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-claude.ac3",
+            "title": "Walking the built mount with lstat finds no symbolic link even when the source skill directory contains one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-claude.ac4",
+            "title": "plugins/<pack>/.claude-plugin/plugin.json contains ./skills/<name> for every selected skill and both manifests contain version equal to the hash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-claude.ac5",
+            "title": "When linkClaudeMount(link, null) runs the link no longer exists, and when relinked to a new mount the link resolves to the new mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-codex",
+        "title": "Write the Codex skill-packs config block and plugin cache copy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/mount.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "mount.test.ts passes including Codex cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-6 in mount.ts: CODEX_PACK_BLOCK_BEGIN/END and writeCodexPackBlock(codexHome, mount|null). The block registers [marketplaces.overdeck-packs] source_type local source=<mount.path> and one [plugins.\"<id>@overdeck-packs\"] enabled = true per pack. Strip only its own markers (same algorithm as launch.ts:211-217), keep mode 0o600, copy plugins/<id> to <codexHome>/plugins/cache/overdeck-packs/<id>/<hash>/ when absent, prune every other overdeck-packs cache dir; null removes block and cache. codexHome is a parameter: never write a codex-home path literal (lint:harness-storage)."
+        },
+        "items": [
+          {
+            "id": "mount-codex.ac1",
+            "title": "Given a config.toml holding a PAN-3942 skill-overrides block, writeCodexPackBlock appends the skill-packs block and both blocks remain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-codex.ac2",
+            "title": "A second call with the same mount produces a byte-identical config.toml and mode 0o600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-codex.ac3",
+            "title": "When called with a new mount, config.toml contains the new mount path and the old hash directory under plugins/cache/overdeck-packs no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-codex.ac4",
+            "title": "When writeCodexPackBlock(codexHome, null) runs, config.toml contains no skill-packs block and the overdeck-packs cache directory no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-gc",
+        "title": "Garbage-collect unreferenced mounts and dangling launch links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/mount.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "mount.test.ts passes including gc cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-7 in mount.ts: gcMounts({maxAgeMs, now}) removes mounts that no <OVERDECK_HOME>/launch/*/skill-packs link targets and whose mtime is older than maxAgeMs, dangling launch links, and stale .tmp- dirs. Tests set mtimes with utimes and pass an explicit now; no real waiting."
+        },
+        "items": [
+          {
+            "id": "mount-gc.ac1",
+            "title": "gcMounts removes an unreferenced mount older than maxAgeMs and returns it in removedMounts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-gc.ac2",
+            "title": "gcMounts preserves an old mount that a launch link targets and preserves a fresh unreferenced mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-gc.ac3",
+            "title": "gcMounts deletes a launch link whose target no longer exists and returns it in removedLinks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-resolve",
+        "title": "Add pack-aware skill resolution and exclude pack ids from disabledSkillNames",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/resolve.ts",
+            "src/lib/skill-overrides/__tests__/resolve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/resolve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resolve.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10"
+          ],
+          "foundationFor": [
+            "pack-store-reads",
+            "pack-store-writes",
+            "launch-pack-apply",
+            "ui-skill-packs"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-8 in resolve.ts: PackToggleLayers, SkillOverrideLayers.packs, PackSkillSource, isPackSkillId, resolvePackSkill(id, optIn, layers, skip?) per PRD §4.3 pseudocode, resolvePackToggle(pack, layers, skip?). disabledSkillNames filters out ids containing /. Pure, no I/O. Native resolveOne behavior is unchanged."
+        },
+        "items": [
+          {
+            "id": "pack-resolve.ac1",
+            "title": "resolve.test.ts has one case per row of the PRD §4.3 precedence table and each resolves the stated enabled value and source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-resolve.ac2",
+            "title": "An opt-in skill with global pack on resolves off with source default, and with a per-skill global true resolves on with source global",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-resolve.ac3",
+            "title": "resolvePackSkill with skip issue returns the project or global answer while ignoring the issue per-skill value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-resolve.ac4",
+            "title": "disabledSkillNames({global:{\"mattpocock/tdd\":false, grilling:false}}) returns exactly [\"grilling\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-store-reads",
+        "title": "Expose pack catalog, pack toggle reads and listSkillStates().packs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-overrides/store.ts",
+            "src/lib/skill-overrides/__tests__/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/store.test.ts src/lib/skill-overrides/__tests__/resolve.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts and resolve.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-14",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-9: catalog.ts parseSkillDescription delegates to readSkillFrontmatter (PD-14) and gains listPackCatalog and readInstalledClaudePluginNames; store.ts gains readGlobalPackOverrides, readProjectPackOverrides, readIssueFile returning {skills, packs}, loadSkillOverrideLayers filling layers.packs, listSkillStates(ctx, {checkUpdates?}) returning packs: PackState[] (shape in PRD §14 WI-9, inherited computed with skip = narrowest context level), and listLowerLevelPackOverrides. Extend the ../catalog.js mock in store.test.ts with listPackCatalog and readInstalledClaudePluginNames."
+        },
+        "items": [
+          {
+            "id": "pack-store-reads.ac1",
+            "title": "Given a cached mattpocock pack and no toggles, listSkillStates({}) returns packs[0].skills all enabled false with source default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-store-reads.ac2",
+            "title": "Given skills.pack_overrides.mattpocock: true in config.yaml, listSkillStates returns tdd enabled with source global-pack and setup-matt-pocock-skills enabled false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-store-reads.ac3",
+            "title": "listSkillStates marks the pack skill grilling bundledOverlap true when the native catalog contains grilling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-store-reads.ac4",
+            "title": "listSkillStates keeps the native skills array shape unchanged and returns pack toggles read from an issue file packs: map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-store-writes",
+        "title": "Write pack toggles and pack/skill overrides at global, project and issue level",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/store.ts",
+            "src/lib/skill-overrides/__tests__/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts passes including write cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-10 in store.ts: unknown-pack error code, PackOverrideUpdate, parseSkillOverrideUpdate accepting exactly one of skill/pack, setSkillOverride dispatching pack updates to setPackOverride, the PD-6 global deviation rule for / ids in setGlobal, the PD-7 pack branch in assertInCatalog, and renderIssueFile writing {issue, skills?, packs?} with deletion only when both maps are empty. Issue writes go through commitPlanArtifacts/pushPlanArtifacts like setIssue."
+        },
+        "items": [
+          {
+            "id": "pack-store-writes.ac1",
+            "title": "A global pack toggle on persists skills.pack_overrides.mattpocock: true and toggling it off clears the key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-store-writes.ac2",
+            "title": "A project pack toggle off persists skill_pack_overrides.mattpocock: false in projects.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-store-writes.ac3",
+            "title": "An issue pack toggle commits the issue file with a packs: map and preserves an existing skills: map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-store-writes.ac4",
+            "title": "setSkillOverride for an unregistered pack rejects with code unknown-pack, and mattpocock/nope rejects with code unknown-skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-store-writes.ac5",
+            "title": "Global mattpocock/tdd on stores true while the pack is off and clears the key while the pack is on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-pack-apply",
+        "title": "Build and apply the pack mount in pan skills launch-settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch.test.ts src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launch.test.ts and skills.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-11: launch.ts gains resolveLaunchPackSelection, applyClaudePacks, applyCodexPacks (lazy imports; no git, no network; uncached packs skipped with the PD-4 warning). skills.ts skillsLaunchSettingsCommand gains --plugin-link <path>: Claude computes the settings JSON, applies packs in try/catch (on failure prints \"[launcher] WARNING: skill packs not applied: <msg>\" to stderr and removes the link), then writes only the JSON to stdout; Codex applies packs after writeCodexSkillOverrides in the same try/catch."
+        },
+        "items": [
+          {
+            "id": "launch-pack-apply.ac1",
+            "title": "applyClaudePacks with the mattpocock pack on creates the link pointing at a mount that contains mattpocock/skills/grilling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pack-apply.ac2",
+            "title": "When the issue-level pack toggle is off, applyClaudePacks leaves no link at the given path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pack-apply.ac3",
+            "title": "An uncached pack produces a \"not cached\" warning and no link, and no git process is spawned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pack-apply.ac4",
+            "title": "launch-settings --plugin-link prints only the settings JSON on stdout and exits 0 with a warning on stderr when applyClaudePacks throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-plugin-dir",
+        "title": "Emit --plugin-link and the --plugin-dir suffix in Claude launchers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/launcher-lines.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts src/lib/skill-overrides/__tests__/launch.test.ts",
+            "npm run typecheck",
+            "git diff --exit-code origin/main -- src/lib/launcher-generator.ts"
+          ],
+          "expected_outputs": [
+            "launcher-generator.test.ts and launch.test.ts pass",
+            "typecheck completes without errors",
+            "git diff reports no change to launcher-generator.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-12: launcher-lines.ts SkillOverrideLaunchConfig gains managedStateKey, sessionId, overdeckEnv.agentId; add skillPackLinkPath (key chain managedStateKey ?? overdeckEnv.agentId ?? sessionId, key must match ^[A-Za-z0-9._-]+$, path join(getOverdeckHome(),\"launch\",key,\"skill-packs\")), pluginLink in launcherSkillOverrideLines (adds --plugin-link and the if [ -d ] PAN_SKILL_PLUGIN_DIR line), claudeSkillPluginDirArg, and claudeSkillOverrideLaunch appending the plugin-dir suffix only when a link exists. launcher-generator.ts is NOT edited. Update every affected expectation in launcher-generator.test.ts and add the new cases listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "launcher-plugin-dir.ac1",
+            "title": "A conversation launcher with sessionId sess-conv contains --plugin-link <OVERDECK_HOME>/launch/sess-conv/skill-packs and ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} after the settings arg",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-plugin-dir.ac2",
+            "title": "A Claude launcher with no managedStateKey, agentId or sessionId contains neither --plugin-link nor PAN_SKILL_PLUGIN_DIR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-plugin-dir.ac3",
+            "title": "The generated remote and ohmypi launcher script contains no PAN_SKILL_PLUGIN_DIR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-plugin-dir.ac4",
+            "title": "git diff origin/main -- src/lib/launcher-generator.ts produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-pack-verbs",
+        "title": "Add pan skills pack add, update, remove, list, sync and gc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skills.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-13: register a pack subcommand group inside registerSkillsCommands with lazy-imported handlers. add/update confirm per PD-10 (readline on TTY; non-TTY without --yes prints the preview and \"Not written: re-run with --yes to trust <short-sha>.\" and exits 1). Print the preview in the exact PRD format. list supports --json and --offline; gc supports --max-age-days (default 7). PackSourceError prints red and exits 1."
+        },
+        "items": [
+          {
+            "id": "cli-pack-verbs.ac1",
+            "title": "pan skills pack add without --yes on a non-TTY prints the preview and Not written, exits 1, and never calls writePackEntry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pack-verbs.ac2",
+            "title": "pan skills pack add --yes calls addPack and prints the pan skills set --pack <id> on hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pack-verbs.ac3",
+            "title": "pan skills pack add sageox prints the issues/2444 note and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pack-verbs.ac4",
+            "title": "pan skills pack list --json --offline prints a JSON array and never calls packUpdateAvailable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-set-pack",
+        "title": "Add pan skills set --pack and pack/skill targets, list block and regenerated slash manifest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts",
+            "npm run build && npm run generate:slash-commands",
+            "npm run lint:slash-commands",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skills.test.ts passes",
+            "lint:slash-commands exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-14: pan skills set <args...> with --pack <id> per PD-9, pack updates through setSkillOverride({level, pack, enabled}), outputs per the PRD, the Skill packs block in pan skills list, then npm run build && npm run generate:slash-commands and commit packages/contracts/src/composer-commands.generated.ts."
+        },
+        "items": [
+          {
+            "id": "cli-set-pack.ac1",
+            "title": "pan skills set mattpocock/unknown on exits 1 and prints unknown skill when the store rejects it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-set-pack.ac2",
+            "title": "When run, pan skills set --pack mattpocock off --issue PAN-1 sends {level:\"issue\", pack:\"mattpocock\", enabled:false, issueId:\"PAN-1\"} to setSkillOverride",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-set-pack.ac3",
+            "title": "pan skills set --pack mattpocock with two positionals exits 1 and prints the usage line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-set-pack.ac4",
+            "title": "npm run lint:slash-commands passes with the regenerated composer-commands.generated.ts committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-packs",
+        "title": "Return packs from GET and accept pack toggles in PUT /api/skills/overrides",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/skill-overrides.ts",
+            "src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/skill-overrides-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skill-overrides-route.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-15: STATUS_BY_CODE gains unknown-pack 404; GET forwards checkUpdates=1 to listSkillStates; the global response body adds packOverriddenBelow; update the header comment with the pack body shape. No new routes."
+        },
+        "items": [
+          {
+            "id": "api-packs.ac1",
+            "title": "GET /api/skills/overrides returns a packs array from listSkillStates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-packs.ac2",
+            "title": "PUT {level:\"project\", projectKey, pack:\"mattpocock\", enabled:false} returns 200 with refreshed packs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-packs.ac3",
+            "title": "PUT for an unknown pack returns 404 with code unknown-pack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-packs.ac4",
+            "title": "GET with checkUpdates=1 forwards checkUpdates true to listSkillStates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-skill-packs",
+        "title": "Render the Skill packs section in SkillOverridesPanel at all three levels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillPacksSection.test.tsx",
+            "src/dashboard/frontend/src/components/skills/SkillOverridesPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/skills/SkillPacksSection.test.tsx src/components/skills/SkillOverridesPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SkillPacksSection.test.tsx and SkillOverridesPanel.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-16: new SkillPacksSection.tsx (props, saves, pack rows, expanded skill rows, notices, empty state exactly as specified; pan-style-guide Broadsheet; no pills; on is not green) mounted from SkillOverridesPanel.tsx above the skill list only when Array.isArray(query.data?.packs). SkillOverridesPanel.test.tsx is not edited. Tests render with a QueryClientProvider and a mocked fetch."
+        },
+        "items": [
+          {
+            "id": "ui-skill-packs.ac1",
+            "title": "Clicking the collapsed mattpocock pack row renders its pack skill rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-skill-packs.ac2",
+            "title": "The setup-matt-pocock-skills row renders the note \"Edits repo files; not turned on by the pack.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-skill-packs.ac3",
+            "title": "At issue level clicking Off on the pack row sends PUT body {level:\"issue\", issueId, pack:\"mattpocock\", enabled:false}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-skill-packs.ac4",
+            "title": "Given inherited {enabled:true, source:\"global\"} the pack Inherit button renders \"Inherit (on via global)\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-skill-packs.ac5",
+            "title": "With an empty packs array the section renders the pan skills pack add mattpocock command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-skill-packs",
+        "title": "Document skill packs in features/skills.mdx and docs/USAGE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx",
+            "docs/USAGE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"## Skill packs\" features/skills.mdx",
+            "grep -n \"pan skills pack add\" docs/USAGE.md features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "grep prints the heading line number",
+            "grep prints matches in both files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §14 WI-17: add the ## Skill packs section to features/skills.mdx after ### When changes apply and before ## Subagents, with every topic listed in the PRD, and add the pack verbs and --pack to docs/USAGE.md ### Skills Commands."
+        },
+        "items": [
+          {
+            "id": "docs-skill-packs.ac1",
+            "title": "features/skills.mdx contains a ## Skill packs heading placed before ## Subagents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skill-packs.ac2",
+            "title": "The section contains the PRD §4.3 precedence table, the pan skills pack add <id> <url> --ref <ref> syntax, and the sentence stating that adding a pack trusts the commit and turns nothing on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skill-packs.ac3",
+            "title": "The section contains links to issues/2444 (SageOx) and issues/3943 (Deft) and contains ~/.overdeck/packs/ and pan skills pack gc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skill-packs.ac4",
+            "title": "docs/USAGE.md Skills Commands block contains pan skills set --pack and pan skills pack add lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-checkpoint",
+        "title": "Run the AC-5 live checkpoint on Claude Code and Codex and paste the output into the PR",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T00:43:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4334",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-packs/mount.ts"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "pan skills pack list --json --offline",
+            "pan skills list"
+          ],
+          "expected_outputs": [
+            "pack list JSON contains the mattpocock entry with a 40-hex commit",
+            "pan skills list shows the mattpocock pack off at global after cleanup"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12",
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Setup (mutates this host, run once by hand): pan skills pack add mattpocock https://github.com/mattpocock/skills --ref v1.2.3 --yes && pan skills set --pack mattpocock on. Run PRD §10 AC-5 steps 1-4 with that real pack and paste the outputs into the PR description. Cleanup afterwards: pan skills set --pack mattpocock off (global) and pan skills set --pack mattpocock inherit --issue <ID>, so the operator launches return to the pre-checkpoint state; leaving the pack registered is fine because adding enables nothing. Files are touched only if AC-5.2 fails and the §4.7 Codex fallback must be implemented. If the interactive pane (AC-5.4) shows a plugin-consent dialog, stop and report with pan tell flywheel-orchestrator instead of shipping."
+        },
+        "items": [
+          {
+            "id": "live-checkpoint.ac1",
+            "title": "When claude -p runs with the --plugin-dir link from pan skills launch-settings, its output contains both grilling and mattpocock:grilling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac2",
+            "title": "When launch-settings --harness codex has run, CODEX_HOME=$tmp/ch codex debug prompt-input output contains mattpocock:grilling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac3",
+            "title": "When pan skills set --pack mattpocock off --issue <ID> has run, launch-settings with --plugin-link leaves no link and [ ! -e \"$tmp/link\" ] exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac4",
+            "title": "When an interactive managed Claude Code pane starts with the pack on, it opens the input prompt with no plugin-consent dialog and its skill list contains mattpocock:grilling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac5",
+            "title": "After cleanup, pan skills list shows the mattpocock pack off with source default at global",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pack-registry",
+        "to": "pack-git-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-git-cache",
+        "to": "pack-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-adapters",
+        "to": "pack-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-claude",
+        "to": "mount-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-codex",
+        "to": "mount-gc",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-adapters",
+        "to": "pack-store-reads",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-registry",
+        "to": "pack-store-reads",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-resolve",
+        "to": "pack-store-reads",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-git-cache",
+        "to": "pack-store-reads",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-store-reads",
+        "to": "pack-store-writes",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-codex",
+        "to": "launch-pack-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-store-reads",
+        "to": "launch-pack-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-pack-apply",
+        "to": "launcher-plugin-dir",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-pack-apply",
+        "to": "cli-pack-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-lifecycle",
+        "to": "cli-pack-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-gc",
+        "to": "cli-pack-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-pack-verbs",
+        "to": "cli-set-pack",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-store-writes",
+        "to": "cli-set-pack",
+        "type": "blocks"
+      },
+      {
+        "from": "pack-store-writes",
+        "to": "api-packs",
+        "type": "blocks"
+      },
+      {
+        "from": "api-packs",
+        "to": "ui-skill-packs",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-set-pack",
+        "to": "docs-skill-packs",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-plugin-dir",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-set-pack",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-gc",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

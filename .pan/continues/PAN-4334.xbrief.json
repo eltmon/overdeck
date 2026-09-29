@@ -1,0 +1,422 @@
+{
+  "version": "1",
+  "issueId": "PAN-4334",
+  "created": "2026-09-29T00:46:06.120Z",
+  "updated": "2026-09-29T02:31:17.767Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pack-adapters": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T00:46:06.120Z",
+      "doneAt": "2026-09-29T00:53:47.540Z"
+    },
+    "pack-registry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T00:54:09.479Z",
+      "doneAt": "2026-09-29T00:57:21.511Z"
+    },
+    "pack-git-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T00:57:26.764Z",
+      "doneAt": "2026-09-29T01:00:39.514Z"
+    },
+    "pack-lifecycle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:00:45.758Z",
+      "doneAt": "2026-09-29T01:08:22.961Z"
+    },
+    "mount-claude": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:08:28.947Z",
+      "doneAt": "2026-09-29T01:12:27.440Z"
+    },
+    "mount-codex": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:12:32.042Z",
+      "doneAt": "2026-09-29T01:14:42.875Z"
+    },
+    "mount-gc": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:15:00.356Z",
+      "doneAt": "2026-09-29T01:16:45.684Z"
+    },
+    "pack-resolve": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:16:53.252Z",
+      "doneAt": "2026-09-29T01:18:57.219Z"
+    },
+    "pack-store-reads": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:19:03.098Z",
+      "doneAt": "2026-09-29T01:24:20.357Z"
+    },
+    "pack-store-writes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:24:36.261Z",
+      "doneAt": "2026-09-29T01:28:07.556Z"
+    },
+    "launch-pack-apply": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:28:14.502Z",
+      "doneAt": "2026-09-29T01:33:55.522Z"
+    },
+    "launcher-plugin-dir": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:34:02.208Z",
+      "doneAt": "2026-09-29T01:39:15.084Z"
+    },
+    "cli-pack-verbs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:39:20.706Z",
+      "doneAt": "2026-09-29T01:43:34.980Z"
+    },
+    "cli-set-pack": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:44:08.511Z",
+      "doneAt": "2026-09-29T01:52:28.116Z"
+    },
+    "api-packs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:52:35.168Z",
+      "doneAt": "2026-09-29T01:54:55.951Z"
+    },
+    "ui-skill-packs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:55:01.799Z",
+      "doneAt": "2026-09-29T01:58:41.362Z"
+    },
+    "docs-skill-packs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:58:47.880Z",
+      "doneAt": "2026-09-29T01:59:41.881Z"
+    },
+    "live-checkpoint": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:06:13.111Z"
+    },
+    "pack-adapters.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:15:30.220Z"
+    },
+    "pack-adapters.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:15:43.057Z"
+    },
+    "pack-adapters.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:15:55.573Z"
+    },
+    "pack-adapters.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:16:08.139Z"
+    },
+    "pack-adapters.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:16:20.744Z"
+    },
+    "pack-registry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:16:33.194Z"
+    },
+    "pack-registry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:16:45.966Z"
+    },
+    "pack-registry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:16:59.301Z"
+    },
+    "pack-registry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:17:11.976Z"
+    },
+    "pack-git-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:17:24.257Z"
+    },
+    "pack-git-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:17:36.348Z"
+    },
+    "pack-git-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:17:49.184Z"
+    },
+    "pack-git-cache.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:18:02.232Z"
+    },
+    "pack-lifecycle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:18:14.617Z"
+    },
+    "pack-lifecycle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:18:27.079Z"
+    },
+    "pack-lifecycle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:18:39.241Z"
+    },
+    "pack-lifecycle.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:18:51.632Z"
+    },
+    "mount-claude.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:19:04.743Z"
+    },
+    "mount-claude.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:19:16.745Z"
+    },
+    "mount-claude.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:19:30.011Z"
+    },
+    "mount-claude.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:19:43.450Z"
+    },
+    "mount-claude.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:19:56.628Z"
+    },
+    "mount-codex.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:20:11.751Z"
+    },
+    "mount-codex.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:20:24.498Z"
+    },
+    "mount-codex.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:20:36.858Z"
+    },
+    "mount-codex.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:20:49.767Z"
+    },
+    "mount-gc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:21:02.506Z"
+    },
+    "mount-gc.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:21:14.102Z"
+    },
+    "mount-gc.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:21:26.582Z"
+    },
+    "pack-resolve.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:21:38.897Z"
+    },
+    "pack-resolve.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:21:50.600Z"
+    },
+    "pack-resolve.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:22:03.085Z"
+    },
+    "pack-resolve.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:22:15.318Z"
+    },
+    "pack-store-reads.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:22:26.962Z"
+    },
+    "pack-store-reads.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:22:38.178Z"
+    },
+    "pack-store-reads.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:22:49.547Z"
+    },
+    "pack-store-reads.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:23:01.253Z"
+    },
+    "pack-store-writes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:23:13.815Z"
+    },
+    "pack-store-writes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:23:24.888Z"
+    },
+    "pack-store-writes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:23:36.252Z"
+    },
+    "pack-store-writes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:23:47.715Z"
+    },
+    "pack-store-writes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:24:00.424Z"
+    },
+    "launch-pack-apply.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:24:11.966Z"
+    },
+    "launch-pack-apply.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:24:23.608Z"
+    },
+    "launch-pack-apply.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:24:35.866Z"
+    },
+    "launch-pack-apply.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:24:48.643Z"
+    },
+    "launcher-plugin-dir.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:25:00.254Z"
+    },
+    "launcher-plugin-dir.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:25:12.469Z"
+    },
+    "launcher-plugin-dir.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:25:24.298Z"
+    },
+    "launcher-plugin-dir.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:25:36.276Z"
+    },
+    "cli-pack-verbs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:25:48.685Z"
+    },
+    "cli-pack-verbs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:26:01.349Z"
+    },
+    "cli-pack-verbs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:26:13.555Z"
+    },
+    "cli-pack-verbs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:26:27.111Z"
+    },
+    "cli-set-pack.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:26:40.598Z"
+    },
+    "cli-set-pack.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:26:54.164Z"
+    },
+    "cli-set-pack.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:27:06.587Z"
+    },
+    "cli-set-pack.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:27:18.616Z"
+    },
+    "api-packs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:27:31.383Z"
+    },
+    "api-packs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:27:44.189Z"
+    },
+    "api-packs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:27:58.604Z"
+    },
+    "api-packs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:28:12.866Z"
+    },
+    "ui-skill-packs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:28:26.553Z"
+    },
+    "ui-skill-packs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:28:39.595Z"
+    },
+    "ui-skill-packs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:28:53.004Z"
+    },
+    "ui-skill-packs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:29:07.016Z"
+    },
+    "ui-skill-packs.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:29:19.513Z"
+    },
+    "docs-skill-packs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:29:32.852Z"
+    },
+    "docs-skill-packs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:29:44.907Z"
+    },
+    "docs-skill-packs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:29:56.776Z"
+    },
+    "docs-skill-packs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:30:08.958Z"
+    },
+    "live-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:30:21.832Z"
+    },
+    "live-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:30:34.420Z"
+    },
+    "live-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:30:47.026Z"
+    },
+    "live-checkpoint.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:30:59.605Z"
+    },
+    "live-checkpoint.ac4": {
+      "status": "cancelled"
+    }
+  }
+}
