@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T15:20:05.507Z",
+  "updated": "2026-09-29T15:20:28.726Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,11 @@
     "summarize.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T15:20:05.506Z"
+    },
+    "workflow": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4331",
+      "claimedAt": "2026-09-29T15:20:28.726Z"
     }
   }
 }
