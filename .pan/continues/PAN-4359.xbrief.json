@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4359",
   "created": "2026-09-29T03:48:03.128Z",
-  "updated": "2026-09-29T04:14:52.112Z",
+  "updated": "2026-09-29T04:20:48.354Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,9 +44,10 @@
       "doneAt": "2026-09-29T04:14:44.540Z"
     },
     "claude-code-status": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4359",
-      "claimedAt": "2026-09-29T04:14:52.112Z"
+      "claimedAt": "2026-09-29T04:14:52.112Z",
+      "doneAt": "2026-09-29T04:20:48.354Z"
     }
   }
 }
