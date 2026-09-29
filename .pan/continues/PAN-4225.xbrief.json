@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4225",
+  "created": "2026-09-29T02:27:12.817Z",
+  "updated": "2026-09-29T02:27:12.817Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "continue-adapters-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4225",
+      "claimedAt": "2026-09-29T02:27:12.817Z"
+    }
+  }
+}
