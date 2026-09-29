@@ -38,7 +38,8 @@ export type PipelineJournalEntryType =
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed'
-  | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned';
+  | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
+  | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn';
 
 export interface PipelineJournalEntry {
   /** ISO timestamp, stamped at append time. */
