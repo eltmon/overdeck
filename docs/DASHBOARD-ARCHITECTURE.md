@@ -370,7 +370,22 @@ door that does not exist; a real record read door would be a separate change.
   streaming, the same delay proves nothing, since a message queued behind a long tool
   call is legitimately unrendered until consumed. Two or more quick sends that Claude
   Code joins into one queued message are reconciled together: the single transcript
-  record clears every contributing bubble at once, not just the first.
+  record clears every contributing bubble at once, not just the first. Claude Code
+  records a long composer paste as `<pasted_content id="N">…</pasted_content id="N">`
+  in both landed and queued records; the parser (`renderableUserText()`) and the
+  landing probe strip that wrapper through `src/lib/pasted-content.ts` before any
+  further checks, so the timeline shows the operator's own text with no tags
+  (PAN-4305). `reconcileComposerEchoes()` compares bubble and transcript text with
+  whitespace collapsed rather than exact, so attachment references Claude Code joins
+  with a space still match a bubble that joined them with a newline, and it also
+  clears a bubble whose full text is contained in a later user record (a merged
+  queued prompt with extra content) — the red "Not found in transcript" state now
+  appears only when no landed or queued record matches or contains the bubble's text
+  at all. Composer delivery still pastes the raw, unwrapped text: every delivery path
+  (tmux `paste-buffer -p`, Herdr `pane.send_text`, Herdr `agent.prompt`) submits with
+  bracketed paste because raw typed bytes submit a multi-line message at its first
+  newline, so the agent sees a long composer message inside `<pasted_content>` too —
+  a known, accepted side effect, not something delivery works around.
 - The PTY supervisor reports what it observes about its harness to
   `POST /api/agents/:id/lifecycle`, authenticated by the session's pty-token. It emits
   `session-started`, `turn-started` (on a confirmed injection) and `exited`. The route

@@ -207,6 +207,79 @@ describe('probeTranscriptSince (PAN-1635 / PAN-1769 eaten-message detection)', (
   });
 });
 
+describe('probeTranscriptSince pasted and queued prompts (PAN-4305)', () => {
+  // Landed record, agent idle (conv 2972 line 3401)
+  const LANDED_WRAPPED = '\n\n<pasted_content id="9469">\nSonnet 5.5 just released!! We need to add that and publish to NPM ASAP!\nFor the WSL related stuff, no.\n</pasted_content id="9469">\n';
+  const LANDED_WRAPPED_INNER = 'Sonnet 5.5 just released!! We need to add that and publish to NPM ASAP!\nFor the WSL related stuff, no.';
+
+  // Queued prompt (line 1486 enqueue / 1493 queued_command attachment)
+  const QUEUED_WRAPPED = '<pasted_content id="9469">\n@/tmp/att/ef87.png\nGo ahead and do your recommended order, please.\n</pasted_content id="9469">';
+  const QUEUED_WRAPPED_INNER = '@/tmp/att/ef87.png\nGo ahead and do your recommended order, please.';
+
+  // Merged / space-joined queued prompt (line 1699)
+  const QUEUED_MERGED = '@/tmp/att/bee4.png @/tmp/att/55f6.png\nWhat just happned here?';
+  const TWO_IMAGE_COMPOSER_TEXT = '@/tmp/att/bee4.png\n@/tmp/att/55f6.png\nWhat just happned here?';
+  const ONE_IMAGE_COMPOSER_TEXT = '@/tmp/att/55f6.png\nWhat just happned here?';
+
+  it('matches a plain queued prompt', async () => {
+    writeSession([queueEnqueueRecord('Please redeploy the fix now.')]);
+
+    await expect(
+      probeTranscriptSince(workspace, sessionId, 0, 'Please redeploy the fix now.'),
+    ).resolves.toEqual({ matchedUserRecord: true, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
+  });
+
+  it('matches a landed record wrapped in pasted_content', async () => {
+    writeSession([userRecord(LANDED_WRAPPED, 'u1')]);
+
+    await expect(
+      probeTranscriptSince(workspace, sessionId, 0, LANDED_WRAPPED_INNER),
+    ).resolves.toEqual({ matchedUserRecord: true, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
+  });
+
+  it('matches a queued_command attachment wrapped in pasted_content', async () => {
+    writeSession([queuedCommandAttachmentRecord(QUEUED_WRAPPED)]);
+
+    await expect(
+      probeTranscriptSince(workspace, sessionId, 0, QUEUED_WRAPPED_INNER),
+    ).resolves.toEqual({ matchedUserRecord: true, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
+  });
+
+  it('matches a merged queued prompt against the two-image composer text', async () => {
+    writeSession([queueEnqueueRecord(QUEUED_MERGED)]);
+
+    await expect(
+      probeTranscriptSince(workspace, sessionId, 0, TWO_IMAGE_COMPOSER_TEXT),
+    ).resolves.toEqual({ matchedUserRecord: true, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
+  });
+
+  it('matches a merged queued prompt against a one-image bubble contained within it', async () => {
+    writeSession([queueEnqueueRecord(QUEUED_MERGED)]);
+
+    await expect(
+      probeTranscriptSince(workspace, sessionId, 0, ONE_IMAGE_COMPOSER_TEXT),
+    ).resolves.toEqual({ matchedUserRecord: true, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
+  });
+
+  it('reports no match when the transcript holds only unrelated records', async () => {
+    writeSession([userRecord('something unrelated entirely', 'u1')]);
+
+    await expect(
+      probeTranscriptSince(workspace, sessionId, 0, LANDED_WRAPPED_INNER),
+    ).resolves.toEqual({ matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
+  });
+
+  it('never matches a wrapped task-notification queued prompt', async () => {
+    writeSession([
+      queueEnqueueRecord('<pasted_content id="1">\n<task-notification><tool-use-id>abc</tool-use-id></task-notification>\n</pasted_content id="1">'),
+    ]);
+
+    await expect(
+      probeTranscriptSince(workspace, sessionId, 0, '<task-notification>'),
+    ).resolves.toEqual({ matchedUserRecord: false, realAssistantTurnCount: 0, compactBoundaryCount: 0 });
+  });
+});
+
 describe('extractSidechainHumanText (PAN-4247 AC3)', () => {
   it('strips the Claude Code sidechain wrapper down to the operator text', () => {
     const wrapped = 'The user sent a new message while you were working:\n'
@@ -218,6 +291,14 @@ describe('extractSidechainHumanText (PAN-4247 AC3)', () => {
 
   it('returns the raw trimmed text when the wrapper is absent', () => {
     expect(extractSidechainHumanText('  plain operator text  ')).toBe('plain operator text');
+  });
+
+  it('strips a pasted_content wrapper from the sidechain body (PAN-4305)', () => {
+    const wrapped = 'The user sent a new message while you were working:\n'
+      + '<pasted_content id="1">\nplease pause and check the logs\n</pasted_content id="1">'
+      + '\n\nThis is how Claude Code surfaces a message sent mid-turn.';
+
+    expect(extractSidechainHumanText(wrapped)).toBe('please pause and check the logs');
   });
 });
 

@@ -163,3 +163,123 @@ describe('reconcileComposerEchoes joined-message matching (PAN-4247)', () => {
     expect(result.consumedEchoIds).toEqual(expect.arrayContaining(['main-joined-space']));
   });
 });
+
+describe('reconcileComposerEchoes pasted and merged prompts (PAN-4305)', () => {
+  const LANDED_WRAPPED_INNER = 'Sonnet 5.5 just released!! We need to add that and publish to NPM ASAP!\nFor the WSL related stuff, no.';
+  const TWO_IMAGE_COMPOSER_TEXT = '@/tmp/att/bee4.png\n@/tmp/att/55f6.png\nWhat just happned here?';
+  const QUEUED_MERGED = '@/tmp/att/bee4.png @/tmp/att/55f6.png\nWhat just happned here?';
+  const ONE_IMAGE_COMPOSER_TEXT = '@/tmp/att/55f6.png\nWhat just happned here?';
+
+  it('1. clears a bubble whose text equals the unwrapped pasted_content inner text', () => {
+    const local = optimisticMessage({ text: LANDED_WRAPPED_INNER, createdAt: '2026-09-27T10:00:00.000Z' });
+    const echo: ChatMessage = {
+      id: 'main-1',
+      role: 'user',
+      text: LANDED_WRAPPED_INNER,
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([local]), [echo]);
+
+    expect(result.optimistic).toEqual([]);
+    expect(result.consumedEchoIds).toContain('main-1');
+  });
+
+  it('2. clears the two-image composer bubble against the space-joined merged record (whitespace collapse)', () => {
+    const local = optimisticMessage({ text: TWO_IMAGE_COMPOSER_TEXT, createdAt: '2026-09-27T10:00:00.000Z' });
+    const echo: ChatMessage = {
+      id: 'main-merged',
+      role: 'user',
+      text: QUEUED_MERGED,
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([local]), [echo]);
+
+    expect(result.optimistic).toEqual([]);
+    expect(result.consumedEchoIds).toContain('main-merged');
+  });
+
+  it('3. clears the one-image bubble contained in the merged record via containment, consuming its id', () => {
+    const local = optimisticMessage({ text: ONE_IMAGE_COMPOSER_TEXT, createdAt: '2026-09-27T10:00:00.000Z' });
+    const echo: ChatMessage = {
+      id: 'main-merged',
+      role: 'user',
+      text: QUEUED_MERGED,
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([local]), [echo]);
+
+    expect(result.optimistic).toEqual([]);
+    expect(result.consumedEchoIds).toContain('main-merged');
+  });
+
+  it('4. clears two leftover bubbles both contained in one record', () => {
+    const first = optimisticMessage({ id: 'optimistic-1', text: 'partial one', createdAt: '2026-09-27T10:00:00.000Z' });
+    const second = optimisticMessage({ id: 'optimistic-2', text: 'partial two', createdAt: '2026-09-27T10:00:01.000Z' });
+    const containing: ChatMessage = {
+      id: 'main-containing',
+      role: 'user',
+      text: 'partial one and also partial two',
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([first, second]), [containing]);
+
+    expect(result.optimistic).toEqual([]);
+    expect(result.consumedEchoIds).toContain('main-containing');
+  });
+
+  it('5. returns the identical state object for a truly missing bubble', () => {
+    const local = optimisticMessage({ text: 'never landed anywhere', createdAt: '2026-09-27T10:00:00.000Z' });
+    const unrelated: ChatMessage = {
+      id: 'main-unrelated',
+      role: 'user',
+      text: 'completely different text',
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+    const input = makeState([local]);
+
+    const result = reconcileComposerEchoes(input, [unrelated]);
+
+    expect(result).toBe(input);
+  });
+
+  it('6. removes a failed notFoundInTranscript entry whose text is contained in a later record', () => {
+    const failedEntry: FailedMessage = {
+      id: 'failed-1',
+      text: ONE_IMAGE_COMPOSER_TEXT,
+      createdAt: '2026-09-27T10:00:00.000Z',
+      kind: 'prompt',
+      notFoundInTranscript: true,
+    };
+    const echo: ChatMessage = {
+      id: 'main-merged',
+      role: 'user',
+      text: QUEUED_MERGED,
+      createdAt: '2026-09-27T10:00:05.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([], [failedEntry]), [echo]);
+
+    expect(result.failed).toEqual([]);
+    expect(result.consumedEchoIds).toContain('main-merged');
+  });
+
+  it('7. does not clear a bubble when the containing record was created before it', () => {
+    const local = optimisticMessage({ text: ONE_IMAGE_COMPOSER_TEXT, createdAt: '2026-09-27T10:00:10.000Z' });
+    const earlierContaining: ChatMessage = {
+      id: 'main-earlier',
+      role: 'user',
+      text: QUEUED_MERGED,
+      createdAt: '2026-09-27T10:00:00.000Z',
+    };
+    const input = makeState([local]);
+
+    const result = reconcileComposerEchoes(input, [earlierContaining]);
+
+    expect(result).toBe(input);
+    expect(result.optimistic).toEqual([local]);
+  });
+});

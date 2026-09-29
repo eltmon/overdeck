@@ -265,5 +265,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`terminalId` = agent id) hides the bug. Herdr work agents run without the
   PTY supervisor, so the enrichment poller's `agent.created` is the only way a
   post-boot agent enters the read model's `agentsById`.
+- **Composer text reaches Claude Code as a paste** (PAN-4305) — Claude Code
+  records a long paste as `<pasted_content id="N">…</pasted_content id="N">`
+  in landed and queued records (closer carries the id). Any filter that drops
+  user text starting with `<` (`isSystemInjection`, `summary-fork.ts`) hides
+  the operator's own message; unwrap through `src/lib/pasted-content.ts` first.
 
 <!-- last-verified: 2026-09-28 -->
