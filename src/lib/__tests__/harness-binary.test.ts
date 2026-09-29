@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const configMock = vi.hoisted(() => ({ loadConfigSync: vi.fn(() => ({ config: {} })) }));
 vi.mock('../config-yaml.js', () => ({ loadConfigSync: configMock.loadConfigSync }));
+
+const requirementsMock = vi.hoisted(() => ({ assertClaudeCodeSupportsModel: vi.fn(async () => undefined) }));
+vi.mock('../claude-code/requirements.js', () => ({
+  assertClaudeCodeSupportsModel: requirementsMock.assertClaudeCodeSupportsModel,
+}));
 
 import {
   configuredHarnessBinaryPath,
@@ -320,6 +325,51 @@ describe('prepareHarnessLaunch', () => {
     })).rejects.toThrow(
       'Kimi Code CLI configured executable "/configured/missing-kimi" was not found or is not executable',
     );
+  });
+
+  describe('Claude Code version gate (PAN-4359)', () => {
+    beforeEach(() => {
+      requirementsMock.assertClaudeCodeSupportsModel.mockClear();
+      requirementsMock.assertClaudeCodeSupportsModel.mockResolvedValue(undefined);
+    });
+
+    it('checks the launch model for a claude-code launch', async () => {
+      await prepareHarnessLaunch('claude-code', {
+        model: 'claude-sonnet-5-5',
+        pathValue: '/usr/bin',
+        home: '/home/test',
+        accessExecutable: executableAccess(['/home/test/.local/bin/claude']),
+        runCommand: vi.fn(async () => ''),
+        allowLoginShell: false,
+      });
+
+      expect(requirementsMock.assertClaudeCodeSupportsModel).toHaveBeenCalledWith(
+        '/home/test/.local/bin/claude',
+        'claude-sonnet-5-5',
+      );
+    });
+
+    it('rejects the launch when the version check rejects', async () => {
+      requirementsMock.assertClaudeCodeSupportsModel.mockRejectedValueOnce(new Error('too old'));
+
+      await expect(prepareHarnessLaunch('claude-code', {
+        model: 'claude-sonnet-5-5',
+        pathValue: '/usr/bin',
+        home: '/home/test',
+        accessExecutable: executableAccess(['/home/test/.local/bin/claude']),
+        runCommand: vi.fn(async () => ''),
+        allowLoginShell: false,
+      })).rejects.toThrow('too old');
+    });
+
+    it('never checks a non-claude-code harness', async () => {
+      await prepareHarnessLaunch('codex', {
+        executablePath: '/configured/codex',
+        accessExecutable: executableAccess(['/configured/codex']),
+      });
+
+      expect(requirementsMock.assertClaudeCodeSupportsModel).not.toHaveBeenCalled();
+    });
   });
 });
 

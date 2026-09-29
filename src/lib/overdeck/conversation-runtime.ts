@@ -556,7 +556,7 @@ export async function spawnConversationSession(
 ): Promise<void> {
   const bareContext = launch.bareContext === true;
   const behavior = getHarnessBehavior(harness);
-  const harnessLaunch = await prepareHarnessLaunch(harness);
+  const harnessLaunch = await prepareHarnessLaunch(harness, { model });
   const stateDir = conversationStateDir(tmuxSession);
   await mkdir(stateDir, { recursive: true });
   if (launch.role) await writeConversationPaneRole(tmuxSession, launch.role);
