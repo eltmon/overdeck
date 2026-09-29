@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4422",
   "created": "2026-09-29T20:41:36.281Z",
-  "updated": "2026-09-29T21:59:24.593Z",
+  "updated": "2026-09-29T21:59:36.843Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "settings-api-id.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T21:59:24.593Z"
+    },
+    "settings-catalog-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T21:59:36.843Z"
     }
   }
 }
