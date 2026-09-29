@@ -4,17 +4,17 @@
     "created": "2026-09-29T14:04:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4333: Session Vault: key rotation after device loss (key ring, re-encrypt refs under a new key)",
-    "updated": "2026-09-29T14:10:49.537Z"
+    "updated": "2026-09-29T14:11:41.878Z"
   },
   "plan": {
     "id": "pan-4333",
     "title": "Session Vault: key rotation after device loss (key ring, re-encrypt refs under a new key)",
-    "status": "proposed",
+    "status": "running",
     "uid": "6f1ab125-6440-4307-a7c4-517af471e286",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T14:04:40Z",
-    "updated": "2026-09-29T14:10:49.537Z",
+    "updated": "2026-09-29T14:11:41.878Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4333",
@@ -899,5 +899,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
