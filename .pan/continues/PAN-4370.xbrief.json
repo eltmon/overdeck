@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T13:54:01.011Z",
+  "updated": "2026-09-29T13:54:16.100Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-4370",
       "claimedAt": "2026-09-29T13:37:05.867Z",
       "doneAt": "2026-09-29T13:54:01.011Z"
+    },
+    "policy-auth-health": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4370",
+      "claimedAt": "2026-09-29T13:54:16.100Z"
     }
   }
 }
