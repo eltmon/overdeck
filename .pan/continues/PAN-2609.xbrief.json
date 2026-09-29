@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:19:30.413Z",
+  "updated": "2026-09-29T06:19:44.351Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,6 +274,10 @@
     "vault-format.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T06:19:30.413Z"
+    },
+    "vault-format.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:19:44.351Z"
     }
   }
 }
