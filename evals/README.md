@@ -28,9 +28,29 @@ Evals that call a model live under `npm run eval`. They read the model from `OVE
 | Flywheel launch-vs-report | [`flywheel-launch.eval.ts`](./flywheel-launch.eval.ts) | Given a fixture board, the flywheel role emits launch actions for eligible issues and respects the author/assignee gate, veto, and `blocks-main` emergency override. |
 | Review synthesis blocker format | [`review-synthesis.eval.ts`](./review-synthesis.eval.ts) | Given fixture convoy reviewer reports, the review role produces the canonical synthesis blocker format and a changes-requested verdict. |
 | Jev smoke | [jev-smoke.eval.ts](./jev-smoke.eval.ts) | Given 8 labeled messages, Jev's question-detection Noul agrees with the label. Skipped unless config.yaml has jev.model and a TypeSafe/Zen key. |
+| Jev turn-end | [jev-turn-end.eval.ts](./jev-turn-end.eval.ts) | Given the 40-row `evals/fixtures/jev-turn-end.json` set, Jev's `turn_end_kind` Choice (confidence-gated at `TURN_END_MIN_CONFIDENCE`) agrees with the label; prints `perClassMetrics` as a table after the run. Skipped unless config.yaml has jev.model and a TypeSafe/Zen key. |
 | Jev acceptance criteria | [jev-acceptance-criteria.eval.ts](./jev-acceptance-criteria.eval.ts) | Given 60+ labeled ACs from .pan/specs, Jev's observable/compound Nouls agree with the labels at the questions.ts thresholds. Skipped unless config.yaml has jev.model and a TypeSafe/Zen key. |
 
 Jev evals take the model from `jev.model` in config.yaml, never from a literal, and are skipped (with the reason printed) when Jev is not configured.
+
+#### Jev turn-end: measured per-class precision (PAN-4371 WI-12 checkpoint)
+
+Measured with `jev.model = jev-1.13-free`, 2026-09-29 (`cd evals && npx evalite run jev-turn-end.eval.ts`). Overall scorer score: **60% (24/40)**.
+
+| Class | Precision | Recall | Support |
+| --- | --- | --- | --- |
+| `asks_operator` | 0.7778 | 0.875 | 8 |
+| `reports_complete` | 0.8 | 0.8 | 10 |
+| `reports_blocked` | 0.6667 | 0.6667 | 9 |
+| `progress_update` | 0.75 | 0.3 | 10 |
+| `other` | null | 0 | 3 |
+
+The WI-12 gate is `asks_operator` precision ≥ 0.9. **Not met** (measured 0.78 on this 40-row fixture and this free-tier model). Per the checkpoint's fallback, the feature is documented as advisory with accuracy under measurement, and the D-1 thresholds (`TURN_END_MIN_CONFIDENCE = 0.7`, `TURN_END_NEEDS_ANSWER_THRESHOLD = 0.5`) are unchanged — thresholds were not tuned against this fixture set.
+
+`QUESTION_SET_VERSION` is `3` after merging PAN-4372's acceptance-criteria questions into the
+same `src/lib/jev/questions.ts` file (both features had independently bumped it 1→2 on their own
+branches). The turn-end question text and thresholds are unchanged from when the measurement
+above was taken — the bump reflects the merge, not a re-tune.
 
 ### Shared harness
 

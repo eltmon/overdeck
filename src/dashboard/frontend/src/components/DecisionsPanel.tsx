@@ -33,7 +33,7 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
     : undefined;
   const prompt =
     decision.pendingAskUserQuestion?.questions?.[0]?.question ??
-    (decision.pendingProposedPlan ? 'A plan is ready for your review.' : enrichmentTitle ?? decision.permissionSummary ?? describePendingInput(decision.kinds));
+    (decision.pendingProposedPlan ? 'A plan is ready for your review.' : enrichmentTitle ?? decision.permissionSummary ?? describePendingInput(decision.kinds, decision.turnEndAssessment));
   const issueRef = formatIssueRef(decision.issueId, decision.issueTitle);
 
   return (
@@ -45,7 +45,7 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
       <div className={styles.rowMain}>
         <div className={styles.rowTop}>
           <span className={`${styles.badge} ${decision.blocking ? styles.badgeBlocking : ''}`}>
-            {describePendingInput(decision.kinds)}
+            {describePendingInput(decision.kinds, decision.turnEndAssessment)}
           </span>
           <span className={styles.subject}>{decision.label}</span>
           {decision.source === 'conversation' && issueRef && (
