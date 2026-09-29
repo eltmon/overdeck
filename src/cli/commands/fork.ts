@@ -11,6 +11,7 @@ interface ForkOptions {
   cwd?: string;
   project?: string;
   plain?: boolean;
+  allowPrimary?: boolean;
 }
 
 const SELF_REFS = new Set(['self', '.', 'current', 'me']);
@@ -63,6 +64,7 @@ export async function forkCommand(
       cwd: options.cwd,
       projectKey: options.project,
       forkMode,
+      allowPrimary: options.allowPrimary,
     });
   } catch (err) {
     if (err instanceof ForkServerError) {
