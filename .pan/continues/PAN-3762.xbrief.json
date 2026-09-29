@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:30:31.597Z",
+  "updated": "2026-09-29T16:30:44.607Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -286,6 +286,10 @@
     "docs-remote-access.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T16:30:31.597Z"
+    },
+    "e2e-pairing-journey.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:30:44.606Z"
     }
   }
 }
