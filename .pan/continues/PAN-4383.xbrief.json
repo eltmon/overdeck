@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4383",
   "created": "2026-09-29T06:22:16.508Z",
-  "updated": "2026-09-29T07:46:55.216Z",
+  "updated": "2026-09-29T07:47:06.908Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "parked-operator-gate.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T07:46:55.216Z"
+    },
+    "parked-operator-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:47:06.908Z"
     }
   }
 }
