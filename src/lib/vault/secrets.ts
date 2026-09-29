@@ -118,3 +118,61 @@ export async function scanNewLines(
   });
   return hits;
 }
+
+export interface WipSecretHit {
+  /** Path of the file the added line belongs to, as the patch names it. */
+  file: string;
+  pattern: SecretPatternName;
+  /** lineHash of the added line (without its leading '+'); for `allow-secret --file`, never printed. */
+  hash: string;
+}
+
+/** `b/src/a.ts` or `"b/sp ace.ts"` → `src/a.ts` / `sp ace.ts`; `/dev/null` → null. */
+function patchPath(raw: string, prefix: 'a/' | 'b/'): string | null {
+  let path = raw.replace(/\t.*$/, '');
+  if (path.length >= 2 && path.startsWith('"') && path.endsWith('"')) path = path.slice(1, -1);
+  if (path === '/dev/null') return null;
+  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+}
+
+/**
+ * Scan the added lines of a unified patch (`git log -p` / `git diff` output)
+ * for WIP capture (PAN-4329 D-4). The current file comes from the `+++ b/<path>`
+ * header, or `--- a/<path>` when the new side is `/dev/null`. Only lines added
+ * inside a hunk are scanned, so a removed or context line never blocks. One hit
+ * per (file, line, pattern); hashes allowed for `vaultId` are skipped. The
+ * matched text never appears in the result.
+ */
+export async function scanWipPatch(vaultId: string, patch: string): Promise<WipSecretHit[]> {
+  const allowed = await allowedSecretHashes(vaultId);
+  const hits: WipSecretHit[] = [];
+  let file = '';
+  let inHunk = false;
+  for (const line of patch.split('\n')) {
+    if (line.startsWith('diff ')) {
+      file = '';
+      inHunk = false;
+      continue;
+    }
+    if (!inHunk) {
+      if (line.startsWith('--- ')) file = patchPath(line.slice(4), 'a/') ?? file;
+      else if (line.startsWith('+++ ')) file = patchPath(line.slice(4), 'b/') ?? file;
+      else if (line.startsWith('@@')) inHunk = true;
+      continue;
+    }
+    if (line.startsWith('@@')) continue;
+    if (!line.startsWith('+')) continue;
+    const added = line.slice(1);
+    const matches = findSecretMatches(added);
+    if (matches.length === 0) continue;
+    const hash = lineHash(added);
+    if (allowed.has(hash)) continue;
+    const seen = new Set<SecretPatternName>();
+    for (const match of matches) {
+      if (seen.has(match.pattern)) continue;
+      seen.add(match.pattern);
+      hits.push({ file, pattern: match.pattern, hash });
+    }
+  }
+  return hits;
+}
