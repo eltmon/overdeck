@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T14:55:57.474Z",
+  "updated": "2026-09-29T14:56:06.121Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-3762",
       "claimedAt": "2026-09-29T14:38:48.780Z",
       "doneAt": "2026-09-29T14:55:57.474Z"
+    },
+    "pairing-exchange": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T14:56:06.121Z"
     }
   }
 }
