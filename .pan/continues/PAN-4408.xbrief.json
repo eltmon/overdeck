@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4408",
   "created": "2026-09-29T14:47:27.786Z",
-  "updated": "2026-09-29T15:20:06.335Z",
+  "updated": "2026-09-29T15:20:10.428Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,11 @@
       "claimedBy": "agent-pan-4408",
       "claimedAt": "2026-09-29T15:19:40.003Z",
       "doneAt": "2026-09-29T15:20:06.335Z"
+    },
+    "docs-claude-md": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4408",
+      "claimedAt": "2026-09-29T15:20:10.427Z"
     }
   }
 }
