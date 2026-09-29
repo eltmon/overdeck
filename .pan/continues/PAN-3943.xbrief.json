@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T22:42:24.067Z",
+  "updated": "2026-09-29T22:42:30.658Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-3943",
       "claimedAt": "2026-09-29T22:37:30.544Z",
       "doneAt": "2026-09-29T22:42:24.067Z"
+    },
+    "deft-mount-transform": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3943",
+      "claimedAt": "2026-09-29T22:42:30.658Z"
     }
   }
 }
