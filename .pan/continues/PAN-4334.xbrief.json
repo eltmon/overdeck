@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T02:24:00.424Z",
+  "updated": "2026-09-29T02:24:11.966Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -282,6 +282,10 @@
     "pack-store-writes.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T02:24:00.424Z"
+    },
+    "launch-pack-apply.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:24:11.966Z"
     }
   }
 }
