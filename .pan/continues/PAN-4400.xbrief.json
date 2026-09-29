@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4400",
   "created": "2026-09-29T14:25:17.551Z",
-  "updated": "2026-09-29T15:28:41.112Z",
+  "updated": "2026-09-29T15:45:28.770Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4400",
       "claimedAt": "2026-09-29T15:26:44.185Z",
       "doneAt": "2026-09-29T15:28:41.111Z"
+    },
+    "preset-data.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:45:28.769Z"
     }
   }
 }
