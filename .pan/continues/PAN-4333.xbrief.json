@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:53:42.594Z",
+  "updated": "2026-09-29T15:53:57.839Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -220,6 +220,10 @@
     "docs-rotation.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T15:53:42.594Z"
+    },
+    "docs-rotation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:53:57.839Z"
     }
   }
 }
