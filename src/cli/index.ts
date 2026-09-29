@@ -328,6 +328,7 @@ planCmd
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
   .option('--no-quality-lint', 'Emergency bypass for xBRIEF quality lint during finalize')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
+  .option('--critic', 'Require an independent different-family plan critique before promotion (automatic for architecture, substrate-improvement and security labels)')
   .action(lazyAction(() => import('./commands/plan-finalize.js'), 'planFinalizeCommand'));
 
 planCmd
