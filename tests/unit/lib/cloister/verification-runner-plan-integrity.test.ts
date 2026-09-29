@@ -130,7 +130,7 @@ describe('verification runner plan-integrity check (PAN-1728)', () => {
   });
 
   it('does not evaluate plan-integrity when the test-skip gate fails', async () => {
-    mockTestSkip.mockResolvedValue({ failed: true, evidence: 'src/a.test.ts: [skip] it.skip(', waiverApplied: false });
+    mockTestSkip.mockResolvedValue({ failed: true, evidence: 'src/a.test.ts: [skip] a disabled test', waiverApplied: false });
 
     const outcome = await verify();
 
