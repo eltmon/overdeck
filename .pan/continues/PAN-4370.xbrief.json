@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T15:35:10.760Z",
+  "updated": "2026-09-29T16:01:20.091Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-09-29T15:35:01.400Z"
     },
     "doctor-memory-row": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4370",
-      "claimedAt": "2026-09-29T15:35:10.760Z"
+      "claimedAt": "2026-09-29T15:35:10.760Z",
+      "doneAt": "2026-09-29T16:01:20.090Z"
     }
   }
 }
