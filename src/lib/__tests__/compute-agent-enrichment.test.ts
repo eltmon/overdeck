@@ -7,6 +7,9 @@ import { computeAgentEnrichment, EMPTY_PENDING_INPUTS_SCAN } from '../agent-enri
 import * as agentState from '../agents/agent-state.js'
 import * as runtimeState from '../agents/runtime-state.js'
 import * as agentInputDetection from '../agent-input-detection.js'
+import { answerOperatorDecision, requestOperatorDecision } from '../cloister/operator-decision.js'
+
+vi.mock('../pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }))
 
 vi.mock('../agents/agent-state.js', async (importOriginal) => {
   const original = await importOriginal<typeof agentState>()
@@ -535,5 +538,87 @@ describe('computeAgentEnrichment blocking-prompt resolution', () => {
     expect(e.pendingInputKinds).toEqual([])
     expect(e.resolution).toBe('needs_input')
     rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+// PAN-4383: an open `pan ask` decision surfaces as a pending AskUserQuestion.
+describe('computeAgentEnrichment operator decision', () => {
+  const getAgentRuntimeStateMock = vi.mocked(runtimeState.getAgentRuntimeState)
+  const getAgentStateSyncMock = vi.mocked(agentState.getAgentState)
+  const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
+
+  function setup(agentId: string) {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-enrichment-decision-'))
+    getAgentStateSyncMock.mockReturnValue(
+      { id: agentId, role: 'work', workspace } as ReturnType<typeof agentState.getAgentState>,
+    )
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
+    return workspace
+  }
+
+  const ask = (workspace: string, agentId: string) => requestOperatorDecision(workspace, {
+    issueId: 'PAN-1',
+    agentId,
+    question: 'Rotate the leaked token?',
+    options: ['Yes', 'No'],
+  })
+
+  it('surfaces the open decision as an askUserQuestion that needs input', async () => {
+    const agentId = 'agent-pan-1'
+    const workspace = setup(agentId)
+    const decision = ask(workspace, agentId)
+
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
+
+    expect(e.pendingInputKinds).toContain('askUserQuestion')
+    expect(e.pendingAskUserQuestion?.toolUseId).toBe(`operator-decision:${decision.questionId}`)
+    expect(e.pendingAskUserQuestion?.questions[0]?.options.map(o => o.label)).toEqual(['Yes', 'No'])
+    expect(e.resolution).toBe('needs_input')
+    rmSync(workspace, { recursive: true, force: true })
+  })
+
+  it('reports no askUserQuestion once the decision is answered', async () => {
+    const agentId = 'agent-pan-1'
+    const workspace = setup(agentId)
+    answerOperatorDecision(workspace, ask(workspace, agentId), 'Yes', 'dashboard-answer')
+
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
+
+    expect(e.pendingInputKinds).not.toContain('askUserQuestion')
+    expect(e.pendingAskUserQuestion).toBeUndefined()
+    rmSync(workspace, { recursive: true, force: true })
+  })
+
+  it("does not show another agent's decision", async () => {
+    const workspace = setup('agent-pan-1')
+    ask(workspace, 'agent-pan-1-slot')
+
+    const e = await computeAgentEnrichment('agent-pan-1', undefined, false, EMPTY_PENDING_INPUTS_SCAN)
+
+    expect(e.pendingInputKinds).not.toContain('askUserQuestion')
+    rmSync(workspace, { recursive: true, force: true })
+  })
+
+  it('shows only the decision while a specialist is active', async () => {
+    const agentId = 'agent-pan-1'
+    const workspace = setup(agentId)
+    const decision = ask(workspace, agentId)
+    const staleScan = {
+      ...EMPTY_PENDING_INPUTS_SCAN,
+      askUserQuestions: [{
+        toolId: 'toolu_stale',
+        timestamp: new Date().toISOString(),
+        questions: [{ question: 'Old question?', header: 'Old', multiSelect: false, options: [{ label: 'a', description: '' }] }],
+      }],
+    }
+
+    const e = await computeAgentEnrichment(agentId, undefined, true, staleScan)
+
+    expect(e.pendingInputKinds).toEqual(['askUserQuestion'])
+    expect(e.pendingAskUserQuestion?.toolUseId).toBe(`operator-decision:${decision.questionId}`)
+    expect(e.pendingQuestionCount).toBe(1)
+    expect(e.hasPendingQuestion).toBe(true)
+    rmSync(workspace, { recursive: true, force: true })
   })
 })
