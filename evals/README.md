@@ -47,6 +47,11 @@ Measured with `jev.model = jev-1.13-free`, 2026-09-29 (`cd evals && npx evalite 
 
 The WI-12 gate is `asks_operator` precision ≥ 0.9. **Not met** (measured 0.78 on this 40-row fixture and this free-tier model). Per the checkpoint's fallback, the feature is documented as advisory with accuracy under measurement, and the D-1 thresholds (`TURN_END_MIN_CONFIDENCE = 0.7`, `TURN_END_NEEDS_ANSWER_THRESHOLD = 0.5`) are unchanged — thresholds were not tuned against this fixture set.
 
+`QUESTION_SET_VERSION` is `3` after merging PAN-4372's acceptance-criteria questions into the
+same `src/lib/jev/questions.ts` file (both features had independently bumped it 1→2 on their own
+branches). The turn-end question text and thresholds are unchanged from when the measurement
+above was taken — the bump reflects the merge, not a re-tune.
+
 ### Shared harness
 
 [`evals/lib/prompt-harness.ts`](./lib/prompt-harness.ts) exports helpers used by the live-model evals:
