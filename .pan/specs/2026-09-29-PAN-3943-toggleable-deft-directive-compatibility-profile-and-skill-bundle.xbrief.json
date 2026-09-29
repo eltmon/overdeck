@@ -1,0 +1,986 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T22:24:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3943: Toggleable Deft Directive compatibility profile and skill bundle",
+    "updated": "2026-09-29T22:31:03.547Z"
+  },
+  "plan": {
+    "id": "pan-3943",
+    "title": "Toggleable Deft Directive compatibility profile and skill bundle",
+    "status": "proposed",
+    "uid": "54731952-1942-4559-87a3-1fc1698c3505",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T22:24:40Z",
+    "updated": "2026-09-29T22:31:03.547Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3943",
+        "label": "PAN-3943",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4425",
+        "label": "PAN-4425 (fork sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4426",
+        "label": "PAN-4426 (dashboard sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3943.md",
+        "label": "PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "skills",
+      "skill-packs",
+      "deft",
+      "directive",
+      "launcher"
+    ],
+    "narratives": {
+      "Problem": "Deft Directive is a process engine that installs by writing tracked repo files (AGENTS.md section, hooks, .githooks + core.hooksPath, package pin, xbrief/). Operators need Deft guidance on for selected work without Deft taking over a project, and a way to switch an existing Directive deposit off per issue, without Overdeck ever writing tracked repo state.",
+      "Proposal": "Build on PAN-3942/PAN-4334: a deft-readonly adapter mounts 7 engine-free Deft skills (prefix stripped, host notice injected) per launch, with Claude permissions.deny against Deft's mutating CLIs in non-Directive projects; a versioned 25-skill map replaces PAN-791; read-only Directive-project detection and an ownership/collision report; an explicit deft pack off at project or issue level in a Directive project exports DEFT_DIRECTIVE_DISABLE=1, writes a marked untracked flag file only inside issue worktrees, and hides the deposit's pointer skills; managed mode (pan skills deft enable|disable --project, gated on detection plus a printed plan digest) exports DEFT_ORCHESTRATOR=overdeck. Provenance appears in pan skills deft status and a [launcher] deft: stderr line. Fork work (PAN-4425) and dashboard controls (PAN-4426) are sibling issues.",
+      "NonGoals": "- Replacing Overdeck's planner, worktree lifecycle, review pipeline, or xBRIEF source of truth with Deft\n- Running directive init/update/bootstrap, deft session:start, or any Deft CLI from Overdeck code; installing @deftai/directive anywhere\n- Writing tracked files, AGENTS.md/CLAUDE.md sections, agent hook files, .githooks, core.hooksPath, or package.json in any project\n- Migrating Overdeck projects into Directive or uninstalling a user's Directive deposit\n- Changes in the eltmon/directive fork (PAN-4425) and dashboard API/UI controls (PAN-4426)\n- Any issue, PR, or comment on deftai/* repositories\n- A conversation-level toggle (PAN-3942 has global/project/issue only)\n- Full Deft orchestration where Deft owns worktrees, review, or merge\n- Mounting Deft hooks, MCP servers, or commands\n- Polyrepo sub-repo Directive detection\n- Changing Overdeck's existing .claude/settings.json hook merge during workspace creation (reported only)\n- SageOx and Matt Pocock pack changes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fork work in eltmon/directive (env-var off switch, external-orchestrator mode) split into sibling PAN-4425",
+        "rationale": "The Overdeck pipeline reviews only the eltmon/overdeck PR; fork commits cannot be reviewed or Item-trailered here. Overdeck exports the env vars as no-ops until the fork engine is pinned, and the flag file works on engines >= v0.92.0."
+      },
+      {
+        "summary": "Dashboard controls split into sibling PAN-4426; this issue delivers the explicit project-level action through pan skills deft enable/disable",
+        "rationale": "Route, no-loss-matrix row, component and mount would exceed the 25-file finalize limit; the CLI already enforces detection plus a printed plan before enabling."
+      },
+      {
+        "summary": "No conversation level; conversations inherit global/project toggles",
+        "rationale": "PAN-3942 was rescoped to global/project/issue; conversation launches run the same launch step with a managedStateKey."
+      },
+      {
+        "summary": "The deft pack must be registered before its toggle can be set",
+        "rationale": "The PAN-4334 store rejects unknown packs; pan skills deft status prints the add command."
+      },
+      {
+        "summary": "Kill switch only on explicit off (issue/project), never on the default",
+        "rationale": "Pack toggles default to off; applying the kill switch on default would silently disable every user's Directive deposit."
+      },
+      {
+        "summary": "Flag file written only in feature-<issue> worktrees, with an ownership marker",
+        "rationale": "A flag in the primary checkout would silence Deft for every session there; the marker lets Overdeck remove only flags it wrote."
+      },
+      {
+        "summary": "Capability boundary = host notice in every mounted SKILL.md plus Claude permissions.deny for Deft CLIs in non-Directive projects",
+        "rationale": "Several allowlisted skills name task/deft commands or xbrief/ writes; Codex has no deny mechanism so the notice is the shared layer."
+      },
+      {
+        "summary": "KNOWN_PACKS.deft points at https://github.com/eltmon/directive",
+        "rationale": "Operator plan 2026-09-29: pack sources point at the forks; the operator still picks --ref and approves the commit."
+      },
+      {
+        "summary": "Read-only allowlist is the 7 skills from PAN-4334 section 3.2 (glossary, debug, design-critique, gh-arch, write-skill, probe, cost)",
+        "rationale": "PAN-4334 research counted CLI dependencies per SKILL.md; re-verified the 25-skill set at eltmon/directive 48e8cbf."
+      }
+    ],
+    "items": [
+      {
+        "id": "deft-skill-map",
+        "title": "Add the versioned Deft skill map, read-only allowlist, and host notice",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "deft-adapter",
+            "deft-mount-transform",
+            "deft-collision-report"
+          ],
+          "files_scope": [
+            "src/lib/skill-packs/deft.ts",
+            "src/lib/skill-packs/__tests__/deft.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/deft.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deft.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/skill-packs/deft.ts per PRD WI-1: DeftSkillClass/DeftSkillEntry types, DEFT_SKILL_PREFIX, DEFT_SKILLS_DIR, DEFT_SKILL_MAP_VERIFIED_AT (eltmon/directive 48e8cbf0e7818a2b2ca60a070791e236ca088ac0, v0.119.10-16), the 25-row DEFT_SKILL_MAP exactly as the PRD table, DEFT_READONLY_SKILLS derived from classes compatible|translated, classifyDeftSkill (unknown => excluded/unreviewed), DEFT_HOST_NOTICE_VERSION=1, DEFT_HOST_NOTICE containing the six verbatim sentences, and applyDeftHostNotice(skillMd, name) that rewrites frontmatter name and inserts the marker comment plus notice after the frontmatter, idempotently. Imports nothing from src/lib/skill-overrides or src/lib/deft. Tests in src/lib/skill-packs/__tests__/deft.test.ts."
+        },
+        "items": [
+          {
+            "id": "deft-skill-map.ac1",
+            "title": "Given the module, when the test counts DEFT_SKILL_MAP keys, then it returns 25 entries covering every name listed in PRD section 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-skill-map.ac2",
+            "title": "DEFT_READONLY_SKILLS returns exactly ['cost','debug','design-critique','gh-arch','glossary','probe','write-skill'] and every conflicting entry has a non-empty overdeck equivalent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-skill-map.ac3",
+            "title": "classifyDeftSkill('brand-new') returns class excluded with reason unreviewed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-skill-map.ac4",
+            "title": "Given the glossary frontmatter shape, when applyDeftHostNotice runs twice, then the output equals one application, sets name: glossary, and contains each of the six required notice sentences exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-adapter",
+        "title": "Add the deft-readonly adapter and the KNOWN_PACKS.deft entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/sources.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck",
+            "npm run build && npm run generate:slash-commands",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts and sources.test.ts pass",
+            "typecheck completes without errors",
+            "composer-commands.generated.ts regenerated and committed",
+            "lint:slash-commands exits 0"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2: extend PackAdapterId (src/lib/skill-packs/adapters.ts:14) with 'deft-readonly'; add KNOWN_PACKS.deft {id:'deft', kind:'pack', url:'https://github.com/eltmon/directive', adapter:'deft-readonly'}; in readPackManifest select skill dirs content/skills/deft-directive-<name> for each DEFT_READONLY_SKILLS name that holds SKILL.md, naming each skill with the stripped name, and report capabilities hooks/contextInjection/gitHooks true and requiresCli ['directive']. Add 'deft-readonly' to ADAPTERS (src/lib/skill-packs/sources.ts:31) and to the --adapter validation, option text, and header comment in src/cli/commands/skills.ts (lines ~9, ~238, ~388). Tests in adapters.test.ts with a temp fixture of all 25 Deft skill dirs and an MIT LICENSE. Then run `npm run build && npm run generate:slash-commands` and commit packages/contracts/src/composer-commands.generated.ts so `npm run lint:slash-commands` passes."
+        },
+        "items": [
+          {
+            "id": "deft-adapter.ac1",
+            "title": "Given a 25-skill Deft fixture, readPackManifest(dir,'deft-readonly') returns exactly the 7 stripped skill names with dirs under content/skills/deft-directive-",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-adapter.ac2",
+            "title": "notAppliedLabels for the deft manifest includes hooks, context injection, git hooks, and requires CLI (directive), and license returns MIT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-adapter.ac3",
+            "title": "A fixture without deft-directive-probe produces 6 skills instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-adapter.ac4",
+            "title": "pan skills pack add accepts --adapter deft-readonly and rejects --adapter foo with the message '--adapter must be plain, claude-plugin, or deft-readonly'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-mount-transform",
+        "title": "Rewrite Deft SKILL.md copies in the pack mount and cover the transform in the mount hash",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/mount.test.ts src/lib/skill-overrides/__tests__/launch.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "mount.test.ts and launch.test.ts pass",
+            "typecheck completes without errors",
+            "no circular dependency reported"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: in src/lib/skill-packs/mount.ts bump MOUNT_FORMAT_VERSION to 2, add MountTransform='deft-readonly' and optional MountPack.transform, append `${transform}.${DEFT_HOST_NOTICE_VERSION}` (or '') to each mountHash entry, reject unknown transforms in assertMountPack, and after copyWithoutSymlinks rewrite <dst>/SKILL.md with applyDeftHostNotice when transform is deft-readonly. In src/lib/skill-overrides/launch.ts resolveLaunchPackSelection, set transform:'deft-readonly' on packs whose catalog adapter is deft-readonly. Tests in mount.test.ts."
+        },
+        "items": [
+          {
+            "id": "deft-mount-transform.ac1",
+            "title": "Given a deft fixture pack with transform deft-readonly, buildMount produces plugins/deft/skills/glossary/SKILL.md whose frontmatter reads name: glossary and which contains the overdeck:deft-host-notice marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-mount-transform.ac2",
+            "title": "Given a pack without a transform, buildMount produces skill files byte-identical to the source files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-mount-transform.ac3",
+            "title": "mountHash returns different hashes for the same selection with and without transform",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-mount-transform.ac4",
+            "title": "The generated .claude-plugin/plugin.json for the deft pack contains ./skills/glossary in its skills array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directive-detect",
+        "title": "Detect Directive projects read-only from derived signals",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "deft-collision-report",
+            "deft-launch-env",
+            "cli-deft-verbs"
+          ],
+          "files_scope": [
+            "src/lib/deft/detect.ts",
+            "src/lib/deft/__tests__/detect.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/detect.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "detect.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: create src/lib/deft/detect.ts exporting DirectiveDetection, detectDirectiveProject(root), and findRepoRoot(cwd) (fs walk to the first dir holding a .git entry). Fields: coreVersion, pinnedEngine, managedSection, agentHookFiles (deft-hook in the four host files), gitHooksPath (async execFile git config --get core.hooksPath, 5000 ms timeout, null on failure), hasGithooksDir, pointerSkills (deft-directive-* under .claude/skills, .agents/skills, .codex/skills), xbriefProjectDefinition, killSwitch {present, overdeckOwned via first line '# overdeck:deft-directive-disable'}, permanentOptOut, killSwitchSupported (>= 0.92.0; null when unparseable). isDirectiveProject = coreVersion || managedSection || pinnedEngine. Spawn `git config` only when a fs signal (coreVersion, managedSection, or pinnedEngine) is present, so a plain project launch spawns nothing. Never writes. Tests in src/lib/deft/__tests__/detect.test.ts."
+        },
+        "items": [
+          {
+            "id": "directive-detect.ac1",
+            "title": "Given an empty directory, detectDirectiveProject returns isDirectiveProject false with empty pointerSkills and agentHookFiles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directive-detect.ac2",
+            "title": "Given the PRD WI-4 Directive fixture, detection returns managedSection 'v3', pinnedEngine '^0.119.10', killSwitchSupported true, pointerSkills ['deft-directive-glossary'], and killSwitch.overdeckOwned true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directive-detect.ac3",
+            "title": "A pin of 0.91.3 returns killSwitchSupported false, and a temp git repo with core.hooksPath=.githooks returns gitHooksPath '.githooks'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directive-detect.ac4",
+            "title": "Given a hash of every fixture file, when detection runs, then every file hash is unchanged and a non-Directive fixture spawns no git process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-collision-report",
+        "title": "Build the Deft ownership and collision report with a stable plan digest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/deft/collisions.ts",
+            "src/lib/deft/__tests__/collisions.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/collisions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "collisions.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: create src/lib/deft/collisions.ts exporting DeftConcern, CollisionRow, DeftCollisionReport, and buildDeftCollisionReport(detection, {overdeckSkillNames}). Rows for the 11 concerns in the PRD order with the fixed owners, skillOverlaps from DEFT_SKILL_MAP conflicting entries whose overdeck name is present, a stable plain-text table in `text` (no timestamps), and digest = sha256 hex of text. Non-Directive projects render the deft column as 'absent'. Tests in src/lib/deft/__tests__/collisions.test.ts."
+        },
+        "items": [
+          {
+            "id": "deft-collision-report.ac1",
+            "title": "buildDeftCollisionReport returns rows containing each of the 11 concerns exactly once, in the PRD order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-collision-report.ac2",
+            "title": "The digest is identical across two calls with the same input and changes when detection.gitHooksPath changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-collision-report.ac3",
+            "title": "Given overdeckSkillNames containing pan-swarm, skillOverlaps includes {deft:'swarm', overdeck:'pan-swarm'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-collision-report.ac4",
+            "title": "Given a non-Directive detection, every row renders the deft column as absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-project-mode",
+        "title": "Store the managed-mode decision in projects.yaml",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/deft/project-mode.ts",
+            "src/lib/deft/__tests__/launch.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/launch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "launch.test.ts (project-mode describe block) passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: create src/lib/deft/project-mode.ts exporting DeftIntegration, readDeftIntegration(key), enableDeftManaged(key, planDigest, now?), disableDeftManaged(key) storing projects.<key>.deft_integration {mode:'managed', plan_digest, enabled_at} through updateProjectsConfigAsync (src/lib/projects.ts:653), typed locally like src/lib/skill-overrides/store.ts:84. enable throws for an unknown project and for a digest not matching /^[0-9a-f]{64}$/. Tests go in a describe('project-mode') block of src/lib/deft/__tests__/launch.test.ts (created by this item; deft-launch-env adds to it) with a temp OVERDECK_HOME."
+        },
+        "items": [
+          {
+            "id": "deft-project-mode.ac1",
+            "title": "enableDeftManaged persists deft_integration with mode managed, the given plan_digest, and an ISO enabled_at, and readDeftIntegration returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-project-mode.ac2",
+            "title": "disableDeftManaged removes only deft_integration, returns true, and preserves unrelated projects.yaml keys and comments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-project-mode.ac3",
+            "title": "enableDeftManaged rejects an unknown project key and a non-64-hex digest without writing projects.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-launch-env",
+        "title": "Resolve and apply the per-launch Deft kill switch, orchestrator env, and flag file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "launcher-deft-wiring",
+            "live-checkpoint"
+          ],
+          "files_scope": [
+            "src/lib/deft/launch.ts",
+            "src/lib/deft/__tests__/launch.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/launch.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "launch.test.ts passes",
+            "typecheck completes without errors",
+            "no circular dependency reported"
+          ],
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: create src/lib/deft/launch.ts exporting DeftLaunchPlan, resolveDeftLaunch(ctx), applyDeftLaunch(plan, root, envFile), DEFT_FLAG_MARKER, and DEFT_CLI_DENY. Implement the decision table exactly (explicit off = resolvePackToggle('deft') false with source issue|project; flag only when issueIdFromWorkspacePath(cwd) is non-null; orchestrator only for managed Directive projects not explicitly off; denyCli only for non-Directive projects with deft skills mounted; hideSkills = pointerSkills under the kill switch). Store/resolve modules are dynamic imports. applyDeftLaunch writes/removes the env file (0600), writes the marked flag only when absent and untracked, appends /.deft-directive-disable to `git rev-parse --git-path info/exclude` when git check-ignore fails (once), deletes only marked flags on re-enable, and touches nothing else. Provenance line format per PRD. Tests in src/lib/deft/__tests__/launch.test.ts using temp git repos."
+        },
+        "items": [
+          {
+            "id": "deft-launch-env.ac1",
+            "title": "Given a Directive fixture in a feature-tst-1 worktree with the deft pack explicitly off at issue level, applyDeftLaunch writes an env file containing DEFT_DIRECTIVE_DISABLE=1 and a flag file starting with '# overdeck:deft-directive-disable', and git status --porcelain returns empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-launch-env.ac2",
+            "title": "Given the same explicit off at a non-worktree cwd, the env file is written and no flag file is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-launch-env.ac3",
+            "title": "Given a Directive project whose deft toggle source is default, no env file and no flag file are created and hideSkills is empty; given managed mode, the env file contains only DEFT_ORCHESTRATOR=overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-launch-env.ac4",
+            "title": "Re-enabling removes the marked flag but preserves a user-written flag without the marker, and a tracked .deft-directive-disable is never modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-launch-env.ac5",
+            "title": "Given applyDeftLaunch runs twice, then the info/exclude file contains the /.deft-directive-disable line exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-deft-wiring",
+        "title": "Wire the Deft env file, pointer hiding, and CLI deny rules into the launch step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/skill-overrides/launcher-lines.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch.test.ts src/lib/__tests__/launcher-generator.test.ts src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "launch.test.ts, launcher-generator.test.ts and skills.test.ts pass",
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "no circular dependency reported"
+          ],
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-2",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8: add deftEnvReadLine(file) to src/lib/skill-overrides/launcher-lines.ts (while-read + case allowlist exporting only DEFT_DIRECTIVE_DISABLE=1 and DEFT_ORCHESTRATOR=overdeck; never source the file); emit it after the plugin-dir line for Claude (file = dirname(pluginLink)/deft.env) and after the Codex step (\"$CODEX_HOME/overdeck-deft.env\"). In src/lib/skill-overrides/launch.ts add applyDeftForLaunch (dynamic import of ../deft/launch.js) and extend claudeSkillSettingsJson(disabled, deny=[]) to add permissions.deny. In skillsLaunchSettingsCommand (src/cli/commands/skills.ts:134-166) run the Deft step fail-open (NFR-2), merge plan.hideSkills into the disabled list for both harnesses, pass DEFT_CLI_DENY only when plan.denyCli, and print plan.provenance to stderr. Update launcher-generator snapshots. Run the Claude deny implementation checkpoint and apply the documented fallback if deny does not apply."
+        },
+        "items": [
+          {
+            "id": "launcher-deft-wiring.ac1",
+            "title": "The Claude launcher snapshot emits the deft.env read line after the PAN_SKILL_PLUGIN_DIR line, and the Codex snapshot emits the read line for \"$CODEX_HOME/overdeck-deft.env\"; neither line sources the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-deft-wiring.ac2",
+            "title": "claudeSkillSettingsJson([], DEFT_CLI_DENY) returns JSON parsing to {permissions:{deny:[...]}}, and claudeSkillSettingsJson([], []) returns ''",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-deft-wiring.ac3",
+            "title": "Given a Deft resolution error, the launch step prints '[launcher] WARNING: deft integration not applied' to stderr, removes the env file, and still prints the settings JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-deft-wiring.ac4",
+            "title": "Given a kill-switched Directive launch, the emitted skill overrides include every detected deft-directive-* pointer skill as off",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-deft-verbs",
+        "title": "Add pan skills deft status, enable, and disable",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/skills-deft.ts",
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck",
+            "npm run build && npm run generate:slash-commands",
+            "npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "skills.test.ts passes",
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "composer-commands.generated.ts regenerated and committed",
+            "lint:slash-commands exits 0"
+          ],
+          "traces": [
+            "FR-11",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9: create src/cli/commands/skills-deft.ts with registerSkillsDeftCommands(skills) and register it in src/cli/commands/skills.ts after the pack block (lines ~386-401). status prints detection, the deft pack registry entry (or the add command), skill map class counts and the 7 mounted names, managed mode, and the report text; --json prints {detection, pack, skillMap, managed, report}. enable refuses non-Directive projects with exit 1 ('<key> is not a Directive project; Overdeck never runs directive init'), prints the report, prompts on TTY, requires --yes otherwise ('Not written: re-run with --yes to accept plan <digest12>.'), then stores the digest. disable removes only the stored decision. Tests in src/cli/commands/__tests__/skills.test.ts. Then run `npm run build && npm run generate:slash-commands` and commit packages/contracts/src/composer-commands.generated.ts so `npm run lint:slash-commands` passes."
+        },
+        "items": [
+          {
+            "id": "cli-deft-verbs.ac1",
+            "title": "pan skills deft enable --project on a non-Directive fixture exits 1 with the not-a-Directive-project message and leaves projects.yaml unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-deft-verbs.ac2",
+            "title": "enable without --yes and without a TTY exits 1, prints 'Not written: re-run with --yes', and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-deft-verbs.ac3",
+            "title": "enable --yes on a Directive fixture persists deft_integration.mode managed with the sha256 digest of the printed report, and disable removes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-deft-verbs.ac4",
+            "title": "status --json on the Directive fixture returns detection.pointerSkills and the 11 report rows, and every CLI test leaves the fixture tree byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-deft",
+        "title": "Document the Deft Directive profile in features/skills.mdx and docs/USAGE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "features/skills.mdx",
+            "docs/USAGE.md"
+          ],
+          "verify_commands": [
+            "grep -n '^## Deft Directive' features/skills.mdx",
+            "grep -n 'pan skills deft enable' docs/USAGE.md",
+            "gh issue view 791 --json state -q .state"
+          ],
+          "expected_outputs": [
+            "features/skills.mdx has a '## Deft Directive' heading",
+            "docs/USAGE.md lists pan skills deft enable",
+            "issue 791 state is CLOSED"
+          ],
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10: in features/skills.mdx rewrite the Deft sentence of '### SageOx and Deft are not plain packs' into a pointer and add a '## Deft Directive' section after '## Skill packs' with the three levels, the add command, the 25-row skill map (verified at eltmon/directive 48e8cbf, v0.119.10-16), host notice rules, the Claude deny list and Codex limit, the WI-7 decision table, flag-file placement and marker, managed-mode commands and storage, the env contract with its PAN-4425 caveat, and the git-hooks limit (the deposited hook scripts do not check the kill switch; whether `deft verify:branch` consults it is unverified and tracked in PAN-4425). In docs/USAGE.md add the deft-readonly adapter and the three pan skills deft verbs. Comment on eltmon/overdeck#791 linking the new section and close it as superseded (never contact deftai/*). Reflect the WI-8 deny checkpoint outcome."
+        },
+        "items": [
+          {
+            "id": "docs-deft.ac1",
+            "title": "features/skills.mdx renders a '## Deft Directive' section containing a 25-row skill map table with the classes and the WI-7 decision table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-deft.ac2",
+            "title": "docs/USAGE.md contains pan skills deft status, enable, and disable and the deft-readonly adapter value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-deft.ac3",
+            "title": "eltmon/overdeck#791 shows a comment linking the new section and its state is CLOSED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-checkpoint",
+        "title": "Verify the Deft profile end to end on this host under an isolated OVERDECK_HOME",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T22:24:40Z",
+        "metadata": {
+          "issueLabel": "pan-3943",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            ".pan/drafts/PAN-3943-live-checkpoint.md"
+          ],
+          "verify_commands": [
+            "test -s .pan/drafts/PAN-3943-live-checkpoint.md",
+            "grep -c 'deft:glossary' .pan/drafts/PAN-3943-live-checkpoint.md"
+          ],
+          "expected_outputs": [
+            "checkpoint file exists and is non-empty",
+            "deft:glossary appears at least twice (Claude and Codex)"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-11: with this branch's build (node dist/cli/index.js) and a scratch OVERDECK_HOME plus a throwaway project, run steps 1-7 and record commands and outputs in .pan/drafts/PAN-3943-live-checkpoint.md. Never touch the real ~/.overdeck/config.yaml and never run directive init; the Directive fixture is hand-built markers only."
+        },
+        "items": [
+          {
+            "id": "live-checkpoint.ac1",
+            "title": "The checkpoint file records pan skills pack add deft printing adapter deft-readonly and 'Skills 7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac2",
+            "title": "The checkpoint file records deft:glossary listed by claude --plugin-dir and by codex debug prompt-input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac3",
+            "title": "The checkpoint file records the Claude deny checkpoint result and empty git status --porcelain output for both the non-Directive and the Directive-fixture launch runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac4",
+            "title": "The checkpoint file records the marked flag created under issue-level off and removed after inherit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "deft-skill-map",
+        "to": "deft-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-skill-map",
+        "to": "deft-mount-transform",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-skill-map",
+        "to": "deft-collision-report",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-adapter",
+        "to": "deft-mount-transform",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-adapter",
+        "to": "launcher-deft-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "directive-detect",
+        "to": "deft-collision-report",
+        "type": "blocks"
+      },
+      {
+        "from": "directive-detect",
+        "to": "deft-launch-env",
+        "type": "blocks"
+      },
+      {
+        "from": "directive-detect",
+        "to": "cli-deft-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-project-mode",
+        "to": "deft-launch-env",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-project-mode",
+        "to": "cli-deft-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-collision-report",
+        "to": "cli-deft-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-launch-env",
+        "to": "launcher-deft-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-mount-transform",
+        "to": "launcher-deft-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-deft-wiring",
+        "to": "cli-deft-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-deft-wiring",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-deft-verbs",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-deft-wiring",
+        "to": "docs-deft",
+        "type": "informs"
+      },
+      {
+        "from": "deft-adapter",
+        "to": "cli-deft-verbs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-3943-toggleable-deft-directive-compatibility-profile-and-skill-bundle.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
