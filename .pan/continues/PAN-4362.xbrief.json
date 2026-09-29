@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:07:45.953Z",
+  "updated": "2026-09-29T11:07:58.097Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "eval-results.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T11:07:45.952Z"
+    },
+    "eval-results.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:07:58.097Z"
     }
   }
 }
