@@ -13,18 +13,45 @@
 import type { Socket } from 'node:net';
 
 import { getInternalToken } from '../../lib/internal-token.js';
-import { hasDashboardAuthHeaders } from './routes/dashboard-auth.js';
+import { registerDeviceConnection } from './device-connections.js';
+import { resolveDashboardCredential, type DashboardCredential } from './routes/dashboard-auth.js';
 import { validateOriginHeaders, type HeaderMap } from './routes/origin-validation.js';
 
-export type UpgradeAuthResult = { ok: true } | { ok: false; status: 401 | 403 | 503; message: string };
+/**
+ * Every `/ws/*` upgrade requires a credential. `GET /api/environment` reports
+ * this as `capabilities.terminalAuth`.
+ */
+export const WS_UPGRADE_REQUIRES_CREDENTIAL = true;
+
+export type UpgradeAuthResult =
+  | { ok: true; credential: DashboardCredential }
+  | { ok: false; status: 401 | 403 | 503; message: string };
 
 export function authorizeDashboardUpgrade(headers: HeaderMap, method: string): UpgradeAuthResult {
   const origin = validateOriginHeaders(headers, method);
   if (!origin.ok) return { ok: false, status: 403, message: origin.error };
   if (!getInternalToken()) return { ok: false, status: 503, message: 'dashboard session token not configured' };
   // PAN-2351 adds scoped access tokens (?token=) here.
-  if (!hasDashboardAuthHeaders(headers)) return { ok: false, status: 401, message: 'Unauthorized' };
-  return { ok: true };
+  const credential = resolveDashboardCredential(headers);
+  if (!credential) return { ok: false, status: 401, message: 'Unauthorized' };
+  return { ok: true, credential };
+}
+
+/** The part of a `ws` WebSocket that revocation needs. */
+export interface ClosableSocket {
+  close(code?: number, reason?: string): void;
+  once(event: 'close', listener: () => void): unknown;
+}
+
+/**
+ * Close a device-authenticated socket with code 4401 when the device is
+ * revoked (PAN-3762 D-3762-10). Other credentials are not revocable, so this
+ * does nothing for them.
+ */
+export function trackDeviceSocket(credential: DashboardCredential, ws: ClosableSocket): void {
+  if (credential.kind !== 'device') return;
+  const unregister = registerDeviceConnection(credential.deviceId, () => ws.close(4401, 'device revoked'));
+  ws.once('close', unregister);
 }
 
 export function rejectUpgrade(socket: Socket, status: number, message: string): void {

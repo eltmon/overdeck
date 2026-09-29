@@ -1,0 +1,303 @@
+{
+  "version": "1",
+  "issueId": "PAN-3762",
+  "created": "2026-09-29T14:15:38.137Z",
+  "updated": "2026-09-29T16:31:09.940Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "env-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T14:15:38.137Z",
+      "doneAt": "2026-09-29T14:16:30.657Z"
+    },
+    "env-descriptor-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T14:16:42.973Z",
+      "doneAt": "2026-09-29T14:34:33.596Z"
+    },
+    "access-token-registry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T14:34:40.006Z",
+      "doneAt": "2026-09-29T14:38:43.466Z"
+    },
+    "device-auth": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T14:38:48.780Z",
+      "doneAt": "2026-09-29T14:55:57.474Z"
+    },
+    "pairing-exchange": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T14:56:06.121Z",
+      "doneAt": "2026-09-29T15:15:47.348Z"
+    },
+    "device-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T15:16:03.741Z",
+      "doneAt": "2026-09-29T15:17:04.448Z"
+    },
+    "live-revocation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T15:17:50.802Z",
+      "doneAt": "2026-09-29T15:24:38.576Z"
+    },
+    "cli-pair": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T15:24:54.853Z",
+      "doneAt": "2026-09-29T15:28:44.453Z"
+    },
+    "cli-devices": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T15:29:02.774Z",
+      "doneAt": "2026-09-29T15:31:51.863Z"
+    },
+    "browser-pairing-landing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T15:31:58.079Z",
+      "doneAt": "2026-09-29T15:40:39.629Z"
+    },
+    "remote-request-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T15:40:46.532Z",
+      "doneAt": "2026-09-29T15:50:51.387Z"
+    },
+    "docs-remote-access": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T15:50:57.837Z",
+      "doneAt": "2026-09-29T15:53:53.548Z"
+    },
+    "e2e-pairing-journey": {
+      "status": "completed",
+      "claimedBy": "agent-pan-3762",
+      "claimedAt": "2026-09-29T15:53:59.890Z",
+      "doneAt": "2026-09-29T15:59:09.789Z"
+    },
+    "env-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:18:17.685Z"
+    },
+    "env-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:18:33.489Z"
+    },
+    "env-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:18:48.887Z"
+    },
+    "env-contract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:19:04.356Z"
+    },
+    "env-descriptor-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:19:18.787Z"
+    },
+    "env-descriptor-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:19:34.429Z"
+    },
+    "env-descriptor-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:19:49.004Z"
+    },
+    "env-descriptor-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:20:03.404Z"
+    },
+    "access-token-registry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:20:18.970Z"
+    },
+    "access-token-registry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:20:33.444Z"
+    },
+    "access-token-registry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:20:48.432Z"
+    },
+    "access-token-registry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:21:04.130Z"
+    },
+    "device-auth.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:21:20.099Z"
+    },
+    "device-auth.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:21:33.769Z"
+    },
+    "device-auth.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:21:49.540Z"
+    },
+    "device-auth.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:22:03.328Z"
+    },
+    "pairing-exchange.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:22:17.216Z"
+    },
+    "pairing-exchange.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:22:30.430Z"
+    },
+    "pairing-exchange.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:22:45.154Z"
+    },
+    "pairing-exchange.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:23:00.905Z"
+    },
+    "pairing-exchange.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:23:16.260Z"
+    },
+    "device-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:23:29.563Z"
+    },
+    "device-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:23:44.301Z"
+    },
+    "device-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:23:59.182Z"
+    },
+    "device-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:24:14.639Z"
+    },
+    "live-revocation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:24:28.301Z"
+    },
+    "live-revocation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:24:42.323Z"
+    },
+    "live-revocation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:24:56.861Z"
+    },
+    "live-revocation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:25:12.140Z"
+    },
+    "cli-pair.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:25:27.223Z"
+    },
+    "cli-pair.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:25:42.581Z"
+    },
+    "cli-pair.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:25:59.609Z"
+    },
+    "cli-pair.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:26:15.703Z"
+    },
+    "cli-devices.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:26:31.596Z"
+    },
+    "cli-devices.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:26:46.921Z"
+    },
+    "cli-devices.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:27:03.027Z"
+    },
+    "cli-devices.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:27:20.011Z"
+    },
+    "browser-pairing-landing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:27:34.370Z"
+    },
+    "browser-pairing-landing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:27:49.253Z"
+    },
+    "browser-pairing-landing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:28:03.560Z"
+    },
+    "browser-pairing-landing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:28:19.001Z"
+    },
+    "remote-request-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:28:33.794Z"
+    },
+    "remote-request-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:28:50.317Z"
+    },
+    "remote-request-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:29:04.737Z"
+    },
+    "remote-request-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:29:20.936Z"
+    },
+    "remote-request-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:29:35.388Z"
+    },
+    "docs-remote-access.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:29:48.818Z"
+    },
+    "docs-remote-access.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:30:01.670Z"
+    },
+    "docs-remote-access.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:30:17.463Z"
+    },
+    "docs-remote-access.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:30:31.597Z"
+    },
+    "e2e-pairing-journey.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:30:44.606Z"
+    },
+    "e2e-pairing-journey.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:30:57.311Z"
+    },
+    "e2e-pairing-journey.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:31:09.940Z"
+    }
+  }
+}

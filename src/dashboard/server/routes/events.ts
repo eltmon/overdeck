@@ -23,6 +23,9 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { getEventStore, type StoredEvent } from '../event-store.js';
 import { retainAllAgentOutputInterest } from '../services/agent-output-service.js';
 import { jsonResponse } from '../http-helpers.js';
+import { endStreamOnDeviceRevocation } from '../device-connections.js';
+import { resolveDashboardCredential } from './dashboard-auth.js';
+import type { HeaderMap } from './origin-validation.js';
 import { httpHandler } from './http-handler.js';
 
 const PUBLIC_CATALOG = [
@@ -242,10 +245,13 @@ const getEventStreamRoute = HttpRouter.add(
         },
       });
 
-      const effectStream = Stream.fromReadableStream<Uint8Array, unknown>({
-        evaluate: () => nodeStream,
-        onError: (err) => err,
-      });
+      const effectStream = endStreamOnDeviceRevocation(
+        Stream.fromReadableStream<Uint8Array, unknown>({
+          evaluate: () => nodeStream,
+          onError: (err) => err,
+        }),
+        resolveDashboardCredential(request.headers as HeaderMap),
+      );
 
       return HttpServerResponse.stream(effectStream, {
         headers: {

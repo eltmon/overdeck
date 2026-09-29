@@ -75,10 +75,61 @@ function consumeDashboardBootstrapToken(): string | null {
   return token
 }
 
+/**
+ * Read and strip a `#pair=<credential>` pairing credential (PAN-3762). The
+ * credential only ever travels in the fragment, and it leaves the address bar
+ * before any request is made.
+ */
+function consumePairingCredential(): string | null {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash.replace(/^#/, '')
+  if (!hash) return null
+  const params = new URLSearchParams(hash)
+  const credential = params.get('pair')
+  if (!credential) return null
+  params.delete('pair')
+  const nextHash = params.toString()
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ''}`)
+  return credential
+}
+
+/** A pairing exchange the server refused; the message is the server's `error` text. */
+export class DashboardPairingError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'DashboardPairingError'
+  }
+}
+
+/**
+ * Trade a pairing credential for this browser's own device session. The
+ * server sets the `overdeck_device` cookie; the session mint that follows then
+ * refreshes it. A refusal never falls back to the root bootstrap.
+ */
+async function exchangePairingCredential(url: string | undefined, credential: string): Promise<void> {
+  const exchangeUrl = new URL(dashboardSessionUrl(url))
+  exchangeUrl.pathname = '/api/pairing/exchange'
+  const platform = typeof navigator !== 'undefined' && navigator.platform ? navigator.platform : 'unknown'
+  const response = await fetch(exchangeUrl.toString(), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credential, label: `Browser on ${platform}`, delivery: 'cookie' }),
+  })
+  if (response.ok) return
+  const data = await response.json().catch(() => null) as { error?: unknown } | null
+  const reason = typeof data?.error === 'string' ? data.error : `HTTP ${response.status}`
+  throw new DashboardPairingError(`Pairing failed: ${reason}`, response.status)
+}
+
 export function ensureDashboardSession(url?: string): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
   const token = consumeDashboardBootstrapToken()
-  dashboardSessionPromise ??= Promise.all(dashboardSessionUrls(url).map(async (sessionUrl) => {
+  const pairingCredential = consumePairingCredential()
+  dashboardSessionPromise ??= (pairingCredential
+    ? exchangePairingCredential(url, pairingCredential)
+    : Promise.resolve()
+  ).then(() => Promise.all(dashboardSessionUrls(url).map(async (sessionUrl) => {
     const response = await fetch(sessionUrl, {
       method: 'POST',
       credentials: 'include',
@@ -88,7 +139,7 @@ export function ensureDashboardSession(url?: string): Promise<void> {
     if (!response.ok) throw new Error(`Dashboard session bootstrap failed: HTTP ${response.status}`)
     const data = await response.json().catch(() => null) as { csrfToken?: unknown } | null
     return typeof data?.csrfToken === 'string' ? data.csrfToken : null
-  })).then((csrfTokens) => {
+  }))).then((csrfTokens) => {
     dashboardCsrfToken = csrfTokens.find((csrfToken) => csrfToken !== null) ?? null
     useConnectionState.getState().setSessionAuthFailed(false)
   }).catch((err) => {

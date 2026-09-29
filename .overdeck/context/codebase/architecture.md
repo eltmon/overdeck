@@ -175,4 +175,8 @@ terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
 `wip-capture.ts` / `wip-apply.ts`: encrypted git-bundle snapshots of uncommitted code on
 `Settlement.wip`.
 
+## Dashboard auth (verified 2026-09-29)
+
+No global auth middleware: each route opts in (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`), and many call only `validateOrigin`. The one credential check is `hasDashboardAuthHeaders` (internal token or the root-derived `overdeck_session` cookie); the session mint also trusts `isLoopbackPeer`. The server binds `0.0.0.0`. `/ws/*` upgrades bypass `HttpRouter` (PAN-1166 / PR #4317 adds `ws-auth.ts`). Machine identity is `src/lib/environment-identity.ts` (`environment-id.json`). PAN-3762 adds device sessions, pairing and a global remote request gate; see `docs/DASHBOARD-AUTH.md`.
+
 <!-- last-verified: 2026-09-29 -->
