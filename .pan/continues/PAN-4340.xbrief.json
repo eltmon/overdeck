@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4340",
   "created": "2026-09-29T04:09:59.174Z",
-  "updated": "2026-09-29T04:29:43.539Z",
+  "updated": "2026-09-29T04:30:23.909Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,10 @@
       "claimedBy": "agent-pan-4340",
       "claimedAt": "2026-09-29T04:28:25.316Z",
       "doneAt": "2026-09-29T04:29:43.539Z"
+    },
+    "foreman-skill-handback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:30:23.909Z"
     }
   }
 }
