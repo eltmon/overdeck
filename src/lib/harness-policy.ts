@@ -32,7 +32,7 @@
  *     subscription is in play, so the ToS bar is not engaged)
  */
 
-import { CODEX_CLI_INSTALL_COMMAND, codexModelMinimumVersion, compareVersions } from './codex/app-server-manager.js'
+import { CODEX_CLI_INSTALL_COMMAND, codexModelMinimumVersion, compareVersions } from './codex/model-floors.js'
 import type { RuntimeName } from './runtimes/types.js'
 import type { AuthMode } from './subscription-types.js'
 import { getProviderForModel } from './providers.js'

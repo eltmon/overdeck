@@ -2,7 +2,7 @@
 
 Live landmines a change in this repo can step on. Verified 2026-09-26.
 
-- **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts:119`) blocks
+- **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
   rules listed in its header). Every harness resolution path must end by passing its
   winner through this gate. In `resolveHarness` a denial throws `HarnessResolutionError`

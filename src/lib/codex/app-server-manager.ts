@@ -11,6 +11,14 @@ import {
   NATIVE_SOCKET_PATH_MAX_BYTES,
   type AppServerTransport,
 } from './app-server-transport.js';
+import { compareVersions } from './model-floors.js';
+
+// Re-exported so existing callers of these pure pieces need no import
+// change; the definitions live in the `ws`-free leaf module model-floors.ts
+// (PAN-4363) so the startup config chain (harness-policy.ts,
+// system-prerequisites.ts) can depend on them without pulling in `ws`
+// through this module's app-server-transport.js import.
+export { CODEX_CLI_INSTALL_COMMAND, CODEX_MODEL_MINIMUM_VERSIONS, codexModelMinimumVersion, compareVersions } from './model-floors.js';
 
 const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = '0.144.0';
@@ -20,25 +28,6 @@ const MINIMUM_CODEX_VERSION = '0.144.0';
  * the ordinary stdio transport; only attachment is unavailable.
  */
 export const MINIMUM_NATIVE_ENDPOINT_CODEX_VERSION = '0.153.4';
-
-/**
- * Oldest Codex CLI OpenAI's backend accepts for each model under ChatGPT
- * sign-in (PAN-4363). Below it the backend answers 400 "The '<model>' model
- * is not supported when using Codex with a ChatGPT account"
- * (openai/codex#47784). 0.156.1 is the first release whose catalog lists
- * both ids. API-key auth has no floor.
- */
-export const CODEX_MODEL_MINIMUM_VERSIONS: Readonly<Record<string, string>> = {
-  'gpt-6-sol': '0.156.1',
-  'gpt-6-luna': '0.156.1',
-};
-
-/** Copyable Codex CLI install/upgrade command; Overdeck never runs it. */
-export const CODEX_CLI_INSTALL_COMMAND = 'npm install -g @openai/codex';
-
-export function codexModelMinimumVersion(model: string): string | undefined {
-  return Object.hasOwn(CODEX_MODEL_MINIMUM_VERSIONS, model) ? CODEX_MODEL_MINIMUM_VERSIONS[model] : undefined;
-}
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
 const VERSION_TIMEOUT_MS = 4_000;
@@ -656,15 +645,6 @@ export function messageThreadId(message: AppServerMessage): string | undefined {
   if (typeof params.threadId === 'string') return params.threadId;
   const thread = asRecord(params.thread);
   return typeof thread.id === 'string' ? thread.id : undefined;
-}
-
-export function compareVersions(left: string, right: string): number {
-  const a = left.split('.').map(Number);
-  const b = right.split('.').map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return (a[index] ?? 0) - (b[index] ?? 0);
-  }
-  return 0;
 }
 
 export function parseCodexCliVersion(raw: string): string | undefined {

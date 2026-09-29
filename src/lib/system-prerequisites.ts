@@ -17,7 +17,7 @@ import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import { promisify } from 'node:util';
 
-import { CODEX_CLI_INSTALL_COMMAND } from './codex/app-server-manager.js';
+import { CODEX_CLI_INSTALL_COMMAND } from './codex/model-floors.js';
 import {
   resolveExecutableDetailed,
   resolveHarnessBinaryDetailed,
