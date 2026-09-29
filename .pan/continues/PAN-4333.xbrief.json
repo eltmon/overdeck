@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:08:32.136Z",
+  "updated": "2026-09-29T15:08:50.221Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "keyring-format.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T15:08:32.135Z"
+    },
+    "keyring-format.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:08:50.221Z"
     }
   }
 }
