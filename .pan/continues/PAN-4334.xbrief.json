@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T01:14:42.875Z",
+  "updated": "2026-09-29T01:15:00.357Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4334",
       "claimedAt": "2026-09-29T01:12:32.042Z",
       "doneAt": "2026-09-29T01:14:42.875Z"
+    },
+    "mount-gc": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4334",
+      "claimedAt": "2026-09-29T01:15:00.356Z"
     }
   }
 }
