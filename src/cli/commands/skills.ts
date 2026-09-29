@@ -6,7 +6,7 @@
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
  *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
  *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
- *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin] [--yes]      (PAN-4334)
+ *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]      (PAN-4334)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
  *
@@ -235,8 +235,13 @@ async function packConfirm(yes: boolean | undefined, note?: string): Promise<(pr
 }
 
 export async function skillsPackAddCommand(id: string, url: string, options: PackAddOptions): Promise<void> {
-  if (options.adapter !== undefined && options.adapter !== 'plain' && options.adapter !== 'claude-plugin') {
-    console.error(chalk.red('--adapter must be plain or claude-plugin'));
+  if (
+    options.adapter !== undefined &&
+    options.adapter !== 'plain' &&
+    options.adapter !== 'claude-plugin' &&
+    options.adapter !== 'deft-readonly'
+  ) {
+    console.error(chalk.red('--adapter must be plain, claude-plugin, or deft-readonly'));
     process.exit(1);
   }
   const [{ addPack }, { CORE_SKILLS }] = await Promise.all([
@@ -385,7 +390,7 @@ export function registerSkillsCommands(program: Command): void {
 
   const pack = skills.command('pack').description('Register, update, and cache external skill packs pinned to a commit');
   pack.command('add <id> <url>').description('Register a git skill pack at the commit a ref resolves to (enables nothing)')
-    .requiredOption('--ref <ref>', 'Tag or branch to pin').option('--adapter <adapter>', 'plain or claude-plugin')
+    .requiredOption('--ref <ref>', 'Tag or branch to pin').option('--adapter <adapter>', 'plain, claude-plugin, or deft-readonly')
     .option('--yes', 'Trust the resolved commit without asking').action(skillsPackAddCommand);
   pack.command('update <id>').description('Move a pack to the commit its ref (or --ref) now resolves to')
     .option('--ref <ref>', 'Switch to a different tag or branch').option('--yes', 'Trust the new commit without asking')

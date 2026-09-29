@@ -351,6 +351,11 @@ describe('pan skills pack', () => {
     expect(mocks.addPack).not.toHaveBeenCalled();
   });
 
+  it('accepts the deft-readonly adapter', async () => {
+    await run(...addArgs, '--adapter', 'deft-readonly', '--yes');
+    expect(mocks.addPack).toHaveBeenCalledWith(expect.objectContaining({ adapter: 'deft-readonly' }), expect.any(Function));
+  });
+
   it('lists packs as JSON offline without an update check', async () => {
     mocks.listPackCatalog.mockResolvedValue([
       { id: 'mattpocock', url: preview.url, ref: 'v1.2.3', commit: COMMIT, adapter: 'claude-plugin', cached: true, manifest: preview.manifest },

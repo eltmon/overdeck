@@ -10,8 +10,9 @@
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, posix } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { DEFT_READONLY_SKILLS, DEFT_SKILL_PREFIX, DEFT_SKILLS_DIR } from './deft.js';
 
-export type PackAdapterId = 'plain' | 'claude-plugin';
+export type PackAdapterId = 'plain' | 'claude-plugin' | 'deft-readonly';
 
 export interface PackSkill {
   name: string;
@@ -59,6 +60,7 @@ export const KNOWN_PACKS: Readonly<Record<string, KnownPack>> = {
     adapter: 'claude-plugin',
     optIn: ['setup-matt-pocock-skills'],
   },
+  deft: { id: 'deft', kind: 'pack', url: 'https://github.com/eltmon/directive', adapter: 'deft-readonly' },
   sageox: {
     id: 'sageox',
     kind: 'integration',
@@ -182,6 +184,16 @@ async function claudePluginSkillDirs(root: string, plugin: Record<string, unknow
   return dirs;
 }
 
+/** Read-only allowlist dirs (`content/skills/deft-directive-<name>`) that hold a SKILL.md (PAN-3943). */
+async function deftReadonlySkillDirs(root: string): Promise<string[]> {
+  const dirs: string[] = [];
+  for (const name of DEFT_READONLY_SKILLS) {
+    const dir = posix.join(DEFT_SKILLS_DIR, DEFT_SKILL_PREFIX + name);
+    if (await isFile(join(root, dir, 'SKILL.md'))) dirs.push(dir);
+  }
+  return dirs;
+}
+
 async function listExecutables(root: string, skillDir: string): Promise<string[]> {
   const found: string[] = [];
   const walk = async (rel: string): Promise<void> => {
@@ -225,10 +237,13 @@ export async function readPackManifest(
   opts: { optIn?: readonly string[] } = {},
 ): Promise<PackManifest> {
   const plugin = await readPluginJson(root, adapter === 'claude-plugin');
+  const deft = adapter === 'deft-readonly';
   const skillDirs =
     adapter === 'claude-plugin'
       ? await claudePluginSkillDirs(root, plugin ?? {})
-      : await scanSkillDirs(root, 'skills');
+      : deft
+        ? await deftReadonlySkillDirs(root)
+        : await scanSkillDirs(root, 'skills');
   const optIn = new Set(opts.optIn ?? []);
 
   const skills: PackSkill[] = [];
@@ -238,23 +253,25 @@ export async function readPackManifest(
     const content = await readTextOrNull(join(root, dir, 'SKILL.md'));
     if (content === null) continue;
     const frontmatter = readSkillFrontmatter(content);
-    const name = frontmatter.name ?? basename(dir);
+    // Deft skills are named by the stripped dir name, never the `deft-directive-*` frontmatter name.
+    const name = deft ? basename(dir).slice(DEFT_SKILL_PREFIX.length) : (frontmatter.name ?? basename(dir));
     if (!SKILL_NAME_PATTERN.test(name) || seen.has(name)) continue;
     seen.add(name);
     skills.push({ name, dir, description: frontmatter.description, optIn: optIn.has(name) });
     executables.push(...(await listExecutables(root, dir)));
   }
 
+  // Deft always carries agent hooks, an AGENTS.md section, and .githooks, and its skills call the directive CLI.
   const capabilities: PackCapabilities = {
-    hooks: (await isFile(join(root, 'hooks', 'hooks.json'))) || plugin?.['hooks'] !== undefined,
+    hooks: deft || (await isFile(join(root, 'hooks', 'hooks.json'))) || plugin?.['hooks'] !== undefined,
     mcpServers: (await isFile(join(root, '.mcp.json'))) || plugin?.['mcpServers'] !== undefined,
     commands: await isDir(join(root, 'commands')),
     agents: await isDir(join(root, 'agents')),
-    contextInjection: false,
-    gitHooks: false,
+    contextInjection: deft,
+    gitHooks: deft,
     executables,
     projectMutatingSkills: skills.filter((skill) => skill.optIn).map((skill) => skill.name),
-    requiresCli: [],
+    requiresCli: deft ? ['directive'] : [],
   };
   const pluginName = typeof plugin?.['name'] === 'string' ? plugin['name'] : null;
   return { skills, capabilities, license: await readLicense(root, plugin), pluginName };

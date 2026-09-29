@@ -28,7 +28,7 @@ import {
 
 export const PACK_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
-const ADAPTERS: readonly PackAdapterId[] = ['plain', 'claude-plugin'];
+const ADAPTERS: readonly PackAdapterId[] = ['plain', 'claude-plugin', 'deft-readonly'];
 const LS_REMOTE_TIMEOUT_MS = 5000;
 
 const execFileAsync = promisify(execFile);
