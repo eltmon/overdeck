@@ -6,6 +6,7 @@ import {
   deriveSessionOutcome,
   outcomeFactsFromAgent,
   outcomeFactsFromSessionNode,
+  planFinalizedFromState,
   type SessionOutcomeFacts,
 } from './sessionOutcome';
 
@@ -80,6 +81,16 @@ describe('deriveSessionOutcome — precedence table', () => {
 
   it('row 6: plan role finalized → Plan finalized', () => {
     expect(deriveSessionOutcome(facts({ role: 'plan', planningComplete: true })).label).toBe('Plan finalized');
+  });
+
+  it('planFinalizedFromState: true for the six post-planning states, false for backlog, parked, closed, undefined', () => {
+    for (const state of ['planned', 'working', 'in-review', 'changes-requested', 'ready', 'merged'] as const) {
+      expect(planFinalizedFromState(state)).toBe(true);
+    }
+    for (const state of ['backlog', 'parked', 'closed'] as const) {
+      expect(planFinalizedFromState(state)).toBe(false);
+    }
+    expect(planFinalizedFromState(undefined)).toBe(false);
   });
 
   it('row 7: stoppedByUser → Stopped by operator', () => {
@@ -212,11 +223,22 @@ describe('outcomeFactsFromSessionNode — role mapping', () => {
     expect(deriveSessionOutcome(f).label).toBe('Handed to review');
   });
 
+  it('planning node with planningComplete undefined and derived state planned → Plan finalized', () => {
+    const f = outcomeFactsFromSessionNode(node({ type: 'planning', status: 'stopped', planningComplete: undefined }), derived({ state: 'planned' }), undefined);
+    expect(deriveSessionOutcome(f).label).toBe('Plan finalized');
+  });
+
+  it('planning node with planningComplete false and derived state backlog → Ended unexpectedly (still unfinished)', () => {
+    const f = outcomeFactsFromSessionNode(node({ type: 'planning', status: 'stopped', planningComplete: false }), derived({ state: 'backlog' }), undefined);
+    expect(deriveSessionOutcome(f).label).toBe('Ended unexpectedly');
+    expect(deriveSessionOutcome(f).tone).toBe('attention');
+  });
+
   it('planning node maps to role plan', () => {
     expect(outcomeFactsFromSessionNode(node({ type: 'planning' }), undefined, undefined).role).toBe('plan');
   });
 
-  it('legacy node maps to role plan but is synthesized (reaches the fallback, not row 11)', () => {
+  it('legacy node maps to role plan but is synthesized (reaches the fallback, not row 12)', () => {
     const f = outcomeFactsFromSessionNode(node({ type: 'legacy', status: 'stopped' }), derived({ state: 'working' }), undefined);
     expect(f.role).toBe('plan');
     expect(f.synthesized).toBe(true);

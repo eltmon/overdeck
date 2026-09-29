@@ -105,6 +105,13 @@ const RECORDED_LIVE_STATUSES = new Set(['running', 'starting']);
 const PRIMARY_ROLES = new Set<SessionOutcomeRole>(['plan', 'work', 'strike']);
 const HANDED_OFF_STATES = new Set<IssueState>(['in-review', 'changes-requested', 'ready']);
 
+/** Issue states that exist only after planning finalized (spec on disk or work past planning). `closed` and `parked` are excluded. */
+const PLAN_FINALIZED_STATES = new Set<IssueState>(['planned', 'working', 'in-review', 'changes-requested', 'ready', 'merged']);
+
+export function planFinalizedFromState(state: IssueState | undefined): boolean {
+  return state !== undefined && PLAN_FINALIZED_STATES.has(state);
+}
+
 /**
  * Pick the outcome for an ended session (call only when the session has
  * ended). Precedence table (first match wins) — see PRD WI-2.
@@ -305,10 +312,17 @@ export function outcomeFactsFromSessionNode(
     ? latestReviewResult
     : undefined;
 
+  // PAN-4398: a finished planner whose node lacks `planningComplete` (server
+  // could not resolve the spec) still derives Plan finalized from the issue
+  // state. Legacy (synthesized) nodes keep the node value.
+  const planningComplete = node.type === 'planning'
+    ? (node.planningComplete === true || planFinalizedFromState(derived?.state) ? true : node.planningComplete)
+    : node.planningComplete;
+
   return {
     role,
     synthesized,
-    planningComplete: node.planningComplete,
+    planningComplete,
     reviewerVerdict,
     prReviewState: derived?.pr?.reviewState,
     prChecks: derived?.pr?.checks,
@@ -352,10 +366,7 @@ export function outcomeFactsFromAgent(
   // D6: the drawer has no `planningComplete`; planning is finalized when the
   // derived state implies the spec exists or work went past planning.
   // `closed` is excluded so a closed issue falls through to close-out.
-  const planningComplete = derived?.state !== undefined
-    && (['planned', 'working', 'in-review', 'changes-requested', 'ready', 'merged'] as IssueState[]).includes(derived.state)
-    ? true
-    : undefined;
+  const planningComplete = planFinalizedFromState(derived?.state) ? true : undefined;
 
   return {
     role,
