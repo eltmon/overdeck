@@ -33,6 +33,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await registry._settleAccessTokenWritesForTests();
   registry._resetAccessTokensForTests();
   vi.useRealTimers();
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;

@@ -272,6 +272,11 @@ export function verifyAccessToken(presented: string | null | undefined): VerifyA
   return { ok: true, record: toPublic(match) };
 }
 
+/** Test-only: resolve once every queued registry write (including lastUsedAt) has settled. */
+export async function _settleAccessTokenWritesForTests(): Promise<void> {
+  await writeQueue;
+}
+
 /** Test-only: drop the snapshot, timer and throttle state. */
 export function _resetAccessTokensForTests(): void {
   stopAccessTokenRefresh();

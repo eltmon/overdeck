@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
 
-const { _resetAccessTokensForTests, createAccessToken } = await import('../../../lib/access-tokens.js');
+const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { _resetDashboardSessionTokenForTests, dashboardCsrfToken } = await import('../routes/dashboard-auth.js');
 const { _resetPairingCredentialsForTests } = await import('../pairing-credentials.js');
@@ -68,6 +68,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.useRealTimers();
+  await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
   delete process.env.OVERDECK_INTERNAL_TOKEN;
   _resetInternalTokenCacheForTests();

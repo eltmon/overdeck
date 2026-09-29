@@ -11,7 +11,7 @@ import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { _resetAccessTokensForTests, createAccessToken, revokeAccessToken } from '../../../lib/access-tokens.js';
+import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken } from '../../../lib/access-tokens.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import {
   _resetDashboardSessionTokenForTests,
@@ -51,6 +51,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
   delete process.env.OVERDECK_INTERNAL_TOKEN;
   _resetInternalTokenCacheForTests();

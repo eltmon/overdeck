@@ -55,6 +55,7 @@ import { commandDeckRouteLayer } from './routes/command-deck.js'
 import { remoteRouteLayer } from './routes/remote.js'
 import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
+import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
@@ -261,6 +262,8 @@ const staticRouteLayer = HttpRouter.add(
 // ─── Route composition ────────────────────────────────────────────────────────
 
 export const makeRoutesLayer = Layer.mergeAll(
+  // PAN-3762: global middleware; requires a credential for non-local /api and /events requests.
+  remoteRequestGateLayer,
   healthRouteLayer,
   dashboardSessionPreflightRouteLayer,
   dashboardSessionRouteLayer,

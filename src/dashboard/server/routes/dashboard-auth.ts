@@ -7,6 +7,7 @@ import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { verifyAccessToken } from '../../../lib/access-tokens.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
+import { readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getHeaderFromMap, getTrustedOrigins, normalizeOrigin, type HeaderMap } from './origin-validation.js';
 
@@ -340,7 +341,10 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }
-  if (!hasDashboardInternalToken(request) && !isLoopbackPeer(request)) {
+  // With dashboard.require_token_mint, a loopback peer is not enough: a local
+  // reverse proxy makes every remote visitor look like one (PAN-3762 D-3762-9).
+  const peerTrusted = !readRemoteAccessConfig().requireTokenMint && isLoopbackPeer(request);
+  if (!hasDashboardInternalToken(request) && !peerTrusted) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   }
   return null;
