@@ -36,6 +36,7 @@ function deps(spawnRun: SpawnRunForWorker, extra: Partial<StartWorkerDeps> = {})
       return path;
     }),
     worktreeBranch: async () => 'feature/pan-9-worker-1',
+    findPrimaryCheckout: async () => null,
     now: () => new Date('2026-09-23T12:00:00.000Z'),
     ...extra,
   };
@@ -131,6 +132,35 @@ describe('startWorker (PAN-3920 W13)', () => {
     const started = await startWorker({ issueId: 'PAN-9', prompt: 'x', parentId: null, cwd: inside }, d);
     expect(started.cwd).toBe(realpathSync(inside));
     expect(d.createItemWorktree).not.toHaveBeenCalled();
+  });
+
+  it('refuses a read-write --cwd that resolves to a primary checkout (PAN-4338)', async () => {
+    const inside = join(workspace, 'packages', 'core');
+    mkdirSync(inside, { recursive: true });
+    const spawnRun = okSpawn();
+    const allocateWorkerId = vi.fn(async () => 'agent-pan-9-worker-1');
+    const findPrimaryCheckout = vi.fn(async () => ({ projectKey: 'demo', repoName: 'docs', root: inside }));
+    await expect(
+      startWorker(
+        { issueId: 'PAN-9', prompt: 'x', parentId: null, cwd: inside },
+        deps(spawnRun, { findPrimaryCheckout, allocateWorkerId }),
+      ),
+    ).rejects.toThrow(/is the primary checkout of demo\/docs; use a worktree/);
+    expect(allocateWorkerId).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('accepts the same primary-checkout --cwd for a read-only worker (PAN-4338)', async () => {
+    const inside = join(workspace, 'packages', 'core');
+    mkdirSync(inside, { recursive: true });
+    const spawnRun = okSpawn();
+    const findPrimaryCheckout = vi.fn(async () => ({ projectKey: 'demo', repoName: 'docs', root: inside }));
+    const started = await startWorker(
+      { issueId: 'PAN-9', prompt: 'x', parentId: null, cwd: inside, readOnly: true },
+      deps(spawnRun, { findPrimaryCheckout }),
+    );
+    expect(started.cwd).toBe(realpathSync(inside));
+    expect(spawnRun).toHaveBeenCalledTimes(1);
   });
 
   it('refuses when the issue has no workspace', async () => {
