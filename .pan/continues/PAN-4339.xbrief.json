@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4339",
   "created": "2026-09-29T02:04:26.104Z",
-  "updated": "2026-09-29T02:43:03.626Z",
+  "updated": "2026-09-29T02:46:57.261Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-29T02:42:57.396Z"
     },
     "lock-write-verbs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4339",
-      "claimedAt": "2026-09-29T02:43:03.626Z"
+      "claimedAt": "2026-09-29T02:43:03.626Z",
+      "doneAt": "2026-09-29T02:46:57.260Z"
     }
   }
 }
