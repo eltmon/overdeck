@@ -24,7 +24,7 @@ import * as pty from '@lydell/node-pty';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxArgs, capturePane, getWindowDimensions, listSessionNames, resizeWindow, sessionExists } from '../../lib/tmux.js';
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
-import { validateOriginHeaders } from './routes/origin-validation.js';
+import { authorizeDashboardUpgrade, rejectUpgrade } from './ws-auth.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
 import { HerdrTerminalProcess, resolveHerdrTerminalId, resolveTerminalAttachTarget } from './services/terminal-service.js';
@@ -94,11 +94,6 @@ function sendControl(ws: WebSocket, payload: unknown): void {
   }
 }
 
-function rejectUpgrade(socket: import('net').Socket, status: number, message: string): void {
-  socket.write(`HTTP/1.1 ${status} ${message}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
-  socket.destroy();
-}
-
 function armReadyTimeout(hub: PtyHub, ws: WebSocket, sessionName: string): ReturnType<typeof setTimeout> {
   const timer = setTimeout(() => {
     const state = hub.clientStates.get(ws);
@@ -115,21 +110,6 @@ function armReadyTimeout(hub: PtyHub, ws: WebSocket, sessionName: string): Retur
 function markClientReady(hub: PtyHub, ws: WebSocket, readyTimer: ReturnType<typeof setTimeout>): void {
   clearTimeout(readyTimer);
   setClientReady(hub, ws);
-}
-
-function authorizeTerminalUpgrade(request: http.IncomingMessage): { ok: true } | { ok: false; status: number; message: string } {
-  // Hotfix for #1166: PAN-457 added an internal-token + session-cookie gate
-  // here that broke every terminal panel when the dashboard is reached via
-  // Traefik (https://overdeck.localhost) instead of `pan up`'s bootstrapped URL.
-  // Origin validation is sufficient to block cross-origin browser attacks
-  // (a tab on evil.example.com cannot forge Origin: https://overdeck.localhost),
-  // which is the realistic threat model for a localhost dev tool. Re-add the
-  // gate properly per the acceptance criteria in #1166 before reintroducing.
-  const originCheck = validateOriginHeaders(request.headers, request.method ?? 'GET');
-  if (!originCheck.ok) {
-    return { ok: false, status: 403, message: originCheck.error };
-  }
-  return { ok: true };
 }
 
 // Fresh-attach snapshot cap. 5000 lines with escape sequences was several megabytes
@@ -261,7 +241,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
 
     if (url.pathname === '/ws/terminal') {
-      const auth = authorizeTerminalUpgrade(request);
+      const auth = authorizeDashboardUpgrade(request.headers, request.method ?? 'GET');
       if (!auth.ok) {
         rejectUpgrade(socket, auth.status, auth.message);
         return;

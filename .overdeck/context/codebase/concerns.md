@@ -268,6 +268,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   502, for the same `(name, clientMessageId)`. A resend after a
   `permission-pending` hold or a `not-delivered` failure must mint a fresh
   `clientMessageId` and send no `retry` flag, like the not-found Resend.
+- **Origin checks never authenticate** — `validateOriginHeaders` passes a GET
+  (so every WebSocket upgrade) that carries no `Origin`/`Referer`. Credentials
+  are `hasDashboardAuthHeaders` (session cookie or internal token); peer trust
+  (`isLoopbackPeer`, incl. Docker-bridge Traefik) belongs only in the session
+  mint. PAN-1166 routes all `/ws/*` upgrades through `ws-auth.ts`.
 - **Agent-to-pane joins must key by `agentId`** (PAN-4320) — on Herdr a
   `BackendPane`'s `id` (`wKZ:p3`) and `terminalId` (`term_…`) are backend
   handles, never agent ids. Six server sites joined by `terminalId ?? id` and

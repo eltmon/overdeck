@@ -6,7 +6,7 @@ import type { ITurnEmitter } from '../../voice/transcription.js';
 import { createTranscriptionManager, type TranscriptionManager } from '../../voice/transcription-manager.js';
 import { createTurnQueue, type TurnQueue } from '../../voice/turn-queue.js';
 import { loadVoiceSettings, subscribeVoiceSettings } from './routes/voice.js';
-import { isTrustedOriginForHost } from './routes/origin-validation.js';
+import { authorizeDashboardUpgrade, rejectUpgrade } from './ws-auth.js';
 
 function sendJson(ws: WebSocket, payload: unknown): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -23,12 +23,6 @@ function rawDataToBuffer(data: WebSocket.RawData): Buffer {
 
 const MAX_AUDIO_FRAME_BYTES = 64_000;
 const VOICE_STOP_FINALIZE_TIMEOUT_MS = 5_000;
-
-function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
-  const origin = request.headers.origin;
-  if (typeof origin !== 'string') return false;
-  return isTrustedOriginForHost(origin, request.headers.host);
-}
 
 export function setupVoiceWebSocket(server: http.Server): void {
   const wss = new WebSocketServer({ noServer: true });
@@ -50,9 +44,9 @@ export function setupVoiceWebSocket(server: http.Server): void {
   originalOn('upgrade', (request: http.IncomingMessage, socket: import('net').Socket, head: Buffer) => {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
     if (url.pathname !== '/ws/voice') return;
-    if (!isTrustedWebSocketOrigin(request)) {
-      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-      socket.destroy();
+    const auth = authorizeDashboardUpgrade(request.headers, request.method ?? 'GET');
+    if (!auth.ok) {
+      rejectUpgrade(socket, auth.status, auth.message);
       return;
     }
     wss.handleUpgrade(request, socket, head, (ws) => {

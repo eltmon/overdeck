@@ -72,6 +72,43 @@ describe('dashboard session bootstrap', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(4)
   })
+
+  it('rejects with DashboardSessionUnauthorizedError on a 401 and marks the store unauthorized', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ensureDashboardSession, DashboardSessionUnauthorizedError } = await import('../wsTransport')
+    const { useConnectionState } = await import('../connectionState')
+
+    await expect(ensureDashboardSession('ws://localhost:3000/ws/rpc'))
+      .rejects.toBeInstanceOf(DashboardSessionUnauthorizedError)
+    expect(useConnectionState.getState().sessionAuthFailed).toBe(true)
+  })
+
+  it('rejects when only the frontend host mint 401s in the two-host case (D-4)', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ csrfToken: 'csrf' }))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ensureDashboardSession, DashboardSessionUnauthorizedError } = await import('../wsTransport')
+
+    await expect(ensureDashboardSession('ws://api.workspace.test/ws/rpc'))
+      .rejects.toBeInstanceOf(DashboardSessionUnauthorizedError)
+  })
+
+  it('clears the unauthorized store flag once a later mint succeeds', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(Response.json({ csrfToken: 'csrf' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ensureDashboardSession } = await import('../wsTransport')
+    const { useConnectionState } = await import('../connectionState')
+
+    await expect(ensureDashboardSession('ws://localhost:3000/ws/rpc')).rejects.toThrow()
+    expect(useConnectionState.getState().sessionAuthFailed).toBe(true)
+
+    await expect(ensureDashboardSession('ws://localhost:3000/ws/rpc')).resolves.toBeUndefined()
+    expect(useConnectionState.getState().sessionAuthFailed).toBe(false)
+  })
 })
 
 describe('wsTransport reconnect backoff', () => {

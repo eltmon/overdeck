@@ -4,7 +4,20 @@ import userEvent from '@testing-library/user-event';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { PATIENT_WINDOW_MS } from '../lib/terminalReconnectPolicy';
+import { ensureDashboardSession } from '../lib/wsTransport';
+import { DashboardSessionUnauthorizedError } from '../lib/dashboardSessionError';
 import { XTerminal } from './XTerminal';
+
+// XTerminal awaits the session mint before opening a socket (PAN-1166 W8).
+// Resolve by default so the existing WebSocket-focused tests below need no
+// changes; the session-mint describe block below overrides per case.
+vi.mock('../lib/wsTransport', async () => {
+  const actual = await vi.importActual<typeof import('../lib/wsTransport')>('../lib/wsTransport');
+  return {
+    ...actual,
+    ensureDashboardSession: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 // Mock xterm.js — it performs real DOM/media-query operations that break in jsdom.
 // Use plain classes (no vi.fn() methods) so vi.clearAllMocks() doesn't clear them.
@@ -82,7 +95,9 @@ class MockWebSocket {
   onerror: (() => void) | null = null;
   send = vi.fn();
   close = vi.fn();
-  constructor() {
+  url: string;
+  constructor(url: string) {
+    this.url = url;
     MockWebSocket.instances.push(this);
     // Simulate async open
     setTimeout(() => this.onopen?.(), 0);
@@ -659,6 +674,49 @@ describe('XTerminal - WebSocket', () => {
   });
 });
 
+describe('XTerminal - session mint (PAN-1166 W8)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    vi.mocked(ensureDashboardSession).mockResolvedValue(undefined);
+    MockWebSocket.instances = [];
+    (Terminal as unknown as { instances: unknown[] }).instances = [];
+    (FitAddon as unknown as { instances: unknown[] }).instances = [];
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      value: 800,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      value: 600,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('never opens a socket when the session mint is refused (401)', async () => {
+    vi.mocked(ensureDashboardSession).mockRejectedValue(new DashboardSessionUnauthorizedError('http://localhost/api/dashboard/session'));
+
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(MockWebSocket.instances).toHaveLength(0);
+
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(MockWebSocket.instances).toHaveLength(0);
+  });
+
+  it('opens the terminal socket once the session mint resolves', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(MockWebSocket.instances[0].url).toContain('/ws/terminal?session=');
+    expect(ensureDashboardSession).toHaveBeenCalled();
+  });
+});
+
 describe('XTerminal - patient reconnect', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -764,6 +822,8 @@ describe('XTerminal - patient reconnect', () => {
     act(() => MockWebSocket.instances[1].onclose?.({ code: 1006, reason: 'still down' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+    // connect() awaits the session mint before opening the socket (PAN-1166 W8).
+    await act(async () => vi.advanceTimersByTimeAsync(0));
 
     expect(MockWebSocket.instances).toHaveLength(3);
     expect(screen.getByRole('status')).toHaveTextContent('Connection lost — reconnecting…');
