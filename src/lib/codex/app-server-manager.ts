@@ -20,6 +20,26 @@ const MINIMUM_CODEX_VERSION = '0.144.0';
  * the ordinary stdio transport; only attachment is unavailable.
  */
 export const MINIMUM_NATIVE_ENDPOINT_CODEX_VERSION = '0.153.4';
+
+/**
+ * Oldest Codex CLI OpenAI's backend accepts for each model under ChatGPT
+ * sign-in (PAN-4363). Below it the backend answers 400 "The '<model>' model
+ * is not supported when using Codex with a ChatGPT account"
+ * (openai/codex#47784). 0.156.1 is the first release whose catalog lists
+ * both ids. API-key auth has no floor.
+ */
+export const CODEX_MODEL_MINIMUM_VERSIONS: Readonly<Record<string, string>> = {
+  'gpt-6-sol': '0.156.1',
+  'gpt-6-luna': '0.156.1',
+};
+
+/** Copyable Codex CLI install/upgrade command; Overdeck never runs it. */
+export const CODEX_CLI_INSTALL_COMMAND = 'npm install -g @openai/codex';
+
+export function codexModelMinimumVersion(model: string): string | undefined {
+  return Object.hasOwn(CODEX_MODEL_MINIMUM_VERSIONS, model) ? CODEX_MODEL_MINIMUM_VERSIONS[model] : undefined;
+}
+
 const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
 const VERSION_TIMEOUT_MS = 4_000;
 
@@ -456,7 +476,7 @@ export class CodexAppServerManager extends EventEmitter {
       cwd: this.options.cwd,
       timeout: VERSION_TIMEOUT_MS,
     }).then(result => result.stdout));
-    const installed = raw.match(/\d+\.\d+\.\d+/)?.[0];
+    const installed = parseCodexCliVersion(raw);
     if (!installed) throw new Error(`Could not parse Codex CLI version from: ${raw.trim()}`);
     if (compareVersions(installed, MINIMUM_CODEX_VERSION) < 0) {
       throw new Error(`Codex CLI ${installed} is unsupported; upgrade to ${MINIMUM_CODEX_VERSION} or newer.`);
@@ -645,6 +665,20 @@ export function compareVersions(left: string, right: string): number {
     if (a[index] !== b[index]) return (a[index] ?? 0) - (b[index] ?? 0);
   }
   return 0;
+}
+
+export function parseCodexCliVersion(raw: string): string | undefined {
+  return raw.match(/\d+\.\d+\.\d+/)?.[0];
+}
+
+/** Installed Codex CLI version, or undefined when it cannot be run or parsed. Never throws, never caches. */
+export async function readCodexCliVersion(binary = 'codex'): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync(binary, ['--version'], { timeout: VERSION_TIMEOUT_MS });
+    return parseCodexCliVersion(stdout);
+  } catch {
+    return undefined;
+  }
 }
 
 function stripAnsi(value: string): string {
