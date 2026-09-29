@@ -206,3 +206,81 @@ $ pan kill agent-pan-4424-worker-1
   agent-pan-4424-worker-1: killed
 Skipping Docker teardown: 1 live sibling agent(s) (agent-pan-4424) still using this workspace
 ```
+
+## Managed Codex launch
+
+`gpt-5.6-luna` is the host's `workhorses.cheap` model (`~/.overdeck/config.yaml`) and it routed to Codex, confirmed by the launcher log (`[codex-launcher] agent=agent-pan-4424-worker-2 mode=app-server ... --model 'gpt-5.6-luna'`).
+
+```
+$ pan worker run --issue PAN-4424 --harness codex --model gpt-5.6-luna --read-only --detach --name pack-probe-codex --prompt "List every available skill whose name contains 'grilling' or 'setup-matt-pocock', exactly as named in your skill list, one per line. Do not invoke any skill. Then record that list as your worker report with pan worker report."
+[codex-launcher] agent=agent-pan-4424-worker-2 mode=app-server resumeSessionId=(none) resumeApplied=no cmd=exec node '/home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/codex-app-server-host.js' --effort 'high' --model 'gpt-5.6-luna' --developer-instructions-file ...
+[claude-invoke] purpose=role-run | role=worker | model=gpt-5.6-luna | source=agents.ts:spawnRun | session=agent-pan-4424-worker-2 | command="bash /home/eltmon/.overdeck/agents/agent-pan-4424-worker-2/launcher.sh"
+agent-pan-4424-worker-2
+
+$ pan worker wait agent-pan-4424-worker-2 --timeout 600
+grilling
+mattpocock:grilling
+worker agent-pan-4424-worker-2 report 1: done; next: pan worker wait agent-pan-4424-worker-2 --after 1
+(exit code 0)
+```
+
+Report: `mattpocock:grilling` present, `grilling` present (bundled), no `mattpocock:setup-matt-pocock-skills` — matches expectation.
+
+`herdr pane list` found the worker's pane at `wQA:p5`. Captured while the worker was still alive, before stopping it (Codex renders its raw turn log rather than a chat UI; tail of the capture):
+
+```
+$ herdr pane read wQA:p5
+[user] <overdeck-memory-context format="json">
+... (memory-context preamble, elided) ...
+---
+
+List every available skill whose name contains 'grilling' or 'setup-matt-pocock', exactly as named in your skill list, one per line. Do not invoke any skill. Then record that list as your worker report with pan worker report.
+
+---
+When you have finished this brief, write your final report as Markdown to a file and run:
+  pan worker report agent-pan-4424-worker-2 --file <that file>
+Use --status blocked if you could not finish because you need a decision, --status failed if the brief cannot be done.
+Do not run pan done, pan review, or pan task done.
+[turn] started
+[turn] completed
+```
+
+No plugin-consent or trust dialog text anywhere in the captured pane.
+
+```
+$ grep -A1 'plugins."mattpocock@overdeck-packs"' ~/.overdeck/agents/agent-pan-4424-worker-2/codex-home-v2/config.toml
+[plugins."mattpocock@overdeck-packs"]
+enabled = true
+```
+
+```
+$ pan kill agent-pan-4424-worker-2
+[agents] Stopping agent-pan-4424-worker-2 (async): tmux=false stateStatus=stopped
+  agent-pan-4424-worker-2: killed
+Skipping Docker teardown: 1 live sibling agent(s) (agent-pan-4424) still using this workspace
+```
+
+## Cleanup
+
+```
+$ pan skills set --pack mattpocock inherit --issue PAN-4424
+mattpocock (pack): inherit at issue PAN-4424 (committed 9e82cde, pushed)
+
+$ pan skills set --pack mattpocock off
+mattpocock (pack): off (default) at global
+
+$ pan skills pack gc --max-age-days 0
+Removed 0 mount(s) and 0 dangling launch link(s).
+
+$ pan skills list --issue PAN-4424 | grep -A3 "Skill packs"
+Skill packs (1)
+
+mattpocock                                  off    default
+  mattpocock/ask-matt                       off    default
+
+$ pan skills pack list --offline
+Skill packs (1)
+
+mattpocock  https://github.com/eltmon/skills @ v1.2.3 (6acc160)
+  cached yes · license MIT · 25 skills · Not applied: executables (2), project-mutating skills (1)
+```
