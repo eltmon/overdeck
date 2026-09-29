@@ -5,11 +5,14 @@
  *   (the trusted commit is an operator decision, so it is stored)
  * - cache:    `~/.overdeck/packs/<id>/` (derived; deletable at any time)
  *
- * Server-reachable: every fs call is async. Nothing here imports
+ * Server-reachable: every fs and git call is async. Nothing here imports
  * `src/lib/skill-overrides/` (that module will import this one).
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { promisify } from 'node:util';
 import { isMap, isScalar, parse as parseYaml, parseDocument, type Document } from 'yaml';
 import { getGlobalConfigPath } from '../config-yaml/load.js';
 import { getOverdeckHome } from '../paths.js';
@@ -19,6 +22,9 @@ import type { PackAdapterId } from './adapters.js';
 export const PACK_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 const ADAPTERS: readonly PackAdapterId[] = ['plain', 'claude-plugin'];
+const LS_REMOTE_TIMEOUT_MS = 5000;
+
+const execFileAsync = promisify(execFile);
 
 export interface PackRegistryEntry {
   id: string;
@@ -153,4 +159,116 @@ export async function deletePackEntry(id: string): Promise<void> {
     }
     return changed;
   });
+}
+
+async function git(args: string[], opts: { timeout?: number } = {}): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, {
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    maxBuffer: 16 * 1024 * 1024,
+    ...opts,
+  });
+  return stdout;
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function assertOperand(kind: string, value: string): void {
+  if (!value || value.startsWith('-')) throw new Error(`invalid pack ${kind}: ${JSON.stringify(value)}`);
+}
+
+/** Clone the pack as a blobless bare repo, or fetch every branch and tag into the existing clone. */
+export async function fetchPackSource(id: string, url: string): Promise<void> {
+  assertOperand('url', url);
+  const repo = packRepoDir(id);
+  if (await exists(repo)) {
+    await git(['--git-dir', repo, 'fetch', '--force', '--tags', 'origin', '+refs/heads/*:refs/heads/*']);
+    return;
+  }
+  await mkdir(dirname(repo), { recursive: true });
+  try {
+    await git(['clone', '--bare', '--filter=blob:none', '--quiet', '--', url, repo]);
+  } catch (error) {
+    await rm(repo, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+/** The 40-hex commit a ref (tag, branch, or SHA) names in the cached clone. */
+export async function resolveRef(id: string, ref: string): Promise<string> {
+  assertOperand('ref', ref);
+  let commit: string;
+  try {
+    commit = (await git(['--git-dir', packRepoDir(id), 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`])).trim();
+  } catch {
+    throw new Error(`pack ${id}: ref ${ref} does not name a commit`);
+  }
+  assertCommit(commit);
+  return commit;
+}
+
+/** Extract a commit into `packs/<id>/<commit>/` (temp dir, then rename); reuses an existing extraction. */
+export async function extractCommit(id: string, commit: string): Promise<string> {
+  const dir = packExtractDir(id, commit);
+  if (await exists(dir)) return dir;
+  const tmp = `${dir}.tmp-${randomBytes(6).toString('hex')}`;
+  const tar = `${tmp}.tar`;
+  try {
+    await mkdir(tmp, { recursive: true });
+    await git(['--git-dir', packRepoDir(id), 'archive', '--format=tar', '-o', tar, commit]);
+    await execFileAsync('tar', ['-xf', tar, '-C', tmp]);
+    try {
+      await rename(tmp, dir);
+    } catch (error) {
+      if (!(await exists(dir))) throw error;
+    }
+    return dir;
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+    await rm(tar, { force: true });
+  }
+}
+
+/** Git object id of `path` at `commit` (a tree for a skill dir), or null when the path is absent. */
+export async function treeHash(id: string, commit: string, path: string): Promise<string | null> {
+  assertCommit(commit);
+  try {
+    return (await git(['--git-dir', packRepoDir(id), 'rev-parse', '--verify', '--quiet', `${commit}:${path}`])).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The remote commit `entry.ref` points at when it differs from the trusted
+ * commit; null when up to date, pinned to a SHA, or the remote is unreachable.
+ * Derived on demand, never stored.
+ */
+export async function packUpdateAvailable(entry: PackRegistryEntry): Promise<string | null> {
+  if (COMMIT_PATTERN.test(entry.ref) || entry.ref === entry.commit) return null;
+  if (!entry.url || entry.url.startsWith('-') || entry.ref.startsWith('-')) return null;
+  let stdout: string;
+  try {
+    stdout = await git(['ls-remote', '--', entry.url, entry.ref, `${entry.ref}^{}`], { timeout: LS_REMOTE_TIMEOUT_MS });
+  } catch {
+    return null;
+  }
+  const refs = new Map<string, string>();
+  for (const line of stdout.split('\n')) {
+    const [sha, name] = line.trim().split('\t');
+    if (sha && name && COMMIT_PATTERN.test(sha)) refs.set(name, sha);
+  }
+  const remote =
+    refs.get(`refs/tags/${entry.ref}^{}`) ??
+    refs.get(`refs/tags/${entry.ref}`) ??
+    refs.get(`refs/heads/${entry.ref}`) ??
+    refs.get(entry.ref) ??
+    null;
+  return remote && remote !== entry.commit ? remote : null;
 }
