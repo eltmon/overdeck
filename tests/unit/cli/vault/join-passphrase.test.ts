@@ -1,15 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { joinCommand } from '../../../../src/cli/commands/vault/join.js';
+import { PASSPHRASE_KEY_RETIRED_MESSAGE, PHRASE_MISMATCH_MESSAGE, joinCommand } from '../../../../src/cli/commands/vault/join.js';
 import { listCommand } from '../../../../src/cli/commands/vault/list.js';
 import { saveCommand } from '../../../../src/cli/commands/vault/save.js';
 import { setupCommand } from '../../../../src/cli/commands/vault/setup.js';
 import { syncCommand } from '../../../../src/cli/commands/vault/sync.js';
 import { readVaultConfig } from '../../../../src/lib/vault/config.js';
+import { readSessionRecord, refName, type SessionRecord } from '../../../../src/lib/vault/format.js';
+import { deriveSubkeys, keyToPhrase } from '../../../../src/lib/vault/identity.js';
 import { PASSPHRASE_MISMATCH_MESSAGE } from '../../../../src/lib/vault/keywrap.js';
+import { listOwned, readListCache } from '../../../../src/lib/vault/local-index.js';
+import { clearNextKey, rotateVaultKey } from '../../../../src/lib/vault/rotate.js';
 import { DirVaultStore } from '../../../../src/lib/vault/store/dir.js';
+import { GitVaultStore } from '../../../../src/lib/vault/store/git.js';
 import { KEYWRAP_OBJECT_NAME } from '../../../../src/lib/vault/store/types.js';
 import { Fixture, captureIo, git, runCli, type CapturedIo } from './helpers.js';
 
@@ -190,5 +195,138 @@ describe('pan vault join --passphrase-file on a vault without a keywrap', () => 
     expect(io.stderr).toEqual([`This vault has no passphrase set. Use the recovery phrase: pan vault join ${remote} --phrase-file <path>`]);
     expect(existsSync(join(overdeckHome, 'vault', 'git'))).toBe(false);
     expect(existsSync(join(overdeckHome, 'vault', 'key'))).toBe(false);
+  });
+});
+
+describe('join after rotation', () => {
+  let fx: Fixture;
+  let remote: string;
+  let cwd: string;
+  let oldPhrase: string;
+  let homeA: string;
+  let homeB: string;
+  let nativeB: string;
+
+  function file(name: string, content: string): string {
+    const path = join(fx.root, name);
+    writeFileSync(path, content);
+    return path;
+  }
+
+  /** Machine A replaces the vault key, as `pan vault rotate-key` does; returns the new key. */
+  async function rotateOnA(keywrap?: Uint8Array | null): Promise<Buffer> {
+    fx.useMachine('a');
+    const store = await GitVaultStore.open(join(homeA, 'vault', 'git'));
+    const { newKey } = await rotateVaultKey({ store, currentKey: readFileSync(join(homeA, 'vault', 'key')), keywrap });
+    await clearNextKey();
+    return newKey;
+  }
+
+  beforeEach(async () => {
+    fx = new Fixture();
+    remote = fx.bareRepo();
+    cwd = join(fx.root, 'repo');
+    mkdirSync(cwd, { recursive: true });
+    homeA = fx.useMachine('a').overdeckHome;
+    const setupIo = captureIo();
+    expect(await runCli(() => setupCommand(remote, { passphraseFile: file('p.txt', `${PASSPHRASE}\n`) }, setupIo))).toBe(0);
+    oldPhrase = setupIo.stdout.find((line) => line.trim().split(' ').length === 24)!.trim();
+
+    homeB = fx.useMachine('b').overdeckHome;
+    expect(await runCli(() => joinCommand(remote, { phraseFile: file('old-phrase.txt', oldPhrase) }, captureIo()))).toBe(0);
+    nativeB = join(fx.root, `${SESSION}.jsonl`);
+    writeFileSync(nativeB, `${user(TITLE, cwd)}\n${assistant('a reply', cwd)}\n`);
+    expect(await runCli(() => saveCommand(nativeB, {}, captureIo()))).toBe(0);
+    expect(await runCli(() => syncCommand({}, captureIo()))).toBe(0);
+  });
+
+  afterEach(() => {
+    fx.cleanup();
+  });
+
+  it('rejoin.ac1: a stale machine joins with the new phrase file, keeps its local index, and its next save appends to the renamed record', async () => {
+    const newKey = await rotateOnA(null);
+    fx.useMachine('b');
+    const ownedBefore = await listOwned();
+    const cacheBefore = await readListCache();
+    const vaultId = ownedBefore[nativeB]!.vaultId;
+
+    // Stale, B is refused.
+    appendFileSync(nativeB, `${user('written after the rotation', cwd)}\n`);
+    const refused = captureIo();
+    expect(await runCli(() => saveCommand(nativeB, {}, refused))).toBe(1);
+    expect(refused.stdout.join('\n')).toContain("This machine's vault key was retired by a key rotation.");
+
+    const joinIo = captureIo();
+    expect(await runCli(() => joinCommand(remote, { phraseFile: file('new-phrase.txt', keyToPhrase(newKey)) }, joinIo))).toBe(0);
+    expect(joinIo.stderr).toEqual([]);
+    expect(readFileSync(join(homeB, 'vault', 'key')).equals(newKey)).toBe(true);
+    // The index entry survives; join's own sync already settled the line B wrote while it was refused.
+    const ownedAfter = await listOwned();
+    expect(Object.keys(ownedAfter)).toEqual(Object.keys(ownedBefore));
+    expect(ownedAfter[nativeB]).toMatchObject({ vaultId, harness: 'claude-code', tail: { lineCount: 3 } });
+    expect((await readListCache()).map((row) => row.vaultId)).toEqual(cacheBefore.map((row) => row.vaultId));
+
+    appendFileSync(nativeB, `${user('written after the re-join', cwd)}\n`);
+    const save = captureIo();
+    expect(await runCli(() => saveCommand(nativeB, {}, save))).toBe(0);
+    expect(save.stdout).toEqual([expect.stringMatching(new RegExp(`: appended 1 line \\(vault ${vaultId.slice(0, 8)}, version 3\\)`))]);
+
+    const keys = deriveSubkeys(newKey);
+    const name = refName('record', vaultId, keys.K_ref);
+    const blob = execFileSync('git', ['cat-file', 'blob', `main:refs/${name}`], { cwd: remote });
+    const record = (await readSessionRecord(name, blob, keys)) as SessionRecord;
+    expect(record.vaultId).toBe(vaultId);
+    expect(record.settlements.map((entry) => entry.lines)).toEqual([2, 3, 4]);
+    expect(record.log).toHaveLength(3);
+  });
+
+  it('rejoin.ac2: the old phrase prints the FR-12 message and writes nothing', async () => {
+    // The keywrap is left as it was: it still wraps the retired key.
+    await rotateOnA();
+    const head = git(remote, 'rev-parse', 'main').trim();
+    fx.useMachine('b');
+    const keyBefore = readFileSync(join(homeB, 'vault', 'key'));
+
+    const byPhrase = captureIo();
+    expect(await runCli(() => joinCommand(remote, { phraseFile: file('old-phrase.txt', oldPhrase) }, byPhrase))).toBe(1);
+    expect(byPhrase.stderr).toEqual([PHRASE_MISMATCH_MESSAGE]);
+    expect(byPhrase.stderr).toEqual(['The recovery phrase does not match this vault. If the vault key was rotated, use the new recovery phrase or passphrase.']);
+
+    const byPassphrase = captureIo();
+    expect(await runCli(() => joinCommand(remote, { passphraseFile: file('p.txt', PASSPHRASE) }, byPassphrase))).toBe(1);
+    expect(byPassphrase.stderr).toEqual([PASSPHRASE_KEY_RETIRED_MESSAGE]);
+    expect(byPassphrase.stderr).toEqual(['The passphrase unlocked a key this vault no longer uses. The vault key was rotated; use the new recovery phrase, or finish the rotation with pan vault rotate-key on the machine that started it.']);
+
+    expect(readFileSync(join(homeB, 'vault', 'key')).equals(keyBefore)).toBe(true);
+    expect(existsSync(join(homeB, 'vault', 'git'))).toBe(true);
+    expect(git(remote, 'rev-parse', 'main').trim()).toBe(head);
+
+    // A machine that never joined gets the same answer and keeps nothing.
+    const { overdeckHome: homeC } = fx.useMachine('c');
+    const fresh = captureIo();
+    expect(await runCli(() => joinCommand(remote, { phraseFile: file('old-phrase.txt', oldPhrase) }, fresh))).toBe(1);
+    expect(fresh.stderr).toEqual([PHRASE_MISMATCH_MESSAGE]);
+    expect(existsSync(join(homeC, 'vault', 'key'))).toBe(false);
+    expect(existsSync(join(homeC, 'vault', 'git'))).toBe(false);
+  });
+
+  it('rejoin.ac3: an untracked object left in the stale clone is gone after join and is never pushed', async () => {
+    fx.useMachine('b');
+    const cloneB = join(homeB, 'vault', 'git');
+    const stray = 'ab' + 'c'.repeat(38);
+    await (await GitVaultStore.open(cloneB)).putObjects([{ id: stray, bytes: Buffer.from('sealed under the retired key') }]);
+    expect(existsSync(join(cloneB, 'objects', 'ab', stray))).toBe(true);
+
+    const newKey = await rotateOnA(null);
+    fx.useMachine('b');
+    expect(await runCli(() => joinCommand(remote, { phraseFile: file('new-phrase.txt', keyToPhrase(newKey)) }, captureIo()))).toBe(0);
+    expect(existsSync(join(cloneB, 'objects', 'ab', stray))).toBe(false);
+
+    appendFileSync(nativeB, `${user('after the re-join', cwd)}\n`);
+    expect(await runCli(() => saveCommand(nativeB, {}, captureIo()))).toBe(0);
+    expect(await runCli(() => syncCommand({}, captureIo()))).toBe(0);
+    expect(git(remote, 'log', '--all', '--name-only', '--format=')).not.toContain(stray);
+    expect(git(remote, 'ls-tree', '-r', '--name-only', 'main')).not.toContain(stray);
   });
 });
