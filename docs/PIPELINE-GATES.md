@@ -884,6 +884,14 @@ observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
    unpushed commits.
+
+   `checkStuckWorkAgents` does **not** read the Jev turn-end assessment
+   (PAN-4371) in this release. That assessment only labels the Needs-you row
+   (`describePendingInput`'s turn-end label) and the parked `idle-running`
+   row's evidence (`src/lib/parked/resolver.ts`, `src/lib/cloister/stall-sweeper.ts`).
+   It is advisory: it never suppresses, adds, or changes a nudge here.
+   Letting this routine act on the assessment is a separate, operator-signed
+   issue (phase 2).
 2. `checkApiErrorAgents` — nudges a work, specialist, or planning agent wedged
    on a provider error (including Claude Code's "API Error: Connection lost
    mid-response"), once per 5 minutes, and only when liveness.ts `isIdle`
