@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4372",
   "created": "2026-09-29T09:44:00.403Z",
-  "updated": "2026-09-29T10:46:55.529Z",
+  "updated": "2026-09-29T10:47:19.120Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -108,6 +108,10 @@
       "claimedBy": "agent-pan-4372",
       "claimedAt": "2026-09-29T10:45:49.049Z",
       "doneAt": "2026-09-29T10:46:55.529Z"
+    },
+    "docs-xbrief-advisory.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:47:19.120Z"
     }
   }
 }
