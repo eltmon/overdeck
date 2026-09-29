@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4359",
   "created": "2026-09-29T03:48:03.128Z",
-  "updated": "2026-09-29T04:38:09.450Z",
+  "updated": "2026-09-29T04:38:10.881Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,11 @@
       "claimedBy": "agent-pan-4359",
       "claimedAt": "2026-09-29T04:20:57.112Z",
       "doneAt": "2026-09-29T04:38:09.450Z"
+    },
+    "upgrade-banner": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4359",
+      "claimedAt": "2026-09-29T04:38:10.881Z"
     }
   }
 }
