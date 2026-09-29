@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:12:27.428Z",
+  "updated": "2026-09-29T16:12:39.687Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "policy-auth-health.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T16:12:27.428Z"
+    },
+    "policy-auth-health.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:12:39.687Z"
     }
   }
 }
