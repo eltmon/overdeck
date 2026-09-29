@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4383",
   "created": "2026-09-29T06:22:16.508Z",
-  "updated": "2026-09-29T06:22:16.508Z",
+  "updated": "2026-09-29T06:43:28.690Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "decision-core": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4383",
-      "claimedAt": "2026-09-29T06:22:16.507Z"
+      "claimedAt": "2026-09-29T06:22:16.507Z",
+      "doneAt": "2026-09-29T06:43:28.689Z"
     }
   }
 }
