@@ -1,0 +1,646 @@
+{
+  "id": "compaction-verified-head-disk-full",
+  "kind": "compaction",
+  "source": "real session excerpt, overdeck PAN-4221, 2026-09, scrubbed; planted facts and decoys edited in",
+  "entries": [
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's write `verified-head.ts`."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01JXtpGUcmtUJWrBB41HHEhY",
+            "name": "Write",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/verified-head.ts",
+              "content": "/**\n * Resolve the primary repo's sha out of a workspace HEAD anchor (PAN-2948:\n * a polyrepo anchor is a composite `fe@<sha> api@<sha>` string, not a plain\n * sha — slicing it directly yields garbage).\n */\nimport { parseCompositeSnapshot, type HeadAnchor } from '../git-utils.js';\n\nexport function primaryShaFromAnchor(anchor: HeadAnchor | string | undefined, primaryRepoKey: string | undefined): string | undefined {\n  if (!anchor) return undefined;\n  const composite = parseCompositeSnapshot(anchor);\n  if (composite.size === 0) return anchor;\n  return (primaryRepoKey && composite.get(primaryRepo …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01JXtpGUcmtUJWrBB41HHEhY",
+            "content": "File created successfully at: ~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/verified-head.ts (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now update `verification-runner.ts` to use the new helper."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01E47Qko5iEcTBVxPQNcWuJg",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/verification-runner.ts",
+              "old_string": "    // The verified sha. A polyrepo anchor is a COMPOSITE snapshot string, so\n    // slicing it yields garbage — resolve the primary repo's sha out of it,\n    // the same way the `overdeck/tests` stamp below does.\n    const verifiedSha = (() => {\n      if (!lastVerifiedCommit) return undefined;\n      const composite = parseCompositeSnapshot(lastVerifiedCommit);\n      if (composite.size === 0) return lastVerifiedCommit as string;\n      const primary = repoRoots[0]?.repoKey;\n      return (primary && composite.get(primary)) ?? [...composite.values()][0];\n    })();",
+              "new_string": "    // The verified sha. A polyrepo anchor is a COMPOSITE snapshot string, so\n    // slicing it yields garbage — resolve the primary repo's sha out of it,\n    // the same way the `overdeck/tests` stamp below does.\n    const verifiedSha = primaryShaFromAnchor(lastVerifiedCommit, repoRoots[0]?.repoKey);"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01E47Qko5iEcTBVxPQNcWuJg",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/verification-runner.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now update the import at line 57 to drop `parseCompositeSnapshot` and add the import of `primaryShaFromAnchor`."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XJgtTY7NaDjKUAGvcYW9zm",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/verification-runner.ts",
+              "offset": 50,
+              "limit": 15
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01XJgtTY7NaDjKUAGvcYW9zm",
+            "content": "50\timport { resolveWorkspaceRepoRoots } from '../project-repos.js';\n51\timport { getXBriefACStatus } from '../xbrief/acceptance-criteria.js';\n52\timport { XBriefMergeConflictError } from '../xbrief/io.js';\n53\timport { isXBriefFilename } from '../xbrief/lifecycle.js';\n54\timport { checkIncompletePlanItems } from '../work/done-preflight.js';\n55\timport { capturePipelineStageForIssue } from '../telemetry/pipeline.js';\n56\timport type { TemplatePlaceholders } from '../workspace-config.js';\n57\timport { parseCompositeSnapshot, snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';\n58\t\n59\tconst execAsync = promisify(exec);\n60\t\n61\texport {\n62\t  deliverVerificationFeedback,\n63\t  MERGED_VERIFICATION_REASON,\n64\t  VERIFICATION_MAX_CYCLES,"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01CiJUZSiMBmCULphYD7dpDT",
+            "name": "Bash",
+            "input": {
+              "command": "grep -n \"HeadAnchor\\|snapshotWorkspaceHeads\" src/lib/cloister/verification-runner.ts"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01CiJUZSiMBmCULphYD7dpDT",
+            "content": "57:import { parseCompositeSnapshot, snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';\n347:    const testSkipHead = await snapshotWorkspaceHeads(issueId, workspacePath);\n863:    let lastVerifiedCommit: HeadAnchor | undefined;\n865:      const { snapshotWorkspaceHeads } = await import('../git-utils.js');\n866:      lastVerifiedCommit = await snapshotWorkspaceHeads(issueId, workspacePath);"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "HeadAnchor and snapshotWorkspaceHeads are still used; only `parseCompositeSnapshot` should be dropped."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Ny9Xtw4SGPKJUN219LnVi4",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/verification-runner.ts",
+              "old_string": "import { parseCompositeSnapshot, snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';",
+              "new_string": "import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';\nimport { primaryShaFromAnchor } from './verified-head.js';"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Ny9Xtw4SGPKJUN219LnVi4",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/verification-runner.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's write the test file."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01LhpschfPNswkrRNJM5w3u3",
+            "name": "Write",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/__tests__/verified-head.test.ts",
+              "content": "import { describe, expect, it, vi } from 'vitest';\n\nimport { primaryShaFromAnchor, readPrimaryHead8 } from '../verified-head.js';\nimport type { HeadAnchor } from '../../git-utils.js';\n\ndescribe('primaryShaFromAnchor', () => {\n  it('returns undefined for an undefined anchor', () => {\n    expect(primaryShaFromAnchor(undefined, 'api')).toBeUndefined();\n  });\n\n  it('returns the plain sha for a monorepo anchor', () => {\n    const sha = 'a'.repeat(40);\n    expect(primaryShaFromAnchor(sha as HeadAnchor, 'api')).toBe(sha);\n  });\n\n  it('resolves the primary repo sha out of a composite polyrepo anchor', …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01LhpschfPNswkrRNJM5w3u3",
+            "content": "File created successfully at: ~/Projects/overdeck/workspaces/feature-pan-4221/src/lib/cloister/__tests__/verified-head.test.ts (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Ji5seHAjHZoThZ7MDFMM9W",
+            "name": "Bash",
+            "input": {
+              "command": "npx vitest run src/lib/cloister/__tests__/verified-head.test.ts 2>&1 | tail -60"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Ji5seHAjHZoThZ7MDFMM9W",
+            "content": "Command did not complete within its 120s timeout and was moved to the background (ID: b8ipqj6sz). Output is being written to: /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4221/0a265ad9-8f3d-46d4-b2a9-a47f36607f25/tasks/b8ipqj6sz.output. You will be notified when it completes. To check interim output, use Read on that file path."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_0191T4QuLr8Rd1b4PbymRcAv",
+            "name": "Bash",
+            "input": {
+              "command": "sleep 30 && echo done"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_0191T4QuLr8Rd1b4PbymRcAv",
+            "content": "<tool_use_error>Blocked: sleep 30 followed by: echo done. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_error>"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I'll wait for the background test run to finish rather than polling."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_013MciYkUqM3S9eaQLm4VLVX",
+            "name": "ToolSearch",
+            "input": {
+              "query": "Monitor",
+              "max_results": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_013MciYkUqM3S9eaQLm4VLVX",
+            "content": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Waiting on the background test run (`b8ipqj6sz`) for `verified-head.test.ts` to finish before continuing."
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": "<task-notification>\n<task-id>b8ipqj6sz</task-id>\n<tool-use-id>toolu_01Ji5seHAjHZoThZ7MDFMM9W</tool-use-id>\n<output-file>/tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4221/0a265ad9-8f3d-46d4-b2a9-a47f36607f25/tasks/b8ipqj6sz.output</output-file>\n<status>failed</status>\n<summary>Background command \"npx vitest run src/lib/cloister/__tests__/verified-head.test.ts 2&gt;&amp;1 | tail -60\" failed with exit code 1</summary>\n</task-notification>"
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01X3Qydn561jFZiqRoRPc4JT",
+            "name": "Read",
+            "input": {
+              "file_path": "/tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4221/0a265ad9-8f3d-46d4-b2a9-a47f36607f25/tasks/b8ipqj6sz.output"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01X3Qydn561jFZiqRoRPc4JT",
+            "content": "1\t\u001b[34mℹ\u001b[39m config file: \u001b[4m~/Projects/overdeck/workspaces/feature-pan-4221/tsdown.config.ts\u001b[24m \n2\t\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/cli/index.ts, src/index.ts, src/supervisor/server.ts, src/lib/channels/pty-supervisor.ts, src/lib/codex/app-server-host.ts, src/lib/acp/host.ts, src/lib/cloister/verification-worker.ts, src/lib/memory/fts-worker.ts, src/lib/memory/checkpoint-worker.ts\u001b[39m\n3\t\u001b[34mℹ\u001b[39m target: \u001b[34mnode18\u001b[39m\n4\t\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n5\t\u001b[34mℹ\u001b[39m Build start\n6\t[rolldown-plugin-dts] Warning: Failed to emit declaration file. Please try to enable `eager` option (`dts.eager` for tsdown).\n7\t[rolldown-plugin-dts] Warning: Failed to emit declaration file. Please try to enable `eager` option (`dts.eager` for tsdown).\n8\t[rolldown-plugin-dts] Warning: Failed to emit declaration file. Please try to enable `eager` option (`dts.eager` for tsdown).\n9\t[ …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Disk is full — that's blocking the CLI dist build the test global-setup needs, unrelated to my change. Let me check disk usage."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01KpRdNSru6prfaNBxgRFS7R",
+            "name": "Bash",
+            "input": {
+              "command": "df -h / /home 2>&1; echo \"---\"; du -sh ~/Projects/overdeck/workspaces/*/dist 2>/dev/null | sort -h | tail -20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01KpRdNSru6prfaNBxgRFS7R",
+            "content": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/nvme1n1p5  832G  790G   35M 100% /\n/dev/nvme1n1p5  832G  790G   35M 100% /\n---\n17M\t~/Projects/overdeck/workspaces/pan-3950-clone/dist\n46M\t~/Projects/overdeck/workspaces/feature-pan-4222/dist\n47M\t~/Projects/overdeck/workspaces/feature-pan-4221/dist\n161M\t~/Projects/overdeck/workspaces/feature-pan-4199/dist\n195M\t~/Projects/overdeck/workspaces/feature-pan-1641/dist\n223M\t~/Projects/overdeck/workspaces/feature-pan-4197/dist\n223M\t~/Projects/overdeck/workspaces/feature-pan-4198/dist\n223M\t~/Projects/overdeck/workspaces/feature-pan-4201/dist\n236M\t~/Projects/overdeck/workspaces/feature-pan-4200/dist"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01BcxuJG7cjGEcqkoH5bNomz",
+            "name": "Bash",
+            "input": {
+              "command": "du -sh ~/Projects/overdeck/workspaces 2>/dev/null; echo \"---top-level---\"; du -sh --exclude=proc / 2>/dev/null | tail -1; echo \"---home---\"; du -h --max-depth=1 ~ 2>/dev/null | sort -rh | head -20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01BcxuJG7cjGEcqkoH5bNomz",
+            "content": "Command did not complete within its 120s timeout and was moved to the background (ID: bgog8saqf). Output is being written to: /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4221/0a265ad9-8f3d-46d4-b2a9-a47f36607f25/tasks/bgog8saqf.output. You will be notified when it completes. To check interim output, use Read on that file path."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "This is a host-wide disk emergency (35M free on a 832G root partition), not something scoped to my workspace — it blocks every agent's build/test step. I need to signal this immediately rather than let it silently stall my work."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01AAKrZP7k6c4RnrV8LQMPhM",
+            "name": "Bash",
+            "input": {
+              "command": "pan tell flywheel-orchestrator \"work pan-4221: HOST DISK FULL — / has only 35M free of 832G (100% used). npm run build:cli fails with ENOSPC, so vitest's global-setup can't build CLI dist and every workspace's tests/builds will start failing host-wide, not just mine. Needs an operator/orchestrator-level disk cleanup (identify and clear the real hog — workspace dist/ dirs only total ~1.5G, so the bulk of 790G used is elsewhere, e.g. docker images/volumes, node_modules duplication, or restic cache). I'm holding item verified-head (code change done, untested) until space is freed.\" 2>&1 | tail -2 …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01AAKrZP7k6c4RnrV8LQMPhM",
+            "content": "Error: Agent flywheel-orchestrator not running"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_011wLaxk3EPWJmYWK4BsHaRy",
+            "name": "Bash",
+            "input": {
+              "command": "gh issue comment 4221 --body \"**Blocker (disk full, host-wide):** \\`/\\` has only 35M free of 832G (100% used). \\`npm run build:cli\\` fails with ENOSPC, so vitest's global-setup can't build CLI dist and tests/builds will start failing across every active workspace on this host, not just this one. Workspace \\`dist/\\` dirs only total ~1.5G combined, so the bulk of the 790G used is elsewhere (docker images/volumes, duplicated node_modules, restic cache, etc.) — needs operator-level cleanup, not something I can safely resolve by deleting other agents' in-progress workspace artifacts. Holding item \\ …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_011wLaxk3EPWJmYWK4BsHaRy",
+            "content": "https://github.com/eltmon/overdeck/issues/4221#issuecomment-5841861729"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "While waiting for the du result, let me check common disk hogs that are safe to investigate without touching other agents' work."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Deleting the dist directories of other workspaces was ruled out, because those belong to other agents. Running the tests from /tmp was rejected: /tmp sits on the same full partition. Until the operator frees space, the verified-head change stays uncommitted and untested."
+          }
+        ]
+      }
+    }
+  ],
+  "plantedFacts": [
+    {
+      "id": "helper",
+      "anyOf": [
+        [
+          "primaryShaFromAnchor"
+        ]
+      ]
+    },
+    {
+      "id": "new-file",
+      "anyOf": [
+        [
+          "verified-head"
+        ]
+      ]
+    },
+    {
+      "id": "import-drop",
+      "anyOf": [
+        [
+          "parseCompositeSnapshot"
+        ]
+      ]
+    },
+    {
+      "id": "disk-full",
+      "anyOf": [
+        [
+          "35M"
+        ],
+        [
+          "disk",
+          "full"
+        ],
+        [
+          "ENOSPC"
+        ]
+      ]
+    },
+    {
+      "id": "escalation",
+      "anyOf": [
+        [
+          "issue",
+          "comment"
+        ],
+        [
+          "flywheel-orchestrator",
+          "not running"
+        ]
+      ]
+    },
+    {
+      "id": "untested",
+      "anyOf": [
+        [
+          "uncommitted"
+        ],
+        [
+          "untested"
+        ],
+        [
+          "not",
+          "tested"
+        ],
+        [
+          "not yet",
+          "pass"
+        ]
+      ]
+    }
+  ],
+  "decoys": [
+    {
+      "id": "delete-dist",
+      "anchor": "dist directories of other workspaces"
+    },
+    {
+      "id": "tmp-tests",
+      "anchor": "Running the tests from /tmp"
+    }
+  ]
+}

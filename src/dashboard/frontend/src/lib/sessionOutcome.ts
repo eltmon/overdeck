@@ -49,6 +49,7 @@ export type SessionOutcomeKind =
   | 'plan-finalized'
   | 'stopped-by-operator'
   | 'stopped-by-close-out'
+  | 'handed-to-review'
   | 'ended-unexpectedly'
   | 'ended';
 
@@ -102,6 +103,14 @@ export const SESSION_ENDED_FALLBACK: SessionOutcome = {
 const RECORDED_ERROR_STATUSES = new Set(['error', 'failed', 'dead']);
 const RECORDED_LIVE_STATUSES = new Set(['running', 'starting']);
 const PRIMARY_ROLES = new Set<SessionOutcomeRole>(['plan', 'work', 'strike']);
+const HANDED_OFF_STATES = new Set<IssueState>(['in-review', 'changes-requested', 'ready']);
+
+/** Issue states that exist only after planning finalized (spec on disk or work past planning). `closed` and `parked` are excluded. */
+const PLAN_FINALIZED_STATES = new Set<IssueState>(['planned', 'working', 'in-review', 'changes-requested', 'ready', 'merged']);
+
+export function planFinalizedFromState(state: IssueState | undefined): boolean {
+  return state !== undefined && PLAN_FINALIZED_STATES.has(state);
+}
 
 /**
  * Pick the outcome for an ended session (call only when the session has
@@ -224,7 +233,23 @@ export function deriveSessionOutcome(facts: SessionOutcomeFacts): SessionOutcome
     };
   }
 
-  // 11 — primary agent ended cleanly with no outcome on a known open, unmerged issue
+  // 11 — work/strike agent handed off: its PR is open for review, and no
+  // earlier row (recorded error/live status) outranked it.
+  if (
+    (facts.role === 'work' || facts.role === 'strike')
+    && !facts.synthesized
+    && facts.issueState !== undefined
+    && HANDED_OFF_STATES.has(facts.issueState)
+  ) {
+    return {
+      kind: 'handed-to-review',
+      label: 'Handed to review',
+      detail: 'The work agent handed off; its PR is open for review.',
+      tone: 'quiet',
+    };
+  }
+
+  // 12 — primary agent ended cleanly with no outcome on a known open, unmerged issue
   if (
     PRIMARY_ROLES.has(facts.role)
     && !facts.synthesized
@@ -240,7 +265,7 @@ export function deriveSessionOutcome(facts: SessionOutcomeFacts): SessionOutcome
     };
   }
 
-  // 12 — fallback
+  // 13 — fallback
   return SESSION_ENDED_FALLBACK;
 }
 
@@ -287,10 +312,17 @@ export function outcomeFactsFromSessionNode(
     ? latestReviewResult
     : undefined;
 
+  // PAN-4398: a finished planner whose node lacks `planningComplete` (server
+  // could not resolve the spec) still derives Plan finalized from the issue
+  // state. Legacy (synthesized) nodes keep the node value.
+  const planningComplete = node.type === 'planning'
+    ? (node.planningComplete === true || planFinalizedFromState(derived?.state) ? true : node.planningComplete)
+    : node.planningComplete;
+
   return {
     role,
     synthesized,
-    planningComplete: node.planningComplete,
+    planningComplete,
     reviewerVerdict,
     prReviewState: derived?.pr?.reviewState,
     prChecks: derived?.pr?.checks,
@@ -334,10 +366,7 @@ export function outcomeFactsFromAgent(
   // D6: the drawer has no `planningComplete`; planning is finalized when the
   // derived state implies the spec exists or work went past planning.
   // `closed` is excluded so a closed issue falls through to close-out.
-  const planningComplete = derived?.state !== undefined
-    && (['planned', 'working', 'in-review', 'changes-requested', 'ready', 'merged'] as IssueState[]).includes(derived.state)
-    ? true
-    : undefined;
+  const planningComplete = planFinalizedFromState(derived?.state) ? true : undefined;
 
   return {
     role,

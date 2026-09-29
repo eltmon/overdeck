@@ -166,6 +166,25 @@ export function getIssueForCleanup(issueId: string) {
   } | undefined;
 }
 
+/**
+ * Move an issue's xBRIEF spec to cancelled/cancelled inside its base
+ * workspace, or skip when that workspace is gone (PAN-4225). Never falls
+ * back to the primary checkout — `planHome` must be resolved by the caller
+ * BEFORE any step that might delete the workspace.
+ */
+export async function transitionCancelledSpec(issueId: string, planHome: string | null): Promise<string> {
+  if (!planHome || !existsSync(planHome)) {
+    return 'xBRIEF cancel transition skipped: no workspace';
+  }
+  try {
+    const { transitionIssueXBrief } = await import('../xbrief/lifecycle-io.js');
+    const tx = await transitionIssueXBrief(planHome, issueId, 'cancelled', 'cancelled');
+    return tx.moved ? `xBRIEF moved ${tx.fromDir} → cancelled` : 'xBRIEF already cancelled';
+  } catch (err: any) {
+    return `xBRIEF cancel transition failed (non-fatal): ${err?.message ?? err}`;
+  }
+}
+
 export async function runDestructiveIssueLifecycle(
   id: string,
   mode: 'reset' | 'cancel',
@@ -176,6 +195,15 @@ export async function runDestructiveIssueLifecycle(
   const issueSource = issueDataService.getIssueSource(id);
   const { ctx, projectConfig } = buildLifecycleContext(id, issueSource ?? undefined);
   const deleteWorkspace = opts.deleteWorkspace ?? true;
+
+  // Resolve the base workspace BEFORE the reset/cancel workflow runs below —
+  // that workflow may delete the workspace, and resolution afterward would
+  // always see it as gone.
+  let cancelPlanHome: string | null = null;
+  if (mode === 'cancel') {
+    const { resolveIssueWorkspacePlanHome } = await import('../xbrief/lifecycle-io.js');
+    cancelPlanHome = resolveIssueWorkspacePlanHome(ctx.projectPath, id);
+  }
 
   cleanupLog.push(...await closeIssuePullRequest(
     id,
@@ -195,22 +223,8 @@ export async function runDestructiveIssueLifecycle(
 
   cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
 
-  // xBRIEF lifecycle transition for cancel (PAN-946): move to cancelled/ on main.
   if (mode === 'cancel') {
-    try {
-      const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
-      const tx = await transitionXBriefOnMain(
-        ctx.projectPath,
-        id,
-        'cancelled',
-        'cancelled',
-        `scope: cancel ${id.toUpperCase()} xBRIEF`,
-      );
-      if (tx.moved) cleanupLog.push(`xBRIEF moved ${tx.fromDir} → cancelled`);
-      if (tx.committed) cleanupLog.push(`Committed xBRIEF cancellation on main`);
-    } catch (err: any) {
-      cleanupLog.push(`xBRIEF cancel transition failed (non-fatal): ${err?.message ?? err}`);
-    }
+    cleanupLog.push(await transitionCancelledSpec(id, cancelPlanHome));
   }
 
   // Kill canonical reviewer/synthesis tmux sessions (PAN-915). They persist

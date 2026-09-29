@@ -110,6 +110,31 @@ describe('DecisionsPanel', () => {
     renderWithQuery(<DecisionsPanel />);
     expect(screen.getByTestId('decisions-empty')).toBeTruthy();
   });
+
+  describe('turn-end label (PAN-4371)', () => {
+    const turnEndDecision = {
+      id: 'conv-20260929-0001',
+      source: 'agent' as const,
+      label: 'conv-20260929-0001',
+      kinds: ['agentTurnEnded'],
+      since: '2026-09-29T00:00:00.000Z',
+      blocking: true,
+      turnEndAssessment: { kind: 'asks_operator', confidence: 0.9, needsAnswer: true, model: 'm' },
+    };
+
+    it('shows the turn-end kind label when a confident assessment is present', () => {
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([turnEndDecision]);
+      renderWithQuery(<DecisionsPanel />);
+      expect(screen.getAllByText('Asked you a question').length).toBeGreaterThan(0);
+    });
+
+    it('falls back to "Answer the agent" without a turn-end assessment', () => {
+      const { turnEndAssessment: _omit, ...withoutAssessment } = turnEndDecision;
+      vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([withoutAssessment]);
+      renderWithQuery(<DecisionsPanel />);
+      expect(screen.getAllByText('Answer the agent').length).toBeGreaterThan(0);
+    });
+  });
 });
 
 describe('DecisionsCount', () => {

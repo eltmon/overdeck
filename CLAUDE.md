@@ -34,7 +34,7 @@
 ## Key Invariants (one-liners)
 
 - `sessions.json` is the append-only session index (only an explicit operator reset may truncate it); there is no `session.id`; close-out prunes caches, never state or transcripts. Entries carry the transcript's absolute path, recorded at session start by each harness's capture point; the resolver (`src/lib/agents/transcript-resolver.ts`) prefers it over per-harness path formulas, which apply only to pre-PAN-3959 entries. Registrations under `agents/ext-*` (agents other tools launched, PAN-3920) are write-once facts plus that same index; cleanup keeps them.
-- The resource governor holds dispatch during memory or CPU saturation, and every local Vitest run enters the shared CPU admission queue. See "Agent Auto-Resume Gates" in [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md).
+- CPU pressure (PSI) refuses lane launches and warns before agent starts; the Flywheel spawn hold is opt-in (`resources.governor_cpu_hold_dispatch`); conversations are never gated; runaway processes are surfaced, never killed; every local Vitest run enters the shared CPU admission queue. See "Agent Auto-Resume Gates" in [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md).
 - `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; shipped subagent definitions carry no `model:` pin — they inherit the session model so Cloister routing applies (prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
 - Project CI state reaches Command Deck rows through the shared read-model event path (`ciByProjectKey` → `/ws/rpc`); webhook observations and server-side REST repair feed it, never frontend polling. [docs/EXTERNAL-EVENT-STREAM.md](docs/EXTERNAL-EVENT-STREAM.md)
 - The per-issue **pipeline journal** (`src/lib/cloister/pipeline-journal.ts`, `<workspace>/.overdeck/pipeline.jsonl`) is the one piece of stored pipeline state: append-only, written at the moment of the action, event-fired on `pipeline-notifier`, never authority — where it disagrees with the PR, the PR wins. Nothing repairs it and nothing rewrites it. [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md)
@@ -58,6 +58,7 @@
 | Effect bridging, façade ratchet, diagnostics ratchet | [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md), [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md) |
 | Issue views, God View | [docs/ISSUE-VIEW.md](docs/ISSUE-VIEW.md), [docs/GOD-VIEW.md](docs/GOD-VIEW.md) |
 | Context layers (rules/skills distribution) | [docs/CONTEXT-LAYERS.md](docs/CONTEXT-LAYERS.md) |
+| Jev (TypeSafe) optional judgment client, config and data disclosure | [configuration/jev.mdx](configuration/jev.mdx) |
 | Flywheel page and loop skill | [docs/FLYWHEEL.md](docs/FLYWHEEL.md) |
 | Gauntlet lanes (`pan lane`) | [reference/lanes.mdx](reference/lanes.mdx) |
 | The no-loss map: every deleted verb/route/view and its new home | [docs/THE-CUT.md](docs/THE-CUT.md) |

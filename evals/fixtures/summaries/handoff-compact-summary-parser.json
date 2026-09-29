@@ -1,0 +1,676 @@
+{
+  "id": "handoff-compact-summary-parser",
+  "kind": "handoff",
+  "source": "real session excerpt, overdeck PAN-4245, 2026-09, scrubbed; planted facts and decoys edited in",
+  "entries": [
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_018Kuu4DcSRpSgUeoJcAz2mN",
+            "name": "Bash",
+            "input": {
+              "command": "grep -rln \"isCompactSummary\" --include=\"*.test.ts\" src/ tests/ 2>/dev/null"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_018Kuu4DcSRpSgUeoJcAz2mN",
+            "content": "(Bash completed with no output)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01U5ZckyqMJXbHCE5HsuHTN4",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation-compaction.ts",
+              "offset": 100,
+              "limit": 80
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01U5ZckyqMJXbHCE5HsuHTN4",
+            "content": "100\t    if (conversationName) {\n101\t      getEventStore().emitOnly({ type: 'conversation.compacting_changed', timestamp: new Date().toISOString(), payload: { conversationName, compacting: false } });\n102\t    }\n103\t  }\n104\t}\n105\t\n106\tasync function doCompact(sessionFile: string): Promise<NativeCompactionResult> {\n107\t\n108\t  const settings = getConversationCompactionSettings();\n109\t  const tokensBefore = await estimateContextTokens(sessionFile);\n110\t\n111\t  let summary: string;\n112\t  try {\n113\t    const result = await generateSmartSummary({\n114\t      jsonlPath: sessionFile,\n115\t      model: settings.model,\n116\t      richMode: settings.richCompaction,\n117\t      mode: 'fork',\n118\t    });\n119\t    summary = result.summary;\n120\t  } catch (error) {\n121\t    console.warn(`[conversation-compaction] Smart summary failed, falling back to heuristic:`, error);\n122\t    summary = await generateFallbackSum …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01HYhVjAuHDeRoDCbX4HDQNb",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "offset": 260,
+              "limit": 230
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01HYhVjAuHDeRoDCbX4HDQNb",
+            "content": "260\t        // Collect all text blocks, joining with newlines to preserve multiline input\n261\t        const textBlocks: string[] = [];\n262\t        for (const block of rawContent as ContentBlock[]) {\n263\t          if (block.type === 'text' && block.text) {\n264\t            const text = renderableUserText(block.text);\n265\t            if (text !== null) textBlocks.push(text);\n266\t          }\n267\t        }\n268\t        if (textBlocks.length > 0) {\n269\t          const ts = entry.timestamp ?? new Date().toISOString();\n270\t          messages.push({\n271\t            id: entry.uuid ?? `user-${messages.length}`,\n272\t            role: 'user',\n273\t            text: textBlocks.join('\\n'),\n274\t            createdAt: ts,\n275\t            sequence: lineSequence,\n276\t          });\n277\t        }\n278\t      }\n279\t    } else if (entry.type === 'assistant' && entry.message) {\n280\t      const msg = entry.message;\n …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_0149E4BiMKmrMSmtmPXSvi3C",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/types.ts",
+              "old_string": "import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';\n\nexport interface ParseResult {",
+              "new_string": "import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';\n\n/** The most recent compaction summary record encountered while parsing a transcript. */\nexport interface CompactSummaryRecord {\n  text: string;\n  sequence: number;\n  uuid?: string;\n  timestamp?: string;\n}\n\nexport interface ParseResult {"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_0149E4BiMKmrMSmtmPXSvi3C",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/types.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Hpi4Wic7ZRnA8j63dLUwxi",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/types.ts",
+              "old_string": "  countedUsageIds?: Set<string>;\n}\n\n/** State carried across incremental parseConversationMessages calls. */\nexport interface ParseState {",
+              "new_string": "  countedUsageIds?: Set<string>;\n  /** Most recent compaction summary record encountered while parsing (see CompactSummaryRecord). */\n  latestCompactSummary?: CompactSummaryRecord;\n}\n\n/** State carried across incremental parseConversationMessages calls. */\nexport interface ParseState {"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Hpi4Wic7ZRnA8j63dLUwxi",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/types.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_015Be7r6QUtpdh2RBEJRQ1mQ",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/types.ts",
+              "old_string": "  /** Request/message IDs already counted into cost/tokens (see ParseResult.countedUsageIds). */\n  countedUsageIds?: Set<string>;\n}",
+              "new_string": "  /** Request/message IDs already counted into cost/tokens (see ParseResult.countedUsageIds). */\n  countedUsageIds?: Set<string>;\n  /** Most recent compaction summary record encountered while parsing (see ParseResult.latestCompactSummary). */\n  latestCompactSummary?: CompactSummaryRecord;\n}"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_015Be7r6QUtpdh2RBEJRQ1mQ",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/types.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now add `isCompactSummary` to `JsonlEntry`:"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XJm6EQN5JTBcbYjDLfBz7s",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/types.ts",
+              "old_string": "  /** Claude Code per-API-request id. Stable across the multiple JSONL lines of one response. */\n  requestId?: string;\n}",
+              "new_string": "  /** Claude Code per-API-request id. Stable across the multiple JSONL lines of one response. */\n  requestId?: string;\n  /** True on the user entry carrying a compaction summary written after a compact_boundary. */\n  isCompactSummary?: boolean;\n}"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01XJm6EQN5JTBcbYjDLfBz7s",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/types.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's edit parser.ts. First the missing-file early return and truncation early return, then the main variable init, the user branch capture, and the final return objects."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_017h6dovUVDiftsBqfCmWmhg",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "old_string": "      lastSequence: priorState?.lastSequence ?? 0,\n      mtimeMs: 0,\n      permissionMode: priorState?.permissionMode,\n      fileEditsByAssistantId: new Map(),\n    };\n  }\n  const fileSize = fileStats.size;",
+              "new_string": "      lastSequence: priorState?.lastSequence ?? 0,\n      mtimeMs: 0,\n      permissionMode: priorState?.permissionMode,\n      fileEditsByAssistantId: new Map(),\n      latestCompactSummary: priorState?.latestCompactSummary,\n    };\n  }\n  const fileSize = fileStats.size;"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_017h6dovUVDiftsBqfCmWmhg",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01F3HPmy921uNw683qP1xn5K",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "old_string": "  // Track permission mode across incremental parses\n  let permissionMode: string | undefined = priorState?.permissionMode;",
+              "new_string": "  // Track permission mode across incremental parses\n  let permissionMode: string | undefined = priorState?.permissionMode;\n  // Most recent compaction summary encountered (persist across incremental parses)\n  let latestCompactSummary = priorState?.latestCompactSummary;"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01F3HPmy921uNw683qP1xn5K",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now add the capture logic in the user branch, right after the pendingAssistant flush and before the content-type branching:"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Q5duFNeJ6PbLejb8HMncf7",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "old_string": "      // Flush any pending assistant message\n      if (pendingAssistant) {\n        messages.push(pendingAssistant);\n        pendingAssistant = null;\n      }\n\n      // Content can be a string (plain text) or array of content blocks",
+              "new_string": "      // Flush any pending assistant message\n      if (pendingAssistant) {\n        messages.push(pendingAssistant);\n        pendingAssistant = null;\n      }\n\n      if (entry.isCompactSummary === true) {\n        let summaryText: string | null = null;\n        if (typeof rawContent === 'string') {\n          summaryText = rawContent.trim() ? rawContent : null;\n        } else if (Array.isArray(rawContent)) {\n          const blocks = (rawContent as ContentBlock[])\n            .filter(block => block.type === 'text' && typeof block.text === 'string' && block.text.trim())\n            .map(block => bloc …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Q5duFNeJ6PbLejb8HMncf7",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's find the main return object and add `latestCompactSummary`:"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01AFNqisLvuJ3f3rSoAsK72X",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "offset": 640,
+              "limit": 50
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01AFNqisLvuJ3f3rSoAsK72X",
+            "content": "640\t      return (a.sequence ?? 0) - (b.sequence ?? 0);\n641\t    });\n642\t  }\n643\t\n644\t  // Streaming detection: agent is active if the last assistant message is incomplete,\n645\t  // or if there are pending/unresolved tools (mid-turn), or a user message arrived\n646\t  // (agent is about to respond), and the file was modified recently.\n647\t  let streaming = false;\n648\t  const lastMsg = messages[messages.length - 1];\n649\t  const assistantIncomplete = lastMsg?.role === 'assistant' && !lastMsg.completedAt;\n650\t  const fileRecent = Date.now() - fileStats.mtimeMs < 5000;\n651\t  if (assistantIncomplete && fileRecent) {\n652\t    streaming = true;\n653\t  } else if (lastMsg?.role === 'user' && fileRecent) {\n654\t    streaming = true;\n655\t  }\n656\t\n657\t  return {\n658\t    messages,\n659\t    workLog,\n660\t    byteOffset: newByteOffset,\n661\t    streaming,\n662\t    totalCost,\n663\t    totalTokens,\n664\t    latestAs …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_016US2Mme5EiTif7mNS2UYbA",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "old_string": "    orphanToolUseIds: orphanToolUseIds.size > 0 ? orphanToolUseIds : undefined,\n    countedUsageIds,\n  };\n}",
+              "new_string": "    orphanToolUseIds: orphanToolUseIds.size > 0 ? orphanToolUseIds : undefined,\n    countedUsageIds,\n    latestCompactSummary,\n  };\n}"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_016US2Mme5EiTif7mNS2UYbA",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now the `parseEntireConversation` function's priorState literal:"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01QUsBZUgQL8uV9gG4vavbC8",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "offset": 686,
+              "limit": 58
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01QUsBZUgQL8uV9gG4vavbC8",
+            "content": "686\t * `parseConversationMessages(file, offset, state)` reads at most MAX_READ_BYTES\n687\t * (10 MB) in a single incremental call. This helper loops the same parser in\n688\t * bounded chunks for callers that need a complete transcript snapshot.\n689\t *\n690\t * ParseState is threaded from the first chunk so tool_use/tool_result pairs can\n691\t * span chunk boundaries. Per-chunk totals are safe to sum because\n692\t * `countedUsageIds` is threaded, so a response split across a read boundary is\n693\t * counted once.\n694\t */\n695\texport async function parseEntireConversation(\n696\t  sessionFile: string,\n697\t  options: { flushPendingToolUse?: boolean } = {},\n698\t): Promise<ParseResult> {\n699\t  let offset = 0;\n700\t  let priorState: ParseState = {\n701\t    pendingToolUse: new Map(),\n702\t    unresolvedResults: new Map(),\n703\t    lastSequence: 0,\n704\t  };\n705\t  const messages: ChatMessage[] = [];\n706\t  cons …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01RnGyk11wHjSzUAPzK64xiz",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "old_string": "      orphanToolUseIds: result.orphanToolUseIds,\n      countedUsageIds: result.countedUsageIds,\n    };\n  }",
+              "new_string": "      orphanToolUseIds: result.orphanToolUseIds,\n      countedUsageIds: result.countedUsageIds,\n      latestCompactSummary: result.latestCompactSummary,\n    };\n  }"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01RnGyk11wHjSzUAPzK64xiz",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01FW5QLTEritntmeMt68crwt",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/parser.ts",
+              "offset": 741,
+              "limit": 10
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01FW5QLTEritntmeMt68crwt",
+            "content": "741\t\n742\t  if (!last) return parseConversationMessages(sessionFile, 0);\n743\t\n744\t  if (options.flushPendingToolUse ?? true) {\n745\t    for (const [id, entry] of last.pendingToolUse) {\n746\t      if (!last.planToolUseIds?.has(id)) {\n747\t        workLog.push(entry);\n748\t      }\n749\t    }\n750\t    last.pendingToolUse.clear();"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Good, that's fine since `last` (the ParseResult) already carries `latestCompactSummary` and gets spread at the final return. Now let's write the test file. First let's look at an existing parser test to match conventions."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_014z37YCnJ35xiVtUY5XHBhu",
+            "name": "Bash",
+            "input": {
+              "command": "ls src/dashboard/server/services/conversation/__tests__/ 2>&1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_014z37YCnJ35xiVtUY5XHBhu",
+            "content": "activity-summary-acp.test.ts"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01EMqcz6gw3xETRx8hNJcG39",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4245/src/dashboard/server/services/conversation/__tests__/activity-summary-acp.test.ts",
+              "limit": 60
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Storing the compact summary on ChatMessage was rejected; it lives on ParseResult instead. An earlier plan to re-read the whole JSONL on every title refresh was abandoned, because parseEntireConversation already carries the latest summary."
+          }
+        ]
+      }
+    }
+  ],
+  "focus": "Write the parser test for latestCompactSummary, then wire it into conversation titles.",
+  "plantedFacts": [
+    {
+      "id": "entry-flag",
+      "anyOf": [
+        [
+          "isCompactSummary"
+        ]
+      ]
+    },
+    {
+      "id": "result-field",
+      "anyOf": [
+        [
+          "latestCompactSummary"
+        ]
+      ]
+    },
+    {
+      "id": "entire",
+      "anyOf": [
+        [
+          "parseEntireConversation"
+        ]
+      ]
+    },
+    {
+      "id": "test-next",
+      "anyOf": [
+        [
+          "activity-summary-acp"
+        ],
+        [
+          "parser test"
+        ],
+        [
+          "test file"
+        ]
+      ]
+    },
+    {
+      "id": "parser-file",
+      "anyOf": [
+        [
+          "parser.ts"
+        ]
+      ]
+    },
+    {
+      "id": "parse-result",
+      "anyOf": [
+        [
+          "ParseResult"
+        ]
+      ]
+    }
+  ],
+  "decoys": [
+    {
+      "id": "chat-message",
+      "anchor": "compact summary on ChatMessage"
+    },
+    {
+      "id": "reread",
+      "anchor": "re-read the whole JSONL on every title refresh"
+    }
+  ]
+}

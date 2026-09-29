@@ -1,0 +1,263 @@
+{
+  "version": "1",
+  "issueId": "PAN-1166",
+  "created": "2026-09-28T12:44:25.371Z",
+  "updated": "2026-09-28T14:03:38.294Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ws-auth-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T12:44:25.370Z",
+      "doneAt": "2026-09-28T12:53:51.879Z"
+    },
+    "ws-terminal-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T12:54:00.907Z",
+      "doneAt": "2026-09-28T13:03:04.085Z"
+    },
+    "ws-rpc-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:03:15.139Z",
+      "doneAt": "2026-09-28T13:09:16.838Z"
+    },
+    "ws-voice-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:09:21.314Z",
+      "doneAt": "2026-09-28T13:14:11.016Z"
+    },
+    "ws-autopreso-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:10:08.098Z",
+      "doneAt": "2026-09-28T13:14:38.927Z"
+    },
+    "unauthorized-phase": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:14:53.556Z",
+      "doneAt": "2026-09-28T13:21:57.021Z"
+    },
+    "session-mint-loud-401": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:22:00.579Z",
+      "doneAt": "2026-09-28T13:25:30.431Z"
+    },
+    "xterminal-mint-first": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:25:35.044Z",
+      "doneAt": "2026-09-28T13:32:25.819Z"
+    },
+    "autopreso-hook-mint-first": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:32:29.733Z",
+      "doneAt": "2026-09-28T13:36:21.363Z"
+    },
+    "voice-hook-mint-first": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:36:26.121Z",
+      "doneAt": "2026-09-28T13:39:47.185Z"
+    },
+    "auth-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:39:52.550Z",
+      "doneAt": "2026-09-28T13:41:38.743Z"
+    },
+    "e2e-ws-auth-spec": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:41:43.788Z",
+      "doneAt": "2026-09-28T13:48:53.926Z"
+    },
+    "ws-auth-helper.ac1": {
+      "status": "completed",
+      "claimedBy": "agent-pan-1166",
+      "claimedAt": "2026-09-28T13:50:47.983Z",
+      "doneAt": "2026-09-28T13:51:52.730Z"
+    },
+    "ws-auth-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:27.650Z"
+    },
+    "ws-auth-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:54:53.679Z"
+    },
+    "ws-auth-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:06.543Z"
+    },
+    "ws-auth-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:21.172Z"
+    },
+    "ws-terminal-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:35.998Z"
+    },
+    "ws-terminal-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:55:48.831Z"
+    },
+    "ws-terminal-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:02.352Z"
+    },
+    "ws-terminal-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:15.874Z"
+    },
+    "ws-rpc-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:28.770Z"
+    },
+    "ws-rpc-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:41.460Z"
+    },
+    "ws-rpc-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:56:54.603Z"
+    },
+    "ws-rpc-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:07.757Z"
+    },
+    "ws-voice-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:20.048Z"
+    },
+    "ws-voice-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:31.248Z"
+    },
+    "ws-voice-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:42.947Z"
+    },
+    "ws-voice-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:57:55.176Z"
+    },
+    "ws-autopreso-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:07.735Z"
+    },
+    "ws-autopreso-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:19.677Z"
+    },
+    "ws-autopreso-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:31.911Z"
+    },
+    "ws-autopreso-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:43.550Z"
+    },
+    "unauthorized-phase.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:58:55.966Z"
+    },
+    "unauthorized-phase.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:08.037Z"
+    },
+    "unauthorized-phase.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:20.727Z"
+    },
+    "unauthorized-phase.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:32.296Z"
+    },
+    "session-mint-loud-401.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:43.513Z"
+    },
+    "session-mint-loud-401.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T13:59:55.189Z"
+    },
+    "session-mint-loud-401.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:09.608Z"
+    },
+    "session-mint-loud-401.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:23.220Z"
+    },
+    "xterminal-mint-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:36.121Z"
+    },
+    "xterminal-mint-first.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:00:48.768Z"
+    },
+    "xterminal-mint-first.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:02.058Z"
+    },
+    "autopreso-hook-mint-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:16.982Z"
+    },
+    "autopreso-hook-mint-first.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:29.558Z"
+    },
+    "autopreso-hook-mint-first.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:42.217Z"
+    },
+    "voice-hook-mint-first.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:01:55.513Z"
+    },
+    "voice-hook-mint-first.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:07.790Z"
+    },
+    "auth-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:20.620Z"
+    },
+    "auth-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:33.516Z"
+    },
+    "auth-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:46.722Z"
+    },
+    "e2e-ws-auth-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:02:59.734Z"
+    },
+    "e2e-ws-auth-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:13.349Z"
+    },
+    "e2e-ws-auth-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:25.969Z"
+    },
+    "e2e-ws-auth-spec.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-28T14:03:38.294Z"
+    }
+  }
+}

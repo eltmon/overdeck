@@ -826,6 +826,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/projects/:projectKey/swarm-policy', kind: 'http', disposition: 'WRITE',     door: 'Project config writer sets the project-level swarm policy' },
   { surface: 'GET /api/issues/:issueId/swarm-policy',      kind: 'http', disposition: 'READ',       door: 'Issue record resolver reads and resolves the issue-level swarm policy' },
   { surface: 'POST /api/issues/:issueId/swarm-policy',     kind: 'http', disposition: 'WRITE',      door: 'Issue record writer sets the issue-level swarm policy' },
+
+  // ── claude-code.ts (PAN-4359) ─────────────────────────────────────────────
+  { surface: 'GET /api/claude-code/status',   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'getClaudeCodeStatus (PAN-4359); host tool version check, outside 8 remodel domains' },
+  { surface: 'POST /api/claude-code/upgrade', kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Claude Code upgrade terminal session (PAN-4359); outside 8 remodel domains' },
 ];
 
 /** PAN-2648 Beads-removal surface lock. */

@@ -1,0 +1,805 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T04:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4341: An independent, different-family plan critic before finalize for flagged plans",
+    "updated": "2026-09-29T04:21:47.096Z"
+  },
+  "plan": {
+    "id": "pan-4341",
+    "title": "An independent, different-family plan critic before finalize for flagged plans",
+    "status": "running",
+    "uid": "13bf7543-82c1-4813-bffa-cc0c94bc50aa",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T04:40:00.000Z",
+    "updated": "2026-09-29T04:21:47.096Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4341",
+        "label": "PAN-4341",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4341.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/deft-adoption.md",
+        "label": "Parent PRD (Issue 7)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "planning",
+      "plan-critic",
+      "finalize",
+      "decorrelation"
+    ],
+    "metadata": {
+      "sizeJustification": "The critic gate is one feature whose halves are only useful together: the CLI dispatch without the server check leaves the Done button and pan plan done as a bypass, and the server check without the CLI dispatch refuses flagged plans with no way to produce a critique. The subsystem count (src/lib, src/cli, src/dashboard, tests/unit, roles, docs, sync-sources) comes from co-located tests, a role prompt and docs, not from breadth of code change; the plan touches 25 files, at the 25-file limit.",
+      "canonicalFilename": "2026-09-29-PAN-4341-an-independent-different-family-plan-critic-before-finalize-for-flagged-plans.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The only pre-code critique is pan plan --probe, the planner reviewing its own plan (sync-sources/skills/pan-plan/SKILL.md line 62). Correlated review is not verification: a same-model, same-context critic repeats the planner's blind spots.",
+      "Proposal": "For flagged plans (labels architecture, substrate-improvement, security, or --critic), pan plan finalize dispatches one read-only worker on a model family different from the planner's (roles.plan.sub.critic.model), with a fixed prompt (roles/plan-critic.md) that sees only the PRD, the inlined draft xBRIEF and the repo. The dispatcher writes .pan/drafts/<stem>-critique.md whose line 1 is plan-digest: <sha256 of the draft minus lifecycle and stamp fields>. The planner answers each blocks-the-design finding under ## Critique response in the PRD. A pure gate (evaluateCritiqueGate) runs in the CLI and in complete-planning: it refuses on missing, stale (digest mismatch) or unanswered critiques, and after two rounds (counted from the tree and git history) it proceeds and lists unresolved findings in the PRD. Nothing is stored; readiness is derived.",
+      "NonGoals": "- A panel of several critics or Deft's full design-critique arc (envelopes, charters, post caps)\n- Fresh re-review lanes or critic-method lines for code review (PAN-4342)\n- A Settings page UI for roles.plan.sub.critic (config.yaml and the settings API accept it)\n- Enforcing critic isolation beyond the prompt (no sandboxing of .overdeck/)\n- Dispatching the critic from the complete-planning server or the dashboard Done button\n- A --no-critic bypass flag\n- Any default critic model or hardcoded model fallback\n- Critique for unflagged plans, or any change to --probe\n- Changes to pan worker run or roles/worker.md\n- Raising any scripts/file-size-allowlist.txt cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Dispatch lives in the CLI finalize path; complete-planning only verifies and returns 422",
+        "rationale": "The CLI can wait up to 540 s inside the 10-minute foreground limit; the server POST has a 90 s timeout. Verifying on the server closes the Done-button and pan plan done bypass."
+      },
+      {
+        "summary": "Model family (familyOf: telemetry family, else provider:<name>, else unknown:<model>) is the decorrelation axis, not the harness",
+        "rationale": "Decorrelation is about the model; the operator deliberately routes some GPT models through claude-code. The dispatch test still asserts the launched harness equals the resolved critic harness, which catches a dropped --harness."
+      },
+      {
+        "summary": "The critic model comes only from the new roles.plan.sub.critic.model setting; unset means a loud refusal",
+        "rationale": "Repo rule: never hardcode a model fallback. Default workhorses are all Claude, so any derived default would be same-family."
+      },
+      {
+        "summary": "Unreadable labels warn and treat the plan as unflagged, identically on CLI and server",
+        "rationale": "The parent PRD frames these gates as cheap-path prevention, not a security boundary (deft-adoption.md line 12); blocking all finalizes on a tracker outage costs more."
+      },
+      {
+        "summary": "The dispatcher writes the critique file (with the digest it computed) and does not commit it; rounds count from the working tree or git history",
+        "rationale": "The planner pane's git shim interferes with pan git writes and promotion already runs git add .pan/. Counting history too means deleting a committed critique cannot reset the round count."
+      },
+      {
+        "summary": "Critique files are named from the resolved workspace PRD stem: <stem>-critique.md and <stem>-critique-2.md",
+        "rationale": "Keeps the critique beside the PRD regardless of the legacy uppercase or canonical lowercase draft name."
+      },
+      {
+        "summary": "No --no-critic flag; exit code 5 means critique-gate refusal",
+        "rationale": "Removing the label is the operator's visible bypass; a flag would be an agent cheap path. Codes 1, 3, 4 keep their meaning."
+      },
+      {
+        "summary": "Worker name plan-critic-r<N> makes finalize re-runs wait on an in-flight critic instead of starting another",
+        "rationale": "Derived idempotency from listWorkers facts, no stored state."
+      }
+    ],
+    "items": [
+      {
+        "id": "plan-digest",
+        "title": "Plan digest helper stable across the finalize stamp",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/cloister/plan-integrity-gate.ts",
+            "src/lib/xbrief/plan-digest.ts",
+            "src/lib/xbrief/__tests__/plan-digest.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/plan-digest.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-digest.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Export stableStringify and stripAllowedFields from src/lib/cloister/plan-integrity-gate.ts (add the export keyword only). Create src/lib/xbrief/plan-digest.ts exporting planDigest(doc): sha256 hex of stableStringify(stripAllowedFields(doc)) after also deleting plan.metadata.canonicalFilename and plan.metadata.promotionIntent (drop plan.metadata when it becomes empty). Code is in the PRD. Tests in src/lib/xbrief/__tests__/plan-digest.test.ts: key order invariance, item title change changes digest, equality before/after stampPlanForFinalization (from src/cli/commands/plan-finalize.ts) on a temp plan file, 64-hex format."
+        },
+        "items": [
+          {
+            "id": "plan-digest.ac1",
+            "title": "Given a draft xBRIEF, when stampPlanForFinalization rewrites it, then planDigest returns the same 64-hex value before and after the stamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-digest.ac2",
+            "title": "Given two docs that differ only in key order, planDigest returns identical digests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-digest.ac3",
+            "title": "Given a doc whose item title changes, planDigest returns a different digest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "critique-core",
+        "title": "Pure critique parser and gate decision (evaluateCritiqueGate)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "foundationFor": [
+            "critique-io",
+            "finalize-cli-critic",
+            "server-critique-gate"
+          ],
+          "files_scope": [
+            "src/lib/planning/plan-critique.ts",
+            "src/lib/planning/__tests__/plan-critique.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/plan-critique.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-critique.test.ts passes with one case per FR-7 branch",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/planning/plan-critique.ts with CRITIC_LABELS, MAX_CRITIQUE_ROUNDS=2, parseCritique, answeredCritiqueTitles, isFlaggedByLabels, evaluateCritiqueGate, withUnresolvedSection exactly as typed in the PRD. Finding headings match /^## (blocks-the-design|sharpens-framing|footnote):\\s*(.+?)\\s*$/. Answers are ### headings under ## Critique response, compared trimmed and lower-cased. Gate order per FR-7: not-required, cap-reached (roundsUsed>=2, unresolved list), missing, stale (digest mismatch or null digest), unanswered, answered. Pure functions only: no fs, no git. Tests in src/lib/planning/__tests__/plan-critique.test.ts, one per FR-7 branch."
+        },
+        "items": [
+          {
+            "id": "critique-core.ac1",
+            "title": "Given a flagged input with no critique, evaluateCritiqueGate returns ok false with kind 'missing' and nextRound 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critique-core.ac2",
+            "title": "Given a critique whose digest differs from currentDigest (or whose line 1 is malformed), evaluateCritiqueGate returns kind 'stale'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critique-core.ac3",
+            "title": "Given a matching digest and a blocks-the-design finding without a matching ### heading under ## Critique response, it returns kind 'unanswered' listing that title; sharpens-framing and footnote findings never block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critique-core.ac4",
+            "title": "Given roundsUsed 2, it returns ok true with kind 'cap-reached' and the unanswered blocks-the-design titles in unresolved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critique-core.ac5",
+            "title": "Given withUnresolvedSection applied twice to a PRD, it produces identical text containing '### Unresolved after two critic rounds' under '## Critique response'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "critic-model",
+        "title": "Critic model resolution from roles.plan.sub.critic with a family check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/planning/plan-critic-model.ts",
+            "src/lib/planning/__tests__/plan-critic-model.test.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/settings-api.test.ts",
+            "docs/CONFIGURATION.md"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/plan-critic-model.test.ts src/lib/__tests__/settings-api.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-critic-model.test.ts and settings-api.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/lib/planning/plan-critic-model.ts exporting familyOf(model) (toTelemetryModelFamily; 'other' becomes provider:<getProviderForModel(model).name>; UnknownModelError becomes unknown:<model>) and resolvePlanCritic({plannerModel, config, resolveHarnessImpl}). Read config.roles?.plan?.sub?.critic?.model directly (never resolveModel, which falls back to the plan model); dereference with derefWorkhorse; refuse 'critic-not-configured' when unset and 'critic-same-family' when families match, with the PRD's message; harness = resolveHarness({model}). Add plan: ['critic'] to ALLOWED_SUB_ROLES in src/lib/settings-api.ts (line 302). Add a 'Plan critic model' subsection to docs/CONFIGURATION.md next to 'Review Mode and Reviewer Models' with a YAML example, the family rule and the no-default statement. No default model anywhere. Add a case to src/lib/__tests__/settings-api.test.ts that a PUT carrying roles.plan.sub.critic is accepted."
+        },
+        "items": [
+          {
+            "id": "critic-model.ac1",
+            "title": "Given config without roles.plan.sub.critic.model, resolvePlanCritic returns ok false with reason 'critic-not-configured' and a message naming roles.plan.sub.critic.model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-model.ac2",
+            "title": "Given a claude planner and a claude critic model, resolvePlanCritic returns reason 'critic-same-family'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-model.ac3",
+            "title": "Given a claude-opus planner and critic gpt-5.5, resolvePlanCritic returns ok true with family 'gpt', plannerFamily 'claude' and the injected harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-model.ac4",
+            "title": "Given the settings API, a PUT carrying roles.plan.sub.critic is accepted (ALLOWED_SUB_ROLES contains plan: ['critic']) and docs/CONFIGURATION.md shows the roles.plan.sub.critic.model example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "critique-io",
+        "title": "Critique file paths, round counting from tree and git history, label reads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "medium",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/planning/plan-critique-io.ts",
+            "src/lib/planning/__tests__/plan-critique-io.test.ts",
+            "src/lib/cloister/auto-merge-eligibility.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/plan-critique-io.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-critique-io.test.ts passes including the committed-then-deleted case",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-15",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add the export keyword to defaultGetIssueLabels in src/lib/cloister/auto-merge-eligibility.ts (line 66). Create src/lib/planning/plan-critique-io.ts exporting resolveWorkspacePrdPath (UPPER.md then lower.md under <workspace>/.pan/drafts), critiquePathForRound (<stem>-critique.md, <stem>-critique-2.md), countCritiqueRounds (a round is used when its file exists in the tree or git log --format=%H -- <path> prints a line; promisified execFile, cwd workspace, never execSync), isPlanFlagged (forced true wins; else labels via defaultGetIssueLabels and isFlaggedByLabels; a thrown reader warns 'Could not read labels for <id>: <error>; plan critic not required' and returns false), loadCritiqueGateInput (currentDigest = planDigest(doc), PRD text, latest critique = round 2 in tree else round 1). Tests use a temp git repo."
+        },
+        "items": [
+          {
+            "id": "critique-io.ac1",
+            "title": "Given a temp git workspace where round 1's critique was committed and then deleted, countCritiqueRounds returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critique-io.ac2",
+            "title": "Given round 1 present only in the working tree (uncommitted), countCritiqueRounds returns 1; with both rounds present it returns 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critique-io.ac3",
+            "title": "Given labels ['Security'], isPlanFlagged returns true; given ['enhancement'] it returns false; given a reader that throws, it returns false and calls warn once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critique-io.ac4",
+            "title": "Given a PRD at .pan/drafts/PAN-9.md, critiquePathForRound returns .pan/drafts/PAN-9-critique.md for round 1 and .pan/drafts/PAN-9-critique-2.md for round 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "critic-role-prompt",
+        "title": "roles/plan-critic.md with the four critic principles and three-token classification",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "files_scope": [
+            "roles/plan-critic.md"
+          ],
+          "verify_commands": [
+            "grep -c -E 'blocks-the-design|sharpens-framing|footnote' roles/plan-critic.md",
+            "scripts/lint-prompts.sh"
+          ],
+          "expected_outputs": [
+            "grep count is at least 3",
+            "lint-prompts.sh exits 0"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create roles/plan-critic.md (no frontmatter, no template variables) with: independence statement; inputs (PRD path, inlined draft xBRIEF, repo) and the prohibition on reading .overdeck/ or transcripts; the four principles named Decorrelation, Method-reconciliation, Non-self-arbitration, and 'A reviewer would catch it' is a failed finding; inventory existing mechanisms before proposing new ones; output format '## <classification>: <short title>' with classification exactly blocks-the-design, sharpens-framing or footnote, plus evidence and smallest fix; the no-findings form '## footnote: no blocking findings'; no file edits. Commit with a Prompt-Change: trailer."
+        },
+        "items": [
+          {
+            "id": "critic-role-prompt.ac1",
+            "title": "Given roles/plan-critic.md, it contains the tokens blocks-the-design, sharpens-framing and footnote and the four principle names Decorrelation, Method-reconciliation, Non-self-arbitration and 'A reviewer would catch it'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-role-prompt.ac2",
+            "title": "Given roles/plan-critic.md, it instructs the critic not to read .overdeck/ and to emit only '## <classification>: <title>' level-2 headings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-role-prompt.ac3",
+            "title": "Given the commit that adds roles/plan-critic.md, its message carries a Prompt-Change: trailer and scripts/check-prompt-change-trailer.sh accepts it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "critic-dispatch",
+        "title": "dispatchPlanCritic: start a read-only different-family worker and write the critique file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/planning/plan-critic-dispatch.ts",
+            "src/lib/planning/__tests__/plan-critic-dispatch.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/plan-critic-dispatch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-critic-dispatch.test.ts passes including the spawnRun harness assertion",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "FR-10",
+            "FR-11",
+            "FR-12",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Create src/lib/planning/plan-critic-dispatch.ts exporting buildPlanCriticBrief and dispatchPlanCritic with the DispatchDeps listed in the PRD (startWorker, startWorkerDeps, waitForWorkerReport, listWorkers, isAlive returning LivenessVerdict (use .alive), getAgentState, stopWorker = stopAgent(id,'operator'), readRoleText, writeFile). Steps: reuse a worker named plan-critic-r<N> (done report -> use it; alive without report -> wait); else startWorker({readOnly:true, name, model, harness}); verify the launched state.json harness equals critic.harness and familyOf(state.model) differs from plannerFamily, else stop and return failed; waitForWorkerReport with default timeout 540000 ms; timeout -> running (do not stop); no report or blocked/failed -> stop, failed; done -> write 'plan-digest: <planDigest(doc)>\\n\\n<body>\\n' to critiquePathForRound, stop the worker, return written. The brief inlines the draft JSON and the workspace-relative PRD path and nothing from continue.json."
+        },
+        "items": [
+          {
+            "id": "critic-dispatch.ac1",
+            "title": "Given a claude-code/claude-opus-4-8 planner and critic gpt-5.5 resolved to codex, the real startWorker's injected spawnRun spy receives harness 'codex' and gitGuardMode 'read-only', which differs from the planner harness 'claude-code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-dispatch.ac2",
+            "title": "Given getAgentState reports the launched worker on harness 'claude-code' when codex was expected, dispatchPlanCritic returns kind 'failed' and calls stopWorker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-dispatch.ac3",
+            "title": "Given a done report, dispatchPlanCritic writes the critique file whose first line equals 'plan-digest: ' + planDigest(doc) followed by the report body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-dispatch.ac4",
+            "title": "Given an alive worker named plan-critic-r1 with no report, dispatchPlanCritic does not call startWorker and waits on that worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "critic-dispatch.ac5",
+            "title": "Given a timeout outcome, dispatchPlanCritic returns kind 'running' and does not stop the worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "finalize-cli-critic",
+        "title": "pan plan finalize --critic: gate, dispatch and exit 5 in the CLI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/plan-finalize.ts",
+            "sync-sources/skills/pan-plan/SKILL.md",
+            "tests/unit/cli/plan-finalize-critic.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/plan-finalize-critic.test.ts tests/unit/cli/plan-finalize-prd-gate-message.test.ts tests/unit/cli/plan-finalize-promote-deferred.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "plan-finalize-critic.test.ts and the existing finalize tests pass",
+            "typecheck completes without errors",
+            "lint (including lint-skills) completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "FR-15",
+            "FR-16",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add --critic to the finalize subcommand in src/cli/index.ts (lines 323-331). In src/cli/commands/plan-finalize.ts add critic?: boolean and an exported runCritiqueStep({issueId, workspacePath, planPath, forced, json}, deps) called after the quality-lint block (ends line 277) and before stampPlanForFinalization (line 283): isPlanFlagged -> loadCritiqueGateInput -> evaluateCritiqueGate; on missing/stale resolve planner model (getAgentState('planning-<lower>')?.model ?? resolveModel('plan', undefined, config)), resolvePlanCritic, parentId = OVERDECK_AGENT_ID ?? 'planning-<lower>', dispatchPlanCritic, then re-evaluate once. Any refusal prints the reason (JSON: {success:false, error:'Plan critique gate failed', message, critiqueGate}) and exitCli(5). cap-reached with unresolved prints a yellow warning. Pass critic: true in the complete-planning POST body when required (extend promotePlanning options). Update sync-sources/skills/pan-plan/SKILL.md in the same commit: --critic in the finalize flags paragraph and a 'Plan critic' section after 'PRD-first gate'. The skill section includes: 'When the issue is flagged, run pan plan finalize with a 600 s Bash timeout or run_in_background: true; a finalize killed mid-wait leaves the critic running, and the next run waits on it.'"
+        },
+        "items": [
+          {
+            "id": "finalize-cli-critic.ac1",
+            "title": "Given an unflagged issue, runCritiqueStep returns proceed true without calling dispatchPlanCritic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-cli-critic.ac2",
+            "title": "Given a flagged issue with no critique file, runCritiqueStep dispatches round 1 and, when the written critique has no blocks-the-design findings and a matching digest, returns proceed true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-cli-critic.ac3",
+            "title": "Given a flagged issue whose matching critique has an unanswered blocks-the-design finding, finalize exits 5 and the message lists that finding title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-cli-critic.ac4",
+            "title": "Given roles.plan.sub.critic.model unset, finalize exits 5 with a message naming roles.plan.sub.critic.model; with --json it prints error 'Plan critique gate failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-cli-critic.ac5",
+            "title": "Given `pan plan finalize --help`, the output lists --critic, and sync-sources/skills/pan-plan/SKILL.md documents --critic and exit code 5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-critique-gate",
+        "title": "complete-planning verifies the critique gate and lists unresolved findings at the cap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "complex",
+          "kind": "backend",
+          "files_scope": [
+            "src/lib/planning/plan-critique-io.ts",
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts",
+            "wc -l src/lib/overdeck/planning-promotion.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "planning-promotion.ts has at most 1000 lines",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-13",
+            "FR-14",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add applyCritiqueGateForPromotion to src/lib/planning/plan-critique-io.ts (isPlanFlagged + loadCritiqueGateInput + evaluateCritiqueGate; on cap-reached with unresolved titles rewrite the workspace PRD with withUnresolvedSection; never dispatch). In src/lib/overdeck/planning-promotion.ts read body.critic === true, add 'critiqueGate' to the CompletePlanningPhase union (line 125), and immediately after the quality-lint pre-check (the block returning 'xBRIEF quality lint failed', lines 744-758) call the helper with the same workspace doc; on refusal emit the phase failure and return 422 {error: 'Plan critique gate: <message>', critiqueGate}. planning-promotion.ts must end at or under 1000 lines (it is 997); do not edit scripts/file-size-allowlist.txt. Tests: a 'plan critique gate' describe block in complete-planning.test.ts (temp git workspace, injected labels, real PRD) covering the issue's five ACs, and a 422 case in planning-promotion-status-event.test.ts."
+        },
+        "items": [
+          {
+            "id": "server-critique-gate.ac1",
+            "title": "Given a flagged issue with no critique file, applyCritiqueGateForPromotion returns ok false with kind 'missing' and completePlanningForIssue returns HTTP 422 whose error starts with 'Plan critique gate:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-critique-gate.ac2",
+            "title": "Given a critique whose digest matches the draft and a PRD that answers each blocks-the-design heading, applyCritiqueGateForPromotion returns ok true with kind 'answered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-critique-gate.ac3",
+            "title": "Given the draft changed after the critique was written, applyCritiqueGateForPromotion returns ok false with kind 'stale'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-critique-gate.ac4",
+            "title": "Given two committed critique rounds and a digest mismatch, applyCritiqueGateForPromotion returns ok true with kind 'cap-reached' and the PRD file now contains '### Unresolved after two critic rounds' with '- <title>' for each unanswered blocks-the-design finding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-critique-gate.ac5",
+            "title": "Given the finished change, `wc -l src/lib/overdeck/planning-promotion.ts` prints at most 1000 and scripts/file-size-allowlist.txt is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-critic-lifecycle",
+        "title": "Document the plan critique step in docs/XBRIEF.md and roles/plan.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T04:40:00.000Z",
+        "metadata": {
+          "issueLabel": "pan-4341",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "difficulty": "simple",
+          "kind": "docs",
+          "files_scope": [
+            "docs/XBRIEF.md",
+            "roles/plan.md"
+          ],
+          "verify_commands": [
+            "grep -n 'plan-digest:' docs/XBRIEF.md",
+            "grep -n 'Critique response' roles/plan.md",
+            "scripts/lint-prompts.sh"
+          ],
+          "expected_outputs": [
+            "docs/XBRIEF.md shows the plan-digest line in the lifecycle section",
+            "roles/plan.md mentions ## Critique response",
+            "lint-prompts.sh exits 0"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In docs/XBRIEF.md 'PRD → Spec Lifecycle' (line 82) insert a 'Plan critique (flagged plans)' step between steps 1 and 2 covering: the three labels and --critic; roles.plan.sub.critic.model must be a different model family; finalize dispatches one read-only worker plan-critic-r<N>; the critique file .pan/drafts/<stem>-critique.md with line 1 'plan-digest: <sha256>' over the draft minus lifecycle and stamp fields; finding heading format; answers as ### <title> under ## Critique response; stale draft triggers the next round; two-round cap with '### Unresolved after two critic rounds'; nothing stored; the Done button returns 422 when a required critique is missing. Renumber later steps. In roles/plan.md add one paragraph after Process step 6 telling the planner what to do on finalize exit 5 (answer each blocks-the-design finding under ## Critique response, re-run finalize, never edit the critique file). Commit with a Prompt-Change: trailer; run scripts/lint-prompts.sh. The roles/plan.md paragraph also says: run finalize for a flagged issue with a 600 s Bash timeout or run_in_background: true; a killed finalize leaves the critic running and the next run waits on it."
+        },
+        "items": [
+          {
+            "id": "docs-critic-lifecycle.ac1",
+            "title": "Given docs/XBRIEF.md, its 'PRD → Spec Lifecycle' section contains a 'Plan critique' step that names plan-digest:, ## Critique response, the labels architecture, substrate-improvement and security, and the two-round cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-critic-lifecycle.ac2",
+            "title": "Given roles/plan.md, its Process section contains the instruction that finalize exit 5 means a plan critique refusal, that findings are answered under ## Critique response before re-running finalize, and that flagged finalizes run with a 600 s Bash timeout or in the background",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-critic-lifecycle.ac3",
+            "title": "Given the commit that edits roles/plan.md, it carries a Prompt-Change: trailer and scripts/lint-prompts.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "plan-digest",
+        "to": "critique-io",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-digest",
+        "to": "critic-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "critique-core",
+        "to": "critique-io",
+        "type": "blocks"
+      },
+      {
+        "from": "critique-core",
+        "to": "finalize-cli-critic",
+        "type": "blocks"
+      },
+      {
+        "from": "critic-model",
+        "to": "critic-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "critic-model",
+        "to": "finalize-cli-critic",
+        "type": "blocks"
+      },
+      {
+        "from": "critique-io",
+        "to": "critic-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "critique-io",
+        "to": "finalize-cli-critic",
+        "type": "blocks"
+      },
+      {
+        "from": "critique-io",
+        "to": "server-critique-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "critic-dispatch",
+        "to": "finalize-cli-critic",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

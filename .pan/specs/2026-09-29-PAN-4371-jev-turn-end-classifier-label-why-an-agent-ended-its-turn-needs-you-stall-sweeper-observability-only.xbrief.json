@@ -1,0 +1,1036 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T09:43:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4371: Jev turn-end classifier: label why an agent ended its turn (Needs-you + stall sweeper), observability only",
+    "updated": "2026-09-29T09:48:57.708Z"
+  },
+  "plan": {
+    "id": "pan-4371",
+    "title": "Jev turn-end classifier: label why an agent ended its turn (Needs-you + stall sweeper), observability only",
+    "status": "running",
+    "uid": "68c897df-5f30-4e63-a740-38928e2edfe3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-09-29T09:43:00Z",
+    "updated": "2026-09-29T09:48:57.708Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4371",
+        "label": "PAN-4371",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4371.md",
+        "label": "PAN-4371 PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/jev-integration.md",
+        "label": "Jev integration research PRD (Issue 1)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "jev",
+      "background-ai",
+      "agent-enrichment",
+      "needs-you",
+      "parked",
+      "stall-sweeper",
+      "observability"
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical feature that was already split out of the Jev research PRD as its own sibling issue (Issue 1 of 4). The file count comes from one optional field travelling through every hop it must cross (lib assessor, transcript reader, store, contracts schema + reducer, server poll, frontend store/row/derive) plus the eval fixtures and three doc files the issue names. The subsystem count is inflated because each docs/ and evals/ file counts separately. Splitting server and frontend halves would ship a contract field with no consumer, or a label with no producer.",
+      "canonicalFilename": "2026-09-29-PAN-4371-jev-turn-end-classifier-label-why-an-agent-ended-its-turn-needs-you-stall-sweeper-observability-only.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "When an agent ends its turn, Overdeck cannot tell a question from a report. computeAgentEnrichment marks every idle interactive agent (plan role or conv-* id) with the pending kind agentTurnEnded, labelled 'Answer the agent', because a prose question has no tool call and no modal. The frontend's isBareTurnEnd must assume the agent asked nothing. Work, review and test agents are excluded from agentTurnEnded, so a work agent that stops blocked or stops to ask is surfaced only as a generic idle-running parked row ('poke for progress').",
+      "Proposal": "Add an optional, off-by-default Jev classification of the last assistant message. src/lib/jev/turn-end.ts assesses {role, last_message (tail <= 6000 chars)} with a five-way Choice and a Noul; results below TURN_END_MIN_CONFIDENCE (0.7) are dropped server-side. src/lib/agents/last-assistant-message.ts reads the last assistant message from claude-code JSONL and codex rollouts by reusing the existing parsers. src/lib/jev/turn-end-store.ts holds an in-process, mtime-keyed store with a synchronous peek and a fire-and-forget schedule; the feature gate is checked before any I/O. The enrichment poll peeks before computing and schedules after, never awaiting; the value travels as an optional turnEndAssessment through @overdeck/contracts to the Needs-you row badge ('Asked you a question' / 'Reported done' / 'Blocked') and to isBareTurnEnd (a confident asks_operator is a real question). The parked resolver appends 'last message reads as: <label> (<conf>)' to idle-running rows (details.turnEnd + parkReason) and the stall sweeper copies it into its recommendation evidence while still acting on nothing. A sanitized 40+ message fixture set and evals/jev-turn-end.eval.ts measure per-class precision and recall.",
+      "NonGoals": "- No change to deacon-lite: checkStuckWorkAgents and every other routine send exactly the same nudges as today; no suppression and no new nudge text (that is the unfiled phase 2, item 1b).\n- No rescheduling of runStallSweeperPatrol and no new sweeper capability: no spawn, stop, message, kill, dispatch, clear or reset.\n- No change to /api/parked (src/dashboard/server/routes/parked.ts) or /api/velocity.\n- No change to the conversation REST pending-input feed; the label reaches only enrichment-sourced agent rows.\n- No new pending-input kind; no change to BLOCKING_KINDS, Decision grouping or sort order.\n- No persistence of any assessment: nothing written to agent rows, sessions.json, the pipeline journal, the tracker, the event store beyond the existing enrichment event, or any file; no eval decision log.\n- No hardcoded Jev model and no default model outside tests.\n- No transcript support beyond claude-code JSONL and codex rollouts; other harnesses report unsupported-harness.\n- No awaiting variant of the resolver (pan parked stays peek-and-schedule).\n- No frontend copy of TURN_END_MIN_CONFIDENCE; no label for progress_update or other.\n- No change to src/dashboard/server/routes/agents/listing.ts output.\n- Nothing beyond the agent role and the last assistant message tail is sent to TypeSafe."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Initial thresholds: TURN_END_MIN_CONFIDENCE = 0.7 on the Choice confidence; needsAnswer = needs_operator_answer Noul >= 0.5.",
+        "rationale": "The issue names the constant but no value; the live smoke test showed Choice confidence of 0.66-0.77 on a clear case, so 0.7 is the midpoint that suppresses the weakest readings. The eval (WI-12) tunes it and any change bumps QUESTION_SET_VERSION."
+      },
+      {
+        "summary": "Strict peek-and-schedule everywhere, including the parked resolver used by pan parked; no await path anywhere.",
+        "rationale": "The issue design says consumers never wait on Jev and Phase-2 bars changing what runs. Planning found runStallSweeperPatrol has had no caller since PAN-3917 W4 (94255f055fe), so the work-agent evidence has no live emitter; that is recorded as a finding and hazard, not fixed here."
+      },
+      {
+        "summary": "The assessment lands in ParkedRow.details.turnEnd plus a clause appended to parkReason, and in the sweeper's recommend() evidence object as turnEnd.",
+        "rationale": "ParkedRow has no evidence field. The sweeper's activity sentence already interpolates row.parkReason, and recommend()'s second argument is spread into the sweep.recommendation payload, which is the evidence the AC means."
+      },
+      {
+        "summary": "Only asks_operator, reports_complete and reports_blocked replace 'Answer the agent'; progress_update and other keep it.",
+        "rationale": "The issue names exactly three labels; unknown or weak readings must look like today."
+      },
+      {
+        "summary": "In @overdeck/contracts the TurnEndAssessment.kind field is Schema.String, not a literal union.",
+        "rationale": "The event store is append-only; a literal union would make a future kind rename fail replay decode. The lib type keeps the literal union."
+      },
+      {
+        "summary": "The '>= 0.9 asks_operator precision before docs call it ready' criterion is an implementation checkpoint with a fallback wording ('advisory; accuracy under measurement').",
+        "rationale": "Measuring needs a Jev key on the host, which the work agent may not have; the fallback keeps the item completable without inventing numbers."
+      },
+      {
+        "summary": "The frontend AC uses a stubbed agent-sourced Decision for a conv-* id, not the conversation REST feed.",
+        "rationale": "Only computeAgentEnrichment produces agentTurnEnded; the REST conversation feed never does, and changing it is out of scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "turn-end-assessor",
+        "title": "Add the turn-end question set and assessTurnEnd",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "turn-end-store",
+            "enrichment-attach",
+            "resolver-turn-end",
+            "eval-fixtures-metrics",
+            "eval-runner"
+          ],
+          "files_scope": [
+            "src/lib/jev/questions.ts",
+            "src/lib/jev/turn-end.ts",
+            "src/lib/jev/__tests__/turn-end.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/turn-end.test.ts src/lib/jev/__tests__/client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "turn-end.test.ts and client.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/jev/questions.ts bump QUESTION_SET_VERSION 1 -> 2 and add TURN_END_KINDS, TurnEndKind, TURN_END_MIN_CONFIDENCE = 0.7, TURN_END_NEEDS_ANSWER_THRESHOLD = 0.5, TURN_END_STATE_MAX_CHARS = 6000 and TURN_END_QUESTIONS (Choice turn_end_kind with the five one-sentence criteria from the PRD, Noul needs_operator_answer with the issue's exact wording). Create src/lib/jev/turn-end.ts exporting TurnEndAssessment, TurnEndInput, TurnEndOutcome, buildTurnEndState (keeps the LAST 6000 chars), assessTurnEnd (calls assess('jevTurnEndAssessment', ...), maps answered/unavailable/failed, returns unassessed 'empty-message' without a call for blank text, never throws), toTurnEndView (drops confidence < 0.7) and formatTurnEndSummary ('last message reads as: <asked the operator|done|blocked|progress update|other> (<conf to 2 dp>)'). Tests reuse the fake-fetch and cost-events mock pattern from src/lib/jev/__tests__/client.test.ts and call resetJevMemo() in beforeEach."
+        },
+        "items": [
+          {
+            "id": "turn-end-assessor.ac1",
+            "title": "Given a 10,000-character last message, when assessTurnEnd sends the request, then the fake fetch receives state.last_message of exactly 6000 characters ending with the input's final characters and state.role equal to the input role",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-end-assessor.ac2",
+            "title": "Given a fake answer turn_end_kind {choice: reports_blocked, confidence: 0.84} and needs_operator_answer noul 0.2, when assessTurnEnd resolves, then it returns status assessed with kind reports_blocked, confidence 0.84 and needsAnswer false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-end-assessor.ac3",
+            "title": "Given confidence 0.69, toTurnEndView returns undefined; given 0.7 it returns the assessment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-end-assessor.ac4",
+            "title": "Given the jevTurnEndAssessment toggle off, when assessTurnEnd is called, then the fake fetch is never invoked and the outcome is unassessed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-end-assessor.ac5",
+            "title": "formatTurnEndSummary for a reports_blocked 0.84 view returns exactly 'last message reads as: blocked (0.84)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "last-assistant-extractor",
+        "title": "Read an agent's last assistant message from claude JSONL or codex rollout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/last-assistant-message.ts",
+            "src/lib/agents/__tests__/last-assistant-message.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/last-assistant-message.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "last-assistant-message.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/agents/last-assistant-message.ts with LAST_ASSISTANT_TAIL_BYTES = 256 KiB, readLastAssistantMessage(agentId, workspace) (resolves via resolveAgentTranscriptCandidate from transcript-resolver.ts) and readLastAssistantMessageFromCandidate(candidate). claude: parseConversationMessages(path, max(0, size - tail)) from src/dashboard/server/services/conversation/parser.ts (a partial first line is skipped by its JSON.parse catch). codex: read the tail with fs/promises, drop the partial first line when offset > 0, push complete lines into createCodexConversationAccumulator(path) from codex-conversation-parser.ts, take .result(size, mtimeMs).messages. Every other TranscriptCandidateKind returns {ok:false, reason:'unsupported-harness'}. Walk messages backwards for the first role 'assistant' with non-empty trimmed text and return {ok:true, messageId: message.id, text, transcriptKind}. No execSync, no new parser. Import getAgentState only from agent-state-read.js if needed."
+        },
+        "items": [
+          {
+            "id": "last-assistant-extractor.ac1",
+            "title": "Given a claude JSONL whose final assistant entry says 'Should I migrate the callers?', when readLastAssistantMessageFromCandidate runs, then it returns ok true with that text and the parser's message id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "last-assistant-extractor.ac2",
+            "title": "Given a claude JSONL larger than LAST_ASSISTANT_TAIL_BYTES, the extractor still returns the final assistant message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "last-assistant-extractor.ac3",
+            "title": "Given a codex rollout fixture, the extractor returns its last assistant message text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "last-assistant-extractor.ac4",
+            "title": "Given a pi candidate, the extractor returns ok false with reason unsupported-harness; given a transcript with only user lines, it returns reason no-assistant-message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "turn-end-store",
+        "title": "Add the mtime-keyed turn-end store with synchronous peek and fire-and-forget schedule",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "enrichment-poll-schedule",
+            "resolver-turn-end"
+          ],
+          "files_scope": [
+            "src/lib/jev/turn-end-store.ts",
+            "src/lib/jev/__tests__/turn-end-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/jev/__tests__/turn-end-store.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "turn-end-store.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/lib/jev/turn-end-store.ts exporting isTurnEndAssessmentEnabled (resolveJevForFeature('jevTurnEndAssessment', loadConfigSync().config).ok), peekTurnEndAssessment(agentId, transcriptMtime), scheduleTurnEndAssessment({agentId, role, transcriptMtime}, deps?), clearTurnEndAssessment, resetTurnEndStore and TURN_END_STORE_MAX_ENTRIES = 256. The gate is checked first in peek and schedule (closed gate = no transcript read). schedule returns void synchronously, skips when mtime is null, when an entry exists for the same mtime, or when a run for agentId:mtime is in flight; otherwise it starts a swallowed async run that resolves the workspace (default getAgentWorkspace from src/lib/agent-enrichment.ts, the same door getAgentJsonlMtime uses for the mtime the poll passes; a state-row-only lookup would store no-transcript for agents found via the pane-cwd or prefix fallback), reads the last assistant message, calls assessTurnEnd and stores {mtime, messageId, view: toTurnEndView(outcome)} (or {mtime, view: undefined, reason} when unassessed). Every outcome is stored for its mtime. Map capped at 256, oldest evicted. Nothing persisted. Deps are injectable for tests."
+        },
+        "items": [
+          {
+            "id": "turn-end-store.ac1",
+            "title": "Given the gate closed, when scheduleTurnEndAssessment runs, then the injected readLastAssistantMessage is never called and peekTurnEndAssessment returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-end-store.ac2",
+            "title": "Given a completed schedule for mtime 100, peekTurnEndAssessment(agent, 100) returns the view and peekTurnEndAssessment(agent, 200) returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-end-store.ac3",
+            "title": "Given a below-threshold outcome, peek returns undefined and a second schedule for the same mtime makes no second assessTurnEnd call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-end-store.ac4",
+            "title": "Given a readLastAssistantMessage that never resolves, scheduleTurnEndAssessment returns synchronously and a second schedule for the same mtime makes no second read call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-turn-end-field",
+        "title": "Add optional turnEndAssessment to the contracts snapshot, event and reducer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4371",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "enrichment-poll-schedule",
+            "needs-you-label",
+            "bare-turn-end"
+          ],
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/events.ts",
+            "packages/contracts/src/event-reducers.ts",
+            "packages/contracts/src/__tests__/turn-end-assessment-reducer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npm --prefix ./packages/contracts test -- src/__tests__/turn-end-assessment-reducer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build succeeds",
+            "turn-end-assessment-reducer.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In packages/contracts/src/types.ts add the exported TurnEndAssessment Schema.Struct {kind: Schema.String, confidence: Schema.Number, needsAnswer: Schema.Boolean, model: Schema.String} above AgentSnapshot and add turnEndAssessment: Schema.optional(TurnEndAssessment) after resolutionCount in AgentSnapshot. Add the same optional field to AgentEnrichmentChangedEvent.payload in events.ts. In event-reducers.ts copy event.payload.turnEndAssessment in the agent.enrichment_changed case (after pendingProposedPlan) and delete base['turnEndAssessment'] in the stop-wipe block (after delete base['pendingProposedPlan']). Create the reducer test. Rebuild contracts."
+        },
+        "items": [
+          {
+            "id": "contracts-turn-end-field.ac1",
+            "title": "Given an agent.enrichment_changed event carrying turnEndAssessment, when reduced, then the agent snapshot contains that turnEndAssessment; a following event without it leaves the field undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-turn-end-field.ac2",
+            "title": "Given a stop-shaped agent.status_changed event with no live pane, when reduced, then the snapshot no longer has a turnEndAssessment key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-turn-end-field.ac3",
+            "title": "Given a persisted agent.enrichment_changed payload with no turnEndAssessment, the event schema decodes it without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enrichment-attach",
+        "title": "Attach turnEndAssessment in computeAgentEnrichment for bare interactive turn ends",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/compute-agent-enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/compute-agent-enrichment.test.ts src/lib/__tests__/agent-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "compute-agent-enrichment.test.ts and agent-enrichment.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add turnEndAssessment?: TurnEndAssessment (type from ./jev/turn-end.js) to the AgentEnrichment interface and a fifth optional parameter turnEndAssessment to computeAgentEnrichment. In the returned object add, last, ...(turnEndAssessment && pendingInputKinds.includes('agentTurnEnded') ? { turnEndAssessment } : {}) so the key is absent otherwise. Record the pre-change JSON for an idle conv-* agent as an inline snapshot before editing the function, then assert it is unchanged after."
+        },
+        "items": [
+          {
+            "id": "enrichment-attach.ac1",
+            "title": "Given an idle conv-pan-1 agent and no fifth argument, JSON.stringify of the enrichment matches the inline snapshot recorded before the change and 'turnEndAssessment' in result is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-attach.ac2",
+            "title": "Given the same agent and {kind: asks_operator, confidence: 0.9}, computeAgentEnrichment returns that turnEndAssessment and pendingInputKinds equal to ['agentTurnEnded']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-attach.ac3",
+            "title": "Given an idle work-role agent and an assessment, the result has no turnEndAssessment key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "enrichment-poll-schedule",
+        "title": "Peek and schedule turn-end assessments in the enrichment poll without awaiting",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service-turn-end.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-enrichment-service-turn-end.test.ts src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts src/dashboard/server/services/__tests__/agent-enrichment-service-peer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three agent-enrichment-service test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In pollOnce pass peekTurnEndAssessment(agentId, currentMtime) as the fifth computeAgentEnrichment argument; after the lastScan bookkeeping call scheduleTurnEndAssessment({agentId, role: enrichment.role ?? 'conversation', transcriptMtime: currentMtime}) only when pendingInputKinds includes 'agentTurnEnded' (never awaited). Extend enrichmentChanged with the kind and confidence comparison, add ...(enrichment.turnEndAssessment ? { turnEndAssessment } : {}) to the event payload, turnEndAssessment: undefined to buildPendingReapEvent, and clearTurnEndAssessment(id) in the stale-agent cleanup loop. New fake-timer test modeled on agent-enrichment-service-peer.test.ts mocking lib/jev/turn-end-store.js."
+        },
+        "items": [
+          {
+            "id": "enrichment-poll-schedule.ac1",
+            "title": "Given scheduleTurnEndAssessment starts a promise that never resolves and computeAgentEnrichment returns ['agentTurnEnded'], when one 10 s fake-timer tick runs, then appendAsync has been called once with an agent.enrichment_changed event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-poll-schedule.ac2",
+            "title": "Given peek returns an assessment echoed by computeAgentEnrichment, the appended payload contains turnEndAssessment; given peek returns undefined, the payload has no turnEndAssessment key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "enrichment-poll-schedule.ac3",
+            "title": "Given an enrichment without agentTurnEnded, scheduleTurnEndAssessment is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-turn-end",
+        "title": "Attach the turn-end reading to idle-running parked rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/parked/resolver.ts",
+            "src/lib/parked/__tests__/resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/parked/__tests__/resolver.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "resolver.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add turnEndByAgentId?: ReadonlyMap<string, TurnEndAssessment> to ParkedSignals. In classifyParked's idle-running push, when a view exists for the agent append '; ' + formatTurnEndSummary(view) to parkReason and add details.turnEnd = {kind, confidence, model, summary}; without a view the row is unchanged. Add ResolveParkedOptions.turnEndFor(agent) whose default returns undefined when isTurnEndAssessmentEnabled() is false, else awaits getAgentJsonlMtime(agent.id), calls scheduleTurnEndAssessment (not awaited) and returns peekTurnEndAssessment. classifyOne builds the map only for live agents idle at or past IDLE_RUNNING_THRESHOLD_MS. If a static import of agent-enrichment.js creates a cycle, import it lazily inside the default turnEndFor."
+        },
+        "items": [
+          {
+            "id": "resolver-turn-end.ac1",
+            "title": "Given classifyParked signals with an idle agent and a reports_blocked 0.84 view, the idle-running row's parkReason contains 'last message reads as: blocked (0.84)' and details.turnEnd.kind equals reports_blocked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-turn-end.ac2",
+            "title": "Given the same signals without turnEndByAgentId, the returned row deep-equals the row produced before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-turn-end.ac3",
+            "title": "Given resolveParkedPopulation with an injected turnEndFor spy, the spy is called for the idle-past-threshold agent only and never for a warm agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweeper-evidence",
+        "title": "Carry the turn-end reading in the stall sweeper's idle-running evidence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/stall-sweeper.ts",
+            "src/lib/cloister/__tests__/stall-sweeper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/stall-sweeper.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stall-sweeper.test.ts passes including every pre-existing case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In reportRow's idle-running case spread { turnEnd: row.details.turnEnd.summary } into the recommend() evidence object when that summary is a string. No other logic change; the activity sentence already includes row.parkReason. Add one sentence to the file-header law: a Jev turn-end reading (PAN-4371) may enrich the evidence; it never selects or triggers an action. Add tests with a stubbed idle-running row built as resolver-turn-end produces it."
+        },
+        "items": [
+          {
+            "id": "sweeper-evidence.ac1",
+            "title": "Given an idle-running row whose details.turnEnd.summary is 'last message reads as: blocked (0.84)', when runStallSweeperPatrol runs, then the emitted sweep.recommendation payload's turnEnd contains 'blocked' and the emitted activity message contains 'blocked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweeper-evidence.ac2",
+            "title": "Given the same run, every emitted event type is one of sweep.scan, sweep.recommendation or sweep.escalated, and the only injected functions called are isAgentLive, emitActivity and emitEvent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweeper-evidence.ac3",
+            "title": "Given an idle-running row with no details.turnEnd, the recommendation payload has no turnEnd key and all pre-existing stall-sweeper tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-label",
+        "title": "Show the turn-end label on the Needs-you row badge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
+            "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/pendingInput.test.ts src/components/__tests__/DecisionsPanel.test.tsx src/lib/__tests__/useDecisions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pendingInput.test.ts, DecisionsPanel.test.tsx and useDecisions.test.ts pass",
+            "typecheck (including typecheck:frontend) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In pendingInput.ts add TURN_END_KIND_LABEL {asks_operator: 'Asked you a question', reports_complete: 'Reported done', reports_blocked: 'Blocked'} and an optional second parameter turnEnd?: {kind: string} | null to describePendingInput that replaces only the agentTurnEnded label when TURN_END_KIND_LABEL has the kind. Thread turnEndAssessment: store.ts PendingInputSubject + selectPendingInputSubjects (a.turnEndAssessment), useDecisions.ts Decision + the agent loop, DecisionsPanel.tsx passes decision.turnEndAssessment to both describePendingInput calls. Add src/lib/__tests__/pendingInput.test.ts and src/components/__tests__/DecisionsPanel.test.tsx to test:frontend-subset in root package.json. Follow the pan-style-guide: no new colors or badge styles."
+        },
+        "items": [
+          {
+            "id": "needs-you-label.ac1",
+            "title": "describePendingInput(['agentTurnEnded'], {kind: 'asks_operator'}) returns 'Asked you a question'; with {kind: 'progress_update'} or no second argument it returns 'Answer the agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-label.ac2",
+            "title": "Given useDecisions returns an agent decision for conv-20260929-0001 with kinds ['agentTurnEnded'] and turnEndAssessment {kind: asks_operator, confidence: 0.9}, DecisionsPanel renders the text 'Asked you a question'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-label.ac3",
+            "title": "Given the same decision without turnEndAssessment, DecisionsPanel renders 'Answer the agent' exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-label.ac4",
+            "title": "Root package.json test:frontend-subset contains src/lib/__tests__/pendingInput.test.ts and src/components/__tests__/DecisionsPanel.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bare-turn-end",
+        "title": "Make isBareTurnEnd treat a confident asks_operator reading as a real question",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/simple/derive.ts",
+            "src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/simple-derive.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "simple-derive.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. In isBareTurnEnd add `if (agent.turnEndAssessment?.kind === 'asks_operator') return false;` after the AUQ/plan check, and update the doc comment to say the server attaches the assessment only above TURN_END_MIN_CONFIDENCE. Add src/lib/__tests__/simple-derive.test.ts to test:frontend-subset in root package.json."
+        },
+        "items": [
+          {
+            "id": "bare-turn-end.ac1",
+            "title": "Given a plan agent with pendingInputKinds ['agentTurnEnded'] and turnEndAssessment {kind: asks_operator, confidence: 0.9}, isBareTurnEnd returns false and isPlanReadyToStart for an issue with hasPlan true returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bare-turn-end.ac2",
+            "title": "Given the same agent with {kind: reports_complete, confidence: 0.9}, or with no assessment, isBareTurnEnd returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bare-turn-end.ac3",
+            "title": "Root package.json test:frontend-subset contains src/lib/__tests__/simple-derive.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eval-fixtures-metrics",
+        "title": "Collect 40+ sanitized labeled final messages and add pure per-class metrics",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "evals/fixtures/jev-turn-end.json",
+            "evals/lib/jev-turn-end-metrics.ts",
+            "tests/unit/evals/lib/jev-turn-end-metrics.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/evals/lib/jev-turn-end-metrics.test.ts",
+            "npm run typecheck:evals",
+            "npm run lint:source-introspection"
+          ],
+          "expected_outputs": [
+            "jev-turn-end-metrics.test.ts passes",
+            "typecheck:evals completes without errors",
+            "lint:source-introspection reports no new offender"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Hand-collect final assistant messages from local ~/.claude/projects/*/*.jsonl transcripts and codex rollouts (read-only; never modify or delete them), label each with one TurnEndKind, and write evals/fixtures/jev-turn-end.json as [{name, role, text, label}]: at least 40 rows and at least 8 each of asks_operator, reports_complete, reports_blocked, progress_update. Sanitize: absolute home paths -> <path>; private names/prefixes (myn, mind your now, krux, tindra, auricle, MIN-, AUR-, KRUX-, TIN-, ELV-) -> <project>/<ISSUE>; drop any message with a token-shaped string or an email; keep the last 6000 characters. Add evals/lib/jev-turn-end-metrics.ts (pure): perClassMetrics(rows) where predicted null means below threshold, FIXTURE_LEAK_PATTERNS and findFixtureLeaks(fixtures). The unit test imports the fixture JSON with `with { type: 'json' }` (never readFile) and builds token-shaped strings at runtime."
+        },
+        "items": [
+          {
+            "id": "eval-fixtures-metrics.ac1",
+            "title": "Given the committed fixture imported as JSON, the test finds at least 40 rows, at least 8 rows for each of asks_operator, reports_complete, reports_blocked and progress_update, and only valid labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-fixtures-metrics.ac2",
+            "title": "findFixtureLeaks(committed fixture) returns an empty array, and it returns a finding for a synthetic row containing '/home/alice/x' and for one containing 'MIN-12'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-fixtures-metrics.ac3",
+            "title": "perClassMetrics on a hand-made six-row set returns the expected precision, recall and support per class, with precision null for a class never predicted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eval-runner",
+        "title": "Add evals/jev-turn-end.eval.ts and record measured precision",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "evals/jev-turn-end.eval.ts",
+            "evals/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:evals"
+          ],
+          "expected_outputs": [
+            "typecheck:evals completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. Model on evals/jev-smoke.eval.ts: resolveJevConfig(loadConfigSync().config), evalite.skip with the printed reason when unresolved, one systemOne call per fixture with state buildTurnEndState(role, text), questions TURN_END_QUESTIONS and model resolution.config.model (never a literal). predicted = choice when confidence >= TURN_END_MIN_CONFIDENCE else null; scorer 'predicted equals label'; print perClassMetrics with console.table. Add the row to the evals/README.md table. IMPLEMENTATION CHECKPOINT: if Jev is configured on the host, run the eval and paste the per-class table and jev.model id into the PR description; the ready gate is asks_operator precision >= 0.9. FALLBACK: when not met or not configured, the PR states the measured number or 'not measured', and docs-turn-end uses the wording 'advisory; accuracy under measurement'. Thresholds do not change without bumping QUESTION_SET_VERSION."
+        },
+        "items": [
+          {
+            "id": "eval-runner.ac1",
+            "title": "Given no jev.model in config, evalite prints '[jev-turn-end] skipped: model-not-configured' (or the actual unavailable reason) and makes no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-runner.ac2",
+            "title": "evals/jev-turn-end.eval.ts passes npm run typecheck:evals and contains no Jev model literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eval-runner.ac3",
+            "title": "The PR description contains either the per-class precision/recall table with the jev.model id, or the sentence that the eval was not measured and why",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-turn-end",
+        "title": "Document the turn-end assessment in jev.mdx, PIPELINE-GATES.md and GOD-VIEW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-29T09:43:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4371",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/jev.mdx",
+            "docs/PIPELINE-GATES.md",
+            "docs/GOD-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Turn-end classification' configuration/jev.mdx",
+            "grep -n 'turn-end' docs/PIPELINE-GATES.md docs/GOD-VIEW.md"
+          ],
+          "expected_outputs": [
+            "jev.mdx has a 'Turn-end classification' section",
+            "both docs files mention the turn-end assessment"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-11",
+            "FR-12",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. configuration/jev.mdx: replace 'This release sends nothing: the client exists, but no feature calls it yet.' with a statement that jevTurnEndAssessment is live and sends the agent's role and the tail (at most 6000 characters) of its last assistant message and nothing else from the transcript, for claude-code and codex agents only; change the table header 'What it sends (when that feature ships)' to 'What it sends'; add a 'Turn-end classification' section with the three labels, the 0.7 threshold, that nothing is persisted, and the readiness wording chosen at the eval-runner checkpoint. docs/PIPELINE-GATES.md 'Deacon-lite: seven routines', after routine 1: checkStuckWorkAgents does not read the assessment in this release; it only labels Needs-you and idle-running rows, is advisory, and never suppresses, adds or changes a nudge. docs/GOD-VIEW.md 'The Stall Sweeper' bullet: idle-running rows may carry details.turnEnd and a 'last message reads as: ...' clause; advisory; runStallSweeperPatrol currently has no scheduler caller (PAN-3917 W4)."
+        },
+        "items": [
+          {
+            "id": "docs-turn-end.ac1",
+            "title": "configuration/jev.mdx no longer contains 'This release sends nothing' and has a 'Turn-end classification' section naming 'Asked you a question', 'Reported done', 'Blocked', the 0.7 threshold and the 6000-character limit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-turn-end.ac2",
+            "title": "docs/PIPELINE-GATES.md's deacon-lite section contains a sentence that checkStuckWorkAgents does not read the turn-end assessment and that the assessment never changes a nudge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-turn-end.ac3",
+            "title": "docs/GOD-VIEW.md's Stall Sweeper bullet contains the 'last message reads as' clause description, the word advisory, and the fact that runStallSweeperPatrol has no scheduler caller",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "turn-end-assessor",
+        "to": "turn-end-store",
+        "type": "blocks"
+      },
+      {
+        "from": "last-assistant-extractor",
+        "to": "turn-end-store",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-end-assessor",
+        "to": "enrichment-attach",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-end-store",
+        "to": "enrichment-poll-schedule",
+        "type": "blocks"
+      },
+      {
+        "from": "enrichment-attach",
+        "to": "enrichment-poll-schedule",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-turn-end-field",
+        "to": "enrichment-poll-schedule",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-end-assessor",
+        "to": "resolver-turn-end",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-end-store",
+        "to": "resolver-turn-end",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-turn-end",
+        "to": "sweeper-evidence",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-turn-end-field",
+        "to": "needs-you-label",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-turn-end-field",
+        "to": "bare-turn-end",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-label",
+        "to": "bare-turn-end",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-end-assessor",
+        "to": "eval-fixtures-metrics",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-fixtures-metrics",
+        "to": "eval-runner",
+        "type": "blocks"
+      },
+      {
+        "from": "eval-runner",
+        "to": "docs-turn-end",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

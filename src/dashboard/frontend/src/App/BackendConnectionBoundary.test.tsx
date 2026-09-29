@@ -12,6 +12,7 @@ const LIVE: ConnectionInputs = {
   serverReachable: true,
   streamLive: true,
   restarting: false,
+  sessionAuthFailed: false,
   hasSnapshot: true,
   lastLiveAt: 1,
 };
@@ -92,6 +93,17 @@ describe('BackendConnectionBoundary', () => {
     expect(firstLoadScreen()?.textContent).toContain('Overdeck server is restarting');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(reconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('names a refused session on the first-load screen', () => {
+    useConnectionState.setState({ hasSnapshot: false, streamLive: false, lastLiveAt: null, sessionAuthFailed: true });
+    render(
+      <BackendConnectionBoundary>
+        <div data-testid="app-content">app</div>
+      </BackendConnectionBoundary>,
+    );
+    expect(firstLoadScreen()?.textContent).toContain('Dashboard session could not be established');
+    expect(firstLoadScreen()?.textContent).toContain('docs/DASHBOARD-AUTH.md');
   });
 
   it('renders children without a snapshot while only live updates are delayed', () => {

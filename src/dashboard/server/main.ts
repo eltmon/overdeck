@@ -52,6 +52,7 @@ import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { startCliproxyWatchdogForDashboard } from './routes/cliproxy.js';
 import { startResourcesSnapshotService } from './routes/resources/snapshot.js';
+import { startRunawayPatrol, stopRunawayPatrol } from '../../lib/cloister/runaway-process-patrol.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
@@ -59,6 +60,7 @@ import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../..
 import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
+import { startConflictRepairPatrol, stopConflictRepairPatrol } from './services/conflict-repair-patrol.js';
 import { warnIfAutonomousMergeBackendUnavailable } from './services/merge-backend-health.js';
 import { warnIfAppCannotMerge } from './services/merge-app-scopes-health.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
@@ -578,10 +580,13 @@ void (async () => {
     const stopTriggers = startResourceRefreshTriggers();
     const stopConvergence = startProjectResourceConvergence();
     const stopResourcesSnapshot = startResourcesSnapshotService();
+    // PAN-4311 D1: the runaway patrol lives here, beside the snapshot it feeds.
+    startRunawayPatrol();
     stopResourceRefreshServices = () => {
       stopTriggers();
       stopConvergence();
       stopResourcesSnapshot();
+      stopRunawayPatrol();
       stopProjectResourceRefreshQueue();
     };
     console.log('[overdeck] Project resource refresh queue and resources snapshot service started');
@@ -694,6 +699,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsSummarizer();
   stopTtsPlayback();
   stopAutoMergeExecutor();
+  stopConflictRepairPatrol();
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
@@ -830,6 +836,16 @@ if (startAutoMergeExecutor()) {
   console.log('[overdeck] Auto-merge executor SKIPPED — peer dashboard spawns nothing');
 } else {
   console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
+}
+
+// PAN-4384: routes an approved, green PR that turned CONFLICTING back to its
+// work agent for a sync-main repair.
+if (startConflictRepairPatrol()) {
+  console.log('[overdeck] Conflict-repair patrol started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Conflict-repair patrol SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Conflict-repair patrol SKIPPED (OVERDECK_DISABLE_CONFLICT_REPAIR=1)');
 }
 
 // PAN-3917: boot used to reset verification runs left `running` by a worker

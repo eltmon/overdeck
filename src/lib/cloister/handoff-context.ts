@@ -15,8 +15,7 @@ import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
 import type { ContinueState } from '../xbrief/continue-state.js';
 import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../overdeck/issue-projects.js';
-import { resolvePlanHome } from '../pan-dir/paths.js';
-import { readContinueState } from '../xbrief/continue-state.js';
+import { readContinueStateForIssue } from '../xbrief/lifecycle-io.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 
 const execAsync = promisify(exec);
@@ -121,7 +120,7 @@ async function captureFiles(
     // Read continue context from the plan home's continue file (PAN-3917).
     try {
       const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspace);
-      const state = readContinueState(resolvePlanHome(project.path), issueId.toUpperCase());
+      const state = readContinueStateForIssue(project.path, issueId.toUpperCase());
       if (state) context.continueState = state;
     } catch { /* ignore */ }
 

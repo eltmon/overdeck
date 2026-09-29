@@ -177,6 +177,7 @@ describe('supervisor systemd unit helpers', () => {
       supervisorPort: 3012,
       workingDirectory: '/opt/overdeck',
       overdeckHome: '/home/dev/.overdeck',
+      cpuWeight: 1000,
     });
 
     expect(unit).toMatchInlineSnapshot(`
@@ -187,6 +188,7 @@ describe('supervisor systemd unit helpers', () => {
 
       [Service]
       Type=simple
+      CPUWeight=1000
       WorkingDirectory=/opt/overdeck
       ExecStart="/usr/bin/node" "/opt/overdeck/dist/supervisor/server.js"
       Environment="OVERDECK_SUPERVISOR_PORT=3012" "OVERDECK_HOME=/home/dev/.overdeck"
@@ -196,6 +198,20 @@ describe('supervisor systemd unit helpers', () => {
     `);
     expect(unit).not.toContain('[Install]');
     expect(unit).not.toContain('WantedBy=');
+  });
+
+  it('defaults the supervisor CPUWeight to resources.dashboard_cpu_weight (PAN-4311)', async () => {
+    const { renderSupervisorUnit } = await import('../systemd.js');
+
+    const unit = renderSupervisorUnit({
+      nodePath: '/usr/bin/node',
+      supervisorBundle: '/opt/overdeck/dist/supervisor/server.js',
+      supervisorPort: 3012,
+      workingDirectory: '/opt/overdeck',
+      overdeckHome: '/home/dev/.overdeck',
+    });
+
+    expect(unit.split('\n')).toContain('CPUWeight=1000');
   });
 
   it('doubles % everywhere and $ only in ExecStart, where systemd expands it', async () => {

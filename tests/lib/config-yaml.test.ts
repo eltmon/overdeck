@@ -299,6 +299,81 @@ api_keys:
       });
     });
 
+    it('defaults the PAN-4311 CPU weight, nice and PSI keys', () => {
+      expect(mergeConfigs().config.resources).toMatchObject({
+        dashboardCpuWeight: 1000,
+        verificationCpuWeight: 20,
+        agentNice: 10,
+        laneNice: 15,
+        governorCpuPsiHoldAvg60: 50,
+        governorCpuPsiRecoveryAvg60: 25,
+        governorCpuHoldDispatch: false,
+      });
+    });
+
+    it('applies valid PAN-4311 CPU overrides', () => {
+      expect(mergeConfigs({
+        resources: {
+          dashboard_cpu_weight: 400,
+          verification_cpu_weight: 35,
+          agent_nice: 5,
+          lane_nice: 19,
+          governor_cpu_psi_hold_avg60: 60,
+          governor_cpu_psi_recovery_avg60: 30,
+          governor_cpu_hold_dispatch: true,
+        },
+      }).config.resources).toMatchObject({
+        dashboardCpuWeight: 400,
+        verificationCpuWeight: 35,
+        agentNice: 5,
+        laneNice: 19,
+        governorCpuPsiHoldAvg60: 60,
+        governorCpuPsiRecoveryAvg60: 30,
+        governorCpuHoldDispatch: true,
+      });
+    });
+
+    it('ignores out-of-range PAN-4311 CPU values and keeps the defaults', () => {
+      expect(mergeConfigs({
+        resources: {
+          dashboard_cpu_weight: 0,
+          verification_cpu_weight: 10_001,
+          agent_nice: 25,
+          lane_nice: 2.5,
+          governor_cpu_psi_hold_avg60: 101,
+          governor_cpu_psi_recovery_avg60: -1,
+          governor_cpu_hold_dispatch: 'yes' as never,
+        },
+      }).config.resources).toMatchObject({
+        dashboardCpuWeight: 1000,
+        verificationCpuWeight: 20,
+        agentNice: 10,
+        laneNice: 15,
+        governorCpuPsiHoldAvg60: 50,
+        governorCpuPsiRecoveryAvg60: 25,
+        governorCpuHoldDispatch: false,
+      });
+    });
+
+    it('warns and falls back to defaults when CPU PSI recovery is at or above hold', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const { resources } = mergeConfigs({
+          resources: {
+            governor_cpu_psi_hold_avg60: 40,
+            governor_cpu_psi_recovery_avg60: 45,
+          },
+        }).config;
+        expect(resources.governorCpuPsiHoldAvg60).toBe(50);
+        expect(resources.governorCpuPsiRecoveryAvg60).toBe(25);
+        expect(warn).toHaveBeenCalledWith(expect.stringMatching(
+          /governor_cpu_psi_recovery_avg60 must be lower than resources\.governor_cpu_psi_hold_avg60/,
+        ));
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it('rejects CPU governor recovery at or above the soft threshold', () => {
       expect(() => mergeConfigs({
         resources: {

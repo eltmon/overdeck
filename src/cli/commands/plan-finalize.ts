@@ -13,6 +13,14 @@ import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/xbrief/quality-lint.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
 import { findProjectByPath, getProjectSwarmHotspots } from '../../lib/projects.js';
+import { getAgentState as readAgentState, type AgentState } from '../../lib/agents/agent-state-read.js';
+import { loadConfigSync } from '../../lib/config-yaml.js';
+import { resolveModel } from '../../lib/config-yaml/roles.js';
+import { evaluateCritiqueGate, type CritiqueGateResult } from '../../lib/planning/plan-critique.js';
+import { isPlanFlagged, loadCritiqueGateInput } from '../../lib/planning/plan-critique-io.js';
+import { resolvePlanCritic } from '../../lib/planning/plan-critic-model.js';
+import { dispatchPlanCritic } from '../../lib/planning/plan-critic-dispatch.js';
+import { reviewAcceptanceCriteria } from '../../lib/jev/acceptance-criteria.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -23,6 +31,8 @@ interface PlanFinalizeOptions {
   qualityLint?: boolean;
   /** Commander negation: `--no-prd` arrives as `prd: false` (default true) — bypass the PRD-first gate. */
   prd?: boolean;
+  /** `--critic`: require a plan critique even without a critic label (PAN-4341). */
+  critic?: boolean;
 }
 
 export interface PendingPromotionMarker {
@@ -187,6 +197,86 @@ export function writePendingPromotionMarker(
   renameSync(tmp, markerPath);
 }
 
+export interface CritiqueStepDeps {
+  isPlanFlagged?: typeof isPlanFlagged;
+  loadCritiqueGateInput?: typeof loadCritiqueGateInput;
+  resolvePlanCritic?: typeof resolvePlanCritic;
+  dispatchPlanCritic?: typeof dispatchPlanCritic;
+  getAgentState?: (id: string) => AgentState | null;
+  loadConfig?: () => ReturnType<typeof loadConfigSync>['config'];
+  env?: NodeJS.ProcessEnv;
+  exit?: (code: number) => Promise<never>;
+}
+
+/**
+ * The plan critique step (PAN-4341 FR-1, FR-8, FR-16). For a flagged plan,
+ * evaluate the critique gate; on a missing or stale critique, dispatch one
+ * different-family critic and evaluate again in the same run. A refusal
+ * prints the reason and exits 5. Nothing is stored: every run derives the
+ * gate from the critique files, the draft and git history.
+ */
+export async function runCritiqueStep(
+  input: { issueId: string; workspacePath: string; doc: unknown; forced: boolean; json: boolean },
+  deps: CritiqueStepDeps = {},
+): Promise<{ proceed: true; required: boolean } | { proceed: false }> {
+  const exit = deps.exit ?? ((code: number) => exitCli(code));
+  const required = await (deps.isPlanFlagged ?? isPlanFlagged)({
+    issueId: input.issueId,
+    forced: input.forced,
+    warn: (message) => console.error(chalk.yellow(`⚠ ${message}`)),
+  });
+  if (!required) return { proceed: true, required: false };
+
+  const refuse = async (message: string, critiqueGate: CritiqueGateResult): Promise<{ proceed: false }> => {
+    if (input.json) {
+      console.log(JSON.stringify({ success: false, error: 'Plan critique gate failed', message, critiqueGate }));
+    } else {
+      console.error(chalk.red(`✗ Plan critique gate: ${message}`));
+    }
+    await exit(5);
+    return { proceed: false };
+  };
+
+  const load = deps.loadCritiqueGateInput ?? loadCritiqueGateInput;
+  const gateArgs = { workspacePath: input.workspacePath, issueId: input.issueId, doc: input.doc, required };
+  const { gateInput, prdPath } = await load(gateArgs);
+  let result = evaluateCritiqueGate(gateInput);
+
+  if (!result.ok && (result.kind === 'missing' || result.kind === 'stale')) {
+    if (!prdPath) return refuse(`critique requires the workspace PRD .pan/drafts/${input.issueId}.md`, result);
+    const plannerId = `planning-${input.issueId.toLowerCase()}`;
+    let critic: Awaited<ReturnType<typeof resolvePlanCritic>>;
+    try {
+      const config = (deps.loadConfig ?? (() => loadConfigSync().config))();
+      const plannerModel = (deps.getAgentState ?? readAgentState)(plannerId)?.model ?? resolveModel('plan', undefined, config);
+      critic = await (deps.resolvePlanCritic ?? resolvePlanCritic)({ plannerModel, config });
+    } catch (error) {
+      return refuse(`could not resolve the plan critic: ${error instanceof Error ? error.message : String(error)}`, result);
+    }
+    if (!critic.ok) return refuse(critic.message, result);
+
+    console.error(chalk.dim(`dispatching plan critic round ${result.nextRound} on ${critic.harness}/${critic.model} (waits up to 9 minutes)…`));
+    const dispatched = await (deps.dispatchPlanCritic ?? dispatchPlanCritic)({
+      issueId: input.issueId,
+      workspacePath: input.workspacePath,
+      prdPath,
+      doc: input.doc,
+      round: result.nextRound,
+      parentId: (deps.env ?? process.env).OVERDECK_AGENT_ID || plannerId,
+      critic,
+    });
+    if (dispatched.kind !== 'written') return refuse(dispatched.message, result);
+    console.error(chalk.dim(`plan critique written: ${dispatched.path}`));
+    result = evaluateCritiqueGate((await load(gateArgs)).gateInput);
+  }
+
+  if (!result.ok) return refuse(result.reason, result);
+  if (result.kind === 'cap-reached' && result.unresolved.length > 0) {
+    console.error(chalk.yellow(`⚠ Plan critique: two rounds used; unresolved blocks-the-design findings go to the PRD for the operator: ${result.unresolved.join('; ')}`));
+  }
+  return { proceed: true, required: true };
+}
+
 export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Promise<void> {
   const startDir = options.workspace ? resolve(options.workspace) : process.cwd();
   const workspacePath = findWorkspaceRoot(startDir);
@@ -260,7 +350,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       }
       return exitCli(3);
     }
-    const warnings = qualityGate.issues.filter(issue => issue.severity === 'warn');
+    const acReview = await reviewAcceptanceCriteria(planDoc);
+    const warnings = [...qualityGate.issues.filter(issue => issue.severity === 'warn'), ...acReview.issues];
     if (warnings.length > 0) {
       if (options.json) {
         console.error(JSON.stringify({ qualityWarnings: warnings }));
@@ -271,10 +362,16 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         }
       }
     }
+    if (acReview.status === 'failed' && !options.json) {
+      console.error(chalk.dim(`ℹ Jev acceptance-criteria review did not run (${acReview.reason})`));
+    }
   }
   if (!options.json) {
     for (const line of readinessReport) console.error(chalk.dim(line));
   }
+
+  const critique = await runCritiqueStep({ issueId, workspacePath, doc: planDoc, forced: options.critic === true, json: options.json === true });
+  if (!critique.proceed) return;
 
   const autoSpawnOnFinalize = readAutoSpawnOnFinalize(issueId);
 
@@ -320,7 +417,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const noPromote = options.promote === false;
   if (!noPromote) {
     emitAutoPromotePhase(issueId, 'completePlanning', 'start', autoSpawnOnFinalize ? 'posting complete-planning autoSpawn request' : 'posting complete-planning request');
-    const promotion = await promotePlanning(issueId, autoSpawnOnFinalize, { noPrd: options.prd === false });
+    const promotion = await promotePlanning(issueId, autoSpawnOnFinalize, { noPrd: options.prd === false, critic: critique.required });
     promoted = promotion.success;
     promoteMessage = promotion.message;
     promoteError = promotion.error;
@@ -450,7 +547,7 @@ const promoteFailure = (error: string): PromotePlanningResult => ({
   workAgentSpawned: false, workAgentMessage: null, workAgentError: null, workAgentSkipReason: null,
 });
 
-export async function promotePlanning(issueId: string, autoSpawn = false, opts: { noPrd?: boolean } = {}): Promise<PromotePlanningResult> {
+export async function promotePlanning(issueId: string, autoSpawn = false, opts: { noPrd?: boolean; critic?: boolean } = {}): Promise<PromotePlanningResult> {
   const url = `${getDashboardApiUrl()}/api/issues/${issueId}/complete-planning`;
   let lastError = 'complete-planning failed';
 
@@ -464,7 +561,11 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
         response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrl() },
-          body: JSON.stringify({ ...(autoSpawn ? { autoSpawn: true } : {}), ...(opts.noPrd ? { noPrd: true } : {}) }),
+          body: JSON.stringify({
+            ...(autoSpawn ? { autoSpawn: true } : {}),
+            ...(opts.noPrd ? { noPrd: true } : {}),
+            ...(opts.critic ? { critic: true } : {}),
+          }),
           signal: controller.signal,
         });
       } finally {

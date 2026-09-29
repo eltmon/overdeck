@@ -187,6 +187,7 @@ export interface ApiSettingsConfig {
     openrouter?: string;
     nous?: string;
     dashscope?: string;
+    typesafe?: string;
   };
   agents?: {
     rtk?: {
@@ -300,6 +301,7 @@ function builtInProviderHarnesses(): BuiltInProviderHarnessesConfig {
 }
 
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
+  plan: ['critic'],
   review: ['security', 'performance', 'correctness', 'requirements'],
 };
 function seededWorkhorses(config: Pick<ReturnType<typeof loadConfigSync>['config'], 'workhorses'>): WorkhorsesConfig {
@@ -953,6 +955,7 @@ async function saveSettingsApiPromiseUnlocked(
       openrouter: settings.api_keys.openrouter,
       nous: settings.api_keys.nous,
       dashscope: settings.api_keys.dashscope,
+      typesafe: settings.api_keys.typesafe,
     },
     agents: (settings.agents?.rtk !== undefined || settings.agents?.tldr !== undefined)
       ? {

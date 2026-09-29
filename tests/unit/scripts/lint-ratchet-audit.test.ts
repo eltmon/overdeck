@@ -127,6 +127,17 @@ describe('lint-ratchet-audit.sh', () => {
     expect(withRef.output).toContain('ratchet audit passed');
   });
 
+  it('accepts an issue ref on the first line of a large squash-merge body', () => {
+    const root = setupRepo();
+    writeEslintAllowlist(root, ['src/legacy.ts', 'src/new-any.ts']);
+    commitAll(root, `PAN-4280 (#4287)\n\n${'* chore: squashed commit line\n'.repeat(3000)}`);
+
+    const result = runAudit(root);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
+
   it('passes range mode for file-size allowlist lowerings and ESLint allowlist removals without issue refs', () => {
     const root = setupRepo();
     writeFileSizeAllowlist(root, [[1100, 'src/base.ts']]);

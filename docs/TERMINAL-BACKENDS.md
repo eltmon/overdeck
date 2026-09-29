@@ -517,6 +517,52 @@ harness on the same transcript.
 Messages cannot reach a Herdr-hosted Claude Code conversation from a tmux host (it has no PTY
 supervisor), which is why step 2 comes before the flip rather than after it.
 
+## CPU classes and priority (PAN-4311)
+
+Every agent pane runs inside one cgroup: the Herdr server unit
+(`overdeck-herdr.service`) or the tmux server's. Inside a cgroup the kernel
+shares CPU per thread, so nothing ordered an operator conversation ahead of a
+batch agent or a gauntlet lane. `launchAgentPane` now applies a **CPU class**
+to every launch (`src/lib/terminal-backends/cpu-class.ts`):
+
+| Class | Who | argv |
+| --- | --- | --- |
+| `interactive` | operator conversations (`tokens.role === 'conversation'`) | unchanged (nice 0) |
+| `batch` | work, worker, review, test, uat, strike and plan agents | `nice -n <resources.agent_nice> -- …` (default 10) |
+| `lane` | gauntlet lane conversations | `nice -n <resources.lane_nice> -- …` (default 15) |
+
+The class defaults from the role token. `spawnConversationSession` derives
+`lane` from the conversation row's `laneRole` (read with
+`getConversationByTmuxSession`), so a resumed lane keeps its class. win32
+launches are never wrapped; macOS has `nice` and gets it.
+
+**Why `nice` works with Herdr detection.** `nice` execs its command, so the
+pane's foreground process is still the launcher and then the harness, and
+Herdr's agent detection sees the same process it always did. A wrapper that
+forks (a shell function, `systemd-run --scope` without exec) would put itself
+in the foreground and break detection. Herdr types the argv into the pane
+shell unquoted for safe words, so a batch launch reads
+`nice -n 10 -- bash /…/launcher.sh`.
+
+**Unit weights.** The dashboard's transient unit (`systemd-run --user`, in
+`src/cli/commands/restart.ts`) and the supervisor unit
+(`renderSupervisorUnit`, `src/lib/systemd.ts`) set
+`CPUWeight=<resources.dashboard_cpu_weight>` (default 1000). A weight on any
+unit makes systemd enable the `cpu` controller in `app.slice`, so CPU is then
+split between sibling units by weight. The split is work-conserving: an idle
+host still gives every unit all the CPU. Verification-worker scopes
+(`buildVerificationWorkerLaunch`) run at
+`CPUWeight=<resources.verification_cpu_weight>` (default 20); the gates
+inside them also run at `nice -n 19`.
+
+**Not used.** `ionice` has no effect on this host class: NVMe devices use the
+`none` I/O scheduler. `IOWeight=` needs the `io` controller delegated to the
+user manager, which takes a root drop-in on `user@.service`
+(`Delegate=cpu memory pids io`); that is an operator choice, not something
+Overdeck installs. `renderHerdrUnit` stays unweighted: raising the Herdr
+unit's weight would lift every agent with it. Per-agent scopes with their own
+weights are a follow-up.
+
 ## The prompt guard (FR-17)
 
 `src/lib/terminal-backends/prompt-guard.ts`, run by **both** adapters inside `prompt`, and by

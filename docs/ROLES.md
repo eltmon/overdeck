@@ -27,6 +27,10 @@ roles: the server reads them at request time and renders them into a
 conversation's first message. They are never spawned as agents. Changing any
 of them requires a `Prompt-Change:` commit trailer.
 
+`roles/plan-critic.md` is also not a role. `pan plan finalize` reads it and
+puts it at the top of the brief for the plan critic, a read-only `worker`
+(PAN-4341). The same `Prompt-Change:` trailer rule applies.
+
 There is no spawned `ship` role file. Shipping is server-side: the dashboard runs
 `rebaseFeatureBranch()`, computes merge readiness live from PR approvals, green
 checks, and forge mergeability, and the human Merge button performs the final

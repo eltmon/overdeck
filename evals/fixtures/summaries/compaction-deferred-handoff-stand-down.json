@@ -1,0 +1,635 @@
+{
+  "id": "compaction-deferred-handoff-stand-down",
+  "kind": "compaction",
+  "source": "real session excerpt, overdeck PAN-4210, 2026-09, scrubbed; planted facts and decoys edited in",
+  "entries": [
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_0167FxoRNycsupvtMBBd8gLi",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts",
+              "offset": 1,
+              "limit": 110
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_0167FxoRNycsupvtMBBd8gLi",
+            "content": "1\t/**\n2\t * deacon-lite's deferred planning hand-off retry (PAN-4155).\n3\t *\n4\t * A spawn guardrail refused the post-planning work-agent start. The retry\n5\t * re-sends it with no acknowledgement on a backoff read from the pipeline\n6\t * journal, stands down when the operator acted, and gives up after two hours\n7\t * with `planning.failed` and an activity warning.\n8\t */\n9\timport { mkdtempSync, rmSync } from 'node:fs';\n10\timport { tmpdir } from 'node:os';\n11\timport { join } from 'node:path';\n12\t\n13\timport { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';\n14\t\n15\tconst mocks = vi.hoisted(() => ({\n16\t  notifyPipeline: vi.fn(),\n17\t  getInternalToken: vi.fn(() => 'test-internal-token'),\n18\t}));\n19\t\n20\tvi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: mocks.notifyPipeline }));\n21\tvi.mock('../../internal-token.js', async (importOriginal) => ({\n22\t  ...(await importOrigin …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01A5TTrc5e3LKku31XMMTLVq",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts",
+              "offset": 110,
+              "limit": 100
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01A5TTrc5e3LKku31XMMTLVq",
+            "content": "110\t\n111\t    await tick(30);\n112\t    expect(spawn).toHaveBeenCalledTimes(2);\n113\t    expect(appended).toEqual([]);\n114\t  });\n115\t\n116\t  it('resumes the schedule from the journal after a restart', async () => {\n117\t    await tick(2); // first retry at T0+2, refused\n118\t    expect(spawn).toHaveBeenCalledTimes(1);\n119\t\n120\t    // A fresh module instance holds no memory of the earlier pass.\n121\t    vi.resetModules();\n122\t    const restarted = await import('../deferred-handoff.js');\n123\t    await vi.advanceTimersByTimeAsync(3 * MINUTE);\n124\t    await restarted.retryDeferredHandoffs(Date.now(), deps()); // T0+5: not due\n125\t    expect(spawn).toHaveBeenCalledTimes(1);\n126\t    await vi.advanceTimersByTimeAsync(MINUTE);\n127\t    await restarted.retryDeferredHandoffs(Date.now(), deps()); // T0+6: due\n128\t    expect(spawn).toHaveBeenCalledTimes(2);\n129\t  });\n130\t\n131\t  it('gives up after two hours,  …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01EDn9nRtw9KQz5BKHKBtTw9",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts",
+              "offset": 209,
+              "limit": 10
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01EDn9nRtw9KQz5BKHKBtTw9",
+            "content": "209\t  });\n210\t});\n211"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01AqtCS8Nj9K2yE7Rb4My9mx",
+            "name": "Bash",
+            "input": {
+              "command": "pan task claim PAN-4210 stand-down-facts 2>&1 | tail -20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01AqtCS8Nj9K2yE7Rb4My9mx",
+            "content": "stand-down-facts\tin_progress"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's implement the source changes."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_017GNcyMXH6KDennebCAaUZU",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/deferred-handoff.ts",
+              "old_string": "  const work = readAgentState(workAgentId);\n  if (work) {\n    if (work.paused === true) return 'the issue is paused';\n    if (work.status === 'running' || work.status === 'starting') return 'a work agent already exists';\n    if (after(work.startedAt)) return 'the work agent was started after the deferral';\n    if (after(work.stoppedAt)) return 'the work agent was stopped after the deferral';\n  }\n  // A new planning cycle does its own hand-off when it finalizes.\n  const planning = readAgentState(`planning-${issueLower}`);\n  if (planning && (planning.status === 'running' || planning.status === ' …[truncated]",
+              "new_string": "  const work = readAgentState(workAgentId);\n  if (work) {\n    if (work.paused === true) return 'the issue is paused';\n    if (after(work.startedAt)) return 'the work agent was started after the deferral';\n    if (after(work.stoppedAt)) return 'the work agent was stopped after the deferral';\n  }\n  // The status label is a spawn-time snapshot: since PAN-3917 complete-planning's\n  // stop projection writes no state.json, so it never reads anything but\n  // 'running' — only startedAt tells us whether this is a new cycle.\n  const planning = readAgentState(`planning-${issueLower}`);\n  if (planning & …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_017GNcyMXH6KDennebCAaUZU",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/deferred-handoff.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_014S7Tn6h3WjuEtJ2oZyBZQK",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/deferred-handoff.ts",
+              "old_string": "const STAND_DOWN_SKIP_REASONS = new Set(['paused', 'troubled', 'closed-issue']);",
+              "new_string": "const STAND_DOWN_SKIP_REASONS = new Set(['paused', 'troubled', 'closed-issue', 'already-running']);"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_014S7Tn6h3WjuEtJ2oZyBZQK",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/deferred-handoff.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now `work-agent-start.ts`:"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_018AtEhEWvtVSjGWD4m2BKxz",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/work-agent-start.ts",
+              "old_string": "  if (body['troubled'] === true) return 'troubled';\n  if (body['guardrails'] || body['requiresAcknowledgement'] === true || status === 409) return 'guardrails';",
+              "new_string": "  if (body['troubled'] === true) return 'troubled';\n  if (body['code'] === 'AGENT_START_IN_FLIGHT') return 'already-running';\n  if (body['guardrails'] || body['requiresAcknowledgement'] === true || status === 409) return 'guardrails';"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_018AtEhEWvtVSjGWD4m2BKxz",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/work-agent-start.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's add the tests. First, tests (a) and (b) plus new stand-down row (c):"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_013fjVzhem4mzUMmLorW5HtY",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts",
+              "old_string": "  it.each([\n    ['a live work agent', () => liveAgentInventory.mockResolvedValue({ backend: 'herdr', panes: [{ agentId: 'agent-pan-4155' }] })],\n    ['a running work agent the operator started', () => getAgentState.mockImplementation((id: string) => (\n      id === 'agent-pan-4155' ? { id, status: 'running', startedAt: new Date(T0 + MINUTE).toISOString() } : null))],\n    ['a work agent the operator stopped', () => getAgentState.mockImplementation((id: string) => (\n      id === 'agent-pan-4155'\n        ? { id, status: 'stopped', startedAt: new Date(T0 - 60 * MINUTE).toISOString(), stoppedAt: new …[truncated]",
+              "new_string": "  it.each([\n    ['a live work agent', () => liveAgentInventory.mockResolvedValue({ backend: 'herdr', panes: [{ agentId: 'agent-pan-4155' }] })],\n    ['a running work agent the operator started', () => getAgentState.mockImplementation((id: string) => (\n      id === 'agent-pan-4155' ? { id, status: 'running', startedAt: new Date(T0 + MINUTE).toISOString() } : null))],\n    ['a work agent the operator stopped', () => getAgentState.mockImplementation((id: string) => (\n      id === 'agent-pan-4155'\n        ? { id, status: 'stopped', startedAt: new Date(T0 - 60 * MINUTE).toISOString(), stoppedAt: new …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_013fjVzhem4mzUMmLorW5HtY",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now the fetch-stub test for AGENT_START_IN_FLIGHT:"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XLQQSdoQXz9vnvFhMQigqi",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts",
+              "old_string": "    expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.retried', data: { skipReason: 'guardrails' } });\n  });\n});",
+              "new_string": "    expect(handoffEntries().at(-1)).toMatchObject({ type: 'handoff.retried', data: { skipReason: 'guardrails' } });\n  });\n\n  it('stands down when the retried spawn reports the agent already starting or running', async () => {\n    const fetchMock = vi.fn(async () => new Response(JSON.stringify({\n      success: false,\n      error: 'Agent agent-pan-4155 is already starting or running.',\n      code: 'AGENT_START_IN_FLIGHT',\n    }), { status: 409 }));\n    vi.stubGlobal('fetch', fetchMock);\n    const { spawn: _unused, ...withoutSpawn } = deps()!;\n    await vi.advanceTimersByTimeAsync(2 * MINUTE);\n   …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01XLQQSdoQXz9vnvFhMQigqi",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4210/src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's run the tests, plus typecheck and lint on the touched files."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_012Em345dStNKnc4tqH5rqq6",
+            "name": "Bash",
+            "input": {
+              "command": "npx vitest run src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts 2>&1 | tail -100"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_012Em345dStNKnc4tqH5rqq6",
+            "content": "Command did not complete within its 120s timeout and was moved to the background (ID: buqb00id2). Output is being written to: /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4210/8c2b9eb1-7fbc-4baf-b0d9-31b0979e9408/tasks/buqb00id2.output. You will be notified when it completes. To check interim output, use Read on that file path."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01FmN8GWAyJrHaCZrekuTsWL",
+            "name": "Bash",
+            "input": {
+              "command": "find . -path ./node_modules -prune -o -name \"*work-agent-start*\" -print 2>/dev/null"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01FmN8GWAyJrHaCZrekuTsWL",
+            "content": "./src/lib/cloister/work-agent-start.ts"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "No dedicated test file for work-agent-start.ts; its behavior is covered indirectly by the deferred-handoff test via the fetch stub. Let's wait for the vitest run."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Ca4Xz1R2gDm2hWurF9LRMA",
+            "name": "Bash",
+            "input": {
+              "command": "sleep 30; cat /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4210/8c2b9eb1-7fbc-4baf-b0d9-31b0979e9408/tasks/buqb00id2.output 2>&1 | tail -100"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Ca4Xz1R2gDm2hWurF9LRMA",
+            "content": "<tool_use_error>Blocked: sleep 30 followed by: cat /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4210/8c2b9eb1-7fbc-4baf-b0d9-31b0979e9408/tasks/buqb00id2.output tail -100. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_error>"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I'll just wait for the background task notification instead of polling."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_018Vm17dNJKPN1gpAdMhCx3x",
+            "name": "Bash",
+            "input": {
+              "command": "cat /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4210/8c2b9eb1-7fbc-4baf-b0d9-31b0979e9408/tasks/buqb00id2.output 2>&1 | tail -150"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_018Vm17dNJKPN1gpAdMhCx3x",
+            "content": "(Bash completed with no output)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_0157k8jHnxW5apccLva7GBR3",
+            "name": "Bash",
+            "input": {
+              "command": "npx vitest run src/lib/cloister/__tests__/deacon-lite-retry-deferred-handoff.test.ts 2>&1 | tail -150"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_0157k8jHnxW5apccLva7GBR3",
+            "content": "Command did not complete within its 120s timeout and was moved to the background (ID: brdyp4ckx). Output is being written to: /tmp/claude-1000/-home-eltmon-Projects-overdeck-workspaces-feature-pan-4210/8c2b9eb1-7fbc-4baf-b0d9-31b0979e9408/tasks/brdyp4ckx.output. You will be notified when it completes. To check interim output, use Read on that file path."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I'll wait for the notification on this background run rather than poll."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01AzGUaN1bjc8HCavnafYNkL",
+            "name": "Bash",
+            "input": {
+              "command": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01AzGUaN1bjc8HCavnafYNkL",
+            "content": "(Bash completed with no output)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "I considered adding a dedicated work-agent-start.test.ts file but dropped that; the fetch stub in the deferred-handoff test covers it instead. Treating HTTP 409 as a stand-down reason was rejected; a 409 still means guardrails."
+          }
+        ]
+      }
+    }
+  ],
+  "plantedFacts": [
+    {
+      "id": "item",
+      "anyOf": [
+        [
+          "stand-down-facts"
+        ]
+      ]
+    },
+    {
+      "id": "skip-reason",
+      "anyOf": [
+        [
+          "already-running"
+        ]
+      ]
+    },
+    {
+      "id": "start-file",
+      "anyOf": [
+        [
+          "work-agent-start"
+        ]
+      ]
+    },
+    {
+      "id": "test-file",
+      "anyOf": [
+        [
+          "deacon-lite-retry-deferred-handoff"
+        ],
+        [
+          "deferred-handoff test"
+        ]
+      ]
+    },
+    {
+      "id": "in-flight",
+      "anyOf": [
+        [
+          "AGENT_START_IN_FLIGHT"
+        ]
+      ]
+    },
+    {
+      "id": "guardrails-409",
+      "anyOf": [
+        [
+          "409",
+          "guardrails"
+        ]
+      ]
+    }
+  ],
+  "decoys": [
+    {
+      "id": "dedicated-test",
+      "anchor": "dedicated work-agent-start.test.ts"
+    },
+    {
+      "id": "409-stand-down",
+      "anchor": "409 as a stand-down reason"
+    }
+  ]
+}

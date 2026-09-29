@@ -1,0 +1,10 @@
+{
+  "id": "pan-4200",
+  "issueId": "PAN-4200",
+  "issueState": "CLOSED",
+  "title": "deps(desktop): electron-builder 26 + @electron/notarize 3 to clear the critical tar advisory",
+  "url": "https://github.com/eltmon/overdeck/issues/4200",
+  "body": "**Source:** the dependency triage from 2026-09-25 (major upgrades).\n\n`bun audit` reports one critical advisory, in `tar`. The vulnerable copies are 6.2.1, pulled in by `electron-builder` 25, and no patched 6.x release exists. So the only fix is `electron-builder` 25 → 26, together with `@electron/notarize` 3. This also fixes the high-severity AppImage advisory, and we ship an AppImage.\n\n## Work\n1. Bump `electron-builder` to 26.x and `@electron/notarize` to 3.x in `apps/desktop`.\n2. `notarize.cjs` loads notarize 3, which is ESM-only. Confirm Node 22 can load it; if not, rename the hook to `.mjs` and update the builder config.\n3. Confirm the mac config still accepts `\"notarize\": false`.\n4. Also move the exact `electron` pin from 40.6.0 to 40.10.6. That clears every Electron advisory listed for 40.x. `bun update` doesn't move exact pins.\n5. Verify: `bun audit` shows no critical; the desktop packaging build still produces the Linux AppImage/tarball (see the desktop packaging invariants: the ABI-143 rebuild and the hardlink-free tarball).\n\n## Acceptance\n- `bun audit` reports 0 critical.\n- The desktop build succeeds on Linux, and the packaged app starts.\n- The PR notes any change to the notarize hook.\n",
+  "prdPath": ".pan/drafts/pan-4200.md",
+  "referenceSpecPath": ".pan/specs/2026-09-25-PAN-4200-deps-desktop-electron-builder-26-electron-notarize-3-to-clear-the-critical-tar-advisory.xbrief.json"
+}

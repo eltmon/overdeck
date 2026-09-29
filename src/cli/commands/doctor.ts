@@ -30,6 +30,7 @@ import { checkInotify } from './doctor-inotify.js';
 import { checkProjectTrackerConfig } from './doctor-project-config.js';
 import { checkHerdr } from './doctor-herdr.js';
 import { checkPrimeAgent } from './doctor-prime-agent.js';
+import { checkClaudeCode } from './doctor-claude-code.js';
 import { checkCoreCommands, checkFirstRunLogins } from './doctor-first-run.js';
 import { checkClaudeLogin, checkGhLogin } from '../../lib/first-run-checks.js';
 import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
@@ -761,11 +762,12 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   for (const c of checkOhmypi(options.strict ?? false)) checks.push(c);
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
-  for (const c of checkCodex()) checks.push(c);
+  for (const c of [...checkCodex(), ...await (await import('./doctor-codex-models.js')).checkCodexModelFloors()]) checks.push(c);
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
   for (const c of await checkPrimeAgent()) checks.push(c); // PAN-3668: version pin + orphaned daemons
+  for (const c of await checkClaudeCode()) checks.push(c); // PAN-4359: version vs model minimums + shadows
 
   // Ollama (PAN-1641): silent unless a local model is configured or installed.
   for (const c of await checkOllama({ config: loadYamlConfig().config })) checks.push(c);

@@ -1,0 +1,215 @@
+{
+  "version": "1",
+  "issueId": "PAN-4341",
+  "created": "2026-09-29T04:22:08.600Z",
+  "updated": "2026-09-29T05:34:05.928Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "plan-digest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T04:22:08.600Z",
+      "doneAt": "2026-09-29T04:23:28.369Z"
+    },
+    "critique-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T04:23:34.681Z",
+      "doneAt": "2026-09-29T04:25:14.198Z"
+    },
+    "critic-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T04:25:15.580Z",
+      "doneAt": "2026-09-29T04:26:50.128Z"
+    },
+    "critique-io": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T04:26:51.237Z",
+      "doneAt": "2026-09-29T04:42:06.632Z"
+    },
+    "critic-role-prompt": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T04:42:07.895Z",
+      "doneAt": "2026-09-29T04:42:30.960Z"
+    },
+    "critic-dispatch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T04:42:32.187Z",
+      "doneAt": "2026-09-29T04:46:14.341Z"
+    },
+    "finalize-cli-critic": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T04:46:15.894Z",
+      "doneAt": "2026-09-29T05:01:57.834Z"
+    },
+    "server-critique-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T05:01:58.825Z",
+      "doneAt": "2026-09-29T05:11:00.690Z"
+    },
+    "docs-critic-lifecycle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4341",
+      "claimedAt": "2026-09-29T05:11:01.547Z",
+      "doneAt": "2026-09-29T05:13:16.576Z"
+    },
+    "plan-digest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:11.565Z"
+    },
+    "plan-digest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:24.566Z"
+    },
+    "plan-digest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:37.320Z"
+    },
+    "critique-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:26:49.377Z"
+    },
+    "critique-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:01.155Z"
+    },
+    "critique-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:12.844Z"
+    },
+    "critique-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:24.467Z"
+    },
+    "critique-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:36.575Z"
+    },
+    "critic-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:27:48.529Z"
+    },
+    "critic-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:00.116Z"
+    },
+    "critic-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:12.096Z"
+    },
+    "critic-model.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:24.448Z"
+    },
+    "critique-io.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:37.237Z"
+    },
+    "critique-io.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:28:49.815Z"
+    },
+    "critique-io.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:03.824Z"
+    },
+    "critique-io.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:17.275Z"
+    },
+    "critic-role-prompt.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:29.773Z"
+    },
+    "critic-role-prompt.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:42.019Z"
+    },
+    "critic-role-prompt.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:29:54.845Z"
+    },
+    "critic-dispatch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:08.633Z"
+    },
+    "critic-dispatch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:23.622Z"
+    },
+    "critic-dispatch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:36.525Z"
+    },
+    "critic-dispatch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:30:48.817Z"
+    },
+    "critic-dispatch.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:01.636Z"
+    },
+    "finalize-cli-critic.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:17.240Z"
+    },
+    "finalize-cli-critic.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:32.581Z"
+    },
+    "finalize-cli-critic.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:31:48.004Z"
+    },
+    "finalize-cli-critic.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:32:03.075Z"
+    },
+    "finalize-cli-critic.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:32:17.580Z"
+    },
+    "server-critique-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:32:32.261Z"
+    },
+    "server-critique-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:32:46.510Z"
+    },
+    "server-critique-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:33:00.406Z"
+    },
+    "server-critique-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:33:13.682Z"
+    },
+    "server-critique-gate.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:33:26.942Z"
+    },
+    "docs-critic-lifecycle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:33:40.077Z"
+    },
+    "docs-critic-lifecycle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:33:52.936Z"
+    },
+    "docs-critic-lifecycle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:34:05.928Z"
+    }
+  }
+}

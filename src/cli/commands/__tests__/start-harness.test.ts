@@ -11,6 +11,10 @@ const agentMocks = vi.hoisted(() => ({
   getProviderAuthMode: vi.fn(async () => 'subscription'),
 }))
 
+const codexPolicyMocks = vi.hoisted(() => ({
+  resolveCodexPolicyContext: vi.fn(async () => ({})),
+}))
+
 vi.mock('readline/promises', () => ({
   createInterface: vi.fn(() => ({
     question: readlineMocks.question,
@@ -39,6 +43,10 @@ vi.mock('../../../lib/harness-policy.js', async () => {
   return actual
 })
 
+vi.mock('../../../lib/codex/policy-context.js', () => ({
+  resolveCodexPolicyContext: codexPolicyMocks.resolveCodexPolicyContext,
+}))
+
 describe('pan start --harness flag (PAN-636)', () => {
   let exitSpy: ReturnType<typeof vi.spyOn>
   let stderrSpy: ReturnType<typeof vi.spyOn>
@@ -52,6 +60,8 @@ describe('pan start --harness flag (PAN-636)', () => {
     agentMocks.clearAgentPaused.mockReset()
     agentMocks.getProviderAuthMode.mockClear()
     agentMocks.getProviderAuthMode.mockResolvedValue('subscription')
+    codexPolicyMocks.resolveCodexPolicyContext.mockReset()
+    codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({})
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
       throw new Error(`__exit__:${code}`)
     }) as never)
@@ -112,6 +122,28 @@ describe('pan start --harness flag (PAN-636)', () => {
     ).resolves.toBe('prime-agent')
     expect(exitSpy).not.toHaveBeenCalled()
     expect(stderrSpy).not.toHaveBeenCalled()
+  })
+
+  it('refuses a below-floor GPT-6 model on --harness codex before any spawn work (PAN-4363)', async () => {
+    codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({ codexCliVersion: '0.153.4' })
+    const { __testInternals } = await import('../start.js')
+    const { spawnAgent } = await import('../../../lib/agents.js')
+    await expect(
+      __testInternals.resolveExplicitHarnessFlag('codex', 'gpt-6-luna'),
+    ).rejects.toThrow(/__exit__:1/)
+    const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')
+    expect(written).toContain('0.156.1')
+    expect(written).toContain('npm install -g @openai/codex')
+    expect(spawnAgent).not.toHaveBeenCalled()
+  })
+
+  it('accepts --harness codex for a GPT-6 model at or above the floor (PAN-4363)', async () => {
+    codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({ codexCliVersion: '0.158.0' })
+    const { __testInternals } = await import('../start.js')
+    await expect(
+      __testInternals.resolveExplicitHarnessFlag('codex', 'gpt-6-luna'),
+    ).resolves.toBe('codex')
+    expect(exitSpy).not.toHaveBeenCalled()
   })
 
   it('rejects --harness pi (invalid value) with non-zero exit and reason on stderr', async () => {

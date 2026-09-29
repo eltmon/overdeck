@@ -18,6 +18,8 @@ const testState = vi.hoisted(() => ({
   // disk at specPath, 'phantom' reports success without a file, 'fail' throws.
   specWrite: 'write' as 'write' | 'phantom' | 'fail',
   specPath: '',
+  // PAN-4341: the plan critique gate's verdict; null passes as not-required.
+  critiqueRefusal: null as null | string,
 }));
 
 vi.mock('../../../dashboard/server/routes/agents.js', () => ({
@@ -62,6 +64,11 @@ vi.mock('../../pan-dir/index.js', () => ({
       return { path, filename: '2026-08-01-PAN-3230-test.xbrief.json' };
     });
   },
+}));
+vi.mock('../../planning/plan-critique-io.js', () => ({
+  applyCritiqueGateForPromotion: vi.fn(async () => (testState.critiqueRefusal
+    ? { ok: false, message: testState.critiqueRefusal, result: { ok: false, kind: 'missing', nextRound: 1, reason: testState.critiqueRefusal } }
+    : { ok: true, result: { ok: true, kind: 'not-required' } })),
 }));
 vi.mock('../../planning/spawn-planning-session.js', () => ({
   resolveAutoSpawnOnFinalize: async (requested: unknown) => requested === true,
@@ -177,6 +184,7 @@ beforeEach(() => {
   testState.prdGateOk = true;
   testState.specWrite = 'write';
   testState.specPath = '';
+  testState.critiqueRefusal = null;
 });
 
 afterEach(() => {
@@ -239,6 +247,21 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
     const response = await completePlanningForIssue(deps);
 
     expect(response.status).toBe(422);
+    expect(saveAgentStateAndEmitEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 before writing the spec when the plan critique gate refuses (PAN-4341)', async () => {
+    createWorkspace();
+    testState.critiqueRefusal = 'no critique for round 1; pan plan finalize dispatches the critic';
+    const deps = serviceDependencies();
+
+    const response = await completePlanningForIssue(deps);
+
+    expect(response.status).toBe(422);
+    const payload = responseJson(response);
+    expect(String(payload.error)).toMatch(/^Plan critique gate: /);
+    expect(payload.critiqueGate).toMatchObject({ kind: 'missing' });
+    expect(existsSync(testState.specPath)).toBe(false);
     expect(saveAgentStateAndEmitEvent).not.toHaveBeenCalled();
   });
 

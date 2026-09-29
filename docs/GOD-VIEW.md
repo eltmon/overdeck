@@ -29,7 +29,12 @@ and status grounded in dashboard state.
   population change, glinting each orb the scan touched; a released orb thaws
   back into the river; an operator-only release fires a slow-rising signal
   flare. The 🧹 PARKED top-bar stat is the true census, and VEL/h shows real
-  stage-transition rate.
+  stage-transition rate. An `idle-running` orb's parked row may carry a Jev
+  turn-end reading — `details.turnEnd` and a "last message reads as: …"
+  clause — when `jevTurnEndAssessment` is on (PAN-4371) — advisory only, it never selects or
+  triggers a sweeper action. `runStallSweeperPatrol` currently has no
+  scheduler caller (PAN-3917 W4), so this sweeper sentence only appears when
+  the sweeper is run by hand.
 - **The Flywheel sun and sequencer** show orchestration activity. The
   conversation constellation above the river shows the live conversation
   count.

@@ -3,12 +3,14 @@ import type { AuthMode, SubscriptionPlan } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelId } from '../model-capabilities.js';
+import { mergeCpuResources } from './merge-cpu.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { isTerminalBackendName } from '@overdeck/contracts';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { normalizeOllamaConfig } from './ollama.js';
+import { normalizeJevConfig } from './jev.js';
 import { normalizeGovernorReserves } from './governor-reserves.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
 import {
@@ -165,6 +167,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ...DEFAULT_CONFIG.terminal,
     },
     ollama: { ...DEFAULT_CONFIG.ollama },
+    jev: { ...DEFAULT_CONFIG.jev },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
@@ -249,6 +252,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorPsiCalmWindowMs: DEFAULT_CONFIG.resources.governorPsiCalmWindowMs,
       governorCpuSoftLoadPerCore: DEFAULT_CONFIG.resources.governorCpuSoftLoadPerCore,
       governorCpuRecoveryLoadPerCore: DEFAULT_CONFIG.resources.governorCpuRecoveryLoadPerCore,
+      dashboardCpuWeight: DEFAULT_CONFIG.resources.dashboardCpuWeight,
+      verificationCpuWeight: DEFAULT_CONFIG.resources.verificationCpuWeight,
+      agentNice: DEFAULT_CONFIG.resources.agentNice,
+      laneNice: DEFAULT_CONFIG.resources.laneNice,
+      governorCpuPsiHoldAvg60: DEFAULT_CONFIG.resources.governorCpuPsiHoldAvg60,
+      governorCpuPsiRecoveryAvg60: DEFAULT_CONFIG.resources.governorCpuPsiRecoveryAvg60,
+      governorCpuHoldDispatch: DEFAULT_CONFIG.resources.governorCpuHoldDispatch,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -466,6 +476,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // highest-precedence layer lands last. Unlike terminal.backend, a bad value throws:
     // a non-localhost base_url would ship every local-agent prompt off the machine.
     result.ollama = normalizeOllamaConfig(config.ollama, result.ollama);
+    // Optional Jev judgment client (PAN-4369): folds like ollama, throws on bad values.
+    result.jev = normalizeJevConfig(config.jev, result.jev);
 
     // Merge conversation configuration
     if (config.conversations?.compaction_model) {
@@ -613,6 +625,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (config.api_keys.voyage) {
         result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
+      }
+      // TypeSafe is not a model provider, so no enabledProviders entry (PAN-4369).
+      if (config.api_keys.typesafe) {
+        result.apiKeys.typesafe = resolveEnvVar(config.api_keys.typesafe);
       }
       if (config.api_keys.google) {
         result.apiKeys.google = resolveEnvVar(config.api_keys.google);
@@ -825,6 +841,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ) {
         result.resources.governorCpuRecoveryLoadPerCore = config.resources.governor_cpu_recovery_load_per_core;
       }
+      mergeCpuResources(config.resources, result.resources, DEFAULT_CONFIG.resources); // PAN-4311
       // PAN-4267: normalize hard/soft/watch/recovery ordering and cap all four
       // against this host's RAM in one place — see governor-reserves.ts.
       const normalizedGovernorReserves = normalizeGovernorReserves(

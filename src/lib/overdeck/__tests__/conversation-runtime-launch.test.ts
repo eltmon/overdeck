@@ -164,6 +164,16 @@ describe('spawnConversationSession through the launch door (PAN-3921)', () => {
     expect(setOption).not.toHaveBeenCalled();
   });
 
+  it('gives an operator conversation a count-only gh shim (PAN-4343)', async () => {
+    await spawn('conv-x', fakeBackend('herdr').backend);
+    expect(launcherConfigs[0]!['ghShim']).toEqual({ id: 'conv-x', denyGrantLabels: false });
+  });
+
+  it('gives the Flywheel conversation the grant-label deny (PAN-4343)', async () => {
+    await spawn('conv-flywheel', fakeBackend('herdr').backend);
+    expect(launcherConfigs[0]!['ghShim']).toEqual({ id: 'conv-flywheel', denyGrantLabels: true });
+  });
+
   it('keeps the PTY supervisor and both tmux session options for claude-code on tmux', async () => {
     const { backend, starts } = fakeBackend('tmux');
     await spawn('conv-x', backend);
@@ -191,6 +201,27 @@ describe('spawnConversationSession through the launch door (PAN-3921)', () => {
 
     await spawn('conv-r', backend, { issueId: 'PAN-1' });
     expect(starts.map((start) => start.tokens.role)).toEqual(['review', 'review']);
+  });
+
+  it('launches a gauntlet lane row under the lane nice level (PAN-4311)', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'lane-root', tmuxSession: 'conv-lane-root', cwd: overdeckHome, workspaceId: null });
+    createConversation({
+      name: 'lane-b1',
+      tmuxSession: 'conv-lane-b1',
+      cwd: overdeckHome,
+      workspaceId: null,
+      parentName: 'lane-root',
+      lane: { run: 'alpha', key: 'b1', role: 'builder' },
+    });
+    const { backend, starts } = fakeBackend('herdr');
+
+    await spawn('conv-lane-b1', backend);
+    await spawn('conv-lane-root', backend);
+
+    const launcher = (name: string) => join(overdeckHome, 'conversations', name, 'launcher.sh');
+    expect(starts[0]!.argv).toEqual(['nice', '-n', '15', '--', 'bash', launcher('conv-lane-b1')]);
+    expect(starts[1]!.argv).toEqual(['bash', launcher('conv-lane-root')]);
   });
 
   it('passes the conversation role through the prompt guard unchanged', () => {

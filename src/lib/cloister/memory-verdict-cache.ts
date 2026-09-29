@@ -18,13 +18,18 @@ export interface MemoryPressureThresholds {
   criticalBytes: number;
 }
 
-export type GovernorTriggerKind = 'soft-dip' | 'hard' | 'swap-psi' | 'psi-unavailable' | 'mac-pressure-critical';
+export type GovernorTriggerKind = 'soft-dip' | 'hard' | 'swap-psi' | 'psi-unavailable' | 'mac-pressure-critical' | 'cpu';
 
 export interface GovernorTrigger {
   kind: GovernorTriggerKind;
+  /** 0 for a `cpu` trigger (PAN-4311 D5). */
   readingBytes: number;
   thresholdBytes: number;
   at: number;
+  /** PAN-4311: set on a `cpu` trigger — which CPU signal crossed which threshold. */
+  cpuSignal?: 'psi-some-avg60' | 'load-per-core';
+  cpuReading?: number;
+  cpuThreshold?: number;
 }
 
 export interface MemoryVerdict {
@@ -36,6 +41,9 @@ export interface MemoryVerdict {
   psiSomeAvg10?: number | null;
   psiFullAvg10?: number | null;
   loadPerCore?: number | null;
+  /** PAN-4311: CPU PSI `some` averages, percent; null when unavailable. */
+  psiCpuSomeAvg10?: number | null;
+  psiCpuSomeAvg60?: number | null;
   trigger?: GovernorTrigger | null;
   /** PAN-4267: macOS's own kernel pressure level, null on Linux. */
   macPressureLevel?: 'normal' | 'warn' | 'critical' | null;

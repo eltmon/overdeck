@@ -96,6 +96,7 @@ import {
   withAutoSpawnConsentClaim,
   type AcceptAutoSpawnConsent,
 } from '../planning/auto-spawn-consent.js';
+import { assertSpawnAdmittedForCpu } from './cpu-dispatch-hold.js';
 import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
@@ -198,7 +199,7 @@ async function spawnRunWithoutConsentClaim(
   });
   const harnessBehavior = getHarnessBehavior(resolvedHarness);
   const isAcp = harnessBehavior.launchCommandKind === 'acp-host';
-  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
+  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness, { model: selectedModel });
   // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
@@ -610,6 +611,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   if (role !== 'work') return spawnAgentWithoutConsentClaim(options);
 
   const startedBy = resolveAgentStartedBy(options.startedBy);
+  await assertSpawnAdmittedForCpu(startedBy); // PAN-4311: opt-in, Flywheel spawns only
   const resolvedOptions = { ...options, startedBy };
   if (isOperatorStartedBy(startedBy) || options.autoSpawnConsentRequired !== true) {
     return spawnAgentWithoutConsentClaim(resolvedOptions);
@@ -683,7 +685,7 @@ async function spawnAgentWithoutConsentClaim(
     model: selectedModel,
   });
   const promptHostTransport = hostTransportFor(resolvedHarness);
-  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
+  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness, { model: selectedModel });
   // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);

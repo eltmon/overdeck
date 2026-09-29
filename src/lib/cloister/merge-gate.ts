@@ -20,6 +20,7 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { issueHoldsForUat } from './auto-merge-eligibility.js';
 import {
   evaluateMergeReadiness,
+  forgeApprovalAtHead,
   getPrFacts,
   type MergeReadiness,
   type PrFacts,
@@ -117,4 +118,68 @@ export async function evaluateIssueMergeGate(
     ...evaluateMergeReadiness(facts, { ciTestsRequired, uatRequired, requireApprovalAtHead: true }),
     facts,
   };
+}
+
+export interface ConflictRepairGateResult {
+  /** True when the PR is merge-ready in every respect except `mergeable: false`. */
+  conflicting: boolean;
+  reason?: string;
+  facts: PrFacts;
+}
+
+/**
+ * PAN-4384: is this PR merge-ready except for a conflict with its base? The
+ * same policy as evaluateIssueMergeGate, judged as if the forge said
+ * `mergeable`. Approval must stand at the head: a marker, else a GitHub review
+ * of the head read directly (withForgeApprovalAtHead skips unmergeable PRs).
+ */
+export async function evaluateConflictRepairGate(
+  issueId: string,
+  deps: MergeGateDeps = {},
+): Promise<ConflictRepairGateResult> {
+  const facts = deps.getFacts ? await deps.getFacts(issueId) : await getPrFacts(issueId);
+  if (facts.error || !facts.open || facts.mergeable !== false) {
+    return { conflicting: false, reason: facts.error ?? 'PR is not conflicting', facts };
+  }
+  if (facts.draft || facts.changesRequested || facts.checks !== 'green') {
+    return { conflicting: false, reason: 'PR is not otherwise merge-ready', facts };
+  }
+  let approvedAtHead = facts.approvedAtHead === true;
+  if (!approvedAtHead && facts.forge === 'github') {
+    approvedAtHead = (await forgeApprovalAtHead(facts, deps.readReviews, deps.overdeckLogins)) === true;
+  }
+  const asMergeable: PrFacts = { ...facts, mergeable: true, ...(approvedAtHead ? { approvedAtHead: true } : {}) };
+  const ciTestsRequired = facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId);
+  let uatRequired = false;
+  if (facts.uatVerdict?.status === 'failed') {
+    try {
+      uatRequired = await (deps.uatRequired ?? defaultUatRequired)(issueId);
+    } catch {
+      uatRequired = true;
+    }
+  }
+  const readiness = evaluateMergeReadiness(asMergeable, { ciTestsRequired, uatRequired, requireApprovalAtHead: true });
+  return readiness.ready ? { conflicting: true, facts } : { conflicting: false, reason: readiness.reason, facts };
+}
+
+/**
+ * PAN-4384: does the PR's approval stand at its current head? `true` when a
+ * marker or a GitHub review names the head, `false` when the forge proves it
+ * does not (the head moved since the approving review), `undefined` when it
+ * cannot tell (lookup failed, GitLab, no PR).
+ *
+ * The facts are read fresh: a branch read is neither served from nor stored
+ * in the PR-facts or PR-tab caches, and a cached pre-push head would answer
+ * for the old head right after the agent pushed a new one.
+ */
+export async function readApprovalStandsAtHead(
+  issueId: string,
+  deps: Pick<MergeGateDeps, 'getFacts' | 'readReviews' | 'overdeckLogins'> = {},
+): Promise<boolean | undefined> {
+  const fresh: PrFactsOptions = { preferBranch: `feature/${issueId.toLowerCase()}` };
+  const facts = deps.getFacts ? await deps.getFacts(issueId, fresh) : await getPrFacts(issueId, {}, fresh);
+  if (facts.error || !facts.open) return undefined;
+  if (facts.approvedAtHead === true) return true;
+  if (facts.forge !== 'github') return undefined;
+  return forgeApprovalAtHead(facts, deps.readReviews, deps.overdeckLogins);
 }
