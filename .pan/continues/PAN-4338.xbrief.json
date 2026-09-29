@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4338",
   "created": "2026-09-29T02:00:20.609Z",
-  "updated": "2026-09-29T02:36:47.720Z",
+  "updated": "2026-09-29T02:36:59.014Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "primary-checkout-resolver.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T02:36:47.719Z"
+    },
+    "cwd-containment-collapse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:36:59.014Z"
     }
   }
 }
