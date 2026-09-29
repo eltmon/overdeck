@@ -3,7 +3,9 @@
 #
 # pack     builds the subject tarball exactly as release.yml publishes it
 # fixture  saves a Claude Code conversation with uncommitted code into a vault, on Linux
-# windows  continues it natively on windows-2022, under pwsh and under Git Bash
+# windows  continues it natively on windows-2022, under pwsh and under Git Bash;
+#          a third, diagnostic leg reruns pwsh with core.autocrlf=false to see what
+#          breaks behind the autocrlf blocker at step 3a (it rates nothing itself)
 # wsl      continues it inside Ubuntu-24.04 on WSL2 (WSL1 fallback, PRD CP-3)
 # summary  turns the results into one table (job summary + artifact)
 #
@@ -91,11 +93,11 @@ jobs:
   windows:
     needs: [pack, fixture]
     runs-on: windows-2022
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
-        shell: [pwsh, gitbash]
+        shell: [pwsh, gitbash, pwsh-autocrlf-false]
     steps:
       - uses: actions/checkout@v4
 
@@ -123,6 +125,15 @@ jobs:
         run: |
           $tgz = (Get-ChildItem "$env:RUNNER_TEMP\subject\*.tgz").FullName
           pwsh -NoProfile -File scripts/windows-smoke/probe.ps1 -Env windows-pwsh -Subject $tgz -Fixture "$env:RUNNER_TEMP\fixture" -Out results/windows-pwsh.json
+
+      - name: Probe (pwsh, core.autocrlf=false; diagnostic)
+        if: matrix.shell == 'pwsh-autocrlf-false'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          $tgz = (Get-ChildItem "$env:RUNNER_TEMP\subject\*.tgz").FullName
+          pwsh -NoProfile -File scripts/windows-smoke/probe.ps1 -Env windows-pwsh-autocrlf-false -Subject $tgz -Fixture "$env:RUNNER_TEMP\fixture" -Out results/windows-pwsh-autocrlf-false.json
 
       # Git Bash exports HOME=/c/Users/<user>; pass it on explicitly (PRD CP-4).
       - name: Probe (Git Bash)
