@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4331",
   "created": "2026-09-29T14:06:28.843Z",
-  "updated": "2026-09-29T14:06:28.843Z",
+  "updated": "2026-09-29T14:34:28.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "fixture-script": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4331",
-      "claimedAt": "2026-09-29T14:06:28.843Z"
+      "claimedAt": "2026-09-29T14:06:28.843Z",
+      "doneAt": "2026-09-29T14:34:28.897Z"
     }
   }
 }
