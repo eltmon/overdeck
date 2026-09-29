@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T23:38:38.175Z",
+  "updated": "2026-09-29T23:38:50.089Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "deft-skill-map.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T23:38:38.175Z"
+    },
+    "deft-skill-map.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T23:38:50.088Z"
     }
   }
 }
