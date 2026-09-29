@@ -33,14 +33,69 @@ Evals that call a model live under `npm run eval`. They read the model from `OVE
 [`evals/lib/prompt-harness.ts`](./lib/prompt-harness.ts) exports helpers used by the live-model evals:
 
 - `loadPromptFile(relPath)` — reads a prompt file resolved from the repo root.
-- `runPromptScenario(opts)` — calls the Anthropic Messages API using the model in `OVERDECK_EVAL_MODEL`; rejects before any network call if the variable is unset.
+- `runPromptScenario(opts)` — resolves the model named by `OVERDECK_EVAL_MODEL` through the model catalog, dispatches to Anthropic (streamed Messages API) or OpenAI (Responses API), and returns `{ text, run }`. Rejects before any network call if the variable is unset, the model is unknown or deprecated, or the provider is unsupported.
 - `extractJsonArray(text)` — leniently extracts the first top-level JSON array from a model response, including through ` ```json ` fences.
+- [`evals/lib/eval-model.ts`](./lib/eval-model.ts) — `resolveEvalModelConfig(env, opts)`, the pure resolver that turns `OVERDECK_EVAL_MODEL`/`OVERDECK_EVAL_EFFORT`/`OVERDECK_EVAL_OPENAI_VIA` into a complete, provider-neutral request config.
+- [`evals/lib/eval-usage.ts`](./lib/eval-usage.ts) — normalizes Anthropic and OpenAI usage objects into a shared `EvalUsage` shape and prices them via `src/lib/cost.ts`.
+- [`evals/lib/openai-responses.ts`](./lib/openai-responses.ts) — the OpenAI Responses API call, routed to the direct API or the local CLIProxy sidecar.
 
 There is no hardcoded model fallback. Set the eval model explicitly:
 
 ```bash
 OVERDECK_EVAL_MODEL=claude-haiku-4-5-20251001 npm run eval
 ```
+
+### Supported providers and models
+
+The harness supports Anthropic and OpenAI models only. The model id in `OVERDECK_EVAL_MODEL` must have a row in `MODEL_CAPABILITIES` (`src/lib/model-capabilities.ts`, `src/lib/model-capability-additions.ts`); a dated snapshot suffix such as `claude-haiku-4-5-20251001` is accepted when its undated base (`claude-haiku-4-5`) has a row. A deprecated id (`src/lib/model-deprecations.ts`) rejects, naming its replacement. An unknown id rejects before any request is sent.
+
+### Environment variables
+
+| Variable | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `OVERDECK_EVAL_MODEL` | Yes | none | No hardcoded fallback; the harness rejects if unset or blank. |
+| `OVERDECK_EVAL_EFFORT` | No | `high` (`DEFAULT_EFFORT`) | Must be one of `EFFORT_LEVELS` and, when the model enumerates `effortLevels`, one of that model's allowed levels. Must stay unset for a model with no `effortLevels` (e.g. Haiku 4.5) — setting it there rejects. |
+| `OVERDECK_EVAL_OPENAI_VIA` | No | `api` | `api` calls `https://api.openai.com` with `OPENAI_API_KEY`; `cliproxy` calls the local CLIProxy sidecar instead. Any other value rejects. |
+| `OPENAI_API_KEY` | Only for OpenAI models on route `api` | none | Required before any OpenAI request on the default route. |
+| `ANTHROPIC_API_KEY` | Only for Anthropic models | none | Resolved by the Anthropic SDK's own credential lookup. |
+
+The harness always sends effort explicitly, because Opus 5.5's API default effort is `medium` — one level below Overdeck's `high` launch effort. Without an explicit value, a live run would not be evaluating Opus 5.5 at the effort Overdeck actually launches it at.
+
+### Request shape per model
+
+- An effort-capable Anthropic model (its catalog row has a non-empty `effortLevels`) gets `thinking: { type: 'adaptive' }` and `output_config: { effort }`. A model with no `effortLevels` gets neither field.
+- `temperature: 0` is sent only when the model is not getting adaptive thinking **and** its catalog row does not set `supportsSamplingParams: false`. Models that reject sampling parameters (Sonnet 5.5, Opus 5, Opus 5.5, Fable) never receive `temperature`, and neither does any model once adaptive thinking is on (the API rejects non-default temperature alongside thinking).
+- `max_tokens` (Anthropic) / `max_output_tokens` (OpenAI) is the catalog row's `maxOutputTokens`, or `EVAL_DEFAULT_MAX_OUTPUT_TOKENS` (16,000) when the row has none, capped by the caller's `opts.maxTokens` when given.
+- The Anthropic call always streams (`client.messages.stream(params).finalMessage()`) — the installed SDK requires streaming once `max_tokens` is large enough to make a non-streaming call risk exceeding the 10-minute request timeout.
+- The OpenAI call is `POST <base>/v1/responses` with `instructions` (the system prompt), one `input` message, `max_output_tokens`, `reasoning: { effort }` when effort is not null, and no `temperature`.
+
+### Run info and cost
+
+Every `runPromptScenario` call returns `{ text, run }`. `run` carries: `model`, `provider`, `effort`, `thinking`, `temperature`, `maxTokens`, `openaiVia`, `usage` (`inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `reasoningTokens`), `costUsd`, `costBasis`, `stopReason`, and `durationMs`. Both live evals (`flywheel-launch.eval.ts`, `review-synthesis.eval.ts`) put `run` into their Evalite task output, so every stored result shows the model, provider, effort, tokens, and cost.
+
+`costBasis` is `'api-equivalent'` when the call went through CLIProxy on a subscription (the number shows what the same tokens would have cost on the API) and `'api'` otherwise. `costUsd` is `null` when `src/lib/cost.ts` has no pricing row for the model.
+
+### Expected cost per eval run
+
+Estimates below assume the flywheel system prompt (≈16 KB ≈ 4K tokens per call × 4 calls) and the review system prompt (≈13 KB ≈ 3.3K tokens × 1 call), an 8K output-token ceiling per call at `high` effort, and `DEFAULT_PRICING` rates from `src/lib/cost.ts`:
+
+| Model | flywheel-launch (4 calls) | review-synthesis (1 call) |
+| --- | --- | --- |
+| `claude-opus-5-5` | ≤ $0.72 | ≤ $0.18 |
+| `claude-sonnet-5-5` | ≤ $0.36 | ≤ $0.09 |
+| `gpt-6-sol` | ≤ $0.36 | ≤ $0.09 |
+| `claude-haiku-4-5` | ≤ $0.18 | ≤ $0.05 |
+| `gpt-6-luna` | ≤ $0.02 | < $0.01 |
+
+Measured values from the first live runs are listed below; replace the estimates when a model is measured.
+
+- `gpt-6-luna` (via `cliproxy`): pending operator run.
+- `claude-sonnet-5-5`: pending operator run — `OVERDECK_EVAL_MODEL=claude-sonnet-5-5 npm run eval` (needs an `ANTHROPIC_API_KEY` credential not present in the reference agent environment).
+
+### Known limits
+
+- `gpt-6-sol` is not served by the local CLIProxy sidecar (`{"error":{"message":"unknown provider for model gpt-6-sol","code":"model_not_found"}}`); evaluate it with `OPENAI_API_KEY` on the default `api` route instead.
+- `xhigh`/`max` effort on OpenAI models was verified only through CLIProxy, not against `api.openai.com` directly.
 
 ### CI prompt gate
 
@@ -64,4 +119,4 @@ Keep datasets small until baseline storage and CI policy exist. Do not commit AP
 
 ## Caveats
 
-The current suite is offline and deterministic. Live model evals should read credentials from the existing Overdeck/provider environment and should document expected cost before being added. CI wiring is intentionally deferred until the team decides which evals are cheap and stable enough to gate by default.
+Live model evals should read credentials from the existing Overdeck/provider environment; see "Expected cost per eval run" above before running one. CI wiring is intentionally deferred until the team decides which evals are cheap and stable enough to gate by default.
