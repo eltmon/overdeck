@@ -126,6 +126,7 @@ describe('settle with WIP capture', () => {
     const after = await readRecord(vaultId);
     expect(after.settlements).toHaveLength(before.settlements.length);
     expect((after.settlements[0]!.wip as { tree: string }).tree).not.toBe(beforeTree);
+    expect(after.settlements[0]!.wip!.at).toBe(new Date(T0 + 20_000).toISOString());
     expect(after.settlements[0]!.at).toBe(before.settlements[0]!.at);
 
     expect(await run(30, { wip: 'force' })).toEqual({ verdict: 'noop', vaultId, wip: { status: 'unchanged' } });
