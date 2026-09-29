@@ -1,6 +1,6 @@
 /**
- * PAN-4334 WI-2/WI-3: the pack registry in config.yaml, the pack cache paths,
- * and the git cache, against real files under a temp OVERDECK_HOME and a
+ * PAN-4334 WI-2/3/4: the pack registry in config.yaml, the pack cache paths,
+ * the git cache and the add/update/remove/sync lifecycle, against real files under a temp OVERDECK_HOME and a
  * local bare repo (no network).
  */
 import { execFileSync } from 'node:child_process';
@@ -21,6 +21,7 @@ const { overdeckHome } = await vi.hoisted(async () => {
 
 import { getGlobalConfigPath } from '../../config-yaml/load.js';
 import {
+  addPack,
   deletePackEntry,
   extractCommit,
   fetchPackSource,
@@ -31,8 +32,12 @@ import {
   packRepoDir,
   packsHome,
   packUpdateAvailable,
+  PackSourceError,
+  removePack,
   resolveRef,
+  syncPack,
   treeHash,
+  updatePack,
   writePackEntry,
 } from '../sources.js';
 
@@ -130,35 +135,60 @@ describe('pack cache paths', () => {
   });
 });
 
-describe('pack git cache', () => {
+interface Upstream {
+  scratch: string;
+  url: string;
+  commitFile: (path: string, content: string, message: string) => string;
+  tag: (name: string, commit: string) => void;
+}
+
+/** A local bare repo on branch main, pushed to from a scratch working copy. */
+function createUpstream(): Upstream {
   const scratch = mkdtempSync(join(tmpdir(), 'skill-pack-upstream-'));
   const work = join(scratch, 'work');
-  const upstream = join(scratch, 'upstream.git');
-  const run = (cwd: string, ...args: string[]): string =>
+  const url = join(scratch, 'upstream.git');
+  const run = (...args: string[]): string =>
     execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...args], {
-      cwd,
+      cwd: work,
       encoding: 'utf8',
     }).trim();
-  const commitFile = (path: string, content: string, message: string): string => {
-    mkdirSync(join(work, path, '..'), { recursive: true });
-    writeFileSync(join(work, path), content);
-    run(work, 'add', '-A');
-    run(work, 'commit', '-q', '-m', message);
-    run(work, 'push', '-q', 'origin', 'main', '--tags');
-    return run(work, 'rev-parse', 'HEAD');
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', url]);
+  execFileSync('git', ['init', '-q', '-b', 'main', work]);
+  run('remote', 'add', 'origin', url);
+  return {
+    scratch,
+    url,
+    commitFile: (path, content, message) => {
+      mkdirSync(join(work, path, '..'), { recursive: true });
+      writeFileSync(join(work, path), content);
+      run('add', '-A');
+      run('commit', '-q', '-m', message);
+      run('push', '-q', 'origin', 'main');
+      return run('rev-parse', 'HEAD');
+    },
+    tag: (name, commit) => {
+      run('tag', '-a', name, '-m', name, commit);
+      run('push', '-q', 'origin', '--tags');
+    },
   };
+}
 
+const skillMd = (name: string): string => `---\nname: ${name}\ndescription: ${name}.\n---\n`;
+
+describe('pack git cache', () => {
+  let up: Upstream;
+  let upstream = '';
+  let scratch = '';
   let first = '';
   let second = '';
 
   beforeAll(() => {
-    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', upstream]);
-    execFileSync('git', ['init', '-q', '-b', 'main', work]);
-    run(work, 'remote', 'add', 'origin', upstream);
-    first = commitFile('skills/a/SKILL.md', '---\nname: a\ndescription: A.\n---\n', 'first');
-    second = commitFile('skills/b/SKILL.md', '---\nname: b\ndescription: B.\n---\n', 'second');
-    run(work, 'tag', '-a', 'v1', '-m', 'v1', first);
-    run(work, 'push', '-q', 'origin', '--tags');
+    up = createUpstream();
+    upstream = up.url;
+    scratch = up.scratch;
+    first = up.commitFile('skills/a/SKILL.md', skillMd('a'), 'first');
+    second = up.commitFile('skills/b/SKILL.md', skillMd('b'), 'second');
+    up.tag('v1', first);
   });
 
   afterAll(() => {
@@ -194,7 +224,7 @@ describe('pack git cache', () => {
 
   it('fetches new upstream commits and reports them as updates', async () => {
     await fetchPackSource('up', upstream);
-    const third = commitFile('skills/c/SKILL.md', '---\nname: c\ndescription: C.\n---\n', 'third');
+    const third = up.commitFile('skills/c/SKILL.md', skillMd('c'), 'third');
     const entry = { id: 'up', url: upstream, ref: 'main', commit: second };
     expect(await packUpdateAvailable(entry)).toBe(third);
     expect(await packUpdateAvailable({ ...entry, commit: third })).toBeNull();
@@ -212,5 +242,120 @@ describe('pack git cache', () => {
   it('leaves no partial clone after a failed fetch', async () => {
     await expect(fetchPackSource('gone', join(scratch, 'missing.git'))).rejects.toThrow();
     expect(existsSync(packRepoDir('gone'))).toBe(false);
+  });
+});
+
+describe('pack lifecycle', () => {
+  let up: Upstream;
+  let first = '';
+  const accept = vi.fn(async () => true);
+  const decline = vi.fn(async () => false);
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile('.claude-plugin/plugin.json', JSON.stringify({ name: 'demo', skills: ['./skills/a'] }), 'plugin');
+    first = up.commitFile('skills/a/SKILL.md', skillMd('a'), 'first');
+    up.tag('v1', first);
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    rmSync(packsHome(), { recursive: true, force: true });
+    accept.mockClear();
+    decline.mockClear();
+  });
+
+  it('writes nothing when the preview is declined', async () => {
+    writeFileSync(configPath(), '# keep me\nmodels:\n  default: sonnet\n');
+    const before = readFileSync(configPath(), 'utf8');
+    const result = await addPack({ id: 'demo', url: up.url, ref: 'v1' }, decline);
+    expect(result.written).toBe(false);
+    expect(result.preview).toMatchObject({ id: 'demo', commit: first, adapter: 'claude-plugin' });
+    expect(result.preview.manifest.skills.map((skill) => skill.name)).toEqual(['a']);
+    expect(readFileSync(configPath(), 'utf8')).toBe(before);
+  });
+
+  it('registers the resolved commit when confirmed and keeps comments', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    const result = await addPack({ id: 'demo', url: up.url, ref: 'v1' }, accept);
+    expect(result.written).toBe(true);
+    expect(accept).toHaveBeenCalledOnce();
+    expect(readFileSync(configPath(), 'utf8')).toContain('# keep me');
+    expect(await getPack('demo')).toEqual({ id: 'demo', url: up.url, ref: 'v1', commit: first });
+  });
+
+  it('refuses integrations, reserved, invalid and registered ids before any git call', async () => {
+    await expect(addPack({ id: 'sageox', url: up.url, ref: 'main' }, accept)).rejects.toMatchObject({
+      code: 'integration',
+      message: expect.stringContaining('issues/2444'),
+    });
+    await expect(addPack({ id: 'grilling', url: up.url, ref: 'main', reservedIds: ['grilling'] }, accept)).rejects.toMatchObject({
+      code: 'bad-id',
+    });
+    await expect(addPack({ id: '../x', url: up.url, ref: 'main' }, accept)).rejects.toBeInstanceOf(PackSourceError);
+    await writePackEntry({ id: 'demo', url: up.url, ref: 'v1', commit: first });
+    await expect(addPack({ id: 'demo', url: up.url, ref: 'v1' }, accept)).rejects.toMatchObject({ code: 'exists' });
+    expect(existsSync(packsHome())).toBe(false);
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it('reports git failures as PackSourceError git', async () => {
+    await expect(addPack({ id: 'demo', url: join(up.scratch, 'missing.git'), ref: 'main' }, accept)).rejects.toMatchObject({
+      code: 'git',
+    });
+  });
+
+  it('updates only when confirmed and previews the added skill', async () => {
+    await writePackEntry({ id: 'demo', url: up.url, ref: 'main', commit: first });
+    up.commitFile('.claude-plugin/plugin.json', JSON.stringify({ name: 'demo', skills: ['./skills/a', './skills/b'] }), 'list b');
+    up.commitFile('skills/a/SKILL.md', `${skillMd('a')}\nChanged.\n`, 'change a');
+    const next = up.commitFile('skills/b/SKILL.md', skillMd('b'), 'add b');
+
+    const declined = await updatePack('demo', {}, decline);
+    expect(declined.written).toBe(false);
+    expect(declined.preview.previousCommit).toBe(first);
+    expect(declined.preview.diff).toEqual({ added: ['b'], removed: [], changed: ['a'], newCapabilities: [] });
+    expect((await getPack('demo'))?.commit).toBe(first);
+
+    const confirmed = await updatePack('demo', {}, accept);
+    expect(confirmed.written).toBe(true);
+    expect((await getPack('demo'))?.commit).toBe(next);
+
+    accept.mockClear();
+    expect((await updatePack('demo', {}, accept)).written).toBe(false);
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it('moves to a new ref when one is given', async () => {
+    const head = up.commitFile('skills/a/notes.md', 'notes\n', 'notes');
+    await writePackEntry({ id: 'demo', url: up.url, ref: 'main', commit: head });
+    const result = await updatePack('demo', { ref: 'v1' }, accept);
+    expect(result.written).toBe(true);
+    expect(await getPack('demo')).toMatchObject({ ref: 'v1', commit: first });
+  });
+
+  it('rejects unknown packs on update and sync', async () => {
+    await expect(updatePack('nope', {}, accept)).rejects.toMatchObject({ code: 'unknown-pack' });
+    await expect(syncPack('nope')).rejects.toMatchObject({ code: 'unknown-pack' });
+  });
+
+  it('syncs the trusted commit into a fresh cache', async () => {
+    await writePackEntry({ id: 'demo', url: up.url, ref: 'v1', commit: first });
+    const result = await syncPack('demo');
+    expect(result).toEqual({ commit: first, dir: packExtractDir('demo', first) });
+    expect(existsSync(join(result.dir, 'skills', 'a', 'SKILL.md'))).toBe(true);
+  });
+
+  it('removes the registry entry, global overrides and the cache', async () => {
+    writeFileSync(configPath(), 'skills:\n  overrides:\n    grilling: false\n    demo/a: true\n  pack_overrides:\n    demo: true\n');
+    await writePackEntry({ id: 'demo', url: up.url, ref: 'v1', commit: first });
+    await syncPack('demo');
+    expect(await removePack('demo')).toEqual({ removed: true });
+    expect(readConfig().skills).toEqual({ overrides: { grilling: false } });
+    expect(existsSync(packCacheDir('demo'))).toBe(false);
+    expect(await removePack('demo')).toEqual({ removed: false });
   });
 });

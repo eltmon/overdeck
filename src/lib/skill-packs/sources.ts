@@ -17,7 +17,14 @@ import { isMap, isScalar, parse as parseYaml, parseDocument, type Document } fro
 import { getGlobalConfigPath } from '../config-yaml/load.js';
 import { getOverdeckHome } from '../paths.js';
 import { runSettingsWriteSerialized } from '../settings-api.js';
-import type { PackAdapterId } from './adapters.js';
+import {
+  detectAdapter,
+  KNOWN_PACKS,
+  notAppliedLabels,
+  readPackManifest,
+  type PackAdapterId,
+  type PackManifest,
+} from './adapters.js';
 
 export const PACK_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
@@ -188,6 +195,7 @@ export async function fetchPackSource(id: string, url: string): Promise<void> {
   assertOperand('url', url);
   const repo = packRepoDir(id);
   if (await exists(repo)) {
+    await git(['--git-dir', repo, 'remote', 'set-url', 'origin', url]);
     await git(['--git-dir', repo, 'fetch', '--force', '--tags', 'origin', '+refs/heads/*:refs/heads/*']);
     return;
   }
@@ -271,4 +279,161 @@ export async function packUpdateAvailable(entry: PackRegistryEntry): Promise<str
     refs.get(entry.ref) ??
     null;
   return remote && remote !== entry.commit ? remote : null;
+}
+
+export type PackSourceErrorCode = 'bad-id' | 'exists' | 'integration' | 'unknown-pack' | 'git';
+
+export class PackSourceError extends Error {
+  constructor(
+    readonly code: PackSourceErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'PackSourceError';
+  }
+}
+
+export interface PackPreview {
+  id: string;
+  url: string;
+  ref: string;
+  commit: string;
+  adapter: PackAdapterId;
+  manifest: PackManifest;
+  previousCommit?: string;
+  diff?: { added: string[]; removed: string[]; changed: string[]; newCapabilities: string[] };
+}
+
+export type ConfirmPack = (preview: PackPreview) => Promise<boolean>;
+
+async function gitStep<T>(id: string, step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (error) {
+    if (error instanceof PackSourceError) throw error;
+    const detail = (error as { stderr?: unknown }).stderr;
+    const message = typeof detail === 'string' && detail.trim() ? detail.trim() : (error as Error).message;
+    throw new PackSourceError('git', `pack ${id}: ${message}`);
+  }
+}
+
+/** PD-13: registry adapter, then the known-pack default, then detection. */
+async function packAdapter(id: string, dir: string, explicit?: PackAdapterId): Promise<PackAdapterId> {
+  return explicit ?? KNOWN_PACKS[id]?.adapter ?? (await detectAdapter(dir));
+}
+
+async function manifestAt(id: string, dir: string, adapter: PackAdapterId): Promise<PackManifest> {
+  return gitStep(id, () => readPackManifest(dir, adapter, { optIn: KNOWN_PACKS[id]?.optIn ?? [] }));
+}
+
+async function requirePack(id: string): Promise<PackRegistryEntry> {
+  if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
+  const entry = await getPack(id);
+  if (!entry) throw new PackSourceError('unknown-pack', `unknown pack: ${id}`);
+  return entry;
+}
+
+/**
+ * Fetch, resolve and preview a new pack; register it only when `confirm`
+ * resolves true. Adding enables nothing.
+ */
+export async function addPack(
+  input: { id: string; url: string; ref: string; adapter?: PackAdapterId; reservedIds?: readonly string[] },
+  confirm: ConfirmPack,
+): Promise<{ written: boolean; preview: PackPreview }> {
+  const { id, url, ref } = input;
+  if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
+  if (input.reservedIds?.includes(id)) {
+    throw new PackSourceError('bad-id', `pack id ${id} is reserved by a core skill; choose another id`);
+  }
+  const known = KNOWN_PACKS[id];
+  if (known?.kind === 'integration') throw new PackSourceError('integration', known.note ?? `${id} is an integration, not a skill pack`);
+  if (await getPack(id)) throw new PackSourceError('exists', `pack ${id} is already registered; use pan skills pack update ${id}`);
+
+  const commit = await gitStep(id, async () => {
+    await fetchPackSource(id, url);
+    return resolveRef(id, ref);
+  });
+  const dir = await gitStep(id, () => extractCommit(id, commit));
+  const adapter = await packAdapter(id, dir, input.adapter);
+  const preview: PackPreview = { id, url, ref, commit, adapter, manifest: await manifestAt(id, dir, adapter) };
+  if (!(await confirm(preview))) return { written: false, preview };
+  await writePackEntry({ id, url, ref, commit, ...(input.adapter ? { adapter: input.adapter } : {}) });
+  return { written: true, preview };
+}
+
+/**
+ * Fetch the pack's ref (or a new one), preview the difference from the
+ * trusted commit, and move the trusted commit only when `confirm` resolves
+ * true. Nothing is asked or written when the commit and ref are unchanged.
+ */
+export async function updatePack(
+  id: string,
+  opts: { ref?: string },
+  confirm: ConfirmPack,
+): Promise<{ written: boolean; preview: PackPreview }> {
+  const entry = await requirePack(id);
+  const ref = opts.ref ?? entry.ref;
+  const commit = await gitStep(id, async () => {
+    await fetchPackSource(id, entry.url);
+    return resolveRef(id, ref);
+  });
+  const dir = await gitStep(id, () => extractCommit(id, commit));
+  const oldDir = await gitStep(id, () => extractCommit(id, entry.commit));
+  const adapter = await packAdapter(id, dir, entry.adapter);
+  const manifest = await manifestAt(id, dir, adapter);
+  const oldManifest = await manifestAt(id, oldDir, adapter);
+
+  const oldByName = new Map(oldManifest.skills.map((skill) => [skill.name, skill]));
+  const newNames = new Set(manifest.skills.map((skill) => skill.name));
+  const changed: string[] = [];
+  for (const skill of manifest.skills) {
+    const before = oldByName.get(skill.name);
+    if (!before) continue;
+    const [oldHash, newHash] = await Promise.all([treeHash(id, entry.commit, before.dir), treeHash(id, commit, skill.dir)]);
+    if (oldHash !== newHash) changed.push(skill.name);
+  }
+  const oldLabels = new Set(notAppliedLabels(oldManifest.capabilities));
+  const preview: PackPreview = {
+    id,
+    url: entry.url,
+    ref,
+    commit,
+    adapter,
+    manifest,
+    previousCommit: entry.commit,
+    diff: {
+      added: manifest.skills.map((skill) => skill.name).filter((name) => !oldByName.has(name)),
+      removed: oldManifest.skills.map((skill) => skill.name).filter((name) => !newNames.has(name)),
+      changed,
+      newCapabilities: notAppliedLabels(manifest.capabilities).filter((label) => !oldLabels.has(label)),
+    },
+  };
+  if (commit === entry.commit && ref === entry.ref) return { written: false, preview };
+  if (!(await confirm(preview))) return { written: false, preview };
+  await writePackEntry({ ...entry, ref, commit });
+  return { written: true, preview };
+}
+
+/**
+ * PD-11: unregister a pack, clear its global toggle and global per-skill
+ * overrides, and delete its cache. Project and issue entries stay (inert).
+ */
+export async function removePack(id: string): Promise<{ removed: boolean }> {
+  if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
+  const removed = (await getPack(id)) !== null;
+  if (removed) await deletePackEntry(id);
+  await rm(packCacheDir(id), { recursive: true, force: true });
+  return { removed };
+}
+
+/** Re-fetch a registered pack and make sure its trusted commit is extracted. Never moves the commit. */
+export async function syncPack(id: string): Promise<{ commit: string; dir: string }> {
+  const entry = await requirePack(id);
+  const dir = await gitStep(id, async () => {
+    await fetchPackSource(id, entry.url);
+    await resolveRef(id, entry.commit);
+    return extractCommit(id, entry.commit);
+  });
+  return { commit: entry.commit, dir };
 }
