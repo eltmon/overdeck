@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T01:20:04.108Z",
+  "updated": "2026-09-29T01:34:31.294Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
       "claimedBy": "agent-pan-4327",
       "claimedAt": "2026-09-29T01:19:07.840Z",
       "doneAt": "2026-09-29T01:20:04.108Z"
+    },
+    "sampling-capability-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T01:34:31.294Z"
     }
   }
 }
