@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4424",
   "created": "2026-09-29T22:24:30.151Z",
-  "updated": "2026-09-29T22:24:30.151Z",
+  "updated": "2026-09-29T22:34:56.211Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "fork-default-cli": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4424",
-      "claimedAt": "2026-09-29T22:24:30.151Z"
+      "claimedAt": "2026-09-29T22:24:30.151Z",
+      "doneAt": "2026-09-29T22:34:56.210Z"
     }
   }
 }
