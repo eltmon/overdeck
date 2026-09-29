@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1728",
   "created": "2026-09-29T01:58:51.551Z",
-  "updated": "2026-09-29T02:10:03.581Z",
+  "updated": "2026-09-29T02:11:55.314Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,9 +80,10 @@
       "doneAt": "2026-09-29T02:09:27.837Z"
     },
     "finalize-trailer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-1728",
-      "claimedAt": "2026-09-29T02:10:03.581Z"
+      "claimedAt": "2026-09-29T02:10:03.581Z",
+      "doneAt": "2026-09-29T02:11:55.314Z"
     }
   }
 }
