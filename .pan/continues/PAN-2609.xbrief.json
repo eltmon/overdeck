@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:33:11.621Z",
+  "updated": "2026-09-29T06:33:24.369Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -522,6 +522,10 @@
     "deletion-door.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T06:33:11.621Z"
+    },
+    "deletion-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:33:24.368Z"
     }
   }
 }
