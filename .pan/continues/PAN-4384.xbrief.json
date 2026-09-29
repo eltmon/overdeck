@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4384",
   "created": "2026-09-29T13:04:47.711Z",
-  "updated": "2026-09-29T14:27:39.989Z",
+  "updated": "2026-09-29T14:28:09.607Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
     "conflict-repair-docs.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T14:27:39.988Z"
+    },
+    "conflict-repair-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:28:09.607Z"
     }
   }
 }
