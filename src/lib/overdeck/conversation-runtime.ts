@@ -85,6 +85,7 @@ import { kimiHomeDefault, kimiSessionsRoot, kimiWirePath } from '../runtimes/sto
 import { codexSessionsRoot, extractThreadIdFromRollout } from '../runtimes/storage/codex.js';
 import { piSessionsRoot } from '../runtimes/storage/pi.js';
 import { conversationContextEnvExports, conversationLaunchContext, type ConversationLaunchContext } from './conversation-launch-context.js';
+import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -557,7 +558,7 @@ export async function spawnConversationSession(
 ): Promise<void> {
   const bareContext = launch.bareContext === true;
   const behavior = getHarnessBehavior(harness);
-  const harnessLaunch = await prepareHarnessLaunch(harness);
+  const harnessLaunch = await prepareHarnessLaunch(harness, { model });
   const stateDir = conversationStateDir(tmuxSession);
   await mkdir(stateDir, { recursive: true });
   if (launch.role) await writeConversationPaneRole(tmuxSession, launch.role);
@@ -783,6 +784,7 @@ export async function spawnConversationSession(
         setTerminalEnv: true,
         unsetProviderEnv: true,
         managedStateKey: tmuxSession,
+        ghShim: { id: tmuxSession, denyGrantLabels: tmuxSession === FLYWHEEL_CONVERSATION_SESSION },
         // Hooks attribute by OVERDECK_AGENT_ID when there is no $TMUX to read (Herdr).
         overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || primeLaunch || useSupervisor || backend.name !== 'tmux') ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [

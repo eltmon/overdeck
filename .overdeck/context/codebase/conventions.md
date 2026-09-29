@@ -18,7 +18,7 @@
 - **Fake timers for any retry/backoff/delay test** — `vi.useFakeTimers()` +
   `vi.advanceTimersByTimeAsync()`; never real waits, never `maxForks: 1` masking.
 - **Skills ↔ CLI lockstep** — changing a `pan <verb>` flag or help string requires
-  updating `skills/pan-<verb>/SKILL.md` in the same commit; `scripts/lint-skills.sh`
+  updating `sync-sources/skills/pan-<verb>/SKILL.md` in the same commit; `scripts/lint-skills.sh`
   (in `npm run lint`) fails CI on drift.
 - **Dashboard = Node 22 from `dist/`** — `npm run build` before restarting it;
   never Bun, never tsx (node-pty addon + circular ESM).
@@ -50,4 +50,4 @@
   (`src/dashboard/frontend/src/lib/issueActions.ts`) via `useIssueActions`; removing a key needs a
   `RETIREMENT_AUDIT` row in `issueActions.parity.test.tsx`.
 
-<!-- last-verified: 2026-09-25 -->
+<!-- last-verified: 2026-09-28 -->

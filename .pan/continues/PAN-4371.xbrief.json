@@ -1,0 +1,267 @@
+{
+  "version": "1",
+  "issueId": "PAN-4371",
+  "created": "2026-09-29T09:51:55.547Z",
+  "updated": "2026-09-29T11:51:40.972Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "turn-end-assessor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T09:51:55.547Z",
+      "doneAt": "2026-09-29T10:00:33.244Z"
+    },
+    "last-assistant-extractor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:00:39.899Z",
+      "doneAt": "2026-09-29T10:07:07.191Z"
+    },
+    "turn-end-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:07:16.062Z",
+      "doneAt": "2026-09-29T10:13:50.430Z"
+    },
+    "contracts-turn-end-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:13:53.462Z",
+      "doneAt": "2026-09-29T10:19:12.878Z"
+    },
+    "enrichment-attach": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:19:16.032Z",
+      "doneAt": "2026-09-29T10:32:54.286Z"
+    },
+    "enrichment-poll-schedule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:32:57.849Z",
+      "doneAt": "2026-09-29T10:40:19.338Z"
+    },
+    "resolver-turn-end": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:40:22.928Z",
+      "doneAt": "2026-09-29T10:51:06.034Z"
+    },
+    "sweeper-evidence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:51:09.830Z",
+      "doneAt": "2026-09-29T10:55:26.879Z"
+    },
+    "needs-you-label": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T10:55:31.608Z",
+      "doneAt": "2026-09-29T11:03:45.915Z"
+    },
+    "bare-turn-end": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T11:03:49.817Z",
+      "doneAt": "2026-09-29T11:08:16.442Z"
+    },
+    "eval-fixtures-metrics": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T11:08:21.211Z",
+      "doneAt": "2026-09-29T11:27:48.980Z"
+    },
+    "eval-runner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T11:27:53.342Z",
+      "doneAt": "2026-09-29T11:31:38.560Z"
+    },
+    "docs-turn-end": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4371",
+      "claimedAt": "2026-09-29T11:31:42.862Z",
+      "doneAt": "2026-09-29T11:34:07.201Z"
+    },
+    "turn-end-assessor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:43:46.668Z"
+    },
+    "turn-end-assessor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:43:58.271Z"
+    },
+    "turn-end-assessor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:44:09.353Z"
+    },
+    "turn-end-assessor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:44:20.098Z"
+    },
+    "turn-end-assessor.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:44:31.372Z"
+    },
+    "last-assistant-extractor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:44:42.366Z"
+    },
+    "last-assistant-extractor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:44:53.461Z"
+    },
+    "last-assistant-extractor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:45:05.054Z"
+    },
+    "last-assistant-extractor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:45:16.949Z"
+    },
+    "turn-end-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:45:28.571Z"
+    },
+    "turn-end-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:45:40.918Z"
+    },
+    "turn-end-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:45:51.665Z"
+    },
+    "turn-end-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:03.087Z"
+    },
+    "contracts-turn-end-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:14.128Z"
+    },
+    "contracts-turn-end-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:24.408Z"
+    },
+    "contracts-turn-end-field.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:35.429Z"
+    },
+    "enrichment-attach.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:46.519Z"
+    },
+    "enrichment-attach.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:46:57.061Z"
+    },
+    "enrichment-attach.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:47:07.970Z"
+    },
+    "enrichment-poll-schedule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:47:18.611Z"
+    },
+    "enrichment-poll-schedule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:47:29.471Z"
+    },
+    "enrichment-poll-schedule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:47:40.112Z"
+    },
+    "resolver-turn-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:47:50.653Z"
+    },
+    "resolver-turn-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:48:01.156Z"
+    },
+    "resolver-turn-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:48:11.691Z"
+    },
+    "sweeper-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:48:22.237Z"
+    },
+    "sweeper-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:48:32.849Z"
+    },
+    "sweeper-evidence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:48:43.502Z"
+    },
+    "needs-you-label.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:48:54.614Z"
+    },
+    "needs-you-label.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:49:05.481Z"
+    },
+    "needs-you-label.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:49:15.976Z"
+    },
+    "needs-you-label.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:49:26.803Z"
+    },
+    "bare-turn-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:49:37.669Z"
+    },
+    "bare-turn-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:49:48.602Z"
+    },
+    "bare-turn-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:49:59.387Z"
+    },
+    "eval-fixtures-metrics.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:50:10.971Z"
+    },
+    "eval-fixtures-metrics.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:50:23.133Z"
+    },
+    "eval-fixtures-metrics.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:50:34.313Z"
+    },
+    "eval-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:50:45.574Z"
+    },
+    "eval-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:50:56.954Z"
+    },
+    "eval-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:51:07.894Z"
+    },
+    "docs-turn-end.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:51:18.628Z"
+    },
+    "docs-turn-end.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:51:29.969Z"
+    },
+    "docs-turn-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:51:40.972Z"
+    }
+  }
+}

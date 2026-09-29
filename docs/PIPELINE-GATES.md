@@ -821,7 +821,9 @@ spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or `app` (GitHub
 App installation tokens). Readers aggregate the last 60 minutes from the
 current and previous hour files; files older than 3 hours are deleted on the
 hour rollover. The dashboard, the deacon child, CLI processes and the agent
-`gh` shim (beside the agent git guard, count-only) all write it.
+`gh` shim (beside the agent git guard; conversations get it alone), which
+counts every call and, for agent panes and the Flywheel conversation, refuses
+grant-label writes (PAN-4343), all write it.
 `src/lib/github-quota/` owns it: `runGh` (metered `gh` exec),
 `withGitHubCaller` (the caller context), the App/PAT metering in
 `rest-meter.ts`, and the pause gate.
@@ -930,6 +932,14 @@ observe and nudge — none reconciles a stored copy of anything:
 
 1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
    unpushed commits.
+
+   `checkStuckWorkAgents` does **not** read the Jev turn-end assessment
+   (PAN-4371) in this release. That assessment only labels the Needs-you row
+   (`describePendingInput`'s turn-end label) and the parked `idle-running`
+   row's evidence (`src/lib/parked/resolver.ts`, `src/lib/cloister/stall-sweeper.ts`).
+   It is advisory: it never suppresses, adds, or changes a nudge here.
+   Letting this routine act on the assessment is a separate, operator-signed
+   issue (phase 2).
 2. `checkApiErrorAgents` — nudges a work, specialist, or planning agent wedged
    on a provider error (including Claude Code's "API Error: Connection lost
    mid-response"), once per 5 minutes, and only when liveness.ts `isIdle`

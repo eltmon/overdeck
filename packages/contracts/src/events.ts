@@ -16,6 +16,7 @@ import {
   ProjectDeploySnapshot,
   Role,
   SequenceNumber,
+  TurnEndAssessment,
   WaitingReason,
 } from "./types"
 import { DerivedIssueState } from "./derived-issue-state"
@@ -332,6 +333,7 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
     })),
     resolution: Schema.optional(AgentResolution),
     resolutionCount: Schema.optional(Schema.Number),
+    turnEndAssessment: Schema.optional(TurnEndAssessment),
   }),
 })
 export type AgentEnrichmentChangedEvent = typeof AgentEnrichmentChangedEvent.Type

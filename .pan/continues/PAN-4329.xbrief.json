@@ -1,0 +1,238 @@
+{
+  "version": "1",
+  "issueId": "PAN-4329",
+  "created": "2026-09-29T09:48:46.123Z",
+  "updated": "2026-09-29T10:51:18.307Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-29T10:51Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-09-29T10:51:18.307Z"
+    }
+  ],
+  "items": {
+    "wip-format": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T09:48:46.123Z",
+      "doneAt": "2026-09-29T09:50:39.260Z"
+    },
+    "wip-scan": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T09:50:46.087Z",
+      "doneAt": "2026-09-29T09:52:14.107Z"
+    },
+    "wip-capture": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T09:52:17.599Z",
+      "doneAt": "2026-09-29T09:58:12.294Z"
+    },
+    "settle-wip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T09:58:16.529Z",
+      "doneAt": "2026-09-29T10:00:19.258Z"
+    },
+    "save-wip-output": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T10:00:23.805Z",
+      "doneAt": "2026-09-29T10:01:58.029Z"
+    },
+    "allow-secret-code": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T10:02:02.378Z",
+      "doneAt": "2026-09-29T10:04:57.360Z"
+    },
+    "wip-apply": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T10:05:01.412Z",
+      "doneAt": "2026-09-29T10:07:42.254Z"
+    },
+    "resume-wip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T10:07:46.259Z",
+      "doneAt": "2026-09-29T10:12:46.744Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4329",
+      "claimedAt": "2026-09-29T10:12:51.074Z",
+      "doneAt": "2026-09-29T10:14:12.558Z"
+    },
+    "wip-format.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:27:13.379Z"
+    },
+    "wip-format.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:27:27.949Z"
+    },
+    "wip-format.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:27:42.105Z"
+    },
+    "wip-format.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:27:56.200Z"
+    },
+    "wip-scan.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:28:10.236Z"
+    },
+    "wip-scan.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:28:23.972Z"
+    },
+    "wip-scan.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:28:41.364Z"
+    },
+    "wip-scan.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:28:55.510Z"
+    },
+    "wip-capture.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:29:07.624Z"
+    },
+    "wip-capture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:29:19.381Z"
+    },
+    "wip-capture.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:29:32.936Z"
+    },
+    "wip-capture.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:29:48.659Z"
+    },
+    "wip-capture.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:30:03.757Z"
+    },
+    "settle-wip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:30:19.784Z"
+    },
+    "settle-wip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:30:34.803Z"
+    },
+    "settle-wip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:30:48.854Z"
+    },
+    "settle-wip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:31:02.953Z"
+    },
+    "settle-wip.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:31:14.921Z"
+    },
+    "save-wip-output.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:31:26.080Z"
+    },
+    "save-wip-output.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:31:39.454Z"
+    },
+    "save-wip-output.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:31:52.634Z"
+    },
+    "allow-secret-code.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:32:05.990Z"
+    },
+    "allow-secret-code.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:32:18.808Z"
+    },
+    "allow-secret-code.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:32:31.281Z"
+    },
+    "allow-secret-code.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:32:42.739Z"
+    },
+    "wip-apply.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:32:54.752Z"
+    },
+    "wip-apply.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:33:06.787Z"
+    },
+    "wip-apply.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:33:19.142Z"
+    },
+    "wip-apply.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:33:30.933Z"
+    },
+    "wip-apply.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:33:43.882Z"
+    },
+    "resume-wip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:33:57.394Z"
+    },
+    "resume-wip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:34:11.300Z"
+    },
+    "resume-wip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:34:26.316Z"
+    },
+    "resume-wip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:34:39.644Z"
+    },
+    "resume-wip.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:34:52.965Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:35:06.778Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:35:21.640Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:35:33.853Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T10:35:46.644Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-29T10:51:18Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4329 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - docs/SESSION-VAULT.md\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-4329 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    }
+  ]
+}

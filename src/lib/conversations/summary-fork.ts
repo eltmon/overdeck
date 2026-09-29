@@ -161,7 +161,7 @@ export class HandoffAuthorModelNotConfiguredError extends Error {
 // transcripts is fine.
 const HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD = 100_000;
 
-function renderExternalHandoffPrompt(template: string, focus: string | undefined, transcript: string, outputPath: string): string {
+export function renderExternalHandoffPrompt(template: string, focus: string | undefined, transcript: string, outputPath: string): string {
   const safeFocus = focus?.trim() || NO_HANDOFF_FOCUS;
   return template
     .split('{{focus}}').join(safeFocus)

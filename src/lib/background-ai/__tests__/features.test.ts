@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BACKGROUND_AI_FEATURE_META,
   BACKGROUND_AI_FEATURES,
   defaultBackgroundAiFeatures,
   isBackgroundFeatureEnabled,
@@ -31,6 +32,33 @@ describe('defaultBackgroundAiFeatures', () => {
     expect(defaults.ttsSummarizer).toBe(false);
     expect(defaults.conversationTitles).toBe(true);
     expect(defaults.memoryExtraction).toBe(true);
+  });
+});
+
+describe('jev* features (PAN-4369)', () => {
+  const JEV_FEATURES = ['jevTurnEndAssessment', 'jevAcceptanceCriteriaReview', 'jevMemoryRelevance'] as const;
+
+  it('defaults all three jev features off', () => {
+    const defaults = defaultBackgroundAiFeatures();
+    for (const key of JEV_FEATURES) expect(defaults[key]).toBe(false);
+  });
+
+  it('enables a jev feature only when its toggle is on and cheap mode is off', () => {
+    expect(isBackgroundFeatureEnabled('jevTurnEndAssessment', configWith(false))).toBe(false);
+    expect(
+      isBackgroundFeatureEnabled('jevTurnEndAssessment', configWith(false, { jevTurnEndAssessment: true })),
+    ).toBe(true);
+    expect(
+      isBackgroundFeatureEnabled('jevTurnEndAssessment', configWith(true, { jevTurnEndAssessment: true })),
+    ).toBe(false);
+  });
+
+  it('describes the data each jev feature sends to TypeSafe', () => {
+    for (const key of JEV_FEATURES) {
+      const meta = BACKGROUND_AI_FEATURE_META.find((m) => m.key === key);
+      expect(meta?.description.startsWith('Sends ')).toBe(true);
+      expect(meta?.description).toContain('TypeSafe');
+    }
   });
 });
 

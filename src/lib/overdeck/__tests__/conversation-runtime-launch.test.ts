@@ -164,6 +164,16 @@ describe('spawnConversationSession through the launch door (PAN-3921)', () => {
     expect(setOption).not.toHaveBeenCalled();
   });
 
+  it('gives an operator conversation a count-only gh shim (PAN-4343)', async () => {
+    await spawn('conv-x', fakeBackend('herdr').backend);
+    expect(launcherConfigs[0]!['ghShim']).toEqual({ id: 'conv-x', denyGrantLabels: false });
+  });
+
+  it('gives the Flywheel conversation the grant-label deny (PAN-4343)', async () => {
+    await spawn('conv-flywheel', fakeBackend('herdr').backend);
+    expect(launcherConfigs[0]!['ghShim']).toEqual({ id: 'conv-flywheel', denyGrantLabels: true });
+  });
+
   it('keeps the PTY supervisor and both tmux session options for claude-code on tmux', async () => {
     const { backend, starts } = fakeBackend('tmux');
     await spawn('conv-x', backend);

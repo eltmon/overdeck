@@ -1,0 +1,129 @@
+{
+  "version": "1",
+  "issueId": "PAN-4363",
+  "created": "2026-09-29T04:31:37.212Z",
+  "updated": "2026-09-29T06:59:24.591Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "floor-table-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4363",
+      "claimedAt": "2026-09-29T04:31:37.212Z",
+      "doneAt": "2026-09-29T04:44:36.460Z"
+    },
+    "policy-codex-floor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4363",
+      "claimedAt": "2026-09-29T04:44:44.465Z",
+      "doneAt": "2026-09-29T04:56:29.623Z"
+    },
+    "resolver-policy-context": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4363",
+      "claimedAt": "2026-09-29T04:56:37.120Z",
+      "doneAt": "2026-09-29T05:56:54.321Z"
+    },
+    "start-explicit-floor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4363",
+      "claimedAt": "2026-09-29T05:56:59.376Z",
+      "doneAt": "2026-09-29T06:20:26.614Z"
+    },
+    "doctor-codex-model-floors": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4363",
+      "claimedAt": "2026-09-29T06:20:32.397Z",
+      "doneAt": "2026-09-29T06:44:55.190Z"
+    },
+    "docs-codex-model-floor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4363",
+      "claimedAt": "2026-09-29T06:44:59.975Z",
+      "doneAt": "2026-09-29T06:53:16.726Z"
+    },
+    "floor-table-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:54:52.050Z"
+    },
+    "floor-table-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:55:22.828Z"
+    },
+    "floor-table-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:55:35.094Z"
+    },
+    "floor-table-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:55:47.140Z"
+    },
+    "policy-codex-floor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:55:59.675Z"
+    },
+    "policy-codex-floor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:56:12.700Z"
+    },
+    "policy-codex-floor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:56:25.660Z"
+    },
+    "resolver-policy-context.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:56:39.048Z"
+    },
+    "resolver-policy-context.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:56:52.466Z"
+    },
+    "resolver-policy-context.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:57:06.166Z"
+    },
+    "start-explicit-floor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:57:20.423Z"
+    },
+    "start-explicit-floor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:57:35.118Z"
+    },
+    "start-explicit-floor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:57:49.620Z"
+    },
+    "doctor-codex-model-floors.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:58:02.694Z"
+    },
+    "doctor-codex-model-floors.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:58:16.126Z"
+    },
+    "doctor-codex-model-floors.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:58:28.544Z"
+    },
+    "doctor-codex-model-floors.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:58:42.308Z"
+    },
+    "docs-codex-model-floor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:58:55.591Z"
+    },
+    "docs-codex-model-floor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:59:10.260Z"
+    },
+    "docs-codex-model-floor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:59:24.591Z"
+    }
+  }
+}

@@ -1,0 +1,636 @@
+{
+  "id": "handoff-first-run-checks",
+  "kind": "handoff",
+  "source": "real session excerpt, overdeck PAN-4282, 2026-09, scrubbed; planted facts and decoys edited in",
+  "entries": [
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01QwXqQsmkjTtYjqVhemNaxe",
+            "name": "Bash",
+            "input": {
+              "command": "ls tests/unit/lib/ 2>/dev/null | head -20; echo \"---\"; ls tests/unit/ 2>/dev/null"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01QwXqQsmkjTtYjqVhemNaxe",
+            "content": "agents\nagents-normalize-id.test.ts\nagents-record-activity.test.ts\nbacklog\nbriefing-assembler.test.ts\nchannels\nci\nclaude-plugins-provision.test.ts\nclean-stale-specialist-statuses.test.ts\ncloister\nconcurrency.test.ts\nconfig-yaml\nconfig.test.ts\nconversations\ncosts\ncosts-wal.test.ts\ncv.test.ts\ndatabase\ndeploy\ndev-supervisor.test.ts\n---\ncli\ncontracts\ndashboard\nevals\nevent-store.test.ts\nflywheel\nfrontend\nhelpers\nlib\nprompts\nrepo-hygiene-workspace-artifacts.test.ts\nscripts\ntelemetry-docs.test.ts\nvitest-config.test.ts\nvitest-cpu-admission.test.ts"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Let's check errors.js for an existing pattern and check `ClaudeCredentialParseError` style, plus check src/lib/errors.ts briefly for conventions (not strictly needed). Now write the implementation file."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01UsnU9rn149nGHzZwgwxYYT",
+            "name": "Bash",
+            "input": {
+              "command": "ls src/lib/first-run-checks.ts 2>&1; grep -n \"checkClaudeLogin\\|checkGhLogin\\|checkHostBackend\\|first-run-checks\" -r src tests .pan/specs 2>/dev/null | grep -v node_modules"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01UsnU9rn149nGHzZwgwxYYT",
+            "content": "ls: cannot access 'src/lib/first-run-checks.ts': No such file or directory\n.pan/specs/2026-09-27-PAN-4282-first-run-get-set-up-checklist-on-home-pan-install-doctor-warn-instead-of-failing-on-optional-tools.xbrief.json:39:      \"Proposal\": \"Add memoized first-run probes (Claude login, gh auth status, host backend) in src/lib/first-run-checks.ts; make tmux/Herdr required flags follow the host backend; extend GET /api/prerequisites with auth, backend and memory (from the existing system-health snapshot) and ?refresh=1; render a dismissible, never-blocking 'Get set up' card on both Homes (banner hidden on Home); move the pan install gate and the doctor core/login rows into small pure modules that forgive Docker, ast-grep and (under Herdr) tmux with warnings; update quickstart, CLI and terminal-backend docs. Full detail in .pan/drafts/pan-4282.md.\",\n.pan/specs/2026-09-27-PAN-4282-first-run-ge …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Good, this is a fresh file. Let me check the `errors.js` module briefly and Effect import conventions for `Effect.runPromise` usage elsewhere."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Qd5Ss1397uCseW3114kctP",
+            "name": "Bash",
+            "input": {
+              "command": "grep -rn \"Effect.runPromise(getClaudeAuthStatus\" src tests --include=\"*.ts\" | grep -v node_modules"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01Qd5Ss1397uCseW3114kctP",
+            "content": "src/lib/agents/runtime-command.ts:649:    const authStatus = await Effect.runPromise(getClaudeAuthStatus());"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's write the new file."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_014RKYYeYZCPWjo7FNDx3PJw",
+            "name": "Write",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4282/src/lib/first-run-checks.ts",
+              "content": "/**\n * First-run probes (PAN-4282 D1): whether Claude and `gh` are logged in, and\n * whether this host's terminal backend can serve agents right now.\n *\n * Each check is memoized for 60 s (the memo stores the in-flight promise, so\n * concurrent callers share one probe), bypassed with `{ force: true }`. A\n * rejected probe deletes its memo entry so the next call retries instead of\n * caching a failure. The dashboard's `/api/prerequisites` report and\n * `pan doctor` both call these directly; this module imports nothing from\n * `src/dashboard/`.\n */\n\nimport { execFile } from 'node:child_process'; …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_014RKYYeYZCPWjo7FNDx3PJw",
+            "content": "File created successfully at: ~/Projects/overdeck/workspaces/feature-pan-4282/src/lib/first-run-checks.ts (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XNtD8U8ggTmkr9PYS1xJ6D",
+            "name": "Bash",
+            "input": {
+              "command": "grep -rln \"vi.mock('node:child_process')\\|vi.mock(\\\"node:child_process\\\")\" tests src --include=\"*.ts\" | grep -v node_modules | head -5"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01XNtD8U8ggTmkr9PYS1xJ6D",
+            "content": "tests/unit/dashboard/server/routes/issue-pr.test.ts\ntests/unit/dashboard/server/routes/issue-discussions.test.ts"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01N2wT4EXZKerQfF6h9FdU2V",
+            "name": "Read",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4282/tests/unit/dashboard/server/routes/issue-pr.test.ts",
+              "offset": 1,
+              "limit": 50
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01N2wT4EXZKerQfF6h9FdU2V",
+            "content": "1\t/**\n2\t * Route-level regression tests for GET /api/issues/:id/pr (PAN-830, pan-9yn5).\n3\t *\n4\t * Exercises `fetchIssuePullRequest()` and `fetchIssuePullRequestDiff()` — the\n5\t * testable cores of the route handlers. The route shells out to `gh pr list`,\n6\t * `gh pr view`, and `gh pr diff`, so we mock node:child_process exec; we also\n7\t * mock the tracker resolution so non-GH and GH-resolved issues can be exercised\n8\t * without touching projects.yaml.\n9\t *\n10\t * Cases covered:\n11\t *   - Non-GitHub issue → metadata returns { pr: null } without shelling out\n12\t *   - No PR for branch (gh pr list returns empty) → metadata returns { pr: null }\n13\t *   - Happy path → metadata returns parsed pr; diff endpoint returns patch\n14\t *   - gh pr view failure → metadata returns { pr: null, error }\n15\t *   - gh pr diff failure → diff endpoint returns { diff: null, error }\n16\t *\n17\t * Same `vi.hoisted`  …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01NSx24JPuFAAnJ8FWBv7wYN",
+            "name": "Bash",
+            "input": {
+              "command": "find tests/unit/lib -maxdepth 1 -name \"*.test.ts\" | head -3 && echo --- && head -30 tests/unit/lib/config.test.ts"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01NSx24JPuFAAnJ8FWBv7wYN",
+            "content": "tests/unit/lib/manifest-prune.test.ts\ntests/unit/lib/git-utils-polyrepo-anchor.test.ts\ntests/unit/lib/git-operations.test.ts\n---\nimport { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';\nimport { join } from 'path';\nimport { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs';\nimport { TEMP_DIR } from '../../setup.js';\n\n// Mock paths module to use temp directory\nvi.mock('../../../src/lib/paths.js', () => ({\n  CONFIG_FILE: join(TEMP_DIR, 'config.toml'),\n  OVERDECK_HOME: TEMP_DIR,\n}));\n\n// Import after mocking\nimport { loadConfigSync, saveConfig, getDefaultConfig } from '../../../src/lib/config.js';\n\n// TODO(PAN-49): Test pollution with TEMP_DIR when run with full suite - passes in isolation\ndescribe.skip('config', () => {\n  const testConfigDir = TEMP_DIR;\n\n  beforeEach(() => {\n    // Create test directory (global setup cleans up before each test)\n    mkd …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Good, confirms relative import path pattern `../../../src/lib/...`. Now write the test file."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_018VH3G7pM3mFW9dB2oakEaM",
+            "name": "Write",
+            "input": {
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4282/tests/unit/lib/first-run-checks.test.ts",
+              "content": "/**\n * Unit tests for src/lib/first-run-checks.ts (PAN-4282 item A).\n *\n * `gh auth status` is exercised through a mocked `node:child_process.execFile`\n * (callback style, matching how `promisify` wraps it). The 60 s memo is\n * exercised with fake timers around `Date.now()` only — `execFile` resolves\n * synchronously via the mock, never a real delay.\n */\n\nimport { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';\nimport { Effect } from 'effect';\n\nconst mockExecFile = vi.fn();\n\nvi.mock('node:child_process', () => ({\n  execFile: (...args: unknown[]) => {\n    const cb = args[args.l …[truncated]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_018VH3G7pM3mFW9dB2oakEaM",
+            "content": "File created successfully at: ~/Projects/overdeck/workspaces/feature-pan-4282/tests/unit/lib/first-run-checks.test.ts (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Now let's run typecheck and the test."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01CqHouizms77axhGqDPzroy",
+            "name": "Bash",
+            "input": {
+              "command": "npx vitest run tests/unit/lib/first-run-checks.test.ts 2>&1 | tail -100"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01CqHouizms77axhGqDPzroy",
+            "content": "src/lib/acp/session-runtime.d.ts (22:304) \u001b[33m[IMPORT_IS_UNDEFINED] Warning:\u001b[0m Import `AcpClient` will always be undefined because there is no matching export in 'packages/effect-acp/src/client.d.ts'\n -  in src/lib/acp/session-runtime.d.ts at 2186..2211\n\nsrc/lib/acp/session-runtime.d.ts (22:331) \u001b[33m[IMPORT_IS_UNDEFINED] Warning:\u001b[0m Import `AcpClient` will always be undefined because there is no matching export in 'packages/effect-acp/src/client.d.ts'\n -  in src/lib/acp/session-runtime.d.ts at 2213..2238\n\nsrc/lib/acp/session-runtime.d.ts (22:358) \u001b[33m[IMPORT_IS_UNDEFINED] Warning:\u001b[0m Import `AcpClient` will always be undefined because there is no matching export in 'packages/effect-acp/src/client.d.ts'\n -  in src/lib/acp/session-runtime.d.ts at 2240..2265\n\nsrc/lib/acp/session-runtime.d.ts (22:385) \u001b[33m[IMPORT_IS_UNDEFINED] Warning:\u001b[0m Import `AcpClient` will always be undefined  …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "All 9 tests pass. Now typecheck."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01C29kEASDUKZ8nPUwZYDwq9",
+            "name": "Bash",
+            "input": {
+              "command": "npm run typecheck 2>&1 | tail -60"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01C29kEASDUKZ8nPUwZYDwq9",
+            "content": "> @overdeck/core@0.62.1 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.62.1 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.62.1 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m~/Projects/overdeck/workspaces/feature-pan-4282/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m446.29 kB\u001b[22m \u001b[2m│ gzip: 77.83 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 446.29 kB\n\u001b[33m[PL …[truncated]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01H6bH6w76q1hFqNxV9Rgrsh",
+            "name": "Edit",
+            "input": {
+              "replace_all": false,
+              "file_path": "~/Projects/overdeck/workspaces/feature-pan-4282/src/lib/first-run-checks.ts",
+              "old_string": "import { hostTerminalBackendName, probeHerdrAvailability } from './terminal-backends/select.js';\nimport type { TerminalBackendName } from './terminal-backends/select.js';",
+              "new_string": "import { hostTerminalBackendName, probeHerdrAvailability } from './terminal-backends/select.js';\nimport type { TerminalBackendName } from './terminal-backends/types.js';"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01H6bH6w76q1hFqNxV9Rgrsh",
+            "content": "The file ~/Projects/overdeck/workspaces/feature-pan-4282/src/lib/first-run-checks.ts has been updated successfully. (file state is current in your context — no need to Read it back)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01DP59BQfxXcQBxnBuMHnqvV",
+            "name": "Bash",
+            "input": {
+              "command": "npm run typecheck 2>&1 | tail -30"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01DP59BQfxXcQBxnBuMHnqvV",
+            "content": "- rolldown-plugin-dts:fake-js (21%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4309ms\u001b[39m\n\n> @overdeck/core@0.62.1 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend && npm run typecheck:acp\n\n\n> @overdeck/core@0.62.1 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.62.1 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.62.1 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n✓ dashboard-types guard passed (14 known errors; none new)\n\n> @overdeck/core@0.62.1 typecheck:frontend\n> bash scripts/lint-frontend-types.sh\n\n✓ frontend-types guard passed (0 known errors; none new)\n\n> @overdeck/core@0.62.1 typecheck:acp\n> tsc --noEmit -p packages/effect-acp/tsconfig.json"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Typecheck passes. Now let's re-run the test file (already imports fixed type) and run lint."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01AJibTnSbxoAC3AUiKef5sg",
+            "name": "Bash",
+            "input": {
+              "command": "npx vitest run tests/unit/lib/first-run-checks.test.ts 2>&1 | tail -15"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01AJibTnSbxoAC3AUiKef5sg",
+            "content": "RUN  v4.1.11 ~/Projects/overdeck/workspaces/feature-pan-4282\n\n\n Test Files  1 passed (1)\n      Tests  9 passed (9)\n   Start at  19:50:47\n   Duration  3.45s (transform 157ms, setup 26ms, import 289ms, tests 14ms, environment 0ms)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01SYPgYHpR8cAAchUETA4Z3y",
+            "name": "Bash",
+            "input": {
+              "command": "npx eslint src/lib/first-run-checks.ts tests/unit/lib/first-run-checks.test.ts 2>&1 | tail -60"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_01SYPgYHpR8cAAchUETA4Z3y",
+            "content": "(Bash completed with no output)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Lint clean. Let's also run the effect-facades lint since NFR-1 is about no execSync/facade shapes."
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_011R6ExExUmnv2r79xEkkJwp",
+            "name": "Bash",
+            "input": {
+              "command": "npm run lint:effect-facades 2>&1 | tail -30"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "toolu_011R6ExExUmnv2r79xEkkJwp",
+            "content": "> @overdeck/core@0.62.1 lint:effect-facades\n> bash scripts/lint-effect-facades.sh\n\n✓ Effect façade ratchet passed (A 1, B 4, C 28; none new)"
+          }
+        ]
+      }
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Probing Claude login by spawning the claude CLI synchronously was rejected; the check reads getClaudeAuthStatus instead. Making tmux a hard requirement in pan doctor was dropped; doctor warns on optional tools instead. Item A is ready to commit."
+          }
+        ]
+      }
+    }
+  ],
+  "focus": "Commit item A (first-run checks) and move on to the next checklist item.",
+  "plantedFacts": [
+    {
+      "id": "module",
+      "anyOf": [
+        [
+          "first-run-checks"
+        ]
+      ]
+    },
+    {
+      "id": "tests",
+      "anyOf": [
+        [
+          "9 tests"
+        ],
+        [
+          "9 passed"
+        ],
+        [
+          "nine tests"
+        ],
+        [
+          "9/9"
+        ]
+      ]
+    },
+    {
+      "id": "gh-mock",
+      "anyOf": [
+        [
+          "execFile"
+        ],
+        [
+          "gh auth status"
+        ]
+      ]
+    },
+    {
+      "id": "facades",
+      "anyOf": [
+        [
+          "effect-facades"
+        ],
+        [
+          "façade"
+        ],
+        [
+          "facade"
+        ]
+      ]
+    },
+    {
+      "id": "claude-auth",
+      "anyOf": [
+        [
+          "getClaudeAuthStatus"
+        ]
+      ]
+    },
+    {
+      "id": "warn",
+      "anyOf": [
+        [
+          "warn"
+        ]
+      ]
+    }
+  ],
+  "decoys": [
+    {
+      "id": "sync-spawn",
+      "anchor": "spawning the claude CLI synchronously"
+    },
+    {
+      "id": "tmux-required",
+      "anchor": "tmux a hard requirement"
+    }
+  ]
+}

@@ -39,7 +39,9 @@ import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { runPreflightChecks } from '../../lib/work/done-preflight.js';
 import { updateContinueState } from '../../lib/xbrief/continue-state.js';
-import { commitPlanArtifacts, planArtifactCommitMessage } from '../../lib/overdeck/plan-artifact-commit.js';
+import { commitPendingIssueArtifacts, commitPlanArtifacts, planArtifactCommitMessage } from '../../lib/overdeck/plan-artifact-commit.js';
+
+export { commitPendingIssueArtifacts };
 import { linkCreatedPullRequestToIssueConversations } from '../../lib/overdeck/conversation-pull-requests.js';
 
 const execAsync = promisify(exec);
@@ -376,6 +378,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   const spinner = ora('Marking work as done...').start();
 
   try {
+    await commitPendingIssueArtifacts(workspacePath, issueId);
+
     // Step 1: rebase onto the target branch and push. `pan done` is one command
     // for the agent; the fetch/rebase/push it used to do by hand lives here.
     const mergeSet = buildMergeSetForIssue(issueId);

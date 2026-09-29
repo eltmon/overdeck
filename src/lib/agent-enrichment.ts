@@ -28,6 +28,16 @@ const execAsync = promisify(exec)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/**
+ * Structural mirror of jev/turn-end.ts's TurnEndAssessment — deliberately not
+ * imported. jev/turn-end.ts -> jev/client.ts -> .../pending-decision-gate.ts
+ * imports back into this file, so importing the type here (even `import type`,
+ * which madge's cycle detector still counts as an edge) creates a new import
+ * cycle. TypeScript's structural typing accepts a real TurnEndAssessment value
+ * wherever this shape is expected.
+ */
+export interface TurnEndAssessment { kind: string; confidence: number; needsAnswer: boolean; model: string }
+
 export interface QuestionOption { label: string; description: string }
 export interface Question { question: string; header: string; options: QuestionOption[]; multiSelect: boolean }
 export interface PendingQuestion { toolId: string; timestamp: string; questions: Question[] }
@@ -93,6 +103,8 @@ export interface AgentEnrichment {
    * session costs no I/O without anyone having to fabricate an empty scan.
    */
   jsonlScan?: PendingInputsScan
+  /** PAN-4371 — advisory Jev reading of why a bare turn end happened. Only present alongside pendingInputKinds:['agentTurnEnded']. */
+  turnEndAssessment?: TurnEndAssessment
 }
 
 // PAN-1520 / PAN-1834 — promote pane-detected blocking surfaces into the
@@ -634,6 +646,7 @@ export async function computeAgentEnrichment(
   startedAt?: string,
   hasActiveSpecialist?: boolean,
   cachedScan?: PendingInputsScan | null,
+  turnEndAssessment?: TurnEndAssessment,
 ): Promise<AgentEnrichment> {
   const isPlanning = agentId.startsWith('planning-')
 
@@ -817,5 +830,6 @@ export async function computeAgentEnrichment(
       : (runtimeState?.resolution || 'working'),
     resolutionCount: runtimeState?.resolutionCount || 0,
     jsonlScan: scan,
+    ...(turnEndAssessment && pendingInputKinds.includes('agentTurnEnded') ? { turnEndAssessment } : {}),
   }
 }

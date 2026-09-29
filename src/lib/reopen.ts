@@ -49,11 +49,10 @@ export async function reopenWorkspaceState(
       if (options.reason) noteParts.push(`reason: ${options.reason}`);
       if (options.trackerContext) noteParts.push('tracker context attached');
 
-      appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
+      result.continueFileUpdated = appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
         reason: 'resume',
         note: noteParts.join('; '),
       });
-      result.continueFileUpdated = true;
     } catch {
       // Non-fatal — the issue-closed cache was still cleared above.
     }

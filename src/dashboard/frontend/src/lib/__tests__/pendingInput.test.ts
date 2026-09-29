@@ -24,4 +24,21 @@ describe('describePendingInput', () => {
     expect(describePendingInput([])).toBe('Waiting on your input');
     expect(describePendingInput(undefined)).toBe('Waiting on your input');
   });
+
+  describe('turn-end label (PAN-4371)', () => {
+    it('replaces "Answer the agent" with the turn-end kind label when confident', () => {
+      expect(describePendingInput(['agentTurnEnded'], { kind: 'asks_operator' })).toBe('Asked you a question');
+    });
+
+    it('falls back to "Answer the agent" for an unlabeled turn-end kind', () => {
+      expect(describePendingInput(['agentTurnEnded'], { kind: 'progress_update' })).toBe(
+        PENDING_INPUT_KIND_LABEL.agentTurnEnded,
+      );
+    });
+
+    it('falls back to "Answer the agent" when there is no turn-end assessment', () => {
+      expect(describePendingInput(['agentTurnEnded'])).toBe(PENDING_INPUT_KIND_LABEL.agentTurnEnded);
+      expect(describePendingInput(['agentTurnEnded'], null)).toBe(PENDING_INPUT_KIND_LABEL.agentTurnEnded);
+    });
+  });
 });

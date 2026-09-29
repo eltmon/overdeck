@@ -199,7 +199,7 @@ async function spawnRunWithoutConsentClaim(
   });
   const harnessBehavior = getHarnessBehavior(resolvedHarness);
   const isAcp = harnessBehavior.launchCommandKind === 'acp-host';
-  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
+  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness, { model: selectedModel });
   // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
@@ -685,7 +685,7 @@ async function spawnAgentWithoutConsentClaim(
     model: selectedModel,
   });
   const promptHostTransport = hostTransportFor(resolvedHarness);
-  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
+  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness, { model: selectedModel });
   // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);

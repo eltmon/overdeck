@@ -554,6 +554,7 @@ export interface YamlConfig {
     nous?: string;
     dashscope?: string;
     quantumllama?: string;
+    typesafe?: string;
   };
 
   /** Tracker API keys (override environment variables) */
@@ -574,6 +575,7 @@ export interface YamlConfig {
 
   /** Local Ollama endpoint used by `ollama:<tag>` models (PAN-1641). */
   ollama?: YamlOllamaConfig;
+  jev?: import('./jev.js').YamlJevConfig;
 
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
@@ -826,6 +828,7 @@ export interface NormalizedConfig {
 
   /** Local Ollama endpoint and the context window an Overdeck-started serve gets (PAN-1641). */
   ollama: NormalizedOllamaConfig;
+  jev: import('./jev.js').NormalizedJevConfig;
 
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;
@@ -843,6 +846,7 @@ export interface NormalizedConfig {
     nous?: string;
     dashscope?: string;
     quantumllama?: string;
+    typesafe?: string;
   };
 
   /** Provider auth mode (subscription vs api-key) by provider */
