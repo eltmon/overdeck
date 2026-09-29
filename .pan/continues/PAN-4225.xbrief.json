@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4225",
   "created": "2026-09-29T02:27:12.817Z",
-  "updated": "2026-09-29T04:36:33.750Z",
+  "updated": "2026-09-29T04:36:50.103Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,14 @@
     "cancel-spec-workspace.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T04:36:33.750Z"
+    },
+    "scope-verbs-plan-home.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:36:48.107Z"
+    },
+    "scope-verbs-plan-home.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T04:36:50.103Z"
     }
   }
 }
