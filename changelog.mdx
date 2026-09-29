@@ -10,6 +10,16 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.64.0" description="Unreleased" tags={["Upcoming"]}>
+  ## Upcoming release
+
+  Drafted from the changes merged to `main` since v0.63.0. The date is set when the release is tagged.
+
+  #### New
+
+  - **GPT-6.1 Sol:** OpenAI's `gpt-6.1-sol` is in the OpenAI provider, the model pickers and the cost tables ($2/M input, $0.10/M cached, $10/M output), with the Codex 272K context limit applied on both the Codex and Claude Code routes. It is opt-in; defaults are unchanged. Under ChatGPT sign-in it needs Codex CLI 0.159.0 or newer, and Overdeck refuses the launch on older versions with the upgrade command. ([#4422](https://github.com/eltmon/overdeck/issues/4422))
+</Update>
+
 <Update label="v0.63.0" description="2026-09-29">
   #### New
 
