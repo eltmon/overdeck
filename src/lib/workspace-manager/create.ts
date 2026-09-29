@@ -27,11 +27,11 @@ import {
   createWorktree,
   installPreRebaseHook,
   preTrustDirectory,
-  relocateVenvScripts,
   restorePreWorktreeMetadata,
   stagePreWorktreeMetadata,
   validateFeatureName,
 } from './worktree-ops.js';
+import { setupWorkspaceTldr } from './tldr-venv.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import {
   clearWorkspaceSetupIncomplete,
@@ -508,92 +508,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   }
 
   // Setup TLDR code analysis for workspace (after worktree creation to ensure directory is ready)
-  try {
-    // Check if python3 is available
-    await execAsync('python3 --version');
-    const venvPath = join(workspacePath, '.venv');
-    const tldrBin = join(venvPath, 'bin', 'tldr');
-
-    // Check if main branch already has a working venv with llm-tldr
-    const mainVenvTldr = join(projectConfig.path, '.venv', 'bin', 'tldr');
-    const mainVenvExists = existsSync(mainVenvTldr);
-
-    if (existsSync(tldrBin)) {
-      // PAN-4171: a resumed setup already has the venv; `cp -a` onto an
-      // existing directory would nest a second copy inside it.
-      result.steps.push('Python venv already present');
-    } else if (mainVenvExists) {
-      // Copy the entire venv from main — faster than pip install (seconds vs 30s+)
-      const mainVenvPath = join(projectConfig.path, '.venv');
-      await execAsync(`cp -a "${mainVenvPath}" "${venvPath}"`);
-      // Python venvs are NOT relocatable: `cp -a` preserves the source venv's
-      // absolute interpreter path in every bin/* shebang + activate script.
-      // Rewrite the copy so each script points at the workspace venv's OWN
-      // python — otherwise a repo rename breaks the TLDR MCP server + enforcer
-      // (see relocateVenvScripts docstring).
-      relocateVenvScripts(mainVenvPath, venvPath);
-      result.steps.push('Copied Python venv from main branch (shebangs relocated)');
-    } else {
-      // Create fresh venv and install llm-tldr.
-      // CPU-only torch FIRST (PAN-3534): llm-tldr hard-depends on
-      // sentence-transformers → torch, and the default GPU wheel drags in
-      // ~6.85GB of nvidia/triton/cuda per venv that nothing here uses (warm
-      // and the read-enforcer are CPU background work). Pre-installing the
-      // CPU wheel satisfies the dependency and keeps the venv under 1GB.
-      await execAsync(`python3 -m venv "${venvPath}"`, { cwd: workspacePath });
-      const pipPath = join(venvPath, 'bin', 'pip');
-      await execAsync(`"${pipPath}" install torch --index-url https://download.pytorch.org/whl/cpu`, {
-        cwd: workspacePath,
-        timeout: 300000,
-      });
-      await execAsync(`"${pipPath}" install llm-tldr`, { cwd: workspacePath, timeout: 300000 });
-      result.steps.push('Created Python venv and installed llm-tldr (CPU-only torch)');
-
-      // Apply .tsx/.jsx support patch (upstream llm-tldr only checks .ts)
-      const patchScript = join(projectConfig.path, 'scripts', 'patches', 'llm-tldr-tsx-support.py');
-      if (existsSync(patchScript)) {
-        await execAsync(`python3 "${patchScript}" "${venvPath}"`);
-        result.steps.push('Applied llm-tldr .tsx/.jsx patch');
-      }
-    }
-
-    // Verify tldr binary exists after setup
-    if (!existsSync(tldrBin)) {
-      result.steps.push('TLDR setup incomplete: tldr binary not found after venv creation');
-    } else {
-      // Copy .tldr index from main branch if it exists
-      const mainTldrDir = join(projectConfig.path, '.tldr');
-      const workspaceTldrDir = join(workspacePath, '.tldr');
-
-      if (existsSync(mainTldrDir) && !existsSync(workspaceTldrDir)) {
-        await execAsync(`cp -r "${mainTldrDir}" "${workspaceTldrDir}"`);
-        result.steps.push('Copied TLDR index from main branch');
-      }
-
-      // Start TLDR daemon for this workspace
-      const { getTldrDaemonService } = await import('../tldr-daemon.js');
-      const tldrService = getTldrDaemonService(workspacePath, venvPath);
-      await tldrService.start(true);
-      result.steps.push('Started TLDR daemon');
-
-      // Warm the index in the background — ensures workspaces always have a working index
-      // even when the main branch cache was empty (nothing to copy)
-      try {
-        await tldrService.warm(true);  // background=true: non-blocking
-        result.steps.push('TLDR index warm initiated (background)');
-      } catch {
-        // Non-fatal — daemon may not support warm yet
-      }
-    }
-  } catch (error: any) {
-    // TLDR setup is optional — don't fail workspace creation, but log clearly
-    if (error.message?.includes('python3')) {
-      result.steps.push('Skipped TLDR setup (python3 not available)');
-    } else {
-      console.warn(`⚠ TLDR setup failed: ${error.message}`);
-      result.steps.push(`TLDR setup failed: ${error.message}`);
-    }
-  }
+  result.steps.push(...(await setupWorkspaceTldr(workspacePath, projectConfig.path)));
 
   // Configure DNS
   if (workspaceConfig.dns) {
