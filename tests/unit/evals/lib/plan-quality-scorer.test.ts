@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { loadFixtureDir, readRepoText } from '../../../../evals/lib/fixtures.js';
 import {
   extractJsonObject,
   parsePlanQualityCase,
   scorePlanQuality,
 } from '../../../../evals/lib/plan-quality-scorer.js';
+import { parseXBriefDocument } from '../../../../src/lib/xbrief/io.js';
 import { lintPlanQuality } from '../../../../src/lib/xbrief/quality-lint.js';
 import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
@@ -111,6 +113,24 @@ describe('evals/lib/plan-quality-scorer', () => {
     it('accepts a valid case and rejects an open issue', () => {
       expect(parsePlanQualityCase(valid).issueId).toBe('PAN-1');
       expect(() => parsePlanQualityCase({ ...valid, issueState: 'OPEN' })).toThrow(/CLOSED/);
+    });
+  });
+
+  describe('committed fixtures', () => {
+    const cases = loadFixtureDir('evals/fixtures/plan-quality').map((f) => parsePlanQualityCase(f.data));
+
+    it('holds exactly 8 closed-issue cases', () => {
+      expect(cases).toHaveLength(8);
+      for (const c of cases) expect(c.issueState).toBe('CLOSED');
+    });
+
+    it('points each case at a reference spec parseXBriefDocument accepts and a readable PRD', () => {
+      for (const c of cases) {
+        const reference = parseXBriefDocument(readRepoText(c.referenceSpecPath), c.referenceSpecPath);
+        expect(reference.plan.items.length, c.id).toBeGreaterThanOrEqual(3);
+        expect(reference.plan.items.length, c.id).toBeLessThanOrEqual(20);
+        expect(readRepoText(c.prdPath).length, c.id).toBeGreaterThan(0);
+      }
     });
   });
 });
