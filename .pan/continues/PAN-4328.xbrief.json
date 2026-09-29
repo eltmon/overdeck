@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4328",
   "created": "2026-09-29T09:43:01.978Z",
-  "updated": "2026-09-29T09:45:47.638Z",
+  "updated": "2026-09-29T09:46:26.085Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-29T09:45:38.338Z"
     },
     "eff-wordlist": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4328",
-      "claimedAt": "2026-09-29T09:45:47.638Z"
+      "claimedAt": "2026-09-29T09:45:47.638Z",
+      "doneAt": "2026-09-29T09:46:26.085Z"
     }
   }
 }
