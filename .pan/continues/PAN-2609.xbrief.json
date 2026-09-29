@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:35:59.047Z",
+  "updated": "2026-09-29T06:36:12.061Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -574,6 +574,10 @@
     "cli-evict-restore.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T06:35:59.047Z"
+    },
+    "cli-exclude-secrets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:36:12.060Z"
     }
   }
 }
