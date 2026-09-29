@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4334",
   "created": "2026-09-29T00:46:06.120Z",
-  "updated": "2026-09-29T02:24:48.644Z",
+  "updated": "2026-09-29T02:25:00.255Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -298,6 +298,10 @@
     "launch-pack-apply.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T02:24:48.643Z"
+    },
+    "launcher-plugin-dir.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T02:25:00.254Z"
     }
   }
 }
