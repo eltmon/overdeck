@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4369",
   "created": "2026-09-29T04:37:53.207Z",
-  "updated": "2026-09-29T04:39:30.282Z",
+  "updated": "2026-09-29T04:46:49.853Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -24,9 +24,10 @@
       "doneAt": "2026-09-29T04:39:13.850Z"
     },
     "config-jev-block": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4369",
-      "claimedAt": "2026-09-29T04:39:30.281Z"
+      "claimedAt": "2026-09-29T04:39:30.281Z",
+      "doneAt": "2026-09-29T04:46:49.853Z"
     }
   }
 }
