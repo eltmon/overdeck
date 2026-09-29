@@ -33,6 +33,9 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from '../paths.js';
+import { getAgentJsonlMtime } from '../agent-enrichment.js';
+import { formatTurnEndSummary, type TurnEndAssessment } from '../jev/turn-end.js';
+import { isTurnEndAssessmentEnabled, peekTurnEndAssessment, scheduleTurnEndAssessment } from '../jev/turn-end-store.js';
 
 export const PARKED_ORBITS = [
   'operator-gate',
@@ -91,6 +94,8 @@ export interface ParkedSignals {
   /** Tracker-closed (only resolved for live-agent candidates; null = unknown/not checked). */
   issueClosed: boolean | null;
   now: number;
+  /** PAN-4371 — advisory Jev turn-end reading, keyed by agent id, for idle-running rows. */
+  turnEndByAgentId?: ReadonlyMap<string, TurnEndAssessment>;
 }
 
 function isoOr(ts: string | number | null | undefined, fallback: number): string {
@@ -214,12 +219,20 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
       if (!Number.isFinite(lastMs)) continue;
       const idleMs = s.now - lastMs;
       if (idleMs < IDLE_RUNNING_THRESHOLD_MS) continue;
+      const turnEnd = s.turnEndByAgentId?.get(agent.id);
       push(
         'idle-running',
         new Date(lastMs).toISOString(),
-        `${agent.id} is alive but has done nothing for ${Math.floor(idleMs / 60_000)} minutes and no pipeline stage owns the next move`,
+        `${agent.id} is alive but has done nothing for ${Math.floor(idleMs / 60_000)} minutes and no pipeline stage owns the next move`
+          + (turnEnd ? `; ${formatTurnEndSummary(turnEnd)}` : ''),
         'poke for progress; if none, stop or resume with a nudge through the established agent-control door',
-        { agentId: agent.id, idleMinutes: Math.floor(idleMs / 60_000) },
+        {
+          agentId: agent.id,
+          idleMinutes: Math.floor(idleMs / 60_000),
+          ...(turnEnd
+            ? { turnEnd: { kind: turnEnd.kind, confidence: turnEnd.confidence, model: turnEnd.model, summary: formatTurnEndSummary(turnEnd) } }
+            : {}),
+        },
       );
     }
   }
@@ -232,6 +245,16 @@ export interface ResolveParkedOptions {
   now?: number;
   /** Tracker-closed check (defaults to isIssueClosed). Only called for live-agent candidates. */
   isClosed?: (issueId: string) => Promise<boolean>;
+  /** PAN-4371 — advisory Jev turn-end reading (defaults to peek+schedule via the turn-end store). */
+  turnEndFor?: (agent: AgentState) => Promise<TurnEndAssessment | undefined>;
+}
+
+/** Default turnEndFor: never awaits the Jev call — schedules it and peeks whatever is already ready. */
+async function defaultTurnEndFor(agent: AgentState): Promise<TurnEndAssessment | undefined> {
+  if (!isTurnEndAssessmentEnabled()) return undefined;
+  const mtime = await getAgentJsonlMtime(agent.id);
+  scheduleTurnEndAssessment({ agentId: agent.id, role: String(agent.role ?? 'work'), transcriptMtime: mtime });
+  return peekTurnEndAssessment(agent.id, mtime);
 }
 
 /**
@@ -245,6 +268,7 @@ export interface ResolveParkedOptions {
 export async function resolveParkedPopulation(options: ResolveParkedOptions = {}): Promise<ParkedRow[]> {
   const now = options.now ?? Date.now();
   const isClosed = options.isClosed ?? isIssueClosed;
+  const turnEndFor = options.turnEndFor ?? defaultTurnEndFor;
 
   const allAgents = listAgentStates();
   // PAN-3849 (W32): "live" is the liveness oracle's verdict (session + live
@@ -293,12 +317,33 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
     if (issueClosed === null && live.length > 0) {
       try { issueClosed = await isClosed(issueId); closedByIssue.set(issueId, issueClosed); } catch { issueClosed = null; }
     }
+
+    // PAN-4371 — only agents the idle-running classifier would actually flag
+    // trigger a turn-end read, so no other live agent's transcript is touched.
+    const idleEligible = issueClosed === true
+      ? []
+      : live.filter((agent) => {
+          if (IDLE_EXEMPT_ROLES.has(String(agent.role ?? ''))) return false;
+          const lastMs = Date.parse(agent.lastActivity ?? agent.startedAt ?? '');
+          return Number.isFinite(lastMs) && now - lastMs >= IDLE_RUNNING_THRESHOLD_MS;
+        });
+    let turnEndByAgentId: ReadonlyMap<string, TurnEndAssessment> | undefined;
+    if (idleEligible.length > 0) {
+      const map = new Map<string, TurnEndAssessment>();
+      await Promise.all(idleEligible.map(async (agent) => {
+        const view = await turnEndFor(agent);
+        if (view) map.set(agent.id, view);
+      }));
+      if (map.size > 0) turnEndByAgentId = map;
+    }
+
     return classifyParked({
       issueId,
       agents: agentsByIssue.get(issueId) ?? [],
       liveAgents: live,
       issueClosed,
       now,
+      turnEndByAgentId,
     });
   };
 
