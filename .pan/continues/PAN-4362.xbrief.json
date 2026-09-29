@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:16:15.201Z",
+  "updated": "2026-09-29T11:16:26.686Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -336,6 +336,10 @@
     "handoff-render-export.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T11:16:15.201Z"
+    },
+    "faithfulness-scorer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:16:26.685Z"
     }
   }
 }
