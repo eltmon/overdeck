@@ -15,7 +15,7 @@ function buildReviewRecallUserPrompt(c: ReviewRecallCase): string {
       ? `Acceptance criteria:\n${c.issue.acceptanceCriteria.map((ac) => `- ${ac}`).join('\n')}\n\n`
       : '';
   return `You are the ${c.lane} reviewer for ${c.issue.id}: ${c.issue.title}.
-${acs}Eval mode: you have no tools and no output file. The complete diff under review is below. Write your final report, in the exact output format from your instructions, as your response text.
+${acs}Eval mode: you have no tools and no output file. The diff below is an excerpt of the pull request, limited to a few of its changed files. Review what it shows, and do not report a requirement as missing only because its implementation is outside the excerpt. Write your final report, in the exact output format from your instructions, as your response text.
 
 \`\`\`diff
 ${c.diff}
