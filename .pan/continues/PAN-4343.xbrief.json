@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4343",
   "created": "2026-09-29T04:18:07.024Z",
-  "updated": "2026-09-29T05:07:27.807Z",
+  "updated": "2026-09-29T05:07:39.687Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "conversation-runtime-gh-shim.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T05:07:27.807Z"
+    },
+    "docs-grant-labels-operator-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T05:07:39.687Z"
     }
   }
 }
