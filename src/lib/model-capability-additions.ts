@@ -28,6 +28,7 @@ export const AUDITED_MODEL_ADDITIONS = {
       'context-length': 95,
     },
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
     notes: 'Fable 5.1 requires Claude Code 2.1.255 or newer. Native 1M context; always-adaptive thinking, High default. API input $10/M, output $50/M, cache read $0.25/M.',
   },
 
