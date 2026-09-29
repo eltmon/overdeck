@@ -1,0 +1,107 @@
+---
+title: Jev (TypeSafe) judgment client
+description: Optional, off-by-default typed judgment calls through TypeSafe's Jev model
+---
+
+# Jev (TypeSafe) judgment client
+
+Overdeck can ask TypeSafe AI's Jev model small, typed questions: yes/no, pick-one, or a score
+on a rubric. Jev is a judgment model, not a coding model. It answers questions about a piece of
+text and never generates text, so it cannot run an agent. It is optional and **off by default**.
+
+## What Jev is
+
+Jev ("System One") takes a `state` (text or JSON) and a set of named questions, and returns a
+calibrated answer for each one:
+
+- a **Noul** question returns a probability from 0 to 1 that the statement is true;
+- a **Choice** question returns a probability for each option;
+- a **Score** question returns an expected score on a rubric.
+
+Answers typically come back in under half a second. Overdeck uses them for fuzzy judgments that
+are hard to do with keyword lists, such as "does this agent message end by asking a question?".
+
+## Two routes
+
+You can reach Jev through OpenCode Zen or directly through TypeSafe.
+
+| Route | `jev.base_url` | `jev.model` | Key |
+| --- | --- | --- | --- |
+| Zen route | `https://opencode.ai/zen` | `jev-1.13-free` (limited time) or `jev-1.13` | An OpenCode Zen API key |
+| Direct route | unset (the SDK uses `https://api.typesafe.ai`) | a pinned version, for example `jev-1.13.0` | A key from [console.typesafe.ai](https://console.typesafe.ai/keys) |
+
+The Zen route needs no new account if you already have an OpenCode Zen key. Both routes use the
+same key slot.
+
+## Configuration
+
+Add a `jev:` block to `~/.overdeck/config.yaml`:
+
+```yaml
+jev:
+  base_url: https://opencode.ai/zen   # omit for the direct route
+  model: jev-1.13-free                # required; there is no default
+  api_key_ref: TYPESAFE_API_KEY       # env var used when api_keys.typesafe is empty
+  timeout_ms: 2000                    # per request, 1–30000
+
+api_keys:
+  typesafe: <your TypeSafe or OpenCode Zen key>
+
+background_ai:
+  cheap_mode: false
+  features:
+    jevTurnEndAssessment: true
+```
+
+You can also set the key in **Settings → Background AI → TypeSafe API key (Jev)**. Overdeck looks
+for the key in this order:
+
+1. `api_keys.typesafe`;
+2. the environment variable named by `jev.api_key_ref` (default `TYPESAFE_API_KEY`).
+
+**There is no default model.** With `jev.model` unset, every Jev feature reports
+`model-not-configured` and makes no request. Overdeck never falls back to the SDK's own default
+model.
+
+Each Jev feature has its own toggle under `background_ai.features`, and all three are off by
+default:
+
+- `jevTurnEndAssessment`
+- `jevAcceptanceCriteriaReview`
+- `jevMemoryRelevance`
+
+Low-cost mode (`background_ai.cheap_mode`, on by default) turns all of them off regardless of their
+toggles. With no `jev:` block, low-cost mode on, or a toggle off, Overdeck behaves exactly as it
+does without Jev: no request, no startup check, and no warning.
+
+## What is sent to TypeSafe
+
+This release sends nothing: the client exists, but no feature calls it yet.
+
+When each feature ships, turning its toggle on sends the following data:
+
+| Toggle | What it sends (when that feature ships) |
+| --- | --- |
+| `jevTurnEndAssessment` | Sends an agent's last message (trimmed to about 6,000 characters) and its role to TypeSafe to classify why the agent stopped. |
+| `jevAcceptanceCriteriaReview` | Sends the id and text of every acceptance criterion in a plan to TypeSafe at plan finalize, for advisory warnings. |
+| `jevMemoryRelevance` | Sends your prompt and up to 20 memory snippets (about 600 characters each) to TypeSafe to drop irrelevant memories before injection. |
+
+The same text appears under each toggle in Settings.
+
+## Privacy
+
+On the direct route, requests go straight to TypeSafe AI. On the Zen route, they go to OpenCode
+Zen, which forwards them to TypeSafe. TypeSafe states that it does not train on customer data.
+Zero data retention is available only on TypeSafe's enterprise plan.
+
+Overdeck never logs the API key or the request body. The client pins the SDK log level to `warn`,
+which also overrides a `TYPESAFE_LOG_LEVEL=debug` environment variable.
+
+## Cost
+
+Jev costs $0.042 per million input tokens, and output is free. `jev-1.13-free` records $0.
+
+Every real request (not a repeat served from Overdeck's in-process memo) appends one event to the
+cost ledger with the source `background:<feature>`, for example
+`background:jevTurnEndAssessment`. The 24-hour spend appears next to each toggle in
+Settings → Background AI.
