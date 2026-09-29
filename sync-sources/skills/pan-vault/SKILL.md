@@ -50,9 +50,13 @@ pan vault resume <id>               # adopt the conversation here and launch the
 pan vault resume <id>@3             # fork at version 3 first
 pan vault resume <id> --cwd <dir> --no-launch
 pan vault resume <id> --on-drift note
+pan vault resume <id> --no-code             # conversation only; skip the code snapshot
+pan vault resume <id> --worktree <dir>      # apply the code snapshot into a new git worktree
 ```
 
 `resume` compares the target directory's git state with the saved state. On a difference it asks on a TTY; `--on-drift continue|note|cancel` answers non-interactively and a non-TTY run without the flag cancels. Claude Code and Codex resume natively; other harnesses get a seed digest file in the target directory.
+
+Each save also captures an encrypted snapshot of the uncommitted code (tracked and untracked files plus unpushed commits; ignored files excluded; 50 MB cap; never pushed to the git host). `resume` applies the latest one before continuing: the target checkout must be clean, or pass `--worktree <dir>`; changes arrive unstaged. A secret in the code blocks only the snapshot; `save` names the file and pattern.
 
 ## Exclusions and secrets
 
@@ -62,6 +66,7 @@ pan vault exclude --origin git@github.com:org/private.git
 pan vault exclude --session <id>    # tombstones an already-saved record
 pan vault include /work/secret-proj
 pan vault allow-secret <id-or-path> <line>
+pan vault allow-secret <id> --file <path>   # blocked lines of one file in the code snapshot
 ```
 
 ## Eviction (opt-in, confirmation required)

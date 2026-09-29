@@ -74,6 +74,29 @@ in scripts and `--no-launch` to print the command instead of running it.
 Claude Code and Codex resume natively. Other harnesses receive a markdown digest of the
 conversation in the target directory to paste into a new session.
 
+### Your uncommitted code comes along
+
+Each save also takes an encrypted snapshot of the code the conversation was working on:
+every tracked and untracked file in the working tree plus any local commits you have not
+pushed. Files matched by `.gitignore` are left out, and everything arrives unstaged. The
+snapshot is stored in your vault like the conversation, end-to-end encrypted, and is
+**never pushed to your git host**, so it works even when the first machine is switched off.
+
+```bash
+pan vault resume <id>                      # applies the snapshot, then continues
+pan vault resume <id> --worktree ../fresh  # apply into a new git worktree instead
+pan vault resume <id> --no-code            # continue the conversation only
+```
+
+`resume` fetches origin, checks out the saved commit, and applies the changes. The target
+checkout must be clean: with uncommitted changes it offers a fresh worktree at a TTY, and
+otherwise stops and asks for `--worktree <dir>`. Nothing in the dirty checkout is touched.
+
+A snapshot larger than 50 MB (`wipMaxBytes` in the vault config) is skipped, and `resume`
+says so. If the uncommitted code contains something that looks like a credential, the
+snapshot is not uploaded; `save` names the file and pattern and prints the command to allow
+it: `pan vault allow-secret <id> --file <path>`, then `pan vault save`.
+
 ## Exclude what should never leave the machine
 
 ```bash
