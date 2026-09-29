@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4422",
   "created": "2026-09-29T20:41:36.281Z",
-  "updated": "2026-09-29T21:56:50.298Z",
+  "updated": "2026-09-29T21:57:05.260Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "catalog-entry.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T21:56:50.298Z"
+    },
+    "cost-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T21:57:05.259Z"
     }
   }
 }
