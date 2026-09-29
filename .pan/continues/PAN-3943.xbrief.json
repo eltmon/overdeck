@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3943",
   "created": "2026-09-29T22:32:07.575Z",
-  "updated": "2026-09-29T22:37:30.544Z",
+  "updated": "2026-09-29T22:42:24.067Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-29T22:37:21.806Z"
     },
     "deft-adapter": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3943",
-      "claimedAt": "2026-09-29T22:37:30.544Z"
+      "claimedAt": "2026-09-29T22:37:30.544Z",
+      "doneAt": "2026-09-29T22:42:24.067Z"
     }
   }
 }
