@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4370",
   "created": "2026-09-29T13:04:28.844Z",
-  "updated": "2026-09-29T16:12:52.807Z",
+  "updated": "2026-09-29T16:13:06.589Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "policy-auth-health.ac5": {
       "status": "completed",
       "doneAt": "2026-09-29T16:12:52.807Z"
+    },
+    "expansion-reasons.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:13:06.589Z"
     }
   }
 }
