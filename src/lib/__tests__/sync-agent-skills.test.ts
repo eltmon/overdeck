@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -80,5 +80,78 @@ describe('agent harness skill sync', () => {
     expect(result.updated).toContain('okf/SKILL.md');
     expect(result.skipped).toContain('personal/SKILL.md');
     expect(readFileSync(join(target, 'personal', 'SKILL.md'), 'utf-8')).toBe('# Personal\n');
+  });
+
+  // PAN-4408: 'okf' is a vendored skill (VENDORED_SKILLS in vendored-skills.ts).
+  it('replaces a locally modified real copy of a vendored skill and records replacedVendored', () => {
+    const { source, target } = fixture();
+    executeAgentSkills({}, target, source);
+    writeFileSync(join(target, 'okf', 'SKILL.md'), '# Locally edited\n');
+
+    const result = executeAgentSkills({}, target, source);
+
+    expect(result.replacedVendored).toContain('okf/SKILL.md');
+    expect(result.conflicts).not.toContain('okf/SKILL.md');
+    expect(readFileSync(join(target, 'okf', 'SKILL.md'), 'utf-8')).toBe('# OKF\n');
+  });
+
+  it('replaces a differing but unmanifested okf file and records replacedVendored', () => {
+    const { source, target } = fixture();
+    mkdirSync(join(target, 'okf'), { recursive: true });
+    writeFileSync(join(target, 'okf', 'SKILL.md'), '# Stale pre-manifest content\n');
+
+    const result = executeAgentSkills({}, target, source);
+
+    expect(result.replacedVendored).toContain('okf/SKILL.md');
+    expect(result.skipped).not.toContain('okf/SKILL.md');
+    expect(readFileSync(join(target, 'okf', 'SKILL.md'), 'utf-8')).toBe('# OKF\n');
+  });
+
+  it('still reports a locally modified non-vendored skill as a conflict', () => {
+    const { source, target } = fixture();
+    mkdirSync(join(source, 'other'), { recursive: true });
+    writeFileSync(join(source, 'other', 'SKILL.md'), '# Other\n');
+    executeAgentSkills({}, target, source);
+    writeFileSync(join(target, 'other', 'SKILL.md'), '# Locally edited\n');
+
+    const result = executeAgentSkills({}, target, source);
+
+    expect(result.conflicts).toContain('other/SKILL.md');
+    expect(result.replacedVendored).not.toContain('other/SKILL.md');
+    expect(readFileSync(join(target, 'other', 'SKILL.md'), 'utf-8')).toBe('# Locally edited\n');
+  });
+
+  it('leaves a symlinked okf root untouched and reports a conflict', () => {
+    const { source, target } = fixture();
+    executeAgentSkills({}, target, source);
+    const realDir = join(target, '..', 'user-okf-checkout');
+    mkdirSync(realDir, { recursive: true });
+    writeFileSync(join(realDir, 'SKILL.md'), '# User checkout, locally edited\n');
+    rmSync(join(target, 'okf'), { recursive: true, force: true });
+    symlinkSync(realDir, join(target, 'okf'));
+
+    const result = executeAgentSkills({}, target, source);
+
+    expect(result.conflicts).toContain('okf/SKILL.md');
+    expect(result.replacedVendored).not.toContain('okf/SKILL.md');
+    expect(readFileSync(join(realDir, 'SKILL.md'), 'utf-8')).toBe('# User checkout, locally edited\n');
+  });
+
+  it('planAgentSkills reports symlink for a converging vendored edit and conflict for a symlinked root', () => {
+    const { source, target } = fixture();
+    executeAgentSkills({}, target, source);
+    writeFileSync(join(target, 'okf', 'SKILL.md'), '# Locally edited\n');
+
+    const convergingPlan = planAgentSkills(target, source);
+    expect(convergingPlan.find((item) => item.name === 'okf/SKILL.md')).toMatchObject({ status: 'symlink' });
+
+    const realDir = join(target, '..', 'user-okf-checkout');
+    mkdirSync(realDir, { recursive: true });
+    writeFileSync(join(realDir, 'SKILL.md'), '# User checkout edit\n');
+    rmSync(join(target, 'okf'), { recursive: true, force: true });
+    symlinkSync(realDir, join(target, 'okf'));
+
+    const symlinkedPlan = planAgentSkills(target, source);
+    expect(symlinkedPlan.find((item) => item.name === 'okf/SKILL.md')).toMatchObject({ status: 'conflict' });
   });
 });

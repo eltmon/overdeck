@@ -14,7 +14,7 @@ const mockMirrorProjectSkills = vi.fn().mockReturnValue({ added: [], updated: []
 const mockCheckDevrootDeprecation = vi.fn().mockReturnValue(null);
 const mockLoadConfig = vi.fn().mockReturnValue({ sync: {} });
 const mockPlanSync = vi.fn().mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
-const emptySyncResult = { created: [], updated: [], adopted: [], skipped: [], conflicts: [], pruned: [], keptModified: [], diffs: [] };
+const emptySyncResult = { created: [], updated: [], adopted: [], skipped: [], conflicts: [], replacedVendored: [], pruned: [], keptModified: [], diffs: [] };
 const mockExecuteSync = vi.fn().mockReturnValue(emptySyncResult);
 const mockExecuteAgentSkillsSync = vi.fn().mockReturnValue(emptySyncResult);
 const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
@@ -278,6 +278,22 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     expect(output).toContain('Kept user-modified stale file(s):');
     expect(output).toContain('skills/custom/SKILL.md');
     expect(output).toContain('~/.agents/skills/agent-custom/SKILL.md');
+    consoleSpy.mockRestore();
+  });
+
+  it('reports replaced locally edited files in vendored skills', async () => {
+    mockExecuteAgentSkillsSync.mockReturnValue({
+      ...emptySyncResult,
+      replacedVendored: ['okf/SKILL.md'],
+    });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    const output = consoleSpy.mock.calls.flatMap((args) => args).join('\n');
+    expect(output).toContain('Replaced locally edited file(s) in vendored skills');
+    expect(output).toContain('~/.agents/skills/okf/SKILL.md');
     consoleSpy.mockRestore();
   });
 
