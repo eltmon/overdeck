@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4369",
   "created": "2026-09-29T04:37:53.207Z",
-  "updated": "2026-09-29T04:52:33.308Z",
+  "updated": "2026-09-29T04:56:30.488Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,9 +68,10 @@
       "doneAt": "2026-09-29T04:52:14.324Z"
     },
     "jev-pricing": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4369",
-      "claimedAt": "2026-09-29T04:52:33.308Z"
+      "claimedAt": "2026-09-29T04:52:33.308Z",
+      "doneAt": "2026-09-29T04:56:30.488Z"
     }
   }
 }
