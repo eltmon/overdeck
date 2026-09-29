@@ -5,7 +5,8 @@
  * PR from the live forge facts (`evaluateConflictRepairGate`), sends the
  * issue's work agent one sync-main repair per PR head, and raises Needs-you
  * once when the same head still conflicts after `CONFLICT_REPAIR_GRACE_MS`, or
- * at once when the agent cannot be reached.
+ * at once when the agent cannot be reached. When a repair moved the head and
+ * the agent never asked for review, it asks the guarded review door once.
  *
  * Nothing is stored. Each repair and escalation is an action journaled in the
  * workspace's pipeline journal with the head it was for (`data.head`), and
@@ -31,6 +32,7 @@ import {
   readPipelineJournal,
   type PipelineJournalEntry,
 } from './pipeline-journal.js';
+import { getGuardedReviewRequester } from './request-review-pipeline.js';
 
 export const CONFLICT_REPAIR_INTERVAL_MS = 60_000;
 /** How long one repair may take before a head that still conflicts escalates. */
@@ -59,9 +61,12 @@ export interface ConflictRepairDeps {
 
 /** Issues whose repair dispatch is still running, so an overlapping tick skips them. */
 const inFlight = new Set<string>();
+/** When the backstop last asked for review, per issue, so a refusing door is not asked every tick. */
+const lastBackstopAt = new Map<string, number>();
 
 export function __resetConflictRepairStateForTests(): void {
   inFlight.clear();
+  lastBackstopAt.clear();
 }
 
 /**
@@ -118,6 +123,15 @@ async function defaultDeliver(agentId: string, prompt: string, dedupKey: string)
   }
 }
 
+async function defaultRequestReview(issueId: string): Promise<unknown> {
+  const requester = getGuardedReviewRequester();
+  if (!requester) {
+    console.log(`[conflict-repair] ${issueId}: no guarded review requester in this process; backstop skipped`);
+    return null;
+  }
+  return requester(issueId, { source: SOURCE, message: 'conflict repair pushed a new head; re-review it' });
+}
+
 async function defaultProbeConflictPaths(workspacePath: string): Promise<string[]> {
   return (await probeBranchConflictPaths(workspacePath, 'main')).paths;
 }
@@ -132,7 +146,7 @@ interface Resolved {
   deliver: NonNullable<ConflictRepairDeps['deliver']>;
   surfaceNeedsYou: NonNullable<ConflictRepairDeps['surfaceNeedsYou']>;
   probeConflictPaths: NonNullable<ConflictRepairDeps['probeConflictPaths']>;
-  requestReview: ConflictRepairDeps['requestReview'];
+  requestReview: NonNullable<ConflictRepairDeps['requestReview']>;
   now: () => number;
   log: (message: string) => void;
 }
@@ -148,7 +162,7 @@ function resolveDeps(deps: ConflictRepairDeps): Resolved {
     deliver: deps.deliver ?? defaultDeliver,
     surfaceNeedsYou: deps.surfaceNeedsYou ?? surfaceIssueFeedbackNeedsYou,
     probeConflictPaths: deps.probeConflictPaths ?? defaultProbeConflictPaths,
-    requestReview: deps.requestReview,
+    requestReview: deps.requestReview ?? defaultRequestReview,
     now: deps.now ?? Date.now,
     log: deps.log ?? ((message) => console.log(message)),
   };
@@ -227,13 +241,51 @@ async function dispatchRepair(
   return 'repair-requested';
 }
 
+/**
+ * FR-7: the agent pushed a repair but never asked for review, so the moved
+ * head sits approved-by-nobody. Once the repair is old enough, ask the guarded
+ * door once; the door journals `review.requested`, which ends the backstop.
+ */
+async function reviewBackstop(
+  d: Resolved,
+  issueId: string,
+  entries: readonly PipelineJournalEntry[],
+  gate: ConflictRepairGateResult,
+): Promise<string | null> {
+  const { facts } = gate;
+  if (!facts.open || facts.mergeable !== true || !facts.headSha) return null;
+  let repairIndex = -1;
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (entries[index].type === 'conflict.repair-requested') {
+      repairIndex = index;
+      break;
+    }
+  }
+  if (repairIndex < 0) return null;
+  const repair = entries[repairIndex];
+  const head = facts.headSha.slice(0, 8);
+  if (repair.data?.head === head) return null;
+  if (entries.slice(repairIndex + 1).some((entry) => entry.type === 'review.requested')) return null;
+  const now = d.now();
+  if (now - Date.parse(repair.at) < CONFLICT_REPAIR_REVIEW_BACKSTOP_MS) return null;
+  const { repairs, escalations } = entriesForHead(entries, head);
+  if (repairs.length > 0 || escalations.length > 0) return null;
+  const last = lastBackstopAt.get(issueId);
+  if (last !== undefined && now - last < CONFLICT_REPAIR_REVIEW_BACKSTOP_MS) return null;
+  lastBackstopAt.set(issueId, now);
+  d.log(`[conflict-repair] ${issueId}: repaired head ${head} has no review request; requesting review`);
+  await d.requestReview(issueId);
+  return 'review-requested';
+}
+
 async function tickIssue(d: Resolved, issueId: string, workspacePath: string): Promise<string | null> {
   const entries = d.readJournal(workspacePath);
   if (!isConflictRepairCandidate(entries)) return null;
   if (d.getIssuePause(issueId).status !== 'unpaused') return null;
 
   const gate = await d.evaluateGate(issueId);
-  if (!gate.conflicting || !gate.facts.headSha) return null;
+  if (!gate.conflicting) return reviewBackstop(d, issueId, entries, gate);
+  if (!gate.facts.headSha) return null;
 
   const head = gate.facts.headSha.slice(0, 8);
   const { repairs, escalations } = entriesForHead(entries, head);

@@ -15,6 +15,7 @@ import {
   __resetConflictRepairStateForTests,
   buildConflictRepairPrompt,
   CONFLICT_REPAIR_GRACE_MS,
+  CONFLICT_REPAIR_REVIEW_BACKSTOP_MS,
   isConflictRepairCandidate,
   tickConflictRepair,
   type ConflictRepairDeps,
@@ -308,5 +309,104 @@ describe('tickConflictRepair', () => {
     } finally {
       rmSync(other, { recursive: true, force: true });
     }
+  });
+});
+
+describe('tickConflictRepair — review backstop after a repair', () => {
+  /** A repair sent for head A, then the forge reports head B as mergeable. */
+  async function repairThenMove(overrides: ConflictRepairDeps = {}) {
+    approve();
+    let current = gate(true, HEAD_A);
+    const requestReview = vi.fn(async () => ({ kind: 'started' }));
+    const { deps } = makeDeps({ evaluateGate: async () => current, requestReview, ...overrides });
+    await tickConflictRepair(deps);
+    current = gate(false, HEAD_B);
+    return { deps, requestReview, setGate: (next: ConflictRepairGateResult) => { current = next; } };
+  }
+
+  it('requests review once for a moved, mergeable head with no review request after the repair', async () => {
+    const { deps, requestReview } = await repairThenMove();
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    expect(await tickConflictRepair(deps)).toEqual(['PAN-1166: review-requested']);
+    vi.advanceTimersByTime(60_000);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).toHaveBeenCalledOnce();
+    expect(requestReview).toHaveBeenCalledWith(ISSUE);
+  });
+
+  it('asks a refusing door again only after another backstop window', async () => {
+    const { deps, requestReview } = await repairThenMove();
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    await tickConflictRepair(deps);
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not request review when a review request followed the repair', async () => {
+    const { deps, requestReview } = await repairThenMove();
+    appendPipelineEntry(workspace, { type: 'review.requested', issueId: ISSUE, source: 'pan-review-request' });
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).not.toHaveBeenCalled();
+  });
+
+  it('does not request review while the head is still the repaired one', async () => {
+    const { deps, requestReview, setGate } = await repairThenMove();
+    setGate(gate(false, HEAD_A));
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).not.toHaveBeenCalled();
+  });
+
+  it('does not request review within the backstop window', async () => {
+    const { deps, requestReview } = await repairThenMove();
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS - 60_000);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).not.toHaveBeenCalled();
+  });
+
+  it('does not request review while the forge has not computed mergeability', async () => {
+    const { deps, requestReview, setGate } = await repairThenMove();
+    setGate({ ...gate(false, HEAD_B), facts: { ...gate(false, HEAD_B).facts, mergeable: null } });
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).not.toHaveBeenCalled();
+  });
+
+  it('does not request review for a paused issue', async () => {
+    let paused = false;
+    const { deps, requestReview } = await repairThenMove({
+      getIssuePause: () => (paused ? { status: 'paused', agentId: 'agent-pan-1166' } : { status: 'unpaused' }),
+    });
+    paused = true;
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).not.toHaveBeenCalled();
+  });
+
+  it('does nothing without a prior repair', async () => {
+    approve();
+    const requestReview = vi.fn(async () => undefined);
+    const { deps } = makeDeps({ evaluateGate: async () => gate(false, HEAD_B), requestReview });
+
+    vi.advanceTimersByTime(CONFLICT_REPAIR_REVIEW_BACKSTOP_MS);
+    await tickConflictRepair(deps);
+
+    expect(requestReview).not.toHaveBeenCalled();
   });
 });
