@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4305",
   "created": "2026-09-29T00:33:19.689Z",
-  "updated": "2026-09-29T00:55:27.176Z",
+  "updated": "2026-09-29T00:55:43.124Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,10 @@
     "pasted-content-helper.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T00:55:27.176Z"
+    },
+    "parser-unwrap-pasted.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T00:55:43.124Z"
     }
   }
 }
