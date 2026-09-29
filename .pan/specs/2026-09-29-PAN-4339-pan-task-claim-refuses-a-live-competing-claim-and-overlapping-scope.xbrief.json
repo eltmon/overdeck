@@ -4,17 +4,17 @@
     "created": "2026-09-29T01:59:33Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4339: `pan task claim` refuses a live competing claim and overlapping scope",
-    "updated": "2026-09-29T02:03:36.438Z"
+    "updated": "2026-09-29T02:04:13.666Z"
   },
   "plan": {
     "id": "pan-4339",
     "title": "`pan task claim` refuses a live competing claim and overlapping scope",
-    "status": "proposed",
+    "status": "running",
     "uid": "4db1f813-9431-4dd9-a0d8-af37a56951ce",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T01:59:33Z",
-    "updated": "2026-09-29T02:03:36.438Z",
+    "updated": "2026-09-29T02:04:13.666Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4339",
