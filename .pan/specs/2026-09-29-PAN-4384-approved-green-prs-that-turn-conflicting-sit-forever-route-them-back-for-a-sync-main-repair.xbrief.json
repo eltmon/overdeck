@@ -4,17 +4,17 @@
     "created": "2026-09-29T06:18:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4384: Approved, green PRs that turn CONFLICTING sit forever: route them back for a sync-main repair",
-    "updated": "2026-09-29T06:22:13.536Z"
+    "updated": "2026-09-29T13:04:35.135Z"
   },
   "plan": {
     "id": "pan-4384",
     "title": "Approved, green PRs that turn CONFLICTING sit forever: route them back for a sync-main repair",
-    "status": "proposed",
+    "status": "running",
     "uid": "cbe3a993-3d7d-40f5-81cd-c81aa2a9e8de",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-09-29T06:18:08Z",
-    "updated": "2026-09-29T06:22:13.536Z",
+    "updated": "2026-09-29T13:04:35.135Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4384",
@@ -557,5 +557,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
