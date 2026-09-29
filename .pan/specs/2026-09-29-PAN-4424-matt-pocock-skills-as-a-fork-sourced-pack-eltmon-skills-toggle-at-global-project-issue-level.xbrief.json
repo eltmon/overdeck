@@ -4,17 +4,17 @@
     "created": "2026-09-29T22:17:20Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4424: Matt Pocock skills as a fork-sourced pack (eltmon/skills): toggle at global/project/issue level",
-    "updated": "2026-09-29T22:22:59.878Z"
+    "updated": "2026-09-29T22:23:41.230Z"
   },
   "plan": {
     "id": "pan-4424",
     "title": "Matt Pocock skills as a fork-sourced pack (eltmon/skills): toggle at global/project/issue level",
-    "status": "proposed",
+    "status": "running",
     "uid": "a6d41fe4-55fe-486f-9ccc-74391fc1890c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-09-29T22:17:20Z",
-    "updated": "2026-09-29T22:22:59.878Z",
+    "updated": "2026-09-29T22:23:41.230Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4424",
@@ -543,5 +543,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
