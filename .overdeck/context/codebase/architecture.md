@@ -165,4 +165,14 @@ imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
 Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store.
 
+## Session Vault (PAN-2609, standalone)
+
+`src/lib/vault/**` + `src/cli/commands/vault/**` (`pan vault`): encrypted off-machine
+storage and cross-machine resume. `settle.ts` appends transcript chunks and a `Settlement`
+to a CAS'd record through `VaultStore` (`store/dir.ts`, `store/git.ts`); `adopt.ts` +
+`materialize.ts` resume elsewhere. Must stay importable without the dashboard, Effect or
+terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
+`wip-capture.ts` / `wip-apply.ts`: encrypted git-bundle snapshots of uncommitted code on
+`Settlement.wip`.
+
 <!-- last-verified: 2026-09-29 -->

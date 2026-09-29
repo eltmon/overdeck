@@ -3,8 +3,9 @@
  *
  * Each settlement records a bounded summary of the working directory's git
  * state; on resume, the saved and current summaries are compared so the user
- * can decide how to handle drift. Only identifiers and counts are recorded:
- * no paths, diffs or file contents ever enter the vault.
+ * can decide how to handle drift. The cwd state records only identifiers and
+ * counts. Uncommitted code travels separately, encrypted, as a WIP snapshot
+ * (`wip-capture.ts`, PAN-4329).
  *
  * Git is invoked through promisified `execFile` (never `execSync`, which would
  * block the event loop when this runs inside the dashboard).

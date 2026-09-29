@@ -19,6 +19,7 @@ const P1_DEFAULTS = {
   evict: false,
   liveQuietMinutes: 30,
   maxChunkBytes: 67108864,
+  wipMaxBytes: 52428800,
 };
 
 describe('vault config', () => {

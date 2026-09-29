@@ -81,6 +81,8 @@ export function registerVaultCommands(program: Command): void {
     .option('--cwd <dir>', 'Working directory to resume in (default: the saved cwd)')
     .option('--no-launch', 'Print the launch command instead of running it')
     .option('--on-drift <choice>', 'When the cwd state differs from the saved state: continue | note | cancel')
+    .option('--no-code', 'Do not apply the saved code snapshot; only continue the conversation')
+    .option('--worktree <dir>', 'Apply the code snapshot into a new git worktree at <dir> instead of the target checkout')
     .action(lazyAction(() => import('./resume.js'), 'resumeCommand'));
 
   vault
@@ -98,8 +100,9 @@ export function registerVaultCommands(program: Command): void {
     .action(lazyAction(() => import('./exclude.js'), 'includeCommand'));
 
   vault
-    .command('allow-secret <id-or-path> <line>')
-    .description('Allow one line that the secret scan blocked, for that record only')
+    .command('allow-secret <id-or-path> [line]')
+    .description('Allow one blocked transcript line, or the blocked code lines of one file, for that record only')
+    .option('--file <path>', 'Allow the blocked lines of this file in the code snapshot (path relative to the repository root)')
     .action(lazyAction(() => import('./allow-secret.js'), 'allowSecretCommand'));
 
   vault

@@ -292,4 +292,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   polyrepo `pan_records.repo` project, finalize makes that commit in the nested
   plan-home repo, not the wrapper.
 
+- **Session Vault WIP capture runs in the Stop hook** (PAN-4329) — `pan vault save --hook`
+  now builds a temp-index commit, bundles and uploads per turn. Never touch the user's
+  index/worktree/stash (temp `GIT_INDEX_FILE` seeded from a *copy* of the real index —
+  an empty one drops force-added ignored files), async `execFile` only, and skip when the
+  (base, tree) pair is unchanged.
+
 <!-- last-verified: 2026-09-29 -->

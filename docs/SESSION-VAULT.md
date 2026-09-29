@@ -17,7 +17,7 @@ projects (NFR-7). `pan vault` sends no telemetry (P-12).
 | **Chunk** | The lines one settlement added, stored as `{ v, codec: "zstd", lineHashes, lines }`, compressed and sealed with AES-256-GCM. The chunk id is `HMAC-SHA256(K_id, plaintext)[:40]` and is the associated data, so a chunk cannot be swapped under another id. |
 | **LOG** | The ordered chunk ids of a record: every native line ever saved, byte for byte. |
 | **VIEW** | Where a resumed session starts: the LOG position of the last compaction boundary (Claude Code `isCompactSummary`, Codex `{"type":"compacted"}`), running to the end. |
-| **Settlement** | One save of a transcript: continuity check, secret scan, chunk upload, record update, CAS. Version *n* is the state after settlement *n*. Each entry has a reserved optional `wip` field (PAN-4329 WIP code snapshots); Phase A never writes it and readers tolerate its absence. |
+| **Settlement** | One save of a transcript: continuity check, secret scan, chunk upload, record update, CAS. Version *n* is the state after settlement *n*. Each entry may carry a `wip` field: an encrypted snapshot of the owner's uncommitted code, or why one was skipped (see [Carrying your code](#carrying-your-code)). |
 | **Owner** | The machine whose native file the record follows. Only the owner appends; another machine takes over by **adoption**. |
 | **Adoption** | `pan vault resume` on another machine: a CAS that adds a segment for the new machine, then materializes the VIEW into a fresh native session file. Two machines racing get exactly one owner; the loser sees `Already continued on <label>`. |
 | **Segment** | One owner period in a record: `{ environmentId, nativeSessionId, logStart, prefix, tail }`. The prefix describes the lines an adopter materialized; the tail is the last 16 line hashes of the native file as settled. |
@@ -98,10 +98,11 @@ pan vault save --hook                       # Claude Code Stop hook: stdin JSON,
 pan vault sync
 pan vault list [--json]                     # local cache only
 pan vault show <id> [--json]                # turns, assistant text, versions
-pan vault resume <id>[@<version>] [--cwd <dir>] [--no-launch] [--on-drift continue|note|cancel]
+pan vault resume <id>[@<version>] [--cwd <dir>] [--no-launch] [--on-drift continue|note|cancel] [--no-code] [--worktree <dir>]
 pan vault exclude [path] [--origin <url>] [--session <id>]
 pan vault include [path] [--origin <url>] [--session <id>]
 pan vault allow-secret <id|path> <line>
+pan vault allow-secret <id> --file <path>    # blocked lines of one file in the code snapshot
 pan vault evict [--review] [--confirm <fingerprint>] [--decline <vaultId>] [--reoffer <vaultId>] [--clear]
 pan vault restore <id> [--to <path>]
 ```
@@ -117,7 +118,7 @@ optionally filtered by `--since` and `--harness`. Each settlement prints one ver
 
 | Verdict | Meaning |
 | --- | --- |
-| `appended N lines` | New lines were saved; the version number follows. |
+| `appended N lines` | New lines were saved; the version number follows. A code-snapshot outcome may follow (see [Carrying your code](#carrying-your-code)). |
 | `noop` | Nothing new since the last settlement. |
 | `blocked at line N: <pattern>` | The secret scan hit; nothing was written. Allow the line or exclude the session. |
 | `diverged` | A saved line changed or the file shrank; nothing was written. |
@@ -143,6 +144,55 @@ the `sessionId` (and, when the cwd changed, `cwd`) values rewritten, and `claude
 command). Codex indexes the rollout from its sessions directory itself; the vault never
 writes a Codex SQLite file (checkpoint outcome 2026-09-28: `opened`). Other harnesses get a
 markdown seed digest at `<cwd>/.overdeck-vault-seed-<vaultId>.md`.
+
+### Carrying your code
+
+Resume moves the conversation, and since
+[PAN-4329](https://github.com/eltmon/overdeck/issues/4329) it also moves the uncommitted
+code the conversation was working on, so it works even when the origin machine is off.
+
+**What is captured.** Every tracked and untracked file in the working tree, and every local
+commit that no remote-tracking ref contains, as one git bundle
+(`src/lib/vault/wip-capture.ts`). Capture builds a WIP commit from a temporary index seeded
+with a copy of yours, so it never touches your index, worktree, stash or branches; it creates
+and deletes one temporary `refs/overdeck/wip/<vaultId>-<pid>` ref. A checkout with nothing
+uncommitted and nothing unpushed records `clean` and uploads nothing.
+
+**What is excluded.** Files matched by `.gitignore` (unless already tracked), the
+staged-versus-unstaged split (everything arrives unstaged), submodule internals, and LFS or
+filter content beyond its git-clean form. Sessions outside a git checkout carry no snapshot.
+
+**When.** Only the machine that owns the record captures. The Stop hook and `pan vault save`
+capture every time (`force`); `pan vault sync` captures at most once per 5 minutes and skips
+when neither HEAD nor the working tree changed. When the transcript did not grow, a forced
+capture replaces the latest settlement's snapshot in place, so version numbers do not move.
+The 5 most recent snapshots are kept per record; older entries are dropped from the record.
+
+**Size cap.** A bundle larger than `wipMaxBytes` (default 50 MB) is not uploaded; the
+settlement records `skipped: too-large` with its size and `save` prints
+`code snapshot skipped: <size> exceeds the <cap> cap`.
+
+**Secrets.** Before upload, the added lines of every commit the bundle carries are scanned
+with the same patterns as transcripts. A hit uploads nothing, records `skipped: secret`, and
+`save` prints the file and pattern (never the value) with the command to allow it:
+`pan vault allow-secret <id> --file <path>`, then `pan vault save` again. The transcript
+itself still saves.
+
+**Storage.** The bundle is split into 8 MiB parts, each zstd-compressed and sealed with
+AES-256-GCM under the vault key, and stored as ordinary vault objects. Snapshots are
+**never pushed to your git host**: the project's origin never sees them, and the vault
+backend sees only ciphertext.
+
+**Apply.** `pan vault resume` applies the latest captured snapshot before adopting: it
+fetches origin, verifies and unbundles the snapshot, checks out the branch at the saved HEAD
+(creating or fast-forwarding it; a branch with commits the snapshot lacks, or one checked out
+in another worktree, is left alone and HEAD is detached at the saved commit), then applies
+the changes unstaged. The target checkout must be clean. A dirty checkout is never written
+to: at a TTY resume offers a fresh worktree at `<cwd>-vault-<id>`; otherwise it exits 1 and
+names `--worktree <dir>`, which applies into a new worktree instead. An applied snapshot
+replaces the drift prompt. A skipped snapshot prints `No code snapshot: skipped (<reason>)`
+and the drift prompt runs as before. `--no-code` skips the code step entirely. Resuming on
+the machine that owns the record skips it too, since the code is already there.
 
 ### Exclusions and secrets
 
@@ -190,6 +240,7 @@ hashes match the file, and the file has been quiet for `liveQuietMinutes` (defau
 | `evict` | `false` | Maintain the pending-deletion batch. |
 | `liveQuietMinutes` | 30 | A transcript modified more recently is live and never eligible. |
 | `maxChunkBytes` | 67108864 | Split larger appends into several chunks. |
+| `wipMaxBytes` | 52428800 | Largest code-snapshot bundle uploaded; larger ones record `skipped: too-large`. |
 
 `~/.overdeck/config.yaml` is not involved: the standalone CLI must not load the settings schema.
 
@@ -223,6 +274,13 @@ hashes match the file, and the file has been quiet for `liveQuietMinutes` (defau
   it is real, then `pan vault allow-secret <id|path> N`, or exclude the session.
 - **`Already continued on <label>`** — another machine adopted the record first. Run
   `pan vault sync` and resume again to take it over from there.
+- **`code snapshot blocked: <file> (<pattern>)`** — the uncommitted code holds a secret.
+  Rotate it if it is real, then run the printed `pan vault allow-secret <id> --file <file>`
+  and `pan vault save`.
+- **`Refusing to apply the code snapshot: … has uncommitted changes`** — resume never
+  writes into a dirty checkout. Commit or move your changes, or pass `--worktree <dir>`.
+- **`This code snapshot needs commits your clone does not have`** — the snapshot builds on
+  commits that `git fetch origin` could not bring in. Fetch or push them, then resume again.
 - **`The passphrase did not unlock this vault.`** — the passphrase does not decrypt
   `keywrap/v1`. Nothing was written. Try again, or press Enter at the prompt to use the
   recovery phrase.
@@ -251,6 +309,8 @@ src/lib/vault/materialize.ts      VIEW -> native file (Claude Code, Codex), rest
 src/lib/vault/adopt.ts            adoption by CAS, version forks
 src/lib/vault/seed.ts             seeded digest for harnesses without native resume
 src/lib/vault/evict.ts            pending-deletion batch and confirmation
+src/lib/vault/wip-capture.ts      WIP code snapshot: temp-index commit, bundle, scan, upload
+src/lib/vault/wip-apply.ts        apply a snapshot: verify, unbundle, checkout base, apply
 src/cli/commands/vault/*.ts       the pan vault verbs
 ```
 
