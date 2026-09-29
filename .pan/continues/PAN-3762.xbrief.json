@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3762",
   "created": "2026-09-29T14:15:38.137Z",
-  "updated": "2026-09-29T16:23:44.301Z",
+  "updated": "2026-09-29T16:23:59.182Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "device-routes.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T16:23:44.301Z"
+    },
+    "device-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T16:23:59.182Z"
     }
   }
 }
