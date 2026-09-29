@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4333",
   "created": "2026-09-29T14:11:53.536Z",
-  "updated": "2026-09-29T15:28:31.145Z",
+  "updated": "2026-09-29T15:28:48.402Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
       "claimedBy": "agent-pan-4333",
       "claimedAt": "2026-09-29T15:28:11.299Z",
       "doneAt": "2026-09-29T15:28:31.145Z"
+    },
+    "rotate-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T15:28:48.402Z"
     }
   }
 }
