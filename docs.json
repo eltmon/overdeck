@@ -111,6 +111,7 @@
               "configuration/effort",
               "configuration/terminal-backend",
               "configuration/memory-governor",
+              "configuration/jev",
               "configuration/context-layers",
               "configuration/appearance",
               "configuration/state-branch",
