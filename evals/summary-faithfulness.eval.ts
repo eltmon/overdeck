@@ -72,10 +72,12 @@ type SummaryOutput = FaithfulnessScores & { docValid: 0 | 1 | null; text: string
 evalite<SummaryCase, SummaryOutput>('summary faithfulness (E4)', {
   data: cases.map((c) => ({ input: c })),
   task: async (c) => {
-    // Tool-call arguments count as source, so every kind is checked against the full serialization.
     const serialized = serializeConversation(c.entries, false);
-    const { text, run } = await runPromptScenario(buildScenario(c, serialized));
-    const scores = scoreFaithfulness(text, c, serialized);
+    const scenario = buildScenario(c, serialized);
+    const { text, run } = await runPromptScenario(scenario);
+    // Supported = anything the model was shown: the full serialization (tool-call arguments
+    // included) plus the prompt itself (the handoff template names commands of its own).
+    const scores = scoreFaithfulness(text, c, `${serialized}\n${scenario.system}\n${scenario.user ?? ''}`);
     const docValid: 0 | 1 | null = c.kind === 'handoff' ? (validateHandoffDoc(text).ok ? 1 : 0) : null;
     appendEvalRecord(
       recordFromRun('summary-faithfulness', c.id, run, scores.score, {

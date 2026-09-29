@@ -59,7 +59,8 @@ const ISSUE_ID_RE = /\b[A-Z]{2,}-\d+\b/g;
 // Standards identifiers shaped like issue ids; never Overdeck-invented facts.
 const NON_ISSUE_PREFIXES = new Set(['UTF', 'SHA', 'ISO', 'HTTP', 'TLS', 'SSL', 'RFC', 'ES']);
 const HEX_RE = /\b[0-9a-f]{7,40}\b/g;
-const BACKTICK_RE = /`([^`\n]{3,})`/g;
+// Single-token spans only: a multi-word span is a command or quote a model may reformat, not an identifier.
+const BACKTICK_RE = /`([^`\s]{3,})`/g;
 
 /** Identifier-shaped tokens: paths, issue ids, git SHAs and `backticked` identifiers. */
 export function extractIdentifiers(text: string): string[] {
@@ -82,7 +83,7 @@ export function unsupportedIdentifiers(summary: string, source: string): string[
 
 const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+|\n+/;
 const RETRACTION_RE =
-  /\b(not|no longer|instead|rejected|abandoned|reverted|dropped|replaced|switched|discarded|superseded|ruled out)\b/i;
+  /\b(not|no longer|instead|rather than|rejected|abandoned|reverted|dropped|replaced|switched|changed|discarded|superseded|ruled out)\b/i;
 
 export function splitSentences(text: string): string[] {
   return text.split(SENTENCE_SPLIT_RE).filter((s) => s.trim() !== '');

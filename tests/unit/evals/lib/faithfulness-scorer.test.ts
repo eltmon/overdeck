@@ -38,9 +38,13 @@ function summaryCase(overrides: Partial<SummaryCase> = {}): SummaryCase {
 describe('evals/lib/faithfulness-scorer', () => {
   describe('extractIdentifiers', () => {
     it('extracts paths, issue ids, SHAs and backticked identifiers', () => {
-      const ids = extractIdentifiers('See ~/notes/plan.md and src/lib/a.ts for PAN-12 at 3f9ab21c; run `pan done`. UTF-8 is fine.');
-      expect(ids).toEqual(expect.arrayContaining(['~/notes/plan.md', 'src/lib/a.ts', 'PAN-12', '3f9ab21c', 'pan done']));
+      const ids = extractIdentifiers('See ~/notes/plan.md and src/lib/a.ts for PAN-12 at 3f9ab21c; call `drainAll`. UTF-8 is fine.');
+      expect(ids).toEqual(expect.arrayContaining(['~/notes/plan.md', 'src/lib/a.ts', 'PAN-12', '3f9ab21c', 'drainAll']));
       expect(ids).not.toContain('UTF-8');
+    });
+
+    it('treats only single-token backticked spans as identifiers', () => {
+      expect(extractIdentifiers('Run `npm run build` and set `overflow: hidden` on `document.body`.')).toEqual(['document.body']);
     });
 
     it('ignores all-letter or all-digit hex-like tokens', () => {
@@ -62,6 +66,11 @@ describe('evals/lib/faithfulness-scorer', () => {
     it('accepts an anchor whose sentence says instead or rejected', () => {
       expect(decoyViolations('It uses 4011 instead of port 4000.', summaryCase().decoys)).toEqual([]);
       expect(decoyViolations('Port 4000 was rejected. The server uses 4011.', summaryCase().decoys)).toEqual([]);
+    });
+
+    it('accepts an anchor whose sentence says rather than or changed', () => {
+      expect(decoyViolations('It listens on 4011 rather than port 4000.', summaryCase().decoys)).toEqual([]);
+      expect(decoyViolations('An early build used port 4000; it was changed to 4011.', summaryCase().decoys)).toEqual([]);
     });
   });
 
