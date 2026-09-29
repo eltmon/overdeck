@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4383",
   "created": "2026-09-29T06:22:16.508Z",
-  "updated": "2026-09-29T07:46:19.754Z",
+  "updated": "2026-09-29T07:46:31.699Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "derived-attention.ac1": {
       "status": "completed",
       "doneAt": "2026-09-29T07:46:19.754Z"
+    },
+    "derived-attention.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T07:46:31.699Z"
     }
   }
 }
