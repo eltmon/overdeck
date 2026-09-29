@@ -594,3 +594,11 @@ describe('normalizeModelName (QuantumLlama, PAN-3252)', () => {
     expect(normalizeModelName('some-unknown-model')).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4' });
   });
 });
+
+describe('normalizeModelName (Sonnet 5.5, PAN-4327)', () => {
+  it('keeps claude-sonnet-5-5 distinct from claude-sonnet-5', () => {
+    expect(normalizeModelName('claude-sonnet-5-5').model).toBe('claude-sonnet-5-5');
+    expect(normalizeModelName('anthropic.claude-sonnet-5-5').model).toBe('claude-sonnet-5-5');
+    expect(normalizeModelName('claude-sonnet-5').model).toBe('claude-sonnet-5');
+  });
+});
