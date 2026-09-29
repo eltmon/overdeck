@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4384",
   "created": "2026-09-29T13:04:47.711Z",
-  "updated": "2026-09-29T14:32:11.197Z",
+  "updated": "2026-09-29T14:32:28.893Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -124,6 +124,10 @@
     "conflict-repair-review-backstop.ac3": {
       "status": "completed",
       "doneAt": "2026-09-29T14:32:11.197Z"
+    },
+    "head-bound-review-request.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T14:32:28.892Z"
     }
   }
 }
