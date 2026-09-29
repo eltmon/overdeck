@@ -1,0 +1,292 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-29T04:07:29Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4340: Every mutating `pan spawn` worker gets its own item worktree; docs match the code",
+    "updated": "2026-09-29T04:08:52.784Z"
+  },
+  "plan": {
+    "id": "pan-4340",
+    "title": "Every mutating `pan spawn` worker gets its own item worktree; docs match the code",
+    "status": "proposed",
+    "uid": "e394166a-9eb6-4cb1-af12-5437069aeba8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-09-29T04:07:29Z",
+    "updated": "2026-09-29T04:08:52.784Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4340",
+        "label": "PAN-4340",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4340.md",
+        "label": "PAN-4340 PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/deft-adoption.md",
+        "label": "Deft adoption PRD, Issue 6",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "foreman",
+      "pan-spawn",
+      "worktree",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "`pan spawn` gives a worker its own `.swarm/<item>` worktree only when the xBRIEF item declares `files_scope` (src/cli/commands/spawn.ts, `const cwd = filesScope?.length ? ... : workspacePath`); otherwise the worker shares the issue workspace, where concurrent workers clobber files. docs/FOREMAN.md and the pan-foreman skill say a `pan spawn` pane pushes the shared feature branch itself, but a scoped worker commits on `<feature>-<item>`, and `pan task done` (markItemDone) only finds `Item:` trailers on the issue workspace's pushed feature branch, so a worker in an item worktree can never complete its own item.",
+      "Proposal": "`pan spawn` always creates or reuses the item worktree `<workspace>/.swarm/<item>` (branch `<feature-branch>-<item>`); a new `--shared` flag keeps the old in-workspace behavior for strictly serial use and is refused (exit 1) when the caller carries OVERDECK_ITEM_ID, i.e. is itself a `pan spawn` worker. Both dispatch kinds follow one hand-back protocol: the worker claims, commits once with the `Item:` trailer on its current branch, reports the sha to the foreman (subagent final result, or `pan tell <foreman OVERDECK_AGENT_ID>` from a pane), and stops without pushing or running `pan task done`; the foreman integrates onto the feature branch, pushes, and runs `pan task done`. The skill, docs/FOREMAN.md and pan-work-agent.md are rewritten to that single story. Full detail, before/after snippets and decisions D1-D6 in .pan/drafts/PAN-4340.md.",
+      "NonGoals": "- No change to `createItemWorktree` or `worktreeBranch` (branch naming, reuse semantics).\n- No refresh of a reused item worktree onto the latest feature branch (stale base on re-dispatch is PAN-4350 territory).\n- No change to `pan task claim` / `pan task done` code, the prompt guard, or the git shim (PAN-4337).\n- No change to `pan worker run` (src/lib/agents/worker/start.ts).\n- No change to the dormant `pan swarm` machinery or the swarm section of roles/work.md.\n- No new persisted state, lease, stamp or journal event; worktree existence is the fact.\n- No automatic cleanup of `.swarm/<item>` worktrees or item branches after integration.\n- The --shared guard must not be described as a security boundary; it is a cooperative env check."
+    },
+    "autoDecisions": [
+      {
+        "summary": "`--shared` wins over `files_scope`: with --shared the cwd is always the issue workspace, and without it every worker gets an item worktree regardless of files_scope.",
+        "rationale": "The issue AC says plainly 'Given --shared, cwd is the workspace' with no files_scope qualifier, and making files_scope irrelevant to cwd gives one rule instead of a matrix. files_scope still drives claim-overlap refusal (PAN-4339)."
+      },
+      {
+        "summary": "Enforce 'foreman or operator only' for --shared by refusing it (exit 1, nothing created) when the caller's env has OVERDECK_ITEM_ID.",
+        "rationale": "OVERDECK_ITEM_ID is set only by `pan spawn` itself (spawn.ts is its only writer in src/), so its presence identifies a pan spawn worker; the foreman and operator shells never carry it. A closed-set deny fits the Deft-adoption PRD's direction; it is cooperative like the other env/PATH guards. Tested via an injected env dep."
+      },
+      {
+        "summary": "A pane worker hands back with `pan tell <foreman OVERDECK_AGENT_ID>` naming the commit sha; the foreman acts on git (`git log <feature>..<feature>-<item> --grep '^Item: <id>'`), not on the message.",
+        "rationale": "The prompt guard only gates prompts TO worker panes, so a worker may message its foreman; the foreman supplies its own id in the dispatch prompt so no id format is hardcoded. Git stays the fact per the state rule."
+      },
+      {
+        "summary": "Workers do not push their item branch.",
+        "rationale": "All worktrees share refs, so the foreman sees the item commit locally; the item branch has no upstream and nothing reads it remotely."
+      },
+      {
+        "summary": "Also correct sync-sources/agents/pan-work-agent.md ('you still own claim/commit/pan task done') as part of the FOREMAN.md docs item.",
+        "rationale": "It states the old split; leaving it would contradict the single protocol the issue requires the skill and doc to describe."
+      }
+    ],
+    "items": [
+      {
+        "id": "spawn-item-worktree-default",
+        "title": "pan spawn defaults every worker to its item worktree and adds a guarded --shared flag",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:07:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4340",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/spawn.ts",
+            "tests/unit/cli/commands/spawn.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/spawn.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "spawn.test.ts passes, including the new --shared and --shared-refusal cases",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4340.md work item W1 steps 1-14. In src/cli/commands/spawn.ts: add `shared?: boolean` to SpawnOptions and `readonly env?: NodeJS.ProcessEnv` to SpawnDeps; right after the --model required check add `const env = deps.env ?? process.env; if (options.shared && env.OVERDECK_ITEM_ID) { console.error(chalk.red('--shared is for the foreman or an operator: a pan spawn worker cannot put another worker in the shared workspace.')); return exitCli(1); }`; replace the files_scope-based cwd selection with `const cwd = options.shared ? workspacePath : await (deps.createWorktree ?? createItemWorktree)(workspacePath, item.id);` (remove the now-unused `filesScope` local); rewrite the header paragraph about files_scope to say every worker gets `<workspace>/.swarm/<item>/` on `<feature-branch>-<item>`, hands back, and the foreman integrates/pushes/runs `pan task done`, with --shared (foreman/operator only) for serial use; change the command description to 'Create a worker pane for one xBRIEF item in its own item worktree' and add `.option('--shared', 'Run the worker in the issue workspace instead of an item worktree (foreman/operator only; serial use)')`. In tests/unit/cli/commands/spawn.test.ts: add a module-level `itemWorktree = vi.fn(async (workspacePath, itemId) => `${workspacePath}/.swarm/${itemId}`)`; inject `createWorktree: itemWorktree` into EVERY spawnCommand call that does not pass shared:true (the FR-5 tokens, CLAIM_ID, not-in-xBRIEF, and ~/.claude.json-untouched tests) so no test runs real git against /tmp/proj; rewrite the first test to assert an item with no files_scope gets spec.cwd '/tmp/proj/workspaces/feature-pan-1/.swarm/item-a' while workspace.cwd stays '/tmp/proj/workspaces/feature-pan-1'; add a --shared test (files_scope present, env {}, createWorktree not called, cwd = workspace) and a refusal test (shared:true, env { OVERDECK_ITEM_ID: 'other-item' }, process.exit(1), no pane, createWorktree not called); update the file header comment. No source-grep tests, no skipIf/.only."
+        },
+        "items": [
+          {
+            "id": "spawn-item-worktree-default.ac1",
+            "title": "Given an item with no files_scope and no --shared, when spawnCommand runs, then createWorktree is called with ('/tmp/proj/workspaces/feature-pan-1', 'item-a') and the started pane's spec.cwd equals '/tmp/proj/workspaces/feature-pan-1/.swarm/item-a' (asserted in tests/unit/cli/commands/spawn.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-item-worktree-default.ac2",
+            "title": "Given shared: true and an item that declares files_scope, when spawnCommand runs, then createWorktree is never called and spec.cwd equals '/tmp/proj/workspaces/feature-pan-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-item-worktree-default.ac3",
+            "title": "Given shared: true and OVERDECK_ITEM_ID set in the injected env, when spawnCommand runs, then it exits with code 1, calls no createWorktree, and starts no pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-item-worktree-default.ac4",
+            "title": "When `npx vitest run tests/unit/cli/commands/spawn.test.ts`, `npm run typecheck` and `npm run lint` run, each exits 0, and registerSpawnCommand declares a --shared option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-skill-handback",
+        "title": "pan-foreman skill describes one hand-back protocol with a worker dispatch-prompt template",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:07:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4340",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-foreman/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'pushes the shared feature branch\\|already commits and pushes directly' sync-sources/skills/pan-foreman/SKILL.md || true",
+            "grep -n 'Dispatch prompt for a worker\\|--shared\\|\\.swarm/<item-id>' sync-sources/skills/pan-foreman/SKILL.md"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep shows the dispatch-prompt heading, the --shared paragraph and the .swarm/<item-id> worktree path"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4340.md work item W2 steps 1-6, editing only sync-sources/skills/pan-foreman/SKILL.md (never the .claude/skills sync-target copy). (1) Frontmatter description: replace 'owns claim/commit/`pan task done` per item, integrates every item onto the feature branch' with 'has every worker commit on its own item branch and hand back, integrates each item onto the feature branch and runs `pan task done` for it'. (2) Same-family vs cross-family: the pan spawn pane is created 'in its own item worktree `<workspace>/.swarm/<item-id>/` on branch `<feature-branch>-<item-id>`'; add a paragraph: --shared runs the pane in the issue workspace on the feature branch, only for strictly serial work with no other worker in the workspace, foreman/operator only, and `pan spawn --shared` from a worker pane exits 1; it changes only where the commit lands. (3) File-ownership paragraph: replace 'concurrent workers in one worktree WILL clobber shared files' with 'every worker has its own worktree, but overlapping items still conflict when you integrate them'; keep the pan task claim overlap-refusal sentences. (4) Per-item protocol for BOTH dispatch kinds: claim (keep refusal + OVERDECK_CLAIM_ID text); implement one item, run only touched tests; one commit with `Item: <item-id>` on the worker's current branch (item branch, or feature branch under --shared); hand back — subagent in its final result, pane via `pan tell <foreman-agent-id> \"<item-id> committed <sha> on <branch>\"` — then stop; the worker does not push, does not run `pan task done`, never runs `pan done`. (5) New '### Dispatch prompt for a worker' fenced template the foreman fills and sends with `pan tell <pane-id>` after pan spawn prints the pane id (or uses as the Agent prompt): issue id, item id, file-ownership map, the foreman's $OVERDECK_AGENT_ID, and the step-4 worker steps. (6) Foreman-only Integrate bullet: confirm the commit from the issue workspace with `git log --format=%H -E --grep='^Item: <item-id>[[:space:]]*$' <feature-branch>..<feature-branch>-<item-id>`, cherry-pick or merge (re-add the trailer if squashing; nothing to pick for a --shared worker), `git push`, then `pan task done <id> <item-id>`; delete the sentence saying a pan spawn pane already commits and pushes directly to the shared feature branch."
+        },
+        "items": [
+          {
+            "id": "foreman-skill-handback.ac1",
+            "title": "`grep -c 'pushes the shared feature branch\\|already commits and pushes directly' sync-sources/skills/pan-foreman/SKILL.md` prints 0, and the per-item protocol states the worker does not push and does not run `pan task done`, for both dispatch kinds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-skill-handback.ac2",
+            "title": "SKILL.md contains a 'Dispatch prompt for a worker' template that includes the item id, the file-ownership map, the foreman's $OVERDECK_AGENT_ID, and a `pan tell` hand-back step naming the commit sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-skill-handback.ac3",
+            "title": "The Integrate bullet names the `git log <feature-branch>..<feature-branch>-<item-id>` check, cherry-pick/merge, `git push`, and then `pan task done` as foreman steps, in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-skill-handback.ac4",
+            "title": "SKILL.md says `pan spawn` creates the pane in `<workspace>/.swarm/<item-id>/` on `<feature-branch>-<item-id>`, and describes --shared as serial-only and refused (exit 1) from a worker pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-doc-handback",
+        "title": "docs/FOREMAN.md and the work-agent prompt describe the single hand-back protocol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-29T04:07:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4340",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FOREMAN.md",
+            "sync-sources/agents/pan-work-agent.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'pushes the shared feature branch\\|already pushed the shared branch' docs/FOREMAN.md || true",
+            "grep -c 'you still own claim/commit' sync-sources/agents/pan-work-agent.md || true",
+            "grep -n '\\.swarm/<item-id>\\|--shared\\|markItemDone' docs/FOREMAN.md"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep prints 0",
+            "third grep shows the item-worktree path, the --shared paragraph and the markItemDone explanation"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4340.md work item W3 steps 1-5. docs/FOREMAN.md: (1) Dispatch section: 'This creates a worker pane inside the issue's workspace' becomes 'This creates a worker pane in its own item worktree `<workspace>/.swarm/<item-id>/`, on branch `<feature-branch>-<item-id>`'; add a --shared paragraph (issue workspace, feature branch, strictly serial, foreman/operator only, refused with exit 1 from a worker pane; it changes only where the commit lands — the foreman still pushes and runs `pan task done`). (2) File-ownership paragraph: same edit as the skill (own worktree each; overlapping items still conflict at integration). (3) Per-item protocol steps 3-5: commit on the worker's branch (item branch, or feature branch under --shared); hand back (subagent final result / pane `pan tell <foreman-agent-id>` with the sha); 'The worker does not push and does not run `pan task done`; the foreman does both after integrating.' Keep 'A worker never calls `pan done`.' Add: '`pan task done` looks for the trailer on the issue workspace's feature branch and checks that branch is pushed (`markItemDone`, `src/lib/xbrief/continue-state.ts`), so it can only succeed after integration.' (4) Foreman-only Integrate bullet: same replacement as the skill (git log check, cherry-pick/merge, git push, pan task done); delete 'A `pan spawn` pane already pushed the shared branch itself — just confirm it landed.' sync-sources/agents/pan-work-agent.md lines 15-18: replace '— you still own claim/commit/`pan task done` per item and the one closing `pan done`.' with '— each worker claims its item and commits on its own item branch; you integrate every item onto the feature branch, push, run `pan task done` for it, and run the one closing `pan done`.'"
+        },
+        "items": [
+          {
+            "id": "foreman-doc-handback.ac1",
+            "title": "`grep -c 'pushes the shared feature branch\\|already pushed the shared branch' docs/FOREMAN.md` prints 0, and FOREMAN.md's per-item protocol states the worker does not push and does not run `pan task done` for either dispatch kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-doc-handback.ac2",
+            "title": "When a reader opens FOREMAN.md's dispatch section, it names the `<workspace>/.swarm/<item-id>/` worktree on `<feature-branch>-<item-id>` as where `pan spawn` puts a worker, and says --shared is serial-only and refused (exit 1) from a worker pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-doc-handback.ac3",
+            "title": "When a reader opens FOREMAN.md's per-item protocol, it explains that `pan task done` (markItemDone) only finds the trailer on the pushed feature branch, and its Integrate bullet lists git push followed by `pan task done` as foreman steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-doc-handback.ac4",
+            "title": "`grep -c 'you still own claim/commit' sync-sources/agents/pan-work-agent.md` prints 0 and the replacement sentence names the foreman as the one who integrates, pushes and runs `pan task done`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-09-29-PAN-4340-every-mutating-pan-spawn-worker-gets-its-own-item-worktree-docs-match-the-code.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
