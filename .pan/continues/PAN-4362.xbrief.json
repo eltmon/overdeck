@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4362",
   "created": "2026-09-29T09:50:32.527Z",
-  "updated": "2026-09-29T11:12:06.441Z",
+  "updated": "2026-09-29T11:12:18.883Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -256,6 +256,10 @@
     "review-recall-eval.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T11:12:06.441Z"
+    },
+    "review-recall-eval.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:12:18.883Z"
     }
   }
 }
