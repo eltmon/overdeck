@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2609",
   "created": "2026-09-28T13:05:52.429Z",
-  "updated": "2026-09-29T06:34:31.966Z",
+  "updated": "2026-09-29T06:34:43.963Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -546,6 +546,10 @@
     "vault-evict-batch.ac4": {
       "status": "completed",
       "doneAt": "2026-09-29T06:34:31.966Z"
+    },
+    "vault-evict-confirm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T06:34:43.963Z"
     }
   }
 }
