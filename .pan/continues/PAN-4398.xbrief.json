@@ -1,0 +1,79 @@
+{
+  "version": "1",
+  "issueId": "PAN-4398",
+  "created": "2026-09-29T13:13:55.090Z",
+  "updated": "2026-09-29T13:45:49.709Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "handed-to-review-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4398",
+      "claimedAt": "2026-09-29T13:13:55.090Z",
+      "doneAt": "2026-09-29T13:26:26.916Z"
+    },
+    "planner-finalized-fallback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4398",
+      "claimedAt": "2026-09-29T13:26:48.587Z",
+      "doneAt": "2026-09-29T13:37:21.743Z"
+    },
+    "issue-view-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4398",
+      "claimedAt": "2026-09-29T13:37:29.239Z",
+      "doneAt": "2026-09-29T13:38:01.047Z"
+    },
+    "handed-to-review-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:42:31.144Z"
+    },
+    "handed-to-review-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:42:52.422Z"
+    },
+    "handed-to-review-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:43:11.231Z"
+    },
+    "handed-to-review-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:43:30.934Z"
+    },
+    "handed-to-review-row.ac5": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:43:49.534Z"
+    },
+    "planner-finalized-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:44:06.879Z"
+    },
+    "planner-finalized-fallback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:44:25.108Z"
+    },
+    "planner-finalized-fallback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:44:43.562Z"
+    },
+    "planner-finalized-fallback.ac4": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:45:00.220Z"
+    },
+    "issue-view-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:45:18.060Z"
+    },
+    "issue-view-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:45:33.571Z"
+    },
+    "issue-view-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T13:45:49.709Z"
+    }
+  }
+}
