@@ -397,7 +397,10 @@ The Skills page shows the same text on the `sageox` pack row.
    ```bash
    ox login
    OX_HOST_MANAGED=1 ox init
+   ox status        # without OX_HOST_MANAGED: lets the ox daemon clone the project's ledger once
    ```
+
+   Session recording writes into a local clone of the project's SageOx ledger. Only the ox daemon clones it, and it needs the network, so run one plain `ox` command in the repo after `ox init` and wait for `ox status` to show the ledger. With uploads off, Overdeck keeps `ox` offline and no daemon runs, so without this clone SageOx records nothing.
 
 4. **Turn the pack on** for that project (or one issue):
 
