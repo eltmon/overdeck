@@ -378,13 +378,7 @@ export function buildGitGuardLines(agentId: string, guardRoot: string, mode: Git
     // orchestrator, most often) so this agent runs behind its own guard only.
     // This MUST precede `command -v git`, or the agent's guard would resolve
     // "real git" to the foreign shim and delegate every call back into it.
-    'IFS=\':\' read -r -a _overdeck_path_segments <<< "$PATH"',
-    '_overdeck_kept_path=()',
-    'for _overdeck_path_segment in "${_overdeck_path_segments[@]}"; do',
-    '  [[ "$_overdeck_path_segment" == */git-guard ]] || _overdeck_kept_path+=("$_overdeck_path_segment")',
-    'done',
-    'PATH="$(IFS=\':\'; echo "${_overdeck_kept_path[*]}")"',
-    'unset _overdeck_path_segments _overdeck_kept_path _overdeck_path_segment',
+    ...dropInheritedGuardDirLines(),
     '_OVERDECK_REAL_GIT="$(command -v git)"',
     // Resolve the worktree once, at launch, so the shim compares canonical paths.
     `_OVERDECK_GUARD_ROOT="$(cd ${shellQuote(guardRoot)} 2>/dev/null && pwd -P)"`,
@@ -532,6 +526,37 @@ export function buildGitGuardLines(agentId: string, guardRoot: string, mode: Git
     'EOF',
     `chmod 0755 ${shellQuote(guardPath)}`,
     ...buildGhShimLines(agentId, guardDir, true),
+    `export PATH="${pathForDoubleQuotes}:$PATH"`,
+  ];
+}
+
+/** Launcher lines that remove every inherited `…/git-guard` dir from PATH. */
+function dropInheritedGuardDirLines(): string[] {
+  return [
+    'IFS=\':\' read -r -a _overdeck_path_segments <<< "$PATH"',
+    '_overdeck_kept_path=()',
+    'for _overdeck_path_segment in "${_overdeck_path_segments[@]}"; do',
+    '  [[ "$_overdeck_path_segment" == */git-guard ]] || _overdeck_kept_path+=("$_overdeck_path_segment")',
+    'done',
+    'PATH="$(IFS=\':\'; echo "${_overdeck_kept_path[*]}")"',
+    'unset _overdeck_path_segments _overdeck_kept_path _overdeck_path_segment',
+  ];
+}
+
+/**
+ * PAN-4343: the `gh` shim alone, for conversation launchers. Conversations get
+ * no git guard (they are operator sessions), but the Flywheel runs as one, so
+ * it needs the grant-label deny. The directory is named `git-guard` so the
+ * launcher prelude and `pan restart` strip it from inherited PATHs.
+ */
+export function buildConversationGhShimLines(conversationId: string, denyGrantLabels: boolean): string[] {
+  const guardDir = join(getOverdeckHome(), 'conversations', conversationId, 'git-guard');
+  const pathForDoubleQuotes = guardDir.replace(/([\\"$`])/g, '\\$1');
+  return [
+    // Drop inherited guard dirs first, so "real gh" is never a foreign shim.
+    ...dropInheritedGuardDirLines(),
+    `mkdir -p ${shellQuote(guardDir)}`,
+    ...buildGhShimLines(conversationId, guardDir, denyGrantLabels),
     `export PATH="${pathForDoubleQuotes}:$PATH"`,
   ];
 }

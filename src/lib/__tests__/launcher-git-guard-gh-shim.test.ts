@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { buildGitGuardLines } from '../launcher-git-guard.js';
+import { buildConversationGhShimLines, buildGitGuardLines } from '../launcher-git-guard.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -165,5 +165,58 @@ describe('grant-label deny (PAN-4343)', () => {
     expect(result.code).toBe(1);
     expect(result.stdout).toBe('');
     expect(result.stderr).toContain('operator grant label');
+  });
+});
+
+describe('conversation gh shim (PAN-4343)', () => {
+  function install(conversationId: string, deny: boolean, path = `${fakeBin}:${process.env.PATH ?? ''}`): string {
+    execFileSync('bash', ['-ec', buildConversationGhShimLines(conversationId, deny).join('\n')], {
+      cwd: home,
+      stdio: 'ignore',
+      env: { ...process.env, PATH: path },
+    });
+    return join(home, 'conversations', conversationId, 'git-guard');
+  }
+
+  async function run(shim: string, args: string[]) {
+    return execFileAsync('sh', [shim, ...args], { encoding: 'utf8' })
+      .then(
+        ({ stdout }) => ({ code: 0, stdout }),
+        (e: { code?: number; stdout?: string }) => ({ code: e.code, stdout: e.stdout }),
+      );
+  }
+
+  it('writes only a gh shim in the conversation guard dir', () => {
+    const guardDir = install('conv-42', false);
+    expect(existsSync(join(guardDir, 'gh'))).toBe(true);
+    expect(existsSync(join(guardDir, 'git'))).toBe(false);
+  });
+
+  it('passes grant-label writes through for an operator conversation and counts them', async () => {
+    const shim = join(install('conv-42', false), 'gh');
+    for (const label of ['released', 'bug']) {
+      const result = await run(shim, ['issue', 'edit', '1', '--add-label', label]);
+      expect(result.code).toBe(3);
+      expect(result.stdout).toBe(`real-gh issue edit 1 --add-label ${label}\n`);
+    }
+    expect(ledgerLines().at(-1)).toMatchObject({ caller: 'agent', agent: 'conv-42' });
+  });
+
+  it('refuses grant-label writes for the Flywheel conversation', async () => {
+    const shim = join(install('conv-flywheel', true), 'gh');
+    expect((await run(shim, ['issue', 'edit', '1', '--add-label', 'released'])).code).toBe(1);
+    expect(await run(shim, ['issue', 'edit', '1', '--add-label', 'bug']))
+      .toEqual({ code: 3, stdout: 'real-gh issue edit 1 --add-label bug\n' });
+  });
+
+  it('bakes the real gh, not an inherited guard dir shim', () => {
+    const inherited = join(home, 'inherited', 'git-guard');
+    mkdirSync(inherited, { recursive: true });
+    writeFileSync(join(inherited, 'gh'), '#!/bin/sh\necho "inherited-shim $*"\n');
+    chmodSync(join(inherited, 'gh'), 0o755);
+
+    const shim = readFileSync(join(install('conv-inherit', false, `${inherited}:${fakeBin}:${process.env.PATH ?? ''}`), 'gh'), 'utf8');
+    expect(shim).toContain(`_OVERDECK_REAL_GH="${join(fakeBin, 'gh')}"`);
+    expect(shim).not.toContain(inherited);
   });
 });
