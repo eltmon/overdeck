@@ -16,6 +16,7 @@
  */
 import chalk from 'chalk';
 import type { Command } from 'commander';
+import type { DeftLaunchResult } from '../../lib/skill-overrides/launch.js';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
@@ -141,11 +142,17 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     process.exit(1);
   }
   const launch = await import('../../lib/skill-overrides/launch.js');
+  const { dirname, join } = await import('node:path');
   const ctx = { cwd: options.cwd, issueId: options.issue };
   const disabled = await launch.resolveLaunchDisabledSkills(ctx);
   if (options.harness === 'claude-code') {
-    const json = launch.claudeSkillSettingsJson(disabled);
     const link = options.pluginLink;
+    // A Claude launch without a launch key (no plugin link) runs no Deft step.
+    const deft = link
+      ? await applyDeftFailOpen(join(dirname(link), 'deft.env'), async envFile =>
+        launch.applyDeftForLaunch(ctx, envFile, await launch.launchMountsDeft(ctx)))
+      : launch.EMPTY_DEFT_LAUNCH;
+    const json = launch.claudeSkillSettingsJson(mergeSkillNames(disabled, deft.hideSkills), deft.deny);
     if (link) {
       // Fail open (NFR-1): a pack error drops the packs, never the launch or the settings JSON.
       await applyPacksFailOpen(() => launch.applyClaudePacks(ctx, link), async () => {
@@ -158,11 +165,35 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     return;
   }
   const codexHome = options.codexHome as string;
-  await launch.writeCodexSkillOverrides(codexHome, disabled);
+  const deft = await applyDeftFailOpen(join(codexHome, 'overdeck-deft.env'), async envFile =>
+    launch.applyDeftForLaunch(ctx, envFile, await launch.launchMountsDeft(ctx)));
+  await launch.writeCodexSkillOverrides(codexHome, mergeSkillNames(disabled, deft.hideSkills));
   await applyPacksFailOpen(() => launch.applyCodexPacks(ctx, codexHome), async () => {
     const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
     await writeCodexPackBlock(codexHome, null);
   });
+}
+
+function mergeSkillNames(disabled: readonly string[], hidden: readonly string[]): string[] {
+  return [...new Set([...disabled, ...hidden])];
+}
+
+/** NFR-2: a Deft error removes the env file and leaves the launch as it would be without Deft. */
+async function applyDeftFailOpen(
+  envFile: string,
+  apply: (envFile: string) => Promise<DeftLaunchResult>,
+): Promise<DeftLaunchResult> {
+  try {
+    const result = await apply(envFile);
+    for (const warning of result.warnings) console.error(warning);
+    if (result.provenance) console.error(result.provenance);
+    return result;
+  } catch (error) {
+    console.error(`[launcher] WARNING: deft integration not applied: ${error instanceof Error ? error.message : String(error)}`);
+    const { rm } = await import('node:fs/promises');
+    await rm(envFile, { force: true }).catch(() => undefined);
+    return { hideSkills: [], deny: [], provenance: '', warnings: [] };
+  }
 }
 
 async function applyPacksFailOpen(apply: () => Promise<string[]>, clear: () => Promise<void>): Promise<void> {

@@ -32,7 +32,13 @@ import {
   resolveLaunchDisabledSkills,
   writeCodexSkillOverrides,
 } from '../launch.js';
-import { claudeSkillPluginDirArg, claudeSkillSettingsArg, launcherSkillOverrideLines } from '../launcher-lines.js';
+import { DEFT_CLI_DENY } from '../../deft/launch.js';
+import {
+  claudeSkillPluginDirArg,
+  claudeSkillSettingsArg,
+  deftEnvReadLine,
+  launcherSkillOverrideLines,
+} from '../launcher-lines.js';
 
 describe('claudeSkillSettingsJson', () => {
   it('maps every disabled skill to off', () => {
@@ -42,6 +48,21 @@ describe('claudeSkillSettingsJson', () => {
 
   it('returns an empty string when nothing is disabled', () => {
     expect(claudeSkillSettingsJson([])).toBe('');
+    expect(claudeSkillSettingsJson([], [])).toBe('');
+  });
+
+  it('adds permissions.deny for the Deft CLI list as one JSON object (PAN-3943)', () => {
+    const json = claudeSkillSettingsJson([], DEFT_CLI_DENY);
+    expect(JSON.parse(json)).toEqual({ permissions: { deny: [...DEFT_CLI_DENY] } });
+    expect(JSON.parse(claudeSkillSettingsJson(['grilling'], ['Bash(deft:*)']))).toEqual({
+      skillOverrides: { grilling: 'off' },
+      permissions: { deny: ['Bash(deft:*)'] },
+    });
+    // The launcher's stdout guard keeps only '' or one `{…}` object.
+    const guard = execFileSync('bash', ['-c', `case "$1" in ''|'{'*'}') echo keep ;; *) echo drop ;; esac`, '_', json], {
+      encoding: 'utf8',
+    });
+    expect(guard).toBe('keep\n');
   });
 });
 
@@ -122,11 +143,37 @@ describe('launcherSkillOverrideLines', () => {
     expect(line).toContain('PAN_SKILL_SETTINGS=');
   });
 
-  it('passes --issue and the codex home for codex', () => {
-    const [line] = launcherSkillOverrideLines({ harness: 'codex', workingDir: '/w', issueId: 'PAN-1' });
+  it('passes --issue and the codex home for codex, then reads the Deft env file', () => {
+    const [line, deft] = launcherSkillOverrideLines({ harness: 'codex', workingDir: '/w', issueId: 'PAN-1' });
     expect(line).toBe(
       `pan skills launch-settings --harness codex --cwd '/w' --issue 'PAN-1' --codex-home "$CODEX_HOME" || echo "[launcher] WARNING: skill overrides not applied" >&2`,
     );
+    expect(deft).toBe(deftEnvReadLine('"$CODEX_HOME/overdeck-deft.env"'));
+  });
+
+  it('exports only the two allowlisted Deft assignments and never sources the file (PAN-3943)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'deft-env-'));
+    const file = join(dir, 'deft.env');
+    const canary = join(dir, 'pwned');
+    const report = `printf '%s|%s|%s' "\${DEFT_DIRECTIVE_DISABLE-unset}" "\${DEFT_ORCHESTRATOR-unset}" "\${EVIL-unset}"`;
+    const read = (): string =>
+      execFileSync('bash', ['-c', `${deftEnvReadLine(`'${file}'`)}\n${report}`], {
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH ?? '' },
+      });
+    try {
+      expect(read()).toBe('unset|unset|unset');
+      await writeFile(
+        file,
+        ['EVIL=1', 'DEFT_ORCHESTRATOR=other', `DEFT_DIRECTIVE_DISABLE=1; touch '${canary}'`, `$(touch '${canary}')`, ''].join('\n'),
+      );
+      expect(read()).toBe('unset|unset|unset');
+      await writeFile(file, 'DEFT_DIRECTIVE_DISABLE=1\nDEFT_ORCHESTRATOR=overdeck\n');
+      expect(read()).toBe('1|overdeck|unset');
+      expect(existsSync(canary)).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   const runStep = (panBody: string): string => {
@@ -151,12 +198,13 @@ describe('launcherSkillOverrideLines', () => {
 
   it('adds the plugin link step as the third line for Claude (PAN-4334)', () => {
     const lines = launcherSkillOverrideLines({ harness: 'claude-code', workingDir: '/w', pluginLink: '/h/launch/k/skill-packs' });
-    expect(lines).toHaveLength(3);
+    expect(lines).toHaveLength(4);
     expect(lines[0]).toContain(`--cwd '/w' --plugin-link '/h/launch/k/skill-packs')"`);
     expect(lines[1]).toMatch(/^case "\$PAN_SKILL_SETTINGS"/);
     expect(lines[2]).toBe(
       `if [ -d '/h/launch/k/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='/h/launch/k/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi`,
     );
+    expect(lines[3]).toBe(deftEnvReadLine(`'/h/launch/k/deft.env'`));
     const codex = launcherSkillOverrideLines({ harness: 'codex', workingDir: '/w', pluginLink: '/h/x' });
     expect(codex.join('\n')).not.toContain('--plugin-link');
   });

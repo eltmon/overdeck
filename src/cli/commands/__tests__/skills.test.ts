@@ -36,6 +36,8 @@ const mocks = vi.hoisted(() => {
     applyClaudePacks: vi.fn(),
     applyCodexPacks: vi.fn(),
     writeCodexPackBlock: vi.fn(),
+    applyDeftForLaunch: vi.fn(),
+    launchMountsDeft: vi.fn(),
   };
 });
 
@@ -65,6 +67,8 @@ vi.mock('../../../lib/skill-overrides/launch.js', async importOriginal => ({
   writeCodexSkillOverrides: mocks.writeCodexSkillOverrides,
   applyClaudePacks: mocks.applyClaudePacks,
   applyCodexPacks: mocks.applyCodexPacks,
+  applyDeftForLaunch: mocks.applyDeftForLaunch,
+  launchMountsDeft: mocks.launchMountsDeft,
 }));
 
 vi.mock('../../../lib/skill-packs/mount.js', () => ({ writeCodexPackBlock: mocks.writeCodexPackBlock, gcMounts: mocks.gcMounts }));
@@ -98,6 +102,8 @@ beforeEach(() => {
   mocks.setSkillOverride.mockResolvedValue({});
   mocks.applyClaudePacks.mockResolvedValue([]);
   mocks.applyCodexPacks.mockResolvedValue([]);
+  mocks.applyDeftForLaunch.mockResolvedValue({ hideSkills: [], deny: [], provenance: '', warnings: [] });
+  mocks.launchMountsDeft.mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -281,6 +287,65 @@ describe('pan skills launch-settings', () => {
     await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
     expect(errors).toEqual(['[launcher] WARNING: skill packs not applied: boom']);
     expect(mocks.writeCodexPackBlock).toHaveBeenCalledWith('/ch', null);
+  });
+});
+
+describe('pan skills launch-settings: deft (PAN-3943)', () => {
+  const deftResult = {
+    hideSkills: ['deft-directive-glossary', 'grilling'],
+    deny: ['Bash(deft:*)'],
+    provenance: '[launcher] deft: pack master (eeeeeeeeeeee); project directive; kill switch',
+    warnings: ['[launcher] WARNING: deft: something'],
+  };
+
+  it('merges hidden pointer skills and the deny list into the Claude settings JSON', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.launchMountsDeft.mockResolvedValue(true);
+    mocks.applyDeftForLaunch.mockResolvedValue(deftResult);
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--issue', 'PAN-1', '--plugin-link', '/k/launch/a/skill-packs');
+    expect(mocks.applyDeftForLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: 'PAN-1' }, '/k/launch/a/deft.env', true);
+    expect(JSON.parse(stdout.join(''))).toEqual({
+      skillOverrides: { grilling: 'off', 'deft-directive-glossary': 'off' },
+      permissions: { deny: ['Bash(deft:*)'] },
+    });
+    expect(errors).toEqual([deftResult.warnings[0], deftResult.provenance]);
+  });
+
+  it('runs no Deft step for a Claude launch without a plugin link', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue([]);
+    await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w');
+    expect(mocks.applyDeftForLaunch).not.toHaveBeenCalled();
+    expect(stdout.join('')).toBe('');
+  });
+
+  it('fails open: warns, removes the env file, and still prints the settings JSON', async () => {
+    const { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'deft-fail-open-'));
+    mkdirSync(join(dir, 'launch', 'a'), { recursive: true });
+    const envFile = join(dir, 'launch', 'a', 'deft.env');
+    writeFileSync(envFile, 'DEFT_DIRECTIVE_DISABLE=1\n');
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.applyDeftForLaunch.mockRejectedValue(new Error('git timed out'));
+    try {
+      await run('launch-settings', '--harness', 'claude-code', '--cwd', '/w', '--plugin-link', join(dir, 'launch', 'a', 'skill-packs'));
+      expect(errors).toContain('[launcher] WARNING: deft integration not applied: git timed out');
+      expect(existsSync(envFile)).toBe(false);
+      expect(stdout.join('')).toBe('{"skillOverrides":{"grilling":"off"}}\n');
+      expect(mocks.applyClaudePacks).toHaveBeenCalled();
+      expect(process.exit).not.toHaveBeenCalled();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('hides pointer skills in the Codex override block and never passes a deny list', async () => {
+    mocks.resolveLaunchDisabledSkills.mockResolvedValue(['grilling']);
+    mocks.applyDeftForLaunch.mockResolvedValue(deftResult);
+    await run('launch-settings', '--harness', 'codex', '--cwd', '/w', '--codex-home', '/ch');
+    expect(mocks.applyDeftForLaunch).toHaveBeenCalledWith({ cwd: '/w', issueId: undefined }, '/ch/overdeck-deft.env', false);
+    expect(mocks.writeCodexSkillOverrides).toHaveBeenCalledWith('/ch', ['grilling', 'deft-directive-glossary']);
   });
 });
 

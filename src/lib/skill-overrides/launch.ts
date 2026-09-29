@@ -11,6 +11,11 @@
  * plugin link or the Codex `overdeck-packs` block at it. It reads only the
  * pack cache; it never runs git or touches the network.
  *
+ * Deft (PAN-3943): the same step resolves the Deft launch plan, writes the
+ * per-launch env file and the marked kill-switch flag, and adds the plan's
+ * pointer skills to the hidden list and its CLI deny list to the Claude
+ * settings. `../deft/*` loads lazily.
+ *
  * The bash the launcher runs is built in `./launcher-lines.ts`, a leaf module,
  * so launcher-generator.ts never reaches this module or the store. The store
  * and project resolution load lazily inside resolveLaunchDisabledSkills.
@@ -106,10 +111,47 @@ export async function applyCodexPacks(ctx: LaunchSkillContext, codexHome: string
   return warnings;
 }
 
-/** The `--settings` JSON for Claude Code, or '' when nothing is hidden. */
-export function claudeSkillSettingsJson(disabled: readonly string[]): string {
-  if (disabled.length === 0) return '';
-  return JSON.stringify({ skillOverrides: Object.fromEntries(disabled.map(name => [name, 'off'])) });
+/** Whether this launch's pack selection mounts any `deft` skill. */
+export async function launchMountsDeft(ctx: LaunchSkillContext): Promise<boolean> {
+  const { selection } = await resolveLaunchPackSelection(ctx);
+  return selection.packs.some(pack => pack.id === 'deft');
+}
+
+export interface DeftLaunchResult {
+  /** Deposit pointer skills to hide for this launch. */
+  hideSkills: string[];
+  /** Claude `permissions.deny` entries; always empty for Codex. */
+  deny: readonly string[];
+  /** `[launcher] deft:` line for stderr; '' when the step did not run. */
+  provenance: string;
+  warnings: string[];
+}
+
+export const EMPTY_DEFT_LAUNCH: DeftLaunchResult = { hideSkills: [], deny: [], provenance: '', warnings: [] };
+
+/** Resolve and apply the Deft launch plan; errors propagate so the caller can fail open. */
+export async function applyDeftForLaunch(
+  ctx: LaunchSkillContext,
+  envFile: string,
+  deftSkillsMounted: boolean,
+): Promise<DeftLaunchResult> {
+  const [{ applyDeftLaunch, DEFT_CLI_DENY, resolveDeftLaunch }, { findRepoRoot }] = await Promise.all([
+    import('../deft/launch.js'),
+    import('../deft/detect.js'),
+  ]);
+  const scope = await resolveLaunchScope(ctx);
+  const plan = await resolveDeftLaunch({ cwd: ctx.cwd, ...scope, deftSkillsMounted });
+  const warnings = await applyDeftLaunch(plan, await findRepoRoot(ctx.cwd), envFile);
+  return { hideSkills: plan.hideSkills, deny: plan.denyCli ? DEFT_CLI_DENY : [], provenance: plan.provenance, warnings };
+}
+
+/** The `--settings` JSON for Claude Code, or '' when nothing is hidden or denied. */
+export function claudeSkillSettingsJson(disabled: readonly string[], deny: readonly string[] = []): string {
+  if (disabled.length === 0 && deny.length === 0) return '';
+  return JSON.stringify({
+    ...(disabled.length > 0 ? { skillOverrides: Object.fromEntries(disabled.map(name => [name, 'off'])) } : {}),
+    ...(deny.length > 0 ? { permissions: { deny: [...deny] } } : {}),
+  });
 }
 
 function escapeTomlBasicString(value: string): string {
