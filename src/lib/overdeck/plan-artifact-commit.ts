@@ -17,9 +17,11 @@
  */
 
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { access, mkdir, rename, rm, rmdir, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { dirname, join, relative, resolve } from 'node:path';
+import { resolvePlanHome } from '../pan-dir/paths.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -72,6 +74,29 @@ export async function commitPlanArtifacts(
     await execFileAsync('git', ['reset', '-q', '--', ...pathspecs], { cwd }).catch(() => {});
     const message = cause instanceof Error ? cause.message : String(cause);
     return { committed: false, reason: message.split('\n')[0] };
+  }
+}
+
+/**
+ * Commit any pending `.pan/continues/` or `.pan/specs/` changes a server
+ * writer dirtied inside `workspacePath`, before a caller runs `git rebase`
+ * there — a dirty tracked file makes rebase refuse, and server writers
+ * (feedback, session history, spec transitions) never commit their own
+ * writes (PAN-4225). Both `pan done`'s rebase-and-push step and the merge
+ * pipeline's in-place feature-branch rebase call this first.
+ */
+export async function commitPendingIssueArtifacts(workspacePath: string, issueId: string): Promise<void> {
+  const planHome = resolvePlanHome(workspacePath);
+  const paths = [join('.pan', 'continues'), join('.pan', 'specs')].filter((p) => existsSync(join(planHome, p)));
+  if (paths.length === 0) return;
+
+  const result = await commitPlanArtifacts({
+    cwd: planHome,
+    paths,
+    message: planArtifactCommitMessage(issueId),
+  });
+  if (!result.committed && result.reason !== 'nothing to commit') {
+    throw new Error(`Could not commit pending plan artifacts for ${issueId}: ${result.reason}`);
   }
 }
 

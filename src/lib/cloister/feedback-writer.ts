@@ -1,6 +1,9 @@
 /**
- * Feedback Writer — writes specialist feedback to the scope xBRIEF continue
- * file and mirrors it into workspace `.pan/feedback/` for agent consumption.
+ * Feedback Writer — writes specialist feedback to the issue's base workspace
+ * continue file (uncommitted; the work agent's `pan task` / `pan done` commits
+ * it — PAN-4225) and mirrors it into workspace `.pan/feedback/` for agent
+ * consumption. When the base workspace is gone, the continue-file write is
+ * skipped (logged) and only the mirror write applies.
  *
  * All I/O is async (fs/promises) — never execSync.
  */
@@ -139,14 +142,13 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
   // never reached the work agent → agent sat idle waiting).
   let continueStateWritten = false;
   try {
-    appendFeedbackEntryForIssue(projectRoot, opts.issueId, {
+    continueStateWritten = appendFeedbackEntryForIssue(projectRoot, opts.issueId, {
       seq,
       specialist: opts.specialist,
       outcome: opts.outcome,
       timestamp,
       markdownBody: opts.markdownBody,
     });
-    continueStateWritten = true;
   } catch (err: any) {
     console.error(
       `[feedback-writer] Failed to append continue-file feedback entry for ${opts.issueId} (non-fatal — will still write workspace mirror):`,
