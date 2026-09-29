@@ -1,0 +1,194 @@
+---
+title: Model presets
+description: One-click, eval-backed model lineups for Anthropic and OpenAI
+---
+
+# Model presets
+
+A **model preset** sets every model and effort setting Overdeck has to a
+coherent lineup from one provider, in one step. Without a preset you would set
+about 40 values by hand: the three workhorse slots, ten roles, four review
+lanes, the tiered-execution tiers, the default conversation model and the
+background AI models.
+
+Overdeck ships three presets:
+
+| Preset | Id | Evidence |
+| --- | --- | --- |
+| Anthropic defaults | `anthropic` | Eval-backed ([2026-09-29 run](https://github.com/eltmon/overdeck/blob/main/docs/model-evals/2026-09-29-opus-5-5-vs-sonnet-5-5.md)) |
+| Anthropic cost-saver (pilot) | `anthropic-cost-saver` | Eval-backed, pilot |
+| OpenAI defaults | `openai` | Research-backed; not yet eval-tested in Overdeck |
+
+## What a preset does
+
+Applying a preset writes explicit values into `~/.overdeck/config.yaml` once.
+After that the values are ordinary settings: you can change any of them, and
+the preset never overrides you later. A preset is not a live config key. The
+retired `models.preset` key (`premium` / `balanced` / `budget`) is unrelated
+and stays retired.
+
+The write is path-scoped. Overdeck edits only the settings the preset changes,
+and every other line of `config.yaml` keeps its exact text. Comments, `$VAR`
+API-key references, unknown keys and values from a project `.pan.yaml` are left
+alone.
+
+Overdeck remembers the previous value of every setting it changed, so you can
+undo the last apply. Undo is single-level: a new apply replaces the undo record.
+Undo restores a setting only if it still holds the value the preset wrote. A
+setting you changed after the apply is left as is, and undo tells you which.
+
+## Apply a preset
+
+**In the dashboard:** open **Settings → Model Routing** and click **Apply
+Anthropic defaults**, **Apply Anthropic cost-saver (pilot)** or **Apply OpenAI
+defaults**. A dialog lists each setting that will change (before → after), the
+settings the preset will not set and why, and any notes. Click **Apply N
+changes** to write them. The confirmation toast has an **Undo** action, and
+**Undo last preset** stays available in the Model Routing section.
+
+**From the CLI:**
+
+```bash
+pan models preset list                     # presets, versions, last applied
+pan models preset show anthropic           # the diff against your config.yaml
+pan models preset apply anthropic --dry-run
+pan models preset apply anthropic          # prints the diff, then asks to confirm
+pan models preset apply openai --yes       # apply without the prompt
+pan models preset undo                     # restore the values the last apply replaced
+```
+
+`show` and `apply --dry-run` accept `--json`. The JSON is the same object the
+dashboard's `GET /api/model-presets/<id>/plan` returns, so the CLI and the
+dialog always show the same diff.
+
+<Warning>
+If a Settings tab is open while you apply a preset from the CLI, reload that
+tab before you edit anything in it. An open tab keeps the values it loaded, and
+its next autosave can write some of them back over the preset.
+</Warning>
+
+## What a preset will not set
+
+- **Settings marked "not set".** Each preset lists the settings it leaves alone
+  and why: embedding and classifier models (they are not chat roles), the
+  registry classification model (it is coupled to its provider), conversation
+  enrichment models, the Jev judgment model, the Gemini thinking level and the
+  TTS summarizer model (the TTS summarizer calls the OpenAI chat API with an
+  OpenAI API key).
+- **Anything without credentials.** If the preset's provider has no credentials
+  (no `claude` or `codex login` sign-in and no API key), the whole preset is
+  blocked and nothing is written. The dialog and the CLI show the sign-in step.
+- **Anything the harness policy forbids.** Each change is checked against the
+  harness that would run it. A role with an explicit harness that cannot run
+  the preset's model (for example `roles.work.harness: kimi-code` with the
+  OpenAI preset) is skipped with the policy's reason. If a workhorse slot
+  fails the check, the whole preset is blocked, because roles reference the
+  slots.
+- **Tiered execution structure.** A preset never turns tiered execution on or
+  off, and never creates tiers or a supervisor. For each tier you already have,
+  it sets `model`, `harness` and `effort` from the tier's hardest difficulty:
+  `trivial` → the cheap slot; `simple` or `medium` → the mid slot; `complex` or
+  `expert` → the expensive slot. It removes a tier's `distribution`, and undo
+  restores it. If a supervisor exists, it gets `workhorse:expensive` and the
+  preset's harness.
+
+Every effort a preset sets is `high`, the recommended default. No preset sets
+`xhigh` or `max`.
+
+## Anthropic defaults (`anthropic`, v1, 2026-09-29)
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| `workhorses.expensive` | `claude-opus-5-5` | The strongest evaluated Claude model. Fable 5.1 has no Overdeck eval and costs 2.5× Opus 5.5. |
+| `workhorses.mid` | `claude-opus-5-5` | `work`, `test`, `ship` and `worker` run on `mid`. The eval found no reason to move it: Sonnet 5.5 matched Opus only on single-turn, tool-less probes. |
+| `workhorses.cheap` | `claude-haiku-4-5` | Cheap slot for trivial tiers. Haiku 4.5 has no effort control, so the preset sets no effort where it runs. |
+| `roles.review.model` | `workhorse:expensive` | E2 review recall, 2026-09-29: Opus 5.5 found the known blocker 30/60 times vs Sonnet 5.5's 10/60 (any severity, 3 reps × 20 cases). By majority per case, 11/20 vs 3/20; sign test 8–0, p ≈ 0.008. Review is pinned to the expensive slot so it stays on Opus even if you move `mid`. |
+| `roles.review.sub.<lane>.model` | `parent` | All four lanes (security, correctness, performance, requirements) inherit the review model. |
+| `roles.plan.model` | `workhorse:expensive` | E3 plan quality is one rep and `plan` is not a `mid` role, so the eval gives no reason to move it. |
+| `roles.work.model`, `roles.test.model`, `roles.ship.model`, `roles.worker.model` | `workhorse:mid` | Execution roles on the `mid` slot (Opus 5.5). |
+| `roles.strike.model`, `roles.sequencer.model`, `roles.knowledge.model`, `roles.flywheel.model` | `workhorse:expensive` | Strike lands on main without review; the others make pipeline-wide decisions. |
+| `roles.<role>.effort`, `roles.review.sub.<lane>.effort` | `high` | The recommended effort for every model. |
+| `models.default_conversation_model` | `claude-sonnet-5-5` | Interactive conversations. |
+| `models.status_review_model`, `models.provider_fallback_model` | `claude-sonnet-5-5` | Background analysis and the Anthropic fallback. |
+| `conversations.compaction_model`, `conversations.title_model` | `claude-haiku-4-5` | Short, cheap background calls. |
+| `conversations.fork_summary_model`, `conversations.handoff_author_model` | `claude-sonnet-5-5` | Fork summaries need a 1M-token window in one shot. |
+| `memory.extraction.provider` / `memory.extraction.model` | `anthropic` / `claude-haiku-4-5` | Written together because the provider and model are coupled. |
+| Tiers | trivial → `workhorse:cheap`; simple/medium → `workhorse:mid`, `high`; complex/expert → `workhorse:expensive`, `high`; harness `claude-code` | See "Tiered execution structure" above. |
+| `models.providers.anthropic` | enabled | Only written if it is `false`. |
+
+**Evidence** (run 2026-09-29, effort `high`,
+[full report](https://github.com/eltmon/overdeck/blob/main/docs/model-evals/2026-09-29-opus-5-5-vs-sonnet-5-5.md)):
+
+- **Review (E2):** Opus 5.5 30/60 vs Sonnet 5.5 10/60, any severity; 11/20 vs
+  3/20 by majority per case; sign test 8–0, p ≈ 0.008. The gap is in the
+  performance lane (5/6 vs 1/6) and the correctness lane (6/7 vs 2/7).
+- **Feedback acceptance (E5):** both models acted on 15/15 genuine feedback
+  messages.
+- **Delegation test:** both models scored 100% intent on all 11 tasks, with a
+  brief and with a casual request.
+- **Cost and speed:** Sonnet 5.5 cost about 45% of Opus 5.5 and was 25–45%
+  faster.
+
+## Anthropic cost-saver (`anthropic-cost-saver`, v1, pilot)
+
+This preset is the Anthropic preset with one change: 30% of work issues run on
+Sonnet 5.5.
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| `roles.work.model` | `[{ model: workhorse:mid, weight: 70 }, { model: claude-sonnet-5-5, weight: 30 }]` | Sonnet 5.5 matched Opus on E5 (15/15) and the delegation test (100% intent in both framings) at about 45% of the cost. Each issue hashes into one arm and stays there across respawns. |
+| `roles.review.model` | `workhorse:expensive` | Review stays on Opus 5.5 (E2). |
+| Everything else | Same as Anthropic defaults | |
+
+It is a **pilot** because the E5 and delegation probes are single-turn and use
+no tools. They say nothing about multi-hour, tool-using work sessions. Compare
+the two arms on real pipeline outcomes before you rely on it:
+
+- review cycles to approval;
+- blocking findings per PR;
+- CI-red rate and verification feedback loops.
+
+## OpenAI defaults (`openai`, v1, 2026-09-29)
+
+<Warning>
+**Research-backed; not yet eval-tested in Overdeck.** No GPT model has run
+through Overdeck's evals yet. The placements come from the September 2026
+routing research. The pending gates are E2 (review recall) and E6 (the
+head-to-head on the real pipeline).
+</Warning>
+
+| Setting | Value | Status and why |
+| --- | --- | --- |
+| `workhorses.expensive` | `gpt-6-astra` | Research-backed; not yet eval-tested in Overdeck. Highest GPT-6 coding-agent score (Artificial Analysis 62). |
+| `workhorses.mid` | `gpt-6-sol` | Research-backed; not yet eval-tested in Overdeck. Coding-agent score 57 at Sonnet 5.5's price. |
+| `workhorses.cheap` | `gpt-6-luna` | Research-backed; not yet eval-tested in Overdeck. Cheapest and fastest; a 77% hallucination rate keeps it out of background AI. |
+| `roles.*.model`, review lanes | Same slot refs as Anthropic defaults (`plan`, `review`, `strike`, `sequencer`, `knowledge`, `flywheel` on expensive; `work`, `test`, `ship`, `worker` on mid; lanes on `parent`) | Research-backed; not yet eval-tested in Overdeck. |
+| `roles.<role>.effort`, lane effort | `high` | Research-backed; not yet eval-tested in Overdeck. |
+| Tiers | trivial → `workhorse:cheap`, `high`; simple/medium → `workhorse:mid`, `high`; complex/expert → `workhorse:expensive`, `high`; harness `codex` | Research-backed; not yet eval-tested in Overdeck. |
+| `models.default_conversation_model` | `gpt-6-sol` | Research-backed; not yet eval-tested in Overdeck. |
+| `models.providers.openai` | `{ enabled: true, harness: codex }` | Research-backed; not yet eval-tested in Overdeck. Other keys on the node, such as `api_key`, are kept. |
+
+**Not set by the OpenAI preset** (these keep their current values):
+
+- Titles, compaction, fork summary, handoff author, status review and memory
+  extraction. Background AI runs through `claude -p`, and the research rates
+  GPT-6 Luna "not yet" for anything that becomes an agent's memory or context.
+  Fork summaries also need a 1M-token window in one shot, and Overdeck pins GPT
+  models to 272K.
+- `models.provider_fallback_model`, which is an Anthropic model by definition.
+- The TTS summarizer model, which needs an OpenAI API key and the E4 summary
+  gate.
+
+**Codex version floor:** under ChatGPT sign-in, GPT-6 Sol and Luna need Codex
+CLI 0.156.1 or newer. OpenAI rejects them with HTTP 400 on older clients. The
+preset's harness check reports this and blocks the apply until you upgrade
+Codex.
+
+## Preset versions and updates
+
+Each preset has a version. When a newer version of the preset you last applied
+ships, Settings → Model Routing shows "*label* updated (v*N*): review changes".
+Click it to see the new diff against your config. Nothing applies
+automatically.
+
+`pan models preset list` shows the same information.
