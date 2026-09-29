@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4371",
   "created": "2026-09-29T09:51:55.547Z",
-  "updated": "2026-09-29T11:51:29.969Z",
+  "updated": "2026-09-29T11:51:40.972Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -258,6 +258,10 @@
     "docs-turn-end.ac2": {
       "status": "completed",
       "doneAt": "2026-09-29T11:51:29.969Z"
+    },
+    "docs-turn-end.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-29T11:51:40.972Z"
     }
   }
 }
