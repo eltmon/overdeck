@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4327",
   "created": "2026-09-29T00:25:15.717Z",
-  "updated": "2026-09-29T00:38:34.183Z",
+  "updated": "2026-09-29T00:38:41.677Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4327",
       "claimedAt": "2026-09-29T00:30:56.647Z",
       "doneAt": "2026-09-29T00:38:34.183Z"
+    },
+    "claude-flag-full-sonnet-ids": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4327",
+      "claimedAt": "2026-09-29T00:38:41.677Z"
     }
   }
 }
