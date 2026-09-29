@@ -270,6 +270,30 @@ describe('deriveSimpleIssue', () => {
     expect(d.rail.review).toBe('current');
     expect(d.rail.ship).toBe('pending');
   });
+
+  // PAN-4399: workStartError carries the not-started reason through to the
+  // needs-you card; a retrying or absent workStart carries nothing.
+  it('a not-started workStart carries its error as workStartError and reads as needs-you', () => {
+    const d = deriveSimpleIssue(makeIssue(), [], derived('working', {
+      attention: 'work-not-started',
+      workStart: { status: 'not-started', at: '2026-09-29T10:00:00.000Z', error: 'gave up' },
+    }));
+    expect(d.workStartError).toBe('gave up');
+    expect(d.display.state).toBe('needs-you');
+    expect(d.display.primaryAction).toBe('Start work');
+  });
+
+  it('a retrying workStart carries no workStartError', () => {
+    const d = deriveSimpleIssue(makeIssue(), [agent()], derived('working', {
+      workStart: { status: 'retrying', at: '2026-09-29T10:00:00.000Z' },
+    }), WORK);
+    expect(d.workStartError).toBeNull();
+  });
+
+  it('no workStart at all carries no workStartError', () => {
+    const d = deriveSimpleIssue(makeIssue(), [agent()], derived('working'), WORK);
+    expect(d.workStartError).toBeNull();
+  });
 });
 
 describe('bucketSimpleHome', () => {

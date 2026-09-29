@@ -62,7 +62,12 @@ export function derivePipelineState(input: PipelineStateInput): PipelineState {
     case 'in-review':
       return derived.pr?.reviewState === 'approved' ? 'in_review_approved' : 'in_review_reviewers_running';
     case 'working':
-      return hasLivePane(panes, 'work') ? 'in_progress_work_running' : 'in_progress_work_idle';
+      if (hasLivePane(panes, 'work')) return 'in_progress_work_running';
+      // PAN-4399: a gave-up post-planning auto-start with no live work pane
+      // reads as the same "awaiting work" state a plan with no work agent
+      // yet would — Start work is the right action either way. A retrying
+      // workStart keeps the ordinary idle mapping.
+      return derived.attention === 'work-not-started' ? 'planning_done_awaiting_work' : 'in_progress_work_idle';
     case 'planned':
       return hasLivePane(panes, 'plan') ? 'planning_active' : 'planning_done_awaiting_work';
     default:
